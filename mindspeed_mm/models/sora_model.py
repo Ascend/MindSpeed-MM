@@ -132,15 +132,6 @@ class SoRAModel(nn.Module):
                     self.index = 0
                     i2v_results = None
 
-                    # Text Encode
-                    if self.load_text_features:
-                        prompt = prompt_ids
-                        if isinstance(prompt_ids, list) or isinstance(prompt_ids, tuple):
-                            prompt = [p.npu() for p in prompt]
-                    else:
-                        prompt, prompt_mask = self.text_encoder.encode(prompt_ids, prompt_mask,
-                                                                       offload_cpu=self.offload_cpu, **kwargs)
-
                     # Visual Encode
                     if self.load_video_features:
                         latents = video
@@ -151,6 +142,15 @@ class SoRAModel(nn.Module):
                             latents, i2v_results = self.ae.encode(video, **kwargs)
                         else:
                             raise NotImplementedError(f"Task {self.task} is not Implemented!")
+                    
+                    # Text Encode
+                    if self.load_text_features:
+                        prompt = prompt_ids
+                        if isinstance(prompt_ids, list) or isinstance(prompt_ids, tuple):
+                            prompt = [p.npu() for p in prompt]
+                    else:
+                        prompt, prompt_mask = self.text_encoder.encode(prompt_ids, prompt_mask,
+                                                                       offload_cpu=self.offload_cpu, **kwargs)
 
             # Gather the results after encoding of ae and text_encoder
             if self.enable_encoder_dp or self.interleaved_steps > 1:

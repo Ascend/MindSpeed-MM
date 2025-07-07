@@ -255,9 +255,6 @@ class DiffusersScheduler:
                 if isinstance(noise_pred, tuple) or isinstance(noise_pred, list):
                     noise_pred = noise_pred[0]
 
-                if isinstance(noise_pred, tuple) or isinstance(noise_pred, list):
-                    noise_pred = noise_pred[0]
-
                 # perform guidance
                 if use_dynamic_cfg:
                     noise_pred = noise_pred.permute(0, 2, 1, 3, 4).float()

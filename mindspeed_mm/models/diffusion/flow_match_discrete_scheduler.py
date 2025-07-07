@@ -338,6 +338,9 @@ class FlowMatchDiscreteScheduler:
                 with torch.no_grad():
                     noise_pred = model(latent_model_input, t_expand, **model_kwargs)
 
+                if isinstance(noise_pred, tuple) or isinstance(noise_pred, list):
+                    noise_pred = noise_pred[0]
+
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (
