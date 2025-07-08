@@ -71,6 +71,9 @@ source auto_convert_mm.sh
 # 替换MindSpeed中的文件
 cd MindSpeed-MM
 cp examples/mindspore/qwen2vl/dot_product_attention.py ../MindSpeed/mindspeed/core/transformer/dot_product_attention.py
+
+# 安装对应版本的tokenizers
+pip install tokenizers==0.21
 mkdir ckpt
 mkdir data
 mkdir logs
@@ -182,11 +185,11 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
 <a id="jump3.1"></a>
 ### 1. 数据集下载(以coco2017数据集为例)
 
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中；
+(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中(以当前目录MindSpeed-MM/为例)；
 
 (2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下;
 
-(3)在./data路径下新建文件mllm_format_llava_instruct_data.json，运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py;
+(3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，在./data路径下将生成文件mllm_format_llava_instruct_data.json(如果该文件已存在，请先移除或重命名备份);
 
    ```
    $playground
@@ -200,11 +203,11 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
    ```
 
 ---
-当前支持读取多个以`,`（注意不要加空格）分隔的数据集，配置方式为`data.json`中
+当前支持读取多个以`,`（注意不要加空格）分隔的数据集，配置方式为`data_*b.json`中(*表示对应的模型尺寸)
 dataset_param->basic_parameters->dataset
 从"./data/mllm_format_llava_instruct_data.json"修改为"./data/mllm_format_llava_instruct_data.json,./data/mllm_format_llava_instruct_data2.json".
 
-同时注意`data.json`中`dataset_param->basic_parameters->max_samples`参数，该参数作用是限制数据只读`max_samples`条，以方便快速验证功能。如果正式训练时，可以把该参数去掉则读取全部数据。
+同时注意`data_*b.json`中`dataset_param->basic_parameters->max_samples`参数(*表示对应的模型尺寸)，该参数作用是限制数据只读`max_samples`条，以方便快速验证功能。如果正式训练时，可以把该参数去掉则读取全部数据。
 
 <a id="jump3.2"></a>
 ### 2. 纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
@@ -249,9 +252,9 @@ dataset_param->basic_parameters->dataset
 
 【数据目录配置】
 
-根据实际情况修改`data.json`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段。
+根据实际情况修改`data_*b.json`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段。
 
-以Qwen2.5VL-7B为例，`data.json`进行以下修改，注意`model_name_or_path`的权重路径为转换前的权重路径。
+以Qwen2.5VL-7B为例，`data_7b.json`进行以下修改，注意`model_name_or_path`的权重路径为转换前的权重路径。
 
 **注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。
 
@@ -277,7 +280,7 @@ dataset_param->basic_parameters->dataset
 }
 ```
 
-如果需要加载大批量数据，可使用流式加载，修改`data.json`中的`sampler_type`字段，增加`streaming`字段。（注意：使用流式加载后当前仅支持`num_worker=0`，单进程处理数据，会有性能波动，并且不支持断点续训功能。）
+如果需要加载大批量数据，可使用流式加载，修改`data_7b.json`中的`sampler_type`字段，增加`streaming`字段。（注意：使用流式加载后当前仅支持`num_worker=0`，单进程处理数据，会有性能波动，并且不支持断点续训功能。）
 
 ```json
 {
@@ -298,7 +301,7 @@ dataset_param->basic_parameters->dataset
 }
 ```
 
-如果需要计算validation loss，需要在shell脚本中修改`eval-interval`参数和`eval-iters`参数；需要在`data.json`中的`basic_parameters`内增加字段：    
+如果需要计算validation loss，需要在shell脚本中修改`eval-interval`参数和`eval-iters`参数；需要在`data_7b.json`中的`basic_parameters`内增加字段：    
 对于非流式数据有两种方式：①根据实际情况增加`val_dataset`验证集路径，②增加`val_rate`字段对训练集进行切分；    
 对于流式数据，仅支持增加`val_dataset`字段进行计算。
 
@@ -435,7 +438,7 @@ PP=4 #PP并行参数
 
 数据集中的视频数据集取自 [llamafactory](https://github.com/hiyouga/LLaMA-Factory/tree/main/data)，视频取自mllm_demo_data，使用时需要将该数据放到自己的data文件夹中去，同时将llamafactory上的mllm_video_demo.json也放到自己的data文件中。
 
-之后根据实际情况修改 `data.json` 中的数据集路径，包括 `model_name_or_path` 、 `dataset_dir` 、 `dataset` 字段，并修改"attr"中  `images` 、 `videos` 字段，修改结果参考如下：
+之后根据实际情况修改 `data_*b.json` 中的数据集路径，包括 `model_name_or_path` 、 `dataset_dir` 、 `dataset` 字段，并修改"attr"中  `images` 、 `videos` 字段，修改结果参考如下：
 
 ```json
 {
