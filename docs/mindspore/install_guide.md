@@ -45,7 +45,7 @@ bash Ascend-hdk-*-npu-driver_*.run --full --force
 
 ## CANN安装
 
-下载[CANN](https://www.hiascend.com/developer/download/community/result?module=cann)，请根据根据系统选择 `aarch64`或 `x86_64`对应版本的 `cann-toolkit`、`cann-kernel`和 `cann-nnal`。参考[CANN安装](https://www.hiascend.com/document/detail/zh/canncommercial/81RC1/softwareinst/instg/instg_0003.html)或执行以下命令安装：
+下载[CANN](https://www.hiascend.com/developer/download/community/result?module=cann)，请根据系统选择 `aarch64`或 `x86_64`对应版本的 `cann-toolkit`、`cann-kernel`和 `cann-nnal`。参考[CANN安装](https://www.hiascend.com/document/detail/zh/canncommercial/81RC1/softwareinst/instg/instg_0003.html)或执行以下命令安装：
 
 ```shell
 bash Ascend-cann-toolkit_8.1.RC1_linux-aarch64.run --install
@@ -60,7 +60,7 @@ source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 ## MindSpore安装
 
-参考[MindSpore官方安装指导](https://www.mindspore.cn/install)，根据系统类型、CANN版本及Python版本选择匹配的对应的安装命令进行安装，安装前请确保网络畅通。或执行以下命令安装：
+参考[MindSpore官方安装指导](https://www.mindspore.cn/install)，根据系统类型、CANN版本及Python版本选择相应的安装命令进行安装，安装前请确保网络畅通。或执行以下命令安装：
 
 ```shell
 pip install mindspore==2.7.0
