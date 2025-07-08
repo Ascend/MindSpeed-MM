@@ -25,6 +25,7 @@ MM_MODEL="./examples/mindspore/qwen2.5vl/model_7b.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-7B-Instruct"
 SAVE_PATH="save_dir"
+LOG_PATH="msrun_log"
 
 TP=1
 PP=4
@@ -40,8 +41,9 @@ DISTRIBUTED_ARGS="
     --node_rank $NODE_RANK \
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT \
-    --log_dir msrun_log \
-    --bind_core=True
+    --log_dir $LOG_PATH \
+    --bind_core=True \
+    --join True \
 "
 
 # GPT_ARGS中模型相关参数具体配置在example/mindspore/qwen2.5vl/model_7b.json中，训练相关参数配置在这里
@@ -103,6 +105,7 @@ msrun $DISTRIBUTED_ARGS pretrain_vlm.py \
     --ai-framework mindspore \
     2>&1 | tee logs/train_${logfile}.log
 chmod 440 logs/train_${logfile}.log
+chmod 440 ${LOG_PATH}/*.log
 chmod -R 640 $SAVE_PATH
 STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F ':' '{print$5}' | awk -F '|' '{print$1}' | head -n 150 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
 SAMPLES_PER_SECOND=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
