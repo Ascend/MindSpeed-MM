@@ -190,14 +190,16 @@ class MMGPTModel(LanguageModule):
             # decoder will get hidden_states from encoder.input_tensor
             decoder_input = None
             
-        if mpu.get_context_parallel_world_size() > 1:
-            split_gather_sizes = cal_split_sizes(decoder_input.shape[0], mpu.get_context_parallel_world_size())
-            decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0, 
-                                                        split_gather_sizes, "down")
+        if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
+            split_gather_sizes = cal_split_sizes(input_ids.shape[-1], mpu.get_context_parallel_world_size())
             input_ids = split_forward_gather_backward(input_ids, mpu.get_context_parallel_group(), 1, 
                                                         split_gather_sizes, "down")
             position_ids = split_forward_gather_backward(position_ids, mpu.get_context_parallel_group(), 2, 
                                                         split_gather_sizes, "down")
+            if self.pre_process:
+                decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0, 
+                                                            split_gather_sizes, "down")
+
 
         # Rotary positional embeddings (embedding is None for PP intermediate devices)
         rotary_pos_emb = None
@@ -235,7 +237,7 @@ class MMGPTModel(LanguageModule):
             **(extra_block_kwargs or {}),
         )
         
-        if mpu.get_context_parallel_world_size() > 1:
+        if self.post_process and mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), 0, 
                                                         split_gather_sizes, "up")
 

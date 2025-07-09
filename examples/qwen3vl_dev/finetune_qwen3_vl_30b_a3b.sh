@@ -56,6 +56,7 @@ GPT_ARGS="
     --use-mcore-models \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
+    --context-parallel-size ${CP} \
     --expert-model-parallel-size ${EP} \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
