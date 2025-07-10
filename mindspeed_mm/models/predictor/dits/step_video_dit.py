@@ -129,6 +129,8 @@ class StepVideoDiT(MultiModalModule):
             self.norm_out = nn.LayerNorm(self.inner_dim, eps=norm_eps, elementwise_affine=norm_elementwise_affine)
             self.scale_shift_table = nn.Parameter(torch.randn(2, self.inner_dim) / self.inner_dim ** 0.5)
             self.proj_out = nn.Linear(self.inner_dim, patch_size * patch_size * self.out_channels)
+        
+        self.use_dpo = getattr(args.mm.model, "dpo", None)
 
     @property
     def dtype(self) -> torch.dtype:
@@ -305,18 +307,24 @@ class StepVideoDiT(MultiModalModule):
             predictor_input_list: values for predictor forward.
             training_loss_input_list: values to calculate loss.
         """
-        (prev_output, prompt, predictor_timesteps, embedded_timestep, attn_mask, rotary_pos_emb,
-         latents, noised_latents, timesteps, noise) = input_tensor_list
+        score, score_lose = None, None
+        if self.use_dpo is not None:
+            (prev_output, prompt, predictor_timesteps, embedded_timestep, attn_mask, rotary_pos_emb, score, score_lose,
+            latents, noised_latents, timesteps, noise) = input_tensor_list
+        else:
+            (prev_output, prompt, predictor_timesteps, embedded_timestep, attn_mask, rotary_pos_emb,
+            latents, noised_latents, timesteps, noise) = input_tensor_list
         predictor_input_list = [prev_output, predictor_timesteps, prompt, None, attn_mask]
         training_loss_input_list = [latents, noised_latents, timesteps, noise, None]
-
         extra_kwargs["embedded_timestep"] = embedded_timestep
         extra_kwargs["rotary_pos_emb"] = rotary_pos_emb
         batch_size, frames, _, height, width = latents.shape
         len_frame = ((height - self.patch_size) // self.patch_size + 1) * ((width - self.patch_size) // self.patch_size + 1)
         (extra_kwargs["batch_size"], extra_kwargs["frames"], extra_kwargs["h"], extra_kwargs["w"], extra_kwargs["len_frame"]) = batch_size, frames, height, width, len_frame
         
-
+        if self.use_dpo is not None:
+            score_list = [score, score_lose]
+            return predictor_input_list, training_loss_input_list, score_list
         return predictor_input_list, training_loss_input_list
 
     def pipeline_set_next_stage_tensor(self, input_list, output_list, extra_kwargs=None):
@@ -347,19 +355,29 @@ class StepVideoDiT(MultiModalModule):
         tokenizer_configs = args.mm.data.dataset_param.tokenizer_config
         max_prompt_len = sum([tokenizer_config.get("model_max_length", 0) for tokenizer_config in tokenizer_configs])
         channels = model_cfg.predictor.in_channels
-
+        rtn_size = 1
+        use_dpo = getattr(model_cfg, "dpo", None)
+        if use_dpo is not None:
+            micro_batch_size = micro_batch_size * 2
+            rtn_size = 2
         pipeline_tensor_shapes = [
-            {"shape": (micro_batch_size, seq_len, hidden_size), "dtype": dtype},  # prev_output
-            {"shape": (micro_batch_size, max_prompt_len, hidden_size), "dtype": dtype},  # prompt
-            {"shape": (micro_batch_size, 6 * hidden_size), "dtype": dtype},  # predictor_timesteps
-            {"shape": (micro_batch_size, hidden_size), "dtype": dtype},  # embedded_timestep
-            {"shape": (micro_batch_size, seq_len, max_prompt_len), "dtype": dtype}, # origin_prompt_mask
-            {"shape": (seq_len, micro_batch_size, num_attention_heads, attention_head_dim), "dtype": torch.float32}, # rotary_pos_emb
+            {"shape": (micro_batch_size * rtn_size, seq_len, hidden_size), "dtype": dtype},  # prev_output
+            {"shape": (micro_batch_size * rtn_size, max_prompt_len, hidden_size), "dtype": dtype},  # prompt
+            {"shape": (micro_batch_size * rtn_size, 6 * hidden_size), "dtype": dtype},  # predictor_timesteps
+            {"shape": (micro_batch_size * rtn_size, hidden_size), "dtype": dtype},  # embedded_timestep
+            {"shape": (micro_batch_size * rtn_size, seq_len, max_prompt_len), "dtype": dtype}, # origin_prompt_mask
+            {"shape": (seq_len * rtn_size, micro_batch_size, num_attention_heads, attention_head_dim), "dtype": torch.float32}, # rotary_pos_emb
             {"shape": (micro_batch_size, latent_size[0], channels, latent_size[1], latent_size[2]), "dtype": dtype},  # latents(x0)
             {"shape": (micro_batch_size, latent_size[0], channels, latent_size[1], latent_size[2]), "dtype": dtype},  # noised_latents
             {"shape": (micro_batch_size,), "dtype": torch.float32},  # timesteps
             {"shape": (micro_batch_size, latent_size[0], channels, latent_size[1], latent_size[2]), "dtype": dtype},  # noise
         ]
+        if use_dpo is not None:
+            score_shape = [
+                {'shape': (1,), 'dtype': torch.float64},  # score_win
+                {'shape': (1,), 'dtype': torch.float64},  # score_lose
+            ]
+            pipeline_tensor_shapes = pipeline_tensor_shapes[:6] + score_shape + pipeline_tensor_shapes[6:]
         return pipeline_tensor_shapes
 
     def _get_block(self, layer_number):

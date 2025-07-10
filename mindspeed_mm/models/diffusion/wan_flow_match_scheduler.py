@@ -45,8 +45,9 @@ class WanFlowMatchScheduler():
         t: Optional[torch.Tensor] = None,
         **kwargs
     ):
+        reduction = kwargs.get("reduction", "mean")
         target = noise - x_start
-        loss = torch.nn.functional.mse_loss(model_output.float(), target.float())
+        loss = torch.nn.functional.mse_loss(model_output.float(), target.float(), reduction=reduction)
         loss *= self._training_weight(t)
         return loss
 
@@ -89,10 +90,17 @@ class WanFlowMatchScheduler():
         
         return latents
     
-    def q_sample(self, latents, **kwargs):
-        noise = torch.randn_like(latents)
-        timestep_idx = torch.randint(0, self.num_train_timesteps, (1,))
-        timestep = self.timesteps[timestep_idx].to(latents.device)
+    def q_sample(self, latents, noise=None, t=None, **kwargs):
+        if noise is None:
+            noise = torch.randn_like(latents)
+        
+        if t is None:
+            timestep_idx = torch.randint(0, self.num_train_timesteps, (1,))
+            timestep = self.timesteps[timestep_idx].to(latents.device)
+        else:
+            timestep = t
+            timestep_idx = (t.to("cpu") == self.timesteps).nonzero()[0]
+        
         sigma = self.sigmas[timestep_idx].to(latents.device)
         noised_latents = (1 - sigma) * latents + sigma * noise
         return noised_latents, noise, timestep
@@ -129,6 +137,8 @@ class WanFlowMatchScheduler():
         return prev_sample
 
     def _training_weight(self, timestep):
+        if len(timestep) > 1:
+            timestep = timestep[0]
         timestep_idx = torch.argmin((self.timesteps - timestep.to(self.timesteps.device)).abs())
         weights = self.linear_timesteps_weights[timestep_idx]
         return weights

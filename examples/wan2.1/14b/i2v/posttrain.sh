@@ -1,6 +1,6 @@
 #!/bin/bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-
+# 该变量只用于规避megatron对其校验，对npu无效
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export ASCEND_SLOG_PRINT_TO_STDOUT=0
 export ASCEND_GLOBAL_LOG_LEVEL=3
@@ -8,33 +8,31 @@ export TASK_QUEUE_ENABLE=1
 export COMBINED_ENABLE=1
 export CPU_AFFINITY_CONF=1
 export HCCL_CONNECT_TIMEOUT=1200
-export MULTI_STREAM_MEMORY_REUSE=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-export ASCEND_LAUNCH_BLOCKING=0
-
-GPUS_PER_NODE=1
+NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1
 NODE_RANK=0
-WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
+WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 TP=1
-PP=1
+PP=8
 VP=1
 CP=1
 MBS=1
-ACC=1
-GBS=$(($WORLD_SIZE*$MBS/$CP/$TP*$ACC))
+GRAD_ACC_STEP=1
+DP=$(($WORLD_SIZE/$TP/$PP/$CP))
+GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
-MM_DATA="examples/stepvideo/t2v/data_dpo.json"
-MM_MODEL="examples/stepvideo/t2v/posttrain_t2v_model.json"
+MM_DATA="./examples/wan2.1/14b/i2v/feature_data.json"
+MM_MODEL="./examples/wan2.1/14b/i2v/posttrain_model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-LOAD_PATH="your_converted_dit_ckpt_dir"
-SAVE_PATH="your_ckpt_path_to_save"
+LOAD_PATH="./weights/Wan-AI/Wan2.1-I2V-14B-Diffusers/transformer/"  # ensure the wandit weight be converted
+SAVE_PATH="path_to_save_your_wandit_weight"
 
 DISTRIBUTED_ARGS="
-    --nproc_per_node $GPUS_PER_NODE \
+    --nproc_per_node $NPUS_PER_NODE \
     --nnodes $NNODES \
     --node_rank $NODE_RANK \
     --master_addr $MASTER_ADDR \
@@ -48,26 +46,32 @@ GPT_ARGS="
     --context-parallel-size ${CP} \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
+    --num-workers 8 \
     --lr 1e-5 \
     --min-lr 1e-5 \
     --adam-beta1 0.9 \
     --adam-beta2 0.999 \
-    --adam-eps 1e-15 \
+    --adam-eps 1e-8 \
     --lr-decay-style constant \
     --weight-decay 1e-2 \
-    --lr-warmup-init 1e-5 \
+    --lr-warmup-init 0 \
     --lr-warmup-iters 0 \
     --clip-grad 1.0 \
     --train-iters 5000 \
     --no-gradient-accumulation-fusion \
-    --load $LOAD_PATH \
+    --no-load-optim \
+    --no-load-rng \
+    --no-save-optim \
+    --no-save-rng \
     --bf16 \
     --recompute-granularity full \
     --recompute-method block \
-    --recompute-num-layers 32 \
+    --recompute-num-layers 40 \
     --use-distributed-optimizer \
-    --allow-tf32 \
-    --num-workers 0 \
+    --overlap-grad-reduce \
+    --overlap-param-gather \
+    --optimization-level 2 \
+    --use-multiparameter-pipeline-model-parallel \
 "
 
 MM_ARGS="
@@ -81,6 +85,7 @@ OUTPUT_ARGS="
     --save-interval 10000 \
     --eval-interval 10000 \
     --eval-iters 10 \
+    --load $LOAD_PATH \
     --save $SAVE_PATH \
 "
 
@@ -96,5 +101,5 @@ torchrun $DISTRIBUTED_ARGS posttrain_sora_dpo.py \
 chmod 440 logs/train_${logfile}.log
 chmod -R 640 $SAVE_PATH
 STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F ':' '{print$5}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
-PERF=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
-echo "Elapsed Time Per iteration: $STEP_TIME, Average Samples per Second: $PERF"
+SPS=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
+echo "Elapsed Time Per iteration: $STEP_TIME, Average Samples per Second: $SPS"

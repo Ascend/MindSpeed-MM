@@ -10,7 +10,11 @@ from mindspeed_mm.data.data_utils.constants import (
     PROMPT_IDS,
     PROMPT_MASK,
     VIDEO,
-    FILE_INFO
+    FILE_INFO,
+    FILE_REJECTED_INFO,
+    VIDEO_REJECTED,
+    SCORE,
+    SCORE_REJECTED
 )
 
 
@@ -62,6 +66,14 @@ class FeatureDataset(MMBaseDataset):
         # Extract text prompt IDs and masks
         examples[PROMPT_IDS] = feature_data.pop(PROMPT_IDS, None)
         examples[PROMPT_MASK] = feature_data.pop(PROMPT_MASK, None)
+
+        # DPO (Direct Preference Optimization) handling
+        if FILE_REJECTED_INFO in sample.keys():
+            rejected_feature_file_path = os.path.join(self.data_folder, sample[FILE_REJECTED_INFO])
+            rejected_feature_data = self.get_data_from_feature_data(rejected_feature_file_path)
+            examples[VIDEO_REJECTED] = rejected_feature_data.pop(VIDEO, None)
+            examples[SCORE] = sample[SCORE]
+            examples[SCORE_REJECTED] = sample[SCORE_REJECTED]
 
         # Add any remaining keys from feature_data to examples
         for key in feature_data.keys():

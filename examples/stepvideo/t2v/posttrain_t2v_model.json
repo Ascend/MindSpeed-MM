@@ -33,15 +33,11 @@
         "fa_layout": "bsnd"
     },
     "diffusion": {
-        "model_id": "DDPM",
-        "num_train_steps":1000,
-        "guidance_scale":7.5,
-        "prediction_type": "v_prediction",
-        "rescale_betas_zero_snr": true,
-        "timestep_spacing": "leading",
-        "device":"npu",
-        "snr_gamma": 5.0,
-        "t_sample_method": "explicit_uniform"
+        "model_id": "flow_match_discrete_scheduler",
+        "num_train_timesteps":1000,
+        "shift": 13.0,
+        "reverse": false,
+        "solver": "euler"
     },
     "text_encoder": [
         {
@@ -62,6 +58,7 @@
         "from_pretrained": "./weights/vae/vae_v2.safetensors",
         "dtype": "bf16",
         "z_channels": 64,
+        "frame_len": 17,
         "version": 2
     },
     "patch": {

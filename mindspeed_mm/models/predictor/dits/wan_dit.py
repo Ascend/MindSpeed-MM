@@ -195,6 +195,8 @@ class WanDiT(MultiModalModule):
 
         if self.pre_process and model_type in ["i2v", "flf2v"]:
             self.img_emb = MLPProj(self.img_dim, self.hidden_size, model_type == 'flf2v', clip_token_len, self.fp32_calculate)
+        
+        self.use_dpo = getattr(args.mm.model, "dpo", None)
 
     @property
     def dtype(self) -> torch.dtype:
@@ -333,6 +335,7 @@ class WanDiT(MultiModalModule):
             prompt = prompt.view(bs, -1, prompt.size(-1))
             if prompt_mask is not None:
                 seq_lens = prompt_mask.view(bs, -1).sum(dim=-1)
+                seq_lens = seq_lens.to(torch.int64)
                 for i, seq_len in enumerate(seq_lens):
                     prompt[i, seq_len:] = 0
             prompt_emb = self.text_embedding(prompt)
@@ -423,14 +426,22 @@ class WanDiT(MultiModalModule):
             predictor_input_list: values for predictor forward.
             training_loss_input_list: values to calculate loss.
         """
-        (prev_output, prompt, prompt_emb, time_emb, times, prompt_mask,
-         latents, timesteps, noise) = input_tensor_list
+        score, score_lose = None, None
+        if self.use_dpo is not None:
+            (prev_output, prompt, prompt_emb, time_emb, times, prompt_mask, score, score_lose,
+            latents, noised_latents, timesteps, noise) = input_tensor_list
+        else:
+            (prev_output, prompt, prompt_emb, time_emb, times, prompt_mask,
+            latents, noised_latents, timesteps, noise) = input_tensor_list
         predictor_input_list = [prev_output, timesteps, prompt, None, prompt_mask]
-        training_loss_input_list = [latents, None, timesteps, noise, None]
+        training_loss_input_list = [latents, noised_latents, timesteps, noise, None]
         extra_kwargs['prompt_emb'] = prompt_emb
         extra_kwargs['time_emb'] = time_emb
         extra_kwargs['times'] = times
         extra_kwargs["ori_shape"] = latents.shape
+        if self.use_dpo is not None:
+            score_list = [score, score_lose]
+            return predictor_input_list, training_loss_input_list, score_list
         return predictor_input_list, training_loss_input_list
 
     def pipeline_set_next_stage_tensor(self, input_list, output_list, extra_kwargs=None):
@@ -444,11 +455,11 @@ class WanDiT(MultiModalModule):
 
         which should be corresponded with initialize_pipeline_tensor_shapes
         """
-        latents, _, timesteps, noise, _ = input_list
+        latents, noised_latents, timesteps, noise, _ = input_list
         if timesteps.dtype != torch.float32:
             timesteps = timesteps.to(torch.float32)
 
-        return list(output_list) + [latents, timesteps, noise]
+        return list(output_list) + [latents, noised_latents, timesteps, noise]
 
     @staticmethod
     def initialize_pipeline_tensor_shapes():
@@ -470,17 +481,31 @@ class WanDiT(MultiModalModule):
         text_dim = model_cfg.predictor.text_dim
         text_len = model_cfg.predictor.text_len
         img_token_len = model_cfg.predictor.clip_token_len if model_cfg.predictor.model_type == 'i2v' else 0
+        rtn_size = 1
+        use_dpo = getattr(model_cfg, "dpo", None)
+        if use_dpo is not None:
+            micro_batch_size = micro_batch_size * 2
+            rtn_size = 2
         pipeline_tensor_shapes = [
-            {'shape': (micro_batch_size, seq_len, hidden_size), 'dtype': dtype},  # prev_output
-            {'shape': (micro_batch_size, text_len, text_dim), 'dtype': dtype},  # prompt
-            {'shape': (micro_batch_size, text_len + img_token_len, hidden_size), 'dtype': dtype},  # prompt_emb
-            {'shape': (micro_batch_size, 6, hidden_size), 'dtype': dtype},  # time_emb
-            {'shape': (micro_batch_size, hidden_size), 'dtype': dtype},  # times
-            {'shape': (micro_batch_size, 1, text_len), 'dtype': dtype},  # origin_prompt_mask
+            {'shape': (micro_batch_size * rtn_size, seq_len, hidden_size), 'dtype': dtype},  # prev_output
+            {'shape': (micro_batch_size * rtn_size, text_len, text_dim), 'dtype': dtype},  # prompt
+            {'shape': (micro_batch_size * rtn_size, text_len + img_token_len, hidden_size), 'dtype': dtype},  # prompt_emb
+            {'shape': (micro_batch_size * rtn_size, 6, hidden_size), 'dtype': dtype},  # time_emb
+            {'shape': (micro_batch_size * rtn_size, hidden_size), 'dtype': dtype},  # times
+            {'shape': (micro_batch_size * rtn_size, 1, text_len), 'dtype': dtype},  # origin_prompt_mask
             {'shape': (micro_batch_size, channels, *latent_size), 'dtype': dtype},  # latents(x0)
+            {"shape": (micro_batch_size, channels, *latent_size), "dtype": dtype},  # noised_latents
             {'shape': (micro_batch_size,), 'dtype': torch.float32},  # timesteps
             {'shape': (micro_batch_size, channels, *latent_size), 'dtype': dtype},  # noise
         ]
+
+        if use_dpo is not None:
+            score_shape = [
+                {'shape': (1,), 'dtype': torch.float64},  # score_win
+                {'shape': (1,), 'dtype': torch.float64},  # score_lose
+            ]
+            pipeline_tensor_shapes = pipeline_tensor_shapes[:6] + score_shape + pipeline_tensor_shapes[6:]
+        
         return pipeline_tensor_shapes
 
 
