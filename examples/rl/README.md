@@ -23,11 +23,15 @@
 以 MindSpeed MM 仓库复现 [Group Relative Policy Optimization (GRPO) ](https://arxiv.org/pdf/2402.03300) 后训练方法为例来帮助用户快速入门，前期需要完成代码仓、环境、数据集以及权重等准备工作，再按照说明中的启动方式启动训练，以下为具体的操作说明。
 
 
-参考实现：
+#### 参考实现
 ```
 url=https://github.com/volcengine/verl
-commit_id=5b542d273cc792971eb66aca07494523be61c58c
+commit_id=d13434fd7b46fcc147f0fa82f4a73b0eeeb1fea4
 ```
+
+#### 变更记录
+
+2025.07.03: 首次支持Qwen2.5-VL 3B/7B/32B GRPO训练
 
 <a id="jump1"></a>
 ## 环境安装
@@ -119,6 +123,9 @@ bash MindSpeed-MM/examples/rl/scripts/copy_adaptor_to_vllm.sh
 cd vllm
 VLLM_TARGET_DEVICE=empty pip install -v -e .
 cd ..
+
+# VLLM安装可能会升级numpy版本，numpy版本要求为1.26.4
+pip install numpy==1.26.4
 
 # 安装VLLM-ASCEND，需导入CANN及ATB环境变量
 source /usr/local/Ascend/ascend-toolkit/set_env.sh

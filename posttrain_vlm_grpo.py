@@ -50,21 +50,14 @@ def train(config):
         from mindspeed_rl.workers.scheduler.launcher_ms import RayActorGroupMs as RayActorGroup
     else:
         from mindspeed_rl.workers.scheduler.launcher import RayActorGroup
-    
+
     if rl_config.colocate_actor_and_vit:
         pgs = construct_colocate_placement_groups(rl_config)
     else:
         pgs = None
 
- 
+
     MsProbe.config_init(msprobe_config)
-    MsProbe.save_configs({
-        'actor': eval(str(actor_config.dict())),
-        'ref': eval(str(ref_config.dict())),
-        'reward': eval(str(reward_config.dict())),
-        'rl': eval(str(rl_config.dict())),
-        'generate': eval(str(generate_config.dict()))
-        })
 
     tokenizer = get_tokenizer(tokenizer_model=actor_config.tokenizer_name_or_path,
                               prompt_type=actor_config.prompt_type, prompt_type_path=actor_config.prompt_type_path)
@@ -233,7 +226,7 @@ def parse_training_config(config: Dict):
 
         reward_config = MegatronConfig({**config.get("megatron_training"), **config.get("reward_config")},
                                        config.get('model'))
-    
+
     vit_config = None
     if rl_config.colocate_actor_and_vit:
         vit_config = MegatronConfig({**config.get("megatron_training"), **config.get("vit_config")},

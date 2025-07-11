@@ -12,7 +12,7 @@ import imageio
 
 try:
     import decord
-except ImportError:
+except (ImportError, OSError):
     print("Failed to import decord module.")
 
 from torchvision.transforms import Compose, Lambda

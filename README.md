@@ -19,6 +19,7 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 
 # 🔥🔥🔥Latest News
 
+* **[Jul. 03, 2025]: 🚀 强化学习上线！ MindSpeed MM支持Qwen2.5VL 3B/7B/32B [GRPO训练](https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/rl)**
 * [Jun. 30, 2025]: 🚀 MindSpeed MM后端支持[MindSpore AI框架](https://gitee.com/ascend/MindSpeed-MM/blob/2.1.0/docs/mindspore/readme.md)
 * [Jun. 05, 2025]: 🚀 MindSpeed MM支持Qwen2.5Omni-7B模型 【Prototype】
 * [Jun. 05, 2025]: 🚀 MindSpeed MM支持OpenSoraPlan 1.5模型
@@ -127,27 +128,27 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 
 ## 已支持特性概览
 
-|       模型 \ 特性       | [TP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) |
-|:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|
-| OpenSoraPlan1.5-T2V | ✔ | ✔ |  |  |  |  | ✔ |  |
-|       Wan2.1        |  |  |  |  | CP (Ulysses) | ✔ | ✔ | Prototype |
-|    HunyuanVideo     | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ | ✔ |
-|   CogVideoX系列-T2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ | Prototype |
-|   CogVideoX系列-I2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ | Prototype |
-|     Opensora1.2     |  |  |  |                                                                                         | DSP | ✔ | ✔ |  |
-| OpensoraPlan1.3-T2V | ✔ | ✔ | ✔ |        ✔                                                                                 | CP (Ulysses) | ✔ | ✔ |  |
-| OpensoraPlan1.3-I2V | ✔ | ✔ | ✔ |          ✔                                                                               | CP (Ulysses) | ✔ | ✔ |  |
-|    InternVL2-2B     |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  |
-|    InternVL2-8B     |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  |
-|    InternVL2-26B    |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  |
-|    InternVL2-76B    |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  |
-|     Qwen2VL-2B      | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ |
-|     Qwen2VL-7B      | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ |
-|     Qwen2VL-72B     | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ |
-|    Qwen2.5VL-3B     | ✔ |  |  | ✔ |  | ✔ |  |  |
-|    Qwen2.5VL-7B     | ✔ |  |  |                                            ✔                                            |  | ✔ |  |  |
-|    Qwen2.5VL-32B    | ✔ |  |  |                                            ✔                                            |  | ✔ |  |  |
-|    Qwen2.5VL-72B    | ✔ |  |  |                                            ✔                                            |  | ✔ |  |  |
+|       模型 \ 特性       | [TP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) | RL |
+|:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|:------:|
+| OpenSoraPlan1.5-T2V | ✔ | ✔ |  |  |  |  | ✔ |  | |
+|       Wan2.1        |  |  |  |  | CP (Ulysses) | ✔ | ✔ | Prototype | |
+|    HunyuanVideo     | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ | ✔ | |
+|   CogVideoX系列-T2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ | Prototype | |
+|   CogVideoX系列-I2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ | Prototype | |
+|     Opensora1.2     |  |  |  |                                                                                         | DSP | ✔ | ✔ |  | |
+| OpensoraPlan1.3-T2V | ✔ | ✔ | ✔ |        ✔                                                                                 | CP (Ulysses) | ✔ | ✔ |  | |
+| OpensoraPlan1.3-I2V | ✔ | ✔ | ✔ |          ✔                                                                               | CP (Ulysses) | ✔ | ✔ |  | |
+|    InternVL2-2B     |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  | |
+|    InternVL2-8B     |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  | |
+|    InternVL2-26B    |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  | |
+|    InternVL2-76B    |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  | |
+|     Qwen2VL-2B      | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ | |
+|     Qwen2VL-7B      | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ | |
+|     Qwen2VL-72B     | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ | DPO |
+|    Qwen2.5VL-3B     | ✔ |  |  | ✔ |  | ✔ |  |  | GRPO |
+|    Qwen2.5VL-7B     | ✔ |  |  |                                            ✔                                            |  | ✔ |  |  | GRPO |
+|    Qwen2.5VL-32B    | ✔ |  |  |                                            ✔                                            |  | ✔ |  |  | GRPO |
+|    Qwen2.5VL-72B    | ✔ |  |  |                                            ✔                                            |  | ✔ |  |  | |
 
 备注：
 
@@ -161,6 +162,7 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 * Distributed Optimizer: [Zero Redundancy Optimizer](https://arxiv.org/abs/1910.02054) (ZeRO)
 * Recomputation: Reducing Activation [Recomputation](https://arxiv.org/abs/2205.05198)
 * LoRA: [Low-Rank Adaptation](https://arxiv.org/abs/2106.09685)
+* RL: Reinforcement Learning
 
 ---
 
