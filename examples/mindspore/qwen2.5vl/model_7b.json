@@ -10,6 +10,7 @@
             "ffn_hidden_size": 3420,
             "llm_hidden_size": 3584,
             "gated_linear_unit": true,
+            "bias_activation_fusion": true,
             "num_attention_heads": 16,
             "hidden_dropout": 0.0,
             "attention_dropout": 0.0,
@@ -84,6 +85,7 @@
         "mrope_section": [16, 24, 24],
         "rope_scaling": null,
         "gated_linear_unit": true,
+        "bias_activation_fusion": true,
         "layernorm_epsilon": 1e-06,
         "add_bias_linear":false,
         "add_qkv_bias": true

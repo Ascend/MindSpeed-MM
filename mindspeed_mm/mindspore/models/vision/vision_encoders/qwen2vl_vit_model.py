@@ -8,6 +8,7 @@ import torch
 import torch.nn.functional as F
 from megatron.core import mpu
 from megatron.training import get_args
+import mindspore as ms
 
 try:
     from mindspeed.utils import set_actual_seq_len
@@ -120,7 +121,7 @@ def qwen2vl_vit_forward(self, pixel_values: torch.Tensor, grid_thw: torch.Tensor
             for i in range(1, len(cu_window_seqlens_np)):
                 window_mask[..., cu_window_seqlens_np[i - 1]: cu_window_seqlens_np[i],
                 cu_window_seqlens_np[i - 1]: cu_window_seqlens_np[i]] = 0
-            window_mask = torch.tensor(window_mask, dtype=torch.bool)
+            window_mask = ms.from_numpy(window_mask)
 
     cu_seqlens = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cumsum(
         dim=0, dtype=torch.int32

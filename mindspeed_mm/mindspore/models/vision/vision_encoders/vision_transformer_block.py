@@ -98,15 +98,17 @@ def qwen2vl_block_forward(
                 packed_seq_params=packed_seq_params,
             )
         else:
+            cu_seqlens_np = tuple(cu_seqlens.numpy()[1:].tolist())
+            cu_window_seqlens_np = tuple(cu_window_seqlens.numpy()[1:].tolist())
             for layer_num, layer in enumerate(self.layers):
                 with self.offload_context:
                     if getattr(self.config, "window_attn_size", None) is not None:
                         if layer_num in fullatt_block_indexes_now:
                             attention_mask_now = attention_mask
-                            set_actual_seq_len(tuple(cu_seqlens.numpy()[1:].tolist()))
+                            set_actual_seq_len(cu_seqlens_np)
                         else:
                             attention_mask_now = window_mask
-                            set_actual_seq_len(tuple(cu_window_seqlens.numpy()[1:].tolist()))
+                            set_actual_seq_len(cu_window_seqlens_np)
                     else:
                         attention_mask_now = attention_mask
                     hidden_states, context = layer(
