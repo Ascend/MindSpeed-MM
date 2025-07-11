@@ -7,7 +7,7 @@ from checkpoint.vlm_model import hf_to_mm
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.converters.qwen2_5vl import create_qwen2_5_vl_ops, qwen2_5_vl_tp_patterns
 from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema
-from checkpoint.vlm_model.operator import Operator, RenameOp, ExpertUpGateMergeOp, GLUSplit, ColWeightSplit
+from checkpoint.vlm_model.operator import Operator, RenameOp, ExpertUpGateMergeOp, GLUSplit, ColSplit
 
 
 def create_qwen3_vl_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups: int, llm_q_size: int,
@@ -41,7 +41,7 @@ qwen3_vl_tp_patterns = {
     **qwen2_5_vl_tp_patterns,
     **{
         r"text_decoder.decoder.layers.(\d+).mlp.experts.local_experts.(\d+).linear_fc1.weight": GLUSplit,
-        r"text_decoder.decoder.layers.(\d+).mlp.experts.local_experts.(\d+).linear_fc2.weight": ColWeightSplit,
+        r"text_decoder.decoder.layers.(\d+).mlp.experts.local_experts.(\d+).linear_fc2.weight": ColSplit,
     }
 }
 

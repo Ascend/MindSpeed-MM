@@ -21,7 +21,7 @@ from checkpoint.vlm_model.hf_to_mm import load_from_hf, convert_hf_to_mm, \
     PPStageSchema, save_by_vpp, merge_vpp_index, partition_state_dict_by_pp
 from checkpoint.vlm_model.config import ConvertMMConfig, ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.operator import (
-    Operator, UpGateMergeOp, QKVMergeOp, RelocateOp, RenameOp, RowWeightSplit, GLUSplit, ColWeightSplit, RowBiasSplit
+    Operator, UpGateMergeOp, QKVMergeOp, RelocateOp, RenameOp, RowSplit, GLUSplit, ColSplit
 )
 
 glm_text_schema = PPStageSchema(

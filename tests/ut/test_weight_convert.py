@@ -13,9 +13,8 @@ from checkpoint.vlm_model.operator import (
     QKVMergeOp,
     RelocateOp,
     TieOp,
-    ColWeightSplit,
-    RowBiasSplit,
-    RowWeightSplit,
+    ColSplit,
+    RowSplit,
     GLUSplit,
 )
 
@@ -145,7 +144,7 @@ def test_tp_split_col_weight(
         value: torch.Tensor,
         expected_shape: torch.Size,
 ) -> None:
-    result = ColWeightSplit.split(tp_size, value)
+    result = ColSplit.split(tp_size, value)
     assert result[tp_rank].shape == expected_shape
 
 
@@ -159,7 +158,7 @@ def test_tp_split_row_bias(
         value: torch.Tensor,
         expected_shape: torch.Size,
 ) -> None:
-    result = RowBiasSplit.split(tp_size, value)
+    result = RowSplit.split(tp_size, value)
     assert result[tp_rank].shape == expected_shape
 
 
@@ -173,7 +172,7 @@ def test_tp_split_row_weight(
         value: torch.Tensor,
         expected_shape: torch.Size,
 ) -> None:
-    result = RowWeightSplit.split(tp_size, value)
+    result = RowSplit.split(tp_size, value)
     assert result[tp_rank].shape == expected_shape
 
 
@@ -213,7 +212,7 @@ def test_tp_merge_row_weight(
         value: List[torch.Tensor],
         expected_shape: torch.Size,
 ) -> None:
-    result = RowWeightSplit.merge(value)
+    result = RowSplit.merge(value)
     assert result.shape == expected_shape
 
 
@@ -225,7 +224,7 @@ def test_tp_merge_row_weight(
         value: List[torch.Tensor],
         expected_shape: torch.Size,
 ) -> None:
-    result = RowBiasSplit.merge(value)
+    result = RowSplit.merge(value)
     assert result.shape == expected_shape
 
 
@@ -237,7 +236,7 @@ def test_tp_merge_col_weight(
         value: List[torch.Tensor],
         expected_shape: torch.Size,
 ) -> None:
-    result = ColWeightSplit.merge(value)
+    result = ColSplit.merge(value)
     assert result.shape == expected_shape
 
 

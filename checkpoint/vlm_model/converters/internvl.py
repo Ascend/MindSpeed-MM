@@ -6,7 +6,7 @@ from checkpoint.common.converter import Converter
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model import hf_to_mm, mm_to_hf
 from checkpoint.vlm_model.operator import (
-    Operator, UpGateMergeOp, QKVMergeOp, RenameOp
+    ColSplit, GLUSplit, Operator, RowSplit, UnalignedColSplit, UnalignedRowSplit, UpGateMergeOp, QKVMergeOp, RenameOp
 )
 
 
@@ -127,7 +127,25 @@ def create_intern_vl_ops(llm_arch: str, llm_num_query_groups: int, llm_q_size: i
     return ops
 
 
-intern_vl_tp_patterns = {}
+def create_internvl_tp_patterns(vision_attention_heads: int) -> dict:
+    """创建InternVL的TP模式"""
+
+    tp_patterns = {
+        r"text_decoder.output_layer.weight": RowSplit,
+        r"text_decoder.embedding.word_embeddings.weight": RowSplit,
+        r'text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight': GLUSplit,
+        r'text_decoder.decoder.layers.(\d+).mlp.linear_fc2.weight': ColSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.linear_proj.weight': ColSplit,
+        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_proj.weight": UnalignedColSplit(vision_attention_heads), # InternVL系列ViT的heads可能存在无法均匀切分情况
+        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_qkv.bias": UnalignedRowSplit(vision_attention_heads),
+        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_qkv.weight": UnalignedRowSplit(vision_attention_heads),
+        r"image_encoder.encoder.encoder.layers.(\d+).mlp.linear_fc1.bias": RowSplit,
+        r"image_encoder.encoder.encoder.layers.(\d+).mlp.linear_fc1.weight": RowSplit,
+        r"image_encoder.encoder.encoder.layers.(\d+).mlp.linear_fc2.weight": ColSplit,
+    }
+    return tp_patterns
 
 vision_schema = hf_to_mm.PPStageSchema(
     firsts=['image_encoder.encoder.embeddings.'],
@@ -155,6 +173,7 @@ class InternVLConverter(Converter):
         """huggingface模型转换mindspeed-mm模型权重"""
         ops = InternVLConverter._create_ops(cfg.hf_config.config)
         cfg.hf_config.config.tie_word_embeddings = cfg.hf_config.config.llm_config.tie_word_embeddings
+        intern_vl_tp_patterns = create_internvl_tp_patterns(cfg.hf_config.config.vision_config.num_attention_heads)
         hf_to_mm.convert_hf_to_mm(cfg, cfg.hf_config.config, ops, intern_vl_tp_patterns,
                                   [vision_schema, hf_to_mm.text_schema])
         # 安全管控权限
@@ -166,6 +185,7 @@ class InternVLConverter(Converter):
         ops = InternVLConverter._create_ops(cfg.hf_config.config)
         # 处理流程需要反转
         ops.reverse()
+        intern_vl_tp_patterns = create_internvl_tp_patterns(cfg.hf_config.config.vision_config.num_attention_heads)
         mm_to_hf.convert_mm_to_hf(cfg, ops, intern_vl_tp_patterns)
         # 安全管控权限
         os.chmod(cfg.save_hf_dir, SAFE_MODE)

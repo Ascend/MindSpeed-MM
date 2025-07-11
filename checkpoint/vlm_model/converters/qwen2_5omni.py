@@ -8,7 +8,7 @@ from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, Con
 from checkpoint.vlm_model.converters.qwen2_5vl import qwen2_5_vl_tp_patterns
 from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema, audio_schema
 from checkpoint.vlm_model.operator import Operator, UpGateMergeOp, QKVMergeOp, QVToQKVMergeOp, \
-    RenameOp, RowBiasSplit, RowWeightSplit, ColWeightSplit
+    RenameOp, RowSplit, ColSplit
 
 
 def create_qwen2_5_omni_ops(vit_num_heads: int, llm_num_query_groups: int, audio_num_heads: int,
@@ -136,12 +136,12 @@ def create_qwen2_5_omni_ops(vit_num_heads: int, llm_num_query_groups: int, audio
 
 qwen2_5_omni_tp_patterns = {
     **qwen2_5_vl_tp_patterns,
-    **{r"audio_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias": RowBiasSplit,
-       r"audio_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight": RowWeightSplit,
-       r"audio_encoder.encoder.blocks.layers.(\d+).self_attention.linear_proj.weight": ColWeightSplit,
-       r"audio_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.bias": RowBiasSplit,
-       r"audio_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.weight": RowWeightSplit,
-       r"audio_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc2.weight": ColWeightSplit,
+    **{r"audio_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias": RowSplit,
+       r"audio_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight": RowSplit,
+       r"audio_encoder.encoder.blocks.layers.(\d+).self_attention.linear_proj.weight": ColSplit,
+       r"audio_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.bias": RowSplit,
+       r"audio_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.weight": RowSplit,
+       r"audio_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc2.weight": ColSplit,
        }
 }
 

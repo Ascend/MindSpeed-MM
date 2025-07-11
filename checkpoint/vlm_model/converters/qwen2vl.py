@@ -10,7 +10,7 @@ from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema, split_by_t
     partition_state_dict_by_pp, save_by_vpp
 from checkpoint.vlm_model.mm_to_hf import load_from_mm, convert_mm_to_hf, merge_by_tp
 from checkpoint.vlm_model.operator import (
-    Operator, UpGateMergeOp, QKVMergeOp, RelocateOp, RenameOp, RowWeightSplit, GLUSplit, ColWeightSplit, RowBiasSplit
+    Operator, UpGateMergeOp, QKVMergeOp, RelocateOp, RenameOp, RowSplit, GLUSplit, ColSplit
 )
 
 
@@ -78,22 +78,22 @@ def create_qwen2vl_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_gro
 
 
 qwen2vl_tp_patterns = {
-    r"text_decoder.output_layer.weight": RowWeightSplit,
-    r"text_decoder.embedding.word_embeddings.weight": RowWeightSplit,
+    r"text_decoder.output_layer.weight": RowSplit,
+    r"text_decoder.embedding.word_embeddings.weight": RowSplit,
     r'text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight': GLUSplit,
-    r'text_decoder.decoder.layers.(\d+).mlp.linear_fc2.weight': ColWeightSplit,
-    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowWeightSplit,
-    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowBiasSplit,
-    r'text_decoder.decoder.layers.(\d+).self_attention.linear_proj.weight': ColWeightSplit,
-    r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_proj.weight": ColWeightSplit,
-    r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias": RowBiasSplit,
-    r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight": RowBiasSplit,
-    r"image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.bias": RowBiasSplit,
-    r"image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.weight": RowWeightSplit,
-    r"image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc2.weight": ColWeightSplit,
-    r"image_encoder.projector.encoder.linear_fc1.bias": RowBiasSplit,
-    r"image_encoder.projector.encoder.linear_fc1.weight": RowWeightSplit,
-    r"image_encoder.projector.encoder.linear_fc2.weight": ColWeightSplit
+    r'text_decoder.decoder.layers.(\d+).mlp.linear_fc2.weight': ColSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.linear_proj.weight': ColSplit,
+    r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_proj.weight": ColSplit,
+    r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias": RowSplit,
+    r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight": RowSplit,
+    r"image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.bias": RowSplit,
+    r"image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.weight": RowSplit,
+    r"image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc2.weight": ColSplit,
+    r"image_encoder.projector.encoder.linear_fc1.bias": RowSplit,
+    r"image_encoder.projector.encoder.linear_fc1.weight": RowSplit,
+    r"image_encoder.projector.encoder.linear_fc2.weight": ColSplit
 }
 
 

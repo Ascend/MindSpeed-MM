@@ -8,8 +8,8 @@ from checkpoint.common.converter import Converter
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.hf_to_mm import PPStageSchema, text_schema, convert_hf_to_mm
 from checkpoint.vlm_model.operator import (
-    ExpertUpGateMergeOp, Operator, UpGateMergeOp, QKVDirectMergeOp, RenameOp, RowWeightSplit, GLUSplit,
-    ColWeightSplit, RowBiasSplit
+    ExpertUpGateMergeOp, Operator, UpGateMergeOp, QKVDirectMergeOp, RenameOp, GLUSplit,
+    ColSplit, RowSplit
 )
 
 
@@ -123,18 +123,18 @@ def create_deepseek_vl_ops() -> List[Operator]:
 
 
 deepseek_vl_tp_patterns = {
-    r"text_decoder.output_layer.weight": RowWeightSplit,
-    r"text_decoder.embedding.word_embeddings.weight": RowWeightSplit,
+    r"text_decoder.output_layer.weight": RowSplit,
+    r"text_decoder.embedding.word_embeddings.weight": RowSplit,
     r"text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight": GLUSplit,
-    r"text_decoder.decoder.layers.(\d+).mlp.linear_fc2.weight": ColWeightSplit,
-    r"text_decoder.decoder.layers.(\d+).self_attention.linear_qb.weight": RowWeightSplit,
-    r"text_decoder.decoder.layers.(\d+).self_attention.linear_kvb.weight": RowWeightSplit,
-    r"text_decoder.decoder.layers.(\d+).self_attention.linear_kvb.bias": RowBiasSplit,
-    r"text_decoder.decoder.layers.(\d+).self_attention.linear_proj.weight": ColWeightSplit,
+    r"text_decoder.decoder.layers.(\d+).mlp.linear_fc2.weight": ColSplit,
+    r"text_decoder.decoder.layers.(\d+).self_attention.linear_qb.weight": RowSplit,
+    r"text_decoder.decoder.layers.(\d+).self_attention.linear_kvb.weight": RowSplit,
+    r"text_decoder.decoder.layers.(\d+).self_attention.linear_kvb.bias": RowSplit,
+    r"text_decoder.decoder.layers.(\d+).self_attention.linear_proj.weight": ColSplit,
     r"text_decoder.decoder.layers.(\d+).mlp.experts.local_experts.(\d+).linear_fc1.weight": GLUSplit,
-    r"text_decoder.decoder.layers.(\d+).mlp.experts.local_experts.(\d+).linear_fc2.weight": ColWeightSplit,
+    r"text_decoder.decoder.layers.(\d+).mlp.experts.local_experts.(\d+).linear_fc2.weight": ColSplit,
     r"text_decoder.decoder.layers.(\d+).mlp.shared_experts.linear_fc1.weight": GLUSplit,
-    r"text_decoder.decoder.layers.(\d+).mlp.shared_experts.linear_fc2.weight": ColWeightSplit
+    r"text_decoder.decoder.layers.(\d+).mlp.shared_experts.linear_fc2.weight": ColSplit
 }
 
 vision_schema = PPStageSchema(

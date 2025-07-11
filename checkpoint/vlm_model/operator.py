@@ -373,7 +373,7 @@ class BaseSplit(ABC):
         pass
 
 
-class ColWeightSplit(BaseSplit):
+class ColSplit(BaseSplit):
     """按列切分权重"""
 
     @staticmethod
@@ -389,7 +389,7 @@ class ColWeightSplit(BaseSplit):
         return torch.cat(tp_values, dim=1)
 
 
-class RowBiasSplit(BaseSplit):
+class RowSplit(BaseSplit):
     """按行切分偏置"""
 
     @staticmethod
@@ -405,20 +405,57 @@ class RowBiasSplit(BaseSplit):
         return torch.cat(tp_values, dim=0)
 
 
-class RowWeightSplit(BaseSplit):
-    """按行切分权重"""
+def unaligned_divide(numerator: int, world_size: int, rank: int) -> int:
+    res = numerator // world_size
+    if rank < numerator % world_size:
+        res += 1
+    return res
 
-    @staticmethod
-    def split(tp_size: int, value: Tensor) -> List[Tensor]:
-        size_per_tp = value.shape[0] // tp_size
-        return [
-            value[rank * size_per_tp:(rank + 1) * size_per_tp, :]
-            for rank in range(tp_size)
-        ]
+
+class UnalignedRowSplit(BaseSplit):
+    """按行切分权重，处理不均匀分布的情况"""
+
+    def __init__(self, num_attention_heads: int):
+        self.head = num_attention_heads
+
+    def split(self, tp_size: int, value: Tensor) -> List[Tensor]:
+        values = torch.chunk(value, 3, dim=0)
+        value_per_tp = []
+        start_idx = 0
+        for tp_rank in range(tp_size):
+            heads_per_tp = unaligned_divide(self.head, tp_size, tp_rank)
+            size_per_tp = heads_per_tp * (value.shape[0] // 3 // self.head)
+            w_q = values[0][start_idx:start_idx + size_per_tp]
+            w_k = values[1][start_idx:start_idx + size_per_tp]
+            w_v = values[2][start_idx:start_idx + size_per_tp]
+            value_per_tp.append(torch.cat((w_q, w_k, w_v), dim=0))
+            start_idx += size_per_tp
+        return value_per_tp
 
     @staticmethod
     def merge(tp_values: List[Tensor]) -> Tensor:
         return torch.cat(tp_values, dim=0)
+
+
+
+class UnalignedColSplit(BaseSplit):
+    """按列切分权重，处理不均匀分布的情况"""
+    def __init__(self, num_attention_heads: int):
+        self.head = num_attention_heads
+
+    def split(self, tp_size: int, value: Tensor) -> List[Tensor]:
+        value_per_tp = []
+        start_idx = 0
+        for tp_rank in range(tp_size):
+            heads_per_tp = unaligned_divide(self.head, tp_size, tp_rank)
+            size_per_tp = heads_per_tp * (value.shape[1] // self.head)
+            value_per_tp.append(value[:, start_idx: start_idx + size_per_tp])
+            start_idx += size_per_tp
+        return value_per_tp
+
+    @staticmethod
+    def merge(tp_values: List[Tensor]) -> Tensor:
+        return torch.cat(tp_values, dim=1)
 
 
 class GLUSplit(BaseSplit):
