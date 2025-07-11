@@ -196,12 +196,12 @@ pip install -e .
 
 MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 ```bash
-# 2b
+# 7b
 mm-convert  Qwen2VLConverter hf_to_mm \
-  --cfg.mm_dir "ckpt/mm_path/Qwen2-VL-2B-Instruct" \
-  --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2-VL-2B-Instruct" \
-  --cfg.parallel_config.llm_pp_layers [[28]] \
-  --cfg.parallel_config.vit_pp_layers [[32]] \
+  --cfg.mm_dir "ckpt/mm_path/Qwen2-VL-7B-Instruct" \
+  --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2-VL-7B-Instruct" \
+  --cfg.parallel_config.llm_pp_layers [[1,10,10,7]] \
+  --cfg.parallel_config.vit_pp_layers [[32,0,0,0]] \
   --cfg.parallel_config.tp_size 1
 ```
 如果需要用转换后模型训练的话，同步修改`examples/qwen2vl/finetune_qwen2vl_7b.sh`中的`LOAD_PATH`参数，该路径为转换后或者切分后的权重，注意与原始权重 `ckpt/hf_path/Qwen2-VL-7B-Instruct`进行区分。
@@ -260,7 +260,7 @@ dataset_param->basic_parameters->dataset
 
 **配置参数**
 
-根据实际情况修改examples/qwen2vl/inference_qwen2vl_7b.json和examples/qwen2vl/inference_qwen2vl_7b.sh中的路径配置，包括tokenizer的加载路径from_pretrained、以及图片处理器的路径image_processer_path。需注意
+根据实际情况修改examples/qwen2vl/data_7b.json和examples/qwen2vl/finetune_qwen2vl_7b.sh中的路径配置，包括tokenizer的加载路径from_pretrained、以及图片处理器的路径image_processer_path。需注意
 
 （1）tokenizer/from_pretrained配置的路径为从huggingface下载的原始Qwen2-VL-7B-Instruct路径。
 
