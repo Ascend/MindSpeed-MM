@@ -174,7 +174,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 ```shell
 ...
 # 加载路径
-LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-7B-Instruct"
+LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 # 保存路径
 SAVE_PATH="save_dir"
 ...
