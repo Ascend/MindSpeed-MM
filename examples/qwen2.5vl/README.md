@@ -95,12 +95,10 @@ pip install torch_npu-2.1.0*-cp310-cp310m-linux_aarch64.whl
 git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.8.0
-git checkout 6f11a6c9edd409f32a805a71e710b01f9191438f
+git checkout 8db5013167274913e106ce6f31aca0a3b085effb
 pip install -r requirements.txt
 pip3 install -e .
 cd ..
-# 替换MindSpeed中的文件
-cp examples/qwen2vl/dot_product_attention.py MindSpeed/mindspeed/core/transformer/dot_product_attention.py
 
 # 安装其余依赖库
 pip install -e .
@@ -553,4 +551,3 @@ NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量
 
 1. 在 `finetune_xx.sh`里，与模型结构相关的参数并不生效，以`examples/qwen2.5vl/model_xb.json`里同名参数配置为准，非模型结构的训练相关参数在 `finetune_xx.sh`修改。
 2. 在使用单卡进行3B模型训练时，如果出现Out Of Memory，可以使用多卡并开启分布式优化器进行训练。
-3. `model.json`设置use_remove_padding为true时，在`examples/qwen2vl/dot_product_attention.py`中，attention_mask形状当前固定为[2048, 2048]，如需更改请参考[昇腾官网FlashAttentionScore](https://www.hiascend.com/document/detail/zh/Pytorch/600/ptmoddevg/trainingmigrguide/performance_tuning_0027.html)的替换指南

@@ -72,6 +72,7 @@ cp examples/rl/code/mindspeed_rl/megatron_sharding_manager.py mindspeed_rl/worke
 # random files
 cp examples/rl/code/mindspeed_rl/megatron_random.py megatron/core/tensor_parallel/random.py
 cp examples/rl/code/mindspeed_rl/mindspeed_random.py mindspeed/core/tensor_parallel/random.py
+cp examples/rl/code/mindspeed_rl/dot_product_attention.py mindspeed/core/transformer/dot_product_attention.py
 
 echo "All performance files copied successfully!"
-echo "Total files copied: 26"
+echo "Total files copied: 27"

@@ -83,12 +83,10 @@ pip install torch_npu-2.1.0*-cp310-cp310m-linux_aarch64.whl
 git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.8.0
-git checkout 6f11a6c9edd409f32a805a71e710b01f9191438f
+git checkout 8db5013167274913e106ce6f31aca0a3b085effb
 pip install -r requirements.txt
 pip3 install -e .
 cd ..
-# 替换MindSpeed中的文件
-cp examples/internvl2.5/dot_product_attention.py MindSpeed/mindspeed/core/transformer/dot_product_attention.py
 
 # 安装其余依赖库
 pip install -e .

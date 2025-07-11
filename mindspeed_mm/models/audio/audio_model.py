@@ -50,6 +50,7 @@ class AudioModel(MultiModalModule):
         self.projector = None  # 开pp时projector只在最后一张卡有projector，这里默认要设为None不然影响freeze
         self.encoder = None
         if self.add_encoder:
+            setattr(config.audio_encoder, "use_general_mask_attention", True)
             self.encoder = AUDIO_ENCODER_MAPPINGS[config.audio_encoder.model_id](
                 config=config.audio_encoder,
                 transformer_layer_spec=encoder_transformer_layer_spec,

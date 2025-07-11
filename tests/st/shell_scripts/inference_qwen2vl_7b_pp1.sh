@@ -30,11 +30,6 @@ LOCATION=$(pip show mindspeed 2>/dev/null | grep "^Location:" | awk '{print $2}'
 echo "LOCATION: $LOCATION"
 echo "BASEPATH: $BASEPATH"
 
-mv -f "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"  "$LOCATION/mindspeed/core/transformer/dot_product_attention.py_bak"
-
-cp -rf "$BASEPATH/examples/qwen2vl/dot_product_attention.py"   "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"
-
-
 MM_MODEL="$BASEPATH/tests/st/run_configs/inference_qwen2vl_7B_pp1/inference_qwen2vl_7b.json"
 LOAD_PATH="/home/ci_resource/models/qwen2vl_7b/qwen2vl7b_pp1"
 
@@ -98,6 +93,3 @@ torchrun $DISTRIBUTED_ARGS inference_vlm.py \
     $MM_ARGS \
     $OUTPUT_ARGS \
     --distributed-backend nccl
-
-
-mv -f "$LOCATION/mindspeed/core/transformer/dot_product_attention.py_bak"  "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"

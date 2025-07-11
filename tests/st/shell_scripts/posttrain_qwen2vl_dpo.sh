@@ -24,8 +24,6 @@ BASEPATH=$(cd `dirname $0`; cd ../../../; pwd)
 LOCATION=$(pip show mindspeed 2>/dev/null | grep "^Location:" | awk '{print $2}')
 echo "LOCATION: $LOCATION"
 echo "BASEPATH: $BASEPATH"
-mv -f "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"  "$LOCATION/mindspeed/core/transformer/dot_product_attention.py_bak"
-cp -rf "$BASEPATH/examples/qwen2vl/dot_product_attention.py"   "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"
 
 MM_DATA="$BASEPATH/tests/st/run_configs/posttrain_qwen2vl_dpo/data_72b_dpo.json"
 MM_MODEL="$BASEPATH/tests/st/run_configs/posttrain_qwen2vl_dpo/model_72b.json"
@@ -114,5 +112,3 @@ torchrun $DISTRIBUTED_ARGS \
     $DPO_ARGS \
     --distributed-backend nccl \
     --lora-target-modules linear_qkv linear_proj linear_fc1 linear_fc2
-
-mv -f "$LOCATION/mindspeed/core/transformer/dot_product_attention.py_bak"  "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"

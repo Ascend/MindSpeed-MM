@@ -77,8 +77,6 @@ cd MindSpeed
 # checkout commit from MindSpeed core_r0.8.0
 git checkout 6f11a6c
 pip install -r requirements.txt
-# 替换MindSpeed中的文件（必选）
-cp ../MindSpeed-MM/examples/qwen2vl/dot_product_attention.py mindspeed/core/transformer/dot_product_attention.py
 cp -r mindspeed ../MindSpeed-MM/
 cd ..
 

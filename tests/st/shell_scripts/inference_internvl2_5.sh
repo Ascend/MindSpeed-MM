@@ -34,10 +34,6 @@ LOCATION=$(pip show mindspeed 2>/dev/null | grep "^Location:" | awk '{print $2}'
 echo "LOCATION: $LOCATION"
 echo "BASEPATH: $BASEPATH"
 
-mv -f "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"  "$LOCATION/mindspeed/core/transformer/dot_product_attention.py_bak"
-
-cp -rf "$BASEPATH/examples/internvl2.5/dot_product_attention.py"   "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"
-
 cd $BASEPATH
 
 MM_MODEL="$BASEPATH/tests/st/run_configs/inference_internvl2_5/inference_4B.json"
@@ -87,5 +83,3 @@ torchrun $DISTRIBUTED_ARGS \
     $MM_ARGS \
     $OUTPUT_ARGS \
     --distributed-backend nccl
-
-mv -f "$LOCATION/mindspeed/core/transformer/dot_product_attention.py_bak"  "$LOCATION/mindspeed/core/transformer/dot_product_attention.py"
