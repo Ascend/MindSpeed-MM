@@ -151,7 +151,13 @@ class MultiModalActorHybridWorkerBase(BaseWorker):
         experience_columns = ['responses', 'advantages', 'old_log_prob',
                              'ref_log_prob', 'input_ids', 'response_length', 'prompt_length', 'attention_mask', 'position_ids', 'input_ids_length']
 
-        experience_count = self.rl_config.actor_update_dispatch_size
+        if self.rl_config.actor_update_dispatch_size is None:
+            experience_count = (
+                self.megatron_config.global_batch_size //
+                self.parallel_state.get_data_parallel_world_size()
+            )
+        else:
+            experience_count = self.rl_config.actor_update_dispatch_size
 
         if skip_actor_log_prob:
             experience_columns.remove('old_log_prob')
@@ -261,7 +267,7 @@ class MultiModalActorHybridWorkerBase(BaseWorker):
                     prompt_length_data = batch_data['input_ids_length'][indexes]
                     # preprocess, remove padding
                     prompts = truncate_rows(prompts_data, prompt_length_data, left_pad=True)
-                else:    
+                else:
                     prompts_data = batch_data['prompts'][indexes]
                     prompt_length_data = batch_data['prompt_length'][indexes]
                     # preprocess, remove padding
@@ -370,7 +376,7 @@ class MultiModalActorHybridWorkerBase(BaseWorker):
 
         profiler_step(actor_compute_log_prob_profiler)
         MsProbe.debugger_stop('actor_compute_log_prob')
-    
+
     @mstx_timer_decorator
     def compute_image_embeds(self):
         experience_consumer_stage = 'actor_image_embeds'
@@ -378,7 +384,7 @@ class MultiModalActorHybridWorkerBase(BaseWorker):
         experience_count = self.rl_config.actor_image_embeds_dispatch_size
         sorted_indexes = self.get_dp_range_indexes(experience_count,
                                                    use_vllm=False) if self.rl_config.guarantee_order else None
-        
+
         actor_image_embeds_profiler = profiler_start(self.profiler_config, role="actor_image_embeds",
                                                      profiler_iteration=self.prof_iteration)
         MsProbe.debugger_start(self.model[0], tag='actor_image_embeds')
@@ -393,7 +399,7 @@ class MultiModalActorHybridWorkerBase(BaseWorker):
                                                                  indexes=sorted_indexes.pop(
                                                                      0) if self.rl_config.guarantee_order else None,
                                                                  get_n_samples=True)
-            if not start_time_defined:  
+            if not start_time_defined:
                 start_time = time.time()
                 start_time_defined = True
             if batch_data and index:
