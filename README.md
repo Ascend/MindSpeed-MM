@@ -338,6 +338,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
+      <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/opensora2.0">OpenSora 2.0-T2V</a></td>
+      <td><a href="https://huggingface.co/hpcai-tech/Open-Sora-v2">11B</a></td>
+      <td> 预训练 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 6.63 (SPS) </td>
+      <td> 5.67 (SPS) </td>
+      <td> / </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/opensoraplan1.2">OpenSoraPlan 1.2</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.2.0">8.7B</a></td>
       <td> 预训练 </td>
