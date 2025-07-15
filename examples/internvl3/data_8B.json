@@ -20,7 +20,7 @@
         "tokenizer_config": {
             "hub_backend": "hf",
             "autotokenizer_name": "AutoTokenizer",
-            "from_pretrained": "OpenGVLab/InternVL3-78B",
+            "from_pretrained": "OpenGVLab/InternVL3-8B",
             "add_eos_token": false,
             "use_fast": false
         },

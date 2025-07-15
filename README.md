@@ -19,6 +19,7 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 
 # 🔥🔥🔥Latest News
 
+* [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型 【Prototype】
 * **[Jul. 03, 2025]: 🚀 强化学习上线！ MindSpeed MM支持Qwen2.5VL 3B/7B/32B [GRPO训练](https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/rl)**
 * [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型 【Prototype】
 * [Jun. 30, 2025]: 🌴 MindSpeed MM版本2.1.0发布
@@ -565,7 +566,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td rowspan="14"> 多模态理解 </td>
+      <td rowspan="16"> 多模态理解 </td>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/glm4.1v">GLM-4.1V</a></td>
       <td><a href="https://github.com/THUDM/GLM-4.1V-Thinking">9B</a></td>
       <td> 微调 </td>
@@ -631,6 +632,27 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan=""><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/internvl2.5">InternVL 2.5</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2_5-78B">78B</a></td>
+      <td> 微调 </td>
+      <td> 8x8 </td>
+      <td> BF16 </td>
+      <td> / </td>
+      <td> / </td>
+      <td> / </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/internvl3">InternVL 3.0</a></td>
+      <td><a href="https://huggingface.co/OpenGVLab/InternVL3-8B">8B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td> / </td>
+      <td> / </td>
+      <td> / </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td><a href="https://huggingface.co/OpenGVLab/InternVL3-78B">78B</a></td>
       <td> 微调 </td>
       <td> 8x8 </td>
       <td> BF16 </td>
