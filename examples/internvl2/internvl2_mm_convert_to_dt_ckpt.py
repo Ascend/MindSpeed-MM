@@ -1,4 +1,5 @@
 import argparse
+import ast
 import re
 from pathlib import Path
 from typing import Optional, Sequence, Any, Tuple, Dict
@@ -453,8 +454,8 @@ if __name__ == '__main__':
     args, unrecognized_args = parser.parse_known_args()
     if unrecognized_args:
         print(f"Unrecognized Args: {unrecognized_args}")
-    args.target_vit_pp_layers = eval(args.target_vit_pp_layers)
-    args.target_gpt_pp_layers = eval(args.target_gpt_pp_layers)
+    args.target_vit_pp_layers = ast.literal_eval(args.target_vit_pp_layers)
+    args.target_gpt_pp_layers = ast.literal_eval(args.target_gpt_pp_layers)
     if len(args.target_vit_pp_layers) != args.target_vit_pp_size:
         raise ValueError(f'len({args.target_vit_pp_layers}) must equals to {args.target_vit_pp_size=}.')
     if len(args.target_gpt_pp_layers) != args.target_gpt_pp_size:
