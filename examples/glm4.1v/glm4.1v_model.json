@@ -12,9 +12,10 @@
             "attention_bias": false,
             "context_parallel_size": 2,
             "out_hidden_size": 4096,
-            "ffn_hidden_size": 3420,
+            "ffn_hidden_size": 4096,
             "llm_hidden_size": 1280,
             "gated_linear_unit": true,
+            "add_bias_linear": false,
             "num_attention_heads": 12,
             "hidden_dropout": 0.0,
             "attention_dropout": 0.0,
@@ -33,10 +34,12 @@
             "freeze": true,
             "use_fused_rotary_pos_emb": true,
             "post_layer_norm": false,
-            "intermediate_size": 3420,
             "tokens_per_second": 2,
             "rms_norm_eps": 1e-05,
-            "window_attn_size": 112
+            "window_attn_size": 112,
+            "recompute_granularity": "full",
+            "recompute_method": "uniform",
+            "recompute_num_layers": 1
         },
         "vision_projector": {
             "model_id": "GlmMLP",

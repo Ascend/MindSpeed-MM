@@ -56,7 +56,6 @@ GPT_ARGS="
     --seq-length 1024 \
     --make-vocab-size-divisible-by 1 \
     --normalization RMSNorm \
-    --use-fused-rmsnorm \
     --swiglu \
     --use-fused-swiglu \
     --lr 1.0e-5 \

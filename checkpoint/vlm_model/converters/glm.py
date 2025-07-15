@@ -40,6 +40,8 @@ def create_glm_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups:
                        llm_q_size: int, llm_kv_size: int) -> List[Operator]:
     """glm4v 权重转换逻辑"""
     ops = [
+        UpGateMergeOp(raw_names=[r"model.visual.blocks.(\d+).mlp.gate_proj.weight", r"model.visual.blocks.(\d+).mlp.up_proj.weight"],
+                      new_name=r"image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.weight"),
         RenameOp(
             (
                 (r'model.visual.patch_embed.proj', r'image_encoder.encoder.patch_embed.proj'),
@@ -47,9 +49,7 @@ def create_glm_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups:
                 (r'model.visual.embeddings.position_embedding', r'image_encoder.encoder.embeddings.position_embedding'),
                 (r'model.visual.blocks.(\d+).attn.proj', r'image_encoder.encoder.blocks.layers.(\d+).self_attention.proj'),
                 (r'model.visual.blocks.(\d+).attn.qkv', r'image_encoder.encoder.blocks.layers.(\d+).self_attention.qkv'),
-                (r'model.visual.blocks.(\d+).mlp.down_proj', r'image_encoder.encoder.blocks.layers.(\d+).mlp.down_proj'),
-                (r'model.visual.blocks.(\d+).mlp.gate_proj', r'image_encoder.encoder.blocks.layers.(\d+).mlp.gate_proj'),
-                (r'model.visual.blocks.(\d+).mlp.up_proj', r'image_encoder.encoder.blocks.layers.(\d+).mlp.up_proj'),
+                (r'model.visual.blocks.(\d+).mlp.down_proj', r'image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc2'),
                 (r'model.visual.blocks.(\d+).norm1', r'image_encoder.encoder.blocks.layers.(\d+).input_layernorm'),
                 (r'model.visual.blocks.(\d+).norm2', r'image_encoder.encoder.blocks.layers.(\d+).pre_mlp_layernorm'),
                 (r'model.visual.post_layernorm', r'image_encoder.encoder.blocks.final_layernorm'),
@@ -61,8 +61,8 @@ def create_glm_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups:
                 (r'model.visual.merger.down_proj', r'image_encoder.projector.down_proj'),
                 (r'model.language_model.embed_tokens', r'text_decoder.embedding.word_embeddings'),
                 (r'model.language_model.layers.(\d+).input_layernorm', r'text_decoder.decoder.layers.(\d+).input_layernorm'),
-                (r'model.language_model.layers.(\d+).mlp.down_proj', r'text_decoder.decoder.layers.(\d+).mlp.down_proj'),
-                (r'model.language_model.layers.(\d+).mlp.gate_up_proj', r'text_decoder.decoder.layers.(\d+).mlp.gate_up_proj'),
+                (r'model.language_model.layers.(\d+).mlp.down_proj', r'text_decoder.decoder.layers.(\d+).mlp.linear_fc2'),
+                (r'model.language_model.layers.(\d+).mlp.gate_up_proj', r'text_decoder.decoder.layers.(\d+).mlp.linear_fc1'),
                 (r'model.language_model.layers.(\d+).post_attention_layernorm', r'text_decoder.decoder.layers.(\d+).pre_mlp_layernorm'),
                 (r'model.language_model.layers.(\d+).post_self_attn_layernorm', r'text_decoder.decoder.layers.(\d+).post_self_attn_layernorm'),
                 (r'model.language_model.layers.(\d+).post_mlp_layernorm', r'text_decoder.decoder.layers.(\d+).post_mlp_layernorm'),

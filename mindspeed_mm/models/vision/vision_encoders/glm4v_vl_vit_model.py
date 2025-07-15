@@ -12,47 +12,14 @@ from transformers.activations import ACT2FN
 from transformers.cache_utils import DynamicCache
 
 from mindspeed_mm.models.common.module import MultiModalModule
-
+from mindspeed_mm.models.vision.vision_encoders.internvit_model import InternRMSNorm
+from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import VisionRotaryEmbedding, PatchEmbed
 
 past_key_values = DynamicCache()
 
 
-class Glm4vRMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6, config=None):
-        """
-        Glm4vRMSNorm is equivalent to T5LayerNorm
-        """
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.variance_epsilon = eps
-
-    def forward(self, hidden_states):
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * hidden_states.to(input_dtype)
-
-    def extra_repr(self):
-        return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
-
-
-class Glm4vMLP(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-
-        self.config = config
-        self.gate_up_proj = nn.Linear(config.hidden_size, 2 * config.ffn_hidden_size, bias=False)
-        self.down_proj = nn.Linear(config.ffn_hidden_size, config.hidden_size, bias=False)
-        self.activation_fn = ACT2FN[config.hidden_act]
-
-    def forward(self, hidden_states: torch.FloatTensor) -> torch.FloatTensor:
-        up_states = self.gate_up_proj(hidden_states)
-
-        gate, up_states = up_states.chunk(2, dim=-1)
-        up_states = up_states * self.activation_fn(gate)
-
-        return self.down_proj(up_states), None
+class Glm4vRMSNorm(InternRMSNorm):
+    pass
 
 
 def rotate_half_llm(x):
@@ -167,20 +134,6 @@ class Glm4vSelfAttention(nn.Module):
         return output.transpose(0, 1), None
 
 
-class Glm4VisionMlp(nn.Module):
-    def __init__(self, config, bias: bool = False):
-        super().__init__()
-        self.hidden_size = config.hidden_size
-        self.intermediate_size = config.out_hidden_size
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=bias)
-        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=bias)
-        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=bias)
-        self.act_fn = ACT2FN[config.hidden_act]
-
-    def forward(self, hidden_state):
-        return self.down_proj(self.act_fn(self.gate_proj(hidden_state)) * self.up_proj(hidden_state)), None
-
-
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
@@ -266,32 +219,6 @@ class Glm4vVisionAttention(SelfAttention):
         return attn_output, None
 
 
-class Glm4vVisionPatchEmbed(nn.Module):
-    def __init__(
-        self,
-        patch_size: int = 14,
-        temporal_patch_size: int = 1,
-        in_channels: int = 3,
-        embed_dim: int = 1536,
-        bias: bool = True,
-    ) -> None:
-        super().__init__()
-        self.patch_size = patch_size
-        self.temporal_patch_size = temporal_patch_size
-        self.in_channels = in_channels
-        self.embed_dim = embed_dim
-        kernel_size = [temporal_patch_size, patch_size, patch_size]
-        self.proj = nn.Conv3d(in_channels, embed_dim, kernel_size=kernel_size, stride=kernel_size, bias=bias)
-
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        target_dtype = self.proj.weight.dtype
-        hidden_states = hidden_states.view(
-            -1, self.in_channels, self.temporal_patch_size, self.patch_size, self.patch_size
-        )
-        hidden_states = self.proj(hidden_states.to(dtype=target_dtype)).view(-1, self.embed_dim)
-        return hidden_states
-
-
 class Glm4vVisionEmbeddings(nn.Module):
     def __init__(self, config: TransformerConfig):
         super().__init__()
@@ -372,18 +299,6 @@ class Glm4vVisionEmbeddings(nn.Module):
         return embeddings
 
 
-class Glm4vVisionRotaryEmbedding(nn.Module):
-    def __init__(self, dim: int, theta: float = 10000.0) -> None:
-        super().__init__()
-        inv_freq = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.float) / dim))
-        self.register_buffer("inv_freq", inv_freq, persistent=False)
-
-    def forward(self, seqlen: int) -> torch.Tensor:
-        seq = torch.arange(seqlen, device=self.inv_freq.device, dtype=self.inv_freq.dtype)
-        freqs = torch.outer(seq, self.inv_freq)
-        return freqs
-
-
 class GlmTransformerBlock(TransformerBlock):
     def _build_layers(self):
         super()._build_layers()
@@ -413,7 +328,7 @@ class GlmViT(MultiModalModule):
         self.pre_process = pre_process
         self.post_process = post_process
 
-        self.patch_embed = Glm4vVisionPatchEmbed(
+        self.patch_embed = PatchEmbed(
             patch_size=config.patch_size,
             temporal_patch_size=config.temporal_patch_size,
             in_channels=config.in_channels,
@@ -423,7 +338,7 @@ class GlmViT(MultiModalModule):
         self.post_conv_layernorm = Glm4vRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
         head_dim = config.hidden_size // config.num_attention_heads
-        self.rotary_pos_emb = Glm4vVisionRotaryEmbedding(head_dim // 2)
+        self.rotary_pos_emb = VisionRotaryEmbedding(head_dim // 2)
 
         self.embeddings = Glm4vVisionEmbeddings(config)
 

@@ -26,7 +26,8 @@ from megatron.core.transformer.transformer_layer import (
     TransformerLayerSubmodules,
 )
 
-from mindspeed_mm.models.vision.vision_encoders.glm4v_vl_vit_model import Glm4vMLP, Glm4vRMSNorm, Glm4vSelfAttention, Glm4vVisionAttention, Glm4VisionMlp
+from mindspeed_mm.models.vision.vision_encoders.glm4v_vl_vit_model import Glm4vRMSNorm, Glm4vSelfAttention, Glm4vVisionAttention
+from mindspeed_mm.models.common.module_spec.llava_layer_spec import get_mlp_module_spec
 
 
 @dataclass
@@ -154,6 +155,7 @@ class Glm4vTransformerLayer(TransformerLayer):
 
 
 def get_glm4v_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
+    mlp = get_mlp_module_spec(use_te=False)
     return ModuleSpec(
         module=Glm4vTransformerLayer,
         submodules=Glm4vTransformerLayerSubmodules(
@@ -172,7 +174,7 @@ def get_glm4v_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
             post_self_attn_layernorm=Glm4vRMSNorm,
             self_attn_bda=get_bias_dropout_add,
             pre_mlp_layernorm=Glm4vRMSNorm,
-            mlp=Glm4vMLP,
+            mlp=mlp,
             post_mlp_layernorm=Glm4vRMSNorm,
             mlp_bda=get_bias_dropout_add,
             sharded_state_dict_keys_map={
@@ -184,7 +186,7 @@ def get_glm4v_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
 
 
 def get_glm4v_vit_layer_spec(config=None, is_vit=True, *args, **kwargs) -> ModuleSpec:
-
+    mlp = get_mlp_module_spec(use_te=False)
     return ModuleSpec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
@@ -202,7 +204,7 @@ def get_glm4v_vit_layer_spec(config=None, is_vit=True, *args, **kwargs) -> Modul
             ),
             self_attn_bda=get_bias_dropout_add,
             pre_mlp_layernorm=Glm4vRMSNorm,
-            mlp=Glm4VisionMlp,
+            mlp=mlp,
             mlp_bda=get_bias_dropout_add,
         ),
     )

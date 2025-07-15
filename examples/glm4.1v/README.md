@@ -115,7 +115,7 @@ mm-convert GlmConverter hf_to_mm \
 mm-convert GlmConverter hf_to_mm \
   --cfg.mm_dir "pretrained/GLM4.1V-9B" \
   --cfg.hf_config.hf_dir "ckpt/hf_path/GLM4.1V-9B-Instruct" \
-  --cfg.parallel_config.llm_pp_layers [[7, 11, 11, 11]] \
+  --cfg.parallel_config.llm_pp_layers [[7,11,11,11]] \
   --cfg.parallel_config.vit_pp_layers [[24,0,0,0]] \
   --cfg.trust_remote_code True
 
