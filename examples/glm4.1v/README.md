@@ -103,7 +103,15 @@ pip install -e .
 MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 
 ```bash
-# 9B
+# 9B PP1
+mm-convert GlmConverter hf_to_mm \
+  --cfg.mm_dir "pretrained/GLM4.1V-9B" \
+  --cfg.hf_config.hf_dir "ckpt/hf_path/GLM4.1V-9B-Instruct" \
+  --cfg.parallel_config.llm_pp_layers [[40]] \
+  --cfg.parallel_config.vit_pp_layers [[24]] \
+  --cfg.trust_remote_code True
+
+# 9B PP4
 mm-convert GlmConverter hf_to_mm \
   --cfg.mm_dir "pretrained/GLM4.1V-9B" \
   --cfg.hf_config.hf_dir "ckpt/hf_path/GLM4.1V-9B-Instruct" \
@@ -271,7 +279,7 @@ bash examples/glm4.1v/fine_tune_glm4.1v.sh
 
 （1）tokenizer/from_pretrained配置的路径为从huggingface下载的原始GLM4.1V-9B-Instruct路径。
 
-（2）shell文件中的LOAD_PATH的路径为经过权重转换后的模型路径(可PP切分)。
+（2）shell文件中的LOAD_PATH的路径为经过权重转换后的模型路径(当前只支持单卡推理)。
 
 <a id="jump5.2"></a>
 #### 2、启动推理
