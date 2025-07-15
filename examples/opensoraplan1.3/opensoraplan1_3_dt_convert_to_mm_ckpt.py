@@ -1,4 +1,6 @@
 import argparse
+import ast
+
 import opensoraplan1_3_mm_convert_to_dt_ckpt as ckpt_utils
 
 
@@ -72,7 +74,7 @@ if __name__ == '__main__':
     args, unrecognized_args = parser.parse_known_args()
     if unrecognized_args:
         print(f"Unrecognized Args: {unrecognized_args}")
-    args.target_dit_pp_layers = eval(args.target_dit_pp_layers)
+    args.target_dit_pp_layers = ast.literal_eval(args.target_dit_pp_layers)
     if len(args.target_dit_pp_layers) != args.target_pp_size:
         raise ValueError(f'len({args.target_dit_pp_layers}) must equals to {args.target_pp_size=}')
 

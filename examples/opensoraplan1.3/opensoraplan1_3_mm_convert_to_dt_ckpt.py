@@ -1,4 +1,5 @@
 import argparse
+import ast
 import re
 from pathlib import Path
 from typing import Optional, Sequence, Any, Tuple, Dict
@@ -401,8 +402,8 @@ if __name__ == "__main__":
     args, unrecognized_args = parser.parse_known_args()
     if unrecognized_args:
         print(f"Unrecognized Args: {unrecognized_args}")
-    args.target_vae_pp_layers = eval(args.target_vae_pp_layers)
-    args.target_dit_pp_layers = eval(args.target_dit_pp_layers)
+    args.target_vae_pp_layers = ast.literal_eval(args.target_vae_pp_layers)
+    args.target_dit_pp_layers = ast.literal_eval(args.target_dit_pp_layers)
     if max(1, len(args.target_vae_pp_layers)) != args.target_vae_pp_size:  # ckpt file has no vae part, [] -> pp_size=1
         raise ValueError(f'len({args.target_vae_pp_layers}) must equals to {args.target_vae_pp_size=}.')
     if len(args.target_dit_pp_layers) != args.target_dit_pp_size:
