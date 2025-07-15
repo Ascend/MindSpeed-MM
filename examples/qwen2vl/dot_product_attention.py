@@ -240,46 +240,74 @@ def dot_product_attention_forward(
                                                                 )[0]
         attn_output = rearrange(attn_output, 'b s h d -> s b (h d)', s=query.shape[1], b=bsz)
         return attn_output
+    elif get_args().context_parallel_algo == "megatron_cp_algo" and mpu.get_context_parallel_world_size() > 1:
+        if is_vit:
+            actual_seq_len = get_actual_seq_len()
+            cp_size = mpu.get_context_parallel_world_size()
+            cp_group = mpu.get_context_parallel_group()
+            split_gather_sizes = cal_split_sizes(query.shape[0], cp_size)
+            heads_num, hidden_dim = query.shape[-2], query.shape[-1]
+
+            query = split_forward_gather_backward(query, cp_group, 0, split_gather_sizes)
+            key = split_forward_gather_backward(key, cp_group, 0, split_gather_sizes)
+            value = split_forward_gather_backward(value, cp_group, 0, split_gather_sizes)
+
+            query = rearrange(query, "s b n d -> s b (n d)")
+            key = rearrange(key, "s b n d -> s b (n d)")
+            value = rearrange(value, "s b n d -> s b (n d)")
+
+            packed_seq_params = PackedSeqParams()
+            packed_seq_params.cu_seqlens_q = torch.tensor(actual_seq_len).npu()
+            packed_seq_params.cu_seqlens_kv = torch.tensor(actual_seq_len).npu()
+
+            attn_output = do_ring_context_parallel(query, key, value, heads_num, 1 / math.sqrt(hidden_dim), None, 
+                                                    packed_seq_params=packed_seq_params, is_vit=True)
+            attn_output = gather_forward_split_backward(attn_output, cp_group, 0, split_gather_sizes)
+        
+        else:
+            cp_rank = mpu.get_context_parallel_rank()
+            cp_size = mpu.get_context_parallel_world_size()
+            cp_group = mpu.get_context_parallel_group()
+            seq_length, batch_size, heads_num, hidden_dim = query.shape
+
+            split_gather_sizes = cal_split_sizes(query.shape[0], mpu.get_context_parallel_world_size())
+
+            batch_data = dict()
+            batch_data["query"] = query.transpose(0, 1)
+            batch_data["key"] = key.transpose(0, 1)
+            batch_data["value"] = value.transpose(0, 1)
+
+            batch_data_this_rank = get_batch_on_this_cp_rank(batch_data)
+            query = batch_data_this_rank["query"].transpose(0, 1)
+            key = batch_data_this_rank["key"].transpose(0, 1)
+            value = batch_data_this_rank["value"].transpose(0, 1)
+
+            query, key, value = [rearrange(x, "s b n d -> s b (n d)") for x in [query, key, value]]
+            attention_mask = torch.triu(torch.ones([2048, 2048], dtype=torch.bool, device=query.device), diagonal=1)
+
+            attn_output = do_ring_context_parallel(query, key, value, heads_num, 1.0 / math.sqrt(hidden_dim), attention_mask)
+            attn_output = gather_forward_split_backward(attn_output, cp_group, 0, split_gather_sizes)
+            attn_output = reorder_output(attn_output, cp_rank, cp_size, cp_group)
+    
     else:
         if is_vit:
-            if get_args().context_parallel_algo == "megatron_cp_algo" and mpu.get_context_parallel_world_size() > 1:
-                actual_seq_len = get_actual_seq_len()
-                cp_size = mpu.get_context_parallel_world_size()
-                cp_group = mpu.get_context_parallel_group()
-                split_gather_sizes = cal_split_sizes(query.shape[0], cp_size)
-                heads_num, hidden_dim = query.shape[-2], query.shape[-1]
+            actual_seq_len = get_actual_seq_len()
+            query, key, value = [rearrange(x, 's b h d -> (b s) h d') for x in [query, key, value]]
+            attn_output = torch_npu.npu_fusion_attention(
+                query, key, value, n_head,
+                pse=None,
+                padding_mask=None,
+                atten_mask=None,
+                scale=1.0 / math.sqrt(query.shape[-1]),
+                keep_prob=1,
+                input_layout='TND',
+                actual_seq_qlen=actual_seq_len,
+                actual_seq_kvlen=actual_seq_len,
+                pre_tockens=2147483647,
+                next_tockens=2147483647,
+                sparse_mode=0)[0]
+            attn_output = rearrange(attn_output, '(b s) h d -> s b (h d)', s=seq_length, b=bsz)
 
-                query = split_forward_gather_backward(query, cp_group, 0, split_gather_sizes)
-                key = split_forward_gather_backward(key, cp_group, 0, split_gather_sizes)
-                value = split_forward_gather_backward(value, cp_group, 0, split_gather_sizes)
-
-                query = rearrange(query, "s b n d -> s b (n d)")
-                key = rearrange(key, "s b n d -> s b (n d)")
-                value = rearrange(value, "s b n d -> s b (n d)")
-
-                packed_seq_params = PackedSeqParams()
-                packed_seq_params.cu_seqlens_q = torch.tensor(actual_seq_len).npu()
-                packed_seq_params.cu_seqlens_kv = torch.tensor(actual_seq_len).npu()
-
-                attn_output = do_ring_context_parallel(query, key, value, heads_num, 1 / math.sqrt(hidden_dim), None, 
-                                                       packed_seq_params=packed_seq_params, is_vit=True)
-                attn_output = gather_forward_split_backward(attn_output, cp_group, 0, split_gather_sizes)
-            else:
-                actual_seq_len = get_actual_seq_len()
-                query, key, value = [rearrange(x, 's b h d -> (b s) h d') for x in [query, key, value]]
-                attn_output = torch_npu.npu_fusion_attention(
-                    query, key, value, n_head,
-                    pse=None,
-                    padding_mask=None,
-                    atten_mask=None,
-                    scale=1.0 / math.sqrt(query.shape[-1]),
-                    keep_prob=1,
-                    input_layout='TND',
-                    actual_seq_qlen=actual_seq_len,
-                    actual_seq_kvlen=actual_seq_len,
-                    pre_tockens=2147483647,
-                    next_tockens=2147483647,
-                    sparse_mode=0)[0].reshape(seq_length, bsz, -1)
         elif use_remove_padding:
             actual_seq_len = get_actual_seq_len()
             query, key, value = [rearrange(x, 's b h d -> (b s) h d') for x in [query, key, value]]
@@ -296,6 +324,7 @@ def dot_product_attention_forward(
                 actual_seq_qlen=actual_seq_len,
                 actual_seq_kvlen=actual_seq_len,
                 sparse_mode=3)[0].reshape(seq_length, bsz, -1)
+
         elif attention_mask is not None:
             query = query.transpose(0, 1).contiguous()
             key = key.transpose(0, 1).contiguous()
@@ -319,44 +348,21 @@ def dot_product_attention_forward(
                 next_tockens=0)[0]
             attn_output = _pad_input(attn_output_unpad, indices_q, bsz, seq_length)
             attn_output = rearrange(attn_output, 'b s h d -> s b (h d)', s=seq_length, b=bsz)
+        
         else:
-            if get_args().context_parallel_algo == "megatron_cp_algo" and mpu.get_context_parallel_world_size() > 1:
-                cp_rank = mpu.get_context_parallel_rank()
-                cp_size = mpu.get_context_parallel_world_size()
-                cp_group = mpu.get_context_parallel_group()
-                seq_length, batch_size, heads_num, hidden_dim = query.shape
-
-                split_gather_sizes = cal_split_sizes(query.shape[0], mpu.get_context_parallel_world_size())
-
-                batch_data = dict()
-                batch_data["query"] = query.transpose(0, 1)
-                batch_data["key"] = key.transpose(0, 1)
-                batch_data["value"] = value.transpose(0, 1)
-
-                batch_data_this_rank = get_batch_on_this_cp_rank(batch_data)
-                query = batch_data_this_rank["query"].transpose(0, 1)
-                key = batch_data_this_rank["key"].transpose(0, 1)
-                value = batch_data_this_rank["value"].transpose(0, 1)
-
-                query, key, value = [rearrange(x, "s b n d -> s b (n d)") for x in [query, key, value]]
-                attention_mask = torch.triu(torch.ones([2048, 2048], dtype=torch.bool, device=query.device), diagonal=1)
-
-                attn_output = do_ring_context_parallel(query, key, value, heads_num, 1.0 / math.sqrt(hidden_dim), attention_mask)
-                attn_output = gather_forward_split_backward(attn_output, cp_group, 0, split_gather_sizes)
-                attn_output = reorder_output(attn_output, cp_rank, cp_size, cp_group)
-            else:
-                query = query.transpose(0, 1).contiguous()
-                key = key.transpose(0, 1).contiguous()
-                value = value.transpose(0, 1).contiguous()
-                attention_mask_npu = torch.triu(
-                    torch.ones([query.shape[1], key.shape[1]], dtype=torch.bool, device=query.device), diagonal=1)
-                attn_output = torch_npu.npu_fusion_attention(
-                    query, key, value, n_head, 'BSND',
-                    keep_prob=1.0,
-                    scale=1.0 / math.sqrt(query.shape[-1]),
-                    atten_mask=attention_mask_npu)[0]
-                attn_output = rearrange(attn_output, 'b s h d -> s b (h d)', s=seq_length, b=bsz)
-        return attn_output
+            query = query.transpose(0, 1).contiguous()
+            key = key.transpose(0, 1).contiguous()
+            value = value.transpose(0, 1).contiguous()
+            attention_mask_npu = torch.triu(
+                torch.ones([query.shape[1], key.shape[1]], dtype=torch.bool, device=query.device), diagonal=1)
+            attn_output = torch_npu.npu_fusion_attention(
+                query, key, value, n_head, 'BSND',
+                keep_prob=1.0,
+                scale=1.0 / math.sqrt(query.shape[-1]),
+                atten_mask=attention_mask_npu)[0]
+            attn_output = rearrange(attn_output, 'b s h d -> s b (h d)', s=seq_length, b=bsz)
+    
+    return attn_output
 
 
 def _unpad_input(
