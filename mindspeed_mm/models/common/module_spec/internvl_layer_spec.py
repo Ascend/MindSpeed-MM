@@ -1,13 +1,14 @@
 from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
 from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
+from megatron.core.transformer.custom_layers.transformer_engine import TENorm
 from megatron.core.transformer.dot_product_attention import DotProductAttention
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.identity_op import IdentityOp
 from megatron.core.transformer.mlp import MLP, MLPSubmodules
 from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
-from mindspeed_mm.models.vision.vision_encoders.internvit_model import InternRMSNorm, InternVitSelfAttention, InternVitTransformerLayer
+from mindspeed_mm.models.vision.vision_encoders.internvit_model import InternVitSelfAttention, InternVitTransformerLayer
 
 
 def get_language_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
@@ -15,7 +16,7 @@ def get_language_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
     return ModuleSpec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
-            input_layernorm=InternRMSNorm,
+            input_layernorm=TENorm,
             self_attention=ModuleSpec(
                 module=SelfAttention,
                 params={"attn_mask_type": AttnMaskType.causal},
@@ -29,7 +30,7 @@ def get_language_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
             ),
             self_attn_bda=get_bias_dropout_add,
             pre_cross_attn_layernorm=IdentityOp,
-            pre_mlp_layernorm=InternRMSNorm,
+            pre_mlp_layernorm=TENorm,
             mlp=mlp,
             mlp_bda=get_bias_dropout_add,
             sharded_state_dict_keys_map={
@@ -45,7 +46,7 @@ def get_vit_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
     return ModuleSpec(
         module=InternVitTransformerLayer,
         submodules=TransformerLayerSubmodules(
-            input_layernorm=InternRMSNorm,
+            input_layernorm=TENorm,
             self_attention=ModuleSpec(
                 module=InternVitSelfAttention,
                 params={"attn_mask_type": AttnMaskType.causal},
@@ -53,12 +54,12 @@ def get_vit_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
                     linear_qkv=ColumnParallelLinear,
                     core_attention=DotProductAttention,
                     linear_proj=RowParallelLinear,
-                    q_layernorm=InternRMSNorm if config.qk_layernorm else IdentityOp,
-                    k_layernorm=InternRMSNorm if config.qk_layernorm else IdentityOp,
+                    q_layernorm=TENorm if config.qk_layernorm else IdentityOp,
+                    k_layernorm=TENorm if config.qk_layernorm else IdentityOp,
                 ),
             ),
             self_attn_bda=get_bias_dropout_add,
-            pre_mlp_layernorm=InternRMSNorm,
+            pre_mlp_layernorm=TENorm,
             mlp=mlp,
             mlp_bda=get_bias_dropout_add,
         )

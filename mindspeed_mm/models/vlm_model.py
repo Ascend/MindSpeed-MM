@@ -5,8 +5,11 @@ from torch.nn import CrossEntropyLoss
 
 from megatron.core import InferenceParams, mpu
 from megatron.core import tensor_parallel
+from megatron.core.parallel_state import get_tensor_model_parallel_group
 from megatron.core.tensor_parallel import scatter_to_sequence_parallel_region
 from megatron.core.packed_seq_params import PackedSeqParams
+from megatron.core.tensor_parallel.mappings import gather_from_sequence_parallel_region
+
 from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 
@@ -407,21 +410,24 @@ class VLMModel(MultiModalModule):
             input_embeds = None
             if self.text_decoder.pre_process:
                 input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
-                _input_ids = input_ids
-                if self.config.sequence_parallel:
-                    _input_ids = scatter_to_sequence_parallel_region(_input_ids.transpose(0, 1)).transpose(0, 1)
+
                 if vit_embeds is not None:
+                    if self.config.sequence_parallel:
+                        input_embeds = gather_from_sequence_parallel_region(input_embeds)
                     input_embeds = input_embeds.transpose(0, 1)  # bsh
-                    image_mask = torch.eq(_input_ids, self.img_context_token_id).unsqueeze(-1).expand_as(input_embeds)
+                    image_mask = torch.eq(input_ids, self.img_context_token_id).unsqueeze(-1).expand_as(input_embeds)
                     vit_embeds = vit_embeds[:, 0, :]
                     input_embeds = input_embeds.masked_scatter(image_mask, vit_embeds)
                     # 音频模态处理
                     if 'input_features' in kwargs:  # 使用WhisperFeatureExtractor提取音频特征后输出值名为input_feature
                         audio_features = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
-                        audio_mask = torch.eq(_input_ids, 151646).unsqueeze(-1).expand_as(input_embeds) 
+                        # 151646 表示音频模态的token id
+                        audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds) 
                         audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
                         input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
                     input_embeds = input_embeds.transpose(0, 1).clone()
+                    if self.config.sequence_parallel:
+                        input_embeds = scatter_to_sequence_parallel_region(input_embeds)
 
             attention_mask, position_ids = prepare_positionsids_mask_for_llm(config=self.config, input_ids=input_ids,
                                                                              inference_params=inference_params,

@@ -101,7 +101,7 @@ class RoPE3D(nn.Module):
     
 
 class DynamicRotaryEmbedding(RotaryEmbedding):
-    def __init_(self,
+    def __init__(self,
                 config,
                 kv_channels,
                 rotary_percent,
@@ -123,7 +123,7 @@ class DynamicRotaryEmbedding(RotaryEmbedding):
             dim = int(dim * rotary_percent)
         
         max_position_embeddings = config.max_position_embeddings
-        factor = config.rope_scaling.get("factor", 1.0)
+        factor = config.rope_scaling.factor if hasattr(config.rope_scaling, 'factor') else 1.0
 
         seq_len = seq_len if seq_len is not None and seq_len > max_position_embeddings else max_position_embeddings
         device = "cpu" if use_cpu_initialization else torch.cuda.current_device()

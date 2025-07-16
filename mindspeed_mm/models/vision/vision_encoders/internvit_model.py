@@ -14,9 +14,12 @@ import torch_npu
 from timm.models.layers import DropPath
 
 from megatron.core import mpu 
+from megatron.core.parallel_state import get_tensor_model_parallel_group
+from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_region
 from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
+from megatron.core.transformer.custom_layers.transformer_engine import TENorm
 from megatron.core.transformer.transformer_block import TransformerBlock, TransformerBlockSubmodules
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
@@ -27,22 +30,6 @@ from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.communications import cal_split_sizes
 from mindspeed_mm.models.common.communications import split_forward_gather_backward, gather_forward_split_backward
 
-
-class InternRMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6, config=None):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.variance_epsilon = eps
-
-    def forward(self, hidden_states):
-        args = get_args()
-        if args.use_fused_rmsnorm:
-            return torch_npu.npu_rms_norm(hidden_states, self.weight, epsilon=self.variance_epsilon)[0]
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * hidden_states.to(input_dtype)
 
 
 class InternVitTransformerLayer(TransformerLayer):
@@ -64,14 +51,6 @@ class InternVitTransformerLayer(TransformerLayer):
                          submodules=submodules, 
                          layer_number=layer_number, 
                          hidden_dropout=hidden_dropout)
-        
-        if config.normalization == 'LayerNorm':
-            self.input_layernorm = torch.nn.LayerNorm(config.hidden_size, config.layernorm_epsilon)
-            self.pre_mlp_layernorm = torch.nn.LayerNorm(config.hidden_size, config.layernorm_epsilon)
-        elif config.normalization == 'RMSNorm':
-            self.input_layernorm = InternRMSNorm(config.hidden_size, config.layernorm_epsilon)
-            self.pre_mlp_layernorm = InternRMSNorm(config.hidden_size, config.layernorm_epsilon)
-            
 
         # InternViT新增可学习参数
         self.ls1 = nn.Parameter(config.initializer_factor * torch.ones(config.hidden_size))
@@ -223,21 +202,24 @@ class InternVitSelfAttention(SelfAttention):
         mixed_qkv, _ = self.linear_qkv(hidden_states)
 
         N, B, C = mixed_qkv.shape
-        mixed_qkv = mixed_qkv.reshape(N, B, 3, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head)
-        mixed_qkv = mixed_qkv.permute(2, 0, 3, 1, 4)
+        mixed_qkv = mixed_qkv.reshape(N, B, 3, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head) # -> [N, B, 3, H, D]
+
+        query, key, value = mixed_qkv.unbind(2) 
         
-        query, key, value = mixed_qkv.unbind(0)  # [sq, np, b, hn]
-        
-        # [sq, b, ng, np/ng * hn] -> [sq, b, np, hn]
+        gather_sizes = cal_split_sizes(dim_size=self.config.num_attention_heads, world_size=self.config.tensor_model_parallel_size)
+
         if self.q_layernorm is not None:
-            N_, H_, B_, D_ = query.shape
-            query = self.q_layernorm(query.permute(2, 0, 1, 3).flatten(-2, -1)).view(B_, N_, H_, D_).transpose(0, 1)
+            query = gather_forward_split_backward(query, get_tensor_model_parallel_group(), dim=2, gather_sizes=gather_sizes)
+            N_, B_, H_, D_ = query.shape
+            query = self.q_layernorm(query.flatten(-2, -1)).view(N_, B_, H_, D_)
+            query = split_forward_gather_backward(query, get_tensor_model_parallel_group(), dim=2, split_sizes=gather_sizes)
 
         if self.k_layernorm is not None:
-            N_, H_, B_, D_ = key.shape
-            key = self.k_layernorm(key.permute(2, 0, 1, 3).flatten(-2, -1)).view(B_, N_, H_, D_).transpose(0, 1)
+            key = gather_forward_split_backward(key, get_tensor_model_parallel_group(), dim=2, gather_sizes=gather_sizes)
+            N_, B_, H_, D_ = key.shape
+            key = self.q_layernorm(key.flatten(-2, -1)).view(N_, B_, H_, D_)
+            key = split_forward_gather_backward(key, get_tensor_model_parallel_group(), dim=2, split_sizes=gather_sizes)
 
-        value = value.permute(0, 2, 1, 3)
 
         if self.config.test_mode:
             self.run_realtime_tests()
@@ -323,7 +305,7 @@ class InternVitTransformerBlock(TransformerBlock):
         )
 
         if self.post_process and self.post_layer_norm:
-            self.final_layernorm = InternRMSNorm(self.config.hidden_size, eps=self.config.layernorm_epsilon)
+            self.final_layernorm = TENorm(self.config.hidden_size, eps=self.config.layernorm_epsilon)
         else:
             self.final_layernorm = None
 
