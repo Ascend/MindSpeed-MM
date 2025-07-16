@@ -14,6 +14,7 @@ import PIL.Image
 import torch
 from megatron.training import get_args, print_rank_0
 from mindspeed_mm.data.data_utils.processing_deepseek_vl_v2 import DeepseekVLV2Processor
+from mindspeed_mm.data.data_utils.constants import MODEL_CONSTANTS
 from mindspeed_mm.data.data_utils.utils import preprocess
 from mindspeed_mm.data.datasets.mm_base_dataset import MMBaseDataset
 from mindspeed_mm.models import Tokenizer
@@ -168,7 +169,42 @@ class MultiModalChatDataset(MMBaseDataset):
         return ret
 
     def multi_modal_multi_image_get_item(self, data_item):
-        pass
+        total_pixel_values, num_image_token_list = [], []
+        num_images = len(data_item["image"])
+
+        for image_path in data_item["image"]:
+            image_path = self.get_path(image_path)
+
+            cur_pixel_values = self.img_video_processor(image_path=image_path, mode='multi_image', num_image=num_images)['pixel_values']
+            total_pixel_values += cur_pixel_values
+            num_image_token_list.append(self.num_image_token * len(cur_pixel_values))
+
+        total_pixel_values = torch.stack(total_pixel_values)
+        num_patches = total_pixel_values.size(0)
+
+        ret = self._init_return_dict()
+        ret.update({"pixel_values": total_pixel_values})
+
+        ret_tokenizer = preprocess(
+            template_name=self.template_name,
+            sources=copy.deepcopy([data_item["conversations"]]),
+            tokenizer=self.tokenizer,
+            num_image_token_list=num_image_token_list,
+            group_by_length=self.group_by_length,
+            is_multimodal=self.is_multimodal,
+            mm_use_im_start_end=self.mm_use_im_start_end,
+            num_image=num_images
+        )
+
+        ret.update(ret_tokenizer)
+        ret["image_flags"] = torch.tensor([1] * num_patches, dtype=torch.long)
+        self._filter_return_dict_keys(ret)
+
+        image_end_token_id = self.tokenizer.convert_tokens_to_ids(MODEL_CONSTANTS[self.template_name]["IMG_END_TOKEN"])
+        if (ret["input_ids"] == image_end_token_id).sum() != num_images:
+            raise ValueError(f"image tokens are truncated, this dataset is {self.data_path}")
+        
+        return ret
 
     def pure_text_get_item(self, data_item):
         pass
@@ -217,7 +253,7 @@ class MultiModalChatDataset(MMBaseDataset):
                 data_item = copy.deepcopy(self.data_samples[index])
                 if "image" in data_item and len(data_item["image"]) != 0:
                     if isinstance(data_item["image"], list):
-                        raise AssertionError(f"Dose not support multi picture inference.")
+                        ret = self.multi_modal_multi_image_get_item(data_item)
                     else:
                         ret = self.multi_modal_get_item(data_item)
                 elif "video" in data_item and data_item["video"] is not None and data_item["video"] != "":
