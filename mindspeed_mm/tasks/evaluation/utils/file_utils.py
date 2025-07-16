@@ -3,21 +3,45 @@ import csv
 import io
 import mimetypes
 import os
-import pickle
 from multiprocessing import Lock
+import json
 from PIL import Image
+import numpy as np
 
 lock = Lock()
 
 
-def load_pkl(pkl_path):
-    with open(pkl_path, 'rb') as f:
-        return pickle.load(f)
+def restore_int64_key(obj):
+    restored = {}
+    for key, value in obj.items():
+        if key.isdigit():
+            key = np.int64(key)
+        elif isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                if sub_value.isdigit():
+                    value[sub_key] = int(sub_value)
+        restored[key] = value
+    return restored
 
 
-def save_pkl(data, pkl_path):
-    with open(pkl_path, 'wb') as f:
-        pickle.dump(data, f)
+def load_json(pkl_path):
+    if not os.path.exists(pkl_path):
+        raise FileNotFoundError(f"File not found: {pkl_path}")
+
+    with open(pkl_path, 'r') as f:
+        data = json.load(f)
+
+    return restore_int64_key(data)
+
+
+def save_json(data, pkl_path):
+    if not isinstance(data, dict):
+        raise ValueError("Data must be a dictionary.")
+
+    converted_data = {int(k) if isinstance(k, np.integer) else k: v for k, v in data.items()}
+
+    with open(pkl_path, 'w') as f:
+        json.dump(converted_data, f)
 
 
 def is_valid_image(image_path):

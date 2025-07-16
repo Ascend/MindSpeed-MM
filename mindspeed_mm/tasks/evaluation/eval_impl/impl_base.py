@@ -10,7 +10,7 @@ from megatron.core import mpu
 from mindspeed_mm.tasks.evaluation.utils.analysis_utils import mmmu_open_question_preprocess, report_acc, eval_vanilla, \
     track_progress_rich
 from mindspeed_mm.tasks.evaluation.utils.string_utils import logger_rank_0
-from mindspeed_mm.tasks.evaluation.utils.file_utils import load_pkl, save_pkl, save_csv
+from mindspeed_mm.tasks.evaluation.utils.file_utils import load_json, save_json, save_csv
 from mindspeed_mm.tasks.evaluation.eval_prompt.build_prompt_base import BasePromptTemplate
 from mindspeed_mm.tasks.evaluation.eval_datasets.datasets_base import BaseEvalDataset
 
@@ -32,7 +32,7 @@ class BaseEvalImpl:
         self.dataset_name = args.evaluation_dataset
         self.supported_types = ['text', 'image', 'video']
         self.result_path = os.path.join(self.output_path, model_name + "_" + self.dataset_name + ".xlsx")
-        self.prev_file = os.path.join(self.output_path, model_name + "_" + self.dataset_name + "_PREV.pkl")
+        self.prev_file = os.path.join(self.output_path, model_name + "_" + self.dataset_name + "_PREV.json")
 
         # 保存每个卡上的结果
         self.out_file = self._out_file(self.rank)
@@ -50,7 +50,7 @@ class BaseEvalImpl:
         print(f"Rank {self.rank} of the data parallel group has {len(sheet_indices)} evaluation data ")
         self.data = dataset.data.iloc[sheet_indices]
         self.data_indices = [i for i in self.data['index']]  # 每个卡处理自己的index
-        self.result = load_pkl(self.prev_file) if os.path.exists(self.prev_file) else {}
+        self.result = load_json(self.prev_file) if os.path.exists(self.prev_file) else {}
 
     def __call__(self):
 
@@ -105,11 +105,11 @@ class BaseEvalImpl:
                 and mpu.is_pipeline_last_stage()
                 and (mpu.get_tensor_model_parallel_rank() == 0)
             ):
-                save_pkl(self.result, self.out_file)
+                save_json(self.result, self.out_file)
 
         if mpu.is_pipeline_last_stage() and mpu.get_tensor_model_parallel_rank() == 0:
             res = {k: self.result[k] for k in self.data_indices}
-            save_pkl(res, self.out_file)
+            save_json(res, self.out_file)
 
     def gather_result(self):
         """
@@ -122,7 +122,7 @@ class BaseEvalImpl:
         if torch.distributed.get_rank() == 0:
             data_all = {}
             for i in range(self.world_size):
-                data_all.update(load_pkl(self._out_file(i)))
+                data_all.update(load_json(self._out_file(i)))
 
             data = self.dataset.data
             for x in data['index']:
@@ -186,7 +186,7 @@ class BaseEvalImpl:
             if tups:
                 res = track_progress_rich(eval_vanilla, tups, nproc=nproc, chunksize=nproc, save=self.prev_file,
                                           keys=keys)
-                result = load_pkl(self.prev_file)
+                result = load_json(self.prev_file)
                 for k, v in zip(keys, res):
                     result[k] = v
             data['hit'] = [result.get(i, {}).get('hit', None) for i in data['index']]
@@ -203,4 +203,4 @@ class BaseEvalImpl:
 
     def _out_file(self, rank):
         return os.path.join(self.output_path,
-                            str(rank) + "_" + f'{self.world_size}_{self.dataset_name}.pkl')
+                            str(rank) + "_" + f'{self.world_size}_{self.dataset_name}.json')
