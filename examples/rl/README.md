@@ -65,6 +65,8 @@ cd ..
 conda create -n test python=3.10
 conda activate test
 
+# for torch-npu dev version or x86 machine [Optional]
+# pip config set global.extra-index-url "https://download.pytorch.org/whl/cpu/ https://mirrors.huaweicloud.com/ascend/repos/pypi"
 # 安装torch和torch_npu
 pip install torch-2.5.1-cp310-cp310-*.whl
 pip install torch_npu-2.5.1*.manylinux2014_aarch64.whl
@@ -134,6 +136,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh
 cd vllm-ascend
 # 因为前面已经安装了对应的torch_npu版本，这里需要将vllm_ascend文件中的requirements.txt中的torch-npu==2.5.1注释
+# 安装时若编译失败，可以关闭编译：export COMPILE_CUSTOM_KERNELS=0
 python setup.py develop
 # vllm-ascend源码安装过程中遇到相关依赖包因网络问题安装不成功，可以先尝试pip install xxx安装对应失败的依赖包，再执行上一句命令
 cd ..
@@ -229,7 +232,11 @@ actor_config:
 
 # 在colocate_actor_and_vit为True时，需设置如下vit_config权重路径
 vit_config:
-    load: ckpt/mm_path/Qwen2.5-VL-3B-Vit-Instruct # 视觉模型megatron格式的权重路径，
+    load: ckpt/mm_path/Qwen2.5-VL-3B-Vit-Instruct # 视觉模型megatron格式的权重路径
+
+generate_config:
+    # 为保证代码安全，配置trust_remote_code默认为False，用户需要设置为True，并且确保自己下载的模型和数据的安全性
+    trust_remote_code: true
   ```
 4. 根据使用机器的情况，修改`NNODES`、`NPUS_PER_NODE`配置， 例如单机 A2 可设置`NNODES`为 1 、`NPUS_PER_NODE`为8；
 5. 如果是单机，需要保证`MASTER_ADDR`与`CURRENT_IP`一致，如果为多机，需要保证各个机器的`MASTER_ADDR`一致，`CURRENT_IP`为各个节点的 IP (需要注意的是`MASTER_ADDR`与`CURRENT_IP`不能设置为`localhost`)；
@@ -239,7 +246,9 @@ vit_config:
 bash examples/rl/scripts/grpo_trainer_qwen25vl_3b.sh
 ```
 
-***注意：所有节点的代码、权重、数据等路径的层级要保持一致，且启动ray的时候都位于MindSpeed-MM目录下***
+> *注意：所有节点的代码、权重、数据等路径的层级要保持一致，且启动ray的时候都位于MindSpeed-MM目录下*
+
+6. 实际运行场景与默认配置脚本不一致时，需要根据实际场景调整`micro_batch_size`、`dispatch_size`等相关配置参数。
 
 <a id="jump4.3"></a>
 #### 3. 日志打点指标说明

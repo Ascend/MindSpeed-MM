@@ -64,7 +64,7 @@ class VLLMInferEngine(BaseInferEngine):
             max_model_len: int = 2048,
             dtype: str = "bfloat16",
             gpu_memory_utilization: float = 0.5,
-            trust_remote_code: bool = True,
+            trust_remote_code: bool = False,
             load_format: str = "megatron",
             enforce_eager: bool = False,
             limit_mm_image_per_prompt: int = 1,
@@ -166,7 +166,7 @@ class VLLMInferEngine(BaseInferEngine):
 
         if load_format == "megatron":
             update_megatron_weight_loader()
-        
+
         limit_mm_per_prompt_dict = {}
         if is_multimodal():
             if limit_mm_image_per_prompt > 0:
@@ -346,7 +346,7 @@ class VLLMInferEngine(BaseInferEngine):
                     prompt_data = {
                         "prompt_token_ids": prompt,
                         "multi_modal_data": {
-                            "image_embeds": image_embeds, 
+                            "image_embeds": image_embeds,
                             "image_grid_thw": grid_thw
                         }
                     }

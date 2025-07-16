@@ -25,8 +25,8 @@ class GenerateConfig(BaseConfig):
     dtype: Data type for model weights. Default is "bfloat16".
     gpu_memory_utilization: GPU memory utilization factor. Default is 0.5.
 
-    enforce_eager: Whether to always use eager-mode PyTorch. If True, we will disable ACL graph and always execute the model in eager mode. 
-                   If False, we will use ACL graph and eager execution in hybrid for maximal performance and flexibility. 
+    enforce_eager: Whether to always use eager-mode PyTorch. If True, we will disable ACL graph and always execute the model in eager mode.
+                   If False, we will use ACL graph and eager execution in hybrid for maximal performance and flexibility.
 
     sampling_config: Configuration for text generation sampling. Default values are set for various sampling parameters.
         - num_completions: The number of independent completions to generate for each input prompt. Default is 1.
@@ -49,9 +49,9 @@ class GenerateConfig(BaseConfig):
         self.data_parallel_size = None
         # 设置 tokenizer 的名称或路径，默认指向一个示例路径，可根据实际情况修改
         self.tokenizer_name_or_path = "/path/to/tokenizer"
-        # 是否信任远程代码，例如用于自定义 tokenizer，默认为 True
-        self.trust_remote_code = True
-        
+        # 是否信任远程代码，例如用于自定义 tokenizer，默认为 False
+        self.trust_remote_code = False
+
         # 推理时的张量并行大小，默认为 8
         self.infer_tensor_parallel_size = 8
 
@@ -98,7 +98,7 @@ class GenerateConfig(BaseConfig):
             for key, _ in config_dict["sampling_config"].items():
                 if key not in self.sampling_config:
                     raise ValueError(f"The key: {key} is missing, causing the setup to fail. Please check."
-                            f" If necessary, register it in the config file.")    
+                            f" If necessary, register it in the config file.")
 
         # 如果提供了配置字典，则更新默认值
         self.update(config_dict)
