@@ -359,6 +359,25 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[30,2,0,0]`、`[0,11,10,7]`），需要在`finetune_qwen2_5_vl_7b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)。
 
+【重计算配置（可选）】
+若要开启vit重计算，需在model.json中的vision_encoder部分添加下面三个重计算相关参数
+
+```json
+{
+  "model_id": "qwen2_5vl",
+  "img_context_token_id": 151655,
+  "vision_start_token_id": 151652,
+  "image_encoder": {
+    "vision_encoder": {
+      "recompute_granularity": "full",
+      "recompute_method": "uniform",
+      "recompute_num_layers": 1
+    }
+  }
+}
+```
+
+
 <a id="jump4.3"></a>
 #### 3. 启动微调
 

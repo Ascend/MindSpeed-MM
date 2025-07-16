@@ -227,8 +227,6 @@ class Qwen2vlVitSelfAttention(SelfAttention):
 
         # hidden_states: [sq, b, h]
         # For self attention we just duplicate the rotary_pos_emb if it isn't already
-        if rotary_pos_emb is not None and not isinstance(rotary_pos_emb, tuple):
-            rotary_pos_emb = (rotary_pos_emb,) * 2
 
         query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states)
         
@@ -259,6 +257,8 @@ class Qwen2vlVitSelfAttention(SelfAttention):
         # absolute positional embedding.
         # otherwise, only relative positional embedding takes effect
         if rotary_pos_emb is not None:
+            half_dim = rotary_pos_emb.shape[-1] // 2
+            rotary_pos_emb = (rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:])
             query = apply_rotary_pos_emb_vision(query, rotary_pos_emb,
                                                 use_fused_rope=self.config.use_fused_rotary_pos_emb)
             key = apply_rotary_pos_emb_vision(key, rotary_pos_emb,
@@ -554,7 +554,7 @@ class Qwen2VLViT(MultiModalModule):
 
         cos_cache = rotary_pos_emb.cos().unsqueeze(1).repeat(1, 1, 2).unsqueeze(1).float()
         sin_cache = rotary_pos_emb.sin().unsqueeze(1).repeat(1, 1, 2).unsqueeze(1).float()
-        rotary_pos_emb = (cos_cache, sin_cache)
+        rotary_pos_emb = torch.concat((cos_cache, sin_cache), dim=-1)
         hidden_states = self.blocks(
             hidden_states=hidden_states,
             rotary_pos_emb=rotary_pos_emb,

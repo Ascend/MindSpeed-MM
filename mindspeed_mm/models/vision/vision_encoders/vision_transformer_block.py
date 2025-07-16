@@ -1,7 +1,7 @@
 # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 
 from contextlib import nullcontext
-from typing import Union
+from typing import Union, List
 
 import torch
 from torch import Tensor
@@ -107,6 +107,101 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
         super().__init__(config=config, spec=spec, post_layer_norm=post_layer_norm, pre_process=pre_process,
                          post_process=post_process)
 
+    def _checkpointed_forward(
+        self,
+        hidden_states: Tensor,
+        attention_mask: Tensor,
+        context: Tensor,
+        context_mask: Tensor,
+        rotary_pos_emb: Tensor,
+        packed_seq_params: PackedSeqParams,
+        fullatt_block_indexes_now: List[int] = None,
+        window_mask: Tensor = None,
+        cu_seqlens: Tensor = None,
+        cu_window_seqlens: Tensor = None,
+    ):
+        """Forward method with activation checkpointing."""
+
+        def custom(start: int, end: int):
+            def custom_forward(
+                hidden_states,
+                attention_mask,
+                context,
+                context_mask,
+                rotary_pos_emb,
+            ):
+                for index in range(start, end):
+                    layer = self._get_layer(index)
+                    current_mask = attention_mask
+                    set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
+                    if len(fullatt_block_indexes_now) > 0 and index in fullatt_block_indexes_now:
+                        current_mask = window_mask
+                        set_actual_seq_len(tuple(cu_window_seqlens[1:].cpu().numpy().tolist()))
+                    hidden_states, context = layer(
+                        hidden_states=hidden_states,
+                        attention_mask=current_mask,
+                        context=context,
+                        context_mask=context_mask,
+                        rotary_pos_emb=rotary_pos_emb,
+                        inference_params=None,
+                        packed_seq_params=packed_seq_params,
+                    )
+                return hidden_states, context
+
+            return custom_forward
+
+        def checkpoint_handler(forward_func):
+            return tensor_parallel.checkpoint(
+                forward_func,
+                self.config.distribute_saved_activations,
+                hidden_states,
+                attention_mask,
+                context,
+                context_mask,
+                rotary_pos_emb,
+            )
+
+        if self.config.recompute_method == 'uniform':
+            # Uniformly divide the total number of Transformer layers and checkpoint
+            # the input activation of each divided chunk.
+            # A method to further reduce memory usage reducing checkpoints.
+            l = 0
+            while l < self.num_layers_per_pipeline_rank:
+                hidden_states, context = checkpoint_handler(
+                    custom(l, l + self.config.recompute_num_layers)
+                )
+
+                l += self.config.recompute_num_layers
+
+        elif self.config.recompute_method == 'block':
+            # Checkpoint the input activation of only a set number of individual
+            # Transformer layers and skip the rest.
+            # A method fully use the device memory removing redundant re-computation.
+            recompute_skip_num_layers = 0
+            for l in range(self.num_layers_per_pipeline_rank):
+                # Skip recomputation when input grad computation is not needed.
+                # Need to have at least one input tensor with gradient computation
+                # for re-enterant autograd engine.
+                if self.config.fp8 and not hidden_states.requires_grad:
+                    recompute_skip_num_layers += 1
+                if (
+                    l >= recompute_skip_num_layers
+                    and l < self.config.recompute_num_layers + recompute_skip_num_layers
+                ):
+                    hidden_states, context = checkpoint_handler(custom(l, l + 1))
+                else:
+                    hidden_states, context = custom(l, l + 1)(
+                        hidden_states,
+                        attention_mask,
+                        context,
+                        context_mask,
+                        rotary_pos_emb,
+                    )
+        else:
+            raise ValueError("Invalid activation recompute method.")
+
+        return hidden_states
+
     def forward(
             self,
             hidden_states: Tensor,
@@ -177,9 +272,9 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
             )
         else:
             fp8_context = nullcontext()
+        fullatt_block_indexes_now = []
         if getattr(self.config, "window_attn_size", None) is not None:
             pp_rank = mpu.get_pipeline_model_parallel_rank()
-            fullatt_block_indexes_now = []
             for x in self.config.fullatt_block_indexes:
                 fullatt_block_indexes_now.append(x - sum(self.config.pipeline_num_layers[:pp_rank]))
         with rng_context and fp8_context:
@@ -192,6 +287,10 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                     context_mask=context_mask,
                     rotary_pos_emb=rotary_pos_emb,
                     packed_seq_params=packed_seq_params,
+                    fullatt_block_indexes_now=fullatt_block_indexes_now,
+                    window_mask=window_mask,
+                    cu_seqlens=cu_seqlens,
+                    cu_window_seqlens=cu_window_seqlens,
                 )
             else:
                 for layer_num, layer in enumerate(self.layers):
