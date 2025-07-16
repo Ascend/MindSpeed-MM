@@ -12,7 +12,7 @@ from rich.progress import (Progress, TextColumn, BarColumn, MofNCompleteColumn, 
                            TimeRemainingColumn, Task)
 from rich.text import Text
 
-from mindspeed_mm.tasks.evaluation.utils.file_utils import save_pkl, load_pkl
+from mindspeed_mm.tasks.evaluation.utils.file_utils import save_json, load_json
 from mindspeed_mm.tasks.evaluation.utils.string_utils import extract_answer_from_item, logger_rank_0, is_expected_type, \
     process_answer
 from mindspeed_mm.tasks.evaluation.utils.string_utils import is_list_in_str
@@ -123,7 +123,7 @@ def track_progress_rich(func: Callable,
             raise FileNotFoundError(f"The directory part of the path '{save}' does not exist.")
 
         if not os.path.exists(save):
-            save_pkl({}, save)
+            save_json({}, save)
     if keys is not None:
         if len(keys) != len(tasks):
             raise ValueError(f"The length of 'keys' ({len(keys)}) "
@@ -172,13 +172,13 @@ def track_progress_rich(func: Callable,
                 results.append(result)
                 if save is not None:
                     with portalocker.Lock(save, timeout=5) as fh:
-                        ans = load_pkl(save)
+                        ans = load_json(save)
                         ans[keys[idx]] = result
 
                         if os.environ.get('VERBOSE', True):
                             print(keys[idx], result, flush=True)
 
-                        save_pkl(ans, save)
+                        save_json(ans, save)
                         fh.flush()
                         os.fsync(fh.fileno())
 
@@ -195,13 +195,13 @@ def track_progress_rich(func: Callable,
 
                         if save is not None:
                             with portalocker.Lock(save, timeout=5) as fh:
-                                ans = load_pkl(save)
+                                ans = load_json(save)
                                 ans[keys[idx]] = result
 
                                 if os.environ.get('VERBOSE', False):
                                     print(keys[idx], result, flush=True)
 
-                                save_pkl(ans, save)
+                                save_json(ans, save)
                                 fh.flush()
                                 os.fsync(fh.fileno())
 
