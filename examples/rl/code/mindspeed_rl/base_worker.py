@@ -314,9 +314,9 @@ class BaseWorker(BaseRayWorker, ABC):
             batch_data, batch_data_length = pack_experience_columns(batch_data, experience_count)
 
         for key in experience_columns:
-            if key not in batch_data.keys() or key not in batch_data_length.keys():
-                raise KeyError(f"`key` {key} is not in `batch_data` or `batch_data_length`")
             if rank_flg:
+                if key not in batch_data.keys() or key not in batch_data_length.keys():
+                    raise KeyError(f"`key` {key} is not in `batch_data` or `batch_data_length`")
                 batch_data_shape = torch.tensor(batch_data[key].shape,
                                                 dtype=torch.int64, device=torch.cuda.current_device())
 
