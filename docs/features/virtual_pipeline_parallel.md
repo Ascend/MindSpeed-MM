@@ -68,12 +68,12 @@ mm-convert  InternVLConverter hf_to_mm \
 "pipeline_num_layers": [[6, 7, 7, 4],[0, 0, 0, 0],[0, 0, 0, 0]]
 ```
 
-3.shell添加vpp参数，可参考examples/internvl2/finetune_internvl2_8B_vpp.sh。因为megatron原生只支持vpp均匀切分，为了支持vpp非均匀切分，需要在shell中导入VP_SIZE变量，VP_SIZE等于pipeline_num_layers的长度；`--num-layers-per-virtual-pipeline-stage 2`该参数仅用于开启vpp功能，需设置成大于1的整数，在初始化通信组时不会用到
+3.shell添加vpp参数，可参考examples/internvl2/finetune_internvl2_8B_vpp.sh。因为megatron原生只支持vpp均匀切分，为了支持vpp非均匀切分，需要在shell中导入VP_SIZE变量，VP_SIZE等于pipeline_num_layers的长度；`--virtual-pipeline-model-parallel-size 3`该参数同样用于开启vpp功能，取值与VP_SIZE相同
 
 ```shell
 export VP_SIZE=3
 GPT_ARGS="
-    --num-layers-per-virtual-pipeline-stage 2
+    --virtual-pipeline-model-parallel-size 3
     ..."
 ```
 

@@ -275,8 +275,14 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
         fullatt_block_indexes_now = []
         if getattr(self.config, "window_attn_size", None) is not None:
             pp_rank = mpu.get_pipeline_model_parallel_rank()
+            vp_rank = mpu.get_virtual_pipeline_model_parallel_rank()
+            if vp_rank:
+                previous_layer = sum(sum(row[:pp_rank]) for row in self.config.pipeline_num_layers[:vp_rank]) + sum(
+                    self.config.pipeline_num_layers[vp_rank][:pp_rank])
+            else:
+                previous_layer = sum(self.config.pipeline_num_layers[:pp_rank])
             for x in self.config.fullatt_block_indexes:
-                fullatt_block_indexes_now.append(x - sum(self.config.pipeline_num_layers[:pp_rank]))
+                fullatt_block_indexes_now.append(x - previous_layer)
         with rng_context and fp8_context:
             # Forward pass.
             if self.config.recompute_granularity == 'full' and self.training:
