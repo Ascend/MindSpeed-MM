@@ -158,7 +158,12 @@ class MultiModalActorHybridWorkerBase(BaseWorker):
             )
         else:
             experience_count = self.rl_config.actor_update_dispatch_size
-
+        total_experience_count = (
+            self.megatron_config.global_batch_size //
+            self.parallel_state.get_data_parallel_world_size()
+        )
+        dispatch_count = total_experience_count // experience_count
+        
         if skip_actor_log_prob:
             experience_columns.remove('old_log_prob')
 
@@ -190,7 +195,7 @@ class MultiModalActorHybridWorkerBase(BaseWorker):
             if batch_data and index:
                 metrics = self.actor_hybrid.update_actor(batch_data, kl_ctrl)
 
-                self.args.consumed_train_samples += self.megatron_config.global_batch_size // self.rl_config.n_samples_per_prompt
+                self.args.consumed_train_samples += (self.megatron_config.global_batch_size // dispatch_count) // self.rl_config.n_samples_per_prompt
                 self.num_floating_point_operations_so_far += num_floating_point_operations(self.args,
                                                                                            self.megatron_config.global_batch_size)
                 if self.parallel_state.is_pipeline_last_stage(ignore_virtual=True) and self.parallel_state.get_tensor_model_parallel_rank() == 0 and self.parallel_state.get_context_parallel_rank() == 0:

@@ -56,6 +56,10 @@ from checkpoint.vlm_model.config import ConvertVppMMConfig
 from checkpoint.vlm_model.operator import Operator, TieOp, TP_PATTERN_T
 
 
+CHECKPOINT_VERSION_KEY = "checkpoint_version"
+CHECKPOINT_VERSION_VALUE = 3.0
+
+
 @dataclass
 class PPStageSchema:
     """When splitting different modules such as vit/lm/audio, the corresponding weight names are different,
@@ -157,10 +161,10 @@ def save_by_vpp(state_dicts: List[Dict[str, torch.Tensor]],
         if vpp_size > 1:
             # Collect VP state dicts for this PP rank
             save_dict = {f'model{vpp_idx}': state_dicts[vpp_idx * pp_size + pp_rank] for vpp_idx in range(vpp_size)}
-            """用于规避megatron对vpp配置下的模型校验，checkpoint_version低于2.0会报错"""
-            save_dict['checkpoint_version'] = 3.0
         else:
             save_dict = {'model': state_dicts[pp_rank]}
+        # 用于规避megatron对checkpoint_version的校验
+        save_dict[CHECKPOINT_VERSION_KEY] = CHECKPOINT_VERSION_VALUE
         torch.save(save_dict, save_path.joinpath(MEGATRON_CKPT_NAME))
     save_root_dir.joinpath(LATEST_TXT).write_text(str(iteration))
 
