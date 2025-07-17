@@ -568,7 +568,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td rowspan="16"> 多模态理解 </td>
+      <td rowspan="17"> 多模态理解 </td>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/glm4.1v">GLM-4.1V</a></td>
       <td><a href="https://github.com/THUDM/GLM-4.1V-Thinking">9B</a></td>
       <td> 微调 </td>
@@ -734,6 +734,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 256.28 (TPS) </td>
       <td> 563 </td>
       <td>【Test】</td>
+    </tr>
+    <tr>
+      <td rowspan="1"><a href="https://gitee.com/zhaomingyu13/MindSpeed-MM/tree/master/examples/qwen2.5omni">Qwen2.5-Omni</a></td>
+      <td><a href="https://huggingface.co/Qwen/Qwen2.5-Omni-7B">7B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td> 12.99 (SPS) </td>
+      <td> 14.44 (SPS) </td>
+      <td> 296 </td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td> 语音识别 </td>
