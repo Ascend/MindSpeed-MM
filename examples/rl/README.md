@@ -16,7 +16,8 @@
   - [准备工作](#jump4.1)
   - [启动训练](#jump4.2)
   - [日志打点指标说明](#jump4.3)
-- [注意事项](#jump5)
+- [断点续训](#jump5)
+- [注意事项](#jump6)
 
 <a id="jump0"></a>
 ## 简介
@@ -305,6 +306,34 @@ bash examples/rl/scripts/grpo_trainer_qwen25vl_3b.sh
 
 ---
 <a id="jump5"></a>
+## 断点续训
+(此功能coming soon)
+进行断点续训时，需要注意配置以下参数并保证每个节点本地都保存对应的权重：
+  ```yaml
+actor_config:
+    finetune: false       #<------- 断点续训时 finetune 参数设置为 false
+    load: /path/qwen25vl_3b_ckpt      #<------- 断点续训时 load 路径应为之前保存的权重路径
+    save: ./ckpt
+    no_load_optim: false  #<------- 断点续训时 no_load_optim 应为 false
+    no_load_rng: false    #<------- 断点续训时 no_load_rng 应为 false
+  
+rl_config:
+    integrated_mode_config:
+      ref_model_load_path: /path/qwen2_5_vl_3b_tp1pp1   #<------- 断点续训时，应在 ref_model_load_path 中配置原始模型megatron权重路径，供 reference model 加载
+  ```
+
+若需要加载指定迭代次数的权重、优化器等状态，需修改上述加载路径`load`中的`latest_checkpointed_iteration.txt`文件内容为指定迭代次数
+```
+qwen25vl_3b_ckpt
+   ├── latest_checkpointed_iteration.txt
+   ├── ...
+```
+备注：
+（1）当前续训时，数据集迭代的续训依赖global_batch_size等参数，如果续训前后global_batch_size等参数不一致，续训会有精度差异；
+（2）当前续训功能跳过已消耗数据的方式一定程度会增加数据集构建处理耗时；（耗时情况会依赖已消耗数据量）
+
+---
+<a id="jump6"></a>
 ## 注意事项
 
 1. 容器内启动时可能会遇到不存在`ip`命令的错误，可使用如下命令进行安装：
