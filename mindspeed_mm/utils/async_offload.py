@@ -14,29 +14,32 @@ def base_check_fn(tensor):
 class GetCnt:
     def __init__(self):
         self._block_idx = -1
-        self._block_tensor_nums = [] # offload tensors per block
+        self._block_tensor_nums = {} # offload tensors per block
 
     def get_cnt(self, block_idx):
         after_block = False
         if block_idx > self._block_idx:
-            self._block_tensor_nums.append(1)
+            self._block_tensor_nums[block_idx] = 1
             if block_idx != 0:
                 after_block = True
             self._block_idx = block_idx
         elif block_idx == self._block_idx:
-            self._block_tensor_nums[-1] += 1
+            self._block_tensor_nums[block_idx] += 1
         else:
-            # 一个step结束
-            self._block_idx = 0
-            self._block_tensor_nums = [1]
+            # one step end
+            self._block_idx = block_idx
+            self._block_tensor_nums = {block_idx: 1}
         
         offload_tensor_key = "{}_{}".format(self._block_idx, self._block_tensor_nums[self._block_idx] - 1)
         return offload_tensor_key, after_block
     
     def get_prefetch_keys(self, block_idx, tensor_idx):
-        if block_idx == 0:
+        prefetch_block_idx = max((idx for idx in self._block_tensor_nums.keys() if idx < block_idx), default=None)
+        
+        if prefetch_block_idx is None:
             return []
-        prefetch_block_tensor_nums = self._block_tensor_nums[block_idx - 1]
+            
+        prefetch_block_tensor_nums = self._block_tensor_nums[prefetch_block_idx]
         block_tensor_nums = self._block_tensor_nums[block_idx]
         start = tensor_idx * prefetch_block_tensor_nums // block_tensor_nums
         end = (tensor_idx + 1) * prefetch_block_tensor_nums // block_tensor_nums

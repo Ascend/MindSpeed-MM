@@ -609,11 +609,16 @@ class WanDiTBlock(nn.Module):
             )
 
         # self attention
+        attention_async_offload_param = (
+            self.attention_async_offload_param 
+            if recompute_skip_core_attention
+            else {}
+        )
         self_attn_out = self.self_attn.core_attention_flash(
             query=query,
             key=key, 
             value=value, 
-            **self.attention_async_offload_param
+            **attention_async_offload_param
         )
 
         # after self attention
