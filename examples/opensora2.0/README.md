@@ -5,21 +5,23 @@
 
 ## 目录
 
-- [版本说明](#版本说明)
-  - [参考实现](#参考实现)
-  - [变更记录](#变更记录)
-- [环境安装](#jump1)
-  - [仓库拉取](#jump1.1)
-  - [环境搭建](#jump1.2)
-- [权重下载及转换](#jump2)
-  - [权重下载](#jump2.1)
-  - [权重转换](#jump2.2)
-- [数据集准备及处理](#jump3)
-- [预训练](#jump4)
-  - [准备工作](#jump4.1)
-  - [配置参数](#jump4.2)
-  - [启动预训练](#jump4.3)
-- [环境变量声明](#jump5)
+- [OpenSora2.0 使用指南](#opensora20-使用指南)
+  - [目录](#目录)
+  - [版本说明](#版本说明)
+      - [参考实现](#参考实现)
+      - [变更记录](#变更记录)
+  - [环境安装](#环境安装)
+      - [1. 仓库拉取](#1-仓库拉取)
+      - [2. 环境搭建](#2-环境搭建)
+  - [权重下载及转换](#权重下载及转换)
+      - [1. 权重下载](#1-权重下载)
+      - [2. 权重转换](#2-权重转换)
+  - [数据集准备及处理](#数据集准备及处理)
+  - [预训练](#预训练)
+      - [1. 准备工作](#1-准备工作)
+      - [2. 配置参数](#2-配置参数)
+      - [3. 启动预训练](#3-启动预训练)
+  - [环境变量声明](#环境变量声明)
 
 ## 版本说明
 #### 参考实现
@@ -110,7 +112,9 @@ pip install -e .
 
 需要对[OpenSoraV2模型]模型进行权重转换，运行权重转换脚本：
 ```shell
-python examples/opensora2.0/convert_ckpt_to_mm.py  --source_path <OpenSoraV2模型> --target_path <OpenSoraV2模型转化后路径> --mode split
+mm-convert OpenSoraConverter hf_to_mm \
+  --cfg.source_path <OpenSoraV2模型> \
+  --cfg.target_path <OpenSoraV2模型转化后路径>
 ```
 
 
@@ -209,7 +213,9 @@ bucket_config（dict）：一个包含bucket配置的字典。
   export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
   export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
   # input_folder为layerzero训练保存权重的路径，output_folder为输出的megatron格式权重的路径
-  python <your_mindspeed_path>/mindspeed/core/distributed/layerzero/state/scripts/convert_to_megatron.py --input_folder ./save_ckpt/opensora2/iter_000xxxx/ --output_folder ./save_ckpt/opensora2_megatron_ckpt/iter_000xxxx/ --prefix predictor
+  mm-convert OpenSoraConverter layerzero_to_mm \
+      --cfg.source_path <./save_ckpt/opensora2/iter_000xxxx/> \
+      --cfg.target_path <./save_ckpt/opensora2_megatron_ckpt/iter_000xxxx/>
   ```
 
 

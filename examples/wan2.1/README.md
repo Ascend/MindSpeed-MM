@@ -2,8 +2,8 @@
 
 - [Wan2.1 使用指南](#wan21-使用指南)
   - [版本说明](#版本说明)
-    - [参考实现](#参考实现)
-    - [变更记录](#变更记录)
+      - [参考实现](#参考实现)
+      - [变更记录](#变更记录)
   - [任务支持列表](#任务支持列表)
   - [环境安装](#环境安装)
     - [仓库拉取](#仓库拉取)
@@ -299,9 +299,9 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
     ```bash
     source /usr/local/Ascend/ascend-toolkit/set_env.sh
-    mm-converter WanConverter layerzero_to_mm \
+    mm-convert WanConverter layerzero_to_mm \
      --cfg.source_path <./save_ckpt/wan2.1/iter_000xxxx/> \
-     --cfg.target_path --target_path <./save_ckpt/wan2.1_megatron_ckpt/iter_000xxxx/>
+     --cfg.target_path <./save_ckpt/wan2.1_megatron_ckpt/iter_000xxxx/>
     ```
 
 - PP：流水线并行

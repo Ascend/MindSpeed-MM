@@ -4,8 +4,9 @@
 </p>
 
 ## 目录
-- [StepVideo 使用指南](#StepVideo-使用指南)
+- [StepVideo 使用指南](#stepvideo-使用指南)
   - [目录](#目录)
+  - [- 环境变量声明](#--环境变量声明)
   - [支持任务列表](#支持任务列表)
   - [环境安装](#环境安装)
       - [仓库拉取](#仓库拉取)
@@ -153,9 +154,13 @@ StepVideo i2v权重下载(需要下载 VAE、transformer、text_encoder、tokeni
 #### 权重转换
 权重转换source_path参数请配置transformer权重文件的路径：
 ```bash
-python examples/stepvideo/convert_ckpt_to_mm.py --source_path <your source path> --target_path <target path> --tp_size 2 --pp_size 48 --num_layers 48 --mode split
+mm-convert StepVideoConverter hf_to_mm \
+  --cfg.source_path <your source path> \
+  --cfg.target_path <your target path> \
+  --cfg.target_parallel_config.tp_size <tp_size> \
+  --cfg.target_parallel_config.pp_layers <pp_layers> \
 ```
-其中--tp_size 后为实际的tp切分策略，当前还不支持PP切分。
+其中`tp_size`表示TP切分数，`pp_layers`表示pp切分后每个stage的层数，如`48`表示不切分，`[24,24]`表示PP=2，每个PP stage 24层。
 
 转换后的权重结构如下：
 
@@ -355,7 +360,9 @@ StepVideo推理启动文件为shell脚本，主要分为如下2个：
 如果使用训练后保存的权重进行推理，需要使用脚本进行转换，权重转换source_path参数请配置训练时的保存路径
 
 ```bash
-python examples/stepvideo/convert_ckpt_to_mm.py --source_path <your source path> --target_path <target path> --tp_size 2 --pp_size 48 --num_layers 48 --mode merge
+mm-convert StepVideoConverter resplit \
+  --cfg.source_path <your source path> \
+  --cfg.target_path <your source path> \
 ```
 
 #### 启动推理

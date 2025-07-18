@@ -83,12 +83,12 @@ class SoraModelConverter(Converter):
     def mm_to_hf(self, cfg: ConvertConfig):
         state_dicts = load_from_mm(cfg.source_path)
         state_dict = self._mm_merge(state_dicts)
-        state_dict = self.str_replace_mapping(
+        state_dict = self._replace_state_dict(
             state_dict,
             flip_mapping(self.hf_to_mm_convert_mapping),
             flip_mapping(self.hf_to_mm_str_replace_mapping)
         )
-        save_as_hf(state_dict, cfg.hf_dir, cfg.target)
+        save_as_hf(state_dict, cfg.hf_dir, cfg.target_path)
 
     @check_method_support
     def resplit(self, cfg: ConvertConfig):

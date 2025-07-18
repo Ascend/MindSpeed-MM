@@ -11,6 +11,6 @@ class ParallelConfig(BaseModel):
 class ConvertConfig(BaseModel):
     source_path: str
     lora_path: str = ""
-    hf_path: str = ""
+    hf_dir: str = ""
     target_path: str
     target_parallel_config: ParallelConfig
