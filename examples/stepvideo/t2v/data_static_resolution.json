@@ -2,8 +2,8 @@
 	"dataset_param": {
 		"dataset_type": "feature",
         "basic_parameters": {
-            "data_path": "./stepvideo/sora_featuers/data.jsonl",
-            "data_folder": "./stepvideo/sora_featuers/"
+            "data_path": "./stepvideo/sora_features/data.jsonl",
+            "data_folder": "./stepvideo/sora_features/"
         },
 		"preprocess_parameters": {
             "video_processor_type": "CogVideoXProcessor",

@@ -2,8 +2,8 @@
     "dataset_param": {
         "dataset_type": "feature",
         "basic_parameters": {
-            "data_path": "./hunyuanvideo/sora_featuers/data.jsonl",
-            "data_folder": "./hunyuanvideo/sora_featuers/"
+            "data_path": "./hunyuanvideo/sora_features/data.jsonl",
+            "data_folder": "./hunyuanvideo/sora_features/"
         },
         "preprocess_parameters": {
             "video_processor_type": "OpensoraplanVideoProcessor",
