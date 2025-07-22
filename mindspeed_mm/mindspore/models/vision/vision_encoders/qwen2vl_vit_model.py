@@ -164,7 +164,7 @@ def qwen2vl_vit_forward(self, pixel_values: torch.Tensor, grid_thw: torch.Tensor
 
     cos_cache = rotary_pos_emb.cos().unsqueeze(1).repeat(1, 1, 2).unsqueeze(1).float()
     sin_cache = rotary_pos_emb.sin().unsqueeze(1).repeat(1, 1, 2).unsqueeze(1).float()
-    rotary_pos_emb = (cos_cache, sin_cache)
+    rotary_pos_emb = torch.concat((cos_cache, sin_cache), dim=-1)
     hidden_states = self.blocks(
         hidden_states=hidden_states,
         rotary_pos_emb=rotary_pos_emb,
@@ -189,3 +189,4 @@ def qwen2vl_vit_forward(self, pixel_values: torch.Tensor, grid_thw: torch.Tensor
     if get_args().use_flash_attn:
         set_actual_seq_len(None)
     return hidden_states, window_index
+    
