@@ -44,7 +44,7 @@ def MRotaryEmbedding_forward(
     import torch_npu
     mrope_section = [0, 0, 0] if positions.ndim == 1 else self.mrope_section
 
-    query, key = torch_npu.npu_mrope(positions,
+    query, key = torch_npu.npu_mrope(positions.contiguous(),
                                         query.contiguous(),
                                         key.contiguous(),
                                         self.cos_sin_cache.contiguous(),
