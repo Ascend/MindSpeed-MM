@@ -327,8 +327,8 @@ bash examples/hunyuanvideo/feature_extract/feature_extraction.sh
     ```bash
     source /usr/local/Ascend/ascend-toolkit/set_env.sh
     mm-converter HunyuanVideoConverter --version t2v --layerzero_to_mm \
-    	--cfg.source_path <./save_ckpt/hunyuanvideo/iter_000xxxx/>
-    	--cfg.target_path <./save_ckpt/hunyuanvideo_megatron_ckpt/iter_000xxxx/>
+    	--cfg.source_path <./save_ckpt/hunyuanvideo/>
+    	--cfg.target_path <./save_ckpt/hunyuanvideo_megatron_ckpt/>
     ```
 
 + 选择性重计算 + FA激活值offload

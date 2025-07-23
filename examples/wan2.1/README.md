@@ -300,8 +300,8 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
     ```bash
     source /usr/local/Ascend/ascend-toolkit/set_env.sh
     mm-convert WanConverter layerzero_to_mm \
-     --cfg.source_path <./save_ckpt/wan2.1/iter_000xxxx/> \
-     --cfg.target_path <./save_ckpt/wan2.1_megatron_ckpt/iter_000xxxx/>
+     --cfg.source_path <./save_ckpt/wan2.1/> \
+     --cfg.target_path <./save_ckpt/wan2.1_megatron_ckpt/>
     ```
 
 - PP：流水线并行

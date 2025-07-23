@@ -214,8 +214,8 @@ bucket_config（dict）：一个包含bucket配置的字典。
   export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
   # input_folder为layerzero训练保存权重的路径，output_folder为输出的megatron格式权重的路径
   mm-convert OpenSoraConverter layerzero_to_mm \
-      --cfg.source_path <./save_ckpt/opensora2/iter_000xxxx/> \
-      --cfg.target_path <./save_ckpt/opensora2_megatron_ckpt/iter_000xxxx/>
+      --cfg.source_path <./save_ckpt/opensora2/> \
+      --cfg.target_path <./save_ckpt/opensora2_megatron_ckpt/>
   ```
 
 

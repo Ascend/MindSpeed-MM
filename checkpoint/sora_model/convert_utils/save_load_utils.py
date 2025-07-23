@@ -172,7 +172,14 @@ def load_from_layerzero(source_path, iteration=None, prefix=None, ema_model=Fals
     layerzero_checkpoint = LayerzeroCheckpoint(source_path)
 
     # Notice: no support TP and PP
-    layerzero_checkpoint = _create_rank_checkpoint(layerzero_checkpoint, 1, 1, 1, 1, for_release)
+    layerzero_checkpoint = _create_rank_checkpoint(
+        layerzero_checkpoint, 
+        tp_index=0, 
+        pp_index=0, 
+        tp_degree=1,
+        pp_degree=1, 
+        for_release=for_release
+    )
     return layerzero_checkpoint
 
 
