@@ -86,7 +86,8 @@
         "add_qkv_bias": true,
         "sequence_parallel": false,
         "tokenizer_type": "PretrainedFromHF",
-        "is_encoder_decoder": false
+        "is_encoder_decoder": false,
+        "use_infer_fa": true
     },
     "text_encoder": null,
     "video_encoder": null,
@@ -165,6 +166,9 @@
         "decoder_start_token_id": null,
         "max_matching_ngram_size": null,
         "stop_strings": null
+    },
+    "patch":{
+        "infer_fa": true
     },
     "min_pixels": 1003520,
     "max_pixels": 12845056,

@@ -214,33 +214,7 @@ def dot_product_attention_forward(
     if not is_vit:
         if attention_mask is not None and 0 not in attention_mask:
             attention_mask = None
-    is_inference = hasattr(get_args().mm.model, 'generation_config')
-    if is_inference:
-        generation_config = get_args().mm.model.generation_config
-    if is_inference and getattr(generation_config, 'kv_cache', None) and not is_vit:
-        # only for inference!
-        query = query.transpose(0, 1).contiguous()  # [b s h d]
-        key = key.transpose(0, 1).contiguous()
-        value = value.transpose(0, 1).contiguous()
-        if query.shape[1] == 1:
-            attention_mask_npu = None
-        else:
-            attention_mask_npu = torch.triu(
-                torch.ones([query.shape[1], key.shape[1]], dtype=torch.bool, device=query.device), diagonal=1)
-
-        attn_output = torch_npu.npu_fused_infer_attention_score(query, key, value,
-                                                                pse_shift=None,
-                                                                atten_mask=attention_mask_npu,
-                                                                actual_seq_lengths=[query.shape[1]],
-                                                                actual_seq_lengths_kv=[key.shape[1]],
-                                                                num_heads=query.shape[2],
-                                                                num_key_value_heads=key.shape[2],
-                                                                scale=1.0 / math.sqrt(query.shape[-1]),
-                                                                input_layout="BSND",
-                                                                )[0]
-        attn_output = rearrange(attn_output, 'b s h d -> s b (h d)', s=query.shape[1], b=bsz)
-        return attn_output
-    elif get_args().context_parallel_algo == "megatron_cp_algo" and mpu.get_context_parallel_world_size() > 1:
+    if get_args().context_parallel_algo == "megatron_cp_algo" and mpu.get_context_parallel_world_size() > 1:
         if is_vit:
             actual_seq_len = get_actual_seq_len()
             cp_size = mpu.get_context_parallel_world_size()
