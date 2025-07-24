@@ -302,7 +302,7 @@ class DPOTrainer(ABC):
             global_rank = torch.distributed.get_rank()
             if loss.isnan():
                 raise ValueError(f'Rank {global_rank}: found NaN in local forward loss calculation. '
-                                 f'Device: {torch.cuda.current_device()}, node: {os.uname()[1]}')
+                                 f'Device: {torch.cuda.current_device()}')
 
         # Reduce loss for logging.
         metrics['lm loss'] = average_losses_across_data_parallel_group([loss])
