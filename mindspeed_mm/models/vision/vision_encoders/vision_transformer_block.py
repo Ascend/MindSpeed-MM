@@ -134,7 +134,7 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                     layer = self._get_layer(index)
                     current_mask = attention_mask
                     set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
-                    if len(fullatt_block_indexes_now) > 0 and index in fullatt_block_indexes_now:
+                    if len(fullatt_block_indexes_now) > 0 and index not in fullatt_block_indexes_now:
                         current_mask = window_mask
                         set_actual_seq_len(tuple(cu_window_seqlens[1:].cpu().numpy().tolist()))
                     hidden_states, context = layer(
