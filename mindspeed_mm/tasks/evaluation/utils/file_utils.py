@@ -1,12 +1,12 @@
 import base64
-import csv
 import io
+import json
 import mimetypes
 import os
 from multiprocessing import Lock
-import json
-from PIL import Image
+
 import numpy as np
+from PIL import Image
 
 lock = Lock()
 
@@ -84,7 +84,3 @@ def decode_base64_to_image(base64_string, target_size=-1):
         if target_size > 0:
             image.thumbnail((target_size, target_size))
         return image.copy()
-
-
-def save_csv(data, f, quoting=csv.QUOTE_ALL):
-    data.to_csv(f, index=False, encoding='utf-8', quoting=quoting)

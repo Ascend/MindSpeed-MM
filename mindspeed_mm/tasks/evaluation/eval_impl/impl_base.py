@@ -7,10 +7,12 @@ import pandas as pd
 from tqdm import tqdm
 from megatron.core import mpu
 
+from mindspeed_mm.utils.security_utils.input_filter import sanitize_dataframe
+from mindspeed_mm.utils.security_utils.validate_path import normalize_path
 from mindspeed_mm.tasks.evaluation.utils.analysis_utils import mmmu_open_question_preprocess, report_acc, eval_vanilla, \
     track_progress_rich
 from mindspeed_mm.tasks.evaluation.utils.string_utils import logger_rank_0
-from mindspeed_mm.tasks.evaluation.utils.file_utils import load_json, save_json, save_csv
+from mindspeed_mm.tasks.evaluation.utils.file_utils import load_json, save_json
 from mindspeed_mm.tasks.evaluation.eval_prompt.build_prompt_base import BasePromptTemplate
 from mindspeed_mm.tasks.evaluation.eval_datasets.datasets_base import BaseEvalDataset
 
@@ -22,7 +24,7 @@ class BaseEvalImpl:
         self.rank = mpu.get_data_parallel_group().rank()
         self.world_size = mpu.get_data_parallel_world_size()
 
-        self.output_path = args.result_output_path
+        self.output_path = normalize_path(args.result_output_path)[0]
         os.makedirs(self.output_path, exist_ok=True)
         model_name = args.evaluation_model
         self.dataset = dataset
@@ -36,7 +38,7 @@ class BaseEvalImpl:
 
         # 保存每个卡上的结果
         self.out_file = self._out_file(self.rank)
-        self.report_file = self.result_path.replace('.xlsx', '_acc.csv')
+        self.report_file = self.result_path.replace('.xlsx', '_acc.xlsx')
         is_divisive = len(dataset) % self.world_size == 0
         remainder = len(dataset) % self.world_size
         if is_divisive:
@@ -193,10 +195,11 @@ class BaseEvalImpl:
             data['log'] = [result.get(i, {}).get('log', None) for i in data['index']]
             if 'GT' in data:
                 data.pop('GT')
-            data.to_excel(self.result_path, index=False, engine='xlsxwriter')
+            cleaned_data = sanitize_dataframe(data)
+            cleaned_data.to_excel(self.result_path, index=False, engine='xlsxwriter')
             acc = report_acc(data)
-
-            save_csv(acc, self.report_file)
+            cleaned_acc = sanitize_dataframe(acc)
+            cleaned_acc.to_excel(self.report_file, index=False, engine='xlsxwriter')
             logger_rank_0(f"save acc file to {self.report_file}")
         if self.world_size > 0:
             dist.barrier()
