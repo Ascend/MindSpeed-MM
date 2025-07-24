@@ -20,7 +20,7 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 # 🔥🔥🔥Latest News
 
 * [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型 【Prototype】
-* **[Jul. 03, 2025]: 🚀 强化学习上线！ MindSpeed MM支持Qwen2.5VL 3B/7B/32B [GRPO训练](https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/rl)**
+* **[Jul. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 3B/7B/32B [GRPO训练](https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/rl)**
 * [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型 【Prototype】
 * [Jun. 30, 2025]: 🌴 MindSpeed MM版本2.1.0发布
 * [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型 【Prototype】
@@ -212,7 +212,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </thead>
   <tbody>
     <tr>
-      <td rowspan="33"> 多模态生成 </td>
+      <td rowspan="34"> 多模态生成 </td>
       </tr>
       <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/blob/master/examples/opensoraplan1.5/">OpenSoraPlan1.5</a></td>

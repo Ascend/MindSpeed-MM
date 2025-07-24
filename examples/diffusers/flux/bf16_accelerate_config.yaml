@@ -7,13 +7,16 @@ deepspeed_config:
   offload_param_device: none
   zero3_init_flag: false
   zero_stage: 2
-distributed_type: DEEPSPEED
-downcast_bf16: 'no'
+  # deepspeed_multinode_launcher: standard
+# main_process_ip: localhost
+# main_process_port: 6000
 machine_rank: 0
-main_training_function: main
-mixed_precision: bf16
 num_machines: 1
 num_processes: 8
+distributed_type: DEEPSPEED
+downcast_bf16: 'no'
+main_training_function: main
+mixed_precision: bf16
 rdzv_backend: static
 same_network: true
 tpu_env: []

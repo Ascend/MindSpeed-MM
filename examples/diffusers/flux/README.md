@@ -271,6 +271,31 @@
         --checkpointing_steps=50000 \ # 修改50000步为所需要步数
         ```
 
+    5. 【Optional】多机运行
+
+        修改config文件
+
+        ```bash
+        vim bf16_accelerate_config.yaml
+        ```
+
+        将文件中的`deepspeed_multinode_launcher`, `main_process_ip`, 以及`main_process_port`消除注释而进行使用。
+
+        ```shell
+            zero_stage: 2
+          #  deepspeed_multinode_launcher: standard
+          # main_process_ip: localhost  # 主节点IP
+          # main_process_port: 6000     # 主节点port
+          machine_rank: 0             # 当前机器的rank
+          num_machines: 1             # 总共的机器数
+          num_processes: 8            # 总共的卡数
+        ```
+
+        如运行双机：
+        - 将两台机器的yaml文件的main_process_ip与main_process_port设置成一样的主节点与port
+        - 一台节点`machine_rank: 0`，另一台`machine_rank: 1`
+        - 两台机器均设置`num_machines: 2`，`num_processes: 16`
+
 4. 【启动 FLUX 微调脚本】
 
     本任务主要提供flux_dreambooth与flux_dreambooth_lora微调脚本，支持多卡训练。
