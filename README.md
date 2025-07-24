@@ -346,8 +346,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 预训练 </td>
       <td> 1x8</td>
       <td> BF16 </td>
-      <td> 6.63 (SPS) </td>
-      <td> 5.67 (SPS) </td>
+      <td> 1.33 (SPS) </td>
+      <td> 1.46 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>
@@ -433,8 +433,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> Lora微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 2.89 (SPS) </td>
-      <td> 3.03 (SPS) </td>
+      <td> 2.76 (SPS) </td>
+      <td> 2.64 (SPS) </td>
       <td> / </td>
       <td>【Pass】</td>
     </tr>
@@ -454,8 +454,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> Lora微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 3.44 (SPS) </td>
-      <td> 3.92 (SPS) </td>
+      <td> 2.33 (SPS) </td>
+      <td> 2.04 (SPS) </td>
       <td> / </td>
       <td>【Pass】</td>
     </tr>
