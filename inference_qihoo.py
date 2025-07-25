@@ -12,8 +12,7 @@ from mindspeed_mm.tasks.inference.pipeline.utils.sora_utils import save_videos, 
 from mindspeed_mm.models.predictor import PredictModel
 from mindspeed_mm.models.diffusion import DiffusionModel
 from mindspeed_mm.models.ae import AEModel
-from mindspeed_mm.models.text_encoder import TextEncoder
-from mindspeed_mm import Tokenizer
+from mindspeed_mm.models.text_encoder import TextEncoder, Tokenizer
 from mindspeed_mm.utils.utils import get_dtype, get_device, is_npu_available
 
 if is_npu_available():

@@ -5,7 +5,7 @@ from megatron.training.initialize import initialize_megatron
 from mindspeed_mm.configs.config import merge_mm_args
 from mindspeed_mm.configs.config import mm_extra_args_provider
 from mindspeed_mm.arguments import extra_args_provider_decorator
-from mindspeed_mm.patchs import PatchesManager
+from mindspeed_mm.patchs.patch_manager import PatchesManager
 from mindspeed_mm.tasks.evaluation.eval_datasets import eval_dataset_dict
 from mindspeed_mm.tasks.evaluation.eval_impl import eval_impl_dict, eval_pipeline_dict
 from mindspeed_mm.tasks.evaluation.eval_prompt import eval_model_prompt_dict

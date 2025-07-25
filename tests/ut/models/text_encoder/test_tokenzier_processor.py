@@ -1,6 +1,6 @@
 import transformers
 
-from mindspeed_mm import Tokenizer
+from mindspeed_mm.models.text_encoder import Tokenizer
 from tests.ut.utils import judge_expression
 from tests.ut.utils import TestConfig
 

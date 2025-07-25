@@ -12,7 +12,7 @@ from megatron.core import mpu, tensor_parallel
 from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 
-from mindspeed_mm.models.common import MultiModalModule
+from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.embeddings import PatchEmbed2D, CombinedTimestepTextProjEmbeddings
 from mindspeed_mm.models.common.ffn import FeedForward
 from mindspeed_mm.models.common.normalize import FP32LayerNorm

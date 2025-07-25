@@ -27,7 +27,7 @@ from megatron.core import mpu, tensor_parallel
 from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 
-from mindspeed_mm.models.common import MultiModalModule
+from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.embeddings.pos_embeddings import RoPE3DStepVideo
 from mindspeed_mm.models.common.attention import ParallelAttention
 from mindspeed_mm.models.common.ffn import FeedForward

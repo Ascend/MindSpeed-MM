@@ -14,7 +14,7 @@ from megatron.training import get_args
 from megatron.legacy.model.enums import AttnType
 
 from mindspeed_mm.data.data_utils.constants import INPUT_MASK, MASKED_VIDEO
-from mindspeed_mm.models.common import MultiModalModule
+from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.embeddings import PatchEmbed2D
 from mindspeed_mm.models.common.ffn import FeedForward
 from mindspeed_mm.models.common.attention import MultiHeadSparseAttentionSBH

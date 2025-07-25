@@ -36,7 +36,7 @@ from mindspeed_mm.data.data_utils.utils import (
 from mindspeed_mm.data.data_utils.video_reader import VideoReader
 from mindspeed_mm.data.data_utils.video_processor import VideoProcessor
 from mindspeed_mm.data.datasets.mm_base_dataset import MMBaseDataset
-from mindspeed_mm.models import Tokenizer
+from mindspeed_mm.models.text_encoder import Tokenizer
 from mindspeed_mm.data.data_utils.data_transform import (
     MaskGenerator,
     add_aesthetic_notice_image,

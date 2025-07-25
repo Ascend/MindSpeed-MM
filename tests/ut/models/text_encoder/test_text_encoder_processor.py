@@ -3,7 +3,7 @@ from typing import Dict, AnyStr, Type
 import mindspeed.megatron_adaptor
 import transformers
 
-from mindspeed_mm import TextEncoder, Tokenizer
+from mindspeed_mm.models.text_encoder import TextEncoder, Tokenizer
 from mindspeed_mm.models.text_encoder.hunyuan_mllm_text_encoder import HunyuanMLLmModel
 from tests.ut.utils import TestConfig, judge_expression
     

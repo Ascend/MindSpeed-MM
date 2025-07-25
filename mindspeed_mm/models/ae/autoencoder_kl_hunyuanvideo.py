@@ -11,7 +11,7 @@ from diffusers.utils import logging
 from diffusers.utils.accelerate_utils import apply_forward_hook
 from diffusers.models.attention_processor import Attention, SpatialNorm
 
-from mindspeed_mm.models.common import load_checkpoint
+from mindspeed_mm.models.common.checkpoint import load_checkpoint
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.distrib import DiagonalGaussianDistribution
 from mindspeed_mm.models.common.conv import TimePaddingCausalConv3d

@@ -30,7 +30,7 @@ from megatron.training.utils import average_losses_across_data_parallel_group
 from megatron.training.utils import print_rank_0
 from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.configs.config import merge_mm_args
-from mindspeed_mm.patchs import PatchesManager
+from mindspeed_mm.patchs.patch_manager import PatchesManager
 from mindspeed_mm.tasks.rl.utils import compute_log_probs
 from mindspeed_mm.training import train
 from mindspeed_mm.utils.random import seed_all

@@ -57,7 +57,7 @@ from mindspeed_mm.configs.config import merge_mm_args
 from mindspeed_mm.tools.profiler import Profiler
 from mindspeed_mm.tools.mem_profiler import memory_profiler
 from mindspeed_mm.arguments import extra_args_provider_decorator
-from mindspeed_mm.patchs import PatchesManager
+from mindspeed_mm.patchs.patch_manager import PatchesManager
 from mindspeed_mm.utils.random import seed_all
 
 

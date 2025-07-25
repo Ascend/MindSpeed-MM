@@ -28,7 +28,7 @@ from mindspeed.core.parallel_state import (
 )
 from mindspeed.core.context_parallel.ring_context_parallel import ringattn_context_parallel
 
-from mindspeed_mm.models.common import MultiModalModule
+from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.embeddings import (
     PatchEmbed3D,
     TimeStepEmbedding,

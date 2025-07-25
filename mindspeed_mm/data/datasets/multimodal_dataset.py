@@ -17,7 +17,7 @@ from mindspeed_mm.data.data_utils.processing_deepseek_vl_v2 import DeepseekVLV2P
 from mindspeed_mm.data.data_utils.constants import MODEL_CONSTANTS
 from mindspeed_mm.data.data_utils.utils import preprocess
 from mindspeed_mm.data.datasets.mm_base_dataset import MMBaseDataset
-from mindspeed_mm.models import Tokenizer
+from mindspeed_mm.models.text_encoder import Tokenizer
 from mindspeed_mm.data.data_utils.multimodal_image_video_preprocess import get_multimodal_image_video_preprocessor
 
 

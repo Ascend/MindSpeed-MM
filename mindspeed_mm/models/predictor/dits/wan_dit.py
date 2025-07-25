@@ -19,7 +19,7 @@ from mindspeed.core.context_parallel.unaligned_cp.mapping import (
 from mindspeed.core.parallel_state import get_context_parallel_group_for_hybrid_ulysses
 from mindspeed.core.context_parallel.ulysses_context_parallel import UlyssesContextAttention
 
-from mindspeed_mm.models.common import MultiModalModule
+from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.attention import FlashAttention, ParallelAttention
 from mindspeed_mm.models.common.embeddings import TextProjection
 from mindspeed_mm.models.common.normalize import normalize, FP32LayerNorm

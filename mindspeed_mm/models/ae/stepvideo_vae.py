@@ -21,7 +21,6 @@ from torch.nn import functional as F
 from mindspeed_mm.models.common.distrib import DiagonalGaussianDistribution
 from mindspeed_mm.models.common.conv import CausalConv3dBase
 from mindspeed_mm.models.common.updownsample import Upsample
-from mindspeed_mm.models.common import load_checkpoint
 
 
 def base_group_norm(x, norm_layer, act_silu=False):

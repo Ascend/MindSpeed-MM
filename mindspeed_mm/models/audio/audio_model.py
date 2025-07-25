@@ -11,7 +11,7 @@ from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.training import get_args
 
 from mindspeed_mm.models.audio.omni_audio_encoder import SinusoidsPositionEmbedding, AudioLinear
-from mindspeed_mm.models.common import MultiModalModule
+from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.vision.vision_encoders.vision_transformer_block import Qwen2VLVisionTransformerBlock
 
 try:
