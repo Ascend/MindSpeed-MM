@@ -22,7 +22,6 @@ import megatron.core.transformer
 from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 
-import mindspeed_mm.models.sora_model
 from .utils import is_enable_lora, merge_dicts, modify_keys_with_dict
 
 
@@ -44,6 +43,7 @@ def model_provider_func_wrapper(model_provider_func):
         if is_enable_lora():
             from peft import LoraConfig, get_peft_model, PeftModel, LoraModel
             from peft.tuners.tuners_utils import check_target_module_exists
+            import mindspeed_mm.models.sora_model
             config = core_transformer_config_from_args(args)
             lora_config = LoraConfig(
                 r=args.lora_r,
@@ -188,3 +188,6 @@ def apply_patches():
         megatron.core.transformer.module.MegatronModule.state_dict_for_save_checkpoint)
     megatron.training.checkpointing.unwrap_model = unwrap_model_wrapper(megatron.training.checkpointing.unwrap_model)
     megatron.training.training.unwrap_model = unwrap_model_wrapper(megatron.training.training.unwrap_model)
+
+
+apply_patches()
