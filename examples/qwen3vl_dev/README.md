@@ -136,7 +136,7 @@ pip install -e .
 <a id="jump2.2"></a>
 #### 2. 权重转换(hf2mm)
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。详细用法参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)，该工具目前支持LLM部分权重单独从纯LLM的hf权重中加载，添加`--config.llm_hf.hf_dir`。
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。详细用法参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)，该工具目前支持LLM部分权重单独从纯LLM的hf权重中加载，添加`--config.llm_hf_config.hf_dir`。
 
 ```bash
 
@@ -144,7 +144,7 @@ MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工�
 mm-convert  Qwen3_VLConverter hf_to_mm \
   --cfg.mm_dir "ckpt/mm_path/Qwen3-VL-30B-A3B" \
   --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-7B-Instruct" \
-  --cfg.llm_hf.hf_dir "ckpt/hf_path/Qwen3-30B-A3B" \
+  --cfg.llm_hf_config.hf_dir "ckpt/hf_path/Qwen3-30B-A3B" \
   --cfg.parallel_config.ep_size 8 \
   --cfg.parallel_config.tp_size 1 \
   --cfg.parallel_config.llm_pp_layers [[48]] \
@@ -154,7 +154,7 @@ mm-convert  Qwen3_VLConverter hf_to_mm \
 # 其中：
 # mm_dir: 转换后保存目录
 # hf_config.hf_dir: VLM的huggingface权重目录
-# llm_hf.hf_dir： LLM的huggingface权重目录，如果添加了该参数，模型中LLM的权重将会从该目录下加载并替换VLM中的LLM权重。
+# llm_hf_config.hf_dir： LLM的huggingface权重目录，如果添加了该参数，模型中LLM的权重将会从该目录下加载并替换VLM中的LLM权重。
 # ep_size： ep并行数量，注意要和微调启动脚本中的配置一致
 # tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
 # llm_pp_layers: llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
