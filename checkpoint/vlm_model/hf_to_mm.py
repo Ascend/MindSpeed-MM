@@ -113,9 +113,6 @@ def partition_state_dict_by_pp(state_dict: STATE_DICT_T,
     """For transformer structures of different modalities, use a universal PP splitting logic to split the
     model parameter state-dict into different PP ranks and reset the corresponding layer numbers
     """
-    if pp_ranges[0].pp_size <= 1:
-        return [state_dict]
-
     pp_weights = []
     for pp_rank in range(pp_ranges[0].pp_size):
         pp_weight = {}
