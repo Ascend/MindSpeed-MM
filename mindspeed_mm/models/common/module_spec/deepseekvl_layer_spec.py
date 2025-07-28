@@ -9,7 +9,7 @@ from megatron.core.tensor_parallel import ColumnParallelLinear, RowParallelLinea
 from megatron.core.transformer import ModuleSpec, TransformerLayer, TransformerLayerSubmodules
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.identity_op import IdentityOp
-from megatron.core.transformer.custom_layers.transformer_engine import TENorm
+from megatron.core.extensions.transformer_engine import TENorm
 from mindspeed_mm.models.common.transformer.multi_head_latent_attention import (
     MLASelfAttentionSubmodules,
     MLASelfAttentionWithMMSplitSubmodules,

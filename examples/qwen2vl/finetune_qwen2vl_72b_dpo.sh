@@ -98,6 +98,7 @@ OUTPUT_ARGS="
     --eval-interval 10000 \
     --eval-iters 5000 \
     --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 
 DPO_ARGS="

@@ -41,6 +41,7 @@ from megatron.training.training import (
     append_to_progress_log,
     build_train_valid_test_data_iterators,
     setup_model_and_optimizer,
+    disable_forward_pre_hook,
 )
 from megatron.training.utils import (
     calc_params_l2_norm,
@@ -347,14 +348,14 @@ def train(
         config.no_sync_func = [model_chunk.no_sync for model_chunk in model]
         if len(model) == 1:
             config.no_sync_func = config.no_sync_func[0]
-        if args.delay_grad_reduce:
+        if args.align_grad_reduce:
             config.grad_sync_func = [
                 model_chunk.start_grad_sync
                 for model_chunk in model
             ]
             if len(model) == 1:
                 config.grad_sync_func = config.grad_sync_func[0]
-    if args.overlap_param_gather and args.delay_param_gather:
+    if args.overlap_param_gather and args.align_param_gather:
         config.param_sync_func = [
             lambda x, model_index=model_index: optimizer.finish_param_sync(
                 model_index, x
@@ -499,8 +500,8 @@ def train(
         # Evaluation
         if args.eval_interval and iteration % args.eval_interval == 0 and args.do_valid:
             timers("interval-time").stop()
-            if args.use_distributed_optimizer and args.overlap_param_gather:
-                optimizer.disable_pre_hook()
+            if args.use_distributed_optimizer and args.overlap_param_gather and isinstance(model, DDP):
+                disable_forward_pre_hook(model)
             if args.manual_gc and args.manual_gc_eval:
                 # Collect all objects.
                 gc.collect()
@@ -612,8 +613,8 @@ def train(
         wandb_writer.finish()
 
     # Close out pre-hooks if using distributed optimizer and overlapped param gather.
-    if args.use_distributed_optimizer and args.overlap_param_gather:
-        optimizer.disable_pre_hook()
+    if args.use_distributed_optimizer and args.overlap_param_gather and isinstance(model, DDP):
+        disable_forward_pre_hook(model)
 
     # If any exit conditions (signal handler, duration, iterations) have been reached, exit.
     if exit_flag:

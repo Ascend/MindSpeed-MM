@@ -19,7 +19,7 @@ from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_
 from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
-from megatron.core.transformer.custom_layers.transformer_engine import TENorm
+from megatron.core.extensions.transformer_engine import TENorm
 from megatron.core.transformer.transformer_block import TransformerBlock, TransformerBlockSubmodules
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
@@ -60,14 +60,19 @@ class InternVitTransformerLayer(TransformerLayer):
         self.drop_path2 = DropPath(drop_path_rate) if drop_path_rate > 0. else nn.Identity()
 
     def forward(
-        self, 
-        hidden_states, 
-        attention_mask, 
-        context=None, 
-        context_mask=None, 
-        rotary_pos_emb=None, 
-        inference_params=None, 
-        packed_seq_params=None
+        self,
+        hidden_states,
+        attention_mask=None,
+        context=None,
+        context_mask=None,
+        rotary_pos_emb=None,
+        rotary_pos_cos=None,
+        rotary_pos_sin=None,
+        attention_bias=None,
+        inference_context=None,
+        packed_seq_params=None,
+        sequence_len_offset=None,
+        inference_params=None,
     ):
         # hidden_states: [s, b, h]
 

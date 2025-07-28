@@ -62,9 +62,6 @@ class VisionModel(MultiModalModule):
         self.projector = None  # 开pp时projector只在最后一张卡有projector，这里默认要设为None不然影响freeze
         self.encoder = None
         if self.add_encoder:
-            # the vit use general mask attention, set the attr to corporate with mindspeed attention calculation.
-            # this attr works for all vision encoder models.
-            setattr(config.vision_encoder, "use_general_mask_attention", True)
             self.encoder = VISION_ENCODER_MAPPINGS[config.vision_encoder.model_id](
                 config=config.vision_encoder,
                 transformer_layer_spec=encoder_transformer_layer_spec,

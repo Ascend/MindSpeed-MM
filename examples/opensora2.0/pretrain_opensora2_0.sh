@@ -81,6 +81,7 @@ OUTPUT_ARGS="
     --eval-interval 10000 \
     --eval-iters 10 \
     --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs

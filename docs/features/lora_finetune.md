@@ -60,6 +60,8 @@ LoRA权重和原始权重合并方法：
 
 ### 注意事项
 
+- 当前依赖的core版本存在一处参数校验错误，使能lora时需手动修改 `MindSpeed/mindspeed/features_manager/memory/swap_attention.py`文件中的一处代码，文件内搜索`if is_enable_lora:`，修改为`if is_enable_lora and args.swap_attention:`。
+
 - **冻结模块**：多模态模型中可能存在部分模块参数冻结的情况，冻结的模块不会参与 LoRA 微调。
 
 ## 参考文献

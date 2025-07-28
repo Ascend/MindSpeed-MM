@@ -73,7 +73,6 @@ GPT_ARGS="
     --use-distributed-optimizer \
     --bf16 \
     --load $LOAD_PATH \
-    --variable-seq-lengths \
     --normalization RMSNorm \
     --use-fused-rmsnorm \
     --no-load-optim \
@@ -86,6 +85,7 @@ GPT_ARGS="
 
 MLA_ARGS="
     --multi-head-latent-attention \
+    --multi-latent-attention \
     --qk-rope-head-dim 64 \
     --qk-nope-head-dim 128 \
     --kv-lora-rank 512 \
@@ -97,7 +97,6 @@ MOE_ARGS="
     --moe-grouped-gemm \
     --moe-permutation-async-comm \
     --moe-token-dispatcher-type alltoall \
-    --use-fused-moe-token-permute-and-unpermute \
 "
 
 OUTPUT_ARGS="
@@ -106,6 +105,7 @@ OUTPUT_ARGS="
     --eval-interval 5000 \
     --eval-iters 5000 \
     --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)

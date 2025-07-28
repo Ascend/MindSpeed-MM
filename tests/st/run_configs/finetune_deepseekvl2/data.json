@@ -12,7 +12,7 @@
     },
     "dataloader_param": {
         "dataloader_mode": "sampler",
-        "shuffle": true,
+        "shuffle": false,
         "drop_last": true,
         "pin_memory": true,
         "sampler_type": "BaseRandomBatchSampler",

@@ -29,6 +29,7 @@
         "fp16_lm_cross_entropy": false,
         "rotary_percent": 1.0,
         "position_embedding_type": "rope",
+        "shape_order": "SBH",
         "parallel_output": true,
         "initializer_factor": 0.1,
         "persist_layer_norm": true,

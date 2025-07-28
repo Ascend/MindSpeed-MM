@@ -8,16 +8,10 @@ from torch.nn import functional as F
 
 from megatron.core.transformer import TransformerConfig, ModuleSpec
 from megatron.core.transformer.transformer_block import TransformerBlock
-from megatron.training import get_args
 
 from mindspeed_mm.models.audio.omni_audio_encoder import SinusoidsPositionEmbedding, AudioLinear
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.vision.vision_encoders.vision_transformer_block import Qwen2VLVisionTransformerBlock
-
-try:
-    from mindspeed.utils import set_actual_seq_len
-except ImportError:
-    set_actual_seq_len = None
 
 
 class AudioModel(MultiModalModule):
@@ -192,10 +186,7 @@ class OmniAudioEncoder(MultiModalModule):
         )
         for i in range(1, len(cu_seqlens)):
             attention_mask[..., cu_seqlens[i - 1]: cu_seqlens[i], cu_seqlens[i - 1]: cu_seqlens[i]] = 0
-        if get_args().use_flash_attn:
-            if set_actual_seq_len is None:
-                raise AssertionError("Please check the commit id of your MindSpeed")
-            set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
+
         hidden_states = self.blocks(hidden_states, attention_mask=attention_mask)
         hidden_states = hidden_states.squeeze(1)
         hidden_states_list = hidden_states.split(aftercnn_lens.tolist(), dim=0)

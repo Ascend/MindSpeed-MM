@@ -981,9 +981,6 @@ def _build_attentionmask_positionid_qwenllm(config, input_ids, attention_mask, i
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
 
-    if get_args().use_flash_attn:
-        return attention_mask, position_ids
-
     seq_len = input_ids.shape[1]
     past_seen_token = 0
     cache_position = kwargs.get('cache_position', None)

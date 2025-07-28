@@ -14,18 +14,20 @@ from megatron.core.models.common.language_module.language_module import Language
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
 from megatron.core.tensor_parallel.mappings import gather_from_sequence_parallel_region
-from megatron.core.transformer.custom_layers.transformer_engine import TEColumnParallelGroupedLinear, TELayerNormColumnParallelLinear, TERowParallelGroupedLinear, TERowParallelLinear
+from megatron.core.extensions.transformer_engine import TEColumnParallelGroupedLinear, TELayerNormColumnParallelLinear, TERowParallelGroupedLinear, TERowParallelLinear
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.mlp import MLP, MLPSubmodules
-from megatron.core.transformer.moe.moe_layer import MoELayer
-from megatron.core.transformer.moe.moe_utils import MoEAuxLossAutoScaler, get_capacity, save_to_aux_losses_tracker
+from megatron.core.transformer.moe.shared_experts import SharedExpertMLP
+from megatron.core.transformer.moe.experts import SequentialMLP
+from megatron.core.transformer.moe.moe_layer import MoELayer, MoESubmodules
+from megatron.core.transformer.moe.moe_utils import MoEAuxLossAutoScaler, get_capacity, save_to_aux_losses_tracker, topk_softmax_with_capacity
 from megatron.core.transformer.moe.router import TopKRouter
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_block import TENorm, TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.training.global_vars import get_args
 
-from mindspeed.core.context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, gather_forward_split_backward
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, gather_forward_split_backward
 from mindspeed.core.tensor_parallel.random import CheckpointWithoutOutput
 from mindspeed.core.transformer.transformer import norm_recompute_forward
 from mindspeed.model.transformer import should_recompute_norm
@@ -89,128 +91,6 @@ def group_limited_topk(
     probs, top_indices = torch.topk(masked_scores, k=topk, dim=-1)
 
     return probs, top_indices
-
-
-def topk_softmax_with_capacity(
-    logits: torch.Tensor,
-    topk: int,
-    capacity_factor: float = None,
-    pad_to_capacity: bool = False,
-    drop_policy: str = "probs",
-    use_pre_softmax: bool = False,
-    num_groups: Optional[int] = None,
-    group_topk: Optional[int] = None,
-    scaling_factor: Optional[float] = None,
-    deterministic_mode: bool = False,
-    score_function: str = "softmax",
-    expert_bias: torch.Tensor = None,
-    norm_topk_prob=False,
-):
-    """Apply capacity and padding to the top-k selection.
-    Args:
-        logits (torch.Tensor): Logits tensor.
-        topk (int): The number of experts to select for each token.
-        capacity_factor (int): The capacity factor of each expert. Will drop tokens if the number of tokens exceeds the capacity.
-        pad_to_capacity (bool): Whether to need padding in token drop mode.
-        drop_policy (str): The policy to drop tokens. Can be either "prob" or "position". If "prob", the tokens with the lowest probabilities will be dropped. If "position", tokens at the end of each batch will be dropped.
-        num_groups (int): Number of groups for routed experts.
-        group_topk (int): Number of selected groups for each token.
-        scaling_factor (float): Scaling factor of routing score in top-k selection.
-        deterministic_mode (bool): Deprecated.
-        score_function (str): The score function to use. Can be either "softmax" or "sigmoid".
-        expert_bias (torch.Tensor): The bias added to logits for expert routing.
-
-    Returns:
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Probs, indices and tokens_per_expert tensor.
-
-        (1) If there's no token padding, the shape of probs and indices is [tokens, top_k], indicating the selected experts for each token.
-        (2) If there's token padding, the shape of probs and indices is [num_expert, capacity], indicating the tokens selected for each expert.
-    """
-    if logits.dim() != 2:
-        raise ValueError(f"Expected 2D logits [num_tokens, num_experts], got {logits.dim()}.")
-
-    num_tokens, num_experts = logits.shape
-
-    def compute_topk(scores, topk, num_groups=None, group_topk=None):
-        if group_topk:
-            return group_limited_topk(
-                scores=scores,
-                topk=topk,
-                num_tokens=num_tokens,
-                num_experts=num_experts,
-                num_groups=num_groups,
-                group_topk=group_topk,
-            )
-        else:
-            return torch.topk(scores, k=topk, dim=1)
-
-    if score_function == "softmax":
-        if use_pre_softmax:
-            scores = torch.softmax(logits, dim=-1, dtype=torch.float32).type_as(logits)
-            probs, top_indices = compute_topk(scores, topk, num_groups, group_topk)
-        else:
-            scores, top_indices = compute_topk(logits, topk, num_groups, group_topk)
-            probs = torch.softmax(scores, dim=-1, dtype=torch.float32).type_as(logits)
-    elif score_function == "sigmoid":
-        scores = torch.sigmoid(logits)
-        if expert_bias is not None:
-            scores_for_routing = scores + expert_bias
-            _, top_indices = compute_topk(scores_for_routing, topk, num_groups, group_topk)
-            scores = torch.gather(scores, dim=1, index=top_indices).type_as(logits)
-        else:
-            scores, top_indices = compute_topk(scores, topk, num_groups, group_topk)
-        probs = scores / (scores.sum(dim=-1, keepdim=True) + 1e-20) if topk > 1 else scores
-    else:
-        raise ValueError(f"Invalid score_function: {score_function}")
-
-    if scaling_factor:
-        probs = probs * scaling_factor
-
-    if capacity_factor is None:
-        # TopK without capacity , back to core 0.7.0 for better performance
-        tokens_per_expert = torch.histc(top_indices, bins=num_experts, min=0, max=num_experts)
-        return probs, top_indices, tokens_per_expert
-    else:
-        # TopK with capacity
-        expert_capacity = get_capacity(
-            num_tokens=num_tokens * topk,
-            num_experts=num_experts,
-            capacity_factor=capacity_factor,
-        )
-        # TopK selection, Maskout unused experts
-        topk_masked_gates = torch.zeros_like(logits).scatter(1, top_indices, probs)
-        topk_mask = torch.zeros_like(logits).scatter(1, top_indices, 1)
-
-        # Maskout exceeded tokens
-        if drop_policy == "probs":
-            capacity_probs, capacity_indices = torch.topk(
-                topk_masked_gates, k=expert_capacity, dim=0, sorted=False
-            )
-            capacity_mask = torch.zeros_like(logits).scatter(0, capacity_indices, 1)
-        elif drop_policy == "position":
-            _, capacity_indices = torch.topk(topk_mask, k=expert_capacity, dim=0, sorted=False)
-            capacity_mask = torch.zeros_like(logits).scatter(0, capacity_indices, 1)
-            capacity_probs = torch.gather(topk_masked_gates, 0, capacity_indices)
-        else:
-            raise ValueError(f"Invalid drop_policy: {drop_policy}")
-
-        if pad_to_capacity:
-            final_probs, final_indices = (
-                capacity_probs.T.contiguous(),
-                capacity_indices.T.contiguous(),
-            )
-            tokens_per_expert_before_capacity = topk_mask.sum(dim=0)
-        else:
-            # Get exceed mask and maskout exceeded probs and indices
-            final_mask = torch.logical_and(topk_mask, capacity_mask)
-            drop_mask = torch.logical_not(final_mask)
-            exceed_mask = torch.gather(drop_mask, 1, top_indices)
-            final_probs = probs * torch.logical_not(exceed_mask)
-            final_indices = top_indices.clone().masked_fill_(
-                exceed_mask, torch.iinfo(torch.long).max
-            )
-            tokens_per_expert_before_capacity = topk_mask.sum(dim=0)
-        return final_probs, final_indices, tokens_per_expert_before_capacity
 
 
 class MOETopKRouter(TopKRouter):
@@ -295,7 +175,6 @@ class MOETopKRouter(TopKRouter):
                 deterministic_mode=self.config.deterministic_mode,
                 score_function=self.score_function,
                 expert_bias=self.expert_bias,
-                norm_topk_prob=self.norm_topk_prob,
             )
         else:
             raise ValueError(f"Unsupported MoE routing type: {self.routing_type}")
@@ -310,12 +189,12 @@ class MOETopKRouter(TopKRouter):
 
 class DeepSeekMoELayer(MoELayer):
     def __init__(self, config, submodules=None, layer_number=None):
-        super().__init__(config, submodules, layer_number)
+        super().__init__(config=config, submodules=submodules, layer_number=layer_number)
         self.router = MOETopKRouter(config=self.config)
 
 
 def get_mlp_module_spec(
-    use_te=True, num_experts=None, moe_grouped_gemm=False
+    use_te=True, num_experts=None, moe_grouped_gemm=False, use_shared_experts=None
 ) -> ModuleSpec:
     if num_experts is None:
         # Dense MLP w/ or w/o TE modules.
@@ -337,10 +216,29 @@ def get_mlp_module_spec(
 
         use_te_grouped_gemm = use_te and TEColumnParallelGroupedLinear is not None
 
+        if use_shared_experts is not None:
+            shared_experts = ModuleSpec(module=SharedExpertMLP,
+                                        params={"gate": False},
+                                        submodules=MLPSubmodules(
+                                            linear_fc1=linear_fc1,
+                                            linear_fc2=linear_fc2,)
+                                        )
+        else:
+            shared_experts = None
+
         return ModuleSpec(
             module=DeepSeekMoELayer,
             submodules=(
-                MLPSubmodules(linear_fc1=linear_fc1, linear_fc2=linear_fc2)
+                MoESubmodules(
+                    experts=ModuleSpec(
+                        module=SequentialMLP,
+                        submodules=MLPSubmodules(
+                            linear_fc1=linear_fc1,
+                            linear_fc2=linear_fc2,
+                        )
+                    ),
+                    shared_experts=shared_experts
+                )
                 if not moe_grouped_gemm or use_te_grouped_gemm
                 else None
             ),
@@ -360,15 +258,18 @@ class MOETransformerBlock(TransformerBlock):
                     and self.config.first_k_dense_replace is not None
                     and self.config.moe_layer_freq is not None
             ):
+                use_shared_experts = self.config.n_shared_experts
                 if (
                         (layer_number - 1) >= self.config.first_k_dense_replace
                         and (layer_number - 1) % self.config.moe_layer_freq == 0
                 ):
                     self.config.ffn_hidden_size = self.config.moe_intermediate_size
                     layer_spec.submodules.mlp = get_mlp_module_spec(use_te=use_te, num_experts=self.config.num_moe_experts,
-                                                                    moe_grouped_gemm=self.config.moe_grouped_gemm)
+                                                                    moe_grouped_gemm=self.config.moe_grouped_gemm,
+                                                                    use_shared_experts=use_shared_experts)
                 else:
-                    layer_spec.submodules.mlp = get_mlp_module_spec(use_te=use_te, moe_grouped_gemm=self.config.moe_grouped_gemm)
+                    layer_spec.submodules.mlp = get_mlp_module_spec(use_te=use_te, moe_grouped_gemm=self.config.moe_grouped_gemm,
+                                                                    use_shared_experts=use_shared_experts)
             model = build_module(layer_spec, config=self.config, layer_number=layer_number)
             self.config.ffn_hidden_size = ffn_hidden_size
             return model
@@ -604,7 +505,7 @@ class MOEModel(MMGPTModel):
             rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids)
         elif self.position_embedding_type == 'rope':
             rotary_seq_len = self.rotary_pos_emb.get_rotary_seq_len(
-                inference_params, self.decoder, decoder_input, self.config
+                inference_params, self.decoder, decoder_input, self.config, None
             )
             rotary_pos_emb = self.rotary_pos_emb(rotary_seq_len)
 

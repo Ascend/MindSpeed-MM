@@ -98,6 +98,7 @@ OUTPUT_ARGS="
     --eval-interval 5000 \
     --eval-iters 5000 \
     --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)

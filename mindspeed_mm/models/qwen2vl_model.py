@@ -238,8 +238,6 @@ class Qwen2VLModel(MultiModalModule):
         return loss
 
     def _build_causal_mask(self, input_ids, attention_mask):
-        if get_args().use_flash_attn:
-            return attention_mask
         seq_len = input_ids.shape[1]
         past_seen_token = 0
         cache_position = torch.arange(

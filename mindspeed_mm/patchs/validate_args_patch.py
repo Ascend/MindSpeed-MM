@@ -1,11 +1,16 @@
 # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 import os
+import warnings
 import torch
 
-from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 from mindspeed.arguments import validate_args_wrapper
+from megatron.core.rerun_state_machine import RerunStateMachine
+from megatron.core.transformer.enums import AttnBackend
+from megatron.core.utils import get_torch_version, is_torch_min_version
+from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 from megatron.training.arguments import load_retro_args, _check_arg_is_not_none, _print_args
 from megatron.training import print_rank_0
+from megatron.training.utils import get_device_arch_version, update_use_dist_ckpt
 
 from mindspeed_mm.configs.config import merge_mm_args
 from mindspeed_mm.utils.utils import ensure_valid
@@ -20,6 +25,7 @@ def safe_getattr(mm_object, mm_name, mm_default_value):
 
 
 def validate_args(args, defaults=None):
+
     if defaults is None:
         defaults = {}
 
@@ -39,6 +45,10 @@ def validate_args(args, defaults=None):
             args.num_experts = safe_getattr(args.mm.model.text_decoder, 'num_moe_experts', args.num_experts)
             args.n_shared_experts = safe_getattr(args.mm.model.text_decoder, 'n_shared_experts', args.n_shared_experts)
             args.mm.model.text_decoder.moe_token_dispatcher_type = safe_getattr(args.mm.model.text_decoder, 'moe_token_dispatcher_type', args.moe_token_dispatcher_type)
+
+            args.add_bias_linear = safe_getattr(args.mm.model.text_decoder, 'add_bias_linear', True)
+            args.mm.model.text_decoder.v_head_dim = safe_getattr(args, 'v_head_dim', 0)
+            args.rope_scaling_type = safe_getattr(args.mm.model.text_decoder, 'rope_scaling_type', None)
 
     # use model.json to fill predictor arg
     if hasattr(args.mm.model, 'predictor'):
@@ -90,52 +100,74 @@ def validate_args(args, defaults=None):
     # Load saved args from Retro (if applicable).
     load_retro_args(args)
 
-    # Tensor model parallel size.
-    args.tensor_model_parallel_size = min(
-        args.tensor_model_parallel_size, args.world_size)
-    ensure_valid(args.world_size % args.tensor_model_parallel_size == 0, 'world size'\
-        ' ({}) is not divisible by tensor model parallel size ({})'.format(
-            args.world_size, args.tensor_model_parallel_size))
+    # Set args.use_dist_ckpt from args.ckpt_format.
+    if args.use_legacy_models:
+        ensure_valid(args.ckpt_format == "torch", \
+            "legacy model format only supports the 'torch' checkpoint format.")
+    update_use_dist_ckpt(args)
 
-    # Pipeline model parallel size.
-    args.pipeline_model_parallel_size = min(
-        args.pipeline_model_parallel_size,
-        (args.world_size // args.tensor_model_parallel_size))
-    args.transformer_pipeline_model_parallel_size = (
-        args.pipeline_model_parallel_size - 1
-        if args.standalone_embedding_stage else
-        args.pipeline_model_parallel_size
+    if args.encoder_pipeline_model_parallel_size == 0 and args.num_experts == 0:
+        ensure_valid(args.encoder_tensor_model_parallel_size == args.tensor_model_parallel_size, "If non-MOE encoder shares first decoder pipeline rank it must have the same TP as the decoder.")
+
+    if args.encoder_tensor_model_parallel_size > 0:
+        ensure_valid(args.num_attention_heads % args.encoder_tensor_model_parallel_size == 0)
+        ensure_valid(args.encoder_tensor_model_parallel_size <= args.tensor_model_parallel_size, "We do not support encoders with more TP than the decoder.")
+
+    if args.encoder_pipeline_model_parallel_size > 0 and args.encoder_tensor_model_parallel_size == 0:
+        args.encoder_tensor_model_parallel_size = args.tensor_model_parallel_size
+
+    encoder_model_size = args.encoder_tensor_model_parallel_size * args.encoder_pipeline_model_parallel_size * args.context_parallel_size
+    decoder_model_size = args.tensor_model_parallel_size * args.pipeline_model_parallel_size * args.context_parallel_size
+    total_model_size = encoder_model_size + decoder_model_size
+
+    # Total model size.
+    ensure_valid(args.world_size % total_model_size == 0,
+        f"world size ({args.world_size}) is not divisible by total_model_size ({encoder_model_size=} + {decoder_model_size=})"
     )
 
-    # Checks.
-    model_parallel_size = args.pipeline_model_parallel_size * \
-                          args.tensor_model_parallel_size
-    ensure_valid(args.world_size % (model_parallel_size * args.context_parallel_size) == 0, \
-        'world size ({}) is not divisible by tensor parallel size ({}) times ' \
-        'pipeline parallel size ({}) times context parallel size ({})'.format(
-        args.world_size, args.tensor_model_parallel_size,
-        args.pipeline_model_parallel_size, args.context_parallel_size))
-    args.data_parallel_size = args.world_size // (model_parallel_size * args.context_parallel_size)
+    if args.attention_backend == AttnBackend.local:
+        ensure_valid(args.spec[0] == 'local', '--attention-backend local is only supported with --spec local')
+
+    # Pipeline model parallel size.
+    args.transformer_pipeline_model_parallel_size = args.pipeline_model_parallel_size
+
+    args.data_parallel_size = args.world_size // total_model_size
+
     if args.rank == 0:
         print('using world size: {}, data-parallel size: {}, '
-              'context-parallel size: {} '
+              'context-parallel size: {}, '
+              'hierarchical context-parallel sizes: {}'
               'tensor-model-parallel size: {}, '
-              'pipeline-model-parallel size: {} '.format(
+              'encoder-tensor-model-parallel size: {}, '
+              'pipeline-model-parallel size: {}, '
+              'encoder-pipeline-model-parallel size: {}'.format(
                   args.world_size, args.data_parallel_size,
                   args.context_parallel_size,
+                  args.hierarchical_context_parallel_sizes,
                   args.tensor_model_parallel_size,
-                  args.pipeline_model_parallel_size), flush=True)
-    if args.pipeline_model_parallel_size > 1:
-        if args.pipeline_model_parallel_split_rank is not None:
-            ensure_valid(args.pipeline_model_parallel_split_rank < \
-                    args.pipeline_model_parallel_size, 'split rank needs'\
-                    ' to be less than pipeline model parallel size ({})'.format(
-                            args.pipeline_model_parallel_size))
+                  args.encoder_tensor_model_parallel_size,
+                  args.pipeline_model_parallel_size,
+                  args.encoder_pipeline_model_parallel_size), flush=True)
 
-    if args.tp_comm_overlap:
-        ensure_valid(args.sequence_parallel, 'Tensor parallel communication/GEMM overlap can happen only when sequence parallelism is enabled')
+    # Checks.
 
-    # Deprecated arguments
+    # Backwards compatibility.
+    if args.pipeline_model_parallel_split_rank is not None:
+        args.encoder_pipeline_model_parallel_size = args.pipeline_model_parallel_split_rank
+        args.pipeline_model_parallel_size -= args.encoder_pipeline_model_parallel_size
+        ensure_valid(args.pipeline_model_parallel_size > 0)
+
+    if args.hierarchical_context_parallel_sizes:
+        from numpy import prod
+        ensure_valid(args.context_parallel_size == prod(args.hierarchical_context_parallel_sizes))
+    if "a2a+p2p" in args.cp_comm_type:
+        ensure_valid(args.hierarchical_context_parallel_sizes is not None, \
+        "--hierarchical-context-parallel-sizes must be set when a2a+p2p is used in cp comm")
+
+    if args.expert_tensor_parallel_size is None:
+        args.expert_tensor_parallel_size = args.tensor_model_parallel_size
+
+    # Deprecated arguments.
     ensure_valid(args.batch_size is None, '--batch-size argument is no longer ' \
         'valid, use --micro-batch-size instead')
     del args.batch_size
@@ -178,16 +210,35 @@ def validate_args(args, defaults=None):
                   f'of "{legacy_default_split_value}"')
         args.split = legacy_default_split_value
 
+    use_data_path = (args.data_path is not None) or (args.data_args_path is not None)
+    if use_data_path:
+        # Exactly one of the two has to be None if we use it.
+        ensure_valid((args.data_path is None) or (args.data_args_path is None))
+    use_per_split_data_path = any(
+        elt is not None
+        for elt in [args.train_data_path, args.valid_data_path, args.test_data_path]) or \
+            args.per_split_data_args_path is not None
+    if use_per_split_data_path:
+        # Exactly one of the two has to be None if we use it.
+        ensure_valid(any(elt is not None
+                   for elt in [args.train_data_path, args.valid_data_path, args.test_data_path]) is False or \
+            args.per_split_data_args_path is None
+        )
     # Batch size.
-    ensure_valid(args.micro_batch_size is not None, 'args.micro_batch_size can not be None')
-    ensure_valid(args.micro_batch_size > 0, 'args.micro_batch_size must be greater than 0')
+    ensure_valid(args.micro_batch_size is not None)
+    ensure_valid(args.micro_batch_size > 0)
     if args.global_batch_size is None:
         args.global_batch_size = args.micro_batch_size * args.data_parallel_size
         if args.rank == 0:
             print('setting global batch size to {}'.format(
                 args.global_batch_size), flush=True)
-    ensure_valid(args.global_batch_size > 0, 'args.global_batch_size must be greater than 0')
-    if args.num_layers_per_virtual_pipeline_stage is not None:
+    ensure_valid(args.global_batch_size > 0)
+
+    # Uneven virtual pipeline parallelism
+    ensure_valid(args.num_layers_per_virtual_pipeline_stage is None or args.num_virtual_stages_per_pipeline_rank is None, \
+        '--num-layers-per-virtual-pipeline-stage and --num-virtual-stages-per-pipeline-rank cannot be set at the same time')
+
+    if args.num_layers_per_virtual_pipeline_stage is not None or args.num_virtual_stages_per_pipeline_rank is not None:
         raise AssertionError('MindSpeed-MM Error: --num-layers-per-virtual-pipeline-stage is deprecated, please use --virtual-pipeline-model-parallel-size instead')
     if hasattr(args, 'virtual_pipeline_model_parallel_size') and args.virtual_pipeline_model_parallel_size is not None and args.virtual_pipeline_model_parallel_size > 1:
         if args.overlap_p2p_comm:
@@ -215,22 +266,100 @@ def validate_args(args, defaults=None):
         args.virtual_pipeline_model_parallel_size = None
         # Overlap P2P communication is disabled if not using the interleaved schedule.
         args.overlap_p2p_comm = False
-        if args.rank == 0:
-            print('WARNING: Setting args.overlap_p2p_comm to False since non-interleaved '
-                  'schedule does not support overlapping p2p communication')
+        args.align_param_gather = False
+        # Only print warning if PP size > 1.
+        if args.rank == 0 and args.pipeline_model_parallel_size > 1:
+            print('WARNING: Setting args.overlap_p2p_comm and args.align_param_gather to False '
+                  'since non-interleaved schedule does not support overlapping p2p communication '
+                  'and aligned param AG')
+
+    if args.rank == 0:
+        print(f"Number of virtual stages per pipeline stage: {args.virtual_pipeline_model_parallel_size}")
+
+    if args.data_parallel_sharding_strategy == "optim_grads_params":
+        args.overlap_param_gather = True
+        args.overlap_grad_reduce = True
+
+    if args.data_parallel_sharding_strategy == "optim_grads":
+        args.overlap_grad_reduce = True
 
     if args.overlap_param_gather:
         ensure_valid(args.use_distributed_optimizer, \
             '--overlap-param-gather only supported with distributed optimizer')
         ensure_valid(args.overlap_grad_reduce, \
-            '--overlap-grad-reduce should be turned on when using --overlap-param-gather')
+            'Must use --overlap-param-gather with --overlap-grad-reduce')
         ensure_valid(not args.use_legacy_models, \
             '--overlap-param-gather only supported with MCore models')
+
+    if args.use_torch_fsdp2:
+        ensure_valid(is_torch_min_version("2.4.0"), \
+            'FSDP2 requires PyTorch >= 2.4.0 with FSDP 2 support.')
+        ensure_valid(args.pipeline_model_parallel_size == 1, \
+            '--use-torch-fsdp2 is not supported with pipeline parallelism')
+        ensure_valid(args.expert_model_parallel_size == 1, \
+            '--use-torch-fsdp2 is not supported with expert parallelism')
+        ensure_valid(not args.use_distributed_optimizer, \
+            "--use-torch-fsdp2 is not supported with MCore's distributed optimizer")
+        ensure_valid(not args.gradient_accumulation_fusion, \
+            '--use-torch-fsdp2 is not supported with gradient accumulation fusion')
+        ensure_valid(args.ckpt_format in ('torch_dist', 'torch_dcp'), \
+            '--use-torch-fsdp2 requires --ckpt-format torch_dist or torch_dcp')
+        ensure_valid(args.untie_embeddings_and_output_weights, \
+            '--use-torch-fsdp2 requires --untie-embeddings-and-output-weights')
+        ensure_valid(not args.fp16, \
+            '--use-torch-fsdp2 not supported with fp16 yet')
+        ensure_valid(os.environ.get('CUDA_DEVICE_MAX_CONNECTIONS') != "1", \
+            'FSDP always requires CUDA_DEVICE_MAX_CONNECTIONS value large than one')
+
+    if args.overlap_param_gather_with_optimizer_step:
+        ensure_valid(args.use_distributed_optimizer, \
+            '--overlap-param-gather-with-optimizer-step only supported with distributed optimizer')
+        ensure_valid(args.overlap_param_gather, \
+            'Must use --overlap-param-gather-with-optimizer-step with --overlap-param-gather')
+        ensure_valid(args.virtual_pipeline_model_parallel_size is not None, \
+            '--overlap-param-gather-with-optimizer-step only supported with interleaved pipeline parallelism')
+        ensure_valid(not args.use_dist_ckpt, \
+            '--overlap-param-gather-with-optimizer-step not supported with distributed checkpointing yet')
+
+    dtype_map = {
+        'fp32': torch.float32, 'bf16': torch.bfloat16, 'fp16': torch.float16, 'fp8': torch.uint8,
+    }
+
+    def map_dtype(d):
+        if isinstance(d, torch.dtype):
+            return d
+        else:
+            return dtype_map.get(d)
+
+    args.main_grads_dtype = map_dtype(args.main_grads_dtype)
+    args.main_params_dtype = map_dtype(args.main_params_dtype)
+    args.exp_avg_dtype = map_dtype(args.exp_avg_dtype)
+    args.exp_avg_sq_dtype = map_dtype(args.exp_avg_sq_dtype)
+
+    if args.fp8_param_gather:
+        ensure_valid(args.use_distributed_optimizer or args.use_torch_fsdp2, \
+            '--fp8-param-gather only supported with distributed optimizer or torch fsdp2')
+
+    if args.use_custom_fsdp:
+        ensure_valid(args.use_distributed_optimizer, \
+            '--use-custom-fsdp only supported with distributed optimizer')
+
+        if args.data_parallel_sharding_strategy in ["optim_grads_params", "optim_grads"]:
+            warnings.warn('Please make sure your TransformerEngine support FSDP + gradient accumulation fusion')
+            ensure_valid(args.gradient_accumulation_fusion is False, \
+                "optim_grads_params optim_grads are not supported with gradient accumulation fusion")
+
+        if args.data_parallel_sharding_strategy == "optim_grads_params":
+            ensure_valid(args.check_weight_hash_across_dp_replicas_interval is None, \
+                'check_weight_hash_across_dp_replicas_interval is not supported with optim_grads_params')
+
+        ensure_valid(os.environ.get('CUDA_DEVICE_MAX_CONNECTIONS') != "1", \
+            'FSDP always requires CUDA_DEVICE_MAX_CONNECTIONS value large than one')
 
     # Parameters dtype.
     args.params_dtype = torch.float
     if args.fp16:
-        ensure_valid(not args.bf16, 'args.bf16 must be false when args.fp16 is true')
+        ensure_valid(not args.bf16)
         args.params_dtype = torch.half
         # Turn off checking for NaNs in loss and grads if using dynamic loss scaling,
         # where NaNs in grads / loss are signal to the loss scaler.
@@ -240,11 +369,17 @@ def validate_args(args, defaults=None):
                 print('WARNING: Setting args.check_for_nan_in_loss_and_grad to False since '
                       'dynamic loss scaling is being used')
     if args.bf16:
-        ensure_valid(not args.fp16, 'args.fp16 must be false when args.bf16 is true')
+        ensure_valid(not args.fp16)
         args.params_dtype = torch.bfloat16
         # bfloat16 requires gradient accumulation and all-reduce to
         # be done in fp32.
-        if not args.accumulate_allreduce_grads_in_fp32:
+        if args.accumulate_allreduce_grads_in_fp32:
+            ensure_valid(args.main_grads_dtype == torch.float32, \
+                "--main-grads-dtype can only be fp32 when --accumulate-allreduce-grads-in-fp32 is set")
+
+        if args.grad_reduce_in_bf16:
+            args.accumulate_allreduce_grads_in_fp32 = False
+        elif not args.accumulate_allreduce_grads_in_fp32 and args.main_grads_dtype == torch.float32:
             args.accumulate_allreduce_grads_in_fp32 = True
             if args.rank == 0:
                 print('accumulate and all-reduce gradients in fp32 for '
@@ -258,10 +393,11 @@ def validate_args(args, defaults=None):
         args.dataloader_type = 'single'
 
     # data
-    ensure_valid(args.num_dataset_builder_threads > 0, 'args.num_dataset_builder_threads should > 0')
+    ensure_valid(args.num_dataset_builder_threads > 0)
 
     # Consumed tokens.
     args.consumed_train_samples = 0
+    args.skipped_train_samples = 0
     args.consumed_valid_samples = 0
 
     # Support for variable sequence lengths across batches/microbatches.
@@ -330,24 +466,31 @@ def validate_args(args, defaults=None):
             args.ffn_hidden_size = 4 * args.hidden_size
 
     if args.kv_channels is None:
-        ensure_valid(args.hidden_size % args.num_attention_heads == 0, 'args.hidden_size % args.num_attention_heads != 0 is not allowed')
+        ensure_valid(args.hidden_size % args.num_attention_heads == 0)
         args.kv_channels = args.hidden_size // args.num_attention_heads
 
+    if args.seq_length is not None and args.context_parallel_size > 1:
+        ensure_valid(args.seq_length % (args.context_parallel_size * 2) == 0, \
+            'seq-length should be a multiple of 2 * context-parallel-size ' \
+            'if context-parallel-size > 1.')
+
     if args.seq_length is not None:
-        ensure_valid(args.encoder_seq_length is None, 'args.encoder_seq_length must be None if args.seq_length is not None')
+        ensure_valid(args.encoder_seq_length is None)
         args.encoder_seq_length = args.seq_length
     else:
-        ensure_valid(args.encoder_seq_length is not None, 'args.encoder_seq_length must be not None when args.seq_length is None')
+        ensure_valid(args.encoder_seq_length is not None)
         args.seq_length = args.encoder_seq_length
 
     if args.seq_length is not None:
-        ensure_valid(args.max_position_embeddings >= args.seq_length, 'args.max_position_embeddings should >= args.seq_length')
+        ensure_valid(args.max_position_embeddings >= args.seq_length, \
+            f"max_position_embeddings ({args.max_position_embeddings}) must be greater than " \
+            f"or equal to seq_length ({args.seq_length}).")
     if args.decoder_seq_length is not None:
-        ensure_valid(args.max_position_embeddings >= args.decoder_seq_length, 'args.max_position_embeddings should >= args.decoder_seq_length')
+        ensure_valid(args.max_position_embeddings >= args.decoder_seq_length)
     if args.lr is not None:
-        ensure_valid(args.min_lr <= args.lr, 'args.min_lr should <= args.lr')
+        ensure_valid(args.min_lr <= args.lr)
     if args.save is not None:
-        ensure_valid(args.save_interval is not None, 'args.save_interval must is not None, when args.save is not None')
+        ensure_valid(args.save_interval is not None)
     # Mixed precision checks.
     if args.fp16_lm_cross_entropy:
         ensure_valid(args.fp16, 'lm cross entropy in fp16 only support in fp16 mode.')
@@ -361,18 +504,16 @@ def validate_args(args, defaults=None):
         ensure_valid(dc[0] >= 8, "Unsupported compute capability for GroupedGEMM kernels.")
 
     if args.weight_decay_incr_style == 'constant':
-        ensure_valid(args.start_weight_decay is None, 'args.start_weight_decay should is None when args.weight_decay_incr_style == constant')
-        ensure_valid(args.end_weight_decay is None, 'args.end_weight_decay should is None when args.weight_decay_incr_style == constant')
+        ensure_valid(args.start_weight_decay is None)
+        ensure_valid(args.end_weight_decay is None)
         args.start_weight_decay = args.weight_decay
         args.end_weight_decay = args.weight_decay
     else:
-        ensure_valid(args.start_weight_decay is not None, 'args.start_weight_decay should is not None, when args.weight_decay_incr_style != constant')
-        ensure_valid(args.end_weight_decay is not None, 'args.end_weight_decay should is not None, when args.weight_decay_incr_style != constant')
+        ensure_valid(args.start_weight_decay is not None)
+        ensure_valid(args.end_weight_decay is not None)
 
-    TORCH_MAJOR = int(torch.__version__.split('.')[0])
-    TORCH_MINOR = int(torch.__version__.split('.')[1])
     # Persistent fused layer norm.
-    if TORCH_MAJOR < 1 or (TORCH_MAJOR == 1 and TORCH_MINOR < 11):
+    if not is_torch_min_version("1.11.0a0"):
         args.no_persist_layer_norm = True
         if args.rank == 0:
             print('Persistent fused layer norm kernel is supported from '
@@ -390,10 +531,10 @@ def validate_args(args, defaults=None):
         ensure_valid(args.recompute_method is not None, \
             'for distributed recompute activations to work you '\
             'need to use a recompute method ')
-        ensure_valid((TORCH_MAJOR, TORCH_MINOR) >= (1, 10), \
+        ensure_valid(is_torch_min_version("1.10.0a0"), \
             'distributed recompute activations are supported for pytorch ' \
             'v1.10 and above (Nvidia Pytorch container >= 21.07). Current ' \
-            'pytorch version is v%s.%s.' % (TORCH_MAJOR, TORCH_MINOR))
+            f'pytorch version is v{get_torch_version()}.')
 
     if args.recompute_granularity == 'selective':
         ensure_valid(args.recompute_method is None, \
@@ -404,26 +545,37 @@ def validate_args(args, defaults=None):
     # to avoid change in numerics when
     # sequence_parallelism is enabled.
     if args.tensor_model_parallel_size == 1:
+        if args.sequence_parallel:
+            warnings.warn("Disabling sequence parallelism because tensor model parallelism is disabled")
         args.sequence_parallel = False
+
+    if args.tp_comm_overlap:
+        ensure_valid(args.sequence_parallel, 'Tensor parallel communication/GEMM overlap can happen only when sequence parallelism is enabled')
 
     # disable async_tensor_model_parallel_allreduce when
     # model parallel memory optimization is enabled
-    if args.sequence_parallel:
-        args.async_tensor_model_parallel_allreduce = False
-
-    if os.environ.get('CUDA_DEVICE_MAX_CONNECTIONS') != "1":
-        if args.sequence_parallel:
-            raise RuntimeError(
-                "Using sequence parallelism requires setting the environment variable "
+    if args.tensor_model_parallel_size > 1 or args.context_parallel_size > 1 and get_device_arch_version() < 10:
+        # CUDA_DEVICE_MAX_CONNECTIONS requirement no longer exists since the Blackwell architecture
+        if args.use_torch_fsdp2 or args.use_custom_fsdp:
+            fsdp_impl = "Torch-FSDP2" if args.use_torch_fsdp2 else "Custom-FSDP"
+            warnings.warn(
+                f"Using tensor model parallelism or context parallelism with {fsdp_impl} together. "
+                "Try not to using them together since they require different CUDA_MAX_CONNECTIONS "
+                "settings for best performance. sequence parallelism requires setting the "
+                f"environment variable CUDA_DEVICE_MAX_CONNECTIONS to 1 while {fsdp_impl} "
+                "requires not setting CUDA_DEVICE_MAX_CONNECTIONS=1 for better parallelization.")
+        else:
+            ensure_valid(os.environ.get('CUDA_DEVICE_MAX_CONNECTIONS') == "1", \
+                "Using tensor model parallelism or context parallelism require setting the environment variable " \
                 "CUDA_DEVICE_MAX_CONNECTIONS to 1")
-        if args.async_tensor_model_parallel_allreduce:
-            raise RuntimeError(
-                "Using async gradient all reduce requires setting the environment "
-                "variable CUDA_DEVICE_MAX_CONNECTIONS to 1")
 
     # Disable bias gelu fusion if we are disabling bias altogether
     if not args.add_bias_linear:
         args.bias_gelu_fusion = False
+
+    # Keep the 'add bias' args in sync; add_qkv_bias is more targeted.
+    if args.add_bias_linear:
+        args.add_qkv_bias = True
 
     # Retro checks.
     if args.retro_add_retriever:
@@ -443,7 +595,6 @@ def validate_args(args, defaults=None):
     if args.decoupled_lr is not None or args.decoupled_min_lr is not None:
         ensure_valid(not args.use_legacy_models, \
             '--decoupled-lr and --decoupled-min-lr is not supported in legacy models.')
-        ensure_valid(not args.use_dist_ckpt, "Distributed checkpointing does not work with decoupled LR yet.")
 
     # Legacy RoPE arguments
     if args.use_rotary_position_embeddings:
@@ -452,17 +603,33 @@ def validate_args(args, defaults=None):
         raise RuntimeError('--rotary-interleaved does not work with rope_fusion.')
     if args.rotary_interleaved and args.use_legacy_models:
         raise RuntimeError('--rotary-interleaved is not supported in legacy models.')
+    if args.position_embedding_type != 'rope':
+        args.apply_rope_fusion = False
 
     # Would just need to add 'NoPE' as a position_embedding_type to support this, but for now
     # don't allow it to keep things simple
     if not args.add_position_embedding and args.position_embedding_type != 'rope':
         raise RuntimeError('--no-position-embedding is deprecated, use --position-embedding-type')
 
+    # Relative position embeddings arguments
+    if args.position_embedding_type == 'relative':
+        ensure_valid((
+            args.transformer_impl == "transformer_engine"
+        ), 'Local transformer implementation currently does not support attention bias-based position embeddings.')
+
+    # MultiModal rotary embeddings arguments
+    if args.position_embedding_type == "mrope":
+        ensure_valid(args.mrope_section is not None, \
+            '--mrope-section should be set when using --position-embedding-type mrope.')
+
     # MoE Spec check
     if args.num_experts == 0:
         args.num_experts = None
     if args.num_experts is not None:
         ensure_valid(args.spec is None, "Model Spec must be None when using MoEs")
+
+    if args.moe_ffn_hidden_size is None:
+        args.moe_ffn_hidden_size = args.ffn_hidden_size
 
     # Context parallel
     if args.context_parallel_size > 1:
@@ -479,28 +646,50 @@ def validate_args(args, defaults=None):
     # Distributed checkpointing checks
     if args.use_dist_ckpt and args.use_legacy_models:
         raise RuntimeError('--use-dist-ckpt is not supported in legacy models.')
-    
+
+    # torch_dcp (torch.distributed.checkpoint) checkpointing format checks.
+    if args.ckpt_format == "torch_dcp":
+        ensure_valid(args.use_torch_fsdp2, "--ckpt-format torch_dcp is only tested with FSDP.")
+        ensure_valid(args.tensor_model_parallel_size <= 1 and args.encoder_tensor_model_parallel_size <= 1, \
+            "--ckpt-format torch_dcp is not tested with megatron tensor parallelism.")
+        ensure_valid(args.pipeline_model_parallel_size <= 1 and args.encoder_pipeline_model_parallel_size <= 1, \
+            "--ckpt-format torch_dcp is not tested with megatron pipeline parallelism.")
+
     # Data blend checks
     ensure_valid(args.mock_data + \
            bool(args.data_path) + \
            any([args.train_data_path, args.valid_data_path, args.test_data_path]) \
            <= 1, "A single data source must be provided in training mode, else None")
 
-    if args.use_tp_pp_dp_mapping:
-        ensure_valid(args.context_parallel_size * args.expert_model_parallel_size <= 1, \
-            "context_parallel and expert_model_parallel can't be used with tp-pp-dp mapping.")
-
     # Deterministic mode
     if args.deterministic_mode:
-        ensure_valid(not args.use_flash_attn, 'Flash attention can not be used in deterministic mode.')
+        ensure_valid(not args.use_flash_attn, "Flash attention can not be used in deterministic mode.")
+        ensure_valid(not args.cross_entropy_loss_fusion, "Cross Entropy Fusion is currently not deterministic.")
 
         all_reduce_choices = ["Tree", "Ring", "CollnetDirect", "CollnetChain", "^NVLS"]
         ensure_valid(os.getenv("NCCL_ALGO", -1) != -1 and os.getenv("NCCL_ALGO") in all_reduce_choices, \
             f"NCCL_ALGO must be one of {all_reduce_choices}.")
 
+        torch.use_deterministic_algorithms(True)
+
     # Update the printed args to reflect that `apply_query_key_layer_scaling` also controls `attention_softmax_in_fp32`
     if args.apply_query_key_layer_scaling:
         args.attention_softmax_in_fp32 = True
+
+    if args.result_rejected_tracker_filename is not None:
+        # Append to passed-in args.iterations_to_skip.
+        iterations_to_skip_from_file = RerunStateMachine.get_skipped_iterations_from_tracker_file(
+            args.result_rejected_tracker_filename
+        )
+        args.iterations_to_skip.extend(iterations_to_skip_from_file)
+
+    # Make sure all functionality that requires Gloo process groups is disabled.
+    if not args.enable_gloo_process_groups:
+        if args.use_distributed_optimizer:
+            # If using distributed optimizer, must use distributed checkpointing.
+            # Legacy checkpointing uses Gloo process groups to collect full distributed
+            # optimizer state in the CPU memory of DP rank 0.
+            ensure_valid(args.use_dist_ckpt)
 
     # Checkpointing
     if args.ckpt_fully_parallel_save_deprecated and args.rank == 0:
@@ -508,16 +697,66 @@ def validate_args(args, defaults=None):
               ' Use --no-ckpt-fully-parallel-save to disable parallel save.')
     use_dist_ckpt_and_not_ckpt_fully_parallel_save = args.use_dist_ckpt and not args.ckpt_fully_parallel_save
     use_distributed_optimizer_and_rank = args.use_distributed_optimizer and args.rank == 0
+    
     if use_dist_ckpt_and_not_ckpt_fully_parallel_save and use_distributed_optimizer_and_rank:
         print('Warning: With non-parallel ckpt save and DistributedOptimizer,'
               ' it will be impossible to resume training with different parallelism.'
               ' Consider removing flag --no-ckpt-fully-parallel-save.')
+    if args.use_dist_ckpt_deprecated and args.rank == 0:
+        print('--use-dist-ckpt is deprecated and has no effect.'
+              ' Use --ckpt-format to select the checkpoint format.')
+    if args.dist_ckpt_format_deprecated and args.rank == 0:
+        print('--dist-ckpt-format is deprecated and has no effect.'
+              ' Use --ckpt-format to select the checkpoint format.')
+
+    # Inference args
+    if args.inference_batch_times_seqlen_threshold > -1:
+        ensure_valid(args.pipeline_model_parallel_size > 1, \
+            "--inference-batch-times-seqlen-threshold requires setting --pipeline-model-parallel-size > 1.")
+
+    if args.inference_dynamic_batching:
+        ensure_valid(args.inference_dynamic_batching_buffer_size_gb is not None)
+        ensure_valid(args.inference_dynamic_batching_buffer_guaranteed_fraction is not None)
+
+    # MoE upcycling check
+    if args.moe_use_upcycling:
+        ensure_valid(args.save is not None, "When using upcycling, the --save option must be specified.")
+        if not args.no_load_optim:
+            args.no_load_optim = True
+            print('Warning: disabling --no-load-optim for upcycling.')
+        if not args.no_load_rng:
+            args.no_load_rng = True
+            print('Warning: disabling --no-load-rng for upcycling.')
+
+    # Optimizer CPU offload check
+    if args.optimizer_cpu_offload:
+        ensure_valid(args.use_precision_aware_optimizer, (
+            "The optimizer cpu offload must be used in conjunction with `--use-precision-aware-optimizer`, "
+            "as the hybrid device optimizer reuses the code path of this flag."
+        ))
+
+
+    if args.non_persistent_ckpt_type == "local":
+        ensure_valid(args.non_persistent_local_ckpt_dir is not None, "Tried to use local checkpointing without specifying --local-ckpt-dir!")
+    if args.replication:
+        ensure_valid(args.replication_jump is not None, "--replication requires the value of --replication-jump!")
+        ensure_valid(args.non_persistent_ckpt_type == "local", f"--replication requires args.non_persistent_ckpt_type == 'local', but got: {args.non_persistent_ckpt_type}")
+    elif args.replication_jump:
+        print("Warning: --replication-jump was specified despite not using replication. Ignoring.")
+        args.replication_jump = None
+
+    if args.mtp_num_layers:
+        ensure_valid(not args.use_legacy_models, "The legacy Megatron models does not support Multi-Token Prediction (MTP).")
+        ensure_valid(args.context_parallel_size == 1, "Multi-Token Prediction (MTP) is not supported with Context Parallelism.")
+        ensure_valid(args.position_embedding_type == "rope" or args.position_embedding_type == "none", (
+            f"Multi-Token Prediction (MTP) is not supported with {args.position_embedding_type} position embedding type."
+            + f"The supported position embedding types are rope and none."
+        ))
 
     # Print arguments.
     _print_args("arguments", args)
 
     return args
-
 
 pm.register_patch("megatron.training.arguments.validate_args", validate_args, force_patch=True)
 pm.register_patch("mindspeed_mm.patchs.validate_args_patch.validate_args", validate_args_wrapper)

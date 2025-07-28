@@ -15,7 +15,7 @@ from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 from mindspeed.utils import get_actual_seq_len
 
 try: 
-    from mindspeed.core.context_parallel.unaligned_cp.mapping import all_to_all
+    from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import all_to_all
     native_all_to_all = False
 except ImportError:
     from mindspeed_mm.models.common.communications import all_to_all
@@ -120,7 +120,7 @@ def get_rotary_seq_len(
 mindspeed_args = get_mindspeed_args()
 if hasattr(mindspeed_args, 'context_parallel_algo') and hasattr(mindspeed_args, 'context_parallel_size'):
     if mindspeed_args.context_parallel_algo == "ulysses_cp_algo" and int(mindspeed_args.context_parallel_size) > 1:
-        pm.register_patch('mindspeed.core.context_parallel.ulysses_context_parallel.UlyssesContextAttention', 
+        pm.register_patch('mindspeed.core.context_parallel.ulysses_context_parallel.ulysses_context_parallel.UlyssesContextAttention', 
                         UlyssesContextAttention, force_patch=True)
         pm.register_patch('megatron.core.models.common.embeddings.rotary_pos_embedding.RotaryEmbedding.get_rotary_seq_len',
                         get_rotary_seq_len, force_patch=True)

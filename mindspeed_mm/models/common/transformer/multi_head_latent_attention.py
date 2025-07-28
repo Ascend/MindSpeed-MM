@@ -61,6 +61,7 @@ class MultiHeadLatentAttention(SelfAttention):
         submodules: MLASelfAttentionSubmodules,
         layer_number: int,
         attn_mask_type=AttnMaskType.padding,
+        cp_comm_type: str = None,
     ):
         super().__init__(
             config=config,
@@ -71,7 +72,6 @@ class MultiHeadLatentAttention(SelfAttention):
         args = get_args()
 
         self.use_flash_attn = args.use_flash_attn
-        self.shape_order = args.shape_order
         self.qk_rope_head_dim = args.qk_rope_head_dim
         self.qk_nope_head_dim = args.qk_nope_head_dim
         self.q_lora_rank = args.q_lora_rank
@@ -81,6 +81,7 @@ class MultiHeadLatentAttention(SelfAttention):
         self.mla_mm_split = self.config.mla_mm_split
         self.mla_fa_without_pad = self.config.mla_fa_without_pad
         self.padded_base_length = self.config.padded_base_length
+        self.shape_order = self.config.shape_order
 
         query_projection_size = self.config.num_attention_heads * self.v_head_dim
         self.q_head_dim = self.qk_nope_head_dim + self.qk_rope_head_dim
@@ -231,9 +232,14 @@ class MultiHeadLatentAttention(SelfAttention):
         hidden_states,
         attention_mask,
         key_value_states=None,
-        inference_params=None,
+        inference_context=None,
         rotary_pos_emb=None,
+        rotary_pos_cos=None,
+        rotary_pos_sin=None,
+        attention_bias=None,
         packed_seq_params=None,
+        sequence_len_offset=None,
+        inference_params=None,
     ):
         """
         Do patch for repeating KV so that GQA+Ulysses is better supported.
@@ -333,8 +339,13 @@ class MultiHeadLatentAttention(SelfAttention):
                     else:
                         cu_seqlens_q = cu_seqlens_kv = None
 
+                    # megatron 012 在计算rope时会对multi_latent_attention判断然后对入参做隔行切分，暂时规避
+                    tmp_multi_latent_attention = self.config.multi_latent_attention
+                    self.config.multi_latent_attention = False
                     q_pe = apply_rotary_pos_emb(q_pe, q_pos_emb, config=self.config, cu_seqlens=cu_seqlens_q)
                     k_pe = apply_rotary_pos_emb(k_pe, k_pos_emb, config=self.config, cu_seqlens=cu_seqlens_kv)
+                    self.config.multi_latent_attention = tmp_multi_latent_attention
+                    del tmp_multi_latent_attention
 
                 query = torch.cat([q_nope, q_pe], dim=-1)
 

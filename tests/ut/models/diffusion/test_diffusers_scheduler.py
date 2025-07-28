@@ -109,7 +109,7 @@ class TestDiffusersScheduler:
         set_args(args)
         os.environ["MASTER_ADDR"] = "localhost"
         os.environ["MASTER_PORT"] = "6000"
-        _initialize_distributed()
+        _initialize_distributed(None, None)
         initialize_model_parallel()
         config = {
             "model_id": "DDPM",

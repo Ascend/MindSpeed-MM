@@ -26,7 +26,8 @@
             "freeze": true,
             "use_fused_rotary_pos_emb": true,
             "post_layer_norm": false,
-            "pipeline_num_layers": [32, 0, 0, 0, 0, 0, 0, 0]
+            "pipeline_num_layers": [32, 0, 0, 0, 0, 0, 0, 0],
+            "attention_mask_type": "general"
 
         },
         "vision_projector": {

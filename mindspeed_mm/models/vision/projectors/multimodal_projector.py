@@ -4,7 +4,7 @@ from megatron.core.transformer.mlp import MLP, MLPSubmodules
 from megatron.core.transformer.spec_utils import build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_viewless_tensor
-from mindspeed.core.transformer.custom_layers.transformer_engine import PTNorm
+from megatron.core.extensions.transformer_engine import TENorm
 
 from mindspeed_mm.models.common.module import MultiModalModule
 
@@ -51,7 +51,7 @@ class MultimodalProjector(MultiModalModule):
             )
         elif self.projector_type == "lnmlp":
             self.ffn_hidden_size = config.ffn_hidden_size
-            self.layernorm = PTNorm(config=config, hidden_size=config.input_size, eps=config.layernorm_epsilon)
+            self.layernorm = TENorm(config=config, hidden_size=config.input_size, eps=config.layernorm_epsilon)
             self.encoder = MLP(
                 config=config,
                 submodules=submodules,

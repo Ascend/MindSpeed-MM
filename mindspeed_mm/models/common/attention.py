@@ -14,9 +14,9 @@ from megatron.training.arguments import core_transformer_config_from_args
 
 from megatron.legacy.model.rms_norm import RMSNorm
 from megatron.legacy.model.enums import AttnType
-from mindspeed.core.context_parallel.ulysses_context_parallel import UlyssesContextAttention
+from mindspeed.core.context_parallel.ulysses_context_parallel.ulysses_context_parallel import UlyssesContextAttention
 from mindspeed.core.parallel_state import get_context_parallel_group_for_hybrid_ulysses
-from mindspeed.core.context_parallel.ring_context_parallel import ringattn_context_parallel
+from mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel import ringattn_context_parallel
 from mindspeed.core.parallel_state import (
     get_context_parallel_group_for_hybrid_ulysses,
     get_context_parallel_group_for_hybrid_ring,
@@ -29,7 +29,7 @@ from mindspeed.core.parallel_state import (
     get_ring_group_for_intra_window,
     get_ring_group_for_intra_window_send_recv_overlap
 )
-from mindspeed.core.context_parallel.unaligned_cp import mapping
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp import mapping
 
 from mindspeed_mm.utils.utils import video_to_image, change_tensor_layout
 from mindspeed_mm.models.common.normalize import normalize, FP32LayerNorm
@@ -187,8 +187,6 @@ class FlashAttention(nn.Module):
                 pse_type=self.pse_type
             )
         else:
-            if self.context_parallel_algo != "ulysses_cp_algo":
-                raise ValueError(f"context_parallel_algo should be one of the [megatron_cp_algo, hybrid_cp_algo, ulysses_cp_algo], but got {self.context_parallel_algo}")
             query, key, value = [change_tensor_layout(x, "sbnd", self.fa_layout, batch_size=batch_size) for x in [query, key, value]]
 
             actual_seq_qlen = []

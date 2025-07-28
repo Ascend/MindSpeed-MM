@@ -3,7 +3,7 @@
 from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
 from megatron.core.transformer.attention import SelfAttentionSubmodules
-from megatron.core.transformer.custom_layers.transformer_engine import (
+from megatron.core.extensions.transformer_engine import (
     TENorm,
 )
 from megatron.core.transformer.dot_product_attention import DotProductAttention

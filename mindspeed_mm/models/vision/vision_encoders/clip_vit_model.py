@@ -3,7 +3,7 @@
 from typing import Optional, Union
 
 import torch
-from megatron.core.transformer.custom_layers.transformer_engine import TENorm
+from megatron.core.extensions.transformer_engine import TENorm
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_block import TransformerBlock

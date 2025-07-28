@@ -72,7 +72,6 @@ GPT_ARGS="
     --load $LOAD_PATH \
     --use-flash-attn \
     --use-fused-rotary-pos-emb \
-    --variable-seq-lengths \
     --normalization RMSNorm \
     --use-fused-rmsnorm \
     --no-load-optim \
@@ -89,6 +88,7 @@ OUTPUT_ARGS="
     --eval-interval 5000 \
     --eval-iters 5000 \
     --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)

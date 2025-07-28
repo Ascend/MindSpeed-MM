@@ -53,6 +53,7 @@ AE_ARGS="
 OUTPUT_ARGS="
     --save-interval 10000 \
     --save $SAVE_PATH
+    --ckpt-format torch \
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)

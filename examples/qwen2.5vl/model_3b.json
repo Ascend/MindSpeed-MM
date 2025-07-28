@@ -36,7 +36,8 @@
                 15,
                 23,
                 31
-            ]
+            ],
+            "attention_mask_type": "general"
         },
         "vision_projector": {
             "model_id": "lnmlp",

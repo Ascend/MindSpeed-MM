@@ -44,6 +44,7 @@ GPT_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
     --context-parallel-size ${CP} \
+    --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --lr 1e-5 \

@@ -76,7 +76,6 @@ GPT_ARGS="
     --use-distributed-optimizer \
     --bf16 \
     --load $LOAD_PATH \
-    --variable-seq-lengths \
     --normalization RMSNorm \
     --num-workers 4 \
     --use-flash-attn \
@@ -89,6 +88,7 @@ OUTPUT_ARGS="
     --eval-interval 5000 \
     --eval-iters 5000 \
     --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)

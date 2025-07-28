@@ -88,6 +88,8 @@
             "recompute_granularity": "full",
             "recompute_method": "uniform",
             "recompute_num_layers": 1,
+            "pre_tockens": 2147483647,
+            "next_tockens": 2147483647,
             "freeze": false
         },
         "vision_projector": {

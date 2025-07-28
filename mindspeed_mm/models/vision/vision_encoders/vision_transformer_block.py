@@ -8,10 +8,10 @@ from torch import Tensor
 from megatron.core.transformer.transformer_block import TransformerBlockSubmodules, TransformerBlock
 from megatron.core import InferenceParams, parallel_state, tensor_parallel, mpu
 from megatron.core.packed_seq_params import PackedSeqParams
+from megatron.training import get_args
 from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_viewless_tensor
-from mindspeed.utils import set_actual_seq_len
 
 
 class VisionTransformerBlock(TransformerBlock):
@@ -133,10 +133,12 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                 for index in range(start, end):
                     layer = self._get_layer(index)
                     current_mask = attention_mask
-                    set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
+                    cu_seqlens_in_use = cu_seqlens[1:]
                     if len(fullatt_block_indexes_now) > 0 and index not in fullatt_block_indexes_now:
                         current_mask = window_mask
-                        set_actual_seq_len(tuple(cu_window_seqlens[1:].cpu().numpy().tolist()))
+                        cu_seqlens_in_use = cu_window_seqlens[1:]
+                    if get_args().use_flash_attn and (packed_seq_params is None or not cu_seqlens_in_use.equal(packed_seq_params.cu_seqlens_q)):
+                        packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_seqlens_in_use, cu_seqlens_kv=cu_seqlens_in_use)
                     hidden_states, context = layer(
                         hidden_states=hidden_states,
                         attention_mask=current_mask,
@@ -221,7 +223,8 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
         if not self.pre_process:
             # See set_input_tensor()
             hidden_states = self.input_tensor
-
+        if cu_seqlens is not None:
+            cu_seqlens_in_use = cu_seqlens[1:]
         # Viewless tensor.
         # - We only need to create a viewless tensor in the case of micro batch
         #   size (mbs) == 1, since in this case, 'hidden_states.transpose()'
@@ -304,12 +307,14 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                         if getattr(self.config, "window_attn_size", None) is not None:
                             if layer_num in fullatt_block_indexes_now:
                                 attention_mask_now = attention_mask
-                                set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
+                                cu_seqlens_in_use = cu_seqlens[1:]
                             else:
                                 attention_mask_now = window_mask
-                                set_actual_seq_len(tuple(cu_window_seqlens[1:].cpu().numpy().tolist()))
+                                cu_seqlens_in_use = cu_window_seqlens[1:]
                         else:
                             attention_mask_now = attention_mask
+                        if get_args().use_flash_attn and (packed_seq_params is None or not cu_seqlens_in_use.equal(packed_seq_params.cu_seqlens_q)):
+                            packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_seqlens_in_use, cu_seqlens_kv=cu_seqlens_in_use)
                         hidden_states, context = layer(
                             hidden_states=hidden_states,
                             attention_mask=attention_mask_now,

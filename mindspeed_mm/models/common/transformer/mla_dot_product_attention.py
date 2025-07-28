@@ -27,13 +27,17 @@ class MlaDotProductAttention(DotProductAttention):
             attn_mask_type: AttnMaskType,
             attention_type: str,
             attention_dropout: float = None,
+            cp_comm_type=None,
+            softmax_scale=None
     ):
         super().__init__(
             config=config,
             layer_number=layer_number,
             attn_mask_type=attn_mask_type,
             attention_type=attention_type,
-            attention_dropout=attention_dropout
+            attention_dropout=attention_dropout,
+            cp_comm_type=cp_comm_type,
+            softmax_scale=softmax_scale
         )
         args = get_args()
 

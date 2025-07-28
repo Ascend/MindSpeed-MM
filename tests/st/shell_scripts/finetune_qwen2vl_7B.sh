@@ -73,6 +73,7 @@ GPT_ARGS="
     --bf16 \
     --variable-seq-lengths \
     --use-distributed-optimizer \
+    --use-flash-attn \
     --num-workers 8 \
 "
 

@@ -7,6 +7,7 @@ from megatron.core import parallel_state
 from megatron.core.enums import ModelType
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from megatron.core.pipeline_parallel.schedules import custom_backward
+from megatron.core.transformer.module import MegatronModule
 
 from mindspeed.core.performance.auto_pipeline_perf.schedules import (
     backward_step_decorator,
@@ -19,6 +20,7 @@ def _get_megatron_optimizer_based_on_param_groups_wrapper(fn):
     @wraps(fn)
     def wrapper(
         config: OptimizerConfig,
+        model_chunks: List[MegatronModule],
         param_groups: List,
         *args,
         **kwargs
@@ -33,7 +35,7 @@ def _get_megatron_optimizer_based_on_param_groups_wrapper(fn):
                     "is_decoupled_lr": False,
                 }
             ]
-        return fn(config, param_groups, *args, **kwargs)
+        return fn(config, model_chunks, param_groups, *args, **kwargs)
 
     return wrapper
 

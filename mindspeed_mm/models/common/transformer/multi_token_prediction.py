@@ -11,6 +11,7 @@ from torch import Tensor
 from megatron.core import InferenceParams, mpu, parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.dist_checkpointing.utils import replace_prefix_for_sharding
+from megatron.core.extensions.transformer_engine import TENorm
 from megatron.core.fusions.fused_layer_norm import FusedLayerNorm
 from megatron.core.models.gpt.gpt_layer_specs import get_gpt_layer_local_spec, get_gpt_layer_with_transformer_engine_spec
 from megatron.core.packed_seq_params import PackedSeqParams
@@ -22,12 +23,11 @@ from megatron.core.tensor_parallel.layers import ColumnParallelLinear
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
-from megatron.core.transformer.transformer_block import TransformerBlockSubmodules, TransformerLayer
+from megatron.core.transformer.transformer_block import TransformerBlockSubmodules
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_tp_sharded_tensor_for_checkpoint, make_viewless_tensor
 from megatron.training import get_args
 from mindspeed.core.tensor_parallel.random import CheckpointWithoutOutput
-from mindspeed.core.transformer.custom_layers.transformer_engine import PTNorm
 
 SUPPORTED_ATTN_MASK = [
     AttnMaskType.padding,
@@ -60,7 +60,7 @@ except ImportError:
     import warnings
 
     warnings.warn('Apex is not installed. Falling back to Torch Norm')
-    LNImpl = PTNorm
+    LNImpl = TENorm
 
 
 def tie_word_embeddings_state_dict(
@@ -244,7 +244,7 @@ def get_mtp_layer_spec(
         layer_norm_impl = TENorm
         column_parallel_linear_impl = TEColumnParallelLinear
     else:
-        layer_norm_impl = PTNorm
+        layer_norm_impl = TENorm
         column_parallel_linear_impl = ColumnParallelLinear
 
     mtp_layer_spec = ModuleSpec(

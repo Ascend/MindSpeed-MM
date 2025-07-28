@@ -33,8 +33,8 @@ class PatchesManager:
         "diffusers_geglu": [("diffusers.models.activations.GEGLU.forward", diffusers_patches.geglu_forward)],
         "torch_adamw": [("torch.optim.AdamW", AdamW)],
         "ae_float32": [
-            ("megatron.legacy.model.module.Float16Module.__init__", models_patches.float16Module_init),
-            ("megatron.legacy.model.module.Float16Module.forward", models_patches.float16Module_forward)
+            ("megatron.core.transformer.module.Float16Module.__init__", models_patches.float16Module_init),
+            ("megatron.core.transformer.module.Float16Module.forward", models_patches.float16Module_forward)
         ],
         "moe_mlp": [
             ("megatron.core.transformer.moe.experts.SequentialMLP.forward", models_patches.SequentialMLP_forward)

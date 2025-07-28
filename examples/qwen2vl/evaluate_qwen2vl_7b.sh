@@ -64,7 +64,6 @@ GPT_ARGS="
     --bf16 \
     --load $LOAD_PATH \
     --vocab-size 1 \
-    --variable-seq-lengths \
     --distributed-timeout-minutes 1000 \
     --use-flash-attn \
     --no-load-optim \

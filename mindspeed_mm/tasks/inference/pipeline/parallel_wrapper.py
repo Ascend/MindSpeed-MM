@@ -22,7 +22,7 @@ from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 from megatron.core import mpu, InferenceParams
 from megatron.core.distributed import DistributedDataParallel as LocalDDP
 from megatron.inference.text_generation.communication import recv_from_prev_pipeline_rank_, send_to_next_pipeline_rank
-from megatron.legacy.model import Float16Module as MegatronFloat16Module
+from megatron.core.transformer.module import Float16Module as MegatronFloat16Module
 from megatron.training import get_args
 from megatron.training.checkpointing import load_checkpoint
 from megatron.training.training import get_model

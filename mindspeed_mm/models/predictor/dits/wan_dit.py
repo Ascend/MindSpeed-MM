@@ -11,13 +11,13 @@ from megatron.core import mpu, tensor_parallel
 from megatron.legacy.model.enums import AttnType
 from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
-from mindspeed.core.context_parallel.unaligned_cp.mapping import (
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import (
     all_to_all,
     gather_forward_split_backward,
     split_forward_gather_backward,
 )
 from mindspeed.core.parallel_state import get_context_parallel_group_for_hybrid_ulysses
-from mindspeed.core.context_parallel.ulysses_context_parallel import UlyssesContextAttention
+from mindspeed.core.context_parallel.ulysses_context_parallel.ulysses_context_parallel import UlyssesContextAttention
 
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.attention import FlashAttention, ParallelAttention

@@ -44,6 +44,8 @@ def model_provider(pre_process=True, post_process=True):
             raise AttributeError("The predictor should provide initialize_pipeline_tensor_shapes for PP_size>1. ")
         args.pipeline_tensor_shapes = model.predictor.initialize_pipeline_tensor_shapes()
         setattr(forward_step, 'pipeline_tensor_shapes', args.pipeline_tensor_shapes)
+        # modification for core 0.12.1 when using multi-parameter PP
+        model.config.pipeline_tensor_shapes = args.pipeline_tensor_shapes
 
     return model
 

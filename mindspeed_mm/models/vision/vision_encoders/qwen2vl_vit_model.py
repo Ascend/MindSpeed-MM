@@ -18,15 +18,10 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_region, gather_from_sequence_parallel_region
 from megatron.training import get_args
 
-from mindspeed.core.context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, \
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, \
     gather_forward_split_backward
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.vision.vision_encoders.vision_transformer_block import Qwen2VLVisionTransformerBlock
-
-try:
-    from mindspeed.utils import set_actual_seq_len
-except ImportError:
-    set_actual_seq_len = None
 
 
 # Copied from transformers.models.llama.modeling_llama.rotate_half
@@ -116,13 +111,18 @@ class Qwen2vlSelfAttention(SelfAttention):
         self.mrope_section = config.mrope_section
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask,
-            key_value_states=None,
-            inference_params=None,
-            rotary_pos_emb=None,
-            packed_seq_params=None,
+        self,
+        hidden_states,
+        attention_mask,
+        key_value_states=None,
+        inference_context=None,
+        rotary_pos_emb=None,
+        rotary_pos_cos=None,
+        rotary_pos_sin=None,
+        attention_bias=None,
+        packed_seq_params=None,
+        sequence_len_offset=None,
+        inference_params=None,
     ):
         query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states)  # s b h d
         
@@ -154,8 +154,12 @@ class Qwen2vlSelfAttention(SelfAttention):
         # ===================================================
         # Adjust key, value for inference
         # ===================================================
-        key, value, _, attn_mask_type = self._adjust_key_value_for_inference(
-            inference_params, key, value, None
+        query, key, value, rotary_pos_emb, attn_mask_type = self._adjust_key_value_for_inference(
+            inference_context,
+            query,
+            key,
+            value,
+            None,
         )
         # ==================================
         # core attention computation
@@ -216,13 +220,18 @@ class Qwen2vlVitSelfAttention(SelfAttention):
         )
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask,
-            key_value_states=None,
-            inference_params=None,
-            rotary_pos_emb=None,
-            packed_seq_params=None,
+        self,
+        hidden_states,
+        attention_mask,
+        key_value_states=None,
+        inference_context=None,
+        rotary_pos_emb=None,
+        rotary_pos_cos=None,
+        rotary_pos_sin=None,
+        attention_bias=None,
+        packed_seq_params=None,
+        sequence_len_offset=None,
+        inference_params=None,
     ):
 
         # hidden_states: [sq, b, h]
@@ -240,14 +249,16 @@ class Qwen2vlVitSelfAttention(SelfAttention):
         # ===================================================
         # Adjust key, value, and rotary_pos_emb for inference
         # ===================================================
-        key, value, rotary_pos_emb, attn_mask_type = self._adjust_key_value_for_inference(
-            inference_params, key, value, rotary_pos_emb
+        query, key, value, rotary_pos_emb, attn_mask_type = self._adjust_key_value_for_inference(
+            inference_context,
+            query,
+            key,
+            value,
+            rotary_pos_emb,
+            rotary_pos_cos,
+            rotary_pos_sin,
+            sequence_len_offset,
         )
-
-        if packed_seq_params is not None:
-            query = query.squeeze(1)
-            key = key.squeeze(1)
-            value = value.squeeze(1)
 
         # ================================================
         # relative positional embedding (rotary embedding)
@@ -285,13 +296,6 @@ class Qwen2vlVitSelfAttention(SelfAttention):
                 attn_mask_type=attn_mask_type,
                 packed_seq_params=packed_seq_params,
             )
-
-        if packed_seq_params is not None:
-            # reshape to same output shape as unpacked case
-            # t is the pack size: sum (sq_i)
-            # (t, np, hn) -> (t, b=1, h=np*hn)
-            # note that batch is a dummy dimension in the packed case
-            core_attn_out = core_attn_out.reshape(core_attn_out.size(0), 1, -1)
 
         # =================
         # Output. [sq, b, h]
@@ -520,9 +524,6 @@ class Qwen2VLViT(MultiModalModule):
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
 
         if get_args().use_flash_attn:
-            if set_actual_seq_len is None:
-                raise AssertionError("Please check the commit id of your MindSpeed")
-            set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
             attention_mask = None
             window_mask = None
         else:
@@ -576,7 +577,5 @@ class Qwen2VLViT(MultiModalModule):
             
         if get_args().sequence_parallel:
             hidden_states = gather_from_sequence_parallel_region(hidden_states)
-            
-        if get_args().use_flash_attn:
-            set_actual_seq_len(None)
+
         return hidden_states, window_index

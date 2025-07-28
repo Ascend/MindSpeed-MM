@@ -116,7 +116,7 @@ def model_provider_func_wrapper(model_provider_func):
 def _load_base_checkpoint_wrapper(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        state_dict, checkpoint_name, release = fn(*args, **kwargs)
+        state_dict, checkpoint_name, release, ckpt_type = fn(*args, **kwargs)
 
         if is_enable_lora() and state_dict is not None:
             args = get_args()
@@ -124,11 +124,11 @@ def _load_base_checkpoint_wrapper(fn):
             state_dict['model'] = modify_keys_with_dict(state_dict['model'], exclude_words)
 
             if args.load_base_model is not None:
-                state_dict_lora, checkpoint_name_lora, release_lora = fn(args.load_base_model, **kwargs)
+                state_dict_lora, checkpoint_name_base, release_base, ckpt_type_base = fn(args.load_base_model, **kwargs)
                 exclude_words = ['base_layer', 'lora_', 'norm']
                 state_dict_lora['model'] = modify_keys_with_dict(state_dict_lora['model'], exclude_words)
                 merge_dicts(state_dict, state_dict_lora)
-        return state_dict, checkpoint_name, release
+        return state_dict, checkpoint_name, release, ckpt_type
 
     return wrapper
 

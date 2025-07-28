@@ -41,6 +41,7 @@ GPT_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
     --context-parallel-size ${CP} \
+    --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --num-workers 8 \
@@ -87,6 +88,7 @@ OUTPUT_ARGS="
     --eval-iters 10 \
     --load $LOAD_PATH \
     --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)

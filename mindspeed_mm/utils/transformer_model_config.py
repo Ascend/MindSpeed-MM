@@ -1,9 +1,12 @@
 from dataclasses import dataclass
+from functools import wraps
+from typing import Any
 import torch.nn.functional as F
 
 from megatron.core import ModelParallelConfig
-from megatron.core.transformer import TransformerConfig
+from megatron.core.transformer.transformer_config import TransformerConfig, MLATransformerConfig
 from megatron.training import get_args
+from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 
 from mindspeed_mm.configs.config import ConfigReader
 from .utils import get_dtype, quick_gelu
@@ -19,16 +22,25 @@ def get_class_variables(cls):
 def get_model_config(config):
     global_args = get_args()
     config_dict = config.to_dict()
-    if 'model_id' in config_dict and config_dict['model_id'] == 'InternVLMLP':
-        config_dict['params_dtype'] = "bf16"
-        config_dict['hidden_size'] = 4096
-        config_dict['num_attention_heads'] = 1
-        config_dict['num_layers'] = 1
-    if 'model_id' in config_dict and config_dict['model_id'] == 'Qwen2.5llm':
-        config_dict['use_repeat_kv'] = True
+    if "model_id" in config_dict and config_dict["model_id"] == "InternVLMLP":
+        config_dict["params_dtype"] = "bf16"
+        config_dict["hidden_size"] = 4096
+        config_dict["num_attention_heads"] = 1
+        config_dict["num_layers"] = 1
+    if "model_id" in config_dict and config_dict["model_id"] == "Qwen2.5llm":
+        config_dict["use_repeat_kv"] = True
+    # for moe
+    if "moe_intermediate_size" in config_dict:
+        config_dict["moe_ffn_hidden_size"] = config_dict["moe_intermediate_size"]
+    if "n_shared_experts" in config_dict:
+        config_dict["moe_shared_expert_intermediate_size"] = (config_dict["n_shared_experts"] *
+                                                              config_dict["moe_ffn_hidden_size"])
 
     t_config = dict()
-    tfc_variables = get_class_variables(TransformerConfig)
+    if getattr(global_args, "multi_latent_attention", False):
+        tfc_variables = get_class_variables(MLATransformerConfig)
+    else:
+        tfc_variables = get_class_variables(TransformerConfig)
     mpc_variables = get_class_variables(ModelParallelConfig)
     for key in tfc_variables:
         if key in config_dict.keys():
@@ -43,22 +55,69 @@ def get_model_config(config):
         t_config["activation_func"] = quick_gelu
     else:
         t_config["activation_func"] = F.gelu
-    
-    trans_config = MMTransformerConfig(**t_config)
 
+    if getattr(global_args, "multi_latent_attention", False):
+        t_config["rope_type"] = "rope"
+        trans_config = MLATransformerConfig(**t_config)
+    else:
+        trans_config = TransformerConfig(**t_config)
+
+    # Update config dict from TransformerConfig
     for key in tfc_variables:
         config_dict[key] = getattr(trans_config, key)
+
+    # Add MindSpeedArgs that needed from global args
+    mindspeed_variables = get_class_variables(MindSpeedArgsRequired)
+    for key in mindspeed_variables:
+        if key not in config_dict:
+            config_dict[key] = getattr(global_args, key)
+
     new_config = ConfigReader(config_dict)
 
     return new_config
 
 
 @dataclass
-class MMTransformerConfig(TransformerConfig):
-    def __post_init__(self):
+class MindSpeedArgsRequired:
+    """Base configuration for MindSpeed Core"""
+
+    # Flash attention
+    pre_tockens: Any = None
+    next_tockens: Any = None
+    sparse_mode: Any = None
+    use_fusion_attn_v2: Any = None
+
+    # Distributed args
+    overlap_param_gather: Any = None
+    overlap_grad_reduce: Any = None
+
+    # alibi args
+    alibi_fusion_attn_type: Any = None
+
+    # 2d tp
+    tp_2d: Any = None
+
+    # CP args
+    context_parallel_algo: Any = None
+    context_parallel_kv_cache_policy: Any = None
+    context_parallel_cache_interval: Any = None
+    use_ulysses_allgather_kv: Any = None
+    megatron_cp_in_bnsd: Any = None
+    attention_mask_type: Any = None
+    use_cp_send_recv_overlap: Any = None
+
+
+def tranformer_config_post_init_wrapper(fn):
+    @wraps(fn)
+    def wrapper(self):
         """Modified from __post_init__ method of TransformerConfig to adapt MLP config"""
         if self.kv_channels is None and self.num_attention_heads == 0:
             self.kv_channels = 0
         if self.pipeline_dtype is None:
             self.pipeline_dtype = self.params_dtype
-        super().__post_init__()
+        fn(self)
+    return wrapper
+
+
+pm.register_patch("megatron.core.transformer.transformer_config.TransformerConfig.__post_init__", tranformer_config_post_init_wrapper)
+pm.apply_patches()

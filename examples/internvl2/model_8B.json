@@ -83,6 +83,8 @@
             "attention_softmax_in_fp32": false,
             "select_layer": -1,
             "ps_version": "v2",
+            "pre_tockens": 2147483647,
+            "next_tockens": 2147483647,
             "freeze": true
         },
         "vision_projector": {

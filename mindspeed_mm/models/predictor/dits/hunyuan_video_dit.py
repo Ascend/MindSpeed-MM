@@ -11,7 +11,7 @@ from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 from mindspeed.ops.npu_rotary_position_embedding import npu_rotary_position_embedding
 
-from mindspeed.core.context_parallel.unaligned_cp.mapping import (
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import (
     split_forward_gather_backward,
     gather_forward_split_backward,
     all_to_all,
@@ -26,7 +26,7 @@ from mindspeed.core.parallel_state import (
     get_context_parallel_for_hybrid_ring_global_ranks,
     get_context_parallel_for_hybrid_ring_rank
 )
-from mindspeed.core.context_parallel.ring_context_parallel import ringattn_context_parallel
+from mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel import ringattn_context_parallel
 
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.embeddings import (
