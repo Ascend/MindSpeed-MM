@@ -266,6 +266,33 @@ $save_dir
   WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```
 
+【模型并行配置】
+
+InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，特性说明[参考](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/unaligned_linear.md)
+```shell
+--unaligned-linear \
+```
+开启TP-SP需要添加以下参数：
+```shell
+--unaligned-linear \
+--sequence-parallel \
+```
+
+开启CP需要添加以下参数:
+```shell
+--context-parallel-algo megatron_cp_algo \
+```
+
+开启PP需要添加以下参数：
+```shell
+--variable-seq-lengths \
+```
+
+开启VPP需要添加以下参数（N为VPP切分数），特性说明[参考](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/virtual_pipeline_parallel.md)：
+```shell
+--virtual-pipeline-model-parallel-size N \
+```
+
 <a id="jump4.3"></a>
 
 #### 3. 启动微调

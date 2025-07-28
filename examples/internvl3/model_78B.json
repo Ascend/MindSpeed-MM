@@ -43,6 +43,8 @@
 	    "layernorm_epsilon": 1e-06,
 	    "add_bias_linear":false,
 	    "add_qkv_bias": true,
+        "reset_attention_mask": false,
+        "variable_seq_lengths": true,
         "recompute_granularity": "full",
         "recompute_method": "uniform",
         "recompute_num_layers": 1
@@ -71,6 +73,8 @@
             "init_method_std": 0.02,
             "initializer_factor": 1.0,
             "output_hidden_states": false,
+            "context_parallel_size": 1,
+            "sequence_parallel": false,
             "use_return_dict": false,
             "params_dtype": "bf16",
             "post_layer_norm": false,

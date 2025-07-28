@@ -278,7 +278,7 @@ class InternVisionEmbeddings(nn.Module):
             self._get_pos_embed(self.position_embedding[:, 1:, :], height, width)
         ], dim=1)
         embeddings = embeddings + position_embedding.to(target_dtype)
-        if get_args().context_parallel_size is not None and get_args().context_parallel_size > 1:
+        if get_args().context_parallel_size is not None and get_args().context_parallel_size > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             split_gather_sizes = cal_split_sizes(self.num_positions, get_args().context_parallel_size)
             embeddings = split_forward_gather_backward(embeddings, mpu.get_context_parallel_group(),
                                                     dim=1, grad_scale="down", split_sizes=split_gather_sizes)
@@ -422,7 +422,7 @@ class InternViT(MultiModalModule):
 
         encoder_outputs = self.encoder(hidden_states, attention_mask)
         
-        if get_args().context_parallel_size is not None and get_args().context_parallel_size > 1:
+        if get_args().context_parallel_size is not None and get_args().context_parallel_size > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             split_gather_sizes = cal_split_sizes(self.seq_length, get_args().context_parallel_size)
             encoder_outputs = gather_forward_split_backward(encoder_outputs, mpu.get_context_parallel_group(),
                                                             dim=0, grad_scale="up", gather_sizes=split_gather_sizes)

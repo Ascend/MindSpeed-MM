@@ -1049,6 +1049,10 @@ def _build_attentionmask_positionid_internllm(attention_mask, position_ids, dtyp
 
         return inverted_mask.masked_fill(inverted_mask.to(torch.bool), torch.finfo(dtype).min)
 
+    if get_args().context_parallel_size > 1 and get_args().context_parallel_algo == "megatron_cp_algo":
+        attention_mask = None
+        return attention_mask, position_ids
+
     input_shape = attention_mask.shape
     # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
     combined_attention_mask = None

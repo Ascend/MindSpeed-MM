@@ -425,7 +425,7 @@ class VLMModel(MultiModalModule):
                         audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds) 
                         audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
                         input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
-                    input_embeds = input_embeds.transpose(0, 1).clone()
+                    input_embeds = input_embeds.transpose(0, 1)
                     if self.config.sequence_parallel:
                         input_embeds = scatter_to_sequence_parallel_region(input_embeds)
 

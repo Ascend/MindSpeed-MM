@@ -226,7 +226,7 @@ class MMGPTModel(LanguageModule):
             rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids)
         elif self.position_embedding_type == 'rope':
             rotary_seq_len = self.rotary_pos_emb.get_rotary_seq_len(
-                inference_params, self.decoder, decoder_input, self.config
+                None, self.decoder, decoder_input, self.config, inference_params
             )
             rotary_pos_emb = self.rotary_pos_emb(rotary_seq_len)
 
