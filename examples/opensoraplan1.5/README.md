@@ -30,7 +30,7 @@
 git clone https://gitee.com/ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
-git checkout core_r0.8.0
+git checkout core_v0.12.1
 cp -r megatron ../MindSpeed-MM/
 cd ../MindSpeed-MM
 ```
@@ -54,8 +54,8 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 # 安装加速库
 git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
-# checkout commit from MindSpeed core_r0.8.0
-git checkout 1ada966f33d6fab6eff7c95b197aae51f8790926
+# checkout commit from MindSpeed core_r0.12.1
+git checkout 6d63944cb2470a0bebc38dfb65299b91329b8d92
 pip install -r requirements.txt 
 pip install -e .
 cd ..

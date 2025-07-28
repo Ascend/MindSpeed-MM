@@ -51,7 +51,7 @@ NVIDIA GPU采用CUDA（Compute Unified Device Architecture）的并行计算架�
 模型迁移前需要参考[《Ascend Extension for PyTorch 软件安装指南》](https://www.hiascend.com/document/detail/zh/Pytorch/700/configandinstg/instg/insg_0001.html)完成昇腾PyTorch训练环境安装，以便完成迁移支持度分析与后续的模型训练，包括NPU驱动和固件、CANN软件（Toolkit、Kernels和NNAL）、以及PyTorch框架和torch_npu插件的安装。
 目前已知的不支持场景：
 
-当前不支持使用DP（Data Parallel，数据并行）模式的模型迁移。若用户训练脚本中包含NPU平台不支持的torch.nn.parallel.DataParallel接口，则需手动修改该接口为torch.nn.parallel.DistributedDataParallel接口，以执行多卡训练。原脚本需要在GPU环境下基于Python3.8及以上跑通。
+当前不支持使用DP（Data Parallel，数据并行）模式的模型迁移。若用户训练脚本中包含NPU平台不支持的torch.nn.parallel.DataParallel接口，则需手动修改该接口为torch.nn.parallel.DistributedDataParallel接口，以执行多卡训练。原脚本需要在GPU环境下基于Python3.10及以上跑通。
 APEX库中的FusedAdam融合优化器，目前不支持使用自动迁移或PyTorch GPU2Ascend工具迁移该优化器，需用户手工进行迁移，具体修改方法可单击[Link](https://gitee.com/ascend/apex#apexoptimizers)。
 大模型迁移暂不支持bmtrain框架的迁移。
 bitsandbytes已支持在昇腾上进行安装，具体可单击[Supported Backends](https://github.com/bitsandbytes-foundation/bitsandbytes/blob/main/docs/source/installation.mdx#supported-backendsmulti-backend-supported-backends)进行参考，目前仅支持NF4量化/反量化迁移，用于LLM QLoRA微调，其余功能暂不支持。

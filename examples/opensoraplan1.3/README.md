@@ -58,7 +58,7 @@ commit_id=4b14d58
 git clone https://gitee.com/ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
-git checkout core_r0.8.0
+git checkout core_v0.12.1
 cp -r megatron ../MindSpeed-MM/
 cd ..
 cd MindSpeed-MM
@@ -69,8 +69,8 @@ cd MindSpeed-MM
 #### 2. 环境搭建
 
 ```bash
-# python3.8
-conda create -n test python=3.8
+# python3.10
+conda create -n test python=3.10
 conda activate test
 
 # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
@@ -86,7 +86,8 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 # 安装加速库
 git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
-git checkout 59b4e983b7dc1f537f8c6b97a57e54f0316fafb0
+# checkout commit from MindSpeed core_r0.12.1
+git checkout 6d63944cb2470a0bebc38dfb65299b91329b8d92
 pip install -r requirements.txt
 pip3 install -e .
 cd ..
