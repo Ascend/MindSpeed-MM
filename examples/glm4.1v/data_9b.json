@@ -5,15 +5,15 @@
             "model_name_or_path": "ckpt/hf_path/GLM4.1V-9B-Instruct",
             "use_fast_tokenizer": true,
             "split_special_tokens": false,
-            "image_max_pixels": 262144,
-            "image_min_pixels": 0,
+            "image_max_pixels": 589824,
+            "image_min_pixels": 1024,
             "video_max_pixels": 16384,
             "video_min_pixels": 0,
             "video_fps": 2.0,
             "video_maxlen": 64
         },
         "basic_parameters": {
-            "template": "qwen2vl",
+            "template": "glm4.1v",
             "dataset_dir": "./data",
             "dataset": "./data/mllm_format_llava_instruct_data.json",
             "cache_dir": "./data/cache_dir",

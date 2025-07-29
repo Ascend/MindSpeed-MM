@@ -1,4 +1,5 @@
-# Copyright 2025 The Qwen Team and The HuggingFace Inc. team. All rights reserved.
+# Copyright 2025 The ZhipuAI Inc. team and HuggingFace Inc. team. All rights reserved.
+
 from typing import Optional, Tuple
 import torch
 import torch.nn as nn
@@ -133,7 +134,6 @@ class Glm4vSelfAttention(nn.Module):
         from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
         attention_interface = ALL_ATTENTION_FUNCTIONS['sdpa']
 
-        attention_mask = None
         attn_output, attn_weights = attention_interface(
             self,
             query_states,

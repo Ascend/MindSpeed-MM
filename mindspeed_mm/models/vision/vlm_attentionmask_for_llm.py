@@ -1075,13 +1075,69 @@ def _build_attentionmask_positionid_internllm(attention_mask, position_ids, dtyp
     return combined_attention_mask.bool(), position_ids
 
 
+def _build_attentionmask_positionid_glm4v(config, input_ids, attention_mask, position_ids, pos_func,
+                                            *args, **kwargs):
+
+    rope_deltas = kwargs.get('rope_deltas', None)
+    inputs_embeds = kwargs.get('inputs_embeds', None)
+    cache_position = kwargs.get('cache_position', None)
+    if position_ids is None:
+        if position_ids is None and (attention_mask is None or attention_mask.ndim == 2):
+            # calculate RoPE index once per generation in the pre-fill stage only
+            if (
+                    (cache_position is not None and cache_position[0] == 0)
+                    or rope_deltas is None
+            ):
+                position_ids, rope_deltas = pos_func(config,
+                                                     input_ids,
+                                                     attention_mask=attention_mask,
+                                                     **kwargs)
+                rope_deltas = rope_deltas
+            # then use the prev pre-calculated rope-deltas to get the correct position ids
+            else:
+                batch_size, seq_length, _ = inputs_embeds.shape
+                delta = (
+                    (cache_position[0] + rope_deltas).to(inputs_embeds.device)
+                    if cache_position is not None
+                    else 0
+                )
+                position_ids = torch.arange(seq_length, device=inputs_embeds.device)
+                position_ids = position_ids.view(1, -1).expand(batch_size, -1)
+                if cache_position is not None:  # otherwise `deltas` is an int `0`
+                    delta = delta.repeat_interleave(batch_size // delta.shape[0], dim=0)
+                position_ids = position_ids.add(delta)
+                position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
+
+    if get_args().use_flash_attn:
+        return attention_mask, position_ids
+
+    inputs_embeds = inputs_embeds.permute(1, 0, 2)
+    past_key_values = None
+    if cache_position is None:
+        past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
+        cache_position = torch.arange(
+            past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
+        )
+    config._attn_implementation = "sdpa"
+
+    from transformers.masking_utils import create_causal_mask
+    causal_mask = create_causal_mask(
+            config=config,
+            input_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            cache_position=cache_position,
+            past_key_values=past_key_values,
+        )
+
+    return causal_mask, position_ids
+
 attention_mask_list = {'qwen2lm': partial(_build_attentionmask_positionid_qwenllm, pos_func=qwen2_position),
                        'qwen2_5_lm': partial(_build_attentionmask_positionid_qwenllm, pos_func=qwen2_5_position),
                        'internllm': _build_attentionmask_positionid_internllm,
                        'deepseek': _build_attentionmask_positionid_internllm,
                        'qwen3_lm': partial(_build_attentionmask_positionid_qwenllm, pos_func=qwen2_5_position),
-                       'qwen2_5_omni_thinker': partial(_build_attentionmask_positionid_qwenllm, pos_func=qwen2_5_omni_position),  
-                       'glm4v_lm': partial(_build_attentionmask_positionid_qwenllm, pos_func=glm_position),  
+                       'qwen2_5_omni_thinker': partial(_build_attentionmask_positionid_qwenllm, pos_func=qwen2_5_omni_position),
+                       'glm4v_lm': partial(_build_attentionmask_positionid_glm4v, pos_func=glm_position),
                        }
 
 

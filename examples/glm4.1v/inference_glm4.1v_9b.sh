@@ -55,7 +55,6 @@ GPT_ARGS="
     --seed 42 \
     --bf16 \
     --load $LOAD_PATH \
-    --use-flash-attn \
     --no-load-optim \
     --no-load-rng
 "

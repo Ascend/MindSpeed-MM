@@ -12,8 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 from dataclasses import dataclass
+from copy import deepcopy
+
 from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
+
+from typing_extensions import override
 
 from transformers import PreTrainedTokenizer
 
@@ -43,6 +48,8 @@ class Template:
     stop_words: List[str]
     efficient_eos: bool
     replace_eos: bool
+    enable_thinking: Optional[bool]
+    thought_words: tuple[str, str]
     mm_plugin: "BasePlugin"
 
     def encode_oneturn(
@@ -73,6 +80,19 @@ class Template:
         """
         encoded_messages = self._encode(tokenizer, messages, system)
         return [(encoded_messages[i], encoded_messages[i + 1]) for i in range(0, len(encoded_messages), 2)]
+
+    def add_thought(self, content: str = "") -> str:
+        r"""Add empty thought to assistant message."""
+        return f"{self.thought_words[0]}\n\n{self.thought_words[1]}\n\n" + content
+
+    def remove_thought(self, content: str) -> str:
+        r"""Remove thought from assistant message."""
+        pattern = re.compile(f"{re.escape(self.thought_words[0])}(.*?){re.escape(self.thought_words[1])}", re.DOTALL)
+        return re.sub(pattern, "", content).lstrip("\n")
+
+    def get_thought_word_ids(self, tokenizer: "PreTrainedTokenizer") -> list[int]:
+        r"""Get the token ids of thought words."""
+        return tokenizer.encode(self.add_thought(), add_special_tokens=False)
 
     def _encode(
             self,
@@ -142,6 +162,64 @@ class Template:
         return token_ids
 
 
+@dataclass
+class ReasoningTemplate(Template):
+    r"""A template that add thought to assistant message."""
+
+    @override
+    def encode_oneturn(
+        self,
+        tokenizer: "PreTrainedTokenizer",
+        messages: list[dict[str, str]],
+        system: Optional[str] = None,
+        tools: Optional[str] = None,
+    ) -> tuple[list[int], list[int]]:
+        messages = deepcopy(messages)
+        for i in range(1, len(messages) - 2, 2):
+            messages[i]["content"] = self.remove_thought(messages[i]["content"])
+
+        if self.enable_thinking is False:  # remove all cot
+            messages[-1]["content"] = self.remove_thought(messages[-1]["content"])
+
+        prompt_ids, response_ids = super().encode_oneturn(tokenizer, messages, system, tools)
+        if (
+            self.thought_words[0] not in messages[-1]["content"]
+            and self.thought_words[1] not in messages[-1]["content"]
+        ):  # add empty cot
+            if not self.enable_thinking:  # do not compute loss
+                prompt_ids += self.get_thought_word_ids(tokenizer)
+            else:  # do compute loss
+                response_ids = self.get_thought_word_ids(tokenizer) + response_ids
+
+        return prompt_ids, response_ids
+
+    @override
+    def encode_multiturn(
+        self,
+        tokenizer: "PreTrainedTokenizer",
+        messages: list[dict[str, str]],
+        system: Optional[str] = None,
+        tools: Optional[str] = None,
+    ) -> list[tuple[list[int], list[int]]]:
+        messages = deepcopy(messages)
+        if self.enable_thinking is False:  # remove all cot
+            for i in range(1, len(messages), 2):
+                messages[i]["content"] = self.remove_thought(messages[i]["content"])
+
+        encoded_messages = self._encode(tokenizer, messages, system)
+        for i in range(0, len(messages), 2):
+            if (
+                self.thought_words[0] not in messages[i + 1]["content"]
+                and self.thought_words[1] not in messages[i + 1]["content"]
+            ):  # add empty cot
+                if not self.enable_thinking:  # do not compute loss
+                    encoded_messages[i] += self.get_thought_word_ids(tokenizer)
+                else:  # do compute loss
+                    encoded_messages[i + 1] = self.get_thought_word_ids(tokenizer) + encoded_messages[i + 1]
+
+        return [(encoded_messages[i], encoded_messages[i + 1]) for i in range(0, len(encoded_messages), 2)]
+
+
 TEMPLATES: Dict[str, "Template"] = {}
 
 
@@ -156,12 +234,15 @@ class RegisterParams:
     stop_words: Optional[Sequence[str]] = None
     efficient_eos: bool = False
     replace_eos: bool = False
+    enable_thinking: Optional[bool] = True
+    thought_words: Optional[tuple[str, str]] = None
 
 
 def _register_template(
         name: str,
         params: RegisterParams,
         mm_plugin: "BasePlugin" = get_mm_plugin(name="base"),
+        template_class: type["Template"] = Template,
 ) -> None:
     r"""
     Registers a chat template.
@@ -196,7 +277,7 @@ def _register_template(
 
     default_separator_formatter = EmptyFormatter()
     default_prefix_formatter = EmptyFormatter()
-    TEMPLATES[name] = Template(
+    TEMPLATES[name] = template_class(
         format_user=params.format_user or default_user_formatter,
         format_assistant=params.format_assistant or default_assistant_formatter,
         format_system=params.format_system or default_user_formatter,
@@ -206,6 +287,8 @@ def _register_template(
         stop_words=[] if params.stop_words is None else params.stop_words,
         efficient_eos=params.efficient_eos,
         replace_eos=params.replace_eos,
+        enable_thinking=params.enable_thinking,
+        thought_words=params.thought_words or ("<think>", "</think>"),
         mm_plugin=mm_plugin,
     )
 
@@ -244,6 +327,23 @@ _register_template(
     mm_plugin=get_mm_plugin(
         name="qwen2_omni", audio_token="<|AUDIO|>", image_token="<|IMAGE|>", video_token="<|VIDEO|>")
 
+)
+
+
+_register_template(
+    name="glm4.1v",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["<|user|>\n{{content}}<|assistant|>"]),
+        format_assistant=StringFormatter(slots=["\n{{content}}"]),
+        format_system=StringFormatter(slots=["<|system|>\n{{content}}"]),
+        format_observation=StringFormatter(slots=["<|observation|>\n{{content}}<|assistant|>"]),
+
+        format_prefix=EmptyFormatter(slots=["[gMASK]<sop>"]),
+        stop_words=["<|user|>", "<|observation|>", "</answer>"],
+        efficient_eos=True
+    ),
+    mm_plugin=get_mm_plugin(name="glm4.1v", image_token="<|image|>", video_token="<|video|>"),
+    template_class=ReasoningTemplate
 )
 
 
