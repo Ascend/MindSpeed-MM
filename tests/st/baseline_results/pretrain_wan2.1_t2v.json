@@ -6,14 +6,14 @@
     ],
     "time": [
         15836.4,
-        11531.6,
-        11594.3
+        11196.4,
+        11230.8
     ],
     "memo info": [
         {
             "rank": 0,
             "allocated memory": 11617.18212890625,
-            "max allocated memory": 26391.87109375
+            "max allocated memory": 22532.8046875
         }
     ],
     "warm_up": 1
