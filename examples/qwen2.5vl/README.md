@@ -359,8 +359,20 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[30,2,0,0]`、`[0,11,10,7]`），需要在`finetune_qwen2_5_vl_7b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)。
 
-【重计算配置（可选）】
-若要开启vit重计算，需在model.json中的vision_encoder部分添加下面三个重计算相关参数
+【vit模块重计算配置（可选）】
+
+当放开vit训练时（默认配置中冻结vit，若要放开请将model.json文件中`vision_encoder`部分配置为`"vision_encoder": {"freeze": false}`。），可以启用重计算以降低显存（注意，此举会对性能产生影响）
+
+若要开启vit重计算，需在model.json中的vision_encoder部分添加重计算相关参数。
+通过`recompute_granularity`参数可以配置重计算模块为`full`或`selective`。
+
+1. full模式
+
+TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重计算，此时可以配置重计算的层数。
+- `recompute_method`: 控制重计算层数计算的方法，可选值为`uniform`（均匀重计算）或`block`（按块重计算）。
+- `recompute_num_layers`: 控制重计算的层数，指定需要重计算的层数量。
+
+示例配置如下：
 
 ```json
 {
@@ -372,6 +384,24 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
       "recompute_granularity": "full",
       "recompute_method": "uniform",
       "recompute_num_layers": 1
+    }
+  }
+}
+```
+2. selective模式
+
+仅对TransformerLayer中attention的core_attention组件进行重计算。
+
+示例配置如下：
+
+```json
+{
+  "model_id": "qwen2_5vl",
+  "img_context_token_id": 151655,
+  "vision_start_token_id": 151652,
+  "image_encoder": {
+    "vision_encoder": {
+      "recompute_granularity": "selective"
     }
   }
 }
