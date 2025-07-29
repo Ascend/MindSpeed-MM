@@ -189,7 +189,7 @@ class TestTestEncoder:
             text_encoder_dict=text_encoder_dict,
             text="This is a hunyuanMLLm example",
             target_model_type=HunyuanMLLmModel,
-            target_output_min=-0.489501953125,
+            target_output_min=-0.4892578125,
             target_att_sum=11,
         )
         self._test_model(test_input)

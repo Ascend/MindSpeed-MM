@@ -6,8 +6,8 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态。软件版本配套�
 
 |MindSpeed MM版本 | MindSpeed版本             | Megatron版本      | PyTorch版本   | torch_npu版本 | CANN版本  | Python版本                               |
 |--------------|-------------------------|-----------------|------------- |-------------|---------|----------------------------------------|
-|master（主线） | core_r0.8.0           | Core 0.8.0      |   2.1.0 | 在研版本        | 在研版本    | Python3.8, Python3.10|
-|2.1.0（商用） | 2.1.0_core_r0.8.0         | Core 0.8.0      |   2.1.0     | 在研版本       | 在研版本    | Python3.8, Python3.10|
+|master（主线） | core_r0.8.0           | Core 0.8.0      |   2.1.0, 2.6.0 | 在研版本        | 在研版本    | Python3.10|
+|2.1.0（商用） | 2.1.0_core_r0.8.0         | Core 0.8.0      |   2.6.0     | 在研版本       | 在研版本    | Python3.10|
 |2.0.0（商用） | 2.0.0_core_r0.8.0         | Core 0.8.0      |   2.1.0     | 7.0.0       | 8.1.RC1    | Python3.8, Python3.10|
 |1.0.0（商用） | 1.0.0_core_r0.6.0         | Core 0.6.0      |   2.1.0     | 6.0.0       | 8.0.0    | Python3.8, Python3.10 |
 
@@ -23,7 +23,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态。软件版本配套�
   </tr>
   <tr>
     <td> Python </td>
-    <td> 3.8 / 3.10 </td>
+    <td> 3.10 </td>
   </tr>
   <tr>
     <td> Driver </td>
@@ -41,7 +41,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态。软件版本配套�
   </tr>
   <tr>
     <td> Torch </td>
-    <td> 2.1.0 </td>
+    <td> 2.6.0 </td>
     <td rowspan="2">《<a href="https://www.hiascend.com/document/detail/zh/Pytorch/700/configandinstg/instg/insg_0004.html">Ascend Extension for PyTorch 配置与安装</a> 》</td>
   </tr>
   <tr>
@@ -83,8 +83,8 @@ source /usr/local/Ascend/nnal/atb/set_env.sh
 ```shell
 conda create -n test python=3.10
 conda activate test
-pip install torch-2.1.0-cp310-cp310*.whl 
-pip install torch_npu-2.1.0*-cp310-cp310*.whl
+pip install torch-2.6.0-cp310-cp310*.whl 
+pip install torch_npu-2.6.0*-cp310-cp310*.whl
 ```
 
 安装apex

@@ -42,13 +42,13 @@
 
 
     ```bash
-    # python3.8
-    conda create -n test python=3.8
+    # python3.10
+    conda create -n test python=3.10
     conda activate test
 
     # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
-    pip install torch-2.1.0-cp38-cp38m-manylinux2014_aarch64.whl 
-    pip install torch_npu-2.1.0*-cp38-cp38m-linux_aarch64.whl
+    pip install torch-2.6.0-cp310-cp310-manylinux_2_28_aarch64.whl
+    pip install torch_npu-2.6.0*-cp310-cp310-manylinux_2_28_aarch64.whl
     
     # apex for Ascend 参考 https://gitee.com/ascend/apex
     # 建议从原仓编译安装
@@ -84,7 +84,7 @@
 
     ```shell
     pip install -e .
-    vim examples/dreambooth/requirements_sd3.txt #修改版本：torchvision==0.16.0, torch==2.1.0, accelerate==0.33.0, 添加deepspeed==0.15.2
+    vim examples/dreambooth/requirements_sd3.txt #修改版本：torchvision==0.16.0, torch==2.6.0, accelerate==0.33.0, 添加deepspeed==0.15.2
     pip install -r examples/dreambooth/requirements_sd3.txt # 安装对应依赖
     ```
 
