@@ -106,6 +106,9 @@ class MindSpeedArgsRequired:
     attention_mask_type: Any = None
     use_cp_send_recv_overlap: Any = None
 
+    # Unaligned SP
+    variable_seq_lengths: Any = None
+
 
 def tranformer_config_post_init_wrapper(fn):
     @wraps(fn)

@@ -12,7 +12,6 @@ from megatron.core import mpu
 from megatron.training import get_args
 from mindspeed.megatron_adaptor import get_mindspeed_args
 from mindspeed.patch_utils import MindSpeedPatchesManager as pm
-from mindspeed.utils import get_actual_seq_len
 
 try: 
     from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import all_to_all
@@ -59,8 +58,9 @@ class UlyssesContextAttention(torch.nn.Module):
         """
 
         attention_mask = args[0]
+        packed_seq_params = kwargs['packed_seq_params']
         if attention_mask is None:
-            act_seq_len = get_actual_seq_len()[-1]
+            act_seq_len = packed_seq_params.cu_seqlens_q[-1]
         else:
             act_seq_len = attention_mask.shape[-1]
 
