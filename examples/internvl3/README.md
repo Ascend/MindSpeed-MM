@@ -97,8 +97,8 @@ pip install -e .
 
 从Huggingface等网站下载开源模型权重
 
-- [
-InternVL3-8B](https://huggingface.co/OpenGVLab/InternVL3-8B)；
+- [InternVL3-8B](https://huggingface.co/OpenGVLab/InternVL3-8B)；
+- [InternVL3-78B](https://huggingface.co/OpenGVLab/InternVL3-78B)；
 
 
 将模型权重保存在`raw_ckpt`目录下，例如`raw_ckpt/InternVL3-8B`。
@@ -122,6 +122,15 @@ mm-convert InternVLConverter hf_to_mm \
   --cfg.hf_config.hf_dir "raw_ckpt/InternVL3-8B" \
   --cfg.parallel_config.llm_pp_layers [[6,8,8,6]] \
   --cfg.parallel_config.vit_pp_layers [[24,0,0,0]] \
+  --cfg.trust_remote_code True
+
+# 78B
+mm-convert InternVLConverter hf_to_mm \
+  --cfg.mm_dir "pretrained/InternVL3-78B" \
+  --cfg.hf_config.hf_dir "raw_ckpt/InternVL3-78B" \
+  --cfg.parallel_config.llm_pp_layers [[40,40]] \
+  --cfg.parallel_config.vit_pp_layers [[45,0]] \
+  --cfg.parallel_config.tp_size 8 \
   --cfg.trust_remote_code True
 
 # 其中：

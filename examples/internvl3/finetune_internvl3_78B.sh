@@ -29,8 +29,8 @@ echo $NNODES
 
 MBS=1
 GRAD_ACC_STEP=128
-TP=1
-PP=16
+TP=8
+PP=2
 CP=1
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
@@ -90,6 +90,7 @@ GPT_ARGS="
     --num-workers 4 \
     --enable-dummy-optimizer \
     --trust-remote-code \
+    --unaligned-linear \
 "
 
 OUTPUT_ARGS="
