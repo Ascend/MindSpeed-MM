@@ -19,6 +19,7 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 
 # 🔥🔥🔥Latest News
 
+* [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
 * [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型 【Prototype】
 * **[Jul. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 3B/7B/32B [GRPO训练](https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/rl)**
 * [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型 【Prototype】
@@ -149,10 +150,10 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 |     Qwen2VL-2B      | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ |  |
 |     Qwen2VL-7B      | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ |  |
 |     Qwen2VL-72B     | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ | DPO |
-|    Qwen2.5VL-3B     | ✔ |  |  | ✔ |  | ✔ |  |  | GRPO |
-|    Qwen2.5VL-7B     | ✔ |  |  | ✔ |  | ✔ |  |  | GRPO |
-|    Qwen2.5VL-32B    | ✔ |  |  | ✔ |  | ✔ |  |  | GRPO |
-|    Qwen2.5VL-72B    | ✔ |  |  | ✔ |  | ✔ |  |  |  |
+|    Qwen2.5VL-3B     | ✔ | ✔ |  | ✔ |  | ✔ | ✔ |  | GRPO |
+|    Qwen2.5VL-7B     | ✔ | ✔ |  | ✔ |  | ✔ | ✔ |  | GRPO |
+|    Qwen2.5VL-32B    | ✔ | ✔ |  | ✔ |  | ✔ | ✔ |  | GRPO |
+|    Qwen2.5VL-72B    | ✔ | ✔ |  | ✔ |  | ✔ | ✔ | ✔ |  |
 |    Qwen2.5Omni-7B   | ✔ |  |  | ✔ |  | ✔ |  | ✔ |  |
 |    InternVL3-8B    | ✔ | ✔ | ✔ | ✔ | CP (Ring) | ✔ | ✔ |  |
 |    InternVL3-78B    | ✔ | ✔ | ✔ | ✔ | CP (Ring) | ✔ | ✔ |  |
@@ -703,7 +704,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 23.77 (SPS) </td>
       <td> 21.79 (SPS) </td>
       <td> 563 </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct">7B</a></td>
@@ -713,7 +714,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 18.82 (SPS) </td>
       <td> 12.67 (SPS) </td>
       <td> 563 </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct">32B</a></td>
@@ -723,7 +724,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 257.50 (TPS) </td>
       <td> / </td>
       <td> 563 </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct">72B</a></td>
@@ -733,7 +734,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 322.96 (TPS) </td>
       <td> 256.28 (TPS) </td>
       <td> 563 </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td rowspan="1"><a href="https://gitee.com/zhaomingyu13/MindSpeed-MM/tree/master/examples/qwen2.5omni">Qwen2.5-Omni</a></td>
@@ -879,7 +880,7 @@ MindSpeed MM集成了昇腾profiling采集工具，以提供对模型运行情�
 针对大模型集群场景的性能调优，这里推荐一款优秀的可视化调优工具MindStudio Insight。
 MindStudio Insight提供了包括Timeline视图、通信分析、计算耗时等的可视化呈现，以便用户分析潜在的性能瓶颈，并指导如何采取措施消除或减少这些瓶颈。
 
-  具体使用方法见[《MindStudio Insight操作指南》](https://www.hiascend.com/document/detail/zh/mindstudio/70RC3/msinsightug/msascendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/ascend-computing/mindstudio-pid-251913966/software/262029358?idAbsPath=fixnode01%7C23710424%7C251366513%7C22892968%7C251913966)
+  具体使用方法见[《MindStudio Insight操作指南》](https://www.hiascend.com/document/detail/zh/mindstudio/80RC1/GUI_baseddevelopmenttool/msascendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/ascend-computing/mindstudio-pid-251913966/software/264465341?idAbsPath=fixnode01|23710424|251366513|254884019|261408772|251913966)
 
 ---
 

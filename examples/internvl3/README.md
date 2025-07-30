@@ -85,9 +85,6 @@ git checkout 6d63944cb2470a0bebc38dfb65299b91329b8d92
 pip install -r requirements.txt
 pip3 install -e .
 cd ..
-# 替换MindSpeed中的文件
-cp examples/internvl2.5/dot_product_attention.py MindSpeed/mindspeed/core/transformer/dot_product_attention.py
-
 # 安装其余依赖库
 pip install -e .
 ```
