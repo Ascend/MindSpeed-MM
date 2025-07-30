@@ -88,7 +88,6 @@ GPT_ARGS="
     --variable-seq-lengths \
     --normalization RMSNorm \
     --num-workers 4 \
-    --enable-dummy-optimizer \
     --trust-remote-code \
     --unaligned-linear \
 "

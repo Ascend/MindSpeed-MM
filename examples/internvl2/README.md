@@ -193,7 +193,21 @@ mm-convert  InternVLConverter hf_to_mm \
 
 【视频数据】
 
-若要使用视频进行训练，用户可参考[视频数据集构造](https://internvl.readthedocs.io/en/latest/get_started/chat_data_format.html#video-data)自行构造视频数据集。
+使用视频进行训练，可参考[视频数据集构造](https://internvl.readthedocs.io/en/latest/get_started/chat_data_format.html#video-data)自行构造视频数据集。
+
+同时依赖Decord库读取视频，Decord安装方法如下：
+
+【X86版安装】
+
+```bash
+pip install decord==0.6.0
+```
+
+【ARM版安装】
+
+`apt`方式安装请[参考链接](https://github.com/dmlc/decord)
+
+`yum`方式安装请[参考脚本](https://github.com/dmlc/decord/blob/master/tools/build_manylinux2010.sh)
 
 ---
 
