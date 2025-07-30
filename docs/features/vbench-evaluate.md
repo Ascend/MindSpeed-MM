@@ -18,6 +18,7 @@ dreamsim==0.2.1
 cloudpickle==3.1.1
 imageio_ffmpeg==0.5.1
 portalocker==2.8.2
+timm==1.0.8
 ```
 detectron2安装：
 ```shell
