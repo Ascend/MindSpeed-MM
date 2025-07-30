@@ -7,7 +7,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态。软件版本配套�
 |MindSpeed MM版本 | MindSpeed版本             | Megatron版本      | PyTorch版本   | torch_npu版本 | CANN版本  | Python版本                               |
 |--------------|-------------------------|-----------------|------------- |-------------|---------|----------------------------------------|
 |master（主线） | core_r0.8.0           | Core 0.8.0      |   2.1.0, 2.6.0 | 在研版本        | 在研版本    | Python3.10|
-|2.1.0（商用） | 2.1.0_core_r0.8.0         | Core 0.8.0      |   2.6.0     | 7.1.0       | 8.2.RC1    | Python3.10|
+|2.1.0（商用） | 2.1.0_core_r0.8.0         | Core 0.8.0      |   2.1.0, 2.6.0     | 7.1.0       | 8.2.RC1    | Python3.8, Python3.10|
 |2.0.0（商用） | 2.0.0_core_r0.8.0         | Core 0.8.0      |   2.1.0     | 7.0.0       | 8.1.RC1    | Python3.8, Python3.10|
 |1.0.0（商用） | 1.0.0_core_r0.6.0         | Core 0.6.0      |   2.1.0     | 6.0.0       | 8.0.0    | Python3.8, Python3.10 |
 
@@ -78,11 +78,12 @@ source /usr/local/Ascend/nnal/atb/set_env.sh
 
 准备[torch_npu](https://www.hiascend.com/developer/download/community/result?module=pt)和[apex](https://gitee.com/ascend/apex)，参考[Ascend Extension for PyTorch 配置与安装](https://www.hiascend.com/document/detail/zh/Pytorch/710/configandinstg/instg/insg_0004.html)或执行以下命令安装：
 
-安装torch和torch_npu，以下以python 3.10为例：
+安装torch和torch_npu，以下以python 3.10 + torch 2.6.0为例：
 
 ```shell
 conda create -n test python=3.10
 conda activate test
+# 注：若需安装torch2.1.0版本需要修改列对应whl包，并且修改 MindSpeed-MM/pyproject.toml中的torch版本为2.1.0
 pip install torch-2.6.0-cp310-cp310*.whl 
 pip install torch_npu-2.6.0*-cp310-cp310*.whl
 ```
