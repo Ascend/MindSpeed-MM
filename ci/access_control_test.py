@@ -9,15 +9,35 @@ def read_files_from_txt(txt_file):
 
 
 def is_examples(file):
-    return file.startswith("example/")
-
-
-def is_pipecase(file):
-    return file.startswith("tests/pipeline")
+    return file.startswith("examples/") and not file.endswith(".py")
 
 
 def is_markdown(file):
     return file.endswith(".md")
+
+
+def is_txt(file):
+    return file.endswith(".txt")
+
+
+def is_image(file):
+    return file.endswith(".jpg") or file.endswith(".png")
+
+
+def is_vedio(file):
+    return file.endswith(".gif")
+
+
+def is_owners(file):
+    return file.startswith("OWNERS")
+
+
+def is_license(file):
+    return file.startswith("LICENSE")
+
+
+def is_no_suffix(file):
+    return os.path.splitext(file)[1] == ''
 
 
 def skip_ci_file(files, skip_cond):
@@ -33,12 +53,17 @@ def alter_skip_ci():
 
     if not os.path.exists(raw_txt_file):
         return False
-    
+
     file_list = read_files_from_txt(raw_txt_file)
     skip_conds = [
         is_examples,
-        is_pipecase,
-        is_markdown
+        is_markdown,
+        is_txt,
+        is_image,
+        is_vedio,
+        is_owners,
+        is_license,
+        is_no_suffix
     ]
 
     return skip_ci_file(file_list, skip_conds)
@@ -61,7 +86,7 @@ class UT_Test:
         base_dir = Path(__file__).absolute().parent.parent
         test_dir = os.path.join(base_dir, 'tests')
         self.ut_file = os.path.join(test_dir, "ut")
-    
+
     def run_ut(self):
         command = f"pytest -x {self.ut_file}"
         code = acquire_exitcode(command)
@@ -77,7 +102,7 @@ class UT_Test:
 # ===============================================
 
 class ST_Test:
-    
+
     def __init__(self):
 
         base_dir = Path(__file__).absolute().parent.parent
@@ -91,7 +116,7 @@ class ST_Test:
     def run_st(self):
         command = f"bash {self.st_shell}"
         code = acquire_exitcode(command)
-        
+
         if code == 0:
             print("ST test success")
         else:
@@ -125,13 +150,18 @@ def run_tests(options):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Control needed test cases")
-    parser.add_argument("--type", type=str, default="all", 
-                        help='Test cases type. `all`: run all test cases; `ut`: run ut case,' '`st`: run st cases;')
+    parser.add_argument("--type", type=str, default="all",
+                        choices=["all", "ut", "st", "codecheck"],
+                        help='Test cases type. `all`: run all test cases; `ut`: run ut case, `st`: run st cases; `codecheck`: used for codecheck;')
     args = parser.parse_args()
     print(f"options: {args}")
     if alter_skip_ci():
-        print("Skipping CI")
+        print("Skipping CI: Success")
+    elif args.type == "codecheck":
+        print("Skipping CI: Failed")
+        exit(1) # codecheck阶段不执行ut/st，直接返回异常值
     else:
+        print("Skipping CI: Failed")
         exit_code = run_tests(args)
         if exit_code != 0:
             exit(exit_code)
