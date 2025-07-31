@@ -1,0 +1,17 @@
+torchvision==0.22.1
+torchaudio==2.7.1
+funasr==1.1.14
+peft==0.13.2
+diffusers==0.33.1
+tokenizers==0.20.3
+transformers==4.45.0
+hyperpyyaml
+modelscope
+onnxruntime
+inflect
+conformer
+matplotlib
+gdown
+rich
+ipdb
+openai-whisper==20240930
