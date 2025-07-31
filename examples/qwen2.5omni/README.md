@@ -137,9 +137,9 @@ MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工�
 mm-convert  Qwen2_5_OmniConverter hf_to_mm \
   --cfg.mm_dir "ckpt/mm_path/Qwen2.5-Omni-7B" \
   --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-Omni-7B" \
-  --cfg.parallel_config.llm_pp_layers [[0,7,12,9]] \
-  --cfg.parallel_config.vit_pp_layers [[32,0,0,0]] \
-  --cfg.parallel_config.audio_pp_layers [[0,32,0,0]] \
+  --cfg.parallel_config.llm_pp_layers [[11,17]] \
+  --cfg.parallel_config.vit_pp_layers [[32,0]] \
+  --cfg.parallel_config.audio_pp_layers [[32,0]] \
   --cfg.parallel_config.tp_size 1
 
 # 其中：
@@ -161,9 +161,9 @@ mm-convert  Qwen2_5_OmniConverter mm_to_hf \
   --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-Omni-7B" \
   --cfg.mm_dir "ckpt/mm_path/Qwen2.5-Omni-7B" \
   --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-Omni-7B" \
-  --cfg.parallel_config.llm_pp_layers [0,7,12,9] \
-  --cfg.parallel_config.vit_pp_layers [32,0,0,0] \
-  --cfg.parallel_config.audio_pp_layers [0,32,0,0] \
+  --cfg.parallel_config.llm_pp_layers [11,17] \
+  --cfg.parallel_config.vit_pp_layers [32,0] \
+  --cfg.parallel_config.audio_pp_layers [32,0] \
   --cfg.parallel_config.tp_size 1
 # 其中：
 # save_hf_dir: mm微调后转换回hf模型格式的目录

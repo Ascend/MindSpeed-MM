@@ -8,6 +8,7 @@ from torch.nn import functional as F
 
 from megatron.core.transformer import TransformerConfig, ModuleSpec
 from megatron.core.transformer.transformer_block import TransformerBlock
+from megatron.training import get_args
 
 from mindspeed_mm.models.audio.omni_audio_encoder import SinusoidsPositionEmbedding, AudioLinear
 from mindspeed_mm.models.common.module import MultiModalModule
@@ -180,14 +181,17 @@ class OmniAudioEncoder(MultiModalModule):
         ).to(torch.int32)
         hidden_states = hidden_states.unsqueeze(0).transpose(0, 1)
         seq_len, _, _ = hidden_states.shape
-        attention_mask = torch.full(
-            [1, seq_len, seq_len], torch.finfo(hidden_states.dtype).min, device=hidden_states.device,
-            dtype=torch.bool
-        )
-        for i in range(1, len(cu_seqlens)):
-            attention_mask[..., cu_seqlens[i - 1]: cu_seqlens[i], cu_seqlens[i - 1]: cu_seqlens[i]] = 0
+        if get_args().use_flash_attn:
+            attention_mask = None
+        else:
+            attention_mask = torch.full(
+                [1, seq_len, seq_len], torch.finfo(hidden_states.dtype).min, device=hidden_states.device,
+                dtype=torch.bool
+            )
+            for i in range(1, len(cu_seqlens)):
+                attention_mask[..., cu_seqlens[i - 1]: cu_seqlens[i], cu_seqlens[i - 1]: cu_seqlens[i]] = 0
 
-        hidden_states = self.blocks(hidden_states, attention_mask=attention_mask)
+        hidden_states = self.blocks(hidden_states, attention_mask=attention_mask, cu_seqlens=cu_seqlens)
         hidden_states = hidden_states.squeeze(1)
         hidden_states_list = hidden_states.split(aftercnn_lens.tolist(), dim=0)
         token_audio_list = []

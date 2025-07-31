@@ -129,6 +129,7 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                 context,
                 context_mask,
                 rotary_pos_emb,
+                packed_seq_params=packed_seq_params,
             ):
                 for index in range(start, end):
                     layer = self._get_layer(index)

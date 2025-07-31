@@ -27,10 +27,10 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-Omni-7B"
 SAVE_PATH="save_dir"
 
 TP=1
-PP=4
+PP=2
 CP=1
 MBS=1
-GRAD_ACC_STEP=96
+GRAD_ACC_STEP=48
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
@@ -78,7 +78,6 @@ GPT_ARGS="
     --num-workers 8 \
     --distributed-timeout-minutes 600 \
     --use-flash-attn \
-    --enable-dummy-optimizer \
 "
 
 MM_ARGS="
