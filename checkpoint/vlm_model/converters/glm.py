@@ -9,19 +9,13 @@
 import os
 from copy import deepcopy
 from typing import Callable, Any, List, Dict, cast
-import torch
-from tqdm import tqdm
 
 from checkpoint.common.converter import Converter
-from checkpoint.common.types import STATE_DICT_T
-from checkpoint.vlm_model.operator import TieOp
 from checkpoint.common.constant import SAFE_MODE
-from checkpoint.vlm_model.operator import Operator
-from checkpoint.vlm_model.hf_to_mm import load_from_hf, convert_hf_to_mm, \
-    PPStageSchema, save_by_vpp, merge_vpp_index, partition_state_dict_by_pp
-from checkpoint.vlm_model.config import ConvertMMConfig, ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
+from checkpoint.vlm_model.hf_to_mm import load_from_hf, convert_hf_to_mm, PPStageSchema
+from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.operator import (
-    Operator, UpGateMergeOp, QKVMergeOp, RelocateOp, RenameOp, RowSplit, GLUSplit, ColSplit
+    Operator, UpGateMergeOp, RenameOp,
 )
 
 glm_text_schema = PPStageSchema(
@@ -81,6 +75,17 @@ def create_glm_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups:
 glm_tp_patterns = {}
 
 
+class ConvertVppMMConfigGlm(ConvertVppMMConfig):
+
+    def model_post_init(self, _context):
+        from transformers.models.glm4v import Glm4vConfig
+        config = cast(Glm4vConfig, self.hf_config.config)
+        self.common_model_config.num_key_value_heads = config.num_key_value_heads
+        self.common_model_config.llm_num_layers = config.num_hidden_layers
+        self.common_model_config.vit_num_layers = config.vision_config.depth
+        self.common_model_config.tie_word_embeddings = config.tie_word_embeddings
+
+
 class GlmConverter(Converter):
     """GLM4V 模型转换工具"""
 
@@ -101,10 +106,11 @@ class GlmConverter(Converter):
         return ops, config
 
     @staticmethod
-    def hf_to_mm(cfg: ConvertVppMMConfig):
+    def hf_to_mm(cfg: ConvertVppMMConfigGlm):
         """huggingface模型转换mindspeed-mm模型权重"""
         ops, _ = GlmConverter._create_ops(cfg.hf_config.config)
-        convert_hf_to_mm(cfg, cfg.hf_config.config, ops, glm_tp_patterns, [glm_vision_schema, glm_text_schema])
+
+        convert_hf_to_mm(cfg, ops, glm_tp_patterns, [glm_vision_schema, glm_text_schema])
         # 安全管控权限
         os.chmod(cfg.mm_dir, SAFE_MODE)
 

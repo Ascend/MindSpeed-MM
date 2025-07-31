@@ -1,8 +1,6 @@
 import os
 from typing import List, cast
 
-from pydantic import model_validator
-
 from checkpoint.common.constant import SAFE_MODE
 from checkpoint.common.converter import Converter
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
@@ -147,38 +145,14 @@ vision_schema = PPStageSchema(
 
 class ConvertVppMMConfigDeepseekVl2(ConvertVppMMConfig):
 
-    @model_validator(mode='after')
-    def validate_sum_of_layers(self) -> "ConvertVppMMConfig":
+    def model_post_init(self, _context):
         from deepseek_vl2.models.modeling_deepseek_vl_v2 import DeepseekVLV2Config
         config = cast(DeepseekVLV2Config, self.hf_config.config)
-
-        # Flatten the vit and llm layers for VPP
-        vit_pipeline_num_layers_flat = [
-            item
-            for sublist in self.parallel_config.vit_pp_layers
-            for item in sublist
-        ]
-        llm_pipeline_num_layers_flat = [
-            item
-            for sublist in self.parallel_config.llm_pp_layers
-            for item in sublist
-        ]
-
-        # Validation for flattened lists
-        expected_length = self.parallel_config.pp_size * self.parallel_config.vpp_size
-        if len(vit_pipeline_num_layers_flat) != expected_length:
-            raise AssertionError(f'Length of vit_pipeline_num_layers_flat must be equal to pp_size * vp_size, '
-                                 f'but got {len(vit_pipeline_num_layers_flat)} and {expected_length}.')
-        if sum(vit_pipeline_num_layers_flat) != config.vision_config.layers:
-            raise AssertionError(f'Sum of vit_pipeline_num_layers_flat must be equal to vit_num_layers, '
-                                 f'but got {sum(vit_pipeline_num_layers_flat)} and {config.vision_config.layers}.')
-        if len(llm_pipeline_num_layers_flat) != expected_length:
-            raise AssertionError(f'Length of llm_pipeline_num_layers_flat must be equal to pp_size * vp_size, '
-                                 f'but got {len(llm_pipeline_num_layers_flat)} and {expected_length}.')
-        if sum(llm_pipeline_num_layers_flat) != config.language_config.num_hidden_layers:
-            raise AssertionError(f'Sum of llm_pipeline_num_layers_flat must be equal to llm_num_layers, '
-                                 f'but got {sum(llm_pipeline_num_layers_flat)} and {config.language_config.num_hidden_layers}.')
-        return self
+        self.common_model_config.num_key_value_heads = config.language_config.num_key_value_heads
+        self.common_model_config.vit_num_layers = config.vision_config.layers
+        self.common_model_config.llm_num_layers = config.language_config.num_hidden_layers
+        self.common_model_config.num_experts = config.language_config.n_routed_experts
+        self.common_model_config.tie_word_embeddings = config.language_config.tie_word_embeddings
 
 
 class DeepSeekVLConverter(Converter):
@@ -194,8 +168,8 @@ class DeepSeekVLConverter(Converter):
     def hf_to_mm(cfg: ConvertVppMMConfigDeepseekVl2):
         """huggingface模型转换mindspeed-mm模型权重"""
         ops = DeepSeekVLConverter._create_ops()
-        cfg.hf_config.config.tie_word_embeddings = cfg.hf_config.config.language_config.tie_word_embeddings
-        convert_hf_to_mm(cfg, cfg.hf_config.config, ops, deepseek_vl_tp_patterns, [vision_schema, text_schema])
+
+        convert_hf_to_mm(cfg, ops, deepseek_vl_tp_patterns, [vision_schema, text_schema])
         # 安全管控权限
         os.chmod(cfg.mm_dir, SAFE_MODE)
 

@@ -46,6 +46,19 @@ qwen3_vl_tp_patterns = {
 }
 
 
+class ConvertVppMMConfigQwen3(ConvertVppMMConfig):
+
+    def model_post_init(self, _context):
+        from transformers.models.qwen2_5_vl import Qwen2_5_VLConfig
+        config = cast(Qwen2_5_VLConfig, self.hf_config.config)
+        self.common_model_config.num_key_value_heads = config.num_key_value_heads
+        self.common_model_config.llm_num_layers = self.llm_hf_config.config.num_hidden_layers
+        self.common_model_config.vit_num_layers = config.vision_config.depth
+        self.common_model_config.num_experts = self.llm_hf_config.config.num_experts
+        self.common_model_config.tie_word_embeddings = config.tie_word_embeddings
+        self.common_model_config.llm_hf_dir = self.llm_hf_config.hf_dir
+
+
 class Qwen3_VLConverter(Converter):
     """Qwen3VL模型转换工具"""
 
@@ -66,10 +79,11 @@ class Qwen3_VLConverter(Converter):
                                    )
 
     @staticmethod
-    def hf_to_mm(cfg: ConvertVppMMConfig):
+    def hf_to_mm(cfg: ConvertVppMMConfigQwen3):
         """huggingface模型转换mindspeed-mm模型权重"""
         ops = Qwen3_VLConverter._create_ops(cfg.hf_config.config)
-        hf_to_mm.convert_hf_to_mm(cfg, cfg.hf_config.config, ops, qwen3_vl_tp_patterns, [vision_schema, text_schema])
+
+        hf_to_mm.convert_hf_to_mm(cfg, ops, qwen3_vl_tp_patterns, [vision_schema, text_schema])
         # 安全管控权限
         os.chmod(cfg.mm_dir, SAFE_MODE)
 

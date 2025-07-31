@@ -146,6 +146,18 @@ qwen2_5_omni_tp_patterns = {
 }
 
 
+class ConvertVppMMConfigQwenOmni(ConvertVppMMConfig):
+
+    def model_post_init(self, _context):
+        from transformers.models.qwen2_5_omni import Qwen2_5OmniConfig
+        config = cast(Qwen2_5OmniConfig, self.hf_config.config)
+        self.common_model_config.num_key_value_heads = config.thinker_config.text_config.num_key_value_heads
+        self.common_model_config.vit_num_layers = config.thinker_config.vision_config.depth
+        self.common_model_config.llm_num_layers = config.thinker_config.text_config.num_hidden_layers
+        self.common_model_config.audio_num_layers = config.thinker_config.audio_config.num_hidden_layers
+        self.common_model_config.tie_word_embeddings = config.thinker_config.text_config.tie_word_embeddings
+
+
 class Qwen2_5_OmniConverter(Converter):
     """Qwen2.5Omni模型转换工具"""
 
@@ -171,11 +183,11 @@ class Qwen2_5_OmniConverter(Converter):
         return ops, config
 
     @staticmethod
-    def hf_to_mm(cfg: ConvertVppMMConfig):
+    def hf_to_mm(cfg: ConvertVppMMConfigQwenOmni):
         """huggingface模型转换mindspeed-mm模型权重"""
         ops, config = Qwen2_5_OmniConverter._create_ops(cfg.hf_config.config)
-        hf_to_mm.convert_hf_to_mm(cfg, config, ops, qwen2_5_omni_tp_patterns,
-                                  [vision_schema, text_schema, audio_schema])
+
+        hf_to_mm.convert_hf_to_mm(cfg, ops, qwen2_5_omni_tp_patterns, [vision_schema, text_schema, audio_schema])
         # 安全管控权限
         os.chmod(cfg.mm_dir, SAFE_MODE)
 

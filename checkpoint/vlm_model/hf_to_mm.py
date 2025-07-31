@@ -52,7 +52,7 @@ from tqdm import tqdm
 
 from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME
 from checkpoint.common.types import STATE_DICT_T, VPP_LAYER_NUM_T
-from checkpoint.vlm_model.config import ConvertVppMMConfig, get_first_available
+from checkpoint.vlm_model.config import ConvertVppMMConfig
 from checkpoint.vlm_model.operator import Operator, TieOp, TP_PATTERN_T
 
 
@@ -293,37 +293,24 @@ def convert(state_dict: STATE_DICT_T, ops: List[Operator], is_tie: bool, is_pp: 
     return state_dict
 
 
-def convert_hf_to_mm(convert_config: ConvertVppMMConfig, config: Any, ops: List[Operator],
-                     tp_patterns: Dict[str, Callable],
+def convert_hf_to_mm(convert_config: ConvertVppMMConfig, ops: List[Operator], tp_patterns: Dict[str, Callable],
                      stages: List[PPStageSchema]):
     parallel_config = convert_config.parallel_config
-    llm_config = convert_config.llm_hf_config
-    num_experts = getattr(config, 'num_experts', getattr(getattr(config, 'language_config', None), 'n_routed_experts', 0))
-    # 校验tp切分数
-    num_key_value_heads = get_first_available(config, [
-            ([], 'num_key_value_heads'), # qwenvl
-            (['thinker_config', "text_config"], 'num_key_value_heads'), # qwen-omni
-            (['language_config'], 'num_key_value_heads'),  # deepseekvl2
-            (['llm_config'], 'num_key_value_heads')])  # intervl
-    if num_key_value_heads % parallel_config.tp_size != 0:
-        raise ValueError(
-            f"Number of key-value heads ({num_key_value_heads}) must be divisible by TP size ({parallel_config.tp_size})"
-        )
+    num_experts = convert_config.common_model_config.num_experts
     # 加载权重字典
     state_dict = load_from_hf(convert_config.hf_config.hf_dir)
 
     # 如果有llm_config，则加载llm权重并合并到state_dict中
-    if llm_config is not None:
-        llm_state_dict = load_from_hf(llm_config.hf_dir)
+    if convert_config.common_model_config.llm_hf_dir is not None:
+        llm_state_dict = load_from_hf(convert_config.common_model_config.llm_hf_dir)
         state_dict = merge_llm_weights_to_state_dict(state_dict, llm_state_dict)
-        num_experts = getattr(llm_config.config, 'num_experts', getattr(llm_config.config, 'n_routed_experts', 0))
 
     if convert_config.save_vit_only:
         # 如果只保存vit权重，则过滤掉非vit的权重
         filter_vit_keys(state_dict)
 
     # 权重转换、合并
-    state_dict = convert(state_dict, ops, config.tie_word_embeddings, parallel_config.is_pp())
+    state_dict = convert(state_dict, ops, convert_config.common_model_config.tie_word_embeddings, parallel_config.is_pp())
 
     # 权重字典按ep域切分
     ep_state_dicts = split_by_ep(state_dict, parallel_config.ep_size, _num_experts=num_experts)

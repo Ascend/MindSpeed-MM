@@ -138,20 +138,33 @@ def create_internvl_tp_patterns(vision_attention_heads: int) -> dict:
         r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowSplit,
         r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowSplit,
         r'text_decoder.decoder.layers.(\d+).self_attention.linear_proj.weight': ColSplit,
-        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_proj.weight": UnalignedColSplit(vision_attention_heads), # InternVL系列ViT的heads可能存在无法均匀切分情况
-        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_qkv.bias": UnalignedRowSplit(vision_attention_heads),
-        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_qkv.weight": UnalignedRowSplit(vision_attention_heads),
+        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_proj.weight": UnalignedColSplit(
+            vision_attention_heads),  # InternVL系列ViT的heads可能存在无法均匀切分情况
+        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_qkv.bias": UnalignedRowSplit(
+            vision_attention_heads),
+        r"image_encoder.encoder.encoder.layers.(\d+).self_attention.linear_qkv.weight": UnalignedRowSplit(
+            vision_attention_heads),
         r"image_encoder.encoder.encoder.layers.(\d+).mlp.linear_fc1.bias": RowSplit,
         r"image_encoder.encoder.encoder.layers.(\d+).mlp.linear_fc1.weight": RowSplit,
         r"image_encoder.encoder.encoder.layers.(\d+).mlp.linear_fc2.weight": ColSplit,
     }
     return tp_patterns
 
+
 vision_schema = hf_to_mm.PPStageSchema(
     firsts=['image_encoder.encoder.embeddings.'],
     lasts=['image_encoder.projector.'],
     middle='image_encoder.encoder.encoder.layers.'
 )
+
+
+class ConvertVppMMConfigInternVL(ConvertVppMMConfig):
+
+    def model_post_init(self, _context):
+        self.common_model_config.num_key_value_heads = self.hf_config.config.llm_config.num_key_value_heads
+        self.common_model_config.vit_num_layers = self.hf_config.config.vision_config.num_hidden_layers
+        self.common_model_config.llm_num_layers = self.hf_config.config.llm_config.num_hidden_layers
+        self.common_model_config.tie_word_embeddings = self.hf_config.config.llm_config.tie_word_embeddings
 
 
 class InternVLConverter(Converter):
@@ -169,13 +182,14 @@ class InternVLConverter(Converter):
         return ops
 
     @staticmethod
-    def hf_to_mm(cfg: ConvertVppMMConfig):
+    def hf_to_mm(cfg: ConvertVppMMConfigInternVL):
         """huggingface模型转换mindspeed-mm模型权重"""
-        ops = InternVLConverter._create_ops(cfg.hf_config.config)
-        cfg.hf_config.config.tie_word_embeddings = cfg.hf_config.config.llm_config.tie_word_embeddings
-        intern_vl_tp_patterns = create_internvl_tp_patterns(cfg.hf_config.config.vision_config.num_attention_heads)
-        hf_to_mm.convert_hf_to_mm(cfg, cfg.hf_config.config, ops, intern_vl_tp_patterns,
-                                  [vision_schema, hf_to_mm.text_schema])
+        config = cfg.hf_config.config
+        ops = InternVLConverter._create_ops(config)
+
+        intern_vl_tp_patterns = create_internvl_tp_patterns(config.vision_config.num_attention_heads)
+
+        hf_to_mm.convert_hf_to_mm(cfg, ops, intern_vl_tp_patterns, [vision_schema, hf_to_mm.text_schema])
         # 安全管控权限
         os.chmod(cfg.mm_dir, SAFE_MODE)
 

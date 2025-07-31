@@ -170,6 +170,31 @@ class ConvertResplitConfig(BaseModel):
         return self
 
 
+class CommonModelConfig(BaseModel):
+    """权重转换框架公共的模型配置"""
+
+    num_experts: int = 0
+    """专家并行数,表示模型中并行使用的专家数量"""
+    #
+    num_key_value_heads: int = 0
+    """多头注意力机制中的键值头数量"""
+
+    tie_word_embeddings: bool = False
+    """是否将词嵌入层和输出层的权重进行绑定"""
+
+    llm_hf_dir: Optional[Path] = None
+    """LLM模型的Huggingface语言模型的存储目录路径"""
+
+    llm_num_layers: int = 0
+    """llm模型层数"""
+
+    vit_num_layers: int = 0
+    """vit模型层数"""
+
+    audio_num_layers: Optional[int] = None
+    """audio模型层数"""
+
+
 # BaseModel/dataclasses注意要在field的下一行添加描述说明
 class ConvertVppMMConfig(BaseModel):
     """huggingface权重转换为mindspeed-mm权重配置"""
@@ -192,86 +217,61 @@ class ConvertVppMMConfig(BaseModel):
     trust_remote_code: bool = False
     """trust_remote_code 默认设为False, 需要用户手动设为True"""
 
+    common_model_config: CommonModelConfig = CommonModelConfig()
+    """权重转换框架公共的模型配置"""
+
+
     @model_validator(mode='after')
-    def validate_sum_of_layers(self) -> "ConvertVppMMConfig":
-        model_config = self.hf_config.config
-
-        # 视觉层数配置调用示例（带注释）
-        vit_num_layers = get_first_available(
-            model_config,
-            candidates=[
-                (['vision_config'], 'depth'),  # 优先级1: qwenvl 风格的路径 (model_config.vision_config.depth)
-                (['thinker_config', 'vision_config'], 'depth'),
-                # 优先级2: qwen-omni 路径 (model_config.thinker_config.vision_config.depth)
-                (['vision_config'], 'num_hidden_layers')
-                # 优先级3: internvl 回退路径 (model_config.vision_config.num_hidden_layers)
-            ]
-        )
-        if vit_num_layers is None:
-            raise AttributeError("Required vision layer config not found in any model type.")
-
-        # 大语言模型层数配置（优先尝试qwenvl > qwen-omni > internvl）
-        llm_num_layers = get_first_available(model_config, [
-            ([], 'num_hidden_layers'),  # qwenvl直接取model_config
-            (['thinker_config', 'text_config'], 'num_hidden_layers'),  # qwen-omni
-            (['llm_config'], 'num_hidden_layers')  # internvl
-        ])
-
-        if self.llm_hf_config is not None:
-            llm_num_layers = self.llm_hf_config.config.num_hidden_layers
-
-        if llm_num_layers is None:
-            raise AttributeError("Required LLM layer config not found in any model type.")
-
-        # 音频层数配置（仅尝试qwen-omni）
-        audio_num_layers = get_first_available(model_config, [
-            (['thinker_config', 'audio_config'], 'num_hidden_layers'),
-        ])
-        if audio_num_layers is None and self.parallel_config.audio_pp_layers is not None:
-            raise AttributeError("Required audio layer config not found in any model type.")
-
-        vit_pipeline_num_layers = self.parallel_config.vit_pp_layers
-        llm_pipeline_num_layers = self.parallel_config.llm_pp_layers
-        audio_pipeline_num_layers = self.parallel_config.audio_pp_layers
-
+    def validate_parallel_policies(self) -> "ConvertVppMMConfig":
+        """
+        1.Verify whether the TP segmentation meets the number of kv heads
+        2.It is verified that the PP and VPP segmentation meet the requirements of the number of model layers
+        """
+        # Verify the tp split configuration
+        if self.common_model_config.num_key_value_heads % self.parallel_config.tp_size != 0:
+            raise ValueError(
+                f"Number of key-value heads ({self.common_model_config.num_key_value_heads}) must be divisible by TP size ({self.parallel_config.tp_size})"
+            )
         # Flatten the vit and llm layers for VPP
+        if self.common_model_config.vit_num_layers is None or self.common_model_config.llm_num_layers is None:
+            raise AttributeError("Required vision or LLM layer config not found in any model type.")
+
         vit_pipeline_num_layers_flat = [
             item
-            for sublist in vit_pipeline_num_layers
+            for sublist in self.parallel_config.vit_pp_layers
             for item in sublist
         ]
         llm_pipeline_num_layers_flat = [
             item
-            for sublist in llm_pipeline_num_layers
+            for sublist in self.parallel_config.llm_pp_layers
             for item in sublist
         ]
-
         # Validation for flattened lists
         expected_length = self.parallel_config.pp_size * self.parallel_config.vpp_size
         if len(vit_pipeline_num_layers_flat) != expected_length:
             raise AssertionError(f'Length of vit_pipeline_num_layers_flat must be equal to pp_size * vp_size, '
                                  f'but got {len(vit_pipeline_num_layers_flat)} and {expected_length}.')
-        if sum(vit_pipeline_num_layers_flat) != vit_num_layers:
+        if sum(vit_pipeline_num_layers_flat) != self.common_model_config.vit_num_layers:
             raise AssertionError(f'Sum of vit_pipeline_num_layers_flat must be equal to vit_num_layers, '
-                                 f'but got {sum(vit_pipeline_num_layers_flat)} and {vit_num_layers}.')
+                                 f'but got {sum(vit_pipeline_num_layers_flat)} and {self.common_model_config.vit_num_layers}.')
         if len(llm_pipeline_num_layers_flat) != expected_length:
             raise AssertionError(f'Length of llm_pipeline_num_layers_flat must be equal to pp_size * vp_size, '
                                  f'but got {len(llm_pipeline_num_layers_flat)} and {expected_length}.')
-        if sum(llm_pipeline_num_layers_flat) != llm_num_layers:
+        if sum(llm_pipeline_num_layers_flat) != self.common_model_config.llm_num_layers:
             raise AssertionError(f'Sum of llm_pipeline_num_layers_flat must be equal to llm_num_layers, '
-                                 f'but got {sum(llm_pipeline_num_layers_flat)} and {llm_num_layers}.')
-        if audio_num_layers is not None:
+                                 f'but got {sum(llm_pipeline_num_layers_flat)} and {self.common_model_config.llm_num_layers}.')
+        if self.common_model_config.audio_num_layers is not None:
             audio_pipeline_num_layers_flat = [
                 item
-                for sublist in audio_pipeline_num_layers
+                for sublist in self.parallel_config.audio_pp_layers
                 for item in sublist
             ]
             if len(audio_pipeline_num_layers_flat) != expected_length:
                 raise AssertionError(f'Length of audio_pipeline_num_layers_flat must be equal to pp_size * vp_size, '
                                      f'but got {len(audio_pipeline_num_layers_flat)} and {expected_length}.')
-            if sum(audio_pipeline_num_layers_flat) != audio_num_layers:
+            if sum(audio_pipeline_num_layers_flat) != self.common_model_config.audio_num_layers:
                 raise AssertionError(f'Sum of audio_pipeline_num_layers_flat must be equal to audio_num_layers, '
-                                     f'but got {sum(audio_pipeline_num_layers_flat)} and {audio_num_layers}.')
+                                     f'but got {sum(audio_pipeline_num_layers_flat)} and {self.common_model_config.audio_num_layers}.')
         return self
 
 
