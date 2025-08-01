@@ -89,9 +89,10 @@ GPT_ARGS="
     --normalization RMSNorm \
     --num-workers 4 \
     --enable-dummy-optimizer \
-    --trust-remote-code \
 "
-
+# To ensure code security, configure trust_remote_code to default to False.
+# Users need to add the following parameter and ensure the security of the models and data they download.
+# --trust-remote-code \
 OUTPUT_ARGS="
     --log-interval 1 \
     --save-interval 5000 \

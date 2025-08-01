@@ -3,4 +3,4 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 config_path="./config.json"
 
-python test.py $config_path
+python multimodal_understanding.py $config_path

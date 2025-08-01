@@ -70,6 +70,7 @@ cd ..
 #### 2. 配置参数
 
 在multimodal_understanding.sh中修改需要传入的参数，model_path, image_path与question，分别表示模型权重保存位置，图片位置与针对传入图片的问题。
+同时还需要修改"trust_remote_code"为true。为保证代码安全，配置trust_remote_code默认为False，用户需要设置为True，并且确保自己下载的模型和数据的安全性。
 
 另外还需设置CANN包安装位置。
 

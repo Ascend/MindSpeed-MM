@@ -316,6 +316,7 @@ mm-convert InternVLConverter hf_to_mm \
   --cfg.parallel_config.llm_pp_layers [[36]] \
   --cfg.parallel_config.vit_pp_layers [[24]] \
   --cfg.trust_remote_code True
+# trust_remote_code: 为保证代码安全，配置trust_remote_code默认为False，用户需要设置为True，并且确保自己下载的模型和数据的安全性
 ```
 <a id="jump5.2"></a>
 
