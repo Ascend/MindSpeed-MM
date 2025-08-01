@@ -1,0 +1,84 @@
+{
+    "frames": 25,
+    "resolution": [480, 720],
+    "allow_internal_format":false,
+    "load_video_features": false,
+    "load_text_features": false,
+    "task": "i2v",
+    "text_encoder": {
+        "model_id": "T5",
+        "hub_backend": "hf",
+        "from_pretrained": "5b-cogvideo",
+        "dtype": "bf16",
+        "load_in_8bit": false,
+        "low_cpu_mem_usage": true,
+        "ucg_rate": 0.1,
+        "use_attention_mask": false
+    },
+   "ae": {
+        "model_id": "contextparallelcasualvae",
+        "from_pretrained": "3d-vae.pt",
+        "cp_size": 1,
+        "dtype": "bf16",
+        "z_channels": 16,
+        "conv_padding": 0,
+        "num_res_blocks": 3,
+        "hidden_size_mult": [1,2,2,4],
+        "use_tiling": false,
+        "encoder_attention": "",
+        "encoder_nonlinearity": "swish",
+        "encoder_conv_in": "ContextParallelCausalConv3d",
+        "encoder_conv_out": "ContextParallelCausalConv3d",
+        "encoder_mid_resnet": "ContextParallelResnetBlock3D",
+        "encoder_resnet_blocks": [
+            "ContextParallelResnetBlock3D",
+            "ContextParallelResnetBlock3D",
+            "ContextParallelResnetBlock3D",
+            "ContextParallelResnetBlock3D"
+        ],
+        "encoder_spatial_downsample": [
+            "DownSample3D",
+            "DownSample3D",
+            "DownSample3D",
+            ""
+        ],
+        "encoder_temporal_downsample": [
+            "",
+            "",
+            "",
+            ""
+        ],
+        "decoder_attention": "",
+        "decoder_nonlinearity": "swish",
+        "decoder_conv_in": "ContextParallelCausalConv3d",
+        "decoder_conv_out": "ContextParallelCausalConv3d",
+        "decoder_mid_resnet": "ContextParallelResnetBlock3D",
+        "decoder_resnet_blocks": [
+            "ContextParallelResnetBlock3D",
+            "ContextParallelResnetBlock3D",
+            "ContextParallelResnetBlock3D",
+            "ContextParallelResnetBlock3D"
+        ],
+        "decoder_spatial_upsample": [
+            "",
+            "Upsample3D",
+            "Upsample3D",
+            "Upsample3D"
+        ],
+        "decoder_temporal_upsample": [
+            "",
+            "",
+            "",
+            ""
+        ],
+        "encoder_gather_norm": true,
+        "decoder_gather_norm": true,
+        "use_quant_layer": false,
+        "i2v_processor": {
+            "processor_id": "cogvideox_i2v_processor",
+            "noised_image_all_concat": false,
+            "noised_image_dropout": 0.05,
+            "noised_image_input": true
+        }
+    }
+}

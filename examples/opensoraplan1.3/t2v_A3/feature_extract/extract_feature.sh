@@ -27,7 +27,7 @@ GBS=$(($WORLD_SIZE*$MBS/$CP/$TP*$ACC))
 
 MM_DATA="examples/opensoraplan1.3/t2v_A3/feature_extract/data.json"
 MM_MODEL="examples/opensoraplan1.3/t2v_A3/pretrain_t2v_model.json"
-MM_TOOL="examples/opensoraplan1.3/t2v_A3/feature_extract/tools.json"
+MM_TOOL="./mindspeed_mm/tools/tools.json"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $GPUS_PER_NODE \
@@ -72,7 +72,7 @@ MM_ARGS="
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
-torchrun $DISTRIBUTED_ARGS examples/opensoraplan1.3/t2v_A3/feature_extract/get_sora_feature.py \
+torchrun $DISTRIBUTED_ARGS mindspeed_mm/tools/feature_extraction/get_sora_feature.py \
     $GPT_ARGS \
     $MM_ARGS \
     --distributed-backend nccl \

@@ -29,9 +29,6 @@
         "max_entries": null
     },
     "sorafeature":{
-        "extract_video_feature": true,
-        "extract_text_feature": true,
-        "data_storage_mode": "standard",
-        "save_path": "./extracted_feature"
+        "save_path": "./sora_features"
     }
 }

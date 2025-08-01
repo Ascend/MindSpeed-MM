@@ -224,7 +224,7 @@ data.jsonl文件内容如下示例：
 | examples/stepvideo/feature_extract/data.json              |      tokenizer_config  | tokenizer分词器选择，配置两种分词器的路径`"from_pretrained": "/model_path/step_llm/step1_chat_tokenizer.model"` 及`"from_pretrained": "/model_path/hunyuan_clip/tokenizer"` |
 | examples/stepvideo/feature_extract/model_stepvideo.json   |      text_encoder    | 配置两种文本编译器路径`"from_pretrained": "./weights/step_llm/"`及`"from_pretrained": "./weights/hunyuan_clip/clip_text_encoder"` |
 | examples/stepvideo/feature_extract/model_stepvideo.json   |      ae              | 配置VAE模型路径`"from_pretrained": "./weights/vae/vae_v2.safetensors"` |
-| examples/stepvideo/feature_extract/tools.json             |      save_path       | 提取后的特征保存路径                                |
+| mindspeed_mm/tools/tools.json                             |      save_path       | 提取后的特征保存路径                                |
 
 | i2v配置文件                                                     |       修改字段        | 修改说明                                            |
 | ------------------------------------------------------------ | :-------------------: | :-------------------------------------------------- |
@@ -233,7 +233,7 @@ data.jsonl文件内容如下示例：
 | examples/stepvideo/feature_extract/data_i2v.json              |      tokenizer_config  | tokenizer分词器选择，配置两种分词器的路径`"from_pretrained": "/model_path/step_llm/step1_chat_tokenizer.model"` 及`"from_pretrained": "/model_path/hunyuan_clip/tokenizer"` |
 | examples/stepvideo/feature_extract/model_stepvideo_i2v.json   |      text_encoder    | 配置两种文本编译器路径`"from_pretrained": "./weights/step_llm/"`及`"from_pretrained": "./weights/hunyuan_clip/clip_text_encoder"` |
 | examples/stepvideo/feature_extract/model_stepvideo_i2v.json   |      ae              | 配置VAE模型路径`"from_pretrained": "./weights/vae/vae_v2.safetensors"` |
-| examples/stepvideo/feature_extract/tools.json                 |      save_path       | 提取后的特征保存路径                                |
+| mindspeed_mm/tools/tools.json                                 |      save_path       | 提取后的特征保存路径                                |
 
 2.启动特征提取
 

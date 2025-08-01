@@ -25,8 +25,8 @@ CP=1
 MBS=1
 GBS=$(($WORLD_SIZE*$MBS/$CP))
 
-MM_DATA="./examples/cogvideox/data.json"
-MM_MODEL="./examples/cogvideox/model_cogvideox.json"
+MM_DATA="./examples/cogvideox/feature_extract/data.json"
+MM_MODEL="./examples/cogvideox/feature_extract/model_cogvideox_i2v.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 
 DISTRIBUTED_ARGS="
@@ -43,40 +43,7 @@ GPT_ARGS="
     --context-parallel-size ${CP} \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
-    --num-layers 1 \
-    --hidden-size 3072 \
-    --num-attention-heads 48 \
-    --seq-length 24 \
-    --max-position-embeddings 24 \
-    --attention-dropout 0.0 \
-    --hidden-dropout 0.0 \
-    --tokenizer-type NullTokenizer \
-    --vocab-size 0 \
-    --position-embedding-type rope \
-    --rotary-base 500000 \
-    --swiglu \
-    --no-masked-softmax-fusion \
-    --lr 1e-4 \
-    --min-lr 1e-4 \
-    --adam-beta1 0.9 \
-    --adam-beta2 0.999 \
-    --adam-eps 1e-8 \
-    --lr-decay-style constant \
-    --weight-decay 1e-2 \
-    --lr-warmup-init 1e-4 \
-    --lr-warmup-iters 500 \
-    --clip-grad 1.0 \
-    --train-iters 5000 \
-    --no-gradient-accumulation-fusion \
-    --no-load-optim \
-    --no-load-rng \
-    --no-save-optim \
-    --no-save-rng \
-    --bf16 \
-    --recompute-granularity full \
-    --recompute-method block \
-    --recompute-num-layers 42 \
-    --use-distributed-optimizer
+    --num-workers 8 \
 "
 
 MM_ARGS="
@@ -85,19 +52,11 @@ MM_ARGS="
     --mm-tool $MM_TOOL
 "
 
-OUTPUT_ARGS="
-    --log-interval 1 \
-    --save-interval 10000 \
-    --eval-interval 10000 \
-    --eval-iters 10 \
-"
-
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
 torchrun $DISTRIBUTED_ARGS ./mindspeed_mm/tools/feature_extraction/get_sora_feature.py \
     $GPT_ARGS \
     $MM_ARGS \
-    $OUTPUT_ARGS \
-    --distributed-backend nccl >> logs/train_${logfile}.log 2>&1
+    --distributed-backend nccl | tee logs/train_${logfile}.log 2>&1
 
 chmod 440 logs/train_${logfile}.log

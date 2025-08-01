@@ -1,4 +1,5 @@
 {
+    "task": "i2v",
     "ae": {
         "model_id": "wan_video_vae",
         "from_pretrained": "Wan2.1-I2V-14B-Diffusers/vae",

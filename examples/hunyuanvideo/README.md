@@ -245,7 +245,7 @@ python examples/hunyuanvideo/convert_ckpt_to_mm.py --module lora --source_path <
 | examples/hunyuanvideo/feature_extract/data.json              |    from_pretrained    | 修改为下载的权重所对应路径（包括Tokenizer） |
 | examples/hunyuanvideo/feature_extract/feature_extraction.sh  |     NPUS_PER_NODE     | 卡数                                                |
 | examples/hunyuanvideo/feature_extract/model_hunyuanvideo.json |    from_pretrained    | 修改为下载的权重所对应路径（包括VAE、Text Encoder） |
-| examples/hunyuanvideo/feature_extract/tools.json             |       save_path       | 提取后的特征保存路径                                |
+| mindspeed_mm/tools/tools.json                                |       save_path       | 提取后的特征保存路径                                |
 
 #### 启动特征提取
 

@@ -1,0 +1,41 @@
+{
+	"dataset_param": {
+		"dataset_type": "t2v",
+		"basic_parameters": {
+			"data_path": "/data_path/data.jsonl",
+			"data_folder": "/data_path",
+			"data_storage_mode": "standard"
+		},
+		"preprocess_parameters": {
+            "video_processor_type": "CogVideoXProcessor",
+			"video_reader_type": "DecordVideo",
+            "train_fps": 8,
+            "skip_frame_num": 3,
+			"num_frames": 25,
+			"max_height": 480,
+			"max_width": 720,
+			"train_pipeline": {
+				"video": [],
+				"image": []
+			}
+		},
+		"use_text_processer": true,
+		"enable_text_preprocessing": false,
+		"tokenizer_config": {
+			"hub_backend": "hf",
+			"autotokenizer_name": "T5Tokenizer",
+			"from_pretrained": "5b-cogvideo/tokenizer",
+			"model_max_length": 226
+		}
+	},
+	"dataloader_param": {
+		"dataloader_mode": "sampler",
+        "sampler_type": "SequentialSampler",
+		"shuffle": true,
+		"drop_last": true,
+		"pin_memory": true,
+		"group_frame": false,
+		"group_resolution": false,
+		"collate_param": {}
+	}
+}

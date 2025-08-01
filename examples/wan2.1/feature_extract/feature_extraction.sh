@@ -24,8 +24,8 @@ MBS=1
 GBS=$(($WORLD_SIZE*$MBS/$CP))
 
 MM_DATA="./examples/wan2.1/feature_extract/data.json"
-MM_MODEL="./examples/wan2.1/feature_extract/model.json"
-MM_TOOL="./examples/wan2.1/feature_extract/tools.json"
+MM_MODEL="./examples/wan2.1/feature_extract/model_t2v.json"
+MM_TOOL="./mindspeed_mm/tools/tools.json"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $NPUS_PER_NODE \
@@ -52,7 +52,7 @@ MM_ARGS="
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
-torchrun $DISTRIBUTED_ARGS ./examples/wan2.1/feature_extract/get_sora_feature.py \
+torchrun $DISTRIBUTED_ARGS ./mindspeed_mm/tools/feature_extraction/get_wan_feature.py \
     $GPT_ARGS \
     $MM_ARGS \
     --distributed-backend nccl | tee logs/train_${logfile}.log 2>&1

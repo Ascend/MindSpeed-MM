@@ -8,14 +8,16 @@ export TASK_QUEUE_ENABLE=1
 export COMBINED_ENABLE=1
 export CPU_AFFINITY_CONF=1
 export HCCL_CONNECT_TIMEOUT=1200
+# 该变量只用于规避megatron对其校验，对npu无效
+export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-NPUS_PER_NODE=1
+GPUS_PER_NODE=1
 MASTER_ADDR=localhost
-MASTER_PORT=6000
+MASTER_PORT=29505
 NNODES=1
 NODE_RANK=0
-WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
+WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
 TP=1
 PP=1
@@ -23,12 +25,12 @@ CP=1
 MBS=1
 GBS=$(($WORLD_SIZE*$MBS/$CP))
 
-MM_DATA="./examples/stepvideo/feature_extract/data_i2v.json"
-MM_MODEL="./examples/stepvideo/feature_extract/model_stepvideo_i2v.json"
+MM_DATA="./examples/cogvideox/feature_extract/data.json"
+MM_MODEL="./examples/cogvideox/feature_extract/model_cogvideox_t2v.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 
 DISTRIBUTED_ARGS="
-    --nproc_per_node $NPUS_PER_NODE \
+    --nproc_per_node $GPUS_PER_NODE \
     --nnodes $NNODES \
     --node_rank $NODE_RANK \
     --master_addr $MASTER_ADDR \

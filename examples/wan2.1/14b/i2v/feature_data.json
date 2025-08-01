@@ -2,8 +2,8 @@
     "dataset_param": {
         "dataset_type": "feature",
         "basic_parameters": {
-            "data_path": "./wan2.1/sora_features/data.jsonl",
-            "data_folder": "./wan2.1/sora_features/"
+            "data_path": "./sora_features/data.jsonl",
+            "data_folder": "./sora_features/"
         },
         "preprocess_parameters": {
             "video_processor_type": "OpensoraplanVideoProcessor",

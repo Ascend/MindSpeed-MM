@@ -75,7 +75,7 @@ class HunyuanVideoI2VProcessor:
         if is_uncond:
             semantic_images = [black_image(img.size[0], img.size[1]) for img in semantic_images]
 
-        return semantic_images
+        return torch.tensor(np.array(semantic_images))
 
     def __call__(self, vae_model, videos, video_latents, **kwargs):
         cond_latents = self.get_cond_latents(video_latents, vae_model)

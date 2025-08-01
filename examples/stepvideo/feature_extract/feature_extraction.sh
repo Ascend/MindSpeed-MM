@@ -25,7 +25,7 @@ GBS=$(($WORLD_SIZE*$MBS/$CP))
 
 MM_DATA="./examples/stepvideo/feature_extract/data.json"
 MM_MODEL="./examples/stepvideo/feature_extract/model_stepvideo.json"
-MM_TOOL="./examples/stepvideo/feature_extract/tools.json"
+MM_TOOL="./mindspeed_mm/tools/tools.json"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $NPUS_PER_NODE \
@@ -52,7 +52,7 @@ MM_ARGS="
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
-torchrun $DISTRIBUTED_ARGS ./examples/stepvideo/feature_extract/get_sora_feature.py \
+torchrun $DISTRIBUTED_ARGS ./mindspeed_mm/tools/feature_extraction/get_sora_feature.py \
     $GPT_ARGS \
     $MM_ARGS \
     --distributed-backend nccl | tee logs/train_${logfile}.log 2>&1

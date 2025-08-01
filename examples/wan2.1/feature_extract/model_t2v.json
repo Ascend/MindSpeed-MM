@@ -1,0 +1,21 @@
+{
+    "ae": {
+        "model_id": "wan_video_vae",
+        "from_pretrained": "Wan2.1-I2V-14B-Diffusers/vae",
+        "dtype": "bf16",
+        "enable_tiling": true,
+        "tiling_param": {
+            "tile_size": [34, 34],
+            "tile_stride": [18, 16]
+        },
+        "norm_latents": true,
+        "norm_mode": "channel_specified_shift_scale",
+        "do_sample": false
+    },
+    "text_encoder": {
+        "model_id": "UMT5",
+        "dtype": "bf16", 
+        "hub_backend": "hf",
+        "from_pretrained": "Wan2.1-I2V-14B-Diffusers/text_encoder"
+    }
+}
