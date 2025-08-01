@@ -17,11 +17,11 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import sys 
-import json 
+import sys
+import json
 
 import torch
-import torch_npu 
+import torch_npu
 from torch_npu.contrib import transfer_to_npu
 from transformers import AutoModelForCausalLM
 
@@ -32,22 +32,23 @@ from janus.utils.io import load_pil_images
 def main():
     if len(sys.argv) != 2:
         print("Please check your arguments")
-        return 
-    
+        return
+
     config_path = sys.argv[1]
-    
+
     with open(config_path, "r") as f:
         config = json.load(f)
 
     model_path = config["model_path"]
     image_path = config["image_path"]
     question = config["question"]
+    trust_remote_code = config.get("trust_remote_code", False)
 
     vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(model_path)
     tokenizer = vl_chat_processor.tokenizer
 
     vl_gpt: MultiModalityCausalLM = AutoModelForCausalLM.from_pretrained(
-        model_path, trust_remote_code=True
+        model_path, trust_remote_code=trust_remote_code
     )
     vl_gpt = vl_gpt.to(torch.bfloat16).npu().eval()
 
@@ -83,7 +84,7 @@ def main():
 
     answer = tokenizer.decode(outputs[0].cpu().tolist(), skip_special_tokens=True)
     print(f"{prepare_inputs['sft_format'][0]}", answer)
-    
+
+
 if __name__ == '__main__':
     main()
-    

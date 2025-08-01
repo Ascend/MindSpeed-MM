@@ -319,6 +319,7 @@ mm-convert  InternVLConverter hf_to_mm \
   --cfg.parallel_config.llm_pp_layers [[32]] \
   --cfg.parallel_config.vit_pp_layers [[24]] \
   --cfg.trust_remote_code True
+  # trust_remote_code: 为保证代码安全，配置trust_remote_code默认为False，用户需要设置为True，并且确保自己下载的模型和数据的安全性
 ```
 
 #### 2. 配置参数
@@ -452,7 +453,6 @@ mm-convert  InternVLConverter mm_to_hf \
         "from_pretrained": "./InternVL2-8B",
         "model_max_length": 4096,
         "add_eos_token": false,
-        "trust_remote_code": true,
         "use_fast": false
     }
 

@@ -82,10 +82,11 @@ GPT_ARGS="
     --no-save-optim \
     --no-save-rng \
     --num-workers 4 \
-    --trust-remote-code \
     --use-flash-attn \
 "
-
+# To ensure code security, configure trust_remote_code to default to False.
+# Users need to add the following parameter and ensure the security of the models and data they download.
+# --trust-remote-code \
 MLA_ARGS="
     --multi-head-latent-attention \
     --q-lora-rank 1536 \

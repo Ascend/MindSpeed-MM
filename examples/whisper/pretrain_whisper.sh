@@ -66,9 +66,10 @@ GPT_ARGS="
     --overlap-grad-reduce \
     --overlap-param-gather \
     --num-workers 4 \
-    --trust-remote-code \
 "
-
+# To ensure code security, configure trust_remote_code to default to False.
+# Users need to add the following parameter and ensure the security of the models and data they download.
+# --trust-remote-code \
 MM_ARGS="
     --mm-data $MM_DATA \
     --mm-model $MM_MODEL \

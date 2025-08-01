@@ -95,7 +95,7 @@ rl_config:
 
 generate_config:
   enforce_eager: true
-  trust_remote_code: true
+  trust_remote_code: false # Note: It needs to be set to true during actual operation
   offload_train_optimizer: true
   offload_train_grad: true
   offload_train_param: true
