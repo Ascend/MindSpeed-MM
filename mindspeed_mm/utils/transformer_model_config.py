@@ -109,6 +109,9 @@ class MindSpeedArgsRequired:
     # Unaligned SP
     variable_seq_lengths: Any = None
 
+    # Ring Attention CP
+    reset_attention_mask: Any = None
+
 
 def tranformer_config_post_init_wrapper(fn):
     @wraps(fn)

@@ -1,4 +1,4 @@
-# Qwen2VL-72B支持非均匀Sequence Parallel切分 
+# Qwen2VL/InternVL支持非均匀Sequence Parallel切分 
 
 ## 问题分析
 
@@ -11,7 +11,7 @@ Sequence Parallel主要作用与TransformerLayer中的Dropout和LayerNorm模块�
 
 
 ## 使用方法
-(当前仅支持qwen2vl)
+(当前支持qwen2vl、InternVL系列模型)
 1. examples/qwen2vl/finetune_qwen2vl_72b.sh中开启`TP`并在GPT_ARGS中添加如下参数  
 ```shell
     --sequence-parallel

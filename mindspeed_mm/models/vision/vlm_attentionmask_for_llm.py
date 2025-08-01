@@ -980,7 +980,12 @@ def _build_attentionmask_positionid_qwenllm(config, input_ids, attention_mask, i
                     delta = delta.repeat_interleave(batch_size // delta.shape[0], dim=0)
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
-
+    
+    # if context parallel is enabled, we do not need to build attention mask, it is already handled by the context parallel algorithm
+    if get_args().context_parallel_size > 1 and get_args().context_parallel_algo == "megatron_cp_algo":
+        attention_mask = None
+        return attention_mask, position_ids
+    
     seq_len = input_ids.shape[1]
     past_seen_token = 0
     cache_position = kwargs.get('cache_position', None)
