@@ -23,6 +23,8 @@
 ## 简介
 以 MindSpeed MM 仓库复现 [Group Relative Policy Optimization (GRPO) ](https://arxiv.org/pdf/2402.03300) 后训练方法为例来帮助用户快速入门，前期需要完成代码仓、环境、数据集以及权重等准备工作，再按照说明中的启动方式启动训练，以下为具体的操作说明。
 
+当前master分支仍处于开发阶段，请使用2.1.0分支进行GRPO训练。
+
 
 #### 参考实现
 ```
@@ -49,7 +51,7 @@ commit_id=d13434fd7b46fcc147f0fa82f4a73b0eeeb1fea4
 git clone https://gitee.com/ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
-git checkout core_r0.8.0
+git checkout core_v0.12.1
 cp -r megatron ../MindSpeed-MM/
 cd ..
 
@@ -81,25 +83,23 @@ pip install -r MindSpeed-MM/examples/rl/requirements.txt
 # 安装加速库
 git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
-# checkout commit from MindSpeed core_r0.8.0
-git checkout 6f11a6c
+# checkout commit from MindSpeed core_r0.12.1
+git checkout 6d63944cb2470a0bebc38dfb65299b91329b8d92
 pip install -r requirements.txt
-# 替换MindSpeed中的文件（必选）
-cp ../MindSpeed-MM/examples/qwen2vl/dot_product_attention.py mindspeed/core/transformer/dot_product_attention.py
 cp -r mindspeed ../MindSpeed-MM/
 cd ..
 
 # 下载MindSpeed RL
 git clone https://gitee.com/ascend/MindSpeed-RL.git
 cd MindSpeed-RL
-git checkout 7466375
+git checkout b374c4b0c2128459f9549b59e648a281bcfb879c
 pip install -r requirements.txt
 cp -r mindspeed_rl ../MindSpeed-MM/
 cd ..
 
-# MindSpeed RL中文件替换（必选）
+# MindSpeed/Megatron 中文件替换（必选）
 cd MindSpeed-MM
-bash examples/rl/scripts/copy_adaptor_to_mindspeed_rl.sh
+bash examples/rl/scripts/copy_adaptor_to_mindspeed.sh
 cd ..
 ```
 
@@ -112,17 +112,14 @@ cd ..
 # 下载vllm
 git clone https://github.com/vllm-project/vllm.git
 cd vllm
-git checkout 5bc1ad6
+git checkout b6553be1bc75f046b00046a4ad7576364d03c835
 cd ../
 
 # 下载vllm-ascend
 git clone https://github.com/vllm-project/vllm-ascend.git
 cd vllm-ascend
-git checkout 75c10ce
+git checkout 03b2910364c4e40d968f6d66992ea49119d80dee
 cd ../
-
-# 替换vllm、vllm-ascend中的文件（必选）
-bash MindSpeed-MM/examples/rl/scripts/copy_adaptor_to_vllm.sh
 
 # 安装VLLM
 cd vllm

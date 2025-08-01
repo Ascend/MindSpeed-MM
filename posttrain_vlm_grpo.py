@@ -30,13 +30,11 @@ from mindspeed_rl.config_cls.mindstudio_config import ProfilerConfig, MsprobeCon
 from mindspeed_rl.datasets.prompt_dataset import PromptDataset
 from mindspeed_rl.datasets.dataloader import PromptDataLoader
 from mindspeed_rl.workers.rule_reward import RuleReward
-from mindspeed_rl.trainer.mm_grpo_trainer_hybrid import RayMMGRPOTrainer
-from mindspeed_rl.workers.mm_actor_hybrid_worker import MultiModalActorHybridWorker
+from mindspeed_rl.trainer.grpo_trainer_hybrid import RayGRPOTrainer
+from mindspeed_rl.workers.actor_hybrid_worker import ActorHybridWorker
 from mindspeed_rl.workers.reference_woker import ReferenceWorker
 from mindspeed_rl.workers.reward_woker import RewardWorker
-from mindspeed_rl.workers.mm_integrated_worker import MultiModalIntegratedWorker
-from mindspeed_rl.workers.vit_worker import VitWorker
-from mindspeed_rl.workers.scheduler.launcher import construct_colocate_placement_groups
+from mindspeed_rl.workers.integrated_worker import IntegratedWorker
 
 
 cur_file_dir = Path(__file__).absolute().parent.parent
@@ -45,17 +43,11 @@ logger = Loggers("grpo_train")
 
 @ray.remote
 def train(config):
-    actor_config, ref_config, reward_config, vit_config, rl_config, generate_config, profiler_config, msprobe_config = parse_training_config(config).values()
+    actor_config, ref_config, reward_config, rl_config, generate_config, profiler_config, msprobe_config = parse_training_config(config).values()
     if hasattr(config['megatron_training'], "ai_framework") and config['megatron_training']['ai_framework'] == "mindspore":
         from mindspeed_rl.workers.scheduler.launcher_ms import RayActorGroupMs as RayActorGroup
     else:
         from mindspeed_rl.workers.scheduler.launcher import RayActorGroup
-
-    if rl_config.colocate_actor_and_vit:
-        pgs = construct_colocate_placement_groups(rl_config)
-    else:
-        pgs = None
-
 
     MsProbe.config_init(msprobe_config)
 
@@ -65,13 +57,12 @@ def train(config):
     logger.info('start async initializing ray actor groups')
 
     reward_list = []
-    vit_worker = None
 
     from pretrain_vlm import model_provider
     if rl_config.use_integrated_worker:
         integrated_worker = RayActorGroup(
-            worker=MultiModalIntegratedWorker,
-            placement_group=pgs,
+            worker=IntegratedWorker,
+            placement_group=None,
             megatron_config=actor_config,
             rl_config=rl_config,
             generate_config=generate_config,
@@ -87,22 +78,9 @@ def train(config):
         actor_worker = integrated_worker
         reference_worker = integrated_worker
 
-        if rl_config.colocate_actor_and_vit:
-            vit_worker = RayActorGroup(
-                worker=VitWorker,
-                placement_group=pgs,
-                megatron_config=vit_config,
-                rl_config=rl_config,
-                model_provider=partial(model_provider, modules=['image_encoder']),
-                tokenizer=tokenizer,
-                initialize_func=initialize_megatron,
-                get_megatron_module=get_megatron_module,
-                global_batch_size=actor_config.global_batch_size * rl_config.n_samples_per_prompt
-            ).initialize()
-
     else:
         actor_worker = RayActorGroup(
-            worker=MultiModalActorHybridWorker,
+            worker=ActorHybridWorker,
             placement_group=None,
             megatron_config=actor_config,
             rl_config=rl_config,
@@ -169,22 +147,19 @@ def train(config):
     )
 
     from mindspeed_rl.datasets.utils import cyclic_iter
-    data_iters = cyclic_iter(data_loader) 
-    for _ in range(consumed_train_samples // actor_config.global_batch_size):
-        next(data_iters)
+    data_iters = cyclic_iter(data_loader)
+
     logger.info('after dataloader is built')
 
     reference_worker.wait_all_ref_objs_run_over()
-    if rl_config.colocate_actor_and_vit:
-        vit_worker.wait_all_ref_objs_run_over()
+
     for reward in reward_list:
         if hasattr(reward, 'wait_all_ref_objs_run_over'):
             reward.wait_all_ref_objs_run_over()
 
-    trainer = RayMMGRPOTrainer(
+    trainer = RayGRPOTrainer(
         actor_worker,
         reference_worker,
-        vit_worker,
         reward_list,
         tokenizer=tokenizer,
         global_batch_size=actor_config.global_batch_size,
@@ -228,14 +203,9 @@ def parse_training_config(config: Dict):
         reward_config = MegatronConfig({**config.get("megatron_training"), **config.get("reward_config")},
                                        config.get('model'))
 
-    vit_config = None
-    if rl_config.colocate_actor_and_vit:
-        vit_config = MegatronConfig({**config.get("megatron_training"), **config.get("vit_config")},
-                                    config.get('model'))
-
     generate_config = GenerateConfig(config.get("generate_config"))
 
-    validate_rl_args(actor_config, ref_config, reward_config, vit_config, rl_config, generate_config)
+    validate_rl_args(actor_config, ref_config, reward_config, rl_config, generate_config)
 
     profiler_config = {}
     profiler_config.update({
@@ -255,7 +225,6 @@ def parse_training_config(config: Dict):
         "actor_config": actor_config,
         "ref_config": ref_config,
         "reward_config": reward_config,
-        "vit_config": vit_config,
         "rl_config": rl_config,
         "generate_config": generate_config,
         "profiler_config": profiler_config,
@@ -272,14 +241,16 @@ def get_megatron_module():
     from megatron.training import get_args
     from megatron.core.pipeline_parallel import get_forward_backward_func
     from megatron.core import DistributedDataParallel as LocalDDP
-    from megatron.legacy.model import Float16Module
+    from megatron.core.transformer.module import Float16Module
     from megatron.training.training import get_model, unwrap_model
     from megatron.core.distributed.distributed_data_parallel_config import DistributedDataParallelConfig
     from megatron.core.tensor_parallel.cross_entropy import vocab_parallel_cross_entropy
     from megatron.training.training import setup_model_and_optimizer
     from megatron.core.enums import ModelType
     from megatron.core.distributed import finalize_model_grads
-    from mindspeed.utils import set_actual_seq_len
+    from mindspeed.utils import set_actual_seq_len, set_position_ids, get_actual_seq_len
+    from megatron.core.optimizer.distrib_optimizer import DistributedOptimizer
+    from megatron.core.optimizer.optimizer import Float16OptimizerWithFloat16Params
 
     return {
         'parallel_state': parallel_state,
@@ -299,7 +270,11 @@ def get_megatron_module():
         'model_type': ModelType,
         'distributed_data_parallel': DistributedDataParallel,
         'finalize_model_grads': finalize_model_grads,
-        'set_actual_seq_len': set_actual_seq_len
+        'set_actual_seq_len': set_actual_seq_len,
+        'get_actual_seq_len': get_actual_seq_len,
+        'set_position_ids': set_position_ids,
+        'distributed_optimizer': DistributedOptimizer,
+        'float16_optimizer_with_float16_params': Float16OptimizerWithFloat16Params
     }
 
 

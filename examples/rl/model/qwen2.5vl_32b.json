@@ -36,6 +36,7 @@
             "normalization": "RMSNorm",
             "use_fused_rotary_pos_emb": true,
             "post_layer_norm": false,
+            "attention_mask_type": "general",
             "freeze": true
         },
         "vision_projector": {

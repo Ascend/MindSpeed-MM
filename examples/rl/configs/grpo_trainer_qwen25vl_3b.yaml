@@ -28,7 +28,6 @@ megatron_training:
   hidden_dropout: 0.0
   distributed_backend: nccl
   no_shared_storage: true
-  variable_seq_lengths: true # 动态PP
   dataset_additional_keys: ['input_ids', 'input_ids_length', 'attention_mask', 'position_ids']
   data_path: /path/dataset/rl_data
   split: 100,0,0
@@ -65,7 +64,7 @@ rl_config:
   blocking: true
   gamma: 1.0
   lam: 0.95
-  use_dynamic_bsz: true
+  use_dynamic_bsz: false
   max_packing_token_size: [15000, 4000]
   actor_forward_micro_batch_size: 1
   ref_forward_micro_batch_size: 1
@@ -90,7 +89,6 @@ rl_config:
   verifier_weight: [1.0]
   num_cpus_for_local_task: 1.0
   use_tensorboard: false
-  reuse_image_embeds: true
   actor_resource:
     num_npus: 8
 
