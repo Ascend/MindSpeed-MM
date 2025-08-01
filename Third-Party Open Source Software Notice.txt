@@ -513,3 +513,12 @@ For the full text of the license, please go to the above.
 
 Copyright Notice included in the software:
 Copyright 2025 Wan-Video/Wan2.1
+
+
+Software Notice
+Software Ming
+License: MIT License
+For the full text of the license, please go to the above.
+
+Copyright Notice included in the software:
+Copyright (c) 2025 inclusionAI
