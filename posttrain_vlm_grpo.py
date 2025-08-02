@@ -331,6 +331,8 @@ def initialize_megatron(
         from mindspeed_mm.configs.config import merge_mm_args
         merge_mm_args(args)
 
+    args.ckpt_format = "torch"
+    args.use_dist_ckpt = False
     set_global_variables(args)
 
     if args.use_deter_comp:
