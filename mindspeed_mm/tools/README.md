@@ -10,6 +10,7 @@
     - [动态采集](#动态采集)
   - [Sora类模型特征提取](#sora类模型特征提取)
   - [内存快照提取](#内存快照提取)
+  - [Tensorboard使用](#Tensorboard使用)
 
 ## <a id="jump1"></a>Profiling采集工具
 
@@ -90,6 +91,7 @@ prof.stop()
 动态采集的具体参数、入参表、及具体操作步骤等请[参考链接](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)
 
 ## <a id="sorafeature"></a>Sora类模型特征提取
+
 [feature_extraction](./feature_extraction)目录下工具可用于提取视频和文本特征并保存，目前支持单batch静态数据集特征提取。按需修改[tools.json](./tools.json)文件。
 
 ```bash
@@ -163,3 +165,35 @@ _stop()
 ```
 
 dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件，可以在[torch页面](https://pytorch.org/memory_viz)可视化查看内存快照。
+
+## <a id="Tensorboard使用"></a>Tensorboard使用
+
+1. 若使用tensorboard，需进行安装：
+
+    ```bash
+    pip install tensorboard
+    ```
+
+2. 设置tensorboard的保存路经`TENSORBOARD_LOGS_PATH`，然后在运行脚本中的`OUTPUT_ARGS`中添加`--tensorboard-dir`从而进行使能：
+
+    ```shell
+    TENSORBOARD_LOGS_PATH="./tensorboard_dir/" # tensorboard保存路径
+
+    # 在args里添加 tensorboard--dir
+    OUTPUT_ARGS="
+        --log-interval 1 \
+        --save-interval 10000 \
+        --eval-interval 10000 \
+        --eval-iters 10 \
+        --load $LOAD_PATH \
+        --save $SAVE_PATH \
+        --ckpt-format torch \
+        --tensorboard-dir $TENSORBOARD_LOGS_PATH \ 
+    "
+    ```
+
+3. 打开tensorboard进行查看，`./tensorboard_dir/`为step2中的保存路径，按需修改
+
+    ```shell
+    tensorboard --logdir ./tensorboard_dir/
+    ```

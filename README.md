@@ -882,6 +882,24 @@ MindStudio Insight提供了包括Timeline视图、通信分析、计算耗时等
 
   具体使用方法见[《MindStudio Insight操作指南》](https://www.hiascend.com/document/detail/zh/mindstudio/80RC1/GUI_baseddevelopmenttool/msascendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/ascend-computing/mindstudio-pid-251913966/software/264465341?idAbsPath=fixnode01|23710424|251366513|254884019|261408772|251913966)
 
+## Sora类模型特征提取
+
+MindSpeed MM支持提取视频和文本特征并保存
+
+  具体方法见 [README](./mindspeed_mm/tools/README.md) 的Sora类模型特征提取章节
+
+## 内存快照提取
+
+MindSpeed MM集成了昇腾内存快照采集工具，以提供对模型运行情况的分析。
+
+  具体方法见 [README](./mindspeed_mm/tools/README.md) 的内存快照提取章节
+
+## Tensorboard使用
+
+MindSpeed MM支持Tensorboard的使用
+
+  具体方法见 [README](./mindspeed_mm/tools/README.md) 的Tensorboard使用章节
+
 ---
 
 # 版本维护
