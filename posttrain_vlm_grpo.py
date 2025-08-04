@@ -330,9 +330,11 @@ def initialize_megatron(
     if getattr(args, "mm_model", None) is not None:
         from mindspeed_mm.configs.config import merge_mm_args
         merge_mm_args(args)
-
+    # 注意megatron080默认ckpt_format是torch，但012默认值变化需要在这里固定住
+    # 当前MM仓库模型都只支持`torch`格式的保存，不支持dist格式，因此这里直接在代码修改不开放配置
     args.ckpt_format = "torch"
     args.use_dist_ckpt = False
+
     set_global_variables(args)
 
     if args.use_deter_comp:
