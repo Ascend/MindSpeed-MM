@@ -241,12 +241,14 @@ class CogVideoXProcessor(AbstractVideoProcessor):
                 arr,
                 size=[image_size[0], int(arr.shape[3] * image_size[0] / arr.shape[2])],
                 interpolation=InterpolationMode.BICUBIC,
+                antialias=None
             )
         else:
             arr = resize(
                 arr,
                 size=[int(arr.shape[2] * image_size[1] / arr.shape[3]), image_size[1]],
                 interpolation=InterpolationMode.BICUBIC,
+                antialias=None
             )
 
         h, w = arr.shape[2], arr.shape[3]

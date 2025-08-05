@@ -10,7 +10,7 @@
             "image_reader_type": "torchvision",
             "train_pipeline": {
                 "image":[
-                    {"trans_type": "Resize", "param": {"size": [448, 448], "interpolation": "BICUBIC"}},
+                    {"trans_type": "Resize", "param": {"size": [448, 448], "interpolation": "BICUBIC", "antialias": null}},
                     {"trans_type": "ToTensor"},
                     {"trans_type": "norm_fun", "param": {"mean":[0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}}
                 ]

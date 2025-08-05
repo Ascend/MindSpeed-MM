@@ -56,8 +56,8 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
     conda activate test
 
     # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
-    pip install torch-2.6.0-cp310-cp310m-manylinux2014_aarch64.whl 
-    pip install torch_npu-2.6.0*-cp310-cp310m-linux_aarch64.whl
+    pip install torch-2.7.1-cp310-cp310m-manylinux2014_aarch64.whl 
+    pip install torch_npu-2.7.1*-cp310-cp310m-linux_aarch64.whl
     
     # apex for Ascend 参考 https://gitee.com/ascend/apex
     # 建议从原仓编译安装

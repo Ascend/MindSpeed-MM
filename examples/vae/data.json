@@ -13,7 +13,8 @@
                 {
                     "trans_type": "Resize",
                     "param": {
-                        "size": 256
+                        "size": 256,
+                        "antialias": null
                     }
                 },
                 {

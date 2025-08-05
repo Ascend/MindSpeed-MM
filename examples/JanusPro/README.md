@@ -25,7 +25,7 @@ cp -r ./Janus ./MindSpeed-MM/examples/JanusPro
 #### 2. 环境搭建
 
 对./examples/JanusPro/Janus中的pyproject.toml文件的dependencies做如下修改：
-- torch==2.1.0
+- torch==2.7.1
 - numpy==1.26.4
 - 增加依赖：decorator
 - 增加依赖：scipy
@@ -40,8 +40,8 @@ conda activate test
 
 # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
 # 下载路径参考 https://www.hiascend.com/document/detail/zh/Pytorch/60RC3/configandinstg/instg/insg_0001.html
-pip install torch-2.1.0-cp310-cp310m-manylinux2014_aarch64.whl
-pip install torch_npu-2.1.0*-cp310-cp310m-linux_aarch64.whl
+pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
+pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 
 # 安装JanusPro依赖库
 cd MindSpeed-MM/examples/JanusPro/Janus
