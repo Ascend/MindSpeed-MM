@@ -15,10 +15,11 @@
 
 
 from functools import wraps
+
 import megatron
 import megatron.core
-from megatron.core.enums import ModelType
 import megatron.core.transformer
+from megatron.core.enums import ModelType
 from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 
@@ -97,7 +98,8 @@ def model_provider_func_wrapper(model_provider_func):
                 vis_recompute_granularity = getattr(vis_config, 'recompute_granularity', None)
                 text_recompute_granularity = getattr(text_config, 'recompute_granularity', None)
                 if vis_recompute_granularity == 'selective' or text_recompute_granularity == 'selective':
-                    raise NotImplementedError("Only support recompute_granularity='full' for vision_encoder or text_encoder.")
+                    raise NotImplementedError(
+                        "Only support recompute_granularity='full' for vision_encoder or text_encoder.")
                 elif vis_recompute_granularity == 'full' or text_recompute_granularity == 'full':
                     _create_hooks(model, args.lora_register_forward_hook)
             else:
@@ -124,7 +126,7 @@ def _load_base_checkpoint_wrapper(fn):
             state_dict['model'] = modify_keys_with_dict(state_dict['model'], exclude_words)
 
             if args.load_base_model is not None:
-                state_dict_lora, checkpoint_name_base, release_base, ckpt_type_base = fn(args.load_base_model, **kwargs)
+                state_dict_lora, *_ = fn(args.load_base_model, args, **kwargs)
                 exclude_words = ['base_layer', 'lora_', 'norm']
                 state_dict_lora['model'] = modify_keys_with_dict(state_dict_lora['model'], exclude_words)
                 merge_dicts(state_dict, state_dict_lora)
@@ -174,6 +176,10 @@ def get_model_wrapper(fn):
     return wrapper
 
 
+def peft_model_load_state_dict(self, state_dict, strict):
+    return self.module.load_state_dict(state_dict, strict)
+
+
 def apply_patches():
     megatron.training.training.load_checkpoint = load_checkpoint_wrapper(
         megatron.training.checkpointing.load_checkpoint)
@@ -188,6 +194,12 @@ def apply_patches():
         megatron.core.transformer.module.MegatronModule.state_dict_for_save_checkpoint)
     megatron.training.checkpointing.unwrap_model = unwrap_model_wrapper(megatron.training.checkpointing.unwrap_model)
     megatron.training.training.unwrap_model = unwrap_model_wrapper(megatron.training.training.unwrap_model)
+    # The logic for loading weights in megatron 0.12 differ from 0.80. In 0.80, the weights were loaded using an
+    # unwashed model, but in 0.12 they are loaded using an unwashed model, resulting in model loading failure
+    # without errors. Therefore, this patch has been added as a replacement.
+    # The `self.module` here is added through the `model.add_module` in `model_provider_func_wrapper`
+    from peft.peft_model import PeftModel
+    PeftModel.load_state_dict = peft_model_load_state_dict
 
 
 apply_patches()
