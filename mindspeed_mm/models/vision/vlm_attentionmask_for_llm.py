@@ -1116,19 +1116,21 @@ def _build_attentionmask_positionid_glm4v(config, input_ids, attention_mask, pos
     if get_args().use_flash_attn:
         return attention_mask, position_ids
 
-    inputs_embeds = inputs_embeds.permute(1, 0, 2)
+    seq_len = input_ids.shape[1]
     past_key_values = None
     if cache_position is None:
         past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
         cache_position = torch.arange(
-            past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1], device=inputs_embeds.device
+            past_seen_tokens, past_seen_tokens + seq_len, device=input_ids.device
         )
     config._attn_implementation = "sdpa"
 
     from transformers.masking_utils import create_causal_mask
+    # The shape of input_embeds (i.e., batch_size and sequence_length) is used to construct the causal mask.
+    # Since input_ids has the same shape as embedded inputs, it can be passed directly here.
     causal_mask = create_causal_mask(
             config=config,
-            input_embeds=inputs_embeds,
+            input_embeds=input_ids,
             attention_mask=attention_mask,
             cache_position=cache_position,
             past_key_values=past_key_values,

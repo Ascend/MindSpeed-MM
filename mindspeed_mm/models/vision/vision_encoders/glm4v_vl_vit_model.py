@@ -11,6 +11,7 @@ from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.enums import AttnMaskType
 from transformers.activations import ACT2FN
 from transformers.cache_utils import DynamicCache
+from transformers.models.qwen2_vl.modeling_qwen2_vl import Qwen2VLRotaryEmbedding
 
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import VisionRotaryEmbedding, PatchEmbed
@@ -45,19 +46,47 @@ def rotate_half_llm(x):
     return torch.stack((-x2, x1), dim=-1).flatten(-2)
 
 
-def apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section):
-    unsqueeze_dim = 1
-    mrope_section = mrope_section * 2
-    cos = torch.cat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
-        unsqueeze_dim
-    )
-    sin = torch.cat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
-        unsqueeze_dim
-    )
+class Glm4vRotaryEmbedding_llm(Qwen2VLRotaryEmbedding):
+    def __init__(self, config: Optional[TransformerConfig] = None):
+        super().__init__(config=config)
+        # head_dim 默认是 hidden_size // num_attention_heads，这里传入kv_channels来覆盖默认值
+        self.config.head_dim = self.config.kv_channels
+        inv_freq, self.attention_scaling = self.rope_init_fn(self.config)
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
 
-    # Interleave them instead of usual shape
-    cos = cos[..., : cos.shape[-1] // 2].repeat_interleave(2, dim=-1)
-    sin = sin[..., : sin.shape[-1] // 2].repeat_interleave(2, dim=-1)
+
+    @torch.no_grad()
+    def forward(self, x_device, x_dtype, position_ids, mrope_section):
+
+        inv_freq_expanded = self.inv_freq[None, None, :, None].float().expand(3, position_ids.shape[1], -1, 1)
+        position_ids_expanded = position_ids[:, :, None, :].float()
+        device_type = x_device.type
+        device_type = device_type if isinstance(device_type, str) and device_type != "mps" else "cpu"
+        with torch.autocast(device_type=device_type, enabled=False):
+            freqs = (inv_freq_expanded.float() @ position_ids_expanded.float()).transpose(2, 3)
+            emb = torch.cat((freqs, freqs), dim=-1)
+            cos = emb.cos()
+            sin = emb.sin()
+        cos = (cos * self.attention_scaling).contiguous()
+        sin = (sin * self.attention_scaling).contiguous()
+
+        # Extract the repetitive calculation from the apply_multimodal_rotary_pos_emb function.
+        unsqueeze_dim = 1
+        mrope_section = mrope_section * 2
+        cos = torch.cat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
+            unsqueeze_dim
+        )
+        sin = torch.cat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
+            unsqueeze_dim
+        )
+
+        # Interleave them instead of usual shape
+        cos = cos[..., : cos.shape[-1] // 2].transpose(0, -1).repeat_interleave(2, dim=0).transpose(0, -1).contiguous()
+        sin = sin[..., : sin.shape[-1] // 2].transpose(0, -1).repeat_interleave(2, dim=0).transpose(0, -1).contiguous()
+        return torch.concat((cos, sin), dim=-1).to(dtype=x_dtype)
+
+
+def apply_multimodal_rotary_pos_emb(q, k, cos, sin):
 
     # Keep half or full tensor for later concatenation
     rotary_dim = cos.shape[-1]
@@ -121,10 +150,8 @@ class Glm4vSelfAttention(nn.Module):
 
         half_dim = rotary_pos_emb.shape[-1] // 2
         cos, sin = rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:]
-        cos = cos.permute(1, 2, 0, 3)
-        sin = sin.permute(1, 2, 0, 3)
         query_states, key_states = apply_multimodal_rotary_pos_emb(
-            query_states, key_states, cos, sin, self.mrope_section
+            query_states, key_states, cos, sin
         )
 
         if not self.training:

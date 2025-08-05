@@ -22,7 +22,7 @@ from mindspeed.utils import set_actual_seq_len
 from mindspeed_mm.models.common.embeddings.rope import DynamicRotaryEmbedding
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2VLRotaryEmbedding_llm
 from mindspeed_mm.utils.utils import ensure_valid
-from mindspeed_mm.models.vision.vision_encoders.glm4v_vl_vit_model import GlmTransformerBlock
+from mindspeed_mm.models.vision.vision_encoders.glm4v_vl_vit_model import GlmTransformerBlock, Glm4vRotaryEmbedding_llm
 
 
 class MMGPTModel(LanguageModule):
@@ -90,7 +90,10 @@ class MMGPTModel(LanguageModule):
         if self.position_embedding_type == 'mrope':
             if getattr(config, 'mrope_section', None) is None:
                 raise AssertionError('mrope section should be provided for mrope!')
-            self.rotary_pos_emb = Qwen2VLRotaryEmbedding_llm(config=config)
+            if getattr(config, 'model_id', None) == "glm4v_lm":
+                self.rotary_pos_emb = Glm4vRotaryEmbedding_llm(config=config)
+            else:
+                self.rotary_pos_emb = Qwen2VLRotaryEmbedding_llm(config=config)
         elif self.position_embedding_type == 'rope':
             if getattr(self.config, "rope_scaling", None) is None:
                 self.rotary_pos_emb = RotaryEmbedding(
@@ -223,7 +226,10 @@ class MMGPTModel(LanguageModule):
             param_dtype = torch.bfloat16
             if not getattr(self.config, 'bf16', False):
                 raise AssertionError('mrope only support bf16 now!')
-            rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids)
+            if getattr(self.config, 'model_id', None) == "glm4v_lm":
+                rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids, self.config.mrope_section)
+            else:
+                rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids)
         elif self.position_embedding_type == 'rope':
             rotary_seq_len = self.rotary_pos_emb.get_rotary_seq_len(
                 None, self.decoder, decoder_input, self.config, inference_params
