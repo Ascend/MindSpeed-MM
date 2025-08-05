@@ -147,7 +147,9 @@ def train(config):
     )
 
     from mindspeed_rl.datasets.utils import cyclic_iter
-    data_iters = cyclic_iter(data_loader)
+    data_iters = cyclic_iter(data_loader) 
+    for _ in range(consumed_train_samples // actor_config.global_batch_size):
+        next(data_iters)
 
     logger.info('after dataloader is built')
 
