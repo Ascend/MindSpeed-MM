@@ -125,9 +125,5 @@ if (
         backward_step,
         force_patch=True,
     )
-    mspm.register_patch(
-        "mindspeed_mm.patchs.dummy_optimizer_patch.backward_step",
-        backward_step_decorator,
-    )
 
     mspm.apply_patches()
