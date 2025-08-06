@@ -59,6 +59,8 @@ GPT_ARGS="
     --use-mcore-models \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
+    --context-parallel-size ${CP} \
+    --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --tokenizer-type NullTokenizer \
@@ -103,6 +105,7 @@ OUTPUT_ARGS="
     --eval-interval 10000 \
     --eval-iters 5000 \
     --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 logfile=train_$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs

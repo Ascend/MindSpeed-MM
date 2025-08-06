@@ -35,6 +35,7 @@
             "normalization": "RMSNorm",
             "use_fused_rotary_pos_emb": true,
             "post_layer_norm": false,
+            "attention_mask_type": "general",
             "freeze": true
         },
         "vision_projector": {
@@ -85,10 +86,7 @@
         "rope_theta": 1000000.0,
         "params_dtype": "bf16",
         "bf16": true,
-        "parallel_output": true,
-        "recompute_granularity": "full",
-        "recompute_method": "uniform",
-        "recompute_num_layers": 1
+        "parallel_output": true
     },
     "text_encoder": null,
     "video_encoder": null

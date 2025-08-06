@@ -27,7 +27,7 @@
             "freeze": true,
             "use_fused_rotary_pos_emb": true,
             "post_layer_norm": false,
-            "pipeline_num_layers": [32, 0, 0, 0],
+            "pipeline_num_layers": [32, 0],
             "intermediate_size": 3420,
             "tokens_per_second": 2,
             "window_attn_size": 112,
@@ -36,7 +36,8 @@
                 15,
                 23,
                 31
-            ]
+            ],
+            "attention_mask_type": "general"
         },
         "vision_projector": {
             "model_id": "lnmlp",
@@ -58,7 +59,7 @@
     "text_decoder": {
         "model_id": "qwen2_5_lm",
         "num_layers": 28,
-        "pipeline_num_layers": [1, 10, 10, 7],
+        "pipeline_num_layers": [12, 16],
         "hidden_size": 3584,
         "ffn_hidden_size": 18944,
         "num_attention_heads": 28,

@@ -68,10 +68,6 @@ cd MindSpeed-Core-MS
 pip install -r requirements.txt
 source auto_convert_mm.sh
 
-# 替换MindSpeed中的文件
-cd MindSpeed-MM
-cp examples/mindspore/qwen2vl/dot_product_attention.py ../MindSpeed/mindspeed/core/transformer/dot_product_attention.py
-
 # 安装对应版本的tokenizers
 pip install tokenizers==0.21
 mkdir ckpt
