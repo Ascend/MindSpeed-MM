@@ -26,7 +26,8 @@
         "save_path": "./memory_snapshot",
         "dump_ranks": [0],
         "stacks": "all",
-        "max_entries": null
+        "max_entries": null,
+        "mem_info":  false
     },
     "sorafeature":{
         "save_path": "./sora_features"

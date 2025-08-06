@@ -4,6 +4,7 @@ import sys
 
 import torch
 import torch_npu
+from megatron.core import mpu
 
 
 def _record(stacks: str = "all", max_entries: int = sys.maxsize):
@@ -36,10 +37,12 @@ class MemoryProfiler:
         self.stacks = None
         self.max_entries = None
         self.current_step = 0
+        self.mem_info = False
 
     def reset(self, config=None):
         if config is not None:
             self.enable = config.enable
+            self.mem_info = config.mem_info
             if self.enable:
                 rank_id = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
                 self.start_step = config.start_step
@@ -63,7 +66,20 @@ class MemoryProfiler:
                 _dump(self.save_path, self.dump_ranks)
                 _stop()
                 self.enable = False
-            self.current_step += 1
+        if self.mem_info:
+            max_memory_reserved = torch.npu.max_memory_reserved()
+            max_memory_allocated = torch.npu.max_memory_allocated()
+            print(f"\nstep: {self.current_step} \
+                    global_rank: {torch.distributed.get_rank()}  \
+                    pp_rank: {mpu.get_pipeline_model_parallel_rank()} \
+                    tp_rank: {mpu.get_tensor_model_parallel_rank()} \
+                    dp_rank: {mpu.get_data_parallel_rank()} \
+                    max_memory_reserved: {max_memory_reserved} \
+                    max_memory_allocated: {max_memory_allocated}\n",
+                  end="",
+                  flush=True)
+            torch.npu.reset_peak_memory_stats()
+        self.current_step += 1
 
     def stop(self):
         if self.enable:
