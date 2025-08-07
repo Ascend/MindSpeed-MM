@@ -6,6 +6,7 @@
 ## 目录
 - [CogVideoX 使用指南](#cogvideox-使用指南)
   - [目录](#目录)
+  - [- 环境变量声明](#--环境变量声明)
   - [版本说明](#版本说明)
       - [参考实现](#参考实现)
       - [变更记录](#变更记录)
@@ -163,9 +164,14 @@ pip install decord==0.6.0
 权重转换source_path参数请配置transformer权重文件的路径：
 ```bash
 python examples/cogvideox/cogvideox_sat_convert_to_mm_ckpt.py --source_path <your source path> --target_path <target path> --task t2v --tp_size 1 --pp_size 10 11 11 10 --num_layers 42 --mode split
+mm-convert CogVideoConverter --version <t2v or i2v> source_to_mm \
+  --cfg.source_path <your source path> \
+  --cfg.target_path <your target path> \
+  --cfg.target_parallel_config.tp_size <tp_size> \
+  --cfg.target_parallel_config.pp_layers <pp_layers> \
 ```
-其中--tp_size 后为实际的tp切分策略， --task 的值为t2v或i2v，
-当开启PP时，--pp_size 后参数值个数与PP的数值相等，并且参数之和与--num_layers 参数相等，举例：当PP=4, --num_layers 4, --pp_size 1 1 1 1; 当PP=4, --num_layers 42, --pp_size 10 11 11 10 
+其中tp_size为实际的tp切分策略， --version的值为t2v或i2v，
+当开启PP时，--pp_layers参数值个数与PP的数值相等，并且参数之和与num_layers参数相等，举例：num_layers=42, 当PP=4, pp_layers可以设置为[10,11,11,10]
 
 转换后的权重结构如下：
 
@@ -306,8 +312,10 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
       # your_mindspeed_path和your_megatron_path分别替换为之前下载的mindspeed和megatron的路径
       export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
       export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
-      # input_folder为layerzero训练保存权重的路径，output_folder为输出的megatron格式权重的路径
-      python <your_mindspeed_path>/mindspeed/core/distributed/layerzero/state/scripts/convert_to_megatron.py --input_folder ./save_ckpt/hunyuanvideo/iter_000xxxx/ --output_folder ./save_ckpt/hunyuanvideo_megatron_ckpt/iter_000xxxx/ --prefix predictor
+      # cfg.source_path为layerzero训练保存权重的路径，cfg.target_path为输出的megatron格式权重的路径
+      mm-convert CogVideoConverter layerzero_to_mm \
+        --cfg.source_path ./save_ckpt/cogvideo/
+        --cfg.target_path ./save_ckpt/cogvideo_megatron_ckpt/
       ```
 
 模型参数配置文件中的`head_dim`字段原模型默认配置为64。此字段调整为128会更加亲和昇腾。
@@ -425,7 +433,9 @@ bash examples/cogvideox/i2v_1.5/inference_cogvideox_i2v_1.5.sh
   
   lora微调功能的权重转换使用`cogvideox_hf_convert_to_mm_ckpt.py`脚本，注意`source_path`为权重所在目录的目录名，非权重本身。
 ```bash
-python examples/cogvideox/cogvideox_hf_convert_to_mm_ckpt.py --source_path <your source path> --target_path <target path> --task t2v --tp_size 1 --pp_size 42 --num_layers 42 --mode split
+mm-convert CogVideoConverter --version <t2v or i2v> hf_to_mm \
+  --cfg.source_path <your source path> \
+  --cfg.target_path <target path>
 ```
 
  VAE权重下载
@@ -491,7 +501,12 @@ bash examples/cogvideox/i2v_1.5/finetune_cogvideox_lora_i2v_1.5.sh
 训练完成后保存的权重仅为lora微调部分，如果需要合并到原始权重中，可以执行以下脚本完成合并（配置仅供参考）：
 
 ```bash
-python  checkpoint/common/merge_base_lora_weight.py --base_save_dir './converted_transformer' --lora_save_dir './my_ckpt' --merge_save_dir './merge_base_lora_target' --lora_target_modules proj_qkv proj_out --lora_alpha 64 --lora_r 128 --pp_size 1 --tp_size 1
+mm-convert CogVideoConverter --version <t2v or i2v> merge_lora_to_base \
+  --cfg.source_path './converted_transformer' \
+  --cfg.lora_path "./my_ckpt" \
+  --cfg.target_path "./merge_base_lora_target" \
+  --lora_rank 128 \
+  --lora_alpha 64 \
 ```
 
 ---

@@ -13,3 +13,4 @@ from checkpoint.vlm_model.converters.internvl import InternVLConverter
 from checkpoint.sora_model.hunyuanvideo_converter import HunyuanVideoConverter
 from checkpoint.sora_model.opensoraplan_converter import OpenSoraPlanConverter
 from checkpoint.sora_model.wan_converter import WanConverter
+from checkpoint.sora_model.cogvideo_converter import CogVideoConverter
