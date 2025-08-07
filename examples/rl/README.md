@@ -100,6 +100,7 @@ cd ..
 # MindSpeed/Megatron 中文件替换（必选）
 cd MindSpeed-MM
 bash examples/rl/scripts/copy_adaptor_to_mindspeed.sh
+bash examples/rl/scripts/copy_adaptor_to_mindspeed_rl.sh
 cd ..
 ```
 

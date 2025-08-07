@@ -22,7 +22,7 @@ from mindspeed_rl.datasets.build_dataset import build_train_valid_test_datasets
 from mindspeed_rl.utils import seed_all
 from mindspeed_rl.utils.utils import MsProbe
 from mindspeed_rl.utils.loggers import Loggers
-from mindspeed_rl.utils.utils import parse_args_from_config, is_multimodal
+from mindspeed_rl.utils.utils import is_multimodal
 from mindspeed_rl.config_cls.megatron_config import MegatronConfig
 from mindspeed_rl.config_cls.rl_config import RLConfig
 from mindspeed_rl.config_cls.generate_config import GenerateConfig
@@ -58,7 +58,6 @@ def train(config):
 
     reward_list = []
 
-    from pretrain_vlm import model_provider
     if rl_config.use_integrated_worker:
         integrated_worker = RayActorGroup(
             worker=IntegratedWorker,
@@ -233,6 +232,23 @@ def parse_training_config(config: Dict):
         "msprobe_config": msprobe_config
     }
 
+def parse_args_from_config(config):
+    # model configs
+    # Parsing utils parameters.
+    import omegaconf
+    for key, value in config.items():  # config is transformed into a dict
+        if isinstance(value, omegaconf.listconfig.ListConfig):
+            sys.argv.append(f"--{key.replace('_', '-')}")
+            for i in value:
+                sys.argv.append(f"{i}")
+        elif isinstance(value, bool):
+            if value:
+                sys.argv.append(f"--{key.replace('_', '-')}")
+        elif value is None:
+            continue
+        else:
+            sys.argv.append(f"--{key.replace('_', '-')}")
+            sys.argv.append(f"{value}")
 
 def get_megatron_module():
     from megatron.core import parallel_state
@@ -322,6 +338,7 @@ def initialize_megatron(
     from megatron.training.initialize import _set_random_seed, \
         _init_autoresume, _compile_dependencies, \
         _initialize_tp_communicators
+    from mindspeed_mm.patchs import ulysses_patches
 
     if args.use_checkpoint_args or args_defaults.get("use_checkpoint_args", False):
         if args.load is None:
@@ -383,6 +400,80 @@ def initialize_megatron(
         # No continuation function
         return None
 
+
+def model_provider(pre_process=True, post_process=True, modules=None):
+    from copy import deepcopy
+    from megatron.training import get_args, print_rank_0
+    from mindspeed_mm.models.vlm_model import VLMModel
+    """Builds the model."""
+    if modules is None:
+        modules = ['image_encoder', 'audio_encoder', 'text_decoder']
+
+    args = get_args()
+    print_rank_0("building VLMModel ...")
+    vlm_config = deepcopy(args.mm.model)
+
+    # distinguish model construct stage when pipeline parallel
+    vlm_config.pre_process = pre_process
+    vlm_config.post_process = post_process
+
+    _configure_modules(vlm_config, modules)
+
+    model = VLMModel(vlm_config)
+
+    _apply_freezing(model, vlm_config)
+
+    return model
+
+
+def _configure_modules(vlm_config, modules):
+    """Configure each module based on the modules list."""
+    module_configs = {
+        'image_encoder': _configure_image_encoder,
+        'audio_encoder': _configure_audio_encoder,
+        'text_decoder': _configure_text_decoder
+    }
+
+    for module_name, config_func in module_configs.items():
+        if module_name in modules and hasattr(vlm_config, module_name):
+            config_func(vlm_config)
+        else:
+            setattr(vlm_config, module_name, None)
+
+
+def _configure_image_encoder(vlm_config):
+    from mindspeed_mm.utils.transformer_model_config import get_model_config
+    """Configure image encoder module."""
+    vlm_config.image_encoder.vision_encoder = get_model_config(vlm_config.image_encoder.vision_encoder)
+    vlm_config.image_encoder.vision_projector = get_model_config(vlm_config.image_encoder.vision_projector)
+
+
+def _configure_audio_encoder(vlm_config):
+    from mindspeed_mm.utils.transformer_model_config import get_model_config
+    """Configure audio encoder module."""
+    vlm_config.audio_encoder.audio_encoder = get_model_config(vlm_config.audio_encoder.audio_encoder)
+
+
+def _configure_text_decoder(vlm_config):
+    from mindspeed_mm.utils.transformer_model_config import get_model_config
+    """Configure text decoder module."""
+    vlm_config.text_decoder = get_model_config(vlm_config.text_decoder)
+
+
+def _apply_freezing(model, vlm_config):
+    """Apply freezing settings to the model."""
+    has_image = hasattr(vlm_config, 'image_encoder') and vlm_config.image_encoder is not None
+    freeze_image_encoder = has_image and getattr(vlm_config.image_encoder.vision_encoder, 'freeze', True)
+    freeze_image_projection = has_image and getattr(vlm_config.image_encoder.vision_projector, 'freeze', False)
+
+    has_audio = hasattr(vlm_config, 'audio_encoder') and vlm_config.audio_encoder is not None
+    freeze_audio_encoder = has_audio and getattr(vlm_config.audio_encoder.audio_encoder, 'freeze', True)
+
+    model.freeze(
+        freeze_image_encoder=freeze_image_encoder,
+        freeze_image_projection=freeze_image_projection,
+        freeze_audio_encoder=freeze_audio_encoder
+    )
 
 def _initialize_distributed():
     """Initialize torch.distributed and core model parallel."""

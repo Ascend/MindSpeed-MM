@@ -20,7 +20,7 @@ from mindspeed_mm.training import pretrain
 from mindspeed_mm.utils.transformer_model_config import get_model_config
 mindspeed_args = get_mindspeed_args()
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
-    import mindspeed_mm.mindspore.mindspore_adaptor 
+    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def model_provider(pre_process=True, post_process=True, modules=None):

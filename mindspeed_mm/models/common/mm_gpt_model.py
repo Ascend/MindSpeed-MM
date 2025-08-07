@@ -208,7 +208,21 @@ class MMGPTModel(LanguageModule):
             # intermediate stage of pipeline
             # decoder will get hidden_states from encoder.input_tensor
             decoder_input = None
-            
+
+        # 考虑cp切分，计算实际长度必须放在切分之前
+        if getattr(self.config, 'use_remove_padding', False):
+            if position_ids is not None and position_ids.dim() == 3:
+                position_ids_fa = position_ids[0]
+            position_ids_fa = position_ids_fa.flatten()
+            indices_q = torch.arange(position_ids_fa.size(0), device=position_ids_fa.device, dtype=torch.int32)
+            cu_seqlens = torch.cat(
+                (
+                    indices_q[position_ids_fa == 0],
+                    torch.tensor(position_ids_fa.size(), device=position_ids_fa.device, dtype=torch.int32),
+                )
+            )
+            set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
+
         if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             split_gather_sizes = cal_split_sizes(input_ids.shape[-1], mpu.get_context_parallel_world_size())
             input_ids = split_forward_gather_backward(input_ids, mpu.get_context_parallel_group(), 1, 
@@ -235,19 +249,6 @@ class MMGPTModel(LanguageModule):
                 None, self.decoder, decoder_input, self.config, inference_params
             )
             rotary_pos_emb = self.rotary_pos_emb(rotary_seq_len)
-
-        if getattr(self.config, 'use_remove_padding', False):
-            if position_ids is not None and position_ids.dim() == 3:
-                position_ids_fa = position_ids[0]
-            position_ids_fa = position_ids_fa.flatten()
-            indices_q = torch.arange(position_ids_fa.size(0), device=position_ids_fa.device, dtype=torch.int32)
-            cu_seqlens = torch.cat(
-                (
-                    indices_q[position_ids_fa == 0],
-                    torch.tensor(position_ids_fa.size(), device=position_ids_fa.device, dtype=torch.int32),
-                )
-            )
-            set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
 
         # Run decoder.
         hidden_states = self.decoder(

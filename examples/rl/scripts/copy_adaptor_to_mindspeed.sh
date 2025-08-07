@@ -25,7 +25,8 @@ do
 done
 
 cp examples/rl/code/build_tokenizer.py mindspeed/features_manager/tokenizer/build_tokenizer.py
-cp examples/rl/code/dot_product_attention.py megatron/core/transformer/dot_product_attention.py
+cp examples/rl/code/dot_product_attention.py mindspeed/core/context_parallel/dot_product_attention.py
+cp examples/rl/code/adaptor.py mindspeed/core/transformer/flash_attention/flash_attention/adaptor.py
 
 echo "All adaptor files copied successfully!"
-echo "Total files copied: 2"
+echo "Total files copied: 3"

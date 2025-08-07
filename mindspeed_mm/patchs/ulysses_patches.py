@@ -64,6 +64,16 @@ class UlyssesContextAttention(torch.nn.Module):
         else:
             act_seq_len = attention_mask.shape[-1]
 
+        if getattr(self.local_attn.config, "use_remove_padding", False):
+            from mindspeed.utils import get_actual_seq_len
+            act_seq_len = get_actual_seq_len()[0]
+            attention_mask = torch.triu(
+                torch.ones([2048, 2048], dtype=torch.bool, device=query.device), diagonal=1
+            )
+            args_list = list(args)
+            args_list[0] = attention_mask
+            args = tuple(args_list)
+
         scatter_sizes_query = cal_split_sizes(query.shape[self.scatter_idx], dist.get_world_size(self.spg))
         scatter_sizes_key = cal_split_sizes(key.shape[self.scatter_idx], dist.get_world_size(self.spg))
         scatter_sizes_value = cal_split_sizes(value.shape[self.scatter_idx], dist.get_world_size(self.spg))
