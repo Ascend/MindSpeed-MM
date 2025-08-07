@@ -18,6 +18,8 @@ class WanFlowMatchScheduler():
         extra_one_step=False,
         reverse_sigmas=False,
         guidance_scale=0.0,
+        max_timestep_boundary=1.0,
+        min_timestep_boundary=0.0,
         **kwargs
         ):
         self.num_inference_timesteps = num_inference_timesteps
@@ -34,6 +36,12 @@ class WanFlowMatchScheduler():
             self._set_timesteps(self.num_inference_timesteps, training=False)
         else:
             self._set_timesteps(self.num_train_timesteps, training=True)
+        
+        if not (0 <= min_timestep_boundary < max_timestep_boundary <= 1):
+            raise ValueError("min_timestep_boundary and max_timestep_boundary must satisfy 0 <= min < max <= 1")
+        
+        self.max_timestep_boundary = max_timestep_boundary
+        self.min_timestep_boundary = min_timestep_boundary
 
     def training_losses(
         self,
@@ -95,7 +103,9 @@ class WanFlowMatchScheduler():
             noise = torch.randn_like(latents)
         
         if t is None:
-            timestep_idx = torch.randint(0, self.num_train_timesteps, (1,))
+            max_timestep_boundary = int(self.max_timestep_boundary * self.num_train_timesteps)
+            min_timestep_boundary = int(self.min_timestep_boundary * self.num_train_timesteps)
+            timestep_idx = torch.randint(min_timestep_boundary, max_timestep_boundary, (1,))
             timestep = self.timesteps[timestep_idx].to(latents.device)
         else:
             timestep = t

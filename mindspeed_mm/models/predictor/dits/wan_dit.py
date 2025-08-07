@@ -57,8 +57,8 @@ class WanDiT(MultiModalModule):
     ):
         super().__init__(config=None)
 
-        if model_type not in ["t2v", "i2v", "flf2v"]:
-            raise ValueError("Please only select among 't2v', 'i2v' and 'flf2v' tasks")
+        if model_type not in ["t2v", "i2v", "flf2v", "wan2.2-t2v", "wan2.2-i2v"]:
+            raise ValueError("Please only select among 't2v', 'i2v', 'flf2v', 'wan2.2-t2v' and 'wan2.2-i2v' tasks")
 
         if not ((hidden_size % num_heads) == 0 and (hidden_size // num_heads) % 2 == 0):
             raise ValueError(
@@ -347,6 +347,9 @@ class WanDiT(MultiModalModule):
                 x = torch.cat([x, i2v_vae_feature], dim=1)  # (b, c[x+y], f, h, w)
                 clip_embedding = self.img_emb(i2v_clip_feature.float() if self.fp32_calculate else i2v_clip_feature.to(time_emb.dtype))
                 prompt_emb = torch.cat([clip_embedding, prompt_emb], dim=1)
+            elif self.model_type in ["wan2.2-i2v"]:
+                i2v_vae_feature = i2v_vae_feature.to(x)
+                x = torch.cat([x, i2v_vae_feature], dim=1)  # (b, c[x+y], f, h, w)
 
             # patch embedding
             patch_emb = self.patch_embedding(x.to(time_emb.dtype))

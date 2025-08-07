@@ -64,7 +64,10 @@ class DiffusersScheduler:
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.
         self.guidance_scale = config.pop("guidance_scale", 1.0)
-        self.do_classifier_free_guidance = self.guidance_scale > 1.0
+        if isinstance(self.guidance_scale, (int, float)):
+            self.do_classifier_free_guidance = self.guidance_scale > 1.0
+        else:
+            self.do_classifier_free_guidance = True
         self.num_train_steps = config.pop("num_train_steps", 1000)
         self.num_inference_steps = config.pop("num_inference_steps", None)
         self.prediction_type = config.get("prediction_type", "epsilon")

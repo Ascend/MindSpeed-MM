@@ -26,7 +26,9 @@ from torchvision.transforms.functional import center_crop
 from transformers import CLIPVisionModel
 from megatron.training import get_args
 from megatron.core import mpu
+from megatron.training.checkpointing import load_checkpoint
 from mindspeed_mm.utils.utils import get_device
+from mindspeed_mm.models.predictor import PredictModel
 
 from .pipeline_base import MMPipeline
 from .pipeline_mixin.encode_mixin import MMEncoderMixin
@@ -47,10 +49,8 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             image_encoder_config = args.image_encoder.to_dict()
             image_encoder = CLIPVisionModel.from_pretrained(image_encoder_config["from_pretrained"])
             image_encoder.to(dtype=image_encoder_config["dtype"], device=get_device(args.device)).eval()
-            self.model_cpu_offload_seq = "text_encoder->image_encoder->predict_model->vae"
         else:
             image_encoder = None
-            self.model_cpu_offload_seq = "text_encoder->predict_model->vae"
 
         self.register_modules(
             vae=vae,
@@ -60,6 +60,11 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             predict_model=predict_model,
             image_encoder=image_encoder,
         )
+
+        if hasattr(args, "low_noise_predictor"):
+            self.predict_model2 = PredictModel(args.predictor).get_model().eval()
+            get_args().load = args.low_noise_predictor
+            load_checkpoint([self.predict_model2], None, None, strict=False)
 
         self.dual_image = args.dual_image
         self.model_type = args.predictor.model_type
@@ -74,11 +79,47 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
 
         self.num_frames, self.height, self.width = config.input_size
         self.generator = None if not hasattr(config, "seed") else torch.Generator().manual_seed(config.seed)
+        if hasattr(args, "boundary_ratio"):
+            self.boundary_timestep = self.scheduler.num_train_timesteps * args.boundary_ratio
 
         self.cpu_offload = getattr(config, "cpu_offload", False)
         if self.cpu_offload:
             local_rank = int(os.getenv("LOCAL_RANK"))
             self.enable_model_cpu_offload(local_rank)
+
+    def enable_model_cpu_offload(self, npu_id: Optional[int] = 0, device: Union[torch.device, str] = "npu"):
+        torch_device = torch.device(device)
+
+        device = torch.device(f"{torch_device.type}:{npu_id or torch_device.index or 0}")
+
+        model_sequence = [
+            self.text_encoder,
+            self.predict_model,
+            self.vae
+        ]
+        hook = None
+
+        if hasattr(self, "predict_model2") and self.predict_model2 is not None: 
+            model_sequence.insert(2, self.predict_model2)
+        if hasattr(self, "image_encoder") and self.image_encoder is not None:
+            model_sequence.insert(1, self.image_encoder)
+
+        from accelerate import cpu_offload_with_hook
+        for cpu_offload_model in model_sequence:
+            cpu_offload_model.cpu()
+            _, hook = cpu_offload_with_hook(cpu_offload_model, device, prev_module_hook=hook)
+
+    def _prepare_predict_model(self, t, guidance_scale):
+        if not hasattr(self, "boundary_timestep") or t >= self.boundary_timestep:
+            # wan2.1, wan2.2 7B and wan2.2 A14B high noise stage
+            curr_predict_model = self.predict_model
+            curr_guidance_scale = guidance_scale[0] if isinstance(guidance_scale, (list, tuple)) else guidance_scale
+        else:
+            # wan2.2 A14B low noise stage
+            curr_predict_model = self.predict_model2
+            curr_guidance_scale = guidance_scale[1] if isinstance(guidance_scale, (list, tuple)) else guidance_scale
+        
+        return curr_predict_model, curr_guidance_scale
 
     @torch.no_grad()
     def __call__(
@@ -176,15 +217,17 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
                 latent_model_input = latents.to(self.predict_model.dtype)
                 timestep = t.expand(latents.shape[0]).to(device=latents.device).float()
 
-                noise_pred = self.predict_model(
+                curr_predict_model, curr_guidance_scale = self._prepare_predict_model(t, guidance_scale)
+
+                noise_pred = curr_predict_model(
                     latent_model_input, timestep, model_kwargs.get("prompt_embeds"), **model_kwargs
                 )[0]
 
                 if do_classifier_free_guidance:
-                    noise_uncond = self.predict_model(
+                    noise_uncond = curr_predict_model(
                         latent_model_input, timestep, model_kwargs.get("negative_prompt_embeds"), **model_kwargs
                     )[0]
-                    noise_pred = noise_uncond + guidance_scale * (noise_pred - noise_uncond)
+                    noise_pred = noise_uncond + curr_guidance_scale * (noise_pred - noise_uncond)
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0]
@@ -350,20 +393,23 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         msk = torch.concat([torch.repeat_interleave(msk[:, 0:1], repeats=4, dim=1), msk[:, 1:]], dim=1)
         msk = msk.view(-1, msk.shape[1] // 4, 4, latent_h, latent_w).transpose(1, 2)
 
-        # clip encode
-        clip_transform = v2.Compose(
-            [
-                v2.Resize(size=[224, 224]),
-                v2.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711]),
-            ]
-        )
-        clip_input = clip_transform(image).to(device=device, dtype=dtype)
-        if self.dual_image:
-            clip_input_l = clip_transform(image_l).to(device=device, dtype=dtype)
-            # The original Wan2.1 code only supports single batch
-            clip_feature = self.image_encoder(torch.concat([clip_input, clip_input_l], dim=0), output_hidden_states=True).hidden_states[-2]
+        if hasattr(self, "image_encoder") and self.image_encoder is not None:
+            # clip encode
+            clip_transform = v2.Compose(
+                [
+                    v2.Resize(size=[224, 224]),
+                    v2.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711]),
+                ]
+            )
+            clip_input = clip_transform(image).to(device=device, dtype=dtype)
+            if self.dual_image:
+                clip_input_l = clip_transform(image_l).to(device=device, dtype=dtype)
+                # The original Wan2.1 code only supports single batch
+                clip_feature = self.image_encoder(torch.concat([clip_input, clip_input_l], dim=0), output_hidden_states=True).hidden_states[-2]
+            else:
+                clip_feature = self.image_encoder(clip_input, output_hidden_states=True).hidden_states[-2]
         else:
-            clip_feature = self.image_encoder(clip_input, output_hidden_states=True).hidden_states[-2]
+            clip_feature = None
 
         # vae encode
         vae_transform = v2.Compose([v2.Resize(size=[h, w]), v2.Normalize(mean=[0.5], std=[0.5])])
