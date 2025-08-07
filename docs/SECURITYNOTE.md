@@ -42,7 +42,36 @@
 
 ### 数据安全声明
 
-1. MindSpeed MM会加载和保存模型文件，其中部分模型文件使用了风险模块pickle，可能存在数据风险。如torch.load，可参考[torch.load](https://pytorch.org/docs/main/generated/torch.load.html#torch.load)、[collective-functions](https://pytorch.org/docs/main/distributed.html#collective-functions)了解具体风险。
+1. 风险概述：
+   MindSpeed MM 模型框架执行模型的加载与保存操作。需要特别注意的是，其底层实现可能使用 [Python pickle](https://docs.python.org/3/library/pickle.html)模块进行部分文件的序列化/反序列化操作，该模块存在固有的安全风险。  
+   
+2. 核心风险场景：
+   当使用 PyTorch 提供的 torch.load()方法加载模型文件时，一个关键的安全风险点在于设置 weights_only=False。在此设置下：  
+   
+   特定框架实现： Megatron-LM 框架的原生代码调用、MindSpeed MM提供的权重转换脚本（将 Megatron 格式转换为 HuggingFace 格式）中，会显式地将 weights_only=False。这意味着这些加载操作继承了 pickle模块的潜在危险，允许执行任意代码。  
+   攻击面： 攻击者可能通过构造恶意的模型文件，利用 pickle的反序列化漏洞实现远程代码执行 (RCE)。  
+   
+3. 严重漏洞警示 (CVE-2025-32434)
+   
+   即使将 weights_only设置为 True，用户仍面临严重风险，特别是使用 PyTorch 版本 <= 2.5.1 时：  
+   
+   攻击者可以利用旧版的 .tar格式模型文件构造恶意模型。这种构造可以绕过 weights_only=True的安全检查机制。成功利用可触发 RCE。用户必须参考此漏洞说明：CVE-2025-32434。  
+   
+4. 关键安全防护措施
+   
+   鉴于上述高风险，强烈建议：
+   
+   来源可信： 仅加载来自官方发布渠道或高度可信仓库的模型文件。  
+   完整性验证： 下载后，务必使用密码学哈希值（如 SHA-256）校验模型文件的完整性和来源真实性。  
+   环境隔离： 在隔离的环境（例如容器或沙箱）中运行模型加载代码，并严格限制该环境的系统访问权限（沙箱逃逸是另一个方向的安全问题）。  
+   安全工具： 利用专用的安全工具（如针对 Pickle 的扫描器）对模型文件进行检测，识别潜在的恶意序列化对象。  
+   PyTorch 版本升级： 避免使用 PyTorch <= 2.5.1 版本。立即升级到已修复 CVE-2025-32434 漏洞的更高版本。  
+   
+5. 参考链接
+   
+   torch.load()文档：https://pytorch.org/docs/main/generated/torch.load.html#torch.load(包含 weights_only参数说明及其风险)
+   
+   PyTorch 分布式通信说明：https://pytorch.org/docs/main/distributed.html#collective-functions
 
 ### 运行安全声明
 
