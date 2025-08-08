@@ -23,6 +23,8 @@ from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.attention import FlashAttention, ParallelAttention
 from mindspeed_mm.models.common.embeddings import TextProjection
 from mindspeed_mm.models.common.normalize import normalize, FP32LayerNorm
+from mindspeed_mm.models.common.fpdt_layer import FPDTFlashAttention
+from mindspeed_mm.utils.utils import change_tensor_layout
 
 
 class WanDiT(MultiModalModule):
@@ -549,6 +551,10 @@ class WanDiTBlock(nn.Module):
         self.fp32_calculate = fp32_calculate
 
         args = get_args()
+
+        self.FPDT = args.mm.model.to_dict().get('predictor', {}).get('FPDT', False)
+        self.FPDT_chunk_number = args.mm.model.to_dict().get('predictor', {}).get('FPDT_chunk_number', None)
+        self.FPDT_with_offload = args.mm.model.to_dict().get('predictor', {}).get('FPDT_with_offload', False)
         self.distribute_saved_activations = args.distribute_saved_activations
 
         self.attention_async_offload_param = {
@@ -745,9 +751,20 @@ class WanDiTBlock(nn.Module):
         modu_out = self.modulate(self.norm2(latents.to(dtype)), shift_mlp, scale_mlp).to(latents.dtype)
 
         # ffn
-        latents = ((latents.to(dtype)) + gate_mlp * self.ffn(modu_out).to(dtype)).to(latents.dtype)
+        if self.FPDT:
+            latents = ((latents.to(dtype)) + gate_mlp * self.fpdt_ffn(modu_out).to(dtype)).to(latents.dtype)
+        else:
+            latents = ((latents.to(dtype)) + gate_mlp * self.ffn(modu_out).to(dtype)).to(latents.dtype)
 
         return latents
+    
+    def fpdt_ffn(self, x):
+        outs = []
+        inputs = torch.chunk(x, dim=1, chunks=self.FPDT_chunk_number)
+        for input_chunk in inputs:
+            outs.append(self.ffn(input_chunk))
+        output = torch.concat(outs, dim=1).contiguous()
+        return output
 
 
 class RoPE3DWan(nn.Module):
@@ -862,7 +879,13 @@ class WanVideoParallelAttention(ParallelAttention):
             rope=rope,
             **kwargs,
         )
+
         args = get_args()
+
+        self.FPDT = args.mm.model.to_dict().get('predictor', {}).get('FPDT', False)
+        self.FPDT_chunk_number = args.mm.model.to_dict().get('predictor', {}).get('FPDT_chunk_number', None)
+        self.FPDT_with_offload = args.mm.model.to_dict().get('predictor', {}).get('FPDT_with_offload', False)
+            
 
         if self.cp_size > 1 and attention_type == AttnType.self_attn \
             and args.context_parallel_algo in ["megatron_cp_algo", "hybrid_cp_algo"]:
@@ -883,7 +906,16 @@ class WanVideoParallelAttention(ParallelAttention):
             else:
                 ulysses_group = mpu.get_context_parallel_group()            
             
-            self.core_attention_flash = UlyssesContextAttention(self.core_attention_flash, ulysses_group)
+            if self.FPDT:
+                self.core_attention_flash = FPDTFlashAttention(
+                    ulysess_context_parallel_group=ulysses_group,
+                    hidden_size=hidden_size,
+                    head_dim=hidden_size // num_attention_heads,
+                    chunk_number=self.FPDT_chunk_number,
+                    with_offload=self.FPDT_with_offload
+                )
+            else:
+                self.core_attention_flash = UlyssesContextAttention(self.core_attention_flash, ulysses_group)
         
         if self.cp_size > 1 and attention_type == AttnType.cross_attn:
             #In the case of cross attention, it is equivalent to performing the raw npu_fusion_attention for the slicing q
@@ -941,6 +973,27 @@ class WanVideoParallelAttention(ParallelAttention):
                 **kwargs,
             )
 
+    def function_after_core_attention(
+        self,
+        core_attn_out,
+        output_layout: str = "sbh"
+    ):  
+        if self.FPDT:
+            chunk_number = self.FPDT_chunk_number
+            core_attn_out_chunks = torch.chunk(core_attn_out, chunks=chunk_number, dim=0)
+            output = [None for _ in range(chunk_number)]
+            for i in range(chunk_number):
+                output[i], _ = self.proj_out(core_attn_out_chunks[i])
+            output = torch.cat(output, dim=0)
+        else:
+            output, bias = self.proj_out(core_attn_out)
+        # reshape
+        output = change_tensor_layout(output, "sbh", output_layout)
+
+        output = self.dropout(output)
+
+        return output
+    
     def get_query_key_value_tensors(self, hidden_states, key_value_states):
         """
         Derives `query` tensor from `hidden_states`, and `key`/`value` tensor

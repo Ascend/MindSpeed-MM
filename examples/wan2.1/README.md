@@ -288,6 +288,8 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
 
+  - FPDT(Fully Pipelined Distributed Transformer): Ulysess Offload 并行请[参考文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/fpdt.md)
+
 - layer_zero
 
   - 使用场景：在模型参数规模较大时，单卡上无法承载完整的模型，可以通过开启layerzero降低静态内存。
