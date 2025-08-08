@@ -86,7 +86,10 @@
         "rope_theta": 1000000.0,
         "params_dtype": "bf16",
         "bf16": true,
-        "parallel_output": true
+        "parallel_output": true,
+        "recompute_granularity": "full",
+        "recompute_method": "uniform",
+        "recompute_num_layers": 1
     },
     "text_encoder": null,
     "video_encoder": null
