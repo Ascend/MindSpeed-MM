@@ -15,7 +15,7 @@ from checkpoint.common.constant import SAFE_MODE
 from checkpoint.vlm_model.hf_to_mm import load_from_hf, convert_hf_to_mm, PPStageSchema
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.operator import (
-    Operator, UpGateMergeOp, RenameOp,
+    Operator, UpGateMergeOp, QKVMergeOp, RenameOp,
 )
 
 glm_text_schema = PPStageSchema(
@@ -36,6 +36,24 @@ def create_glm_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups:
     ops = [
         UpGateMergeOp(raw_names=[r"model.visual.blocks.(\d+).mlp.gate_proj.weight", r"model.visual.blocks.(\d+).mlp.up_proj.weight"],
                       new_name=r"image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc1.weight"),
+        QKVMergeOp(raw_names=(r"model.language_model.layers.(\d+).self_attn.q_proj.weight",
+                              r"model.language_model.layers.(\d+).self_attn.k_proj.weight",
+                              r"model.language_model.layers.(\d+).self_attn.v_proj.weight"),
+                   new_name=r"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight",
+                   group=llm_num_query_groups,
+                   q_size=llm_q_size,
+                   k_size=llm_kv_size,
+                   v_size=llm_kv_size,
+                   ),
+        QKVMergeOp(raw_names=(r"model.language_model.layers.(\d+).self_attn.q_proj.bias",
+                              r"model.language_model.layers.(\d+).self_attn.k_proj.bias",
+                              r"model.language_model.layers.(\d+).self_attn.v_proj.bias"),
+                   new_name=r"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias",
+                   group=llm_num_query_groups,
+                   q_size=llm_q_size,
+                   k_size=llm_kv_size,
+                   v_size=llm_kv_size,
+                   ),
         RenameOp(
             (
                 (r'model.visual.patch_embed.proj', r'image_encoder.encoder.patch_embed.proj'),
@@ -62,10 +80,7 @@ def create_glm_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups:
                 (r'model.language_model.layers.(\d+).post_mlp_layernorm', r'text_decoder.decoder.layers.(\d+).post_mlp_layernorm'),
                 (r'model.language_model.norm', r'text_decoder.decoder.final_layernorm'),
                 (r'lm_head', r'text_decoder.output_layer'),
-                (r"model.language_model.layers.(\d+).self_attn.q_proj", r"text_decoder.decoder.layers.(\d+).self_attention.q_proj"),
-                (r"model.language_model.layers.(\d+).self_attn.k_proj", r"text_decoder.decoder.layers.(\d+).self_attention.k_proj"),
-                (r"model.language_model.layers.(\d+).self_attn.v_proj", r"text_decoder.decoder.layers.(\d+).self_attention.v_proj"),
-                (r'model.language_model.layers.(\d+).self_attn.o_proj', r'text_decoder.decoder.layers.(\d+).self_attention.o_proj'),
+                (r'model.language_model.layers.(\d+).self_attn.o_proj', r'text_decoder.decoder.layers.(\d+).self_attention.linear_proj'),
             )
         ),
     ]

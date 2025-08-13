@@ -2,6 +2,7 @@
 
 from typing import Optional, Tuple
 import torch
+import torch_npu
 import torch.nn as nn
 import torch.nn.functional as F
 from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
@@ -9,34 +10,12 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.enums import AttnMaskType
-from transformers.activations import ACT2FN
-from transformers.cache_utils import DynamicCache
+from megatron.training.global_vars import get_args
 from transformers.models.qwen2_vl.modeling_qwen2_vl import Qwen2VLRotaryEmbedding
+from mindspeed.core.megatron_basic.megatron_basic import PTNorm
 
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import VisionRotaryEmbedding, PatchEmbed
-
-past_key_values = DynamicCache()
-
-
-class Glm4vRMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6, config=None):
-        """
-        Glm4vRMSNorm is equivalent to T5LayerNorm
-        """
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.variance_epsilon = eps
-
-    def forward(self, hidden_states):
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * hidden_states.to(input_dtype)
-
-    def extra_repr(self):
-        return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
 
 
 def rotate_half_llm(x):
@@ -81,12 +60,12 @@ class Glm4vRotaryEmbedding_llm(Qwen2VLRotaryEmbedding):
         )
 
         # Interleave them instead of usual shape
-        cos = cos[..., : cos.shape[-1] // 2].transpose(0, -1).repeat_interleave(2, dim=0).transpose(0, -1).contiguous()
-        sin = sin[..., : sin.shape[-1] // 2].transpose(0, -1).repeat_interleave(2, dim=0).transpose(0, -1).contiguous()
+        cos = cos[..., : cos.shape[-1] // 2].transpose(0, -1).repeat_interleave(2, dim=0).transpose(0, -1).permute(2, 0, 1, 3).contiguous()
+        sin = sin[..., : sin.shape[-1] // 2].transpose(0, -1).repeat_interleave(2, dim=0).transpose(0, -1).permute(2, 0, 1, 3).contiguous()
         return torch.concat((cos, sin), dim=-1).to(dtype=x_dtype)
 
 
-def apply_multimodal_rotary_pos_emb(q, k, cos, sin):
+def apply_multimodal_rotary_pos_emb(q, k, cos, sin, use_fused_rope=True):
 
     # Keep half or full tensor for later concatenation
     rotary_dim = cos.shape[-1]
@@ -94,8 +73,12 @@ def apply_multimodal_rotary_pos_emb(q, k, cos, sin):
     k_rot, k_pass = k[..., :rotary_dim], k[..., rotary_dim:]
 
     # Apply rotary embeddings on the first half or full tensor
-    q_embed = (q_rot * cos) + (rotate_half_llm(q_rot) * sin)
-    k_embed = (k_rot * cos) + (rotate_half_llm(k_rot) * sin)
+    if use_fused_rope:
+        q_embed = torch_npu.npu_rotary_mul(q_rot, cos, sin, rotary_mode='interleave')
+        k_embed = torch_npu.npu_rotary_mul(k_rot, cos, sin, rotary_mode='interleave')
+    else:
+        q_embed = (q_rot * cos) + (rotate_half_llm(q_rot) * sin)
+        k_embed = (k_rot * cos) + (rotate_half_llm(k_rot) * sin)
 
     # Concatenate back to full shape
     q_embed = torch.cat([q_embed, q_pass], dim=-1)
@@ -104,7 +87,7 @@ def apply_multimodal_rotary_pos_emb(q, k, cos, sin):
     return q_embed, k_embed
 
 
-class Glm4vSelfAttention(nn.Module):
+class Glm4vSelfAttention(SelfAttention):
     def __init__(
             self,
             config: TransformerConfig,
@@ -112,68 +95,100 @@ class Glm4vSelfAttention(nn.Module):
             layer_number: int,
             attn_mask_type=AttnMaskType.padding
     ):
-        super().__init__()
-        self.layer_idx = layer_number
-        self.config = config
-        self.mrope_section = config.mrope_section
-        self.hidden_size = config.hidden_size
-        self.num_heads = config.num_attention_heads
-        self.head_dim = self.hidden_size // self.num_heads
-        self.num_key_value_heads = config.num_key_value_heads
-        self.num_key_value_groups = self.num_heads // self.num_key_value_heads
-        self.is_causal = True
-        self.attention_dropout = config.attention_dropout
-        self.rope_scaling = config.rope_scaling
-        self.scaling = self.head_dim**-0.5
+        super().__init__(
+            config=config,
+            submodules=submodules,
+            layer_number=layer_number,
+            attn_mask_type=attn_mask_type
+        )
 
-        self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias=True)
-        self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=True)
-        self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=True)
-        self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias=False)
+        self.mrope_section = config.mrope_section
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask,
-            rotary_pos_emb=None,
+        self,
+        hidden_states,
+        attention_mask,
+        key_value_states=None,
+        inference_context=None,
+        rotary_pos_emb=None,
+        rotary_pos_cos=None,
+        rotary_pos_sin=None,
+        attention_bias=None,
+        packed_seq_params=None,
+        sequence_len_offset=None,
+        inference_params=None,
     ):
-        hidden_states = hidden_states.transpose(0, 1)
-        bsz, q_len, _ = hidden_states.size()
+        query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states)  # s b h d
 
-        query_states = self.q_proj(hidden_states)
-        key_states = self.k_proj(hidden_states)
-        value_states = self.v_proj(hidden_states)
+        if self.config.context_parallel_size > key.shape[2]:
+            key = key.repeat_interleave(
+                query.shape[2] // key.shape[2], dim=2
+            )
+            value = value.repeat_interleave(
+                query.shape[2] // value.shape[2], dim=2
+            )
 
-        query_states = query_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
-        value_states = value_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
+        if packed_seq_params is not None:
+            query = query.squeeze(1)
+            key = key.squeeze(1)
+            value = value.squeeze(1)
 
-        half_dim = rotary_pos_emb.shape[-1] // 2
-        cos, sin = rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:]
-        query_states, key_states = apply_multimodal_rotary_pos_emb(
-            query_states, key_states, cos, sin
+        # ================================================
+        # relative positional embedding (rotary embedding)
+        # ================================================
+
+        # TODO, can apply positional embedding to value_layer so it has
+        # absolute positional embedding.
+        # otherwise, only relative positional embedding takes effect
+        if rotary_pos_emb is not None:
+            half_dim = rotary_pos_emb.shape[-1] // 2
+            cos, sin = rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:]
+            query, key = apply_multimodal_rotary_pos_emb(query, key, cos, sin,
+                                                         use_fused_rope=self.config.use_fused_rotary_pos_emb)  # b h s d
+        # ===================================================
+        # Adjust key, value for inference
+        # ===================================================
+        query, key, value, rotary_pos_emb, attn_mask_type = self._adjust_key_value_for_inference(
+            inference_context,
+            query,
+            key,
+            value,
+            None,
         )
+        # ==================================
+        # core attention computation
+        # ==================================
+        if self.checkpoint_core_attention and self.training:
+            core_attn_out = self._checkpointed_attention_forward(
+                query,
+                key,
+                value,
+                attention_mask,
+                attn_mask_type=attn_mask_type,
+                packed_seq_params=packed_seq_params,
+            )
+        else:
+            core_attn_out = self.core_attention(
+                query,
+                key,
+                value,
+                attention_mask,
+                attn_mask_type=attn_mask_type,
+                packed_seq_params=packed_seq_params,
+            )
 
-        if not self.training:
-            cache_kwargs = {"sin": sin, "cos": cos, "cache_position": None}  # Specific to RoPE models
-            key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
+        if packed_seq_params is not None:
+            # reshape to same output shape as unpacked case
+            # from (t, np, hn) to (t, b=1, h=np*hn)
+            # t is the pack size = sum (sq_i)
+            # note that batch is a dummy dimension in the packed case
+            core_attn_out = core_attn_out.reshape(core_attn_out.size(0), 1, -1)
 
-        from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
-        attention_interface = ALL_ATTENTION_FUNCTIONS['sdpa']
-
-        attn_output, attn_weights = attention_interface(
-            self,
-            query_states,
-            key_states,
-            value_states,
-            attention_mask,
-            dropout=0.0 if not self.training else self.attention_dropout,
-            scaling=self.scaling,
-        )
-
-        attn_output = attn_output.reshape(bsz, q_len, -1).contiguous()
-        output = self.o_proj(attn_output)
-        return output.transpose(0, 1), None
+        # =================
+        # Output. [sq, b, h]
+        # =================
+        output, bias = self.linear_proj(core_attn_out)
+        return output, bias
 
 
 def rotate_half(x):
@@ -346,7 +361,7 @@ class GlmTransformerBlock(TransformerBlock):
         super()._build_layers()
 
         if self.post_process and self.post_layer_norm:
-            self.final_layernorm = Glm4vRMSNorm(self.config.hidden_size, eps=self.config.layernorm_epsilon)
+            self.final_layernorm = PTNorm(config=self.config, hidden_size=self.config.hidden_size, eps=self.config.layernorm_epsilon)
         else:
             self.final_layernorm = None
 
@@ -377,7 +392,7 @@ class GlmViT(MultiModalModule):
             embed_dim=config.hidden_size,
             bias=True,
         )
-        self.post_conv_layernorm = Glm4vRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.post_conv_layernorm = PTNorm(config=self.config, hidden_size=config.hidden_size, eps=config.rms_norm_eps)
 
         head_dim = config.hidden_size // config.num_attention_heads
         self.rotary_pos_emb = VisionRotaryEmbedding(head_dim // 2)

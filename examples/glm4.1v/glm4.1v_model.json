@@ -62,7 +62,7 @@
     "text_decoder": {
         "model_id": "glm4v_lm",
         "num_layers": 40,
-        "pipeline_num_layers": [7, 11, 11, 11],
+        "pipeline_num_layers": [5,12,12,11],
         "hidden_size": 4096,
         "ffn_hidden_size": 13696,
         "num_attention_heads": 32,

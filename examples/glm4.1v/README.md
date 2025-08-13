@@ -115,7 +115,7 @@ mm-convert GlmConverter hf_to_mm \
 mm-convert GlmConverter hf_to_mm \
   --cfg.mm_dir "pretrained/GLM4.1V-9B" \
   --cfg.hf_config.hf_dir "ckpt/hf_path/GLM4.1V-9B-Instruct" \
-  --cfg.parallel_config.llm_pp_layers [[7,11,11,11]] \
+  --cfg.parallel_config.llm_pp_layers [[5,12,12,11]] \
   --cfg.parallel_config.vit_pp_layers [[24,0,0,0]] \
   --cfg.trust_remote_code True
 
@@ -255,9 +255,9 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```
 注意，当开启PP时，`model.json`中配置的`vision_encoder`和`text_decoder`的`pipeline_num_layer`参数控制了各自的PP切分策略。对于流水线并行，要先处理`vision_encoder`再处理`text_decoder`。
 
-比如9b默认的值`[24,0,0,0]`、`[7,11,11,11]`，其含义为PP域内第一张卡先放24层`vision_encoder`再放7层`text_decoder`、第二张卡放`text_decoder`接着的11层、第三张卡放`text_decoder`接着的11层、第四张卡放`text_decoder`接着的11层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[22,2,0,0]`、`[7,11,11,11]`的配置是错的）
+比如9b默认的值`[24,0,0,0]`、`[5,12,12,11]`，其含义为PP域内第一张卡先放24层`vision_encoder`再放7层`text_decoder`、第二张卡放`text_decoder`接着的11层、第三张卡放`text_decoder`接着的11层、第四张卡放`text_decoder`接着的11层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[22,2,0,0]`、`[5,12,12,11]`的配置是错的）
 
-同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[7,11,11,11]`），需要在`fine_tune_glm4.1v.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)。
+同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[5,12,12,11]`），需要在`fine_tune_glm4.1v.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)。
 
 <a id="jump4.3"></a>
 #### 3. 启动微调

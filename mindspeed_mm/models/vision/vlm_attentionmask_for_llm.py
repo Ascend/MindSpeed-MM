@@ -1113,9 +1113,6 @@ def _build_attentionmask_positionid_glm4v(config, input_ids, attention_mask, pos
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
 
-    if get_args().use_flash_attn:
-        return attention_mask, position_ids
-
     seq_len = input_ids.shape[1]
     past_key_values = None
     if cache_position is None:
@@ -1135,6 +1132,10 @@ def _build_attentionmask_positionid_glm4v(config, input_ids, attention_mask, pos
             cache_position=cache_position,
             past_key_values=past_key_values,
         )
+
+    if causal_mask is None or get_args().use_flash_attn:
+        causal_mask = torch.triu(
+                torch.ones([seq_len, seq_len], dtype=torch.bool, device=input_ids.device), diagonal=1)
 
     return causal_mask, position_ids
 

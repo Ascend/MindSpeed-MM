@@ -52,6 +52,8 @@ GPT_ARGS="
     --normalization RMSNorm \
     --swiglu \
     --use-fused-swiglu \
+    --use-fused-rmsnorm \
+    --use-flash-attn \
     --seed 42 \
     --bf16 \
     --load $LOAD_PATH \
