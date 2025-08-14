@@ -16,7 +16,7 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
-TP=4
+TP=1
 PP=1
 CP=1
 MBS=1
@@ -69,6 +69,8 @@ GPT_ARGS="
     --overlap-grad-reduce \
     --overlap-param-gather \
     --sequence-parallel \
+    --layerzero \
+    --layerzero-config ${layerzero_config} \
 "
 
 MM_ARGS="
