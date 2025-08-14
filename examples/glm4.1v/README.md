@@ -204,7 +204,7 @@ dataset_param->basic_parameters->dataset
 
 【模型保存加载及日志信息配置】
 
-根据实际情况配置`examples/glm4.1v/fine_tune_glm4.1v.sh`的参数，包括加载、保存路径以及保存间隔`--save-interval`（注意：分布式优化器保存文件较大耗时较长，请谨慎设置保存间隔）
+根据实际情况配置`examples/glm4.1v/finetune_glm4.1v_9b.sh`的参数，包括加载、保存路径以及保存间隔`--save-interval`（注意：分布式优化器保存文件较大耗时较长，请谨慎设置保存间隔）
 
 ```shell
 ...
@@ -241,7 +241,7 @@ $save_dir
 
 【单机运行配置】
 
-配置`examples/glm4.1v/fine_tune_glm4.1v.sh`参数如下
+配置`examples/glm4.1v/finetune_glm4.1v_9b.sh`参数如下
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
@@ -257,7 +257,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 比如9b默认的值`[24,0,0,0]`、`[5,12,12,11]`，其含义为PP域内第一张卡先放24层`vision_encoder`再放7层`text_decoder`、第二张卡放`text_decoder`接着的11层、第三张卡放`text_decoder`接着的11层、第四张卡放`text_decoder`接着的11层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[22,2,0,0]`、`[5,12,12,11]`的配置是错的）
 
-同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[5,12,12,11]`），需要在`fine_tune_glm4.1v.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)。
+同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[5,12,12,11]`），需要在`finetune_glm4.1v_9b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)。
 
 <a id="jump4.3"></a>
 #### 3. 启动微调
@@ -265,7 +265,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 以GLM4.1V-9B为例，启动微调训练任务。
 
 ```shell
-bash examples/glm4.1v/fine_tune_glm4.1v.sh
+bash examples/glm4.1v/finetune_glm4.1v_9b.sh
 ```
 
 ---

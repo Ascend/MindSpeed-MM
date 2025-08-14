@@ -21,7 +21,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 
 MM_DATA="./examples/glm4.1v/data_9b.json"
-MM_MODEL="./examples/glm4.1v/glm4.1v_model.json"
+MM_MODEL="./examples/glm4.1v/model_9b.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="ckpt/mm_path/GLM4.1V-9B-Instruct"
 SAVE_PATH="save_dir"
