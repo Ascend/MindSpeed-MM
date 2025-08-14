@@ -7,7 +7,7 @@ datasets==2.21.0
 accelerate==0.33.0
 deepspeed==0.15.2
 decorator==4.4.2
-pybind11
+pybind11==2.13.6
 ninja
 wheel
 numpy
@@ -23,3 +23,4 @@ pytest
 gpytorch
 pandas
 transformers>=4.26.1
+pyarrow==20.0.0
