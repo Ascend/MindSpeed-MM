@@ -19,6 +19,7 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 
 # 🔥🔥🔥Latest News
 
+* [Aug. 15, 2025]: 🚀 MindSpeed MM支持Lumina-mGPT 2.0模型 【Prototype】
 * [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
 * [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型 【Prototype】
 * **[Jul. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 3B/7B/32B [GRPO训练](https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/rl)**
@@ -523,6 +524,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 47.95 (FPS)</td>
       <td> / </td>
       <td>【Pass】</td>
+    </tr>
+    <tr>
+      <td><a href="https://github.com/Alpha-VLLM/Lumina-mGPT-2.0">Lumina-mGPT 2.0</a></td>
+      <td><a href="https://huggingface.co/Alpha-VLLM/Lumina-mGPT-2.0">7B</a></td>
+      <td> 微调 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 7.9 (SPS)</td>
+      <td> 8.7 (SPS)</td>
+      <td> 1024 </td>
+      <td>【Test】</td>
     </tr>
     <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/diffusers/flux">Flux</a></td>

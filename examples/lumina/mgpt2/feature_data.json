@@ -1,0 +1,23 @@
+{
+    "dataset_param": {
+        "dataset_type": "lumina",
+        "basic_parameters": {
+            "data_config": {
+                "path": "./sora_features/data.jsonl"
+            }
+        },
+        "preprocess_parameters": {
+            "item_processor_type": "LoadFeatureItemProcessor"
+        }
+    },
+    "dataloader_param": {
+        "dataloader_mode": "sampler",
+        "sampler_type": "LuminaMetaLenDistSampler",
+        "shuffle": true,
+        "drop_last": true,
+        "pin_memory": true,
+        "group_frame": false,
+        "group_resolution": false,
+        "collate_param": {}
+    }
+}

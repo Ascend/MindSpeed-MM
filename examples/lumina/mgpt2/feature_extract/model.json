@@ -1,0 +1,18 @@
+{
+    "ae": {
+        "model_id": "movqvae",
+        "from_pretrained": "./lumina_mgpt/movqgan/270M/movqgan_270M.ckpt",
+        "double_z": false,
+        "z_channels": 4,
+        "resolution": 256,
+        "in_channels": 3,
+        "out_ch": 3,
+        "ch": 256,
+        "ch_mult": [1, 2, 2, 4],
+        "num_res_blocks": 2,
+        "attn_resolutions": [32],
+        "dropout": 0.0,
+        "n_embed": 16384,
+        "embed_dim": 4
+    }
+}
