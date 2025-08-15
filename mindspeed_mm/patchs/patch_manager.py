@@ -22,6 +22,7 @@ from mindspeed_mm.patchs import (
     infer_fa_patch,
     models_patches,
     transformers_patches,
+    fsdp1_patches,
 )
 
 
@@ -43,7 +44,10 @@ class PatchesManager:
             ("megatron.core.optimizer.distrib_optimizer.DistributedOptimizer.__init__", adaptive_clip_grad_patch.adaptive_clip_grad_norm_optimizer_init_wrapper),
             ("megatron.core.optimizer.distrib_optimizer.DistributedOptimizer.clip_grad_norm", adaptive_clip_grad_patch.adaptive_clip_grad_norm_wrapper)
         ],
-        "infer_fa": [("megatron.core.transformer.dot_product_attention.DotProductAttention.forward", infer_fa_patch.dot_product_attention_forward_infer_wrapper)]
+        "infer_fa": [("megatron.core.transformer.dot_product_attention.DotProductAttention.forward", infer_fa_patch.dot_product_attention_forward_infer_wrapper)],
+        "use_fsdp1": [
+            ("megatron.training.training.get_model", fsdp1_patches.fsdp1_get_model)
+        ]
     }
 
     @staticmethod

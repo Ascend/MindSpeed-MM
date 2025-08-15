@@ -522,3 +522,5 @@ For the full text of the license, please go to the above.
 
 Copyright Notice included in the software:
 Copyright (c) 2025 inclusionAI
+
+Copyright 2024 Meta Inc.

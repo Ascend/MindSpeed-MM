@@ -2,10 +2,12 @@ import importlib
 
 from mindspeed_mm.models.text_encoder.hunyuan_mllm_tokenizer import HunyuanMllmTokenizer
 from mindspeed_mm.models.text_encoder.stepllm_tokenizer import WrappedStepChatTokenizer
+from mindspeed_mm.models.text_encoder.lumina_mgpt2_tokenizer import LuminaMGPT2Tokenizer
 
 TOKENIZER_MODEL_MAPPINGS = {
     "stepchat": WrappedStepChatTokenizer,
     "hunyuanMLLmTokenizer": HunyuanMllmTokenizer,
+    "luminaMGPT2Tokenizer": LuminaMGPT2Tokenizer
 }
 
 

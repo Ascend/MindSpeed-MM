@@ -10,6 +10,7 @@ class SeparatorStyle(Enum):
     PLAIN = auto()
     DeepSeek = auto()
     DeepSeekV2 = auto()
+    LuminaMGPT2 = auto()
 
 
 @dataclasses.dataclass
@@ -86,6 +87,21 @@ class Conversation:
                         ret += message + self.sep2
                 else:
                     ret = ret
+        elif self.sep_style == SeparatorStyle.LuminaMGPT2:
+            ret = ""
+            pieces = []
+            for role, message in self.messages:
+                if message:
+                    turn = message + self.sep
+                    ret += turn
+                    if role == self.roles[1]:
+                        pieces.append({"data": turn, "predict": True})
+                    else:
+                        pieces.append({"data": turn, "predict": False})
+            return {
+                "conv": ret,  # text involving the complete conversation
+                "pieces": pieces,  # list to help correctly mark the labels
+            }
         else:
             raise ValueError(f"Invalid style: {self.sep_style}")
 
@@ -233,5 +249,15 @@ register_conv_template(
         sep2="<｜end▁of▁sentence｜>",
         stop_token_ids=[100001],
         stop_str=["User:", "<｜end▁of▁sentence｜>"]
+    )
+)
+
+register_conv_template(
+    Conversation(
+        name="lumina-mgpt2",
+        roles=("Human", "Assistant"),
+        messages=(),
+        sep_style=SeparatorStyle.LuminaMGPT2,
+        sep="<reserved08706>"
     )
 )

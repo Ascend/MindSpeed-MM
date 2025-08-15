@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import torch
 from torch.distributed import ProcessGroup
-from torch.utils.data import DataLoader, BatchSampler, SequentialSampler
+from torch.utils.data import DataLoader, BatchSampler, SequentialSampler, Sampler
 from megatron.training import get_args
 
 from mindspeed_mm.data.data_utils.utils import (
@@ -33,7 +33,8 @@ from mindspeed_mm.data.dataloader.sampler import (
     VariableVideoBatchSampler,
     BaseRandomBatchSampler,
     BucketBatchSampler,
-    AESampler
+    AESampler,
+    LuminaMetaLenDistSampler
 )
 from mindspeed_mm.data.dataloader.data_collator import DATA_COLLATOR
 
@@ -336,6 +337,27 @@ def prepare_sampler_dataloader(
             num_workers=num_workers,
             prefetch_factor=prefetch_factor,
             persistent_workers=persistent_workers
+        )
+    elif sampler_type == "LuminaMetaLenDistSampler":
+        acc_grad = cal_gradient_accumulation_size()
+        sampler = LuminaMetaLenDistSampler(
+            dataset,
+            num_replicas=process_group.size(),
+            rank=process_group.rank(),
+            shuffle=shuffle,
+            seed=seed,
+            batch_size=batch_size,
+            acc_grad=acc_grad
+        )
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=sampler,
+            pin_memory=pin_memory,
+            num_workers=num_workers,
+            persistent_workers=persistent_workers,
+            collate_fn=lambda batch: tuple(zip(*batch)),
+            drop_last=drop_last,
         )
     else:
         raise NotImplementedError(f"sampler type: {sampler_type}")

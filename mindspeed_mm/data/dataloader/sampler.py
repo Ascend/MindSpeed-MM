@@ -6,6 +6,7 @@ import time
 from collections import Counter, OrderedDict, defaultdict
 from pprint import pformat
 
+import numpy as np
 import torch
 import torch.distributed as dist
 from torch.utils.data import DataLoader, Dataset, Sampler
@@ -15,6 +16,7 @@ from pandarallel import pandarallel
 from transformers import AutoProcessor
 
 from mindspeed_mm.data.datasets.t2v_dataset import DynamicVideoTextDataset
+from mindspeed_mm.data.datasets.lumina_dataset import LuminaConversationDataset
 from mindspeed_mm.data.data_utils.bucket import Bucket
 from mindspeed_mm.data.data_utils.aspect_ratio import get_num_pixels, get_resolution_with_aspect_ratio
 from mindspeed_mm.data.data_utils.utils import format_numel_str
@@ -977,3 +979,133 @@ class AESampler(DistributedSampler):
         self.epoch = state_dict['epoch']
         self.seed = state_dict['seed']
         self.current_index = state_dict.get('current_index', 0)
+
+
+class LuminaMetaLenDistSampler(Sampler):
+    def __init__(
+        self,
+        dataset: LuminaConversationDataset,
+        num_replicas: Optional[int] = None,
+        rank: Optional[int] = None,
+        shuffle: bool = True,
+        seed: int = 0,
+        batch_size=None,
+        acc_grad=1,
+        length_clustering=True,
+        allow_mixed_task_among_acc=False,
+    ):
+        self.dataset = dataset
+        self.total_samples = len(dataset)
+        self.num_replicas = num_replicas
+        self.rank = rank
+        self.shuffle = shuffle
+        self.seed = seed
+        self.batch_size = batch_size
+        self.acc_grad = acc_grad
+        self.length_clustering = length_clustering
+        self.allow_mixed_task_among_acc = allow_mixed_task_among_acc
+
+        self.epoch = 0
+        self.micro_batch_times_data_parallel_size = self.batch_size * self.num_replicas
+        self.last_batch_size = self.total_samples % self.micro_batch_times_data_parallel_size
+
+        global_bsz_acc = batch_size * num_replicas * acc_grad
+
+        group_len = defaultdict(int)
+        for meta in dataset.meta_collection:
+            group_len[meta["type"]] += int(meta["len"] * meta.get("ratio", 1.0))
+
+        group_len = {key: val // global_bsz_acc * global_bsz_acc for key, val in group_len.items()}
+
+        self.total_size = sum(list(group_len.values()))
+        self.num_samples = self.total_size // num_replicas
+
+    def __iter__(self) -> Iterator:
+        global_batch_size = self.batch_size * self.num_replicas
+        global_bsz_acc = self.batch_size * self.num_replicas * self.acc_grad
+        rng = np.random.default_rng(self.seed + self.epoch)
+
+        group_indices_and_len = defaultdict(list)
+
+        # Initialize the starting index
+        start_idx = 0
+
+        # Iterate through the list of dictionaries
+        for meta in self.dataset.meta_collection:
+            # Calculate the ending index for the current collection
+            end_idx = start_idx + meta["len"]
+            indices = list(range(start_idx, end_idx))
+            indices_and_len = [[idx, length] for idx, length in zip(indices, meta["item_len_list"])]
+            if meta.get("ratio", 1.0) != 1.0:
+                indices_and_len = list(rng.choice(indices_and_len, int(meta["len"] * meta["ratio"]), replace=False))
+                print(f"meta{i}: sample (ratio = {meta['ratio']}) {len(indices_and_len)} items")
+            group_indices_and_len[meta["type"]].extend(indices_and_len)
+            # Update the starting index for the next collection
+            start_idx = end_idx
+
+        for group_name, indices_and_len in group_indices_and_len.items():
+            group_indices_and_len[group_name] = indices_and_len[
+                : len(indices_and_len) // global_bsz_acc * global_bsz_acc
+            ]
+
+        if self.shuffle:
+            for _, indices_and_len in group_indices_and_len.items():
+                rng.shuffle(indices_and_len)
+
+            group_indices = {}
+            if self.length_clustering:
+                for group_name, indices_and_len in group_indices_and_len.items():
+                    # shuffle before sorting is still important when lots of samples share the same length
+                    indices_and_len.sort(key=lambda x: x[1])
+                    group_indices[group_name] = [_[0] for _ in indices_and_len]
+
+                # option1: shuffle among neighboring items
+                for group_name, indices in group_indices.items():
+                    result = []
+                    for pos in range(0, len(indices), global_batch_size * 500):
+                        sublist = indices[pos: pos + global_batch_size * 500]
+                        rng.shuffle(sublist)
+                        result.extend(sublist)
+                    group_indices[group_name] = result
+            else:
+                for group_name, indices_and_len in group_indices_and_len.items():
+                    group_indices[group_name] = [_[0] for _ in indices_and_len]
+
+            del group_indices_and_len
+
+            if self.allow_mixed_task_among_acc:
+                global_batched_indices = [
+                    indices[i: i + global_batch_size]
+                    for group_name, indices in group_indices.items()
+                    for i in range(0, len(indices), global_batch_size)
+                ]
+            else:
+                global_batched_indices = []
+                for _, indices in group_indices.items():
+                    group_batched_indices = [indices[i: i + global_batch_size] for i in range(0, len(indices), global_batch_size)]
+                    rng.shuffle(group_batched_indices)
+                    group_batched_indices = [
+                        sum(group_batched_indices[i: i + self.acc_grad], start=[])
+                        for i in range(0, len(group_batched_indices), self.acc_grad)
+                    ]
+                    global_batched_indices.extend(group_batched_indices)
+            rng.shuffle(global_batched_indices)
+            indices = [_
+                for batch_indices in global_batched_indices 
+                for _ in batch_indices
+            ]
+        else:
+            indices = indices[:self.total_size]
+
+        own_indices = []
+        for start_pos in range(self.rank * self.batch_size, len(indices), global_batch_size):
+            own_indices += indices[start_pos: start_pos + self.batch_size]
+        # subsample
+        if len(own_indices) != self.num_samples:
+            raise AssertionError(f"The length of own_indices {len(own_indices)} should be equal to num_samples {self.num_samples}!")
+
+        self.epoch += 1
+        return iter(own_indices)
+
+    def __len__(self) -> int:
+        return self.num_samples

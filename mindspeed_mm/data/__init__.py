@@ -22,6 +22,7 @@ from mindspeed_mm.data.datasets.feature_dataset import FeatureDataset
 from mindspeed_mm.data.datasets.audio_dataset import AudioDataset
 from mindspeed_mm.data.datasets.qwen2vl_dataset import get_qwen2vl_dataset
 from mindspeed_mm.data.datasets.ae_dataset import TrainVideoDataset
+from mindspeed_mm.data.datasets.lumina_dataset import LuminaConversationDataset
 from mindspeed_mm.models.ae.training.global_vars import get_ae_args
 
 
@@ -77,6 +78,8 @@ def build_mm_dataset(dataset_param):
             dataset = DeepSeekVLDataset(single_param, **dataset_param_copy)
             datasets.append(dataset)
         return ConcatDataset(datasets)
+    if dataset_type == "lumina":
+        return LuminaConversationDataset(basic_param, **dataset_param)
     else:
         raise NotImplementedError(dataset_type)
 

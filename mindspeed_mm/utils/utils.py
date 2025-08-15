@@ -152,6 +152,8 @@ def video_to_image(func):
             x = rearrange(x, "b c t h w -> (b t) c h w")
             x = func(self, x, *args, **kwargs)
             x = rearrange(x, "(b t) c h w -> b c t h w", t=t)
+        else:
+            x = func(self, x, *args, **kwargs)
         return x
     return wrapper
 

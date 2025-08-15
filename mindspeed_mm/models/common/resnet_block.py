@@ -16,7 +16,7 @@ from mindspeed_mm.models.common.conv import (
 )
 from mindspeed_mm.models.common.updownsample import UpsampleCausal3D, DownsampleCausal3D
 from mindspeed_mm.models.common.normalize import normalize
-from mindspeed_mm.models.common.activations import Sigmoid
+from mindspeed_mm.models.common.activations import Sigmoid, get_activation_layer
 
 
 class ResnetBlock2D(nn.Module):
@@ -33,6 +33,7 @@ class ResnetBlock2D(nn.Module):
         eps=1e-6,
         affine=True,
         norm_type="groupnorm",
+        act_type="silu"
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -45,7 +46,7 @@ class ResnetBlock2D(nn.Module):
         self.norm2 = normalize(out_channels, num_groups, eps, affine, norm_type=norm_type)
         self.dropout = torch.nn.Dropout(dropout)
         self.conv2 = torch.nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding)
-        self.activation = nn.SiLU()
+        self.activation = get_activation_layer(act_type)()
         if self.in_channels != self.out_channels:
             if self.use_conv_shortcut:
                 self.conv_shortcut = torch.nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding)

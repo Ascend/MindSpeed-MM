@@ -19,6 +19,8 @@ def get_activation_layer(act_type):
         return nn.ReLU
     elif act_type == "silu":
         return nn.SiLU
+    elif act_type == "swish":
+        return Sigmoid
     else:
         raise ValueError(f"Unknown activation type: {act_type}")
     
