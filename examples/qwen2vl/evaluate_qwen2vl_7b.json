@@ -74,8 +74,6 @@
         "layernorm_epsilon": 1e-06,
         "add_bias_linear":false,
         "add_qkv_bias": true,
-        "tensor_model_parallel_size": 1,
-        "pipeline_model_parallel_size": 1,
         "sequence_parallel": false,
         "tokenizer_type": "PretrainedFromHF",
         "is_encoder_decoder": false,
