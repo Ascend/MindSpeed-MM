@@ -19,6 +19,7 @@ from mindspeed_mm.utils.utils import ensure_valid
 def safe_getattr(mm_object, mm_name, mm_default_value):
     # 如果 mm_object.mm_name 不等于 mm_default_value， 则打印日志， 提示用户真实使用的值已被覆盖
     mm_value = getattr(mm_object, mm_name, mm_default_value)
+
     if mm_value != mm_default_value:
         print_rank_0(f'[INFO] the original value of {mm_name} is {mm_default_value}, now changed as {mm_value} which comes from model.json')
     return mm_value
@@ -58,6 +59,10 @@ def validate_args(args, defaults=None):
                 raise AssertionError(f"MindSpeed-MM Error: mm_double_blocks_depth must > 0, actually:{mm_double_blocks_depth}")
             args.num_layers = safe_getattr(args.mm.model.predictor, 'mm_single_blocks_depth', args.num_layers)
         args.num_layers = safe_getattr(args.mm.model.predictor, 'num_layers', args.num_layers)
+        # Some models have num_layers as a list in the predictor, so sum it up to get total layers
+        if isinstance(args.num_layers, (tuple, list)):
+            args.num_layers = sum(args.num_layers)
+
         args.num_attention_heads = safe_getattr(args.mm.model.predictor, 'num_heads', args.num_attention_heads)
         head_dim = getattr(args.mm.model.predictor, 'head_dim', 1)
         if isinstance(head_dim, int):

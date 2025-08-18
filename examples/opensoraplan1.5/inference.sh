@@ -1,11 +1,6 @@
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-export ASCEND_LAUNCH_BLOCKING=1
-export MULTI_STREAM_MEMORY_REUSE=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-export COMBINED_ENABLE=1
-export CPU_AFFINITY_CONF=1
-export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
 
 MASTER_ADDR=localhost
 MASTER_PORT=6000
@@ -38,21 +33,9 @@ SORA_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
     --context-parallel-size ${CP} \
+    --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
-    --num-layers 32 \
-    --hidden-size 3072 \
-    --num-attention-heads 16 \
-    --seq-length 1024 \
-    --max-position-embeddings 1024 \
-    --attention-dropout 0.0 \
-    --hidden-dropout 0.0 \
-    --tokenizer-type NullTokenizer \
-    --vocab-size 0 \
-    --position-embedding-type rope \
-    --rotary-base 500000 \
-    --swiglu \
-    --no-masked-softmax-fusion \
     --sequence-parallel \
     --fp16 \
     --load $LOAD_PATH \

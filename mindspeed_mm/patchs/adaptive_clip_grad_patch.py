@@ -320,7 +320,7 @@ def adaptive_clip_grad_norm_wrapper(fn):
         if self.config.clip_grad_ema_decay > 0.0:
             params_for_norm = get_unlocked_main_params_for_norm(self.get_parameters())
             return adaptive_clip_grad_norm_fp32_with_distributed_optimizer(
-                params, grads_for_norm, params_for_norm, model_parallel_group=self.get_model_parallel_group(),
+                params, grads_for_norm, params_for_norm, model_parallel_group=self.get_grad_stats_parallel_group(),
                 clip_grad_ema_decay=self.config.clip_grad_ema_decay
             )
         return fn(*args, **kwargs)

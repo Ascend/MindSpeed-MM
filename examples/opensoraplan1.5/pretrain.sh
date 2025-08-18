@@ -10,12 +10,12 @@ export COMBINED_ENABLE=1
 export CPU_AFFINITY_CONF=1
 export HCCL_CONNECT_TIMEOUT=1800
 
-GPUS_PER_NODE=4
+NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1
 NODE_RANK=0
-WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
+WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 TP=4
 PP=1
@@ -31,7 +31,7 @@ MM_MODEL="./examples/opensoraplan1.5/pretrain_model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 
 DISTRIBUTED_ARGS="
-    --nproc_per_node $GPUS_PER_NODE \
+    --nproc_per_node $NPUS_PER_NODE \
     --nnodes $NNODES \
     --node_rank $NODE_RANK \
     --master_addr $MASTER_ADDR \
@@ -42,22 +42,10 @@ GPT_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
     --context-parallel-size ${CP} \
+    --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
-    --num-layers 32 \
-    --hidden-size 3072 \
-    --num-attention-heads 16 \
-    --seq-length 1024 \
-    --max-position-embeddings 1024 \
-    --attention-dropout 0.0 \
-    --hidden-dropout 0.0 \
-    --tokenizer-type NullTokenizer \
-    --vocab-size 0 \
-    --position-embedding-type rope \
-    --rotary-base 500000 \
-    --swiglu \
-    --num-workers 0 \
-    --no-masked-softmax-fusion \
+    --num-workers 8 \
     --bf16 \
     --lr 1e-5 \
     --min-lr 1e-5 \
@@ -81,7 +69,7 @@ GPT_ARGS="
     --use-distributed-optimizer \
     --recompute-granularity full \
     --recompute-method block \
-    --recompute-num-layers 48 \
+    --recompute-num-layers 32 \
     --sequence-parallel \
 "
 
