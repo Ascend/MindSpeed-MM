@@ -587,8 +587,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> / </td>
-      <td> / </td>
+      <td> 12.16(SPS) </td>
+      <td> 10.28(SPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>
