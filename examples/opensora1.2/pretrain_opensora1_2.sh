@@ -25,6 +25,7 @@ GBS=$(($WORLD_SIZE*$MBS/$CP))
 MM_DATA="./examples/opensora1.2/data.json"
 MM_MODEL="./examples/opensora1.2/model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
+SAVE_PATH="your_ckpt_path_to_save"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $GPUS_PER_NODE \
@@ -68,6 +69,8 @@ OUTPUT_ARGS="
     --save-interval 10000 \
     --eval-interval 10000 \
     --eval-iters 10 \
+    --save $SAVE_PATH \
+    --ckpt-format torch \
 "
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
