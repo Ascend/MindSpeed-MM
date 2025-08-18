@@ -80,7 +80,14 @@ def loss_func(output_tensor):
     loss = output_tensor[0].mean()
     averaged_loss = average_losses_across_data_parallel_group([loss])
     loss = loss.unsqueeze(0)
-    return loss, {"loss": averaged_loss[0]}
+    # NOTE: Megatron multiplies the loss by `mpu.get_context_parallel_world_size()`(cp_size).
+    # To keep the effective loss unchanged we divide by `cp_size` before returning from this function.
+    #
+    # Old behaviour: loss was returned unscaled. We scale the grad in backward of all-gather.
+    #
+    # New behaviour: loss = loss_raw / cp_size  (done right here).
+    #                loss = loss * cp_size  (megatron).
+    return loss / mpu.get_context_parallel_world_size(), {"loss": averaged_loss[0]}
 
 
 def get_batch_for_step(data_iterator):
