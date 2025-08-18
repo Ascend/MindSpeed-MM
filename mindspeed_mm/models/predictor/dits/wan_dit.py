@@ -138,20 +138,8 @@ class WanDiT(MultiModalModule):
                 f"Context_parallel_algo {self.context_parallel_algo} is not implemented"
             )
 
-        # rope
-        self.rope = RoPE3DWan(head_dim=self.head_dim, max_seq_len=self.max_seq_len)
-
         if self.pre_process:
-            # embeddings
-            self.patch_embedding = nn.Conv3d(
-                self.in_dim,
-                self.hidden_size,
-                kernel_size=self.patch_size,
-                stride=self.patch_size,
-            )
-            self.text_embedding = TextProjection(
-                self.text_dim, self.hidden_size, partial(nn.GELU, approximate="tanh")
-            )
+            # time embeddings
             self.time_embedding = nn.Sequential(
                 nn.Linear(self.freq_dim, self.hidden_size),
                 nn.SiLU(),
@@ -159,11 +147,26 @@ class WanDiT(MultiModalModule):
             )
             if self.fp32_calculate:
                 self.time_embedding = self.time_embedding.to(torch.float32)
-
             # time emb projection
             self.time_projection = nn.Sequential(
                 nn.SiLU(), nn.Linear(self.hidden_size, self.hidden_size * 6)
             )
+            # embeddings
+            self.text_embedding = TextProjection(
+                self.text_dim, self.hidden_size, partial(nn.GELU, approximate="tanh")
+            )
+            if model_type in ["i2v", "flf2v"]:
+                self.img_emb = MLPProj(self.img_dim, self.hidden_size, model_type == 'flf2v', clip_token_len, self.fp32_calculate)
+            
+            self.patch_embedding = nn.Conv3d(
+                self.in_dim,
+                self.hidden_size,
+                kernel_size=self.patch_size,
+                stride=self.patch_size,
+            )
+
+        # rope
+        self.rope = RoPE3DWan(head_dim=self.head_dim, max_seq_len=self.max_seq_len)
 
         # attention blocks
         self.blocks = nn.ModuleList(
@@ -195,9 +198,6 @@ class WanDiT(MultiModalModule):
             # head
             self.head = Head(self.hidden_size, self.out_dim, self.patch_size, self.eps)
 
-        if self.pre_process and model_type in ["i2v", "flf2v"]:
-            self.img_emb = MLPProj(self.img_dim, self.hidden_size, model_type == 'flf2v', clip_token_len, self.fp32_calculate)
-        
         self.use_dpo = getattr(args.mm.model, "dpo", None)
 
     @property
@@ -565,6 +565,11 @@ class WanDiTBlock(nn.Module):
             "d2h_stream": d2h_stream,
         }
 
+        # modulation
+        self.modulation = nn.Parameter(
+            torch.randn(1, 6, self.hidden_size) / self.hidden_size**0.5
+        )
+        self.norm1 = nn.LayerNorm(self.hidden_size, eps=eps, elementwise_affine=False)
         self.self_attn = WanVideoParallelAttention(
             query_dim=hidden_size,
             key_dim=None,
@@ -583,6 +588,7 @@ class WanDiTBlock(nn.Module):
             has_img_input=False,
             fa_layout=fa_layout,
         )
+        self.norm3 = FP32LayerNorm(self.hidden_size, eps=eps) if fp32_calculate else nn.LayerNorm(self.hidden_size, eps=eps)
 
         self.cross_attn = WanVideoParallelAttention(
             query_dim=hidden_size,
@@ -602,17 +608,11 @@ class WanDiTBlock(nn.Module):
             fa_layout=fa_layout,
         )
 
-        self.norm1 = nn.LayerNorm(self.hidden_size, eps=eps, elementwise_affine=False)
         self.norm2 = nn.LayerNorm(self.hidden_size, eps=eps, elementwise_affine=False)
-        self.norm3 = FP32LayerNorm(self.hidden_size, eps=eps) if fp32_calculate else nn.LayerNorm(self.hidden_size, eps=eps)
         self.ffn = nn.Sequential(
             nn.Linear(self.hidden_size, self.ffn_dim),
             nn.GELU(approximate="tanh"),
             nn.Linear(self.ffn_dim, self.hidden_size),
-        )
-        # modulation
-        self.modulation = nn.Parameter(
-            torch.randn(1, 6, self.hidden_size) / self.hidden_size**0.5
         )
 
     def modulate(self, x: torch.Tensor, shift: torch.Tensor, scale: torch.Tensor):

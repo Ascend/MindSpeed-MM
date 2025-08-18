@@ -68,6 +68,7 @@ GPT_ARGS="
     --recompute-num-layers 42 \
     --use-distributed-optimizer \
     --overlap-grad-reduce \
+    --overlap-param-gather \
     --allow-tf32 \
     --num-workers 8 \
 "

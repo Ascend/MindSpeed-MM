@@ -133,27 +133,6 @@ class SatDiT(MultiModalModule):
 
         # Initialize blocks
 
-        if self.pre_process:
-            if self.ofs_embed_dim is not None:
-                self.ofs_embed = nn.Sequential(
-                    nn.Linear(self.ofs_embed_dim, self.ofs_embed_dim),
-                    nn.SiLU(),
-                    nn.Linear(self.ofs_embed_dim, self.ofs_embed_dim),
-                )
-            self.time_embed = TimeStepEmbedding(inner_dim, self.time_embed_dim)
-            # Init PatchEmbed
-            if self.patch_type == "3D":
-                self.patch_embed = VideoPatch3D(in_channels, inner_dim, self.patch_size)
-            else:
-                self.patch_embed = VideoPatch2D(in_channels, inner_dim, self.patch_size_h)
-            
-            # Init Projection
-            self.caption_projection = None
-            if text_hidden_size is not None:
-                self.caption_projection = nn.Linear(self.text_hidden_size, inner_dim)
-        
-        self.global_layer_idx = global_layer_idx if global_layer_idx is not None else tuple(range(num_layers))
-
         self.rope = Rotary3DPositionEmbedding(
             hidden_size_head=head_dim,
             text_length=text_length,
@@ -163,6 +142,28 @@ class SatDiT(MultiModalModule):
             hidden_size=inner_dim,
             learnable_pos_embed=learnable_pos_embed
         )
+        if self.pre_process:
+            # Init PatchEmbed
+            if self.patch_type == "3D":
+                self.patch_embed = VideoPatch3D(in_channels, inner_dim, self.patch_size)
+            else:
+                self.patch_embed = VideoPatch2D(in_channels, inner_dim, self.patch_size_h)
+            self.time_embed = TimeStepEmbedding(inner_dim, self.time_embed_dim)
+
+            if self.ofs_embed_dim is not None:
+                self.ofs_embed = nn.Sequential(
+                    nn.Linear(self.ofs_embed_dim, self.ofs_embed_dim),
+                    nn.SiLU(),
+                    nn.Linear(self.ofs_embed_dim, self.ofs_embed_dim),
+                )
+            
+            # Init Projection
+            self.caption_projection = None
+            if text_hidden_size is not None:
+                self.caption_projection = nn.Linear(self.text_hidden_size, inner_dim)
+        
+        self.global_layer_idx = global_layer_idx if global_layer_idx is not None else tuple(range(num_layers))
+
         # Init VideoDiTBlock
         self.videodit_blocks = nn.ModuleList(
             [
@@ -666,16 +667,31 @@ class VideoDiTBlock(nn.Module):
         self.norm_type = norm_type
         self.positional_embeddings = positional_embeddings
 
+
+        # Define three blocks. Each block has its own normalization layer.
+        # 1. Scale-shift.
+        config = core_transformer_config_from_args(args)
+        config.sequence_parallel = False
+        self.scale_shift_table = nn.Sequential(
+            nn.SiLU(),
+            tensor_parallel.ColumnParallelLinear(
+                self.time_embed_dim,
+                12 * dim,
+                config=config,
+                init_method=config.init_method,
+                gather_output=False
+            )
+        )
+
+        # 2. Self-Attn
+        self.norm1 = nn.LayerNorm(dim, elementwise_affine=norm_elementwise_affine, eps=norm_eps)
+
         if positional_embeddings and (num_positional_embeddings is None):
             raise ValueError("If `positional_embedding` type is defined, `num_positition_embeddings` must also be defined.")
         if positional_embeddings == "sinusoidal":
             self.rope = SinusoidalPositionalEmbedding(dim, max_seq_length=num_positional_embeddings)
         else:
             self.rope = rope
-
-        # Define three blocks. Each block has its own normalization layer.
-        # 1. Self-Attn
-        self.norm1 = nn.LayerNorm(dim, elementwise_affine=norm_elementwise_affine, eps=norm_eps)
 
         self.enable_sequence_parallelism = enable_sequence_parallelism
         if self.enable_sequence_parallelism or self.sequence_parallel:
@@ -716,7 +732,7 @@ class VideoDiTBlock(nn.Module):
                 fa_layout="bnsd"
             )
 
-        # 2. Feed-forward
+        # 3. Feed-forward
         self.norm2 = nn.LayerNorm(dim, norm_eps, norm_elementwise_affine)
 
         self.ff = TensorParallelFeedForward(
@@ -728,19 +744,6 @@ class VideoDiTBlock(nn.Module):
             bias=ff_bias
         )
 
-        # 3. Scale-shift.
-        config = core_transformer_config_from_args(args)
-        config.sequence_parallel = False
-        self.scale_shift_table = nn.Sequential(
-            nn.SiLU(),
-            tensor_parallel.ColumnParallelLinear(
-                self.time_embed_dim,
-                12 * dim,
-                config=config,
-                init_method=config.init_method,
-                gather_output=False
-            )
-        )
         for param in self.norm1.parameters():
             setattr(param, "sequence_parallel", self.sequence_parallel)
         for param in self.norm2.parameters():
