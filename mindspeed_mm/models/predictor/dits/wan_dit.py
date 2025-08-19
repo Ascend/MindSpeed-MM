@@ -16,7 +16,7 @@ from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mappi
     gather_forward_split_backward,
     split_forward_gather_backward,
 )
-from mindspeed.core.parallel_state import get_context_parallel_group_for_hybrid_ulysses
+from mindspeed.core.context_parallel.model_parallel_utils import get_context_parallel_group_for_hybrid_ulysses
 from mindspeed.core.context_parallel.ulysses_context_parallel.ulysses_context_parallel import UlyssesContextAttention
 
 from mindspeed_mm.models.common.module import MultiModalModule

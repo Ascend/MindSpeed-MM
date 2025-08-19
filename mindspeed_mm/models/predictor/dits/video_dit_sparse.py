@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from diffusers.models.embeddings import PixArtAlphaTextProjection
 from diffusers.models.normalization import AdaLayerNormSingle
 from megatron.core import mpu, tensor_parallel
-from mindspeed.core.parallel_state import (get_context_parallel_for_hybrid_ring_world_size,
+from mindspeed.core.context_parallel.model_parallel_utils import (get_context_parallel_for_hybrid_ring_world_size,
                                            get_context_parallel_for_hybrid_ring_rank)
 from megatron.training import get_args
 from megatron.legacy.model.enums import AttnType

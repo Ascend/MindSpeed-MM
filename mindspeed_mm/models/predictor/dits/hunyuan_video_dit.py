@@ -17,12 +17,11 @@ from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mappi
     all_to_all,
     cal_split_sizes
 )
-from mindspeed.core.parallel_state import (
+from mindspeed.core.context_parallel.model_parallel_utils import (
     get_context_parallel_group_for_hybrid_ulysses,
     get_context_parallel_group_for_hybrid_ring,
     get_context_parallel_for_hybrid_ring_world_size,
     get_context_parallel_for_hybrid_ulysses_world_size,
-    get_context_parallel_next_rank,
     get_context_parallel_for_hybrid_ring_global_ranks,
     get_context_parallel_for_hybrid_ring_rank
 )

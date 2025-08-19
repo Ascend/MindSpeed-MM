@@ -15,9 +15,8 @@ from megatron.training.arguments import core_transformer_config_from_args
 from megatron.legacy.model.rms_norm import RMSNorm
 from megatron.legacy.model.enums import AttnType
 from mindspeed.core.context_parallel.ulysses_context_parallel.ulysses_context_parallel import UlyssesContextAttention
-from mindspeed.core.parallel_state import get_context_parallel_group_for_hybrid_ulysses
 from mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel import ringattn_context_parallel
-from mindspeed.core.parallel_state import (
+from mindspeed.core.context_parallel.model_parallel_utils import (
     get_context_parallel_group_for_hybrid_ulysses,
     get_context_parallel_group_for_hybrid_ring,
     get_context_parallel_for_hybrid_ring_world_size,
