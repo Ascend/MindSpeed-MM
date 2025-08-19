@@ -4,7 +4,6 @@
 import os
 import random
 from typing import Union, List, Optional
-from concurrent.futures import ThreadPoolExecutor
 import warnings
 import copy
 import sys
@@ -134,18 +133,12 @@ class T2VDataset(MMBaseDataset):
                 cfg=self.cfg,
             )
 
-        # Thread pool configuration for data loading
-        max_workers = kwargs.get("max_workers", 1)
-        self.executor = ThreadPoolExecutor(max_workers=max_workers)
-        self.timeout = kwargs.get("timeout", 60)
-
          # Data validation
         self.data_samples = self.video_processer.select_valid_data(self.data_samples)
 
     def __getitem__(self, index):
         try:
-            future = self.executor.submit(self.getitem, index)
-            data = future.result(timeout=self.timeout) 
+            data = self.getitem(index)
             return data
         except Exception as e:
             if self.data_storage_mode == "standard":
