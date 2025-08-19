@@ -661,18 +661,18 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> / </td>
-      <td> / </td>
+      <td> 7.07 (SPS) </td>
+      <td> 6.67 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL3-78B">78B</a></td>
       <td> 微调 </td>
-      <td> 8x8 </td>
+      <td> 4x8 (A3) </td>
       <td> BF16 </td>
-      <td> / </td>
-      <td> / </td>
+      <td> 3.79 (SPS) </td>
+      <td> 4.69 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>
