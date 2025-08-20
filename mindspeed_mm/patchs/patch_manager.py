@@ -13,32 +13,21 @@
 # limitations under the License.
 
 from megatron.training import get_args
-from mindspeed.optimizer.adamw import AdamW
 from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 
 from mindspeed_mm.patchs import (
     adaptive_clip_grad_patch,
-    diffusers_patches,
     infer_fa_patch,
     models_patches,
-    transformers_patches,
     fsdp1_patches,
 )
 
 
 class PatchesManager:
     configs = {
-        "t5_attention": [("transformers.models.t5.modeling_t5.T5Attention.forward", transformers_patches.t5_forward)],
-        "t5_layer_norm": [("transformers.models.t5.modeling_t5.T5LayerNorm", transformers_patches.NpuRMSNorm)],
-        "t5_gelu": [("transformers.activations.NewGELUActivation", transformers_patches.ApproximateGELU)],
-        "diffusers_geglu": [("diffusers.models.activations.GEGLU.forward", diffusers_patches.geglu_forward)],
-        "torch_adamw": [("torch.optim.AdamW", AdamW)],
         "ae_float32": [
             ("megatron.core.transformer.module.Float16Module.__init__", models_patches.float16Module_init),
             ("megatron.core.transformer.module.Float16Module.forward", models_patches.float16Module_forward)
-        ],
-        "moe_mlp": [
-            ("megatron.core.transformer.moe.experts.SequentialMLP.forward", models_patches.SequentialMLP_forward)
         ],
         "adaptive_clip_grad_norm": [
             ("megatron.core.optimizer.distrib_optimizer.DistributedOptimizer.__init__", adaptive_clip_grad_patch.adaptive_clip_grad_norm_optimizer_init_wrapper),

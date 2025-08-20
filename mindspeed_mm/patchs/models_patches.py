@@ -71,28 +71,3 @@ def float16Module_forward(self, *inputs, **kwargs):
     if mpu.is_pipeline_last_stage():
         outputs = float16_to_fp32(outputs)
     return outputs
-
-
-def SequentialMLP_forward(self, permuted_local_hidden_states, tokens_per_expert):
-
-    output_local = torch.zeros_like(permuted_local_hidden_states)
-    output_bias_local = None
-    if self.add_bias:
-        output_bias_local = torch.zeros_like(permuted_local_hidden_states)
-
-    cumsum_num_tokens = torch.cumsum(tokens_per_expert, dim=0)
-    # Insert zero at the begining for offset index's convenience
-    zero_tensor = torch.zeros(1, dtype=torch.long, device=cumsum_num_tokens.device)
-    cumsum_num_tokens = torch.cat((zero_tensor, cumsum_num_tokens))
-    for expert_num, expert in enumerate(self.local_experts):
-        start = cumsum_num_tokens[expert_num]
-        end = cumsum_num_tokens[expert_num + 1]
-        hidden = permuted_local_hidden_states[start:end]
-        output, output_bias = expert(hidden)
-
-        output_local[start:end] = output
-        if self.add_bias:
-            output_bias = output_bias.expand_as(output)
-            output_bias_local[start:end, :] = output_bias
-
-    return output_local, output_bias_local
