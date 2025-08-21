@@ -1,0 +1,78 @@
+{
+    "dataset_param": {
+        "dataset_type": "rewardvideo",
+        "preprocess_parameters": {
+            "model_name_or_path": "./weights/Qwen2-VL-2B-Instruct/",
+            "local_files_only": true,
+            "use_fast_tokenizer": false,
+            "split_special_tokens": true,
+            "eval_dim": ["VQ", "MQ", "TA"],
+            "prompt_template_type": "detailed_special",
+            "use_tied_data": true,
+            "video_processor_type": "RewardVideoProcessor",
+            "video_reader_type": "DecordVideo",
+            "sample_type": "uniform",
+            "fps": 2.0,
+            "video_max_pixels": 200704,
+            "video_min_pixels": 100352,
+            "train_pipeline": {
+				"video": [
+					{
+						"trans_type": "ResizeVideo",
+						"param": {
+                            "transform_size": "auto",
+                            "interpolation_mode": "bicubic",
+                            "antialias": true,
+                            "mode": "resize"
+                        }
+                        
+					},
+                    {
+                        "trans_type": "ToTensorVideo"
+                    }
+				]
+            }
+        },
+        "basic_parameters": {
+            "template": null,
+            "data_folder": "./data_folder/VideoGen-RewardBench/",
+            "data_path": "./data_folder/videogen-rewardbench.csv",
+            "cache_dir": "./cache_dir",
+            "streaming": false,
+            "train_on_prompt": false,
+            "mask_history": false,
+            "preprocessing_batch_size": 24,
+            "preprocessing_num_workers": 8,
+            "max_samples": null,
+            "tool_format": null
+        },
+        "attr": {
+            "system": null,
+            "images": null,
+            "videos": "videos",
+            "messages": "messages",
+            "role_tag": "role",
+            "content_tag": "content",
+            "user_tag": "user",
+            "assistant_tag": "assistant",
+            "observation_tag": null,
+            "function_tag": null,
+            "system_tag": null
+        }
+    },
+    "inference_param": {
+        "data_path": "./data_folder/VideoGen-RewardBench/",
+        "save_path": "./data_folder/VideoGen-RewardBench/"
+    },
+    "dataloader_param": {
+        "dataloader_mode": "sampler", 
+        "drop_last": true,
+        "sampler_type": "BaseRandomBatchSampler",
+        "collate_param": {
+            "model_name": "videoalign",
+            "ignore_pad_token_for_loss": true
+        },
+        "pin_memory": true,
+        "shuffle": true
+    }
+}

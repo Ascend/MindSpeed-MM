@@ -33,6 +33,7 @@ class VLMModel(MultiModalModule):
         {
             "pre_process": (bool),  # Include the embedding leayer in the gpt decoder (used with pipeline parallelism).
             "post_process": (bool),  # Include an output layer and a layernorm in the gpt decoder (used with pipeline parallelism).
+            "reward_process: (bool, optional), # Without an output layer in the gpt decoder (only used with videoalign). Defaults to False.
             "add_text_encoder": (bool),  # Whether to construct the text encoder. not used now. 
             "add_image_encoder": (bool),  # Whether to construct the image encoder.
             "add_video_encoder": (bool),  # Whether to construct the video encoder. not used now.
@@ -51,6 +52,7 @@ class VLMModel(MultiModalModule):
         self.config = core_transformer_config_from_args(get_args())
         self.pre_process: bool = config.pre_process
         self.post_process: bool = config.post_process
+        self.reward_process: bool = getattr(config, 'reward_process', False)
         self.add_text_encoder = config.text_encoder is not None
         self.add_image_encoder = config.image_encoder is not None
         self.add_video_encoder = config.video_encoder is not None
@@ -237,7 +239,8 @@ class VLMModel(MultiModalModule):
                 share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
                 rotary_base=config.rope_theta if getattr(config, 'rope_theta', None) else config.rotary_base,
                 pre_process=self.pre_process,
-                post_process=self.post_process
+                post_process=self.post_process,
+                reward_process=self.reward_process
             )
         if self.enable_vp:
             if self.pp_size * self.vp_size != len(config.pipeline_num_layers) * len(config.pipeline_num_layers[0]):
@@ -293,7 +296,8 @@ class VLMModel(MultiModalModule):
                 share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
                 rotary_base=config.rope_theta if getattr(config, 'rope_theta', None) else config.rotary_base,
                 pre_process=pre_process,
-                post_process=post_process
+                post_process=post_process,
+                reward_process=self.reward_process
             )
 
 

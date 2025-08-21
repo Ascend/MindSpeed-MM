@@ -23,6 +23,8 @@ from megatron.core.enums import ModelType
 from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 
+from mindspeed_mm.models.reward_model import Qwen2VLRewardModelBT
+
 from .utils import is_enable_lora, merge_dicts, modify_keys_with_dict
 
 
@@ -36,11 +38,26 @@ def unwrap_model_wrapper(fn):
     return wrapper
 
 
+def lora_apply_to_module(lora_apply_modules, module_name):
+    """Determine whether LoRA should be applied to a specific module."""
+    # LoRA is applied to all modules(default).
+    if "all" in lora_apply_modules:
+        return True
+    
+    # Check if the module is in the list of modules with LoRA enabled.
+    for apply_module in lora_apply_modules:
+        if apply_module in module_name:
+            return True
+
+    return False
+
+
 def model_provider_func_wrapper(model_provider_func):
     @wraps(model_provider_func)
     def wrapper(*args, **kwargs):
         model = model_provider_func(*args, **kwargs)
         args = get_args()
+        mm_model = getattr(args.mm, 'model', None)
         if is_enable_lora():
             from peft import LoraConfig, get_peft_model, PeftModel, LoraModel
             from peft.tuners.tuners_utils import check_target_module_exists
@@ -58,7 +75,12 @@ def model_provider_func_wrapper(model_provider_func):
 
             freeze_params = [name for name, param in model.named_parameters() if not param.requires_grad]
             trainable_target_modules = []
+            lora_apply_modules = getattr(mm_model, 'lora_apply_modules', [])
+            lora_mixed_training = getattr(mm_model, 'lora_mixed_training', False)
+            
             for module_name, _ in model.named_modules():
+                if lora_mixed_training and not lora_apply_to_module(lora_apply_modules, module_name):
+                    continue
                 if not check_target_module_exists(lora_config, module_name):
                     continue
                 if not any(param_name.startswith(module_name) for param_name in freeze_params):
@@ -89,10 +111,24 @@ def model_provider_func_wrapper(model_provider_func):
                                 if _sub_name in layer:
                                     sub_module.register_forward_hook(_hook)
 
-            mm_model = getattr(args.mm, 'model', None)
             image_encoder = getattr(mm_model, 'image_encoder', None) if mm_model else None
             text_config = getattr(mm_model, 'text_decoder', None) if mm_model else None
             vis_config = getattr(image_encoder, 'vision_encoder', None) if image_encoder else None
+            projector_config = getattr(image_encoder, 'vision_projector', None) if image_encoder else None
+
+            if lora_mixed_training:
+                def set_requires_grad(_moudle, requires_grad):
+                    for p in _moudle.parameters():
+                        p.requires_grad = requires_grad
+                if isinstance(model.model, mindspeed_mm.models.reward_model.Qwen2VLRewardModelBT):
+                    if text_config and 'text_decoder' not in lora_apply_modules:
+                        set_requires_grad(model.model.text_decoder)
+                    if vis_config and 'vision_encoder' not in lora_apply_modules:
+                        set_requires_grad(model.model.image_encoder.encoder, not getattr(vis_config, 'freeze', False))
+                    if projector_config and 'vision_projector' not in lora_apply_modules:
+                        set_requires_grad(model.model.image_encoder.projector, not getattr(projector_config, 'freeze', False))
+                    if 'rm_head' not in lora_apply_modules:
+                        set_requires_grad(model.model.rm_head, True)
 
             if text_config and vis_config:
                 vis_recompute_granularity = getattr(vis_config, 'recompute_granularity', None)

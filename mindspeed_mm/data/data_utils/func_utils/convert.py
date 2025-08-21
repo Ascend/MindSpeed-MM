@@ -14,12 +14,14 @@
 
 import bisect
 import os
+import copy
 from abc import abstractmethod, ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from typing import TYPE_CHECKING, Any, Optional, Union, Tuple, Literal, List, Dict, Type
 
+import torch
 from transformers import PreTrainedTokenizer, ProcessorMixin, AutoProcessor, AutoConfig, AutoTokenizer
 
 from mindspeed_mm.data.data_utils.func_utils.log import get_logger
@@ -383,6 +385,97 @@ class DataArguments:
         self.dataset = self.dataset.split(",")
 
 
+@dataclass
+class DataArgumentsForRewardVideo:
+    r"""
+    Arguments pertaining to what data we are going to input our model for training and evaluation.
+    """
+    cache_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Directory to read/write data. Defaults to `~/.cache/huggingface/datasets`(env:HF_DATASETS_CACHE)"},
+    )
+    template: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Which template to use for constructing prompts in training and inference."},
+    )
+    data_folder: str = field(
+        default="data",
+        metadata={"help": "Path to the folder containing the datasets."},
+    )
+    data_path: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The name of dataset(s) to use for training. Use commas to separate multiple datasets."},
+    )
+    data_path_val: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The name of dataset(s) to use for validation. Use commas to separate multiple datasets."},
+    )
+    train_on_prompt: bool = field(
+        default=False,
+        metadata={"help": "Whether or not to disable the mask on the prompt."},
+    )
+    mask_history: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether or not to mask the history and train on the last turn only."},
+    )
+    streaming: bool = field(
+        default=False,
+        metadata={"help": "Enable dataset streaming."},
+    )
+    overwrite_cache: bool = field(
+        default=False,
+        metadata={"help": "Overwrite the cached training and evaluation sets."},
+    )
+    preprocessing_batch_size: int = field(
+        default=1000,
+        metadata={"help": "The number of examples in one group in pre-processing."},
+    )
+    preprocessing_num_workers: Optional[int] = field(
+        default=None,
+        metadata={"help": "The number of processes to use for the pre-processing."},
+    )
+    max_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes, truncate the number of examples for each dataset."},
+    )
+    tool_format: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Tool format to use for constructing function calling examples."},
+    )
+    val_dataset: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Name of the validation dataset."},
+    )
+    val_max_samples: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "For debugging purposes, truncate the number of examples for each validation dataset."},
+    )
+    val_rate: Optional[float] = field(
+        default=None,
+        metadata={"help": "The proportion of the dataset to be used for validation."},
+    )
+    packing: Optional[bool] = field(
+        default=None,
+        metadata={"help": "Enable sequences packing in training. Will automatically enable in pre-training."},
+    )
+    neat_packing: bool = field(
+        default=False,
+        metadata={"help": "Enable sequence packing without cross-attention."},
+    )
+
+    def __post_init__(self):
+        self.data_path = self.data_path.split(",")
+
+
 def search_for_fit(numbers: List[int], capacity: int) -> int:
     r"""Find the index of largest number that fits into the knapsack with the given capacity."""
     index = bisect.bisect(numbers, capacity)
@@ -691,6 +784,106 @@ class PairwiseDatasetProcessor(DatasetProcessor):
         print(f"rejected_labels:\n{self.tokenizer.decode(valid_rejected_labels, skip_special_tokens=False)}")
 
 
+class VideoRewardProcessor(DatasetProcessor):
+    def __init__(self, template, tokenizer, processor, data_args, video_reader, video_processor):
+        super().__init__(template, tokenizer, processor, data_args,)
+        self.video_reader = video_reader
+        self.video_processor = video_processor
+    
+    def _clean_examples(self, example):
+        """
+        remove unnecessary keys from message(very very necessary)
+        """
+        clean_example = copy.deepcopy(example)
+        for i in range(len(example[0])):
+            for key in example[0]['content'][i].keys():
+                if example[0]['content'][i][key] is None:
+                    clean_example[0]['content'][i].pop(key)
+        return clean_example
+
+    def _pad_sequence(self, sequences, attention_mask, max_len, padding_side='right'):
+        """
+        Pad the sequences to the maximum length.
+        """
+        if sequences.shape[1] >= max_len:
+            return sequences, attention_mask
+        
+        pad_len = max_len - sequences.shape[1]
+        padding = (0, pad_len) if padding_side == 'right' else (pad_len, 0)
+
+        sequences_padded = torch.nn.functional.pad(sequences, padding, 'constant', self.processor.tokenizer.pad_token_id)
+        attention_mask_padded = torch.nn.functional.pad(attention_mask, padding, 'constant', 0)
+        
+        return sequences_padded, attention_mask_padded
+
+    def _encode_data_example(
+        self,
+    ) -> Tuple[List[int], List[int]]:
+        has_idx = "metainfo_idx" in self.examples and self.examples["metainfo_idx"] is not None
+        
+        A_data = self._clean_examples(self.examples['A_data'])
+        B_data = self._clean_examples(self.examples['B_data'])
+
+        video_inputs_A = self.video_processor(self.video_reader(A_data[0]['content'][0]["video"]))
+        video_inputs_B = self.video_processor(self.video_reader(B_data[0]['content'][0]["video"]))
+
+        batch_A = self.processor(
+            text=self.processor.apply_chat_template(A_data, tokenize=False, add_generation_prompt=True),
+            images=None,
+            videos=video_inputs_A,
+            padding=True,
+            return_tensors="pt",
+            videos_kwargs={"do_rescale": False},
+        )
+        batch_B = self.processor(
+            text=self.processor.apply_chat_template(B_data, tokenize=False, add_generation_prompt=True),
+            images=None,
+            videos=video_inputs_B,
+            padding=True,
+            return_tensors="pt",
+            videos_kwargs={"do_rescale": False},
+        )
+
+        max_len = max(batch_A["input_ids"].shape[1], batch_B["input_ids"].shape[1])
+        batch_A["input_ids"], batch_A["attention_mask"] = self._pad_sequence(batch_A["input_ids"], batch_A["attention_mask"], max_len, "right")
+        batch_B["input_ids"], batch_B["attention_mask"] = self._pad_sequence(batch_B["input_ids"], batch_B["attention_mask"], max_len, "right")
+
+        batch = {
+            "A": batch_A,
+            "B": batch_B,
+            "return_loss": True,
+        }
+
+        if has_idx:
+            metainfo_idx = torch.tensor(self.examples["metainfo_idx"])
+            batch["metainfo_idx"] = metainfo_idx
+
+        return batch
+
+    def preprocess_dataset(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+        # build input pairs with format
+
+        model_inputs = defaultdict(list)
+
+        for example in examples:
+            self.examples = example
+            batch = self._encode_data_example()
+            model_inputs["A"].append(batch["A"])
+            model_inputs["B"].append(batch["B"])
+            if "metainfo_idx" in batch:
+                model_inputs["metainfo_idx"].append(batch["metainfo_idx"])
+            model_inputs["A_scores"].append(example["A_scores"])
+            model_inputs["B_scores"].append(example["B_scores"])
+            model_inputs["chosen_label"].append(example["chosen_label"])
+
+        return model_inputs
+    
+    def print_data_example(self, example: Dict[str, List[int]]) -> None:
+        print("chosen_label:\n{}".format(example["chosen_label"]))
+        print("A_scores:\n{}".format(A_scores))
+        print("B_scores:\n{}".format(B_scores))
+
+
 def infer_seqlen(source_len: int, target_len: int, cutoff_len: int) -> Tuple[int, int]:
     r"""
     Computes the real sequence length after truncation by the cutoff_len.
@@ -755,3 +948,19 @@ def load_tokenizer(model_args: "ProcessorArguments") -> "TokenizerModule":
 
     return {"tokenizer": tokenizer, "processor": processor}
 
+
+def load_reward_tokenizer(model_args) -> "TokenizerModule":
+    r"""
+    Loads pretrained tokenizer and optionally loads processor for reward model.
+    """
+    try:
+        processor = AutoProcessor.from_pretrained(model_args['model_name_or_path'], padding_side="right", local_files_only=getattr(model_args, 'local_files_only', False))
+        
+    except Exception as e:
+        logger.warning("Processor was not found: %s.", e)
+        processor = None
+
+    if processor is not None and "Processor" not in processor.__class__.__name__:
+        processor = None
+
+    return {"tokenizer": processor.tokenizer, "processor": processor}

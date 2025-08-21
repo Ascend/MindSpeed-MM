@@ -894,6 +894,17 @@ def qwen2_position(config,
     return position_ids, rope_deltas
 
 
+def videoalign_position(config,
+                  input_ids,
+                  image_grid_thw=None,
+                  video_grid_thw=None,
+                  attention_mask=None,
+                  **kwargs):
+    position_ids, rope_deltas = qwen2vl_get_rope_index(config, input_ids, image_grid_thw, video_grid_thw,
+                                     kwargs.get('second_per_grid_ts', None), attention_mask=None)
+    return position_ids, rope_deltas
+
+
 def qwen2_5_position(config,
                      input_ids,
                      image_grid_thw=None,
@@ -1158,3 +1169,7 @@ def prepare_positionsids_mask_for_llm(config=None, input_ids=None, inference_par
                                                  attention_mask=attention_mask, position_ids=position_ids, **kwargs)
     else:
         raise AssertionError(f'the attention mask for llm is not build or model_id has error {llm_model_id}')
+
+
+def prepare_positionsids_mask_for_videoalign(config=None, input_ids=None, inference_params=None, attention_mask=None, position_ids=None, *args, **kwargs):
+    return partial(_build_attentionmask_positionid_qwenllm, pos_func=videoalign_position)(config=config, input_ids=input_ids, inference_params=inference_params, attention_mask=attention_mask, position_ids=position_ids, **kwargs)

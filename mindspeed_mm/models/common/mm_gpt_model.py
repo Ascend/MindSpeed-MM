@@ -35,6 +35,7 @@ class MMGPTModel(LanguageModule):
         max_sequence_length (int): maximum size of sequence. This is used for positional embedding
         pre_process (bool, optional): Include embedding layer (used with pipeline parallelism). Defaults to True.
         post_process (bool, optional): Include an output layer (used with pipeline parallelism). Defaults to True.
+        reward_process (bool, optional): Without an output layer (only used with videoalign). Defaults to False.
         fp16_lm_cross_entropy (bool, optional): Defaults to False.
         parallel_output (bool, optional): Do not gather the outputs, keep them split across tensor parallel ranks. Defaults to True.
         share_embeddings_and_output_weights (bool, optional): When True, input embeddings and output logit weights are shared. Defaults to False.
@@ -52,6 +53,7 @@ class MMGPTModel(LanguageModule):
         max_sequence_length: int,
         pre_process: bool = True,
         post_process: bool = True,
+        reward_process: bool = False,
         fp16_lm_cross_entropy: bool = False,
         parallel_output: bool = True,
         share_embeddings_and_output_weights: bool = False,
@@ -67,6 +69,7 @@ class MMGPTModel(LanguageModule):
         self.max_sequence_length = max_sequence_length
         self.pre_process = pre_process
         self.post_process = post_process
+        self.reward_process = reward_process
         self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
         self.parallel_output = parallel_output
         self.share_embeddings_and_output_weights = share_embeddings_and_output_weights
@@ -263,8 +266,7 @@ class MMGPTModel(LanguageModule):
         if self.post_process and mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), 0, 
                                                         split_gather_sizes, "up")
-
-        if not self.post_process:
+        if not self.post_process or self.reward_process:
             return hidden_states
 
         # logits and loss

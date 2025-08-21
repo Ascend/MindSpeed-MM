@@ -542,3 +542,12 @@ For the full text of the license, please go to the above.
 
 Copyright Notice included in the software:
 Copyright 2025 hao-ai-lab
+
+
+Software Notice
+Software VideoAlign
+License: Apache License 2.0
+For the full text of the license, please go to the above.
+
+Copyright Notice included in the software:
+Copyright 2025 KwaiVGI/VideoAlign

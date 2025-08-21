@@ -247,12 +247,16 @@ def filter_vit_keys(_state_dict: STATE_DICT_T):
             _state_dict.pop(key)
 
 
-def load_from_hf(hf_dir: Path) -> STATE_DICT_T:
+def load_from_hf(hf_dir: Path, pt_path: Optional[Path] = None) -> STATE_DICT_T:
     # 注意AutoModel.from_pretrained转换成模型对象时，存在torch_dtype问题需确认，因此这里直接读取safetensors确保dtype一致
-    files = list(hf_dir.glob("*.safetensors"))
     state_dict = {}
-    for safe_path in files:
-        state_dict.update(load_file(str(safe_path), device='cpu'))
+    if pt_path:
+        weight = torch.load(pt_path)
+        state_dict.update(weight, device='cpu')
+    else:
+        files = list(hf_dir.glob("*.safetensors"))
+        for safe_path in files:
+            state_dict.update(load_file(str(safe_path), device='cpu'))
     return state_dict
 
 
@@ -295,10 +299,11 @@ def convert(state_dict: STATE_DICT_T, ops: List[Operator], is_tie: bool, is_pp: 
 
 def convert_hf_to_mm(convert_config: ConvertVppMMConfig, ops: List[Operator], tp_patterns: Dict[str, Callable],
                      stages: List[PPStageSchema]):
+    pt_path = convert_config.pt_path
     parallel_config = convert_config.parallel_config
     num_experts = convert_config.common_model_config.num_experts
     # 加载权重字典
-    state_dict = load_from_hf(convert_config.hf_config.hf_dir)
+    state_dict = load_from_hf(convert_config.hf_config.hf_dir, pt_path)
 
     # 如果有llm_config，则加载llm权重并合并到state_dict中
     if convert_config.common_model_config.llm_hf_dir is not None:
@@ -311,6 +316,9 @@ def convert_hf_to_mm(convert_config: ConvertVppMMConfig, ops: List[Operator], tp
 
     # 权重转换、合并
     state_dict = convert(state_dict, ops, convert_config.common_model_config.tie_word_embeddings, parallel_config.is_pp())
+
+    if convert_config.save_lora_only:
+        state_dict = {k: v for k, v in state_dict.items() if "lora" in k}
 
     # 权重字典按ep域切分
     ep_state_dicts = split_by_ep(state_dict, parallel_config.ep_size, _num_experts=num_experts)

@@ -1,4 +1,5 @@
 import os
+import math
 import random
 from collections import Counter
 from typing import Dict, Optional, Type, List
@@ -654,3 +655,152 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         print(f"{'After filter':<25}: {len(data_samples)}")
 
         return data_samples, sample_sizes
+
+
+@Registry.register
+class RewardVideoProcessor(AbstractVideoProcessor):
+    def __init__(
+        self,
+        sample_type: str = "uniform",
+        sample_nframe: int = None,
+        fps: float = 2.0,
+        min_frames: int = 4,
+        max_frames: int = 768,
+        video_min_pixels: int = 100352,
+        video_max_pixels: int = None,
+        resized_height: int = None,
+        resized_width: int = None,
+        **base_args
+    ):
+        """Initialize Reward specific parameters"""
+        super().__init__(**base_args)
+        self.sample_type = sample_type
+        self.sample_nframe = sample_nframe
+        self.fps = fps
+        self.min_frames = min_frames
+        self.max_frames = max_frames
+        self.video_min_pixels = video_min_pixels
+        self.video_max_pixels = video_max_pixels
+        self.resized_height = resized_height
+        self.resized_width = resized_width
+        self.frame_factor = 2
+        self.image_factor = 28
+
+        if sample_type not in ["uniform", "multi_pts"]:
+            print("Warning: No valid video sample-type is offering. Whole frames will be used for model input")
+    
+    def round_by_factor(self, number: int, factor: int) -> int:
+        """Returns the closest integer to 'number' that is divisible by 'factor'."""
+        return round(number / factor) * factor
+
+
+    def ceil_by_factor(self, number: int, factor: int) -> int:
+        """Returns the smallest integer greater than or equal to 'number' that is divisible by 'factor'."""
+        return math.ceil(number / factor) * factor
+
+
+    def floor_by_factor(self, number: int, factor: int) -> int:
+        """Returns the largest integer less than or equal to 'number' that is divisible by 'factor'."""
+        return math.floor(number / factor) * factor
+    
+    def get_sample_nframes(
+        self,
+        total_frames: int,
+        video_fps: int | float,
+    ) -> int:
+        """calculate the number of frames for video used for model inputs.
+        Args:
+            - sample_nframe: the number of frames to extract for model inputs.
+            - fps: the fps to extract frames for model inputs.
+                - min_frames: the minimum number of frames of the video, only used when fps is provided.
+                - max_frames: the maximum number of frames of the video, only used when fps is provided.
+            total_frames (int): the original total number of frames of the video.
+            video_fps (int | float): the original fps of the video.
+        """
+        if self.sample_nframe:
+            nframes = self.round_by_factor(min(self.sample_nframe, total_frames), self.frame_factor)
+        else:
+            min_frames = self.ceil_by_factor(self.min_frames, self.frame_factor)
+            max_frames = self.floor_by_factor(min(self.max_frames, total_frames), self.frame_factor)
+            nframes = total_frames / video_fps * self.fps
+            nframes = min(max(nframes, min_frames), max_frames)
+            nframes = self.round_by_factor(nframes, self.frame_factor)
+        nframes = min(nframes, total_frames)
+        if not (self.frame_factor <= nframes and nframes <= total_frames):
+            print(f"Warning: nframes should in interval [{self.frame_factor}, {total_frames}], but got {nframes}.")
+        return nframes
+    
+    def sample_frames(self, vframes):
+        total_frames, video_fps = vframes.get_len(), vframes.get_video_fps()
+        if self.sample_type == "uniform":
+            nframes = self.get_sample_nframes(total_frames=total_frames, video_fps=video_fps)
+            idx = torch.linspace(0, total_frames - 1, nframes).round().long().tolist()
+            video = vframes.get_batch(idx)
+        elif self.sample_type == "multi_pts":
+            frames_each_pts = 6
+            num_pts = 4
+            fps = 8
+            nframes = int(total_frames * self.fps // video_fps)
+            frames_idx = torch.linspace(0, total_frames - 1, nframes).round().long().tolist()
+
+            start_pt = int(frames_each_pts // 2)
+            end_pt = int(nframes - frames_each_pts // 2 - 1)
+            pts = torch.linspace(start_pt, end_pt, num_pts).round().long().tolist()
+            idx = []
+            for pt in pts:
+                idx.extend(frames_idx[pt - frames_each_pts // 2: pt + frames_each_pts // 2])
+            video = vframes.get_batch(idx)
+        else:
+            video = vframes.get_batch(np.arange(0, total_frames))
+        return video
+
+    def get_frame_size(self, nframes: int, height: int, width: int):
+        max_pixels_limit = 768 * 28 * 28
+        max_total_pixels = 24576 * 28 * 28
+        max_aspect_ratio = 200
+
+        if self.resized_height and self.resized_width:
+            height, width = self.resized_height, self.resized_width
+            max_pixels = 16384 * 28 * 28
+            min_pixels = 4 * 28 * 28
+        else:
+            min_pixels = self.video_min_pixels
+            max_pixels = self.video_max_pixels if self.video_max_pixels else max(min(max_pixels_limit, max_total_pixels / nframes * self.frame_factor), int(self.video_min_pixels * 1.05))
+        
+        if max(height, width) / min(height, width) > max_aspect_ratio:
+            print(f"Warning: absolute aspect ratio must be smaller than {max_aspect_ratio}, got {max(height, width) / min(height, width)}")
+
+        resized_height = max(self.image_factor, self.round_by_factor(height, self.image_factor))
+        resized_width = max(self.image_factor, self.round_by_factor(width, self.image_factor))
+        if resized_height * resized_width > max_pixels:
+            beta = math.sqrt((height * width) / max_pixels)
+            resized_height = self.floor_by_factor(height / beta, self.image_factor)
+            resized_width = self.floor_by_factor(width / beta, self.image_factor)
+        elif resized_height * resized_width < min_pixels:
+            beta = math.sqrt(min_pixels / (height * width))
+            resized_height = self.ceil_by_factor(height * beta, self.image_factor)
+            resized_width = self.ceil_by_factor(width * beta, self.image_factor)
+        return resized_height, resized_width
+
+    def __call__(
+        self,
+        vframes,
+        **kwargs
+    ):
+        video = self.sample_frames(vframes)
+        nframes, _, height, width = video.shape
+        resized_height, resized_width = self.get_frame_size(nframes, height, width)
+        self.transform_size = {
+            "max_height": resized_height,
+            "max_width": resized_width,
+        }
+
+        self.video_transforms = get_transforms(is_video=True, train_pipeline=self.train_pipeline, transform_size=self.transform_size)
+
+        video = self.video_transforms(video)
+
+        return video
+    
+    def select_valid_data(self, data_samples):
+        return super().select_valid_data(data_samples)
+
