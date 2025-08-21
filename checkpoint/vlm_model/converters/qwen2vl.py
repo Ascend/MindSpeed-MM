@@ -150,8 +150,8 @@ class Qwen2VLConverter(Converter):
         source = cfg.source_parallel_config
         target = cfg.target_parallel_config
         tp_state_dicts = load_from_mm(cfg.source_dir, source.vit_pp_layers, source.llm_pp_layers, source.tp_size)
-        state_dict = merge_by_tp(tp_state_dicts, source.tp_size)
-        tp_state_dicts = split_by_tp(state_dict, target.tp_size)
+        state_dict = merge_by_tp(tp_state_dicts=tp_state_dicts, patterns=qwen2vl_tp_patterns)
+        tp_state_dicts = split_by_tp(state_dict=state_dict, patterns=qwen2vl_tp_patterns, tp_size=target.tp_size)
         pp_ranges = merge_vpp_index([target.vit_pp_layers], [target.llm_pp_layers], [[]])
         for tp_rank, tp_state_dict in enumerate(tqdm(tp_state_dicts, desc="tp step")):
             pp_state_dicts = partition_state_dict_by_pp(tp_state_dict, pp_ranges, [vision_schema, text_schema])

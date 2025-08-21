@@ -1,13 +1,19 @@
 import os
 from typing import Any, cast, List
 
+from tqdm import tqdm
+
 from checkpoint.common.constant import SAFE_MODE
 from checkpoint.common.converter import Converter
 from checkpoint.vlm_model import hf_to_mm, mm_to_hf
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.converters.qwen2vl import create_qwen2vl_ops, qwen2vl_tp_patterns
-from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema
-from checkpoint.vlm_model.operator import Operator, UpGateMergeOp, GLUSplit, RenameOp
+from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema, split_by_tp, merge_vpp_index, \
+    partition_state_dict_by_pp, save_by_vpp
+from checkpoint.vlm_model.mm_to_hf import load_from_mm, merge_by_tp
+from checkpoint.vlm_model.operator import (
+    Operator, UpGateMergeOp, RenameOp, GLUSplit
+)
 
 
 def create_qwen2_5_vl_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups: int,
@@ -85,4 +91,16 @@ class Qwen2_5_VLConverter(Converter):
     @staticmethod
     def resplit(cfg: ConvertResplitConfig):
         """mindspeed-mm模型权重重新切分"""
-        pass
+        source = cfg.source_parallel_config
+        target = cfg.target_parallel_config
+        tp_state_dicts = load_from_mm(cfg.source_dir, source.vit_pp_layers, source.llm_pp_layers, source.tp_size)
+        state_dict = merge_by_tp(tp_state_dicts=tp_state_dicts, patterns=qwen2_5_vl_tp_patterns)
+        tp_state_dicts = split_by_tp(state_dict=state_dict, patterns=qwen2_5_vl_tp_patterns, tp_size=target.tp_size)
+        pp_ranges = merge_vpp_index([target.vit_pp_layers], [target.llm_pp_layers], [[]])
+        for tp_rank, tp_state_dict in enumerate(tqdm(tp_state_dicts, desc="tp step")):
+            pp_state_dicts = partition_state_dict_by_pp(tp_state_dict, pp_ranges, [vision_schema, text_schema])
+            save_by_vpp(pp_state_dicts, cfg.target_dir,
+                        pp_and_vpp_size=(target.pp_size, 1),
+                        tp_rank=tp_rank)
+        # 安全管控权限
+        os.chmod(cfg.target_dir, SAFE_MODE)

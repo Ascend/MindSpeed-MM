@@ -15,6 +15,7 @@
   - [权重下载](#jump2.1)
   - [权重转换hf2mm](#jump2.2)
   - [权重转换mm2hf](#jump2.3)
+  - [权重重切分](#jump2.4)
 - [数据集准备及处理](#jump3)
   - [数据集下载](#jump3.1)
   - [混合数据集处理](#jump3.2)  
@@ -200,6 +201,34 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
 LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-7B-Instruct"
 ```
 
+<a id="jump2.4"></a>
+#### 4. 训练后重新切分权重
+
+权重下载及转换部分会把权重进行pp切分和tp切分，在微调后，如果需要对权重重新进行切分，可使用`mm-convert`权重转换工具对微调后的权重进行切分。
+注意：当前还不支持VPP切分。
+
+```bash
+mm-convert  Qwen2_5_VLConverter resplit \
+  --cfg.source_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
+  --cfg.target_dir "ckpt/mm_resplit_pp/Qwen2.5-VL-7B-Instruct" \
+  --cfg.source_parallel_config.llm_pp_layers [12,16] \
+  --cfg.source_parallel_config.vit_pp_layers [32,0] \
+  --cfg.source_parallel_config.tp_size 1 \
+  --cfg.target_parallel_config.llm_pp_layers [1,10,10,7] \
+  --cfg.target_parallel_config.vit_pp_layers [32,0,0,0] \
+  --cfg.target_parallel_config.tp_size 2
+# 其中
+# source_dir: 微调后保存的权重目录
+# target_dir: 希望重新pp切分后保存的目录
+# source_parallel_config.llm_pp_layers: 微调时llm的pp配置
+# source_parallel_config.vit_pp_layers: 微调时vit的pp配置
+# source_parallel_config.tp_size: 微调时tp并行配置
+# target_parallel_config.llm_pp_layers: 期望的重切分llm模块切分层数
+# target_parallel_config.vit_pp_layers: 期望的重切分vit模块切分层数
+# target_parallel_config.tp_size: 期望的tp并行配置（tp_size不能超过原仓config.json中的num_key_value_heads）
+```
+
+---
 <a id="jump3"></a>
 ## 数据集准备及处理
 
