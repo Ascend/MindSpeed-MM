@@ -412,6 +412,24 @@ def unaligned_divide(numerator: int, world_size: int, rank: int) -> int:
     return res
 
 
+class UnalignedEmbeddingSplit(BaseSplit):
+    """按行切分嵌入权重，处理不均匀分布的情况"""
+
+    @staticmethod
+    def split(tp_size: int, value: Tensor) -> List[Tensor]:
+        value_per_tp = []
+        start_idx = 0
+        for tp_rank in range(tp_size):
+            size_per_tp = unaligned_divide(value.shape[0], tp_size, tp_rank)
+            value_per_tp.append(value[start_idx:start_idx + size_per_tp])
+            start_idx += size_per_tp
+        return value_per_tp
+
+    @staticmethod
+    def merge(tp_values: List[Tensor]) -> Tensor:
+        return torch.cat(tp_values, dim=0)
+
+
 class UnalignedRowSplit(BaseSplit):
     """按行切分权重，处理不均匀分布的情况"""
 

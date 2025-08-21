@@ -6,7 +6,7 @@ from checkpoint.common.converter import Converter
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model import hf_to_mm, mm_to_hf
 from checkpoint.vlm_model.operator import (
-    ColSplit, GLUSplit, Operator, RowSplit, UnalignedColSplit, UnalignedRowSplit, UpGateMergeOp, QKVMergeOp, RenameOp
+    ColSplit, GLUSplit, Operator, RowSplit, UnalignedColSplit, UnalignedEmbeddingSplit, UnalignedRowSplit, UpGateMergeOp, QKVMergeOp, RenameOp
 )
 
 
@@ -131,8 +131,8 @@ def create_internvl_tp_patterns(vision_attention_heads: int) -> dict:
     """创建InternVL的TP模式"""
 
     tp_patterns = {
-        r"text_decoder.output_layer.weight": RowSplit,
-        r"text_decoder.embedding.word_embeddings.weight": RowSplit,
+        r"text_decoder.output_layer.weight": UnalignedEmbeddingSplit,
+        r"text_decoder.embedding.word_embeddings.weight": UnalignedEmbeddingSplit,
         r'text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight': GLUSplit,
         r'text_decoder.decoder.layers.(\d+).mlp.linear_fc2.weight': ColSplit,
         r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowSplit,
