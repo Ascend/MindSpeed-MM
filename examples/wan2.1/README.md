@@ -368,10 +368,21 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
   - 不进行重计算的self-attention激活值异步offload
     - 在`exmaples/wan2.1/{model_size}/{task}/pretrain_model.json`中，通过`attention_async_offload`字段可以开启异步offload，建议开启该功能，节省更多的显存
 
+- fsdp2
+
+  - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存。
+  
+  - 使能方式：`examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dist`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/fsdp2.md)
+
+
 #### 启动训练
 
 ```bash
 bash examples/wan2.1/{model_size}/{task}/pretrain.sh
+```
+或
+```
+bash examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh
 ```
 
 ## lora 微调

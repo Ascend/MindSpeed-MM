@@ -36,6 +36,10 @@ class PatchesManager:
         "infer_fa": [("megatron.core.transformer.dot_product_attention.DotProductAttention.forward", infer_fa_patch.dot_product_attention_forward_infer_wrapper)],
         "use_fsdp1": [
             ("megatron.training.training.get_model", fsdp1_patches.fsdp1_get_model)
+        ],
+        "clip_grad_async": [
+            ("megatron.core.optimizer.clip_grads.get_grad_norm_fp32", adaptive_clip_grad_patch.get_grad_norm_fp32_async),
+            ("megatron.core.optimizer.clip_grads.clip_grad_by_total_norm_fp32", adaptive_clip_grad_patch.clip_grad_by_total_norm_fp32_async)
         ]
     }
 

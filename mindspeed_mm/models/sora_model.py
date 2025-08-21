@@ -14,13 +14,18 @@
 # limitations under the License.
 
 from logging import getLogger
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional, Tuple
 
 import torch
 import torch_npu
 from megatron.core import mpu
 from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
+from megatron.core.transformer.utils import (
+    make_sharded_tensors_for_checkpoint,
+    sharded_state_dict_default,
+)
+from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from torch import nn
 
 from mindspeed_mm.data.data_utils.constants import (
@@ -333,3 +338,40 @@ class SoRAModel(nn.Module):
 
         self.index += 1
         return latents, prompt, video_mask, prompt_mask, i2v_results
+    
+    def sharded_state_dict(
+        self,
+        prefix: str = '',
+        sharded_offsets: Tuple[Tuple[int, int, int]] = (),
+        metadata: Optional[dict] = None,
+    ) -> ShardedStateDict:
+        """Default implementation for sharded state dict for distributed checkpointing.
+
+        General definition of sharded_state_dict simply calls `sharded_state_dict_default`
+        (which call sharded_state_dict method if possible or a default implementation otherwise)
+        recursively on all submodules.
+
+        Args:
+            prefix (str): prefix for the state dict keys
+            sharded_offsets (Tuple[Tuple[int, int, int]], optional): sharding already
+                applied (e.g. PP related) by sup-modules. Passed along to ShardedTensor
+            metadata (dict, optional): metadata passed recursively to sharded_state_dict methods
+
+        Returns:
+            dict: dictionary of state dict keys mapped to ShardedTensors
+        """
+        sharded_state_dict = {}
+        # Save parameters
+        
+        self._save_to_state_dict(sharded_state_dict, '', keep_vars=True)
+        
+        sharded_state_dict = make_sharded_tensors_for_checkpoint(
+            sharded_state_dict, prefix, sharded_offsets=sharded_offsets, extra_state_suffix=""
+        )
+        # Recurse into submodules
+        for name, module in self.named_children():
+            sharded_state_dict.update(
+                sharded_state_dict_default(module, f'{prefix}{name}.', sharded_offsets, metadata)
+            )
+
+        return sharded_state_dict

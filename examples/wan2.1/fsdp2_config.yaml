@@ -1,0 +1,7 @@
+sharding_size: 8
+sub_modules_to_wrap:
+  - mindspeed_mm.models.predictor.dits.wan_dit.WanDiTBlock
+reshard_after_forward: True
+param_dtype: "bf16"
+reduce_dtype: "fp32"
+cast_forward_inputs: True
