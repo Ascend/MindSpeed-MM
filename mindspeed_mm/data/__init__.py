@@ -22,7 +22,6 @@ from mindspeed_mm.data.datasets.feature_dataset import FeatureDataset
 from mindspeed_mm.data.datasets.audio_dataset import AudioDataset
 from mindspeed_mm.data.datasets.qwen2vl_dataset import get_qwen2vl_dataset, get_reward_video_dataset
 from mindspeed_mm.data.datasets.ae_dataset import TrainVideoDataset
-from mindspeed_mm.data.datasets.lumina_dataset import LuminaConversationDataset
 from mindspeed_mm.models.ae.training.global_vars import get_ae_args
 
 
@@ -81,6 +80,7 @@ def build_mm_dataset(dataset_param):
     elif dataset_type == "rewardvideo":
         return get_reward_video_dataset(basic_param, preprocess_param, dataset_param)
     if dataset_type == "lumina":
+        from mindspeed_mm.data.datasets.lumina_dataset import LuminaConversationDataset
         return LuminaConversationDataset(basic_param, **dataset_param)
     else:
         raise NotImplementedError(dataset_type)

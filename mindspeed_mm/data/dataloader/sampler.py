@@ -16,7 +16,6 @@ from pandarallel import pandarallel
 from transformers import AutoProcessor
 
 from mindspeed_mm.data.datasets.t2v_dataset import DynamicVideoTextDataset
-from mindspeed_mm.data.datasets.lumina_dataset import LuminaConversationDataset
 from mindspeed_mm.data.data_utils.bucket import Bucket
 from mindspeed_mm.data.data_utils.aspect_ratio import get_num_pixels, get_resolution_with_aspect_ratio
 from mindspeed_mm.data.data_utils.utils import format_numel_str
@@ -984,7 +983,7 @@ class AESampler(DistributedSampler):
 class LuminaMetaLenDistSampler(Sampler):
     def __init__(
         self,
-        dataset: LuminaConversationDataset,
+        dataset: Dataset,
         num_replicas: Optional[int] = None,
         rank: Optional[int] = None,
         shuffle: bool = True,

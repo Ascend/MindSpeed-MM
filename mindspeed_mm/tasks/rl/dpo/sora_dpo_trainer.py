@@ -100,6 +100,8 @@ class SoRADPOTrainer(DPOTrainer):
                 raise AttributeError("The actor should provide initialize_pipeline_tensor_shapes for PP_size>1. ")
             args.pipeline_tensor_shapes = self.hyper_model.actor.initialize_pipeline_tensor_shapes()
             setattr(SoRADPOTrainer.forward_step, 'pipeline_tensor_shapes', args.pipeline_tensor_shapes)
+            # modification for core 0.12.1 when using multi-parameter PP
+            self.hyper_model.config.pipeline_tensor_shapes = args.pipeline_tensor_shapes
 
         return self.hyper_model
 
