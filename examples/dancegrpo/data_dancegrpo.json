@@ -1,0 +1,7 @@
+{
+  "dataset_param": {
+    "basic_parameters": {
+      "data_path": "./data/rl_embeddings/videos2caption.json"
+    }
+  }
+}

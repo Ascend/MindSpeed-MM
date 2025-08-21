@@ -1,0 +1,13 @@
+{
+  "task": "t2i",
+  "reward": {
+    "model_id": "CLIP-ViT-H-14",
+    "model_name": "ViT-H-14",
+    "ckpt_dir": "./ckpt/hps_ckpt",
+    "pretrained": "open_clip_pytorch_model.bin",
+    "load_pt": "HPS_v2.1_compressed.pt"
+  },
+  "diffusion": {
+    "model_id": "FLUX"
+  }
+}

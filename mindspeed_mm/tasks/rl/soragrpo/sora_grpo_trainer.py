@@ -41,6 +41,7 @@ class SoraGRPOTrainer(ABC):
         torch.cuda.set_device(self.local_rank)
         self.rank = int(os.environ["RANK"])
         self.world_size = int(os.environ["WORLD_SIZE"])
+        self.local_world_size = int(os.environ["LOCAL_WORLD_SIZE"])
         self.train_valid_test_dataset_provider = train_valid_test_dataset_provider
         self.optimizer = None
         self.lr_scheduler = None
@@ -56,6 +57,7 @@ class SoraGRPOTrainer(ABC):
         world_size = self.world_size
         local_rank = self.local_rank
         device = self.device
+        local_world_size = self.local_world_size
 
         # enable communication deterministic can improve performance when world_size < 8
         if world_size <= 8:
@@ -73,7 +75,7 @@ class SoraGRPOTrainer(ABC):
 
         transformer = None
         load_rank_batchsize = self.args.load_rank
-        for start_rank in range(0, world_size, load_rank_batchsize):
+        for start_rank in range(0, local_world_size, load_rank_batchsize):
             end_rank = min(start_rank + load_rank_batchsize, world_size)
             load_ranks = list(range(start_rank, end_rank))
             if local_rank in load_ranks:
@@ -95,7 +97,7 @@ class SoraGRPOTrainer(ABC):
                     )
                 if local_rank % load_rank_batchsize == 0:
                     print(f"rank {load_ranks} load success")
-            torch.distributed.barrier()
+            dist.barrier()
 
         main_print(
             f"--> Initializing FSDP with sharding strategy: {args.fsdp_sharding_startegy}"
