@@ -213,6 +213,10 @@ def get_model_wrapper(fn):
 
 
 def peft_model_load_state_dict(self, state_dict, strict):
+    if strict:
+        keys_to_rm = [key for key in state_dict.keys() if '._extra_state' in key]
+        for key in keys_to_rm:
+            del state_dict[key]
     return self.module.load_state_dict(state_dict, strict)
 
 
