@@ -62,19 +62,19 @@ def get_window_index(self, grid_thw):
 
 
 def qwen2vlvit_selfattention_forward(
-        self,
-        hidden_states,
-        attention_mask,
-        key_value_states=None,
-        inference_context=None,
-        rotary_pos_emb=None,
-        rotary_pos_cos=None,
-        rotary_pos_sin=None,
-        attention_bias=None,
-        packed_seq_params=None,
-        sequence_len_offset=None,
-        inference_params=None,
-    ):
+    self,
+    hidden_states,
+    attention_mask,
+    key_value_states=None,
+    inference_context=None,
+    rotary_pos_emb=None,
+    rotary_pos_cos=None,
+    rotary_pos_sin=None,
+    attention_bias=None,
+    packed_seq_params=None,
+    sequence_len_offset=None,
+    inference_params=None,
+):
 
     # hidden_states shape is [sq, b, h]
     # For self attention we just duplicate the rotary_pos_emb if it isn't already
@@ -110,17 +110,16 @@ def qwen2vlvit_selfattention_forward(
     # absolute positional embedding.
     # otherwise, only relative positional embedding takes effect
     if rotary_pos_emb is not None:
-        half_dim = rotary_pos_emb.shape[-1] // 2
-        rotary_pos_emb = (rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:])
         query = apply_rotary_pos_emb_vision(query, rotary_pos_emb,
                                             use_fused_rope=self.config.use_fused_rotary_pos_emb)
         key = apply_rotary_pos_emb_vision(key, rotary_pos_emb,
-                                          use_fused_rope=self.config.use_fused_rotary_pos_emb)
+                                            use_fused_rope=self.config.use_fused_rotary_pos_emb)
 
     if packed_seq_params is not None:
         query = query.squeeze(1)
         key = key.squeeze(1)
         value = value.squeeze(1)
+
     # ==================================
     # core attention computation
     # ==================================
@@ -145,6 +144,7 @@ def qwen2vlvit_selfattention_forward(
 
     if packed_seq_params is not None:
         core_attn_out = core_attn_out.reshape(core_attn_out.shape[0], 1, -1)
+
     # =================
     # Output. [sq, b, h]
     # =================
