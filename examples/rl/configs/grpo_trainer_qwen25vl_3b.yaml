@@ -2,7 +2,7 @@ model: /path/MindSpeed-MM/configs/model/qwen2.5vl_3b.json # 模型配置文件�
 
 megatron_training:
   model: qwen2.5vl_3b
-  use_fused_rmsnorm: true
+  use_fused_rmsnorm: false
   normalization: RMSNorm
   use_mcore_models: true
   sequence_parallel: false
@@ -10,9 +10,9 @@ megatron_training:
   no_masked_softmax_fusion: true
   attention_softmax_in_fp32: true
   no_gradient_accumulation_fusion: true
-  use_fused_swiglu: true
+  use_fused_swiglu: false
   swiglu: true
-  use_fused_rotary_pos_emb: true
+  use_fused_rotary_pos_emb: false
   position_embedding_type: rope
   bf16: true
   use_distributed_optimizer: true

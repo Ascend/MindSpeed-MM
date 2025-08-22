@@ -92,15 +92,15 @@ cd ..
 # 下载MindSpeed RL
 git clone https://gitee.com/ascend/MindSpeed-RL.git
 cd MindSpeed-RL
-git checkout b374c4b0c2128459f9549b59e648a281bcfb879c
 pip install -r requirements.txt
 cp -r mindspeed_rl ../MindSpeed-MM/
 cd ..
 
-# MindSpeed/Megatron 中文件替换（必选）
 cd MindSpeed-MM
+# 安装mm-convert工具
+pip install -e . --no-deps
+# MindSpeed/Megatron 中文件替换（必选）
 bash examples/rl/scripts/copy_adaptor_to_mindspeed.sh
-bash examples/rl/scripts/copy_adaptor_to_mindspeed_rl.sh
 cd ..
 ```
 

@@ -2,7 +2,7 @@ model: /path/MindSpeed-MM/configs/model/qwen2.5vl_32b.json # 模型配置文件�
 
 megatron_training:
   model: qwen2.5vl_32b
-  use_fused_rmsnorm: true
+  use_fused_rmsnorm: false
   normalization: RMSNorm
   use_mcore_models: true
   sequence_parallel: false
@@ -10,9 +10,9 @@ megatron_training:
   no_masked_softmax_fusion: true
   attention_softmax_in_fp32: true
   no_gradient_accumulation_fusion: true
-  use_fused_swiglu: true
+  use_fused_swiglu: false
   swiglu: true
-  use_fused_rotary_pos_emb: true
+  use_fused_rotary_pos_emb: false
   position_embedding_type: rope
   bf16: true
   use_distributed_optimizer: true
@@ -74,7 +74,7 @@ rl_config:
   blocking: true
   gamma: 1.0
   lam: 0.95
-  use_dynamic_bsz: true
+  use_dynamic_bsz: false
   max_packing_token_size: [90000, 4000]
   actor_forward_micro_batch_size: 1
   ref_forward_micro_batch_size: 1
@@ -99,8 +99,8 @@ rl_config:
   verifier_weight: [1.0]
   num_cpus_for_local_task: 1.0
   use_tensorboard: false
-  reuse_image_embeds: true
-  colocate_actor_and_vit: true
+  reuse_image_embeds: false
+  colocate_actor_and_vit: false
   actor_resource:
     num_npus: 16
   vit_resource:
