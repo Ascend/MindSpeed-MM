@@ -299,7 +299,7 @@ def convert(state_dict: STATE_DICT_T, ops: List[Operator], is_tie: bool, is_pp: 
 
 def convert_hf_to_mm(convert_config: ConvertVppMMConfig, ops: List[Operator], tp_patterns: Dict[str, Callable],
                      stages: List[PPStageSchema]):
-    pt_path = convert_config.pt_path
+    pt_path = getattr(convert_config, 'pt_path', None)
     parallel_config = convert_config.parallel_config
     num_experts = convert_config.common_model_config.num_experts
     # 加载权重字典
@@ -310,7 +310,7 @@ def convert_hf_to_mm(convert_config: ConvertVppMMConfig, ops: List[Operator], tp
         llm_state_dict = load_from_hf(convert_config.common_model_config.llm_hf_dir)
         state_dict = merge_llm_weights_to_state_dict(state_dict, llm_state_dict)
 
-    if convert_config.save_vit_only:
+    if getattr(convert_config, 'save_lora_only', False):
         # 如果只保存vit权重，则过滤掉非vit的权重
         filter_vit_keys(state_dict)
 

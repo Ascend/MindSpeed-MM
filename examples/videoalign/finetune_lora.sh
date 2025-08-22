@@ -103,7 +103,7 @@ LORA_ARGS="
 "
 
 #--save $SAVE_PATH \
-logfile=$(date +%Y%m%d)_$(date +%H%M%S)_half_pixels
+logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
 torchrun $DISTRIBUTED_ARGS pretrain_videoalign.py \
     $GPT_ARGS \

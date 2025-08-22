@@ -8,6 +8,7 @@
     "loss_type": "btt",
     "lora_apply_modules": ["text_decoder"],
     "lora_mixed_training": true,
+    "lora_save_full_weight": true,
     "image_encoder": {
         "vision_encoder": {
             "model_id": "qwen2vit",

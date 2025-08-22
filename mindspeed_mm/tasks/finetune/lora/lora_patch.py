@@ -23,9 +23,7 @@ from megatron.core.enums import ModelType
 from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 
-from mindspeed_mm.models.reward_model import Qwen2VLRewardModelBT
-
-from .utils import is_enable_lora, merge_dicts, modify_keys_with_dict
+from .utils import is_enable_lora, merge_dicts, modify_keys_with_dict, is_save_full_weight
 
 
 def unwrap_model_wrapper(fn):
@@ -195,7 +193,7 @@ def state_dict_for_save_checkpoint(state_dict):
 def state_dict_for_save_checkpoint_wrapper(fn):
     @wraps(fn)
     def wrapper(self, prefix='', keep_vars=False):
-        if is_enable_lora():
+        if is_enable_lora() and not is_save_full_weight():
             return state_dict_for_save_checkpoint(self.state_dict(prefix=prefix, keep_vars=keep_vars))
         return fn(self, prefix='', keep_vars=False)
 

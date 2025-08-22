@@ -24,6 +24,13 @@ def is_enable_lora():
     return False
 
 
+def is_save_full_weight():
+    args = get_args()
+    mm_model = args.mm_model
+    save_full_weight = getattr(mm_model, 'lora_save_full_weight', False)
+    return save_full_weight
+
+
 def merge_dicts(statedict1, statedict2):
     result = statedict1
     for key, value in statedict2.items():
