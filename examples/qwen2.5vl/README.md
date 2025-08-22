@@ -103,12 +103,6 @@ cd ..
 # 安装其余依赖库
 pip install -e .
 
-# 安装transformers指定版本
-git clone https://github.com/huggingface/transformers.git
-cd transformers
-git checkout fa56dcc2a
-pip install -e .
-
 ```
 
 ---
@@ -579,11 +573,6 @@ NPUS_PER_NODE=8
 
 ```shell
 pip install -e ".[evaluate]"
-# 上面命令会安装旧版transformers，需通过以下命令重新安装transformers指定版本
-git clone https://github.com/huggingface/transformers.git # 如果先前已经clone，可不执行此命令
-cd transformers
-git checkout fa56dcc2a
-pip install -e .
 ```
 
 <a id="jump7.4"></a>

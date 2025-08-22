@@ -105,12 +105,6 @@ cd ..
 # 安装其余依赖库
 pip install -e .
 
-# 安装transformers指定版本
-git clone https://github.com/huggingface/transformers.git
-cd transformers
-git checkout fa56dcc2a
-pip install -e .
-
 ```
 
 ---

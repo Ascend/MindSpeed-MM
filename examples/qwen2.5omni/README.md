@@ -101,12 +101,6 @@ pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 # apex for Ascend 参考 https://gitee.com/ascend/apex
 # 建议从原仓编译安装
 
-# 安装transformers指定版本
-git clone https://github.com/huggingface/transformers.git
-cd transformers
-git checkout 7bb619d
-pip install -e .
-
 # 安装librosa，用于音频解析
 pip install librosa
 
