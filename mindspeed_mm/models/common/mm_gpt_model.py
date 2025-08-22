@@ -75,7 +75,7 @@ class MMGPTModel(LanguageModule):
         self.share_embeddings_and_output_weights = share_embeddings_and_output_weights
         self.position_embedding_type = position_embedding_type
 
-        # megatron core pipelining currently depends on model type 
+        # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
 
         # These 2 attributes are needed for TensorRT-LLM export.
@@ -228,12 +228,12 @@ class MMGPTModel(LanguageModule):
 
         if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             split_gather_sizes = cal_split_sizes(input_ids.shape[-1], mpu.get_context_parallel_world_size())
-            input_ids = split_forward_gather_backward(input_ids, mpu.get_context_parallel_group(), 1, 
+            input_ids = split_forward_gather_backward(input_ids, mpu.get_context_parallel_group(), 1,
                                                         split_gather_sizes, "down")
-            position_ids = split_forward_gather_backward(position_ids, mpu.get_context_parallel_group(), 2, 
+            position_ids = split_forward_gather_backward(position_ids, mpu.get_context_parallel_group(), 2,
                                                         split_gather_sizes, "down")
             if self.pre_process:
-                decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0, 
+                decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0,
                                                             split_gather_sizes, "down")
 
 
@@ -247,6 +247,12 @@ class MMGPTModel(LanguageModule):
                 rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids, self.config.mrope_section)
             else:
                 rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids)
+                half_dim = rotary_pos_emb.shape[-1] // 2
+                cos, sin = rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:]
+                mrope_section = self.config.mrope_section * 2
+                cos = torch.cat([m[:, i % 3, :, :] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(2)
+                sin = torch.cat([m[:, i % 3, :, :] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(2)
+                rotary_pos_emb = torch.cat([cos, sin], dim=0)
         elif self.position_embedding_type == 'rope':
             rotary_seq_len = self.rotary_pos_emb.get_rotary_seq_len(
                 None, self.decoder, decoder_input, self.config, inference_params
@@ -262,9 +268,9 @@ class MMGPTModel(LanguageModule):
             packed_seq_params=packed_seq_params,
             **(extra_block_kwargs or {}),
         )
-        
+
         if self.post_process and mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
-            hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), 0, 
+            hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), 0,
                                                         split_gather_sizes, "up")
         if not self.post_process or self.reward_process:
             return hidden_states

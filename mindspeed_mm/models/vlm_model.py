@@ -33,8 +33,9 @@ class VLMModel(MultiModalModule):
         {
             "pre_process": (bool),  # Include the embedding leayer in the gpt decoder (used with pipeline parallelism).
             "post_process": (bool),  # Include an output layer and a layernorm in the gpt decoder (used with pipeline parallelism).
+            "add_text_encoder": (bool),  # Whether to construct the text encoder. not used now.
             "reward_process: (bool, optional), # Without an output layer in the gpt decoder (only used with videoalign). Defaults to False.
-            "add_text_encoder": (bool),  # Whether to construct the text encoder. not used now. 
+            "add_text_encoder": (bool),  # Whether to construct the text encoder. not used now.
             "add_image_encoder": (bool),  # Whether to construct the image encoder.
             "add_video_encoder": (bool),  # Whether to construct the video encoder. not used now.
             "add_text_decoder": (bool),  # Whether to construct the text decoder.
@@ -66,7 +67,7 @@ class VLMModel(MultiModalModule):
 
         self.share_embeddings_and_output_weights = not getattr(config.text_decoder, 'untie_embeddings_and_output_weights', True)
         self.img_context_token_id = config.img_context_token_id
-        
+
 
         # initialize pipeline parallel configs
         self.pp_size = mpu.get_pipeline_model_parallel_world_size()
@@ -75,7 +76,7 @@ class VLMModel(MultiModalModule):
             self.vp_rank = mpu.get_virtual_pipeline_model_parallel_rank()
             self.vp_size = mpu.get_virtual_pipeline_model_parallel_world_size()
         self.pp_rank = mpu.get_pipeline_model_parallel_rank()
-        
+
         if self.add_text_encoder:
             self.text_encoder = TextEncoder(config.text_encoder).get_model()
         if self.add_image_encoder:
@@ -143,7 +144,7 @@ class VLMModel(MultiModalModule):
 
         pre_process = pipeline_start_index == 0
         post_process = pipeline_end_index == config.vision_encoder.num_layers
-        
+
         print(
             f"image encoder pipeline config:\
             pp_rank:{self.pp_rank},\
@@ -207,7 +208,7 @@ class VLMModel(MultiModalModule):
 
         pre_process = pipeline_start_index == 0
         post_process = pipeline_end_index == config.audio_encoder.num_layers
-        
+
         print(
             f"image encoder pipeline config:\
             pp_rank:{self.pp_rank},\
@@ -226,7 +227,7 @@ class VLMModel(MultiModalModule):
             post_process=post_process,
         )
 
-        
+
     def _build_text_decoder_model(self, config):
         if self.pp_size <= 1:
             return MMGPTModel(
@@ -271,7 +272,7 @@ class VLMModel(MultiModalModule):
         else:
             pipeline_start_index = sum(config.pipeline_num_layers[:self.pp_rank])
             pipeline_end_index = sum(config.pipeline_num_layers[:self.pp_rank + 1])
-        
+
         pre_process = pipeline_start_index == 0
         post_process = pipeline_end_index == config.num_layers
 
@@ -365,7 +366,7 @@ class VLMModel(MultiModalModule):
         shift_labels = labels[..., 1:].contiguous()
 
         #如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
-        loss = tensor_parallel.vocab_parallel_cross_entropy(shift_logits.float(), shift_labels) 
+        loss = tensor_parallel.vocab_parallel_cross_entropy(shift_logits.float(), shift_labels)
         loss = loss * (shift_labels > -1)
         loss = torch.sum(loss) / torch.sum(shift_labels > -1)
 
@@ -419,14 +420,16 @@ class VLMModel(MultiModalModule):
                     if self.config.sequence_parallel:
                         input_embeds = gather_from_sequence_parallel_region(input_embeds)
                     input_embeds = input_embeds.transpose(0, 1)  # bsh
-                    image_mask = torch.eq(input_ids, self.img_context_token_id).unsqueeze(-1).expand_as(input_embeds)
+                    image_mask = torch.eq(input_ids, self.img_context_token_id)
                     vit_embeds = vit_embeds[:, 0, :]
-                    input_embeds = input_embeds.masked_scatter(image_mask, vit_embeds)
+                    indices_tuple = torch.nonzero(image_mask, as_tuple=True)
+                    input_embeds[indices_tuple] = vit_embeds
+
                     # 音频模态处理
                     if 'input_features' in kwargs:  # 使用WhisperFeatureExtractor提取音频特征后输出值名为input_feature
                         audio_features = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
                         # 151646 表示音频模态的token id
-                        audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds) 
+                        audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds)
                         audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
                         input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
                     input_embeds = input_embeds.transpose(0, 1)

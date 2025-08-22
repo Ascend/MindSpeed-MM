@@ -115,10 +115,9 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
         context_mask: Tensor,
         rotary_pos_emb: Tensor,
         packed_seq_params: PackedSeqParams,
+        window_packed_seq_params: PackedSeqParams,
+        full_packed_seq_params: PackedSeqParams,
         fullatt_block_indexes_now: List[int] = None,
-        window_mask: Tensor = None,
-        cu_seqlens: Tensor = None,
-        cu_window_seqlens: Tensor = None,
     ):
         """Forward method with activation checkpointing."""
 
@@ -134,12 +133,14 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                 for index in range(start, end):
                     layer = self._get_layer(index)
                     current_mask = attention_mask
-                    cu_seqlens_in_use = cu_seqlens[1:]
                     if len(fullatt_block_indexes_now) > 0 and index not in fullatt_block_indexes_now:
-                        current_mask = window_mask
-                        cu_seqlens_in_use = cu_window_seqlens[1:]
-                    if get_args().use_flash_attn and (packed_seq_params is None or not cu_seqlens_in_use.equal(packed_seq_params.cu_seqlens_q)):
-                        packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_seqlens_in_use, cu_seqlens_kv=cu_seqlens_in_use)
+                        packed_seq_params = window_packed_seq_params
+                    else:
+                        packed_seq_params = full_packed_seq_params
+
+                    if get_args().use_flash_attn is False:
+                        packed_seq_params = None
+
                     hidden_states, context = layer(
                         hidden_states=hidden_states,
                         attention_mask=current_mask,
@@ -224,8 +225,7 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
         if not self.pre_process:
             # See set_input_tensor()
             hidden_states = self.input_tensor
-        if cu_seqlens is not None:
-            cu_seqlens_in_use = cu_seqlens[1:]
+
         # Viewless tensor.
         # - We only need to create a viewless tensor in the case of micro batch
         #   size (mbs) == 1, since in this case, 'hidden_states.transpose()'
@@ -250,32 +250,6 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
         else:
             rng_context = nullcontext()
 
-        if self.config.fp8:
-            import transformer_engine  # To keep out TE dependency when not training in fp8
-
-            if self.config.fp8 == "e4m3":
-                fp8_format = transformer_engine.common.recipe.Format.E4M3
-            elif self.config.fp8 == "hybrid":
-                fp8_format = transformer_engine.common.recipe.Format.HYBRID
-            else:
-                raise ValueError("E4M3 and HYBRID are the only supported FP8 formats.")
-
-            fp8_recipe = transformer_engine.common.recipe.DelayedScaling(
-                margin=self.config.fp8_margin,
-                interval=self.config.fp8_interval,
-                fp8_format=fp8_format,
-                amax_compute_algo=self.config.fp8_amax_compute_algo,
-                amax_history_len=self.config.fp8_amax_history_len,
-                override_linear_precision=(False, False, not self.config.fp8_wgrad),
-            )
-            fp8_group = None
-            if parallel_state.model_parallel_is_initialized():
-                fp8_group = parallel_state.get_amax_reduction_group(with_context_parallel=True)
-            fp8_context = transformer_engine.pytorch.fp8_autocast(
-                enabled=True, fp8_recipe=fp8_recipe, fp8_group=fp8_group
-            )
-        else:
-            fp8_context = nullcontext()
         fullatt_block_indexes_now = []
         if getattr(self.config, "window_attn_size", None) is not None:
             pp_rank = mpu.get_pipeline_model_parallel_rank()
@@ -287,7 +261,18 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                 previous_layer = sum(self.config.pipeline_num_layers[:pp_rank])
             for x in self.config.fullatt_block_indexes:
                 fullatt_block_indexes_now.append(x - previous_layer)
-        with rng_context and fp8_context:
+
+        window_packed_seq_params = None
+        full_packed_seq_params = None
+        if get_args().use_flash_attn and packed_seq_params is None:
+            if cu_window_seqlens is not None:
+                cu_window_seqlens = cu_window_seqlens[1:]
+                window_packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_window_seqlens, cu_seqlens_kv=cu_window_seqlens)
+            if cu_seqlens is not None:
+                cu_full_seqlens = cu_seqlens[1:]
+                full_packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_full_seqlens, cu_seqlens_kv=cu_full_seqlens)
+
+        with rng_context:
             # Forward pass.
             if self.config.recompute_granularity == 'full' and self.training:
                 hidden_states = self._checkpointed_forward(
@@ -297,10 +282,9 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                     context_mask=context_mask,
                     rotary_pos_emb=rotary_pos_emb,
                     packed_seq_params=packed_seq_params,
+                    window_packed_seq_params=window_packed_seq_params,
+                    full_packed_seq_params=full_packed_seq_params,
                     fullatt_block_indexes_now=fullatt_block_indexes_now,
-                    window_mask=window_mask,
-                    cu_seqlens=cu_seqlens,
-                    cu_window_seqlens=cu_window_seqlens,
                 )
             else:
                 for layer_num, layer in enumerate(self.layers):
@@ -308,14 +292,17 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                         if getattr(self.config, "window_attn_size", None) is not None:
                             if layer_num in fullatt_block_indexes_now:
                                 attention_mask_now = attention_mask
-                                cu_seqlens_in_use = cu_seqlens[1:]
+                                packed_seq_params = full_packed_seq_params
                             else:
                                 attention_mask_now = window_mask
-                                cu_seqlens_in_use = cu_window_seqlens[1:]
+                                packed_seq_params = window_packed_seq_params
                         else:
                             attention_mask_now = attention_mask
-                        if get_args().use_flash_attn and (packed_seq_params is None or not cu_seqlens_in_use.equal(packed_seq_params.cu_seqlens_q)):
-                            packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_seqlens_in_use, cu_seqlens_kv=cu_seqlens_in_use)
+                            packed_seq_params = full_packed_seq_params
+
+                        if get_args().use_flash_attn is False:
+                            packed_seq_params = None
+
                         hidden_states, context = layer(
                             hidden_states=hidden_states,
                             attention_mask=attention_mask_now,

@@ -33,14 +33,7 @@ def rotate_half(x):
 
 
 # Modified based on transformers.models.qwen2_vl.modeling_qwen2_vl
-def apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_dim=2, use_fused_rope=True):
-    mrope_section = mrope_section * 2
-    cos = torch.cat([m[:, i % 3, :, :] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
-        unsqueeze_dim
-    )
-    sin = torch.cat([m[:, i % 3, :, :] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
-        unsqueeze_dim
-    )
+def apply_multimodal_rotary_pos_emb(q, k, cos, sin, use_fused_rope=True):
     if use_fused_rope:
         import torch_npu
         q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
@@ -52,10 +45,10 @@ def apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_dim
 
 
 # Modified based on transformers.models.qwen2_vl.modeling_qwen2_vl
-def apply_rotary_pos_emb_vision(tensor: torch.Tensor, freqs: Tuple[torch.Tensor, torch.Tensor], use_fused_rope=True) -> torch.Tensor:
+def apply_rotary_pos_emb_vision(tensor: torch.Tensor, freqs: torch.Tensor, use_fused_rope=True) -> torch.Tensor:
     orig_dtype = tensor.dtype
     tensor = tensor.float()
-    cos, sin = freqs[0], freqs[1]
+    cos, sin = torch.chunk(freqs, 2, dim=0)
     if use_fused_rope:
         import torch_npu
         output = torch_npu.npu_rotary_mul(tensor, cos, sin).to(orig_dtype)
@@ -125,7 +118,7 @@ class Qwen2vlSelfAttention(SelfAttention):
         inference_params=None,
     ):
         query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states)  # s b h d
-        
+
         if self.config.context_parallel_size > key.shape[2]:
             key = key.repeat_interleave(
                 query.shape[2] // key.shape[2], dim=2
@@ -147,9 +140,8 @@ class Qwen2vlSelfAttention(SelfAttention):
         # absolute positional embedding.
         # otherwise, only relative positional embedding takes effect
         if rotary_pos_emb is not None:
-            half_dim = rotary_pos_emb.shape[-1] // 2
-            cos, sin = rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:]
-            query, key = apply_multimodal_rotary_pos_emb(query, key, cos, sin, self.mrope_section,
+            cos, sin = torch.chunk(rotary_pos_emb, 2, dim=0)
+            query, key = apply_multimodal_rotary_pos_emb(query, key, cos, sin,
                                                          use_fused_rope=self.config.use_fused_rotary_pos_emb)  # b h s d
         # ===================================================
         # Adjust key, value for inference
@@ -238,7 +230,7 @@ class Qwen2vlVitSelfAttention(SelfAttention):
         # For self attention we just duplicate the rotary_pos_emb if it isn't already
 
         query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states)
-        
+
         if self.config.context_parallel_size > key.shape[2]:
             key = key.repeat_interleave(
                 query.shape[2] // key.shape[2], dim=2
@@ -268,8 +260,6 @@ class Qwen2vlVitSelfAttention(SelfAttention):
         # absolute positional embedding.
         # otherwise, only relative positional embedding takes effect
         if rotary_pos_emb is not None:
-            half_dim = rotary_pos_emb.shape[-1] // 2
-            rotary_pos_emb = (rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:])
             query = apply_rotary_pos_emb_vision(query, rotary_pos_emb,
                                                 use_fused_rope=self.config.use_fused_rotary_pos_emb)
             key = apply_rotary_pos_emb_vision(key, rotary_pos_emb,
@@ -533,10 +523,10 @@ class Qwen2VLViT(MultiModalModule):
             )
             for i in range(1, len(cu_seqlens)):
                 attention_mask[..., cu_seqlens[i - 1]: cu_seqlens[i], cu_seqlens[i - 1]: cu_seqlens[i]] = 0
-            
+
         if get_args().sequence_parallel:
             hidden_states = scatter_to_sequence_parallel_region(hidden_states)
-            
+
         if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             split_gather_sizes = cal_split_sizes(hidden_states.shape[0], mpu.get_context_parallel_world_size())
             rotary_pos_emb = split_forward_gather_backward(
@@ -547,16 +537,16 @@ class Qwen2VLViT(MultiModalModule):
                 "down"
             )
             hidden_states = split_forward_gather_backward(
-                hidden_states, 
-                mpu.get_context_parallel_group(), 
-                0, 
+                hidden_states,
+                mpu.get_context_parallel_group(),
+                0,
                 split_gather_sizes,
                 "down"
             )
 
         cos_cache = rotary_pos_emb.cos().unsqueeze(1).repeat(1, 1, 2).unsqueeze(1).float()
         sin_cache = rotary_pos_emb.sin().unsqueeze(1).repeat(1, 1, 2).unsqueeze(1).float()
-        rotary_pos_emb = torch.concat((cos_cache, sin_cache), dim=-1)
+        rotary_pos_emb = torch.concat((cos_cache, sin_cache), dim=0)
         hidden_states = self.blocks(
             hidden_states=hidden_states,
             rotary_pos_emb=rotary_pos_emb,
@@ -565,7 +555,7 @@ class Qwen2VLViT(MultiModalModule):
             cu_seqlens=cu_seqlens,
             cu_window_seqlens=cu_window_seqlens
         )
-        
+
         if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             hidden_states = gather_forward_split_backward(
                 hidden_states,
@@ -574,7 +564,7 @@ class Qwen2VLViT(MultiModalModule):
                 split_gather_sizes,
                 "up"
             )
-            
+
         if get_args().sequence_parallel:
             hidden_states = gather_from_sequence_parallel_region(hidden_states)
 
