@@ -29,8 +29,10 @@
   - [数据集准备](#jump7.1)
   - [配置参数](#jump7.2)
   - [启动评测](#jump7.3)
-- [环境变量声明](#jump8)
-- [注意事项](#jump9)
+- [特性使用介绍](#jump8)
+  - [lora微调](#jump8.1)
+- [环境变量声明](#jump9)
+- [注意事项](#jump10)
 
 ---
 <a id="jump1"></a>
@@ -539,8 +541,14 @@ bash examples/mindspore/qwen2.5vl/evaluate_qwen2_5_vl_7b.sh
 - *.csv文件，这个文件会输出统计准确率等数据。
 
 ---
-
 <a id="jump8"></a>
+## 特性使用介绍
+
+<a id="jump8.1"></a>
+### lora微调
+LoRA为框架通用能力，当前功能已支持，可参考[LoRA特性文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/lora_finetune.md)。
+
+<a id="jump9"></a>
 ## 环境变量声明
 ASCEND_RT_VISIBLE_DEVICES： 指定NPU设备的索引值
 
@@ -566,7 +574,7 @@ TOKENIZERS_PARALLELISM： 用于控制Hugging Face的transformers库中的分词
 NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量
 
 ---
-<a id="jump9"></a>
+<a id="jump10"></a>
 ## 注意事项
 
 1. 在 `finetune_xx.sh`里，与模型结构相关的参数并不生效，以`examples/mindspore/qwen2.5vl/model_xb.json`里同名参数配置为准，非模型结构的训练相关参数在 `finetune_xx.sh`修改。
