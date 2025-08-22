@@ -1,14 +1,14 @@
-from functools import partial
 import multiprocessing as mp
-import csv
+from functools import partial
 
-import torch.distributed as dist
 import numpy as np
 import pandas as pd
+import torch.distributed as dist
 
 from mindspeed_mm.tasks.evaluation.eval_impl.impl_base import BaseEvalImpl
-from mindspeed_mm.tasks.evaluation.utils.string_utils import is_list_in_str, dict2dataframe, logger_rank_0
 from mindspeed_mm.tasks.evaluation.utils.analysis_utils import hit_calculate, process_line
+from mindspeed_mm.tasks.evaluation.utils.string_utils import is_list_in_str, dict2dataframe, logger_rank_0
+from mindspeed_mm.utils.security_utils.input_filter import sanitize_dataframe
 
 
 class VQAEvalImpl(BaseEvalImpl):
@@ -64,9 +64,10 @@ class VQAEvalImpl(BaseEvalImpl):
             ret.round(2)
 
             suffix = self.result_path.split('.')[-1]
-            result_file = self.result_path.replace(f'.{suffix}', '_acc.csv')
+            result_file = self.result_path.replace(f'.{suffix}', '_acc.xlsx')
 
-            ret.to_csv(result_file, sep='\t', index=False, encoding='utf-8', quoting=csv.QUOTE_ALL)
+            cleaned_ret = sanitize_dataframe(ret)
+            cleaned_ret.to_excel(result_file, index=False, engine='xlsxwriter')
             logger_rank_0(f"save acc file to {result_file}")
         if self.world_size > 0:
             dist.barrier()
