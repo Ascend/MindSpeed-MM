@@ -97,7 +97,7 @@
 
     ```shell
     pip install -e .
-    vim examples/text_to_image/requirements_sdxl.txt #修改torchvision版本：torchvision==0.16.0, torch==2.7.1
+    vim examples/text_to_image/requirements_sdxl.txt #修改版本：torch==2.7.1
     pip install -r examples/text_to_image/requirements_sdxl.txt # 安装diffusers原仓对应依赖
     pip install -r sdxl/requirements_sdxl_extra.txt #安装sdxl对应依赖
     ```
