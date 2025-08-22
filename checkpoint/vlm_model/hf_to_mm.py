@@ -310,14 +310,14 @@ def convert_hf_to_mm(convert_config: ConvertVppMMConfig, ops: List[Operator], tp
         llm_state_dict = load_from_hf(convert_config.common_model_config.llm_hf_dir)
         state_dict = merge_llm_weights_to_state_dict(state_dict, llm_state_dict)
 
-    if getattr(convert_config, 'save_lora_only', False):
+    if convert_config.save_vit_only:
         # 如果只保存vit权重，则过滤掉非vit的权重
         filter_vit_keys(state_dict)
 
     # 权重转换、合并
     state_dict = convert(state_dict, ops, convert_config.common_model_config.tie_word_embeddings, parallel_config.is_pp())
 
-    if convert_config.save_lora_only:
+    if getattr(convert_config, 'save_lora_only', False):
         state_dict = {k: v for k, v in state_dict.items() if "lora" in k}
 
     # 权重字典按ep域切分
