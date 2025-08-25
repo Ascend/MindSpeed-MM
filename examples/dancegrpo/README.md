@@ -14,6 +14,7 @@
 - [训练](#jump4)
     - [准备工作](#jump4.1)
     - [启动训练](#jump4.2)
+- [备注](#jump5)
 
 <a id="jump0"></a>
 
@@ -133,7 +134,7 @@ cd ..
 raw file下载文件至MindSpeed MM工程根目录的data目录下。
 
 数据集下载完成后要对数据进行预处理，在启动预处理之前，可以根据自身训练配置需要修改[ 数据预处理脚本 ](./preprocess_flux_rl_embeddings.sh)的配置，以FLUX模型为例：
-1. vae模型权重所在路径为`LOAD_PATH`，默认为data/flux；
+1. vae模型权重所在路径为`LOAD_PATH`，默认为ckpt/flux；
 2. 预处理后的数据集存放路径为`OUTPUT_DIR`，默认为data/rl_embeddings；
 3. 提示词文件路径为`PROMPT_DIR`，默认为data/prompts.txt。
 
@@ -239,3 +240,8 @@ bash examples/dancegrpo/posttrain_flux_dancegrpo.sh
 > *注意：所有节点的代码、权重、数据等路径的层级要保持一致，且启动训练脚本的时候都位于MindSpeed MM目录下*
 
 训练完成后，会在logs目录中生成运行日志文件，生成训练reward记录文件。
+
+<a id="jump5"></a>
+
+## 备注
+对于CPU型号为x86的设备，建议使用torchvision版本为`0.22.1+cpu`
