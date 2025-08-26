@@ -26,7 +26,13 @@ class ParallelConfig(BaseModel):
     """audio模块pipeline parallel切分每张卡上切分几层"""
 
     tp_size: PositiveInt = 1
-    """tensor parallel张量并行组，模型转换时不同的tp组要切分到不同的目录下"""
+    """默认tensor parallel张量并行组，模型转换时不同的tp组要切分到不同的目录下"""
+
+    vit_tp_size: Optional[NonNegativeInt] = 0
+    """异构并行下,视频的tensor parallel张量并行组, 为0时使用默认tp_size配置"""
+
+    audio_tp_size: Optional[NonNegativeInt] = 0
+    """异构并行下,音频的tensor parallel张量并行组, 为0时使用默认tp_size配置"""
 
     ep_size: PositiveInt = 1
     """expert parallel张量并行组，模型转换时不同的ep组要切分到不同的目录下"""
@@ -61,7 +67,13 @@ class VppParallelConfig(BaseModel):
     """audio模块pipeline parallel切分每张卡上切分几层, vpp切分配置参考docs/features/virtual_pipeline_parallel.md"""
 
     tp_size: PositiveInt = 1
-    """tensor parallel张量并行组，模型转换时不同的tp组要切分到不同的目录下"""
+    """默认tensor parallel张量并行组，模型转换时不同的tp组要切分到不同的目录下"""
+
+    vit_tp_size: Optional[NonNegativeInt] = 0
+    """异构并行下,视频的tensor parallel张量并行组, 为0时使用默认tp_size配置"""
+
+    audio_tp_size: Optional[NonNegativeInt] = 0
+    """异构并行下,音频的tensor parallel张量并行组, 为0时使用默认tp_size配置"""
 
     ep_size: Optional[PositiveInt] = 1
     """expert parallel专家并行组，模型转换时不同的ep组要切分到不同的目录下"""

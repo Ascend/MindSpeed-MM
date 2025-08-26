@@ -50,7 +50,7 @@ import torch
 from safetensors.torch import load_file
 from tqdm import tqdm
 
-from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME
+from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME, IMAGE_ENCODER, AUDIO_ENCODER, TEXT_DECODER
 from checkpoint.common.types import STATE_DICT_T, VPP_LAYER_NUM_T
 from checkpoint.vlm_model.config import ConvertVppMMConfig
 from checkpoint.vlm_model.operator import Operator, TieOp, TP_PATTERN_T
@@ -173,28 +173,51 @@ def save_by_vpp(state_dicts: List[Dict[str, torch.Tensor]],
     save_root_dir.joinpath(LATEST_TXT).write_text(str(iteration))
 
 
-def split_by_tp(state_dict: STATE_DICT_T, patterns: TP_PATTERN_T, tp_size: int = 1) -> List[STATE_DICT_T]:
+def split_by_tp(state_dict: STATE_DICT_T, patterns: TP_PATTERN_T, tp_size: int = 0, vit_tp_size: int = 0,
+                         audio_tp_size: int = 0) -> List[STATE_DICT_T]:
     """
     将状态字典按 TP 并行度切分
     :param state_dict: 原始状态字典
     :param patterns: 匹配模式到切分类的映射
-    :param tp_size: TP 并行度
+    :param tp_size: 默认 TP 并行度
+    :param vit_tp_size: vit TP 并行度
+    :param audio_tp_size: audio TP 并行度
     :return: 切分后的状态字典列表
     """
-    if tp_size == 1:
+    if tp_size == 1 and vit_tp_size <= 1 and audio_tp_size <= 1:
         return [state_dict.copy()]
+    max_tp_size = max(tp_size, vit_tp_size, audio_tp_size)
+    if any(
+        size != 0 and max_tp_size % size != 0
+        for size in [tp_size, vit_tp_size, audio_tp_size]
+    ):
+        raise ValueError('TP segmentation of multiple modules does not meet the requirements')
+
     # 初始化 TP 状态字典列表
-    tp_dicts = [dict() for _ in range(tp_size)]
+    tp_dicts = [dict() for _ in range(max_tp_size)]
+
+    def assign_split_values(tar_splitter, tar_tp_dicts, tar_tp_size, tar_key, tar_value):
+        # 一次性获取所有 TP 的切分结果
+        tar_split_values = tar_splitter.split(tar_tp_size, tar_value)
+        # 遍历tar_tp_dicts中的每个字典
+        for i, tar_tp_dict in enumerate(tar_tp_dicts):
+            # 通过取模运算循环获取split_values中的值
+            tar_tp_dict[tar_key] = tar_split_values[i % len(tar_split_values)].clone()
+
     # 遍历原始状态字典的每个键值对
     for key, value in state_dict.items():
         # 检查是否匹配任何模式
         for pattern, splitter in patterns.items():
             if re.match(pattern, key):
-                # 一次性获取所有 TP 的切分结果
-                split_values = splitter.split(tp_size, value)
-                for tp_dict, val in zip(tp_dicts, split_values):
-                    tp_dict[key] = val
-                break
+                if vit_tp_size != 0 and key.startswith(IMAGE_ENCODER):
+                    assign_split_values(splitter, tp_dicts, vit_tp_size, key, value)
+                    break
+                if audio_tp_size != 0 and key.startswith(AUDIO_ENCODER):
+                    assign_split_values(splitter, tp_dicts, audio_tp_size, key, value)
+                    break
+                if vit_tp_size == 0 or audio_tp_size == 0 or key.startswith(TEXT_DECODER):
+                    assign_split_values(splitter, tp_dicts, tp_size, key, value)
+                    break
         else:
             # 未匹配任何模式的值直接复制到所有 TP
             for tp_dict in tp_dicts:
@@ -327,7 +350,7 @@ def convert_hf_to_mm(convert_config: ConvertVppMMConfig, ops: List[Operator], tp
     ep_tp_state_dicts = []
     for ep_state_dict in ep_state_dicts:
         # 每个ep域对应的tp域拆分
-        tp_state_dicts = split_by_tp(ep_state_dict, tp_patterns, parallel_config.tp_size)
+        tp_state_dicts = split_by_tp(ep_state_dict, tp_patterns, parallel_config.tp_size, parallel_config.vit_tp_size, parallel_config.audio_tp_size)
         ep_tp_state_dicts.append(tp_state_dicts)
 
     # pp索引生成

@@ -8,7 +8,7 @@ from typing import List
 import torch
 from safetensors.torch import save_file
 
-from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME
+from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME, IMAGE_ENCODER, AUDIO_ENCODER, TEXT_DECODER
 from checkpoint.common.types import STATE_DICT_T, PP_LAYER_NUM_T
 from checkpoint.vlm_model.config import ConvertHFConfig
 from checkpoint.vlm_model.hf_to_mm import load_from_hf
@@ -77,14 +77,21 @@ def load_from_mm(load_dir: Path,
     return state_dicts
 
 
-def merge_by_tp(tp_state_dicts: List[STATE_DICT_T], patterns: TP_PATTERN_T) -> STATE_DICT_T:
+def merge_by_tp(tp_state_dicts: List[STATE_DICT_T], patterns: TP_PATTERN_T, tp_size: int = 0, vit_tp_size: int = 0,
+                         audio_tp_size: int = 0) -> STATE_DICT_T:
     """将多个TP分片的权重合并回完整权重"""
     if not tp_state_dicts:
         return {}
     merged_dict = {}
-    tp_size = len(tp_state_dicts)
-    if tp_size == 1:
+    max_tp_size = len(tp_state_dicts)
+    if max_tp_size == 1:
         return tp_state_dicts[0]
+    # 定义前缀和对应tp_size的映射
+    tp_config = {
+        IMAGE_ENCODER: vit_tp_size,
+        AUDIO_ENCODER: audio_tp_size,
+        TEXT_DECODER: tp_size
+    }
     for key in tp_state_dicts[0].keys():
         # 收集所有分片的对应权重
         tp_values = [sd[key] for sd in tp_state_dicts]
@@ -92,7 +99,15 @@ def merge_by_tp(tp_state_dicts: List[STATE_DICT_T], patterns: TP_PATTERN_T) -> S
         # 查找匹配的拆分函数，并获取其反向合并方法
         for pattern, merger in patterns.items():
             if re.match(pattern, key):
-                merged_dict[key] = merger.merge(tp_values)
+                for prefix, size in tp_config.items():
+                    if key.startswith(prefix):
+                        if size <= 0:
+                            merged_dict[key] = merger.merge(tp_values)
+                        if size == 1:
+                            merged_dict[key] = tp_values[0]
+                        else:
+                            merged_dict[key] = merger.merge(tp_values[:size])
+                        break
                 break
         else:
             merged_dict[key] = tp_values[0]
@@ -142,10 +157,12 @@ def convert_mm_to_hf(convert_config: ConvertHFConfig,
                      tp_patterns: TP_PATTERN_T,
                      merge_source: bool = False):
     parallel_config = convert_config.parallel_config
+    # 找到最大的tp
+    max_tp_size = max(parallel_config.tp_size, parallel_config.vit_tp_size, parallel_config.audio_tp_size)
     # 加载权重字典
     state_dicts = load_from_mm(convert_config.mm_dir, parallel_config.vit_pp_layers, parallel_config.llm_pp_layers,
-                               parallel_config.tp_size, parallel_config.audio_pp_layers)
-    state_dict = merge_by_tp(state_dicts, tp_patterns)
+                               max_tp_size, parallel_config.audio_pp_layers)
+    state_dict = merge_by_tp(state_dicts, tp_patterns, parallel_config.tp_size, parallel_config.vit_tp_size, parallel_config.audio_tp_size)
     for op in ops:
         op.revert(state_dict)  # 执行逆操作
     if merge_source:
