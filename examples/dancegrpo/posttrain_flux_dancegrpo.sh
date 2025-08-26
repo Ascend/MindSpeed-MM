@@ -106,4 +106,5 @@ torchrun $DISTRIBUTED_ARGS posttrain_flux_dancegrpo.py \
     --distributed-backend nccl \
     2>&1 | tee logs/train_${logfile}.log
 chmod 440 logs/train_${logfile}.log
-chmod -R 640 $SAVE_PATH
+find $SAVE_PATH -type d -exec chmod 750 {} \;
+find $SAVE_PATH -type f -exec chmod 640 {} \;

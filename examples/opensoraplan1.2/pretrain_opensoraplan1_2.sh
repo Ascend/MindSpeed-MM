@@ -26,6 +26,7 @@ GBS=$(($WORLD_SIZE*$MBS/$CP/$TP/$PP*$ACC))
 MM_DATA="./examples/opensoraplan1.2/data.json"
 MM_MODEL="./examples/opensoraplan1.2/model_opensoraplan1_2.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
+SAVE_PATH="your_ckpt_path_to_save"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $GPUS_PER_NODE \
@@ -87,6 +88,8 @@ torchrun $DISTRIBUTED_ARGS pretrain_sora.py \
     2>&1 | tee logs/train_${logfile}.log
 
 chmod 440 logs/train_${logfile}.log
+find $SAVE_PATH -type d -exec chmod 750 {} \;
+find $SAVE_PATH -type f -exec chmod 640 {} \;
 STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F ':' '{print$5}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
 PERF=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
 echo "Elapsed Time Per iteration: $STEP_TIME, Average Samples per Second: $PERF"

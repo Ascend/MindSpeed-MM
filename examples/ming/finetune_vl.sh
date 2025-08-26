@@ -53,3 +53,5 @@ torchrun $DISTRIBUTED_ARGS finetune_vl.py \
     $MODEL_ARGS \
     2>&1 | tee logs/train_${logfile}.log
 chmod 440 logs/train_${logfile}.log
+find $SAVE_PATH -type d -exec chmod 750 {} \;
+find $SAVE_PATH -type f -exec chmod 640 {} \;
