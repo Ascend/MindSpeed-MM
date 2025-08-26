@@ -66,11 +66,27 @@ class MMConfig:
     """
 
     def __init__(self, json_files: dict) -> None:
+        errors = []
         for json_name, json_path in json_files.items():
-            if os.path.exists(json_path):
+            try:
+                if json_path == "":
+                    continue
                 real_path = os.path.realpath(json_path)
                 config_dict = self.read_json(real_path)
                 setattr(self, json_name, ConfigReader(config_dict))
+            except FileNotFoundError as e:
+                errors.append(f"Warning: Config file not found: {json_path} - {e}")
+            except PermissionError as e:
+                errors.append(f"Error: Permission denied when reading: {json_path} - {e}")
+            except json.JSONDecodeError as e:
+                errors.append(f"Error: Invalid JSON format in {json_path}: {e}")
+            except Exception as e:
+                errors.append(f"Error: Unexpected error loading {json_path}: {e}")
+
+        if errors:
+            for error in errors:
+                print(error)
+            raise RuntimeError("One or more config files failed to load. See above errors.")
 
     @staticmethod
     def read_json(json_path):

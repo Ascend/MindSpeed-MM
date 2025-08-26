@@ -91,6 +91,7 @@ MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功�
 - [posttrain_vlm_grpo.py](https://gitee.com/ascend/MindSpeed-MM/blob/master/posttrain_vlm_grpo.py)
 - [posttrain_sora_dpo](https://gitee.com/ascend/MindSpeed-MM/blob/master/posttrain_sora_dpo.py)
 - [posttrain_qwen2vl_dpo](https://gitee.com/ascend/MindSpeed-MM/blob/master/posttrain_qwen2vl_dpo.py)
+- [posttrain_flux_dancegrpo](https://gitee.com/ascend/MindSpeed-MM/blob/master/posttrain_flux_dancegrpo.py)
 - [pretrain_deepseekvl](https://gitee.com/ascend/MindSpeed-MM/blob/master/pretrain_deepseekvl.py)
 - [pretrain_llava](https://gitee.com/ascend/MindSpeed-MM/blob/master/pretrain_llava.py)
 - [pretrain_sora](https://gitee.com/ascend/MindSpeed-MM/blob/master/pretrain_sora.py)
@@ -99,6 +100,8 @@ MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功�
 - [pretrain_internvl](https://gitee.com/ascend/MindSpeed-MM/blob/master/pretrain_internvl.py)
 - [pretrain_qwen2vl](https://gitee.com/ascend/MindSpeed-MM/blob/master/pretrain_qwen2vl.py)
 - [pretrain_vlm](https://gitee.com/ascend/MindSpeed-MM/blob/master/pretrain_vlm.py)
+- [pretrain_lumina](https://gitee.com/ascend/MindSpeed-MM/blob/master/pretrain_lumina.py)
+- [pretrain_videoalign](https://gitee.com/ascend/MindSpeed-MM/blob/master/pretrain_videoalign.py)
 
 ## 通信安全加固
 
