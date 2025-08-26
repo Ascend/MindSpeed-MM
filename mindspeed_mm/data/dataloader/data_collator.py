@@ -13,12 +13,11 @@ from transformers import WhisperProcessor
 
 from megatron.training import get_args
 from mindspeed_mm.data.data_utils.constants import MODEL_CONSTANTS
-from mindspeed_mm.data.data_utils.func_utils.collator import MultiModalDataCollatorForSeq2Seq, PairwiseDataCollatorWithPadding
-from mindspeed_mm.data.data_utils.func_utils.convert import load_tokenizer, IGNORE_INDEX, load_reward_tokenizer, VideoRewardProcessor
+from mindspeed_mm.data.data_utils.func_utils.collator import MultiModalDataCollatorForSeq2Seq, \
+    PairwiseDataCollatorWithPadding
+from mindspeed_mm.data.data_utils.func_utils.convert import load_tokenizer, IGNORE_INDEX
 from mindspeed_mm.data.data_utils.func_utils.model_args import ProcessorArguments
 from mindspeed_mm.data.data_utils.func_utils.template import get_template_and_fix_tokenizer
-from mindspeed_mm.data.data_utils.video_processor import VideoProcessor
-from mindspeed_mm.data.data_utils.video_reader import VideoReader
 from mindspeed_mm.data.data_utils.utils import get_value_from_args
 from mindspeed_mm.data.data_utils.constants import (
     PROMPT_IDS,
@@ -524,7 +523,6 @@ class DataCollatorForOpenSoraPlan:
                                       masked_video, input_mask)
         return processed_res
 
-
     @staticmethod
     def pad_to_multiple(number, ds_stride):
         remainder = number % ds_stride
@@ -565,58 +563,19 @@ class DataCollatorForQwen2vlDPO:
 
 class DataCollatorForVideoAlign:
     def __init__(self, dataset_param, **kwargs):
+        from mindspeed_mm.data.data_utils.func_utils.convert import reward_setting_processor, VideoRewardProcessor
         if not isinstance(dataset_param, dict):
             dataset_param = dataset_param.to_dict()
         preprocess_args_dict = dataset_param["preprocess_parameters"]
 
-        video_reader, video_processor, tokenizer, processor, model_args = self.reward_setting_processor(preprocess_args_dict)
+        video_reader, video_processor, tokenizer, processor, model_args = reward_setting_processor(preprocess_args_dict)
 
-        self.reward_processor = VideoRewardProcessor(None, tokenizer, processor, dataset_param, video_reader, video_processor)
-    
-    def reward_setting_processor(self, preprocess_args_dict):
-        eval_dim = preprocess_args_dict.pop("eval_dim", ["VQ"])
-        train_pipeline = preprocess_args_dict.pop("train_pipeline", {})
-        video_reader_type = preprocess_args_dict.pop('video_reader_type', "DecordVideo")
-        video_processor_type = preprocess_args_dict.pop('video_processor_type', "RewardVideoProcessor")
-        sample_type = preprocess_args_dict.pop('sample_type', "uniform")
-        sample_nframe = preprocess_args_dict.pop('sample_nframe', None)
-        fps = preprocess_args_dict.pop('fps', 2.0)
-        video_max_pixels = preprocess_args_dict.pop('video_max_pixels', 200704)
-        video_min_pixels = preprocess_args_dict.pop('video_min_pixels', 100352)
-
-        split_special_tokens = preprocess_args_dict.pop("split_special_tokens", False)
-
-        video_reader = VideoReader(video_reader_type=video_reader_type)
-        video_processor = VideoProcessor.create(
-            video_processor_type=video_processor_type,
-            fps=fps,
-            video_min_pixels=video_min_pixels,
-            video_max_pixels=video_max_pixels,
-            sample_type=sample_type,
-            sample_nframe=sample_nframe,
-            train_pipeline=train_pipeline
-        )
-
-        tokenizer_module = load_reward_tokenizer(preprocess_args_dict)
-        tokenizer, processor = tokenizer_module['tokenizer'], tokenizer_module['processor']
-
-        special_token_ids = None
-        token_embedding_length = None
-        if split_special_tokens:
-            special_tokens = ["<|VQ_reward|>", "<|MQ_reward|>", "<|TA_reward|>"]
-            tokenizer.add_special_tokens({"additional_special_tokens": special_tokens})
-            special_token_ids = tokenizer.convert_tokens_to_ids(special_tokens)
-            token_embedding_length = len(tokenizer)
-        
-        tokenizer_padding_side = "right"
-        pad_token_id = tokenizer.pad_token_id
-        model_args = {"special_token_ids": special_token_ids, "token_embedding_length": token_embedding_length,
-                    "tokenizer_padding_side": tokenizer_padding_side, "pad_token_id": pad_token_id}
-        return video_reader, video_processor, tokenizer, processor, model_args
+        self.reward_processor = VideoRewardProcessor(None, tokenizer, processor, dataset_param, video_reader,
+                                                     video_processor)
 
     def __call__(self, examples):
         process_data = self.reward_processor.preprocess_dataset(examples)
-        
+
         model_inputs = {
             'input_ids_A': process_data['A'][0]['input_ids'],
             'attention_mask_A': process_data['A'][0]['attention_mask'],

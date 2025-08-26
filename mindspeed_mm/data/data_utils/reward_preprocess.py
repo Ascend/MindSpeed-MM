@@ -1,5 +1,7 @@
 # Copyright 2025 The KwaiVGI team. All rights reserved.
 
+import copy
+
 import torch
 
 VIDEOSCORE_QUERY_PROMPT = """
@@ -119,8 +121,8 @@ def build_prompt(prompt, dimension, template_type):
                                     dimension_description=dimension_description,
                                     text_prompt=prompt)
     elif template_type == "video_score":
-        return VIDEOSCORE_QUERY_PROMPT.format(dimension_name=dimension_name, 
-                                              dimension_description=dimension_description, 
+        return VIDEOSCORE_QUERY_PROMPT.format(dimension_name=dimension_name,
+                                              dimension_description=dimension_description,
                                               text_prompt=prompt)
     elif template_type == "detailed_special":
         return DETAILED_PROMPT_WITH_SPECIAL_TOKEN.format(text_prompt=prompt)
@@ -131,26 +133,25 @@ def build_prompt(prompt, dimension, template_type):
 
 
 def fill_data_template(
-    data_folder,
-    relative_path,
-    prompt,
-    fps,
-    max_pixels,
-    num_frames,
-    eval_dim,
-    sample_nframe=None,
-    sample_type="uniform",
-    prompt_template_type="detailed_special",
-    ):
+        data_folder,
+        relative_path,
+        prompt,
+        fps,
+        max_pixels,
+        num_frames,
+        eval_dim,
+        sample_nframe=None,
+        sample_type="uniform",
+        prompt_template_type="detailed_special",
+):
     data_dict = [
         {
             "role": "user",
             "content": [
-                {   
+                {
                     "type": "video",
-                    
-                    "video": f"file://{data_folder}/{relative_path}", 
-                    "max_pixels": max_pixels, 
+                    "video": f"file://{data_folder}/{relative_path}",
+                    "max_pixels": max_pixels,
                     "fps": fps if sample_nframe is None else None,
                     "nframes": min(sample_nframe, num_frames) if sample_nframe is not None else None,
                     "sample_type": sample_type
@@ -165,8 +166,20 @@ def fill_data_template(
     return data_dict
 
 
+def clean_examples(example):
+    """
+    remove unnecessary keys from message(very very necessary)
+    """
+    clean_example = copy.deepcopy(example)
+    for i in range(len(example[0])):
+        for key in example[0]['content'][i].keys():
+            if example[0]['content'][i][key] is None:
+                clean_example[0]['content'][i].pop(key)
+    return clean_example
+
+
 def build_reward_data(example, data_folder, eval_dim, fps, video_max_pixels, sample_nframe=None, sample_type="uniform",
-                        prompt_template_type="detailed_special", **extra_block_kwargs):
+                      prompt_template_type="detailed_special", **extra_block_kwargs):
     A_data = fill_data_template(data_folder=data_folder,
                                 relative_path=example["path_A"],
                                 prompt=example["prompt"],
@@ -191,7 +204,7 @@ def build_reward_data(example, data_folder, eval_dim, fps, video_max_pixels, sam
     chosen_labels = []
     A_scores = []
     B_scores = []
-    
+
     for eval_dim_ in eval_dim:
         ### chosen_label: 1 if A is chosen, -1 if B is chosen, 0 if tied.
         ### 22 if invalid.
@@ -233,7 +246,7 @@ def build_reward_data(example, data_folder, eval_dim, fps, video_max_pixels, sam
     if 'metainfo_idx' in example:
         metainfo_idx = example['metainfo_idx']
 
-    return {"A_data": A_data, "B_data": B_data, 
-            "A_scores": A_scores, "B_scores": B_scores, 
+    return {"A_data": A_data, "B_data": B_data,
+            "A_scores": A_scores, "B_scores": B_scores,
             "chosen_label": chosen_labels,
             "metainfo_idx": metainfo_idx}

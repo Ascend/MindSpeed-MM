@@ -12,7 +12,7 @@ from checkpoint.vlm_model.hf_to_mm import vision_schema, PPStageSchema, split_by
     partition_state_dict_by_pp, save_by_vpp
 from checkpoint.vlm_model.mm_to_hf import load_from_mm, convert_mm_to_hf, merge_by_tp
 from checkpoint.vlm_model.operator import (
-    Operator, UpGateMergeOp, QKVMergeOp, RelocateOp, RenameOp, RowSplit, GLUSplit, ColSplit
+    Operator, UpGateMergeOp, QKVMergeOp, RelocateOp, RenameOp, ResizeEmbedOp, RowSplit, GLUSplit, ColSplit
 )
 
 
@@ -23,8 +23,8 @@ text_schema = PPStageSchema(
 )
 
 
-def create_videoalign_ops(new_transformers_weight_key: bool, model_prefix: str, vit_embed_dim: int, vit_num_heads: int, 
-                          llm_num_query_groups: int, llm_q_size: int, llm_kv_size: int) -> List[Operator]:
+def create_videoalign_ops(new_transformers_weight_key: bool, model_prefix: str, resize_vocab_size: int, vit_embed_dim: int,
+                          vit_num_heads: int, llm_num_query_groups: int, llm_q_size: int, llm_kv_size: int) -> List[Operator]:
     """videoalign权重转换逻辑"""
     model_prefix_name = model_prefix if model_prefix else ""
     if new_transformers_weight_key:
@@ -94,6 +94,9 @@ def create_videoalign_ops(new_transformers_weight_key: bool, model_prefix: str, 
             )
         ),
     ]
+
+    if resize_vocab_size:
+        ops.append(ResizeEmbedOp(fr'text_decoder.embedding.word_embeddings.weight', resize_vocab_size))
     return ops
 
 videoalign_tp_patterns = {
@@ -123,6 +126,9 @@ class ModelConfigVideoAlign(CommonModelConfig):
     model_prefix: Optional[str] = None
     """模型权重名包含额外前缀"""
 
+    resize_vocab_size: Optional[int] = None
+    """需要更改的vocab_size并同步更改word_embeddings的shape"""
+
 
 class ConvertVppMMConfigVideoAlign(ConvertVppMMConfigQwen2):
     pt_path: Optional[Path] = None
@@ -148,6 +154,7 @@ class VideoAlignConverter(Converter):
         llm_kv_size = llm_head_hidden_size
         ops = create_videoalign_ops(common_model_config.new_transformers_weight_key,
                                  common_model_config.model_prefix,
+                                 common_model_config.resize_vocab_size,
                                  hf_config.vision_config.embed_dim,
                                  hf_config.vision_config.num_heads,
                                  hf_config.num_key_value_heads,

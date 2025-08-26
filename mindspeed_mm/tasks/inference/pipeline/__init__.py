@@ -11,6 +11,7 @@ from mindspeed_mm.tasks.inference.pipeline.hunyuanvideo_pipeline import HunyuanV
 from mindspeed_mm.tasks.inference.pipeline.wan_pipeline import WanPipeline
 from mindspeed_mm.tasks.inference.pipeline.stepvideo_pipeline import StepVideoPipeline
 from mindspeed_mm.tasks.inference.pipeline.glm_pipeline import GlmPipeline
+from mindspeed_mm.tasks.inference.pipeline.videoalign_pipeline import VideoAlignPipeline
 
 sora_pipeline_dict = {"OpenSoraPlanPipeline": OpenSoraPlanPipeline,
                       "OpenSoraPipeline": OpenSoraPipeline,

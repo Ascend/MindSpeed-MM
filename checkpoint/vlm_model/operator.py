@@ -61,6 +61,37 @@ def get_layer_and_expert_num(pattern: str, names: Iterable[str]) -> Tuple[int, i
     return layer_num, expert_num
 
 
+def resize_embedding(tensor: Tensor, new_vocab_size: int, original_vocab_size: int = None) -> Tensor:
+    """
+    调整嵌入权重矩阵的大小
+    Args:
+        tensor: 原始嵌入权重，形状为 [vocab_size, hidden_size]
+        new_vocab_size: 目标词汇表大小
+        original_vocab_size: 原始词汇表大小（revert时使用）
+    """
+    old_vocab_size, hidden_size = tensor.shape
+    # revert时强制使用原始大小
+    target_size = original_vocab_size if original_vocab_size is not None else new_vocab_size
+
+    if target_size == old_vocab_size:
+        return tensor.clone()
+
+    # 创建新权重矩阵
+    new_tensor = torch.empty(target_size, hidden_size, device=tensor.device, dtype=tensor.dtype)
+
+    # 复制原有权重
+    copy_size = min(old_vocab_size, target_size)
+    new_tensor[:copy_size] = tensor[:copy_size].clone()
+
+    # 初始化新增部分（使用原分布的均值和标准差）
+    if target_size > old_vocab_size:
+        mean = tensor.mean().item()
+        std = tensor.std().item()
+        torch.nn.init.normal_(new_tensor[old_vocab_size:], mean=mean, std=std)
+
+    return new_tensor
+
+
 class Operator(ABC):
 
     @abstractmethod
@@ -342,6 +373,50 @@ class TieOp(Operator):
         pass
 
 
+class ResizeEmbedOp(Operator):
+    """调整词嵌入权重（word_embeddings.weight）的形状至指定词汇表大小"""
+
+    def __init__(self, name: str, new_vocab_size: int):
+        """Args: name:嵌入权重名称, new_vocab_size:目标词汇表大小"""
+        self.name = name  # 嵌入权重名称（固定单层）
+        self.new_vocab_size = new_vocab_size  # 目标大小
+        self.original_vocab_size = None  # 保存原始大小，用于反向恢复
+
+    def apply(self, weights: STATE_DICT_T) -> None:
+        """正向操作：将嵌入权重调整为新词汇表大小"""
+        # 检查权重是否存在且为2D嵌入矩阵
+        if self.name not in weights:
+            raise KeyError(f"weight: {self.name} not exist in state dict")
+        tensor = weights[self.name]
+        if tensor.ndim != 2:
+            raise ValueError(f"weight: {self.name} must be 2D tensor, but the actual shape is {tensor.shape}")
+
+        # 保存原始大小（仅首次apply时记录）
+        if self.original_vocab_size is None:
+            self.original_vocab_size = tensor.shape[0]
+
+        # 应用调整
+        weights[self.name] = resize_embedding(
+            tensor,
+            new_vocab_size=self.new_vocab_size
+        )
+
+    def revert(self, weights: STATE_DICT_T) -> None:
+        """反向操作：将嵌入权重恢复为原始大小"""
+        if self.name not in weights:
+            raise KeyError(f"weight: {self.name} not exist in state dict")
+        if self.original_vocab_size is None:
+            raise RuntimeError("No apply operation has been performed, so revert cannot be executed. ")
+
+        tensor = weights[self.name]
+        # 恢复为原始大小
+        weights[self.name] = resize_embedding(
+            tensor,
+            new_vocab_size=None,
+            original_vocab_size=self.original_vocab_size
+        )
+
+
 class BaseSplit(ABC):
     """Abstract base class for tensor splitting strategies."""
 
@@ -453,7 +528,6 @@ class UnalignedRowSplit(BaseSplit):
     @staticmethod
     def merge(tp_values: List[Tensor]) -> Tensor:
         return torch.cat(tp_values, dim=0)
-
 
 
 class UnalignedColSplit(BaseSplit):

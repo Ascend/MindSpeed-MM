@@ -25,18 +25,14 @@
                             "antialias": true,
                             "mode": "resize"
                         }
-                        
-					},
-                    {
-                        "trans_type": "ToTensorVideo"
-                    }
+					}
 				]
             }
         },
         "basic_parameters": {
             "template": null,
             "data_folder": "./data_folder/VideoGen-RewardBench/",
-            "data_path": "./data_folder/videogen-rewardbench.csv",
+            "data_path": "./data_folder/VideoGen-RewardBench/videogen-rewardbench.csv",
             "cache_dir": "./cache_dir",
             "streaming": false,
             "train_on_prompt": false,
@@ -61,11 +57,23 @@
         }
     },
     "inference_param": {
-        "data_path": "./data_folder/VideoGen-RewardBench/",
-        "save_path": "./data_folder/VideoGen-RewardBench/"
+        "data_folder": "./data_folder/VideoGen-RewardBench/",
+        "data_path": "./data_folder/VideoGen-RewardBench/videogen-rewardbench.csv",
+        "save_path": "./eval_result/",
+        "task": "evaluate",
+        "reward_attributes": ["VQ", "MQ", "TA", "Overall"],
+        "use_norm": false,
+        "norm_param": {
+            "VQ_mean": 3.6757,
+            "VQ_std": 2.2476,
+            "MQ_mean": 1.1646,
+            "MQ_std": 1.3811,
+            "TA_mean": 2.8105,
+            "TA_std": 2.5121
+        }
     },
     "dataloader_param": {
-        "dataloader_mode": "sampler", 
+        "dataloader_mode": "sampler",
         "drop_last": true,
         "sampler_type": "BaseRandomBatchSampler",
         "collate_param": {

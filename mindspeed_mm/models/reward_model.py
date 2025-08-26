@@ -20,13 +20,14 @@ class Qwen2VLRewardModelBT(VLMModel):
         self.output_dim = config.output_dim
         self.reward_token = config.reward_token
         self.loss_type = config.loss_type
+        self.loss_dtype = torch.bfloat16 if getattr(config.text_decoder, 'bf16', False) else torch.float32
         self.rm_head = nn.Linear(config.text_decoder.hidden_size, self.output_dim, bias=False)
 
         self.pad_token_id = extra_config['pad_token_id']
         self.special_token_ids = extra_config['special_token_ids']
         if self.special_token_ids is not None:
             self.reward_token = "special"
-        
+
     def forward(
             self,
             input_ids: torch.Tensor,
@@ -45,6 +46,7 @@ class Qwen2VLRewardModelBT(VLMModel):
             *args, **kwargs
     ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
         if self.add_image_encoder and pixel_values is not None:
+            pixel_values = pixel_values.to(self.loss_dtype)
             vit_embeds = self.image_encoder(pixel_values, image_grid_thw)
 
             if image_flags is not None:
@@ -93,8 +95,7 @@ class Qwen2VLRewardModelBT(VLMModel):
             )
 
             hidden_states = output.transpose(0, 1)
-            
-            logits = self.rm_head(hidden_states.to(hidden_states.device))    # [B, L, N]
+            logits = self.rm_head(hidden_states)  # [B, L, N]
 
             if input_ids is not None:
                 batch_size = input_ids.shape[0]
@@ -114,7 +115,7 @@ class Qwen2VLRewardModelBT(VLMModel):
                     sequence_lengths = sequence_lengths.to(logits.device)
                 else:
                     sequence_lengths = -1
-            
+
             ## get the last token's logits
             if self.reward_token == "last":
                 pooled_logits = logits[torch.arange(batch_size, device=logits.device), sequence_lengths]
@@ -128,7 +129,7 @@ class Qwen2VLRewardModelBT(VLMModel):
                 for special_token_id in self.special_token_ids:
                     special_token_mask = special_token_mask | (input_ids == special_token_id)
                 pooled_logits = logits[special_token_mask, ...]
-                pooled_logits = pooled_logits.view(batch_size, 3, -1)   # [B, 3, N] asslert 3 attributes
+                pooled_logits = pooled_logits.view(batch_size, 3, -1)  # [B, 3, N] asslert 3 attributes
                 if self.output_dim == 3:
                     pooled_logits = pooled_logits.diagonal(dim1=1, dim2=2)
                 pooled_logits = pooled_logits.view(batch_size, -1)

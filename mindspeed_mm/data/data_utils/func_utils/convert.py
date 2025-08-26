@@ -26,7 +26,8 @@ from transformers import PreTrainedTokenizer, ProcessorMixin, AutoProcessor, Aut
 
 from mindspeed_mm.data.data_utils.func_utils.log import get_logger
 from mindspeed_mm.data.data_utils.func_utils.model_args import ProcessorArguments
-
+from mindspeed_mm.data.data_utils.video_processor import VideoProcessor
+from mindspeed_mm.data.data_utils.video_reader import VideoReader
 
 IGNORE_INDEX = -100
 
@@ -697,13 +698,13 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
 
 class PairwiseDatasetProcessor(DatasetProcessor):
     def _encode_data_example(
-        self,
-        prompt: List[Dict[str, str]],
-        response: List[Dict[str, str]],
-        system: Optional[str],
-        images: List["ImageInput"],
-        videos: List["VideoInput"],
-        audios: List["AudioInput"],
+            self,
+            prompt: List[Dict[str, str]],
+            response: List[Dict[str, str]],
+            system: Optional[str],
+            images: List["ImageInput"],
+            videos: List["VideoInput"],
+            audios: List["AudioInput"],
     ) -> Tuple[List[int], List[int], List[int], List[int]]:
         chosen_messages = self.template.mm_plugin.process_messages(
             prompt + [response[0]], images, videos, audios, self.processor
@@ -786,20 +787,11 @@ class PairwiseDatasetProcessor(DatasetProcessor):
 
 class VideoRewardProcessor(DatasetProcessor):
     def __init__(self, template, tokenizer, processor, data_args, video_reader, video_processor):
-        super().__init__(template, tokenizer, processor, data_args,)
+        from mindspeed_mm.data.data_utils.reward_preprocess import clean_examples
+        super().__init__(template, tokenizer, processor, data_args, )
         self.video_reader = video_reader
         self.video_processor = video_processor
-    
-    def _clean_examples(self, example):
-        """
-        remove unnecessary keys from message(very very necessary)
-        """
-        clean_example = copy.deepcopy(example)
-        for i in range(len(example[0])):
-            for key in example[0]['content'][i].keys():
-                if example[0]['content'][i][key] is None:
-                    clean_example[0]['content'][i].pop(key)
-        return clean_example
+        self.clean_examples = clean_examples
 
     def _pad_sequence(self, sequences, attention_mask, max_len, padding_side='right'):
         """
@@ -807,7 +799,7 @@ class VideoRewardProcessor(DatasetProcessor):
         """
         if sequences.shape[1] >= max_len:
             return sequences, attention_mask
-        
+
         pad_len = max_len - sequences.shape[1]
         padding = (0, pad_len) if padding_side == 'right' else (pad_len, 0)
 
@@ -820,25 +812,25 @@ class VideoRewardProcessor(DatasetProcessor):
         self,
     ) -> Tuple[List[int], List[int]]:
         has_idx = "metainfo_idx" in self.examples and self.examples["metainfo_idx"] is not None
-        
-        A_data = self._clean_examples(self.examples['A_data'])
-        B_data = self._clean_examples(self.examples['B_data'])
 
-        video_inputs_A = self.video_processor(self.video_reader(A_data[0]['content'][0]["video"]))
-        video_inputs_B = self.video_processor(self.video_reader(B_data[0]['content'][0]["video"]))
+        A_data = self.clean_examples(self.examples['A_data'])
+        B_data = self.clean_examples(self.examples['B_data'])
+
+        video_inputs_A = self.video_processor(self.video_reader(A_data[0]['content'][0]["video"])) / 255.0
+        video_inputs_B = self.video_processor(self.video_reader(B_data[0]['content'][0]["video"])) / 255.0
 
         batch_A = self.processor(
-            text=self.processor.apply_chat_template(A_data, tokenize=False, add_generation_prompt=True),
+            text=self.processor.apply_chat_template([A_data], tokenize=False, add_generation_prompt=True),
             images=None,
-            videos=video_inputs_A,
+            videos=[video_inputs_A],
             padding=True,
             return_tensors="pt",
             videos_kwargs={"do_rescale": False},
         )
         batch_B = self.processor(
-            text=self.processor.apply_chat_template(B_data, tokenize=False, add_generation_prompt=True),
+            text=self.processor.apply_chat_template([B_data], tokenize=False, add_generation_prompt=True),
             images=None,
-            videos=video_inputs_B,
+            videos=[video_inputs_B],
             padding=True,
             return_tensors="pt",
             videos_kwargs={"do_rescale": False},
@@ -877,11 +869,53 @@ class VideoRewardProcessor(DatasetProcessor):
             model_inputs["chosen_label"].append(example["chosen_label"])
 
         return model_inputs
-    
+
     def print_data_example(self, example: Dict[str, List[int]]) -> None:
         print("chosen_label:\n{}".format(example["chosen_label"]))
         print("A_scores:\n{}".format(A_scores))
         print("B_scores:\n{}".format(B_scores))
+
+
+def reward_setting_processor(preprocess_args_dict):
+    eval_dim = preprocess_args_dict.pop("eval_dim", ["VQ"])
+    train_pipeline = preprocess_args_dict.pop("train_pipeline", {})
+    video_reader_type = preprocess_args_dict.pop('video_reader_type', "DecordVideo")
+    video_processor_type = preprocess_args_dict.pop('video_processor_type', "RewardVideoProcessor")
+    sample_type = preprocess_args_dict.pop('sample_type', "uniform")
+    sample_nframe = preprocess_args_dict.pop('sample_nframe', None)
+    fps = preprocess_args_dict.pop('fps', 2.0)
+    video_max_pixels = preprocess_args_dict.pop('video_max_pixels', 200704)
+    video_min_pixels = preprocess_args_dict.pop('video_min_pixels', 100352)
+
+    split_special_tokens = preprocess_args_dict.pop("split_special_tokens", False)
+
+    video_reader = VideoReader(video_reader_type=video_reader_type)
+    video_processor = VideoProcessor.create(
+        video_processor_type=video_processor_type,
+        fps=fps,
+        video_min_pixels=video_min_pixels,
+        video_max_pixels=video_max_pixels,
+        sample_type=sample_type,
+        sample_nframe=sample_nframe,
+        train_pipeline=train_pipeline
+    )
+
+    tokenizer_module = load_reward_tokenizer(preprocess_args_dict)
+    tokenizer, processor = tokenizer_module['tokenizer'], tokenizer_module['processor']
+
+    special_token_ids = None
+    token_embedding_length = None
+    if split_special_tokens:
+        special_tokens = ["<|VQ_reward|>", "<|MQ_reward|>", "<|TA_reward|>"]
+        tokenizer.add_special_tokens({"additional_special_tokens": special_tokens})
+        special_token_ids = tokenizer.convert_tokens_to_ids(special_tokens)
+        token_embedding_length = len(tokenizer)
+
+    tokenizer_padding_side = "right"
+    pad_token_id = tokenizer.pad_token_id
+    model_args = {"special_token_ids": special_token_ids, "token_embedding_length": token_embedding_length,
+                  "tokenizer_padding_side": tokenizer_padding_side, "pad_token_id": pad_token_id}
+    return video_reader, video_processor, tokenizer, processor, model_args
 
 
 def infer_seqlen(source_len: int, target_len: int, cutoff_len: int) -> Tuple[int, int]:
