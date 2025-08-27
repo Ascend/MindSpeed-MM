@@ -20,6 +20,7 @@ from mindspeed_mm.models.vlm_model import VLMModel
 from mindspeed_mm.patchs import dummy_optimizer_patch
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.utils.transformer_model_config import get_model_config
+from mindspeed_mm.utils.hetero_parallel import change_parallel_state, apply_hetero_parallel_hooks
 mindspeed_args = get_mindspeed_args()
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
     import mindspeed_mm.mindspore.mindspore_adaptor
@@ -41,6 +42,10 @@ def model_provider(pre_process=True, post_process=True, modules=None):
     _configure_modules(vlm_config, modules)
 
     model = VLMModel(vlm_config)
+
+    if args.hetero_parallel:
+        print_rank_0("apply hetero parallel ...")
+        apply_hetero_parallel_hooks(model)
 
     _apply_freezing(model, vlm_config)
 
@@ -146,6 +151,10 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
     """Build train, valid, and test datasets."""
     args = get_args()
     data_config = args.mm.data
+    if args.hetero_parallel:
+        print_rank_0("change parallel state for data loader ...")
+        change_parallel_state("text_decoder")
+
     datasets = build_mm_dataset(data_config.dataset_param)
     build_dataloader = partial(
         build_mm_dataloader,

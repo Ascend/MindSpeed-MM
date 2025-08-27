@@ -98,6 +98,10 @@ def _add_training_args(parser):
     group.add_argument('--recompute-num-layers-skip-core-attention',
                        type=int,
                        default=0)
+    group.add_argument('--hetero-parallel',
+                       action='store_true',
+                       default=False,
+                       help='apply different parallelism to different models')
 
     return parser
 

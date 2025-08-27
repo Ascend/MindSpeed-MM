@@ -10,7 +10,7 @@ from megatron.core.tensor_parallel import scatter_to_sequence_parallel_region
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.tensor_parallel.mappings import gather_from_sequence_parallel_region
 
-from megatron.training import get_args
+from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
 
 from mindspeed_mm.models.common.module_spec.get_layer_spec import get_vit_layer_spec, get_llm_layer_spec, \
@@ -21,6 +21,7 @@ from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.text_encoder.text_encoder import TextEncoder
 from mindspeed_mm.models.common.mm_gpt_model import MMGPTModel
 from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positionsids_mask_for_llm
+from mindspeed_mm.utils.hetero_parallel import change_parallel_state
 
 
 class VLMModel(MultiModalModule):
@@ -49,8 +50,9 @@ class VLMModel(MultiModalModule):
 
     def __init__(self, config) -> None:
         super().__init__(config=config)
+        args = get_args()
 
-        self.config = core_transformer_config_from_args(get_args())
+        self.config = core_transformer_config_from_args(args)
         self.pre_process: bool = config.pre_process
         self.post_process: bool = config.post_process
         self.reward_process: bool = getattr(config, 'reward_process', False)
@@ -90,6 +92,9 @@ class VLMModel(MultiModalModule):
         if self.add_audio_encoder:
             self.audio_encoder = self._build_audio_encoder_model(config.audio_encoder)
 
+        if args.hetero_parallel:
+            change_parallel_state('text_decoder')
+
     def shared_embedding_or_output_weight(self):
         """
         This is a convenience method to surface the language model's word embeddings, which is
@@ -102,6 +107,19 @@ class VLMModel(MultiModalModule):
     def _build_image_encoder_model(self, config):
         vit_layer_spec = get_vit_layer_spec(config.vision_encoder)
         proj_layer_spec = get_projector_layer_spec(config.vision_projector)
+
+        if get_args().hetero_parallel:
+            change_parallel_state('image_encoder')
+
+            self.pp_size = mpu.get_pipeline_model_parallel_world_size()
+            self.enable_vp = mpu.get_virtual_pipeline_model_parallel_world_size() is not None
+            if self.enable_vp:
+                self.vp_rank = mpu.get_virtual_pipeline_model_parallel_rank()
+                self.vp_size = mpu.get_virtual_pipeline_model_parallel_world_size()
+            self.pp_rank = mpu.get_pipeline_model_parallel_rank()
+            print_rank_0(f'initial: image_encoder pp size is {self.pp_size}')
+            print_rank_0(f'initial: image_encoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
+            print_rank_0(f'initial: image_encoder dp size is {mpu.get_data_parallel_world_size()}')
 
         if self.pp_size <= 1:
             return VisionModel(
@@ -168,6 +186,18 @@ class VLMModel(MultiModalModule):
     def _build_audio_encoder_model(self, config):
         audio_layer_spec = get_audio_layer_spec(config.audio_encoder)
 
+        if get_args().hetero_parallel:
+            change_parallel_state('audio_encoder')
+            self.pp_size = mpu.get_pipeline_model_parallel_world_size()
+            self.enable_vp = mpu.get_virtual_pipeline_model_parallel_world_size() is not None
+            if self.enable_vp:
+                self.vp_rank = mpu.get_virtual_pipeline_model_parallel_rank()
+                self.vp_size = mpu.get_virtual_pipeline_model_parallel_world_size()
+            self.pp_rank = mpu.get_pipeline_model_parallel_rank()
+            print_rank_0(f'initial: audio_encoder pp size is {self.pp_size}')
+            print_rank_0(f'initial: audio_encoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
+            print_rank_0(f'initial: audio_encoder dp size is {mpu.get_data_parallel_world_size()}')
+
         if self.pp_size <= 1:
             return AudioModel(
                 config=config,
@@ -229,6 +259,20 @@ class VLMModel(MultiModalModule):
 
 
     def _build_text_decoder_model(self, config):
+        if get_args().hetero_parallel:
+            change_parallel_state('text_decoder')
+            self.pre_process = mpu.is_pipeline_first_stage()
+            self.post_process = mpu.is_pipeline_last_stage()
+            self.pp_size = mpu.get_pipeline_model_parallel_world_size()
+            self.enable_vp = mpu.get_virtual_pipeline_model_parallel_world_size() is not None
+            if self.enable_vp:
+                self.vp_rank = mpu.get_virtual_pipeline_model_parallel_rank()
+                self.vp_size = mpu.get_virtual_pipeline_model_parallel_world_size()
+            self.pp_rank = mpu.get_pipeline_model_parallel_rank()
+            print_rank_0(f'initial: text_decoder pp size is {self.pp_size}')
+            print_rank_0(f'initial: text_decoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
+            print_rank_0(f'initial: text_decoder dp size is {mpu.get_data_parallel_world_size()}')
+
         if self.pp_size <= 1:
             return MMGPTModel(
                 config=config,

@@ -52,7 +52,10 @@
             "freeze": true,
             "layernorm_epsilon": 1e-06,
             "normalization": "RMSNorm"
-        }
+        },
+        "tp":1,
+        "pp":1,
+        "cp":1
     },
     "audio_encoder": {
         "audio_encoder": {
@@ -79,7 +82,10 @@
             "n_window": 100,
             "scale_embedding": false,
             "output_dim": 3584
-        }
+        },
+        "tp":1,
+        "pp":1,
+        "cp":1
     },
     "text_decoder": {
         "model_id": "qwen2_5_omni_thinker",
