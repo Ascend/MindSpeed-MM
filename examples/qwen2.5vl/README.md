@@ -9,7 +9,7 @@
   - [参考实现](#参考实现)
   - [变更记录](#变更记录)
 - [环境安装](#jump1)
-  - [仓库拉取](#jump1.1)
+  - [环境准备](#jump1.1)
   - [环境搭建](#jump1.2)
 - [权重下载及转换](#jump2)
   - [权重下载](#jump2.1)
@@ -18,7 +18,7 @@
   - [权重重切分](#jump2.4)
 - [数据集准备及处理](#jump3)
   - [数据集下载](#jump3.1)
-  - [混合数据集处理](#jump3.2)  
+  - [混合数据集处理](#jump3.2)
 - [微调](#jump4)
   - [准备工作](#jump4.1)
   - [配置参数](#jump4.2)
@@ -56,14 +56,16 @@ commit_id=fa56dcc
 <a id="jump1"></a>
 ## 环境安装
 
+<a id="jump1.1"></a>
+#### 1. 环境准备
+
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)，完成昇腾软件安装。
 
-<a id="jump1.1"></a>
-#### 1. 仓库拉取
-
-```shell
+<a id="jump1.2"></a>
+#### 2. 环境搭建
+```bash
 git clone https://gitee.com/ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
@@ -71,38 +73,17 @@ git checkout core_v0.12.1
 cp -r megatron ../MindSpeed-MM/
 cd ..
 cd MindSpeed-MM
-mkdir logs
-mkdir data
-mkdir ckpt
-```
-
-<a id="jump1.2"></a>
-#### 2. 环境搭建
-
-```bash
-# python3.10
-conda create -n test python=3.10
-conda activate test
-
-# 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
-# 下载路径参考 https://www.hiascend.com/document/detail/zh/Pytorch/60RC3/configandinstg/instg/insg_0001.html
-pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
-pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
-
-# apex for Ascend 参考 https://gitee.com/ascend/apex
-# 建议从原仓编译安装
-
+mkdir logs data ckpt
 # 安装加速库
 git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 6d63944cb2470a0bebc38dfb65299b91329b8d92
-pip install -r requirements.txt
-pip3 install -e .
-cd ..
-# 安装其余依赖库
+# 安装mindspeed及依赖
 pip install -e .
-
+cd ..
+# 安装mindspeed mm及依赖
+pip install -e .
 ```
 
 ---
