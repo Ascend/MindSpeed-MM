@@ -1,8 +1,7 @@
-import os
 from typing import List, cast
 
-from checkpoint.common.constant import SAFE_MODE
 from checkpoint.common.converter import Converter
+from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.hf_to_mm import PPStageSchema, text_schema, convert_hf_to_mm
 from checkpoint.vlm_model.operator import (
@@ -171,7 +170,7 @@ class DeepSeekVLConverter(Converter):
 
         convert_hf_to_mm(cfg, ops, deepseek_vl_tp_patterns, [vision_schema, text_schema])
         # 安全管控权限
-        os.chmod(cfg.mm_dir, SAFE_MODE)
+        set_directory_permissions(cfg.mm_dir)
 
     @staticmethod
     def mm_to_hf(cfg: ConvertHFConfig):

@@ -1,4 +1,5 @@
-SAFE_MODE = 0o750
+DIR_MODE = 0o750
+FILE_MODE = 0o640
 DIGIT_FMT = r'(\d+)'
 MEGATRON_CKPT_NAME = "model_optim_rng.pt"
 LATEST_TXT = "latest_checkpointed_iteration.txt"

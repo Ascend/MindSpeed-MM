@@ -1,10 +1,9 @@
-import os
 from typing import Any, cast, List
 
 from tqdm import tqdm
 
-from checkpoint.common.constant import SAFE_MODE
 from checkpoint.common.converter import Converter
+from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema, split_by_tp, convert_hf_to_mm, merge_vpp_index, \
     partition_state_dict_by_pp, save_by_vpp
@@ -134,7 +133,7 @@ class Qwen2VLConverter(Converter):
 
         convert_hf_to_mm(cfg, ops, qwen2vl_tp_patterns, [vision_schema, text_schema])
         # 安全管控权限
-        os.chmod(cfg.mm_dir, SAFE_MODE)
+        set_directory_permissions(cfg.mm_dir)
 
     @staticmethod
     def mm_to_hf(cfg: ConvertHFConfig):
@@ -142,7 +141,7 @@ class Qwen2VLConverter(Converter):
         ops = Qwen2VLConverter._create_ops(cfg.hf_config.config)
         convert_mm_to_hf(cfg, ops, qwen2vl_tp_patterns)
         # 安全管控权限
-        os.chmod(cfg.save_hf_dir, SAFE_MODE)
+        set_directory_permissions(cfg.save_hf_dir)
 
     @staticmethod
     def resplit(cfg: ConvertResplitConfig):
@@ -159,4 +158,4 @@ class Qwen2VLConverter(Converter):
                         pp_and_vpp_size=(target.pp_size, 1),
                         tp_rank=tp_rank)
         # 安全管控权限
-        os.chmod(cfg.target_dir, SAFE_MODE)
+        set_directory_permissions(cfg.target_dir)

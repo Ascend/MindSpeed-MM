@@ -6,14 +6,12 @@
 @Desc    : glm4.1v huggingface模型转换成mindspeed-mm模型
 
 """
-import os
-from copy import deepcopy
-from typing import Callable, Any, List, Dict, cast
+from typing import Any, List, cast
 
 from checkpoint.common.converter import Converter
-from checkpoint.common.constant import SAFE_MODE
-from checkpoint.vlm_model.hf_to_mm import load_from_hf, convert_hf_to_mm, PPStageSchema
+from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
+from checkpoint.vlm_model.hf_to_mm import convert_hf_to_mm, PPStageSchema
 from checkpoint.vlm_model.operator import (
     Operator, UpGateMergeOp, QKVMergeOp, RenameOp,
 )
@@ -127,7 +125,7 @@ class GlmConverter(Converter):
 
         convert_hf_to_mm(cfg, ops, glm_tp_patterns, [glm_vision_schema, glm_text_schema])
         # 安全管控权限
-        os.chmod(cfg.mm_dir, SAFE_MODE)
+        set_directory_permissions(cfg.mm_dir)
 
     @staticmethod
     def mm_to_hf(cfg: ConvertHFConfig):

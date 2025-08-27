@@ -33,6 +33,8 @@ import mindspeed.megatron_adaptor
 import torch
 import torch_npu
 
+from checkpoint.common.permissions import set_directory_permissions
+
 
 def get_latest_iteration(path: Path) -> str:
     """从指定路径读取最新的迭代号."""
@@ -154,4 +156,5 @@ if __name__ == '__main__':
         print(f"Error creating directory:{e}")
 
     merge_model(base_save_dir, lora_save_dir, merge_save_dir, pp_size, tp_size)
+    set_directory_permissions(Path(merge_save_dir))
     print('Finished!')

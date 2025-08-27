@@ -1,10 +1,9 @@
-import os
 from typing import Any, cast, List
 
 from tqdm import tqdm
 
-from checkpoint.common.constant import SAFE_MODE
 from checkpoint.common.converter import Converter
+from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.vlm_model import hf_to_mm, mm_to_hf
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.converters.qwen2vl import create_qwen2vl_ops, qwen2vl_tp_patterns
@@ -78,7 +77,7 @@ class Qwen2_5_VLConverter(Converter):
 
         hf_to_mm.convert_hf_to_mm(cfg, ops, qwen2_5_vl_tp_patterns, [vision_schema, text_schema])
         # 安全管控权限
-        os.chmod(cfg.mm_dir, SAFE_MODE)
+        set_directory_permissions(cfg.mm_dir)
 
     @staticmethod
     def mm_to_hf(cfg: ConvertHFConfig):
@@ -86,7 +85,7 @@ class Qwen2_5_VLConverter(Converter):
         ops = Qwen2_5_VLConverter._create_ops(cfg.hf_config.config)
         mm_to_hf.convert_mm_to_hf(cfg, ops, qwen2_5_vl_tp_patterns)
         # 安全管控权限
-        os.chmod(cfg.save_hf_dir, SAFE_MODE)
+        set_directory_permissions(cfg.save_hf_dir)
 
     @staticmethod
     def resplit(cfg: ConvertResplitConfig):
@@ -103,4 +102,4 @@ class Qwen2_5_VLConverter(Converter):
                         pp_and_vpp_size=(target.pp_size, 1),
                         tp_rank=tp_rank)
         # 安全管控权限
-        os.chmod(cfg.target_dir, SAFE_MODE)
+        set_directory_permissions(cfg.target_dir)

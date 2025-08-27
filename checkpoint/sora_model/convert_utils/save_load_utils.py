@@ -7,8 +7,8 @@ import stat
 import shutil
 import torch
 from safetensors.torch import load_file, save_file
-
-
+from checkpoint.common.permissions import set_directory_permissions
+from checkpoint.common.constant import FILE_MODE
 MEGATRON_LASTEST_ITERATION_FILE_NAME = "latest_checkpointed_iteration.txt"
 MEGATRON_MODEL_KEY = "model"
 MEGATRON_CKPT_NAME = "model_optim_rng.pt"
@@ -99,6 +99,8 @@ def save_as_mm(save_dir, state_dicts, latest_checkpointed_iteration="release"):
                 save_dict[MEGATRON_MODEL_KEY] = state_dict
             torch.save(save_dict, save_path)
 
+    set_directory_permissions(Path(save_dir))
+
 
 def load_from_hf(hf_dir):
     if not os.path.exists(hf_dir):
@@ -143,6 +145,8 @@ def save_as_hf(state_dict, hf_dir, save_dir):
         name = f'model-{index:05}-of-{len(state_dicts):05}.safetensors'
         save_file(state_dict, os.path.join(save_dir, name), metadata=metadata)
 
+    set_directory_permissions(Path(save_dir))
+
 
 def load_pt(source_path, module_name=None):
     state_dict = torch.load(source_path, map_location='cpu')
@@ -153,6 +157,7 @@ def load_pt(source_path, module_name=None):
 
 def save_as_pt(state_dict, target_path):
     torch.save(state_dict, target_path)
+    os.chmod(target_path, FILE_MODE)
 
 
 def load_from_layerzero(source_path, iteration=None, prefix=None, ema_model=False, for_release=True):

@@ -1,12 +1,12 @@
-import os
 from typing import Any, List
 
-from checkpoint.common.constant import SAFE_MODE
 from checkpoint.common.converter import Converter
-from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
+from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.vlm_model import hf_to_mm, mm_to_hf
+from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.operator import (
-    ColSplit, GLUSplit, Operator, RowSplit, UnalignedColSplit, UnalignedEmbeddingSplit, UnalignedRowSplit, UpGateMergeOp, QKVMergeOp, RenameOp
+    ColSplit, GLUSplit, Operator, RowSplit, UnalignedColSplit, UnalignedEmbeddingSplit, UnalignedRowSplit,
+    UpGateMergeOp, QKVMergeOp, RenameOp
 )
 
 
@@ -191,7 +191,7 @@ class InternVLConverter(Converter):
 
         hf_to_mm.convert_hf_to_mm(cfg, ops, intern_vl_tp_patterns, [vision_schema, hf_to_mm.text_schema])
         # 安全管控权限
-        os.chmod(cfg.mm_dir, SAFE_MODE)
+        set_directory_permissions(cfg.mm_dir)
 
     @staticmethod
     def mm_to_hf(cfg: ConvertHFConfig):
@@ -202,7 +202,7 @@ class InternVLConverter(Converter):
         intern_vl_tp_patterns = create_internvl_tp_patterns(cfg.hf_config.config.vision_config.num_attention_heads)
         mm_to_hf.convert_mm_to_hf(cfg, ops, intern_vl_tp_patterns)
         # 安全管控权限
-        os.chmod(cfg.save_hf_dir, SAFE_MODE)
+        set_directory_permissions(cfg.save_hf_dir)
 
     @staticmethod
     def resplit(cfg: ConvertResplitConfig):

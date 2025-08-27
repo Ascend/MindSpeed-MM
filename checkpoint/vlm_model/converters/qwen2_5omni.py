@@ -1,8 +1,7 @@
-import os
 from typing import Any, cast, Tuple, List
 
-from checkpoint.common.constant import SAFE_MODE
 from checkpoint.common.converter import Converter
+from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.vlm_model import hf_to_mm, mm_to_hf
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.converters.qwen2_5vl import qwen2_5_vl_tp_patterns
@@ -189,7 +188,7 @@ class Qwen2_5_OmniConverter(Converter):
 
         hf_to_mm.convert_hf_to_mm(cfg, ops, qwen2_5_omni_tp_patterns, [vision_schema, text_schema, audio_schema])
         # 安全管控权限
-        os.chmod(cfg.mm_dir, SAFE_MODE)
+        set_directory_permissions(cfg.mm_dir)
 
     @staticmethod
     def mm_to_hf(cfg: ConvertHFConfig):
@@ -197,7 +196,7 @@ class Qwen2_5_OmniConverter(Converter):
         ops, config = Qwen2_5_OmniConverter._create_ops(cfg.hf_config.config)
         mm_to_hf.convert_mm_to_hf(cfg, ops, qwen2_5_omni_tp_patterns, merge_source=True)
         # 安全管控权限
-        os.chmod(cfg.save_hf_dir, SAFE_MODE)
+        set_directory_permissions(cfg.save_hf_dir)
 
     @staticmethod
     def resplit(cfg: ConvertResplitConfig):
