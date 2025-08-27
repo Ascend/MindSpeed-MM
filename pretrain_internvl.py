@@ -82,12 +82,12 @@ def get_batch(data_iterator, is_vit_last_stage=False):
     """Generate a batch."""
     need_split = False
     if get_args().dist_train:
-        from mindspeed.multi_modal.dist_train.inner_data_parallel.utils import need_inner_data_parallel
+        from mindspeed.core.multi_modal.dist_train.utils import need_inner_data_parallel
         need_split = need_inner_data_parallel()
     if data_iterator is not None:
         if get_args().dist_train and need_split:
-            from mindspeed.multi_modal.dist_train.inner_data_parallel.utils import get_global_data_parallel_size
-            from mindspeed.multi_modal.dist_train.inner_data_parallel.inner_data_parallel import get_inner_data_parallel_world_size
+            from mindspeed.core.multi_modal.dist_train.utils import get_global_data_parallel_size
+            from mindspeed.core.multi_modal.dist_train.inner_data_parallel import get_inner_data_parallel_world_size
             index = mpu.get_data_parallel_rank() // get_inner_data_parallel_world_size()
             dp_size = get_global_data_parallel_size()
             for i in range(dp_size):
@@ -106,7 +106,7 @@ def get_batch(data_iterator, is_vit_last_stage=False):
     image_flags = batch["image_flags"].to(torch.cuda.current_device())
 
     if need_split:
-        from mindspeed.multi_modal.dist_train.inner_data_parallel.mappings import split_data
+        from mindspeed.core.multi_modal.dist_train.inner_data_parallel import split_data
         image = split_data(image)
     batch = {
         "input_ids": input_ids,

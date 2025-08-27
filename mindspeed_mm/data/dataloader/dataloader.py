@@ -238,8 +238,8 @@ def prepare_sampler_dataloader(
     elif sampler_type == "BaseRandomBatchSampler":
         need_split = False
         if get_args().dist_train:
-            from mindspeed.multi_modal.dist_train.inner_data_parallel.utils import need_inner_data_parallel, get_global_data_parallel_size
-            from mindspeed.multi_modal.dist_train.inner_data_parallel.inner_data_parallel import get_inner_data_parallel_world_size
+            from mindspeed.core.multi_modal.dist_train.utils import need_inner_data_parallel, get_global_data_parallel_size
+            from mindspeed.core.multi_modal.dist_train.inner_data_parallel import get_inner_data_parallel_world_size
             need_split = need_inner_data_parallel()
         if need_split:
             num_replicas = get_global_data_parallel_size()

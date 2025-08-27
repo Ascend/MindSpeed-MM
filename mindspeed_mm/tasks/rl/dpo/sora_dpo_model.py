@@ -31,7 +31,7 @@ class SoRADPOModel(nn.Module):
         self.config = core_transformer_config_from_args(args)
         self.task = getattr(config, "task", "t2v")
         if args.dist_train:
-            from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
         self.pre_process = mpu.is_pipeline_first_stage() if not args.dist_train else is_in_subworld('vae')  # vae subworld
         self.post_process = mpu.is_pipeline_last_stage()
         self.input_tensor = None
@@ -61,7 +61,7 @@ class SoRADPOModel(nn.Module):
         predictor_config = copy.deepcopy(config.predictor)
 
         if args.dist_train:
-            from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
             if is_in_subworld('dit'):
                 self.reference = PredictModel(predictor_config_ref).get_model().eval()
                 self.reference.requires_grad_(False)
@@ -211,7 +211,7 @@ class SoRADPOModel(nn.Module):
         if not get_args().dist_train:
             state_dict = self.actor.state_dict(prefix=prefix, keep_vars=keep_vars)
             return state_dict
-        from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+        from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
         if is_in_subworld('dit'):
             return self.actor.state_dict(prefix=prefix, keep_vars=keep_vars)
         return None
@@ -219,7 +219,7 @@ class SoRADPOModel(nn.Module):
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         """Customized load."""
         if get_args().dist_train:
-            from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
             if is_in_subworld('vae'):
                 return None
         if not isinstance(state_dict, Mapping):

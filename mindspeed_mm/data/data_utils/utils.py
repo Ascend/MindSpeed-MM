@@ -1031,8 +1031,8 @@ def cal_gradient_accumulation_size():
                   * mpu.get_context_parallel_world_size() * mpu.get_pipeline_model_parallel_world_size())
     
     if getattr(args, "dist_train", False):
-        from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
-        from mindspeed.multi_modal.dist_train.config.dist_train_config import get_dist_model_config
+        from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
+        from mindspeed.core.multi_modal.dist_train.dist_train_config import get_dist_model_config
         if is_in_subworld("vae"):
             dit_cfg = get_dist_model_config('dit')
             acc = int(

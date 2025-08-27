@@ -74,7 +74,7 @@ class InternVLModel(MultiModalModule):
 
         args = get_args()
         if args.dist_train:
-            from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
             if is_in_subworld("gpt"):
                 self.add_image_encoder = False
                 self.add_video_encoder = False
@@ -362,8 +362,8 @@ class InternVLModel(MultiModalModule):
                             transfer
                         )
                 if get_args().dist_train:
-                    from mindspeed.multi_modal.dist_train.inner_data_parallel.mappings import gather_from_inner_dp_region
-                    from mindspeed.multi_modal.dist_train.inner_data_parallel.utils import need_inner_data_parallel
+                    from mindspeed.core.multi_modal.dist_train.inner_data_parallel import gather_from_inner_dp_region
+                    from mindspeed.core.multi_modal.dist_train.utils import need_inner_data_parallel
                     if need_inner_data_parallel():
                         vit_embeds = gather_from_inner_dp_region(
                             vit_embeds,

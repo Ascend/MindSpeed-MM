@@ -81,7 +81,7 @@ class SoRAModel(nn.Module):
 
         # build inner moudule
         if args.dist_train:
-            from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
         self.pre_process = mpu.is_pipeline_first_stage() if not args.dist_train else is_in_subworld(
             'vae')  # vae subworld
         self.post_process = mpu.is_pipeline_last_stage()
@@ -106,7 +106,7 @@ class SoRAModel(nn.Module):
 
         self.diffusion = DiffusionModel(config.diffusion).get_model()
         if args.dist_train:
-            from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
             if is_in_subworld('dit'):
                 self.predictor = PredictModel(config.predictor).get_model()
         else:
@@ -248,7 +248,7 @@ class SoRAModel(nn.Module):
             if self.is_enable_lora:
                 state_dict = self.state_dict_for_save_lora_checkpoint(state_dict)
             return state_dict
-        from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+        from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
         if is_in_subworld('dit'):
             return self.predictor.state_dict(prefix=prefix, keep_vars=keep_vars)
         return None
@@ -256,7 +256,7 @@ class SoRAModel(nn.Module):
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         """Customized load."""
         if get_args().dist_train:
-            from mindspeed.multi_modal.dist_train.parallel_state import is_in_subworld
+            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
             if is_in_subworld('vae'):
                 return None
         if not isinstance(state_dict, Mapping):
