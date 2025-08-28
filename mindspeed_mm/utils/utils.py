@@ -16,7 +16,7 @@
 import os
 import importlib
 from functools import lru_cache
-from typing import Type, Any, Dict
+from typing import Type, Any, Dict, List, Optional
 from einops import rearrange
 
 import torch
@@ -445,3 +445,93 @@ def change_tensor_layout(tensor, src_layout, dst_layout, batch_size=None):
             raise ValueError(f"Unsupported input type {type(tensor)}")
     else:
         raise ValueError(f"Unsupported layout conversion from {src_layout} to {dst_layout}!")
+
+
+def reorder_output(attn_output, cp_rank, cp_size, cp_group, dim=0):
+    index_this_rank = torch.tensor([cp_rank, (2 * cp_size - cp_rank - 1)], dtype=torch.int8, device=attn_output.device)
+    index_list = [torch.zeros_like(index_this_rank, device=attn_output.device) for _ in range(cp_size)]
+    torch.distributed.all_gather(index_list, index_this_rank, group=cp_group)
+
+    index_list = [int(item) for item in list(torch.concat(index_list))]
+    index_map = {element: idx for idx, element in enumerate(index_list)}
+    target = [i for i in range(len(index_list))]
+    target_list = [index_map[element] for element in target]
+    
+    chunks = torch.chunk(attn_output, chunks=len(target_list), dim=dim)
+    reordered_chunks = [chunks[idx] for idx in target_list]
+    attn_output = torch.concat(reordered_chunks, dim=dim)
+    return attn_output
+
+
+def _gather(
+    input_: torch.Tensor,
+    pg: torch.distributed.ProcessGroup,
+    dim: int = -1,
+    gather_size: List = None
+):
+    input_ = input_.contiguous()
+    world_size = torch.distributed.get_world_size(group=pg)
+
+    if input_.device.type not in ["cpu", "npu"]:
+        raise AssertionError(f"Only support cpu and npu device, got {input_.device}")
+
+    if world_size == 1:
+        return input_
+    
+    if gather_size is not None:
+        tensor_list = []
+        tensor_shape_base = input_.size()
+        for i in range(world_size):
+            tensor_shape = list(tensor_shape_base)
+            tensor_shape[dim] = gather_size[i]
+            tensor_list.append(torch.empty(tensor_shape, dtype=input_.dtype, device=input_.device))
+    else:
+        tensor_list = [torch.empty_like(input_) for _ in range(world_size)]
+
+    torch.distributed.all_gather(tensor_list, input_, group=pg)
+
+    output = torch.cat(tensor_list, dim=dim).contiguous()
+    return output
+
+
+class _SplitForwardGatherBackWardWithMegatronCP(torch.autograd.Function):
+    '''
+    Split the input tensor in the forward pass and gather the gradients in the backward pass. 
+    It will be implemented in Mindspeed in the future.
+    '''
+    @staticmethod
+    def forward(ctx, val, cp_rank, cp_size, seq_dim, cp_group=None):
+        val = val.view(
+            *val.shape[0:seq_dim],
+            2 * cp_size,
+            val.shape[seq_dim] // (2 * cp_size),
+            *val.shape[(seq_dim + 1):],
+        )
+        index = torch.tensor([cp_rank, (2 * cp_size - cp_rank - 1)], device=val.device)
+        val = val.index_select(seq_dim, index)
+        val = val.view(*val.shape[0:seq_dim], -1, *val.shape[(seq_dim + 2):])
+
+        ctx.cp_group = cp_group
+        ctx.cp_rank = cp_rank
+        ctx.cp_size = cp_size
+        ctx.seq_dim = seq_dim
+
+        return val
+        
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad_input = {}
+        grad_input = _gather(grad_output, ctx.cp_group, dim=ctx.seq_dim) / ctx.cp_size
+        grad_input = reorder_output(grad_input, ctx.cp_rank, ctx.cp_size, ctx.cp_group, dim=ctx.seq_dim)
+        return grad_input, None, None, None, None
+
+
+def split_forward_gather_backward_with_megatron_cp(
+        input_: torch.Tensor,
+        process_group: torch.distributed.ProcessGroup,
+        dim: int = 0
+) -> torch.Tensor:
+    cp_size = torch.distributed.get_world_size(group=process_group)
+    cp_rank = torch.distributed.get_rank(group=process_group)
+
+    return _SplitForwardGatherBackWardWithMegatronCP.apply(input_, cp_rank, cp_size, dim, process_group)

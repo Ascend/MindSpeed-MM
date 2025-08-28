@@ -138,7 +138,7 @@ def loss_func(output_tensor):
     averaged_loss = average_losses_across_data_parallel_group([loss])
     loss_dir["loss"] = averaged_loss[0]
     loss = loss.unsqueeze(0).clone()
-    return loss, loss_dir
+    return loss / mpu.get_context_parallel_world_size(), loss_dir
 
 
 def forward_step(data_iterator, model):

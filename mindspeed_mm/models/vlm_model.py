@@ -1,18 +1,20 @@
 # Copyright (c) 2023; NVIDIA CORPORATION. All rights reserved.
 from typing import Optional, Dict, Tuple, Union
-import torch
+
+import torch 
 from torch.nn import CrossEntropyLoss
 
 from megatron.core import InferenceParams, mpu
 from megatron.core import tensor_parallel
-from megatron.core.parallel_state import get_tensor_model_parallel_group
-from megatron.core.tensor_parallel import scatter_to_sequence_parallel_region
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.tensor_parallel.mappings import gather_from_sequence_parallel_region
 
 from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
 
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import gather_forward_split_backward, cal_split_sizes
+
+from mindspeed_mm.utils.utils import split_forward_gather_backward_with_megatron_cp
 from mindspeed_mm.models.common.module_spec.get_layer_spec import get_vit_layer_spec, get_llm_layer_spec, \
     get_projector_layer_spec, get_audio_layer_spec
 from mindspeed_mm.models.vision.vision_model import VisionModel
@@ -416,6 +418,25 @@ class VLMModel(MultiModalModule):
 
         return loss
 
+    def compute_megatron_cp_loss(self, logits, labels):
+        # split and shift labels
+        shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
+        labels = split_forward_gather_backward_with_megatron_cp(shift_labels, mpu.get_context_parallel_group(), 1)
+
+        if mpu.get_context_parallel_rank() == 0:
+            logits = logits[..., :-1, :].contiguous()
+            labels = labels[..., :-1].contiguous()
+
+        # 如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
+        loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), labels)
+        loss = loss * (labels > -1)
+        token_nums = torch.sum(labels > -1)
+
+        total_loss = gather_forward_split_backward(loss, mpu.get_context_parallel_group(), dim=-1)
+        torch.distributed.all_reduce(token_nums, group=mpu.get_context_parallel_group())
+
+        loss = total_loss.sum() / token_nums
+        return loss
 
     def forward(
             self,
@@ -477,8 +498,6 @@ class VLMModel(MultiModalModule):
                         audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
                         input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
                     input_embeds = input_embeds.transpose(0, 1)
-                    if self.config.sequence_parallel:
-                        input_embeds = scatter_to_sequence_parallel_region(input_embeds)
 
             attention_mask, position_ids = prepare_positionsids_mask_for_llm(config=self.config, input_ids=input_ids,
                                                                              inference_params=inference_params,
@@ -503,12 +522,15 @@ class VLMModel(MultiModalModule):
                 output = output.contiguous().float()
                 loss = None
                 if labels is not None:
-                    # if use TP then must use compute_megatron_loss, if do not use TP, then two loss are ok, but they are not equal
-                    global_args = get_args()
-                    if global_args.tensor_model_parallel_size > 1:
-                        loss = self.compute_megatron_loss(output, labels)
+                    if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "megatron_cp_algo":
+                        loss = self.compute_megatron_cp_loss(output, labels)
                     else:
-                        loss = self.compute_loss(output, labels)
+                        # if use TP then must use compute_megatron_loss, if do not use TP, then two loss are ok, but they are not equal
+                        global_args = get_args()
+                        if global_args.tensor_model_parallel_size > 1:
+                            loss = self.compute_megatron_loss(output, labels)
+                        else:
+                            loss = self.compute_loss(output, labels)
                 return {
                     "loss": loss,
                     "logits": output

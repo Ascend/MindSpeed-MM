@@ -527,7 +527,7 @@ class Qwen2VLViT(MultiModalModule):
         if get_args().sequence_parallel:
             hidden_states = scatter_to_sequence_parallel_region(hidden_states)
 
-        if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
+        if mpu.get_context_parallel_world_size() > 1:
             split_gather_sizes = cal_split_sizes(hidden_states.shape[0], mpu.get_context_parallel_world_size())
             rotary_pos_emb = split_forward_gather_backward(
                 rotary_pos_emb,
@@ -556,7 +556,7 @@ class Qwen2VLViT(MultiModalModule):
             cu_window_seqlens=cu_window_seqlens
         )
 
-        if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
+        if mpu.get_context_parallel_world_size() > 1:
             hidden_states = gather_forward_split_backward(
                 hidden_states,
                 mpu.get_context_parallel_group(),

@@ -23,7 +23,6 @@ from mindspeed.megatron_adaptor import get_mindspeed_args
 from mindspeed.model.transformer import get_attention_mask
 from mindspeed.ops.fusion_attention_v2 import npu_fusion_attention
 from mindspeed.patch_utils import MindSpeedPatchesManager as pm
-from mindspeed.utils import get_batch_on_this_cp_rank
 
 from mindspeed_mm.utils.utils import ensure_valid
 
@@ -151,22 +150,8 @@ def vlm_cp_dot_product_attention_forward(
         cp_para['cp_size'] = cp_size
         cp_para['rank'] = rank
 
-        # add split and gather qkv
-        split_gather_sizes = cal_split_sizes(query.shape[0], cp_size)
         if cp_para['causal']:
-            batch_data = dict()
-            batch_data['query'] = query.transpose(0, 1)
-            batch_data['key'] = key.transpose(0, 1)
-            batch_data['value'] = value.transpose(0, 1)
-            batch_data_this_rank = get_batch_on_this_cp_rank(batch_data)
-            query = batch_data_this_rank['query'].transpose(0, 1)
-            key = batch_data_this_rank['key'].transpose(0, 1)
-            value = batch_data_this_rank['value'].transpose(0, 1)
             attention_mask = torch.triu(torch.ones([2048, 2048], dtype=torch.bool, device=query.device), diagonal=1)
-        else:
-            query = split_forward_gather_backward(query, cp_group, 0, split_gather_sizes)
-            key = split_forward_gather_backward(key, cp_group, 0, split_gather_sizes)
-            value = split_forward_gather_backward(value, cp_group, 0, split_gather_sizes)
 
         query, key, value = [rearrange(x, 's b h d -> s b (h d)') for x in [query, key, value]]
         if self.config.context_parallel_algo in ['megatron_cp_algo', 'hybrid_cp_algo']:
@@ -195,10 +180,6 @@ def vlm_cp_dot_product_attention_forward(
             output = ringattn_context_parallel(query, key, value, n_head, cp_para, scale, attention_mask,
                                                 self.attention_dropout.p,
                                                 packed_seq_params)
-            # gather forward split backward
-            output = gather_forward_split_backward(output, cp_group, 0, split_gather_sizes)
-            if cp_para['causal']:
-                output = reorder_output(output, rank, cp_size, cp_group)
         else:
             cp_para['scheduling_info'] = get_scheduling_info()
             output = adaptive_attn_context_parallel(query, key, value, n_head, cp_para, scale, attention_mask,
@@ -250,22 +231,6 @@ def vlm_cp_dot_product_attention_forward(
         if packed_seq_params is not None:
             output = rearrange(output, '(b s) h d -> s b (h d)', s=seq_length, b=bsz)
     return output
-
-
-def reorder_output(attn_output, cp_rank, cp_size, cp_group):
-    index_this_rank = torch.tensor([cp_rank, (2 * cp_size - cp_rank - 1)], dtype=torch.int8, device=attn_output.device)
-    index_list = [torch.zeros_like(index_this_rank, device=attn_output.device) for _ in range(cp_size)]
-    torch.distributed.all_gather(index_list, index_this_rank, group=cp_group)
-
-    index_list = [int(item) for item in list(torch.concat(index_list))]
-    index_map = {element: idx for idx, element in enumerate(index_list)}
-    target = [i for i in range(len(index_list))]
-    target_list = [index_map[element] for element in target]
-    
-    chunks = torch.chunk(attn_output, chunks=len(target_list), dim=0)
-    reordered_chunks = [chunks[idx] for idx in target_list]
-    attn_output = torch.concat(reordered_chunks, dim=0)
-    return attn_output
 
 
 mindspeed_args = get_mindspeed_args()

@@ -5,13 +5,14 @@ from typing import Dict, Literal, Optional, Tuple, Union
 import torch
 from torch import Tensor
 
-from megatron.core import InferenceParams, parallel_state, tensor_parallel, mpu
+from megatron.core import InferenceParams, tensor_parallel, mpu
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.models.common.embeddings.language_model_embedding import LanguageModelEmbedding
 from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEmbedding
 from megatron.core.models.common.language_module.language_module import LanguageModule
 from megatron.core.packed_seq_params import PackedSeqParams
-from megatron.core.transformer.enums import AttnMaskType, ModelType
+from megatron.core.tensor_parallel import scatter_to_sequence_parallel_region
+from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
@@ -21,7 +22,7 @@ from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mappi
 from mindspeed.utils import set_actual_seq_len
 from mindspeed_mm.models.common.embeddings.rope import DynamicRotaryEmbedding
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2VLRotaryEmbedding_llm
-from mindspeed_mm.utils.utils import ensure_valid
+from mindspeed_mm.utils.utils import ensure_valid, split_forward_gather_backward_with_megatron_cp
 from mindspeed_mm.models.vision.vision_encoders.glm4v_vl_vit_model import GlmTransformerBlock, Glm4vRotaryEmbedding_llm
 
 
@@ -226,16 +227,28 @@ class MMGPTModel(LanguageModule):
             )
             set_actual_seq_len(tuple(cu_seqlens[1:].cpu().numpy().tolist()))
 
-        if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
+        if mpu.get_context_parallel_world_size() > 1:
             split_gather_sizes = cal_split_sizes(input_ids.shape[-1], mpu.get_context_parallel_world_size())
-            input_ids = split_forward_gather_backward(input_ids, mpu.get_context_parallel_group(), 1,
-                                                        split_gather_sizes, "down")
-            position_ids = split_forward_gather_backward(position_ids, mpu.get_context_parallel_group(), 2,
-                                                        split_gather_sizes, "down")
-            if self.pre_process:
-                decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0,
-                                                            split_gather_sizes, "down")
 
+            if get_args().context_parallel_algo == "ulysses_cp_algo":
+                input_ids = split_forward_gather_backward(input_ids, mpu.get_context_parallel_group(), 1,
+                                                            split_gather_sizes, "down")
+                position_ids = split_forward_gather_backward(position_ids, mpu.get_context_parallel_group(), 2,
+                                                            split_gather_sizes, "down")
+                if self.pre_process:
+                    decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0,
+                                                                split_gather_sizes, "down")
+                    
+            elif get_args().context_parallel_algo == "megatron_cp_algo":
+                input_ids = split_forward_gather_backward_with_megatron_cp(input_ids, mpu.get_context_parallel_group(), dim=1)
+                if position_ids is not None:
+                    position_ids = split_forward_gather_backward_with_megatron_cp(position_ids, mpu.get_context_parallel_group(), dim=2)
+                if self.pre_process:
+                    decoder_input = split_forward_gather_backward_with_megatron_cp(decoder_input, mpu.get_context_parallel_group(), dim=0)
+
+        # sp must be after cp
+        if self.config.sequence_parallel and self.pre_process:
+            decoder_input = scatter_to_sequence_parallel_region(decoder_input)
 
         # Rotary positional embeddings (embedding is None for PP intermediate devices)
         rotary_pos_emb = None
