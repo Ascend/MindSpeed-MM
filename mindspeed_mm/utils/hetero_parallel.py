@@ -122,9 +122,9 @@ def initial_modules_mpu(reuse_module, args):
     parallel_configs = parallel_config_extract(args_dict)
     for parallel_config in parallel_configs:
         module = next(iter(parallel_config))
-        TP = parallel_config[module]["TP"]
-        CP = parallel_config[module]["CP"]
-        PP = parallel_config[module]["PP"]
+        TP = parallel_config[module]["tp"]
+        CP = parallel_config[module]["cp"]
+        PP = parallel_config[module]["pp"]
 
         if module not in _ParallelStatesDict:
             _ParallelStatesDict[module] = {}
