@@ -89,7 +89,7 @@ def audio_encoder_forward_hook(module, input, output):
 
 
 def parallel_config_extract(args_dict):
-    targets = ["TP", "CP", "PP"]
+    targets = ["tp", "cp", "pp"]
     results = []
 
     def dfs(curr, par_key=None):
