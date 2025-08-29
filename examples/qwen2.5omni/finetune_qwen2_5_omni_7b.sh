@@ -49,6 +49,7 @@ GPT_ARGS="
     --pipeline-model-parallel-size ${PP} \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
+    --context-parallel-size ${CP} \
     --tokenizer-type NullTokenizer \
     --vocab-size 152064 \
     --seq-length 3072 \
