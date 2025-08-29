@@ -123,6 +123,12 @@ MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工�
 
 以InternVL2-8B为例，使用命令如下
 
+如果在权重转换过程中发生错误，请从Huggingface等网站下载最新权重并重新转换。如问题仍然存在，请提交issue，我们会第一时间为您解答。
+
+> **为什么需要下载最新权重？**
+> 
+> 权重转换过程中会调用transformers的相关API（如`AutoConfig`）。随着transformers版本的升级，旧版本权重文件可能与新版本的transformers不兼容，因此建议使用最新权重以确保转换成功。
+
 
 ```bash
 # 根据实际情况修改 ascend-toolkit 路径
@@ -613,15 +619,15 @@ NPUS_PER_NODE=4
 
 <a id="jump8"></a>
 ## 环境变量声明
-ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏
-ASCEND_GLOBAL_LOG_LEVEL： 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志。0：对应DEBUG级别，1：对应INFO级别，2：对应WARNING级别，3：对应ERROR级别，4：对应NULL级别，不输出日志
-TASK_QUEUE_ENABLE： 用于控制开启task_queue算子下发队列优化的等级，0：关闭，1：开启Level 1优化，2：开启Level 2优化
-COMBINED_ENABLE： 设置combined标志。设置为0表示关闭此功能；设置为1表示开启，用于优化非连续两个算子组合类场景
-CPU_AFFINITY_CONF： 控制CPU端算子任务的处理器亲和性，即设定任务绑核，设置0或未设置：表示不启用绑核功能， 1：表示开启粗粒度绑核， 2：表示开启细粒度绑核
-HCCL_CONNECT_TIMEOUT:  用于限制不同设备之间socket建链过程的超时等待时间，需要配置为整数，取值范围[120,7200]，默认值为120，单位s
-HCCL_EXEC_TIMEOUT： 控制设备间执行时同步等待的时间，在该配置时间内各设备进程等待其他设备执行通信同步
-PYTORCH_NPU_ALLOC_CONF： 控制缓存分配器行为
-ACLNN_CACHE_LIMIT： 配置单算子执行API在Host侧缓存的算子信息条目个数
-TOKENIZERS_PARALLELISM： 用于控制Hugging Face的transformers库中的分词器（tokenizer）在多线程环境下的行为
-NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量
+ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏  
+ASCEND_GLOBAL_LOG_LEVEL： 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志。0：对应DEBUG级别，1：对应INFO级别，2：对应WARNING级别，3：对应ERROR级别，4：对应NULL级别，不输出日志  
+TASK_QUEUE_ENABLE： 用于控制开启task_queue算子下发队列优化的等级，0：关闭，1：开启Level 1优化，2：开启Level 2优化  
+COMBINED_ENABLE： 设置combined标志。设置为0表示关闭此功能；设置为1表示开启，用于优化非连续两个算子组合类场景  
+CPU_AFFINITY_CONF： 控制CPU端算子任务的处理器亲和性，即设定任务绑核，设置0或未设置：表示不启用绑核功能， 1：表示开启粗粒度绑核， 2：表示开启细粒度绑核  
+HCCL_CONNECT_TIMEOUT:  用于限制不同设备之间socket建链过程的超时等待时间，需要配置为整数，取值范围[120,7200]，默认值为120，单位s  
+HCCL_EXEC_TIMEOUT： 控制设备间执行时同步等待的时间，在该配置时间内各设备进程等待其他设备执行通信同步  
+PYTORCH_NPU_ALLOC_CONF： 控制缓存分配器行为  
+ACLNN_CACHE_LIMIT： 配置单算子执行API在Host侧缓存的算子信息条目个数  
+TOKENIZERS_PARALLELISM： 用于控制Hugging Face的transformers库中的分词器（tokenizer）在多线程环境下的行为  
+NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量  
 <a id="jump9"></a>

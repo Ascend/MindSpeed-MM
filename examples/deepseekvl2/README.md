@@ -93,7 +93,7 @@ MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工�
 `mm-convert`工具详细用法参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 
 **注意**
-1. DeepSeekVL权重转换依赖deepseekvl2包，安装过程参考[链接](https://github.com/deepseek-ai/DeepSeek-VL2)。
+1. DeepSeekVL权重转换依赖deepseekvl2包，安装过程参考[链接](https://github.com/deepseek-ai/DeepSeek-VL2)。deepseekvl2包与特定版本的transformers兼容，建议安装transformers 4.45.0或transformers 4.38.2版本以确保兼容性。
 2. 转换前需要在hf格式权重目录下，修改config.json的`"_attn_implementation"`字段改为`"eager"`。
 
 转换命令如下
