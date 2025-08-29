@@ -92,7 +92,7 @@ GRPO_ARGS="
     --clip_range 1e-4 \
     --adv_clip_max 5.0 \
     --hps_reward_save $HPS_REWARD_SAVE_PATH \
-    --sample_batch_size 12 \
+    --sample_batch_size 4 \
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
