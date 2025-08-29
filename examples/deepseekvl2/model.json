@@ -3,6 +3,7 @@
     "text_decoder": {
         "model_id": "deepseek",
         "num_layers": 30,
+        "pipeline_num_layers": [13, 17],
         "hidden_size": 2560,
         "num_attention_heads": 32,
         "num_query_groups": 32,
@@ -66,6 +67,8 @@
         "global_view_pos": "head",
         "vision_encoder": {
             "model_id": "SigLip",
+            "num_layers": 27,
+            "pipeline_num_layers": [27, 0],
             "params_dtype": "bf16",
             "model_name": "siglip_so400m_patch14_384",
             "image_size": 384,

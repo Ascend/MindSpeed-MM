@@ -23,9 +23,9 @@ WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 MBS=1
 GRAD_ACC_STEP=2
 TP=1
-PP=1
+PP=2
 CP=1
-EP=8
+EP=4
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
@@ -76,6 +76,7 @@ GPT_ARGS="
     --bf16 \
     --normalization RMSNorm \
     --use-fused-rmsnorm \
+    --variable-seq-lengths \
     --no-load-optim \
     --no-load-rng \
     --no-save-optim \
@@ -95,7 +96,6 @@ MLA_ARGS="
 "
 
 MOE_ARGS="
-    --moe-grouped-gemm \
     --moe-permutation-async-comm \
     --moe-token-dispatcher-type alltoall \
 "

@@ -14,14 +14,14 @@ export ACLNN_CACHE_LIMIT=100000
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
-NNODES=1
+NNODES=4
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 MBS=1
-GRAD_ACC_STEP=64
+GRAD_ACC_STEP=16
 TP=1
-PP=1
+PP=2
 CP=1
 EP=8
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
@@ -75,6 +75,7 @@ GPT_ARGS="
     --load $LOAD_PATH \
     --normalization RMSNorm \
     --use-fused-rmsnorm \
+    --variable-seq-lengths \
     --no-load-optim \
     --no-load-rng \
     --no-save-optim \
@@ -95,7 +96,6 @@ MLA_ARGS="
 "
 
 MOE_ARGS="
-    --moe-grouped-gemm \
     --moe-permutation-async-comm \
     --moe-token-dispatcher-type alltoall \
 "
