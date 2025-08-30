@@ -29,6 +29,14 @@ def dot_product_attention_forward_impl(
         attention_bias: Tensor = None,
         packed_seq_params: Optional[PackedSeqParams] = None,
 ):
+    if packed_seq_params is None:
+        seq_length, bsz, n_head, head_dim = (
+            query.shape[0], query.shape[1], query.shape[2], query.shape[3]
+        )
+    else:
+        seq_length, n_head, head_dim = (
+            query.shape[0], query.shape[1], query.shape[2]
+        )
     use_remove_padding = getattr(self.config, 'use_remove_padding', False)
     if use_remove_padding:
         from mindspeed.utils import get_actual_seq_len
@@ -50,10 +58,6 @@ def dot_product_attention_forward_impl(
             sparse_mode=3)[0].reshape(seq_length, bsz, -1)
 
     else:
-        seq_length, bsz, n_head, head_dim = (
-            query.shape[0], query.shape[1], query.shape[2], query.shape[3]
-        )
-
         sparse_mode = self.config.sparse_mode
         if attn_mask_type == AttnMaskType.no_mask:
             sparse_mode = 0  # default mask
@@ -64,17 +68,15 @@ def dot_product_attention_forward_impl(
             else self.softmax_scale
         )
 
-        if packed_seq_params is not None:  # TND
-            actual_seq_qlen = packed_seq_params.cu_seqlens_q.tolist()
-            actual_seq_kvlen = packed_seq_params.cu_seqlens_kv.tolist()
-            query, key, value = (
-                [
-                    rearrange(x, 's b h d -> (b s) h d')
-                    for x in [query, key, value]
-                ]
-            )
+        if packed_seq_params is not None: # TND
+            if isinstance(packed_seq_params.cu_seqlens_q, list):
+                actual_seq_qlen = packed_seq_params.cu_seqlens_q
+                actual_seq_kvlen = packed_seq_params.cu_seqlens_kv
+            else:
+                actual_seq_qlen = packed_seq_params.cu_seqlens_q.tolist()
+                actual_seq_kvlen = packed_seq_params.cu_seqlens_kv.tolist()
             shape_order = 'TND'
-        else:  # SBH
+        else: # SBH
             actual_seq_qlen = None
             actual_seq_kvlen = None
             query, key, value = (
@@ -101,14 +103,5 @@ def dot_product_attention_forward_impl(
             actual_seq_qlen=actual_seq_qlen,
             actual_seq_kvlen=actual_seq_kvlen
         )[0]
-
-        if packed_seq_params is not None:
-            output = (
-                rearrange(
-                    output,
-                    '(b s) h d -> s b (h d)',
-                    s=seq_length, b=bsz
-                )
-            )
 
     return output

@@ -18,6 +18,7 @@
   - [日志打点指标说明](#jump4.3)
 - [断点续训](#jump5)
 - [注意事项](#jump6)
+- [性能数据](#jump7)
 
 <a id="jump0"></a>
 ## 简介
@@ -56,6 +57,8 @@ cp -r megatron ../MindSpeed-MM/
 cd ..
 
 cd MindSpeed-MM
+# 安装mm-convert工具
+pip install -e . --no-deps
 mkdir -p logs data ckpt
 cd ..
 ```
@@ -85,20 +88,18 @@ git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
-pip install -r requirements.txt
 cp -r mindspeed ../MindSpeed-MM/
 cd ..
 
 # 下载MindSpeed RL
 git clone https://gitee.com/ascend/MindSpeed-RL.git
 cd MindSpeed-RL
+git checkout 6cb2e0d61eed19460d24575f65005930b8335329
 pip install -r requirements.txt
 cp -r mindspeed_rl ../MindSpeed-MM/
 cd ..
 
 cd MindSpeed-MM
-# 安装mm-convert工具
-pip install -e . --no-deps
 # MindSpeed/Megatron 中文件替换（必选）
 bash examples/rl/scripts/copy_adaptor_to_mindspeed.sh
 cd ..
@@ -134,6 +135,7 @@ pip install numpy==1.26.4
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh
 cd vllm-ascend
+pip install -r requirements-dev.txt
 # 因为前面已经安装了对应的torch_npu版本，这里需要将vllm_ascend文件中的requirements.txt中的torch-npu==2.5.1注释
 # 安装时若编译失败，可以关闭编译：export COMPILE_CUSTOM_KERNELS=0
 python setup.py develop
@@ -345,3 +347,15 @@ sudo apt-get install iproute2
 ```shell
 pip install "ray[default]" debugpy
 ```
+
+---
+<a id="jump7"></a>
+## 性能数据
+
+| 模型                  | 机器型号     | GBS | n_samples | max_prompt_length | max_tokens | 端到端 tps | 
+|---------------------|----------|-----|-----------|-------------------|------------|---------| 
+| Qwen25VL-3B           | Atlas A3 | 256  | 5         | 1024              | 2048       | 3606     | 
+| Qwen25VL-7B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 4133     | 
+| Qwen25VL-32B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 626     |
+
+注：模型 token/p/s 性能数据会打印在日志中, 当前计算公式下，A3单卡性能需要将日志打印的token/p/s性能指数*2。
