@@ -16,6 +16,7 @@ from mindspeed_mm.tasks.evaluation.reward_impl.utils.eval_accuracy import calc_a
 from mindspeed_mm.configs.config import mm_extra_args_provider
 from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.patchs.patch_manager import PatchesManager
+from mindspeed_mm.utils.security_utils.input_filter import sanitize_dataframe
 
 mindspeed_args = get_mindspeed_args()
 
@@ -125,11 +126,13 @@ def main():
             print(
                 f"{df_infer_single.loc[batch_idx, 'path']} reward: VQ:{rewards[i]['VQ']}, MQ:{rewards[i]['MQ']}, TA:{rewards[i]['TA']}, Overall:{rewards[i]['Overall']}")
 
-    df_infer_single.to_csv(os.path.join(save_path, 'reward_out_single.csv'), index=False)
+    df_infer_single_ = sanitize_dataframe(df_infer_single)
+    df_infer_single_.to_excel(os.path.join(save_path, 'reward_out_single.xlsx'), index=False, engine='openpyxl')
 
     if task == 'evaluate':
         df_infer_pair = convert_single_to_pair(df_input_pair, df_infer_single)
-        df_infer_pair.to_csv(os.path.join(save_path, "reward_out_pair.csv"), index=False)
+        df_infer_pair_ = sanitize_dataframe(df_infer_pair)
+        df_infer_pair_.to_excel(os.path.join(save_path, "reward_out_pair.xlsx"), index=False, engine='openpyxl')
 
         reward_attributes = getattr(inference_param, 'reward_attributes', ["VQ", "MQ", "TA", "Overall"])
         eval_results = {}
