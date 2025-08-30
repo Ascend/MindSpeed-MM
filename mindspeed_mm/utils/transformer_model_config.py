@@ -56,6 +56,17 @@ def get_model_config(config):
     else:
         t_config["activation_func"] = F.gelu
 
+    if t_config.get("kv_channels") is None and t_config.get("hidden_size") and t_config.get("num_attention_heads"):
+        t_config["kv_channels"] = t_config["hidden_size"] // t_config["num_attention_heads"]
+    if t_config.get("ffn_hidden_size") is None and t_config.get("hidden_size"):
+        t_config["ffn_hidden_size"] = 4 * t_config["hidden_size"]
+    if t_config.get("num_attention_heads") is None:
+        t_config["num_attention_heads"] = 0
+    if t_config.get("num_query_groups") is None and t_config.get("num_attention_heads"):
+        t_config["num_query_groups"] = t_config.get("num_attention_heads")
+    if t_config.get("cp_comm_type") is None:
+        t_config["cp_comm_type"] = None
+
     if getattr(global_args, "multi_latent_attention", False):
         t_config["rope_type"] = "rope"
         trans_config = MLATransformerConfig(**t_config)

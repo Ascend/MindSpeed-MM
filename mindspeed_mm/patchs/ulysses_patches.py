@@ -74,6 +74,10 @@ class UlyssesContextAttention(torch.nn.Module):
             args_list[0] = attention_mask
             args = tuple(args_list)
 
+        if packed_seq_params is not None:
+            query = query.unsqueeze(1)
+            key = key.unsqueeze(1)
+            value = value.unsqueeze(1)
         scatter_sizes_query = cal_split_sizes(query.shape[self.scatter_idx], dist.get_world_size(self.spg))
         scatter_sizes_key = cal_split_sizes(key.shape[self.scatter_idx], dist.get_world_size(self.spg))
         scatter_sizes_value = cal_split_sizes(value.shape[self.scatter_idx], dist.get_world_size(self.spg))
@@ -98,6 +102,8 @@ class UlyssesContextAttention(torch.nn.Module):
         else:
             output = all_to_all(context_layer, self.spg, self.gather_idx, self.scatter_idx, gather_sizes, scatter_sizes_query)
         output = output.reshape(output.shape[0], output.shape[1], -1)
+        if packed_seq_params is not None:
+            output = output.squeeze(1)
 
         # out e.g., [s/p::h]
         return output

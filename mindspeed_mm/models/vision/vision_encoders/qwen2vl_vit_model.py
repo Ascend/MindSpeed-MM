@@ -211,6 +211,13 @@ class Qwen2vlVitSelfAttention(SelfAttention):
             attn_mask_type=attn_mask_type
         )
 
+    def apply_rotary_pos_emb_qk(self, rotary_pos_emb, query, key):
+        query = apply_rotary_pos_emb_vision(query, rotary_pos_emb,
+                                            use_fused_rope=self.config.use_fused_rotary_pos_emb)
+        key = apply_rotary_pos_emb_vision(key, rotary_pos_emb,
+                                            use_fused_rope=self.config.use_fused_rotary_pos_emb)
+        return query, key
+
     def forward(
         self,
         hidden_states,
@@ -260,10 +267,13 @@ class Qwen2vlVitSelfAttention(SelfAttention):
         # absolute positional embedding.
         # otherwise, only relative positional embedding takes effect
         if rotary_pos_emb is not None:
-            query = apply_rotary_pos_emb_vision(query, rotary_pos_emb,
-                                                use_fused_rope=self.config.use_fused_rotary_pos_emb)
-            key = apply_rotary_pos_emb_vision(key, rotary_pos_emb,
-                                                use_fused_rope=self.config.use_fused_rotary_pos_emb)
+            query, key = self.apply_rotary_pos_emb_qk(rotary_pos_emb, query, key)
+
+        # Adapt origin TND format
+        if packed_seq_params is not None:
+            query = query.squeeze(1)
+            key = key.squeeze(1)
+            value = value.squeeze(1)
 
         # ==================================
         # core attention computation
@@ -286,6 +296,13 @@ class Qwen2vlVitSelfAttention(SelfAttention):
                 attn_mask_type=attn_mask_type,
                 packed_seq_params=packed_seq_params,
             )
+
+        if packed_seq_params is not None:
+            # reshape to same output shape as unpacked case
+            # from (t, np, hn) to (t, b=1, h=np*hn)
+            # t is the pack size = sum (sq_i)
+            # note that batch is a dummy dimension in the packed case
+            core_attn_out = core_attn_out.reshape(core_attn_out.size(0), 1, -1)
 
         # =================
         # Output. [sq, b, h]

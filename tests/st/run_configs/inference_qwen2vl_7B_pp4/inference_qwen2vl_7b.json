@@ -38,7 +38,9 @@
             "activation_func": "gelu",
             "bf16": true,
             "params_dtype": "bf16",
-            "freeze": true
+            "freeze": true,
+            "layernorm_epsilon": 1e-06,
+            "normalization": "LayerNorm"
         }
     },
     "text_decoder": {

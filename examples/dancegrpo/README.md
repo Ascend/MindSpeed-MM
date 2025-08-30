@@ -78,7 +78,7 @@ pip install torch_npu-2.7.1*.whl
 # 安装加速库
 git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
-git checkout 6d63944cb2470a0bebc38dfb65299b91329b8d92
+git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
 cp -r mindspeed ../MindSpeed-MM/
 cd ..
 

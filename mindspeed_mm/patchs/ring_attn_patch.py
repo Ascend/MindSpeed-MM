@@ -78,16 +78,39 @@ def vlm_cp_dot_product_attention_forward(
             attention_mask = get_attention_mask()
             if self.config.attention_mask_type == 'causal':
                 self.config.sparse_mode = 2
-            if self.config.reset_attention_mask:
+            if getattr(self.config, 'reset_attention_mask', False):
                 if self.config.attention_mask_type == 'general':
                     self.config.sparse_mode = 2
                     if not (self.config.context_parallel_size == 1 or self.config.context_parallel_algo == 'ulysses_cp_algo'):
                         self.config.sparse_mode = 1
 
     sparse_mode = self.config.sparse_mode
+    is_ulysses_algo = (getattr(self.config, 'context_parallel_algo', None) == 'ulysses_cp_algo')
+    if packed_seq_params is not None and self.config.attention_mask_type == 'causal':
+        attention_mask = torch.triu(
+                        torch.ones((2048, 2048), 
+                        device='npu', dtype=torch.bool), diagonal=1)
+        sparse_mode = 2
     ensure_valid(attention_bias is None, 'Attention bias is not supported for DotProductAttention.')
 
-    seq_length, bsz, n_head = query.shape[0], query.shape[1], query.shape[2]
+    if packed_seq_params is not None and not is_ulysses_algo:
+        #TND
+        T, n_head, D = query.shape[0], query.shape[1], query.shape[2]
+    else:
+        seq_length, bsz, n_head, head_dim = query.shape[0], query.shape[1], query.shape[2], query.shape[3]
+
+    if packed_seq_params is not None and not is_ulysses_algo:
+        # TND
+        cp_size = parallel_state.get_context_parallel_world_size()
+        actual_seq_qlen = packed_seq_params.cu_seqlens_q.tolist()
+        actual_seq_kvlen = packed_seq_params.cu_seqlens_kv.tolist()
+        shape_order = 'TND'
+    else:
+        # SBH
+        actual_seq_qlen = None if packed_seq_params is None else packed_seq_params.cu_seqlens_q.tolist()
+        actual_seq_kvlen = None if packed_seq_params is None else packed_seq_params.cu_seqlens_kv.tolist()
+        query, key, value = [rearrange(x, 's b h d -> s b (h d)') for x in [query, key, value]]
+        shape_order = 'SBH'
 
     if attn_mask_type == AttnMaskType.no_mask:
         sparse_mode = 0  # default mask
@@ -116,6 +139,7 @@ def vlm_cp_dot_product_attention_forward(
         attn_para['next_tokens'] = self.config.next_tockens
         attn_para['keep_prob'] = 1 - self.attention_dropout.p
         attn_para['sparse_mode'] = sparse_mode
+        attn_para['n_head'] = n_head
         output = ulyssesattn_context_parallel(query, key, value, attn_para, self.ulysses_comm_para)
 
         return output
@@ -153,8 +177,10 @@ def vlm_cp_dot_product_attention_forward(
         if cp_para['causal']:
             attention_mask = torch.triu(torch.ones([2048, 2048], dtype=torch.bool, device=query.device), diagonal=1)
 
-        query, key, value = [rearrange(x, 's b h d -> s b (h d)') for x in [query, key, value]]
         if self.config.context_parallel_algo in ['megatron_cp_algo', 'hybrid_cp_algo']:
+            is_general_eod = ((getattr(self.config, 'attention_mask_type', None) == 'general') and (packed_seq_params is not None))
+            if is_general_eod:
+                query, key, value = [rearrange(x, '(b s) n d -> s b (n d)', b=self.config.micro_batch_size) for x in [query, key, value]]
             cp_para['cp_global_ranks'] = cp_global_ranks
             if self.config.use_cp_send_recv_overlap:
                 if cp_expanded_by_2d_tp:
@@ -180,23 +206,19 @@ def vlm_cp_dot_product_attention_forward(
             output = ringattn_context_parallel(query, key, value, n_head, cp_para, scale, attention_mask,
                                                 self.attention_dropout.p,
                                                 packed_seq_params)
+            if is_general_eod:
+                output = rearrange(output, 's b (n d) -> (b s) n d', n=n_head)
         else:
             cp_para['scheduling_info'] = get_scheduling_info()
             output = adaptive_attn_context_parallel(query, key, value, n_head, cp_para, scale, attention_mask,
                                                     self.attention_dropout.p)
 
     else:
-        if packed_seq_params is not None:  # TND
-            cp_size = parallel_state.get_context_parallel_world_size()
-            actual_seq_qlen = packed_seq_params.cu_seqlens_q.tolist()
-            actual_seq_kvlen = packed_seq_params.cu_seqlens_kv.tolist()
-            query, key, value = [rearrange(x, 's b h d -> (b s) h d') for x in [query, key, value]]
+        # For EoD ulysses
+        if packed_seq_params is not None:
+            query, key, value = [rearrange(x, 's b (h d) -> (b s) h d', d=head_dim) for x in [query, key, value]]
             shape_order = 'TND'
-        else:  # SBH
-            actual_seq_qlen = None
-            actual_seq_kvlen = None
-            query, key, value = [rearrange(x, 's b h d -> s b (h d)') for x in [query, key, value]]
-            shape_order = 'SBH'
+
         if self.config.use_fusion_attn_v2:
             output = npu_fusion_attention(
                 query, key, value, n_head, shape_order,
@@ -229,7 +251,8 @@ def vlm_cp_dot_product_attention_forward(
                 actual_seq_kvlen=actual_seq_kvlen
             )[0]
         if packed_seq_params is not None:
-            output = rearrange(output, '(b s) h d -> s b (h d)', s=seq_length, b=bsz)
+            output = rearrange(output, '(b s) h d -> s b (h d)', b=bsz)
+            shape_order = 'TND'
     return output
 
 

@@ -38,6 +38,7 @@ def validate_args(args, defaults=None):
         args.num_layers = safe_getattr(args.mm.model.text_decoder, 'num_layers', args.num_layers)
         args.hidden_size = safe_getattr(args.mm.model.text_decoder, 'hidden_size', args.hidden_size)
         args.num_attention_heads = safe_getattr(args.mm.model.text_decoder, 'num_attention_heads', args.num_attention_heads)
+        args.num_query_groups = safe_getattr(args.mm.model.text_decoder, 'num_query_groups', args.num_query_groups)
         args.max_position_embeddings = safe_getattr(args.mm.model.text_decoder, 'max_position_embeddings', args.max_position_embeddings)
         args.ffn_hidden_size = safe_getattr(args.mm.model.text_decoder, 'ffn_hidden_size', args.ffn_hidden_size)
 
