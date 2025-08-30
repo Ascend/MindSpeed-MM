@@ -1,4 +1,4 @@
-# Qwen2VL-72B支持非均匀Ulysses CP切分 
+# QwenVL系列支持非均匀Ulysses CP切分 
 
 ## 问题分析
 
@@ -11,7 +11,8 @@ Ulysses CP算法基于All2All算子，对All2All算子的Input List与Output Lis
 
 
 ## 使用方法
-(当前仅支持qwen2vl)
+(当前仅支持qwen2vl、qwen2.5vl和RL GRPO qwen2.5vl)
+### qwen2vl、qwen2.5vl使用方法，以qwen2vl72b为例
 1. examples/qwen2vl/finetune_qwen2vl_72b.sh中设置CP大小，默认脚本中为1
 ```shell
 CP=1
@@ -21,4 +22,14 @@ CP=1
 ```shell
     --context-parallel-algo ulysses_cp_algo
 ```
-默认CP算法即ulysses_cp_algo，该参数可以不添加
+
+### RL GRPO qwen2.5vl使用方法,以3b模型为例
+1. examples/rl/configs/grpo_trainer_qwen25vl_3b.yaml中，在actor_config下添加
+```yaml
+context_parallel_size: 1
+context_parallel_algo: ulysses_cp_algo
+```
+2. examples/rl/model/qwen2.5vl_3b.json中，在image_encoder和text_decoder下添加
+```json
+context_parallel_size: 1 #注意,需要与grpo_trainer_qwen25vl_3b.yaml中配置一致
+```
