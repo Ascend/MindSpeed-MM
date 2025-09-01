@@ -31,5 +31,5 @@ context_parallel_algo: ulysses_cp_algo
 ```
 2. examples/rl/model/qwen2.5vl_3b.json中，在image_encoder和text_decoder下添加
 ```json
-context_parallel_size: 1 #注意,需要与grpo_trainer_qwen25vl_3b.yaml中配置一致
+"context_parallel_size": 1 #注意,需要与grpo_trainer_qwen25vl_3b.yaml中配置一致
 ```
