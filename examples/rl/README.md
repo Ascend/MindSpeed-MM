@@ -186,6 +186,15 @@ export LD_PRELOAD="$LD_PRELOAD:/usr/local/lib/libjemalloc.so.2"
 
 根据具体任务要求，参考Qwen2.5VL[权重下载及转换](https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/qwen2.5vl#权重下载及转换)获取相应的权重。
 
+> 若未安装`mm-convert`工具，可以使用`python checkpoint/convert_cli.py`代替，如：
+```
+python checkpoint/convert_cli.py Qwen2_5_VLConverter hf_to_mm \
+  --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-3B-Instruct" \
+  --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-3B-Instruct" \
+  --cfg.parallel_config.llm_pp_layers [[36]] \
+  --cfg.parallel_config.vit_pp_layers [[32]] \
+  --cfg.parallel_config.tp_size 1
+```
 
 <a id="jump3"></a>
 ## 数据集准备及处理
@@ -314,7 +323,7 @@ actor_config:
     save: ./ckpt
     no_load_optim: false  #<------- 断点续训时 no_load_optim 应为 false
     no_load_rng: false    #<------- 断点续训时 no_load_rng 应为 false
-  
+
 rl_config:
     integrated_mode_config:
       ref_model_load_path: /path/qwen2_5_vl_3b_tp1pp1   #<------- 断点续训时，应在 ref_model_load_path 中配置原始模型megatron权重路径，供 reference model 加载
