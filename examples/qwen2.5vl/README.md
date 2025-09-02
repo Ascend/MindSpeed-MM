@@ -272,15 +272,15 @@ dataset_param->basic_parameters->dataset
 
 在多模态理解任务中，当训练数据存在长视频或高分辨率多图时，训练任务可能会因为序列长度过长导致显存占用过多、默认切分配置不适用，此处提供长序列场景的训练支持，下方提供长序列需修改的配置（以下方首条训练配置为例）：
 
-将`finetune_qwen2_5_vl_72b.sh`中的`TP=2`改为`TP=8`、`PP=8`改为`PP=4`、`CP=1`改为`CP=4`、`--seq-length 1024`改为`--seq-length 131072`、`--context-parallel-algo ulysses_cp_algo`改为`--context-parallel-algo megatron_cp_algo`；
+将`finetune_qwen2_5_vl_72b.sh`中的`--swap-attention \`去除、`TP=2`改为`TP=8`、`PP=8`改为`PP=4`、`CP=1`改为`CP=4`、`GRAD_ACC_STEP=96`改为`GRAD_ACC_STEP=1`、`--seq-length 1024`改为`--seq-length 131072`、`--context-parallel-algo ulysses_cp_algo`改为`--context-parallel-algo megatron_cp_algo`；
 
 将`data_72b.json`中的`"video_max_pixels": 16384`改为`"video_max_pixels": 262144`、`"video_fps": 2.0`改为`"video_fps": 60.0`、`"video_maxlen": 64`改为`"video_maxlen": 768`、`"images": "images"`改为`"images": null`、`"videos": null`改为`"videos": "videos"`；
 
-将`model_72b.json`中的`"pipeline_num_layers": [32, 0, 0, 0, 0, 0, 0, 0]`改为`"pipeline_num_layers": [32, 0, 0, 0]`、`"pipeline_num_layers": [6, 11, 11, 11, 11, 11, 11, 8]`改为`"pipeline_num_layers": [6, 25, 25, 24]`。
+将`model_72b.json`中的`"pipeline_num_layers": [32, 0, 0, 0, 0, 0, 0, 0]`改为`"pipeline_num_layers": [32, 0, 0, 0]`、`"pipeline_num_layers": [6, 11, 11, 11, 11, 11, 11, 8]`改为`"pipeline_num_layers": [6, 25, 25, 24]`、`"max_position_embeddings": 128000`改为`max_position_embeddings": 131072`并在下方加入`"recompute_granularity": "full",`、`"recompute_method": "uniform",`、`"recompute_num_layers": 1,`。
 
-| **训练数据配置** | **模型规模** | **集群规模** | **切分配置** | **性能数据** |
+| **训练数据配置** | **模型规模** | **集群规模** | **模型及切分配置** | **性能数据** |
 | --------------- | ----------- | ----------- | ----------- | ------------ |
-| "video_max_pixels":262144,<br>"video_fps":60.0,<br>"video_maxlen":768,<br>"seq-length":131072 | 72B | 8*8(A3) | TP8<br>PP4(vit pp_layers:[32,0,0,0], llm pp_layers:[6,25,25,24])<br>CP4(context-parallel-algo:megatron_cp_algo) |/|
+| "video_max_pixels":262144,<br>"video_fps":60.0,<br>"video_maxlen":768,<br>"seq-length":131072 | 72B | 8*8(A3) | TP8<br>PP4(vit pp_layers:[32,0,0,0], llm pp_layers:[6,25,25,24])<br>CP4(context-parallel-algo:megatron_cp_algo)<br>text_decoder full recompute:<br> &ensp; "recompute_granularity": "full",<br> &ensp; "recompute_method": "uniform",<br> &ensp; "recompute_num_layers": 1 |/|
 
 ---
 

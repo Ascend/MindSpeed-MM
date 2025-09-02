@@ -92,6 +92,9 @@ def get_model_config(config):
 class MindSpeedArgsRequired:
     """Base configuration for MindSpeed Core"""
 
+    # Train basic
+    micro_batch_size: Any = None
+
     # Flash attention
     pre_tockens: Any = None
     next_tockens: Any = None

@@ -266,10 +266,14 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
         full_packed_seq_params = None
         if get_args().use_flash_attn and packed_seq_params is None:
             if cu_window_seqlens is not None:
-                cu_window_seqlens = cu_window_seqlens[1:].tolist()
+                cu_window_seqlens = cu_window_seqlens[1:]
+                if self.config.context_parallel_size == 1:
+                    cu_window_seqlens = cu_window_seqlens.tolist()
                 window_packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_window_seqlens, cu_seqlens_kv=cu_window_seqlens)
             if cu_seqlens is not None:
-                cu_full_seqlens = cu_seqlens[1:].tolist()
+                cu_full_seqlens = cu_seqlens[1:]
+                if self.config.context_parallel_size == 1:
+                    cu_full_seqlens = cu_full_seqlens.tolist()
                 full_packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_full_seqlens, cu_seqlens_kv=cu_full_seqlens)
 
         with rng_context:
