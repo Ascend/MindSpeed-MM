@@ -188,6 +188,15 @@ export LD_PRELOAD="$LD_PRELOAD:/usr/local/lib/libjemalloc.so.2"
 
 根据具体任务要求，参考Qwen2.5VL[权重下载及转换](https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl#权重下载及转换)获取相应的权重。
 
+> 若未安装`mm-convert`工具，可以使用`python checkpoint/convert_cli.py`代替，如：
+```
+python checkpoint/convert_cli.py Qwen2_5_VLConverter hf_to_mm \
+  --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-3B-Instruct" \
+  --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-3B-Instruct" \
+  --cfg.parallel_config.llm_pp_layers [[36]] \
+  --cfg.parallel_config.vit_pp_layers [[32]] \
+  --cfg.parallel_config.tp_size 1
+```
 
 <a id="jump3"></a>
 ## 数据集准备及处理
@@ -316,7 +325,7 @@ actor_config:
     save: ./ckpt
     no_load_optim: false  #<------- 断点续训时 no_load_optim 应为 false
     no_load_rng: false    #<------- 断点续训时 no_load_rng 应为 false
-  
+
 rl_config:
     integrated_mode_config:
       ref_model_load_path: /path/qwen2_5_vl_3b_tp1pp1   #<------- 断点续训时，应在 ref_model_load_path 中配置原始模型megatron权重路径，供 reference model 加载
@@ -352,10 +361,10 @@ pip install "ray[default]" debugpy
 <a id="jump7"></a>
 ## 性能数据
 
-| 模型                  | 机器型号     | GBS | n_samples | max_prompt_length | max_tokens | 端到端 tps | 
-|---------------------|----------|-----|-----------|-------------------|------------|---------| 
-| Qwen25VL-3B           | Atlas A3 | 256  | 5         | 1024              | 2048       | 3606     | 
-| Qwen25VL-7B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 4133     | 
+| 模型                  | 机器型号     | GBS | n_samples | max_prompt_length | max_tokens | 端到端 tps |
+|---------------------|----------|-----|-----------|-------------------|------------|---------|
+| Qwen25VL-3B           | Atlas A3 | 256  | 5         | 1024              | 2048       | 3606     |
+| Qwen25VL-7B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 4133     |
 | Qwen25VL-32B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 626     |
 
 注：模型 token/p/s 性能数据会打印在日志中, 当前计算公式下，A3单卡性能需要将日志打印的token/p/s性能指数*2。
