@@ -105,7 +105,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 mm-convert  DeepSeekVLConverter hf_to_mm \
   --cfg.mm_dir "pretrained/DeepSeekVl2" \
   --cfg.hf_config.hf_dir "raw_ckpt/DeepSeekVL2" \
-  --cfg.parallel_config.llm_pp_layers [[14,16]] \
+  --cfg.parallel_config.llm_pp_layers [[13,17]] \
   --cfg.parallel_config.vit_pp_layers [[27,0]] \
   --cfg.parallel_config.ep_size 8 \
   --cfg.parallel_config.tp_size 1 \
