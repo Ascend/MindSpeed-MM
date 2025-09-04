@@ -94,7 +94,7 @@ cd ..
 # 下载MindSpeed RL
 git clone https://gitee.com/ascend/MindSpeed-RL.git
 cd MindSpeed-RL
-git checkout 6cb2e0d61eed19460d24575f65005930b8335329
+git checkout 85d1477a9bd0eda9c1064da10024329aca50804f
 pip install -r requirements.txt
 cp -r mindspeed_rl ../MindSpeed-MM/
 cd ..
@@ -363,8 +363,8 @@ pip install "ray[default]" debugpy
 
 | 模型                  | 机器型号     | GBS | n_samples | max_prompt_length | max_tokens | 端到端 tps |
 |---------------------|----------|-----|-----------|-------------------|------------|---------|
-| Qwen25VL-3B           | Atlas A3 | 256  | 5         | 1024              | 2048       | 3606     |
-| Qwen25VL-7B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 4133     |
+| Qwen25VL-3B           | Atlas A3 | 256  | 5         | 1024              | 2048       | 6302     |
+| Qwen25VL-7B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 2761     |
 | Qwen25VL-32B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 626     |
 
 注：模型 token/p/s 性能数据会打印在日志中, 当前计算公式下，A3单卡性能需要将日志打印的token/p/s性能指数*2。
