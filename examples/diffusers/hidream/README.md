@@ -94,7 +94,6 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
     ```shell
     pip install -e .
     pip install -r examples/dreambooth/mm_requirements_hidream.txt # 安装对应依赖
-    pip install deepspeed==0.15.2
     ```
 
 <a id="jump2"></a>

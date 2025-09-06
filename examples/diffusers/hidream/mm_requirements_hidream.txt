@@ -1,4 +1,4 @@
-accelerate==0.33.0
+accelerate==1.10.0
 torchvision
 torch==2.7.1
 transformers==4.47.1
@@ -12,3 +12,4 @@ decorator
 attrs
 mindstudio-probe
 datasets
+deepspeed==0.17.2
