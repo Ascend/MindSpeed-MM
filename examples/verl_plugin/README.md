@@ -181,7 +181,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 #### 2. 启动训练
 
-以 Qwen2.5VL 7B 模型为例,在启动训练之前，需要修改[启动脚本](../../examples/verl_plugin/scripts/grpo_trainer_qwen2_5_vl_7b.sh)的配置：
+以 Qwen2.5VL 7B 模型为例,在启动训练之前，需要修改[启动脚本](../../examples/verl_plugin/scripts/train_qwen2_5_vl_7b_grpo_full.sh)的配置：
 
 1. 根据使用机器的情况，修改`NNODES`、`NPUS_PER_NODE`配置， 例如单机 A2 可设置`NNODES`为 1 、`NPUS_PER_NODE`为8；
 2. 如果是单机，需要保证`MASTER_ADDR`与`CURRENT_IP`一致，如果为多机，需要保证各个机器的`MASTER_ADDR`一致，`CURRENT_IP`为各个节点的 IP (需要注意的是`MASTER_ADDR`与`CURRENT_IP`不能设置为`localhost`)；
@@ -231,7 +231,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
     - 若多机运行，*仅需主节点*需运行此脚本
 
     ```bash
-    bash examples/grpo_trainer/grpo_trainer_qwen2_5_vl_7b.sh --data_path=xxx ---model_path=xxx
+    bash examples/grpo_trainer/train_qwen2_5_vl_7b_grpo_full.sh --data_path=xxx ---model_path=xxx
     ```
 
 > *注意：所有节点的代码、权重、数据等路径的层级要保持一致，且启动ray的时候都位于verl目录下*

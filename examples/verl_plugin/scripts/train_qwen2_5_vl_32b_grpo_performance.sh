@@ -24,37 +24,38 @@ fi
 
 ENGINE=vllm
 export VLLM_USE_V1=1
-export HCCL_CONNECT_TIMEOUT=3600
+export HCCL_CONNECT_TIMEOUT=5400
 
 # Some models are optimized by vllm ascend. While in some case, e.g. rlhf training, 
 # the optimized model may not be suitable. In this case, set this value to 0 to disable the optimized model.
 export USE_OPTIMIZED_MODEL=0
 
 # prompt&response length
-max_prompt_length=1024
-max_response_length=2048
-max_num_batched_tokens=8192
+max_prompt_length=18000
+max_response_length=512
+max_num_batched_tokens=20000
 
 # vllm related params
 free_cache_engine=True
-gpu_memory_utilization=0.5
+gpu_memory_utilization=0.6
 tensor_model_parallel_size=8
 enable_chunked_prefill=True
 enforce_eager=False
 
 # batch size
-train_batch_size=256
-ppo_mini_batch_size=32
+train_batch_size=32
+ppo_mini_batch_size=16
 ppo_micro_batch_size_per_gpu=1
-log_prob_micro_batch_size_per_gpu=4
+log_prob_micro_batch_size_per_gpu=2
 use_remove_padding=True
-ignore_eos=False
+ignore_eos=True
 
 # training params
 enable_gradient_checkpointing=True
-nnodes=1
+nnodes=2
 n_gpus_per_node=16
-sp_size=1
+sp_size=2
+rollout_n=8
 
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
@@ -80,6 +81,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.enable_gradient_checkpointing=$enable_gradient_checkpointing \
     actor_rollout_ref.actor.fsdp_config.param_offload=True \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
+    actor_rollout_ref.actor.fsdp_config.wrap_policy.min_num_params=0 \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$log_prob_micro_batch_size_per_gpu \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$tensor_model_parallel_size \
     actor_rollout_ref.rollout.name=$ENGINE \
@@ -90,7 +92,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.enforce_eager=$enforce_eager \
     actor_rollout_ref.rollout.free_cache_engine=$free_cache_engine \
     actor_rollout_ref.rollout.max_num_batched_tokens=$max_num_batched_tokens \
-    actor_rollout_ref.rollout.n=5 \
+    actor_rollout_ref.rollout.n=$rollout_n \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$log_prob_micro_batch_size_per_gpu \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \
@@ -100,12 +102,15 @@ python3 -m verl.trainer.main_ppo \
     trainer.experiment_name='qwen2_5_vl_32b_function_rm' \
     trainer.n_gpus_per_node=$n_gpus_per_node \
     trainer.nnodes=$nnodes \
-    trainer.balance_batch=False \
-    trainer.save_freq=50 \
+    trainer.save_freq=-1 \
     trainer.test_freq=-1 \
-    trainer.total_training_steps=150 \
+    trainer.total_epochs=15 \
     trainer.device=npu \
     trainer.val_before_train=False \
     actor_rollout_ref.model.enable_activation_offload=True \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=$sp_size \
-    actor_rollout_ref.ref.ulysses_sequence_parallel_size=$sp_size > train_qwen2_5_vl_32b_grpo_full.log 2>&1 &
+    actor_rollout_ref.ref.ulysses_sequence_parallel_size=$sp_size > train_qwen2_5_vl_32b_grpo_performance.log 2>&1 &
+wait
+
+TPS=`grep 'perf/throughput:' train_qwen2_5_vl_32b_grpo_performance.log | awk -F 'perf/throughput:' '{print$2}' | awk -F ' ' '{print$1}' | tail -n 5 | awk '{sum+=$1} END {print sum/NR}'`
+echo "Final Performance TPS : $TPS"
