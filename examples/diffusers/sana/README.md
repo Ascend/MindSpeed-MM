@@ -41,7 +41,6 @@ Sana是由NVIDIA、麻省理工学院和清华大学共同推出的文生图模�
 
 1. 软件与驱动安装
 
-
     ```bash
     # python3.10
     conda create -n test python=3.10
@@ -85,7 +84,7 @@ Sana是由NVIDIA、麻省理工学院和清华大学共同推出的文生图模�
 
     ```shell
     pip install -e .
-    vim examples/dreambooth/requirements_sana.txt #修改版本：torchvision==0.16.0, torch==2.6.0, accelerate==0.33.0, transformers==4.47.1 添加deepspeed==0.15.2
+    vim examples/dreambooth/requirements_sana.txt #修改版本：torch==2.6.0, accelerate==1.10.0, transformers==4.47.1, 添加deepspeed==0.17.2
     pip install -r examples/dreambooth/requirements_sana.txt # 安装对应依赖
     ```
 

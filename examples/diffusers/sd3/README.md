@@ -40,7 +40,6 @@
 
 1. 软件与驱动安装
 
-
     ```bash
     # python3.10
     conda create -n test python=3.10
@@ -84,7 +83,7 @@
 
     ```shell
     pip install -e .
-    vim examples/dreambooth/requirements_sd3.txt #修改版本：torchvision==0.16.0, torch==2.6.0, accelerate==0.33.0, 添加deepspeed==0.15.2
+    vim examples/dreambooth/requirements_sd3.txt #修改版本：torch==2.6.0, accelerate==1.10.0, 添加deepspeed==0.17.2
     pip install -r examples/dreambooth/requirements_sd3.txt # 安装对应依赖
     ```
 
@@ -357,6 +356,7 @@ vim infer_sd3_img2img.py # 进入运行I2I推理的Python文件
 ## 使用基线数据集进行评估
 
 ## 环境变量声明
+
 ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏  
 ASCEND_GLOBAL_LOG_LEVEL： 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志。0：对应DEBUG级别，1：对应INFO级别，2：对应WARNING级别，3：对应ERROR级别，4：对应NULL级别，不输出日志  
 ASCEND_GLOBAL_EVENT_ENABLE： 设置应用类日志是否开启Event日志，0：关闭Event日志，1：开启Event日志  
