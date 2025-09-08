@@ -23,6 +23,10 @@
   - [准备工作](#jump4.1)
   - [配置参数](#jump4.2)
   - [启动微调](#jump4.3)
+- [异构并行微调](#jump5)
+  - [准备工作](#jump5.1)
+  - [配置参数](#jump5.2)
+  - [启动异构并行微调](#jump5.3)
 - [特性使用介绍](#jump7)
   - [lora微调](#jump7.1)
 - [环境变量声明](#jump8)
@@ -384,6 +388,83 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 #### 3. 启动微调
 
 以Qwen2.5Omni-7B为例，启动微调训练任务。
+
+```shell
+bash examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh
+```
+
+<a id="jump5"></a>
+## 异构并行微调
+
+<a id="jump5.1"></a>
+#### 1. 准备工作
+
+配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
+
+其中“权重转换”需要根据设定的异构并行配置进行修改，例如Vit模块和Audio模块不切分，llm模块按TP4进行切分时，权重转换脚本命令如下：
+
+```bash
+# 7b
+mm-convert  Qwen2_5_OmniConverter hf_to_mm \
+  --cfg.mm_dir "ckpt/mm_path/Qwen2.5-Omni-7B" \
+  --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-Omni-7B" \
+  --cfg.parallel_config.llm_pp_layers [[28]] \
+  --cfg.parallel_config.vit_pp_layers [[32]] \
+  --cfg.parallel_config.audio_pp_layers [[32]] \
+  --cfg.parallel_config.tp_size 4 \
+  --cfg.parallel_config.vit_tp_size 1 \
+  --cfg.parallel_config.audio_tp_layers 1
+
+# 其中：
+# mm_dir: 转换后保存目录
+# hf_dir: huggingface权重目录
+# llm_pp_layers: llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
+# vit_pp_layers: vit在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
+# audio_pp_layers: audio在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
+# tp_size: 默认tp并行数量，注意要和微调启动脚本中的配置一致
+# vit_tp_size: vit的tp并行数量，不配置时vit使用默认的tp并行数量
+# audio_tp_layers: audio的tp并行数量，不配置时vit使用默认的tp并行数量
+```
+
+<a id="jump5.2"></a>
+#### 2. 配置参数
+参考**微调**章节进行数据目录配置和模型保存加载等配置，需要注意的是在配置`examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh`时要增加`--hetero-parallel`开启异构并行训练
+
+```shell
+...
+GPT_ARGS="
+    ...
+    --hetero-parallel \  # 开启异构并行训练
+    ...
+"
+```
+
+【模型异构并行配置】
+
+如需修改vit或audio的并行配置，需在model_7b.json中的image_encoder和audio_encoder部分修改对应的并行参数
+
+```json
+{
+  "image_encoder": {
+        "vision_encoder": {},
+        "vision_projector": {},
+        "tp":1,
+        "pp":1,
+        "cp":1
+    },
+    "audio_encoder": {
+        "audio_encoder": {},
+        "tp":1,
+        "pp":1,
+        "cp":1
+    }
+}
+```
+
+<a id="jump5.3"></a>
+#### 3. 启动异构并行微调
+
+以Qwen2.5Omni-7B为例，启动异构并行微调训练任务。
 
 ```shell
 bash examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh
