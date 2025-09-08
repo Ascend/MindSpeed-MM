@@ -1,7 +1,7 @@
-model: /path/MindSpeed-MM/configs/model/qwen2.5vl_3b.json # 模型配置文件的绝对路径
+model: /path/MindSpeed-MM/configs/model/qwen2.5vl_7b.json # 模型配置文件的绝对路径
 
 megatron_training:
-  model: qwen2.5vl_3b
+  model: qwen2.5vl_7b
   use_fused_rmsnorm: false
   normalization: RMSNorm
   use_mcore_models: true
@@ -17,12 +17,12 @@ megatron_training:
   bf16: true
   use_distributed_optimizer: true
   tokenizer_type: PretrainedFromHF
-  tokenizer_name_or_path: /path/Qwen2.5-VL-3B-Instruct # 原始权重绝对路径
+  tokenizer_name_or_path: /path/Qwen2.5-VL-7B-Instruct # 原始权重绝对路径
   global_batch_size: 512
   seq_length: 1024
   save_interval: 50
   train_iters: 1000
-  stage: ray_grpo
+  stage: ray_dapo
   attention_dropout: 0.0
   init_method_std: 0.01
   hidden_dropout: 0.0
@@ -36,9 +36,9 @@ megatron_training:
   npu_deterministic: false # 是否开启确定性计算
 
 actor_config:
-  model: qwen2.5vl_3b
+  model: qwen2.5vl_7b
   micro_batch_size: 1
-  tensor_model_parallel_size: 1
+  tensor_model_parallel_size: 4
   pipeline_model_parallel_size: 1
   lr: 1e-6
   lr_decay_style: constant
@@ -49,7 +49,7 @@ actor_config:
   adam_beta1: 0.9
   adam_beta2: 0.999
   finetune: true
-  load: /path/qwen2_5_vl_3b_tp1pp1 # megatron格式的权重路径
+  load: /path/qwen2_5_vl_7b_tp4pp1 # megatron格式的权重路径
   save: ./ckpt
   no_load_optim: true
   no_load_rng: true
@@ -65,20 +65,16 @@ rl_config:
   gamma: 1.0
   lam: 0.95
   use_dynamic_bsz: false
-  ref_max_packing_token_size: 15000
-  actor_max_packing_token_size: 15000
-  update_max_packing_token_size: 4000
-  actor_forward_micro_batch_size: 1
-  ref_forward_micro_batch_size: 1
+  max_packing_token_size: [55000, 8000]
   reward_dispatch_size: 5
   adv_dispatch_size: 5
   actor_rollout_dispatch_size: 320
-  actor_update_dispatch_size: 160
+  actor_update_dispatch_size: 320
   actor_logprob_dispatch_size: 320
   adv_estimator: group_norm
   kl_penalty: low_var_kl
   kl_ctrl_type: fixed
-  init_kl_coef: 0.01
+  init_kl_coef: 0
   mini_batch_size: 32
   max_prompt_length: 1024
   epochs: 1
@@ -87,10 +83,31 @@ rl_config:
   shuffle_mini_batch: false
   n_samples_per_prompt: 5
   rule_reward: true
-  verifier_function: ["base_acc"]
+  verifier_function: ["acc_for-dapo"]
   verifier_weight: [1.0]
   num_cpus_for_local_task: 1.0
   use_tensorboard: false
+
+  #token level loss策略
+  token_level_loss: true
+
+  #clip Higher策略
+  clip_higher_enable: true
+  clip_ratio_low: 0.2
+  clip_ratio_high: 0.28
+
+  #过长response惩罚措施
+  overlong_buffer_enable: true
+  rollout_max_tokens: 2048
+  overlong_buffer: 512
+  overlong_buffer_penalty_factor: 0.1
+
+  #Prompt过滤措施
+  filter_groups_enable: true
+  filter_groups_metric: acc_for_dapo
+  filter_groups_max_batches: -1
+  filter_groups_train_batch_size: 512
+
   actor_resource:
     num_npus: 8
 
