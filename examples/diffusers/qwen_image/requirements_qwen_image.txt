@@ -1,0 +1,14 @@
+accelerate==1.10.0
+torchvision
+torch==2.7.1
+transformers==4.47.1
+ftfy
+tensorboard
+Jinja2
+peft>=0.14.0
+sentencepiece
+scipy
+decorator
+attrs
+datasets
+deepspeed==0.17.2
