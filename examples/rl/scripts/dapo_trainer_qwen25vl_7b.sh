@@ -44,7 +44,7 @@ if [ "$MASTER_ADDR" = "$CURRENT_IP" ]; then
           echo "Ray cluster is ready with $device_count devices (from $npu_count NPU resources), starting Python script."
           ray status
           log_file="logs/dapo_train_$(date +%Y%m%d_%H%M%S).log"
-          python posttrain_vlm_grpo.py --config-name $YAML 2>&1 | tee "$log_file"
+          python posttrain_vlm_dapo.py --config-name $YAML 2>&1 | tee "$log_file"
           break
       else
           echo "Waiting for Ray to allocate $NNODES devices. Current device count: $device_count"

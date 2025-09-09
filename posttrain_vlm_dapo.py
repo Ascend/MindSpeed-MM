@@ -177,7 +177,6 @@ def train(config):
         actor_worker,
         reward_list,
         dynamic_sampling_list,
-        vit_worker,
         tokenizer=tokenizer,
         global_batch_size=actor_config.global_batch_size,
         micro_batch_size=rl_config.adv_dispatch_size,
