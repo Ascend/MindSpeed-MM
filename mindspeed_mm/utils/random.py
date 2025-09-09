@@ -23,6 +23,8 @@ import torch_npu
 
 def seed_all(seed=1234):
     random.seed(seed)
+    os.environ["HCCL_DETERMINISTIC"] = "True"
+    os.environ["CLOSE_MATMUL_K_SHIFT"] = "1"
     os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
