@@ -65,8 +65,8 @@ rl_config:
   gamma: 1.0
   lam: 0.95
   use_dynamic_bsz: false
-  ref_max_packing_token_size: 15000
-  actor_max_packing_token_size: 15000
+  ref_max_packing_token_size: 55000
+  actor_max_packing_token_size: 55000
   update_max_packing_token_size: 8000
   reward_dispatch_size: 5
   adv_dispatch_size: 5

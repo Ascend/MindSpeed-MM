@@ -65,7 +65,9 @@ rl_config:
   gamma: 1.0
   lam: 0.95
   use_dynamic_bsz: false
-  max_packing_token_size: [55000, 8000]
+  ref_max_packing_token_size: 55000
+  actor_max_packing_token_size: 55000
+  update_max_packing_token_size: 8000
   reward_dispatch_size: 5
   adv_dispatch_size: 5
   actor_rollout_dispatch_size: 320
@@ -83,7 +85,7 @@ rl_config:
   shuffle_mini_batch: false
   n_samples_per_prompt: 5
   rule_reward: true
-  verifier_function: ["acc_for-dapo"]
+  verifier_function: ["acc_for_dapo"]
   verifier_weight: [1.0]
   num_cpus_for_local_task: 1.0
   use_tensorboard: false
@@ -100,7 +102,7 @@ rl_config:
   overlong_buffer_enable: true
   rollout_max_tokens: 2048
   overlong_buffer: 512
-  overlong_buffer_penalty_factor: 0.1
+  overlong_buffer_penalty_factor: 1.0
 
   #Prompt过滤措施
   filter_groups_enable: true
@@ -133,7 +135,7 @@ generate_config:
   sampling_config:
     logprobs: 0
     max_tokens: 2048
-    top_p: 1.
+    top_p: 1.0
     top_k: -1
     min_p: 0.0
     temperature: 1.0
