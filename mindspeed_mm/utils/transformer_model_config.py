@@ -22,13 +22,6 @@ def get_class_variables(cls):
 def get_model_config(config):
     global_args = get_args()
     config_dict = config.to_dict()
-    if "model_id" in config_dict and config_dict["model_id"] == "InternVLMLP":
-        config_dict["params_dtype"] = "bf16"
-        config_dict["hidden_size"] = 4096
-        config_dict["num_attention_heads"] = 1
-        config_dict["num_layers"] = 1
-    if "model_id" in config_dict and config_dict["model_id"] == "Qwen2.5llm":
-        config_dict["use_repeat_kv"] = True
     # for moe
     if "moe_intermediate_size" in config_dict:
         config_dict["moe_ffn_hidden_size"] = config_dict["moe_intermediate_size"]

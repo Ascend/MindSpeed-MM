@@ -10,7 +10,7 @@
     "add_rmsnorm_offset": false,
     "img_context_token_id": 151667,
     "text_decoder": {
-        "model_id": "Qwen2.5llm",
+        "model_id": "internllm",
 	    "num_layers": 80,
 	    "pipeline_num_layers": [0, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 2],
 	    "hidden_size": 8192,
@@ -85,7 +85,9 @@
             "model_id": "InternVLMLP",
             "downsample_ratio": 0.5,
             "vit_hidden_size": 3200,
-            "llm_hidden_size": 8192
+            "llm_hidden_size": 8192,
+            "params_dtype":"bf16",
+            "num_layers":1
         }
     },
     "text_encoder": null,

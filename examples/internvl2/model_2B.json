@@ -89,7 +89,9 @@
             "model_id": "InternVLMLP",
             "downsample_ratio": 0.5,
             "vit_hidden_size": 1024,
-            "llm_hidden_size": 2048
+            "llm_hidden_size": 2048,
+            "params_dtype":"bf16",
+            "num_layers":1
         }
     },
     "text_encoder": null,

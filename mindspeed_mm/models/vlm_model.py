@@ -2,6 +2,8 @@
 from typing import Optional, Dict, Tuple, Union
 
 import torch 
+import torch
+import numpy
 from torch.nn import CrossEntropyLoss
 
 from megatron.core import InferenceParams, mpu
@@ -24,6 +26,8 @@ from mindspeed_mm.models.text_encoder.text_encoder import TextEncoder
 from mindspeed_mm.models.common.mm_gpt_model import MMGPTModel
 from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positionsids_mask_for_llm
 from mindspeed_mm.utils.hetero_parallel import change_parallel_state
+from mindspeed_mm.utils.hetero_parallel import change_parallel_state
+from mindspeed_mm.utils.utils import EncoderBalanceComm
 
 
 class VLMModel(MultiModalModule):
@@ -109,6 +113,7 @@ class VLMModel(MultiModalModule):
     def _build_image_encoder_model(self, config):
         vit_layer_spec = get_vit_layer_spec(config.vision_encoder)
         proj_layer_spec = get_projector_layer_spec(config.vision_projector)
+        self.encoder_dp_enable = config.vision_encoder.model_id == "InternViT"
 
         if get_args().hetero_parallel:
             change_parallel_state('image_encoder')
@@ -453,6 +458,7 @@ class VLMModel(MultiModalModule):
             cache_position: Optional[torch.LongTensor] = None,
             rope_deltas: Optional[torch.LongTensor] = None,
             image_flags: Optional[torch.LongTensor] = None,
+            transfer: Optional[numpy.ndarray] = None,
             *args, **kwargs
     ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
 
@@ -461,6 +467,13 @@ class VLMModel(MultiModalModule):
             vit_embeds = kwargs.get('vit_embeds').unsqueeze(1)
         elif self.add_image_encoder and pixel_values is not None:
             vit_embeds = self.image_encoder(pixel_values, image_grid_thw)
+            if get_args().encoder_dp_balance and self.encoder_dp_enable:
+                vit_embeds = EncoderBalanceComm.apply(
+                    vit_embeds,
+                    mpu.get_data_parallel_group(),
+                    transfer
+                )
+
             if image_flags is not None:
                 if self.image_encoder.post_process:
                     image_flags = image_flags.squeeze(-1)

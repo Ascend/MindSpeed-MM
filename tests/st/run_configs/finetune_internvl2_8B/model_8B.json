@@ -10,6 +10,7 @@
     "add_rmsnorm_offset": false,
     "img_context_token_id": 92546,
     "text_decoder": {
+        "model_id": "internllm",
         "num_layers": 32,
         "pipeline_num_layers": [6, 9, 9, 8],
         "hidden_size": 4096,
@@ -90,7 +91,9 @@
             "model_id": "InternVLMLP",
             "downsample_ratio": 0.5,
             "vit_hidden_size": 1024,
-            "llm_hidden_size": 4096
+            "llm_hidden_size": 4096,
+            "params_dtype":"bf16",
+            "num_layers":1
         }
     },
     "text_encoder": null,

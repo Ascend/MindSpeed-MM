@@ -21,6 +21,7 @@ from mindspeed_mm.patchs import dummy_optimizer_patch
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.utils.transformer_model_config import get_model_config
 from mindspeed_mm.utils.hetero_parallel import change_parallel_state, apply_hetero_parallel_hooks
+from mindspeed_mm.utils.utils import EncoderBalanceComm
 mindspeed_args = get_mindspeed_args()
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
     import mindspeed_mm.mindspore.mindspore_adaptor
@@ -110,7 +111,7 @@ def move_to_device(batch: Dict[str, Any], float_dtype: str):
                         for t in v]
 
 
-def get_batch(data_iterator):
+def get_batch(data_iterator, is_vit_last_stage=False):
     """Generate a batch."""
     if data_iterator is not None:
         batch = next(data_iterator)
@@ -121,6 +122,12 @@ def get_batch(data_iterator):
     if has_video:
         batch['pixel_values'] = batch.pop('pixel_values_videos')
         batch['image_grid_thw'] = batch.pop('video_grid_thw')
+    if (mpu.is_pipeline_first_stage() or is_vit_last_stage) and get_args().encoder_dp_balance:
+        batch['pixel_values'], batch['tranfer'] = EncoderBalanceComm.apply(
+            batch['pixel_values'],
+            mpu.get_data_parallel_group())
+    else:
+        batch['tranfer'] = None
     return batch
 
 
@@ -143,7 +150,10 @@ def loss_func(output_tensor):
 
 def forward_step(data_iterator, model):
     """Forward step."""
-    output_tensor = model(**get_batch(data_iterator))
+    is_vit_last_stage = False
+    if model.module.module.add_image_encoder:
+        is_vit_last_stage = model.module.module.image_encoder.post_process
+    output_tensor = model(**get_batch(data_iterator, is_vit_last_stage))
     return output_tensor, loss_func
 
 
