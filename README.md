@@ -19,18 +19,19 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 
 # 🔥🔥🔥Latest News
 
-* [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型 【Prototype】
+* [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型 【Prototype】
+* [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
 * [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
-* [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型 【Prototype】
+* [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型
 * **[Jul. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 3B/7B/32B [GRPO训练](https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/rl)**
-* [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型 【Prototype】
+* [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型
 * [Jun. 30, 2025]: 🌴 MindSpeed MM版本2.1.0发布
-* [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型 【Prototype】
-* [Jun. 05, 2025]: 🚀 MindSpeed MM支持Qwen2.5Omni-7B模型 【Prototype】
+* [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型
+* [Jun. 05, 2025]: 🚀 MindSpeed MM支持Qwen2.5Omni-7B模型
 * [Jun. 05, 2025]: 🤝 MindSpeed MM**原生支持**OpenSoraPlan 1.5模型
-* [Apr. 03, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-32B模型 【Prototype】
+* [Apr. 03, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-32B模型
 * [Mar. 27, 2025]: 🚀 MindSpeed MM支持Wan2.1-1.3B/14B模型
-* [Mar. 26, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-3B/7B/72B模型 【Prototype】
+* [Mar. 26, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-3B/7B/72B模型
 * [Feb. 20, 2025]: 🚀 MindSpeed MM支持InternVL2.5-78B模型
 * [Feb. 18, 2025]: 🚀 MindSpeed MM支持HunyuanVideo模型
 * [Feb. 17, 2025]: 🔥 MindSpeed MM支持Mindspeed-Core & Megatron 0.8.0版本
@@ -214,8 +215,19 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </thead>
   <tbody>
     <tr>
-      <td rowspan="35"> 多模态生成 </td>
+      <td rowspan="36"> 多模态生成 </td>
       </tr>
+      <tr>
+      <td><a href="https://github.com/Alpha-VLLM/Lumina-mGPT-2.0">Lumina-mGPT 2.0</a></td>
+      <td><a href="https://huggingface.co/Alpha-VLLM/Lumina-mGPT-2.0">7B</a></td>
+      <td> 微调 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 7.9 (SPS)</td>
+      <td> 8.7 (SPS)</td>
+      <td> 1024 </td>
+      <td>【Pass】</td>
+    </tr>
       <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/blob/master/examples/opensoraplan1.5/">OpenSoraPlan1.5</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.5.0">8.5B</a></td>
@@ -351,7 +363,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 1.33 (SPS) </td>
       <td> 1.46 (SPS) </td>
       <td> / </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/opensoraplan1.2">OpenSoraPlan 1.2</a></td>
@@ -526,17 +538,6 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://github.com/Alpha-VLLM/Lumina-mGPT-2.0">Lumina-mGPT 2.0</a></td>
-      <td><a href="https://huggingface.co/Alpha-VLLM/Lumina-mGPT-2.0">7B</a></td>
-      <td> 微调 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-      <td> 7.9 (SPS)</td>
-      <td> 8.7 (SPS)</td>
-      <td> 1024 </td>
-      <td>【Test】</td>
-    </tr>
-    <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/diffusers/flux">Flux</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">12B</a></td>
       <td> 全参微调 </td>
@@ -546,6 +547,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 53.65 (FPS) </td>
       <td> / </td>
       <td>【Pass】</td>
+    </tr>
+    <tr>
+      <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/diffusers/flux-kontext">Flux-Kontext</a></td>
+      <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">12B</a></td>
+      <td> 全参微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td> 1.97 (FPS) </td>
+      <td> 2.00 (FPS) </td>
+      <td> / </td>
+      <td>【Test】</td>
     </tr>
     <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/diffusers/sana">Sana</a></td>
@@ -567,7 +579,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 18.37 (FPS) </td>
       <td> 19.61 (FPS) </td>
       <td> / </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/diffusers/kolors">Kolors</a></td>
@@ -590,7 +602,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 12.16(SPS) </td>
       <td> 10.28(SPS) </td>
       <td> / </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/llava1.5">LLaVA 1.5</a></td>
@@ -642,7 +654,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 214 (TPS) </td>
       <td> 191 (TPS) </td>
       <td> / </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td rowspan=""><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/internvl2.5">InternVL 2.5</a></td>
@@ -664,7 +676,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 7.07 (SPS) </td>
       <td> 6.67 (SPS) </td>
       <td> / </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL3-78B">78B</a></td>
@@ -674,7 +686,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 3.79 (SPS) </td>
       <td> 4.69 (SPS) </td>
       <td> / </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td rowspan="3"><a href="https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/qwen2vl">Qwen2-VL</a></td>

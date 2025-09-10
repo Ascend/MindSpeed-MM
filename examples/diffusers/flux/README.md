@@ -160,7 +160,7 @@
     max_train_steps=5000
     mixed_precision="bf16" # 混精
     resolution=256
-    config_file="pretrain_${mixed_precision}_accelerate_config.yaml"
+    config_file="bf16_accelerate_config.yaml"
 
     # accelerate launch --config_file ${config_file} \ 目录下
     --dataloader_num_workers=0 \ # 请基于系统配置与数据大小进行调整num workers
