@@ -42,16 +42,7 @@
 1. 软件与驱动安装
 
     ```bash
-    # python3.10
-    conda create -n test python=3.10
-    conda activate test
-
-    # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
-    pip install torch-2.6.0-cp310-cp310-manylinux_2_28_aarch64.whl
-    pip install torch_npu-2.6.0*-cp310-cp310-manylinux_2_28_aarch64.whl
-    
-    # apex for Ascend 参考 https://gitee.com/ascend/apex
-    # 建议从原仓编译安装
+    # 安装 torch 和 torch_npu，参考上述安装指南进行安装
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
     source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -84,7 +75,7 @@
 
     ```shell
     pip install -e .
-    vim examples/dreambooth/requirements_flux.txt #修改版本：torch==2.6.0, accelerate==1.10.0, transformers==4.47.1, 添加deepspeed==0.17.2
+    vim examples/dreambooth/requirements_flux.txt #修改版本：torch==2.6.0, accelerate==1.7.0, transformers==4.47.1, 添加deepspeed==0.17.2
     pip install -r examples/dreambooth/requirements_flux.txt # 安装对应依赖
     ```
 
