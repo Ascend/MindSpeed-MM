@@ -103,7 +103,7 @@ def merge_by_tp(tp_state_dicts: List[STATE_DICT_T], patterns: TP_PATTERN_T, tp_s
                     if key.startswith(prefix):
                         if size <= 0:
                             merged_dict[key] = merger.merge(tp_values)
-                        if size == 1:
+                        elif size == 1:
                             merged_dict[key] = tp_values[0]
                         else:
                             merged_dict[key] = merger.merge(tp_values[:size])

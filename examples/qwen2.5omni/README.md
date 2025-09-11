@@ -401,7 +401,7 @@ bash examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
-其中“权重转换”需要根据设定的异构并行配置进行修改，例如Vit模块和Audio模块不切分，llm模块按TP4进行切分时，权重转换脚本命令如下：
+其中“权重转换”需要根据设定的异构并行配置进行修改（当前仅支持DP和TP的异构并行），例如Vit模块和Audio模块不切分，llm模块按TP4进行切分时，权重转换脚本命令如下：
 
 ```bash
 # 7b
@@ -428,9 +428,16 @@ mm-convert  Qwen2_5_OmniConverter hf_to_mm \
 
 <a id="jump5.2"></a>
 #### 2. 配置参数
-参考**微调**章节进行数据目录配置和模型保存加载等配置，需要注意的是在配置`examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh`时要增加`--hetero-parallel`开启异构并行训练
+参考**微调**章节进行数据目录配置和模型保存加载等配置，需要注意的是在配置`examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh`时要增加`--hetero-parallel`开启异构并行训练；
+
+注意llm的并行配置在finetune_qwen2_5_omni_7b.sh文件中定义，vit和audio的并行配置在model_7b.json文件中定义，vit和audio以及llm三者的gbs是一致的，需要关注llm的MBS配置；
+例如vit和audio模块不切分，而llm采用tp4切分时，llm的MBS必须是自身TP的整数倍，以确保vit和audio的DP域能够均匀分配到整数的MBS值；
 
 ```shell
+TP=4
+PP=1
+CP=1
+MBS=4
 ...
 GPT_ARGS="
     ...
@@ -445,7 +452,7 @@ GPT_ARGS="
 
 ```json
 {
-  "image_encoder": {
+    "image_encoder": {
         "vision_encoder": {},
         "vision_projector": {},
         "tp":1,
