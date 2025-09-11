@@ -56,7 +56,7 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
         config["sde_solver"] = True
         config["eta"] = args.eta
         config["index"] = perm
-        z, pred_original, log_prob = self.flux_step(pred, latents.to(torch.float32), sigma_schedule,
+        z, pred_original, log_prob = self.grpo_step(pred, latents.to(torch.float32), sigma_schedule,
                                                     pre_latents.to(torch.float32), config)
         return log_prob
 
@@ -301,7 +301,7 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
             config["sde_solver"] = True
             config["eta"] = args.eta
             config["index"] = i
-            z, pred_original, log_prob = self.flux_step(pred, z.to(torch.float32), sigma_schedule, None, config)
+            z, pred_original, log_prob = self.grpo_step(pred, z.to(torch.float32), sigma_schedule, None, config)
             z.to(torch.bfloat16)
             all_latents.append(z)
             all_log_probs.append(log_prob)

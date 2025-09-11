@@ -49,9 +49,12 @@ class SoraGRPOTrainer(ABC):
         merge_mm_args(self.args)
         self.device = torch.cuda.current_device()
         self.hyper_model = None
+        self.gc_iteration = 5
         initialize_sequence_parallel_state(self.args.sp_size)
 
     def train(self):
+        import gc
+        gc.disable()
         args = self.args
         rank = self.rank
         world_size = self.world_size
@@ -74,14 +77,14 @@ class SoraGRPOTrainer(ABC):
             os.makedirs(args.save, exist_ok=True)
 
         transformer = None
-        load_rank_batchsize = self.args.load_rank
+        load_rank_batchsize = args.load_rank
         for start_rank in range(0, local_world_size, load_rank_batchsize):
             end_rank = min(start_rank + load_rank_batchsize, world_size)
             load_ranks = list(range(start_rank, end_rank))
             if local_rank in load_ranks:
                 if local_rank % load_rank_batchsize == 0:
                     print(f"rank {load_ranks} load start")
-                self.hyper_model = self.model_provider(self.args)
+                self.hyper_model = self.model_provider(args)
                 transformer = self.hyper_model.diffuser
                 fsdp_kwargs, split_modules = get_dit_fsdp_kwargs(
                     self.hyper_model,
@@ -99,7 +102,7 @@ class SoraGRPOTrainer(ABC):
                     print(f"rank {load_ranks} load success")
             dist.barrier()
 
-        main_print(
+        self.main_print(
             f"--> Initializing FSDP with sharding strategy: {args.fsdp_sharding_startegy}"
         )
 
@@ -117,7 +120,7 @@ class SoraGRPOTrainer(ABC):
         )
 
         init_steps = 0
-        main_print(f"optimizer: {optimizer}")
+        self.main_print(f"optimizer: {optimizer}")
 
         lr_scheduler = get_scheduler(
             args.lr_scheduler,
@@ -155,20 +158,20 @@ class SoraGRPOTrainer(ABC):
                 / args.sp_size
                 * args.train_sp_batch_size
         )
-        main_print("***** Running training *****")
-        main_print(f"  Num examples = {len(train_dataset)}")
-        main_print(f"  Dataloader size = {len(train_dataloader)}")
-        main_print(f"  Resume training from step {init_steps}")
-        main_print(f"  Instantaneous batch size per device = {args.train_batch_size}")
-        main_print(
+        self.main_print("***** Running training *****")
+        self.main_print(f"  Num examples = {len(train_dataset)}")
+        self.main_print(f"  Dataloader size = {len(train_dataloader)}")
+        self.main_print(f"  Resume training from step {init_steps}")
+        self.main_print(f"  Instantaneous batch size per device = {args.train_batch_size}")
+        self.main_print(
             f"  Total train batch size (w. data & sequence parallel, accumulation) = {total_batch_size}"
         )
-        main_print(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-        main_print(f"  Total optimization steps per epoch = {args.train_iters}")
-        main_print(
+        self.main_print(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+        self.main_print(f"  Total optimization steps per epoch = {args.train_iters}")
+        self.main_print(
             f"  Total training parameters per FSDP shard = {sum(p.numel() for p in transformer.parameters() if p.requires_grad) / 1e9} B"
         )
-        main_print(f"  Master weight dtype: {transformer.parameters().__next__().dtype}")
+        self.main_print(f"  Master weight dtype: {transformer.parameters().__next__().dtype}")
 
         progress_bar = tqdm(
             range(0, 100000),
@@ -211,6 +214,8 @@ class SoraGRPOTrainer(ABC):
                     }
                 )
                 progress_bar.update(1)
+                if step % self.gc_iteration == 0:
+                    gc.collect()
 
         if get_sequence_parallel_state():
             destroy_sequence_parallel_group()
@@ -598,7 +603,7 @@ class SoraGRPOTrainer(ABC):
         if not x == y:
             raise AssertionError(f"{msg} not equal")
 
-    def flux_step(
+    def grpo_step(
             self,
             model_output: torch.Tensor,
             latents: torch.Tensor,
@@ -641,31 +646,29 @@ class SoraGRPOTrainer(ABC):
         else:
             return prev_sample_mean, pred_original_sample
 
+    def save_checkpoint(self, transformer, rank, output_dir, step, epoch):
+        self.main_print(f"--> saving checkpoint at step {step}")
+        with FSDP.state_dict_type(
+                transformer,
+                StateDictType.FULL_STATE_DICT,
+                FullStateDictConfig(offload_to_cpu=True, rank0_only=True),
+        ):
+            cpu_state = transformer.state_dict()
+        if rank <= 0:
+            save_dir = os.path.join(output_dir, f"checkpoint-{step}-{epoch}")
+            os.makedirs(save_dir, exist_ok=True)
+            # save using safetensors
+            weight_path = os.path.join(save_dir, "diffusion_pytorch_model.safetensors")
+            save_file(cpu_state, weight_path)
+            config_dict = dict(transformer.config)
+            if "dtype" in config_dict:
+                del config_dict["dtype"]
+            config_path = os.path.join(save_dir, "config.json")
+            # save dict as json
+            with open(config_path, "w") as f:
+                json.dump(config_dict, f, indent=4)
+        self.main_print(f"--> checkpoint saved at step {step}")
 
-def save_checkpoint(transformer, rank, output_dir, step, epoch):
-    main_print(f"--> saving checkpoint at step {step}")
-    with FSDP.state_dict_type(
-            transformer,
-            StateDictType.FULL_STATE_DICT,
-            FullStateDictConfig(offload_to_cpu=True, rank0_only=True),
-    ):
-        cpu_state = transformer.state_dict()
-    if rank <= 0:
-        save_dir = os.path.join(output_dir, f"checkpoint-{step}-{epoch}")
-        os.makedirs(save_dir, exist_ok=True)
-        # save using safetensors
-        weight_path = os.path.join(save_dir, "diffusion_pytorch_model.safetensors")
-        save_file(cpu_state, weight_path)
-        config_dict = dict(transformer.config)
-        if "dtype" in config_dict:
-            del config_dict["dtype"]
-        config_path = os.path.join(save_dir, "config.json")
-        # save dict as json
-        with open(config_path, "w") as f:
-            json.dump(config_dict, f, indent=4)
-    main_print(f"--> checkpoint saved at step {step}")
-
-
-def main_print(content):
-    if int(os.environ["LOCAL_RANK"]) <= 0:
-        print(content)
+    def main_print(self, content):
+        if int(os.environ["LOCAL_RANK"]) <= 0:
+            print(content)

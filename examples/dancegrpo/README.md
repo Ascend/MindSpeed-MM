@@ -120,11 +120,14 @@ mkdir ckpt/hps_ckpt
 cd ..
 ```
 
-下载FLUX预训练权重[FLUX预训练权重](https://huggingface.co/black-forest-labs/FLUX.1-dev)
+下载FLUX预训练权重 [FLUX预训练权重](https://huggingface.co/black-forest-labs/FLUX.1-dev)
 ，下载至MindSpeed MM工程根目录下的ckpt/flux目录中。
 
-下载HPS-v2.1预训练权重[HPS-v2.1预训练权重](https://huggingface.co/xswu/HPSv2/tree/main)
-，下载至MindSpeed MM工程根目录下的ckpt/hps_ckpt目录中。
+下载HPS-v2.1预训练权重 [HPS-v2.1预训练权重](https://huggingface.co/xswu/HPSv2/tree/main)
+，将其中的`HPS_v2.1_compressed.pt`下载至MindSpeed MM工程根目录下的ckpt/hps_ckpt目录中。
+
+下载CLIP预训练权重 [CLIP预训练权重](https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/tree/main)
+，将其中的`open_clip_pytorch_model.bin`下载至MindSpeed MM工程根目录下的ckpt/hps_ckpt目录中。
 
 <a id="jump3"></a>
 
