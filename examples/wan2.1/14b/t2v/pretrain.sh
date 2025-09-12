@@ -26,7 +26,7 @@ DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
 MM_DATA="./examples/wan2.1/14b/t2v/feature_data.json"
-MM_MODEL="./examples/wan2.1/14b/t2v/pretrain_model.json"
+MM_MODEL="./examples/wan2.1/14b/t2v/pretrain_model_fsdp2.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="./weights/Wan-AI/Wan2.1-T2V-14B-Diffusers/transformer/"  # ensure the wandit weight be converted
 SAVE_PATH="path to save your wandit weight"

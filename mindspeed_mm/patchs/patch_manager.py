@@ -20,6 +20,7 @@ from mindspeed_mm.patchs import (
     infer_fa_patch,
     models_patches,
     fsdp1_patches,
+    training_patches,
 )
 
 
@@ -40,6 +41,11 @@ class PatchesManager:
         "clip_grad_async": [
             ("megatron.core.optimizer.clip_grads.get_grad_norm_fp32", adaptive_clip_grad_patch.get_grad_norm_fp32_async),
             ("megatron.core.optimizer.clip_grads.clip_grad_by_total_norm_fp32", adaptive_clip_grad_patch.clip_grad_by_total_norm_fp32_async)
+        ],
+        # Enable this patch when loading model weights from a .pt checkpoint file in distributed training.
+        # This will override the default model loading behavior to handle distributed checkpoint format.
+        "get_dist_model_load_from_pt": [
+            ("megatron.training.training.get_model", training_patches.get_dist_model_load_from_pt)
         ]
     }
 
