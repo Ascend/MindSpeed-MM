@@ -223,8 +223,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8</td>
       <td> BF16 </td>
-      <td> 7.9 (SPS)</td>
-      <td> 8.7 (SPS)</td>
+      <td> 8.24 (SPS)</td>
+      <td> 8.79 (SPS)</td>
       <td> 1024 </td>
       <td>【Pass】</td>
     </tr>
@@ -234,7 +234,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 预训练 </td>
       <td> 1x8</td>
       <td> BF16 </td>
-      <td> 0.93 (SPS) </td>
+      <td> 0.83 (SPS) </td>
       <td> / </td>
       <td> / </td>
       <td>【北大贡献】</td>
