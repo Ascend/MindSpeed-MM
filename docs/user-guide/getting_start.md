@@ -229,7 +229,7 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_3b.sh
 git clone https://gitee.com/ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
-git checkout core_r0.8.0
+git checkout core_v0.12.1
 cp -r megatron ../MindSpeed-MM/
 cd ../MindSpeed-MM
 ```
@@ -245,8 +245,8 @@ conda activate test
 # 安装加速库
 git clone https://gitee.com/ascend/MindSpeed.git
 cd MindSpeed
-# checkout commit from MindSpeed core_r0.8.0
-git checkout 1ada966f33d6fab6eff7c95b197aae51f8790926
+# checkout commit from MindSpeed core_v0.12.1
+git checkout 6aff65eba929b4f39848a5153ac455467d0b0f9e
 pip install -r requirements.txt 
 pip install -e .
 cd ..
