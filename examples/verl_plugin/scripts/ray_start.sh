@@ -76,5 +76,3 @@ else
       fi
   done
 fi
-
-sleep 600

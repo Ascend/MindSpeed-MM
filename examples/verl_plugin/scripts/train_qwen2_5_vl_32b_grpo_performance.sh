@@ -109,7 +109,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.val_before_train=False \
     actor_rollout_ref.model.enable_activation_offload=True \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=$sp_size \
-    actor_rollout_ref.ref.ulysses_sequence_parallel_size=$sp_size > train_qwen2_5_vl_32b_grpo_performance.log 2>&1 &
+    actor_rollout_ref.ref.ulysses_sequence_parallel_size=$sp_size | tee train_qwen2_5_vl_32b_grpo_performance.log 2>&1 &
 wait
 
 TPS=`grep 'perf/throughput:' train_qwen2_5_vl_32b_grpo_performance.log | awk -F 'perf/throughput:' '{print$2}' | awk -F ' ' '{print$1}' | tail -n 5 | awk '{sum+=$1} END {print sum/NR}'`

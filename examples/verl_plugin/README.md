@@ -104,7 +104,7 @@ git checkout 97b65c63c729c61ca607315cf7084012aabc6bba
 pip install -r requirements-npu.txt
 pip install -v -e .
 # for x86 machine [Optional]
-# pip install -r requirements-npu.txt --trusted-host download.pytorch.org --trusted-host
+# pip install -r requirements-npu.txt --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 # pip install -v -e . --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 cd ..
 
@@ -231,7 +231,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
     - 若多机运行，*仅需主节点*需运行此脚本
 
     ```bash
-    bash examples/grpo_trainer/train_qwen2_5_vl_7b_grpo_full.sh --data_path=xxx ---model_path=xxx
+    bash examples/grpo_trainer/train_qwen2_5_vl_7b_grpo_full.sh --data_path=xxx --model_path=xxx
     ```
 
 > *注意：所有节点的代码、权重、数据等路径的层级要保持一致，且启动ray的时候都位于verl目录下*

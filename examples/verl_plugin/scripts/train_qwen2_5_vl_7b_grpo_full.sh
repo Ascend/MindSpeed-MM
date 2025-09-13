@@ -106,4 +106,4 @@ python3 -m verl.trainer.main_ppo \
     trainer.device=npu \
     trainer.val_before_train=False \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=$sp_size \
-    actor_rollout_ref.ref.ulysses_sequence_parallel_size=$sp_size > train_qwen2_5_vl_7b_grpo_full.log 2>&1 &
+    actor_rollout_ref.ref.ulysses_sequence_parallel_size=$sp_size | tee train_qwen2_5_vl_7b_grpo_full.log 2>&1 &
