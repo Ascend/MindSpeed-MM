@@ -15,7 +15,7 @@
 
 MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件，同时支持多模态生成及多模态理解，旨在为华为 [昇腾芯片](https://www.hiascend.com/) 提供端到端的多模态训练解决方案, 包含预置业界主流模型，数据工程，分布式训练及加速，预训练、微调、在线推理任务等特性。
 
-# 通知: 本项目已经正式迁移至 [Gitcode](https://gitcode.com/Ascend) 平台\n
+# 通知: 本项目已经正式迁移至 [Gitcode](https://gitcode.com/Ascend) 平台
 ---
 
 # 🔥🔥🔥Latest News
