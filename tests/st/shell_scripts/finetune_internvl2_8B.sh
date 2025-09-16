@@ -92,7 +92,7 @@ OUTPUT_ARGS="
 
 
 torchrun $DISTRIBUTED_ARGS \
-    $BASEPATH/pretrain_vlm.py \
+    $BASEPATH/pretrain_internvl.py \
     $GPT_ARGS \
     $MM_ARGS \
     $OUTPUT_ARGS \
