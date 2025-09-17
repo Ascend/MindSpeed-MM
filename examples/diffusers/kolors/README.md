@@ -37,7 +37,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 1. 三方件安装
 
@@ -48,7 +48,7 @@
 
     # 安装 torch 
     pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
-    # apex for Ascend 参考 https://gitee.com/ascend/apex
+    # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装
     pip install diffusers==0.30.0 accelerate==0.27.2 transformers==4.42.4  torchvision==0.22.1
     ```
@@ -57,7 +57,7 @@
 
     ```shell
     # 克隆仓库
-    git clone https://gitee.com/ascend/MindSpeed-MM.git
+    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
     cd examples/diffusers/kolors
     ```
 
@@ -78,4 +78,4 @@
 
 ### 公网地址说明
 
-代码涉及公网地址参考 [公网地址](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/public_address_statement.md)
+代码涉及公网地址参考 [公网地址](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/public_address_statement.md)

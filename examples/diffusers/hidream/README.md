@@ -46,7 +46,7 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 1. 软件与驱动安装
 
@@ -59,7 +59,7 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
     pip install torch-2.7.1-cp310-cp310m-manylinux2014_aarch64.whl 
     pip install torch_npu-2.7.1*-cp310-cp310m-linux_aarch64.whl
     
-    # apex for Ascend 参考 https://gitee.com/ascend/apex
+    # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
@@ -69,7 +69,7 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
 2. 克隆仓库到本地服务器
 
     ```shell
-    git clone https://gitee.com/ascend/MindSpeed-MM.git
+    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
     ```
 
 3. 模型搭建
@@ -358,4 +358,4 @@ OMP_NUM_THREADS： 设置执行期间使用的线程数
 
 ### 公网地址说明
 
-代码涉及公网地址参考 [公网地址](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/public_address_statement.md)
+代码涉及公网地址参考 [公网地址](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/public_address_statement.md)

@@ -27,7 +27,9 @@
 - [注意事项](#jump7)
 
 ## 版本说明
+
 #### 参考实现
+
 ```
 url=https://github.com/OpenGVLab/InternVL.git
 commit_id=2d57e21
@@ -44,14 +46,14 @@ commit_id=2d57e21
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 <a id="jump1.1"></a>
 
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -76,11 +78,11 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -113,8 +115,7 @@ InternVL2_5-78B](https://huggingface.co/OpenGVLab/InternVL2_5-78B)；
 
 MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及PP（Pipeline Parallel）的权重切分。
 
-`mm-convert`工具详细用法参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
-
+`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
 
 ```bash
 # 根据实际情况修改 ascend-toolkit 路径
@@ -147,6 +148,7 @@ mm-convert InternVLConverter hf_to_mm \
 同步修改`examples/internvl2.5/finetune_internvl2.5_*b.sh`中的`LOAD_PATH`参数，该路径为转换后或者切分后的权重，注意与原始权重`raw_ckpt/InternVL2_5-*B`进行区分。
 
 以`InternVL2_5-78B`为例
+
 ```shell
 LOAD_PATH="pretrained/InternVL2_5-78B"
 ```
@@ -293,6 +295,7 @@ $save_dir
 ```shell
 bash examples/internvl2.5/finetune_internvl2.5_78B.sh
 ```
+
 <a id="jump5"></a>
 
 ## 推理
@@ -318,6 +321,7 @@ mm-convert InternVLConverter hf_to_mm \
   --cfg.trust_remote_code True
 # trust_remote_code: 为保证代码安全，配置trust_remote_code默认为False，用户需要设置为True，并且确保自己下载的模型和数据的安全性
 ```
+
 <a id="jump5.2"></a>
 
 #### 2. 配置参数
@@ -381,6 +385,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 ...
 MM_MODEL="./examples/internvl2.5/inference_4B.json"
 ```
+
 <a id="jump5.3"></a>
 
 #### 3. 启动推理
@@ -392,6 +397,7 @@ bash examples/internvl2.5/inference_internvl.sh
 <a id="jump6"></a>
 
 ## 环境变量声明
+
 ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏  
 ASCEND_GLOBAL_LOG_LEVEL： 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志。0：对应DEBUG级别，1：对应INFO级别，2：对应WARNING级别，3：对应ERROR级别，4：对应NULL级别，不输出日志  
 TASK_QUEUE_ENABLE： 用于控制开启task_queue算子下发队列优化的等级，0：关闭，1：开启Level 1优化，2：开启Level 2优化  
@@ -405,4 +411,5 @@ NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量
 <a id="jump7"></a>
 
 ## 注意事项
-1. 在使用流水线并行策略进行多机训练可能会出现卡住现象，可参考[此处](https://gitee.com/ascend/MindSpeed/pulls/1627/files)修改。
+
+1. 在使用流水线并行策略进行多机训练可能会出现卡住现象，可参考[此处](https://gitcode.com/Ascend/MindSpeed/pulls/1627/files)修改。

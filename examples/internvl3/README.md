@@ -42,14 +42,14 @@ commit_id=d779db3
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 <a id="jump1.1"></a>
 
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -74,11 +74,11 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -109,7 +109,7 @@ pip install -e .
 
 MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及PP（Pipeline Parallel）的权重切分。
 
-`mm-convert`工具详细用法参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
+`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
 
 
 ```bash
@@ -291,7 +291,7 @@ $save_dir
 
 【模型并行配置】
 
-InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，特性说明[参考](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/unaligned_linear.md)
+InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，特性说明[参考](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/unaligned_linear.md)
 ```shell
 --unaligned-linear \
 ```
@@ -311,7 +311,7 @@ InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，�
 --variable-seq-lengths \
 ```
 
-开启VPP需要添加以下参数（N为VPP切分数），特性说明[参考](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/virtual_pipeline_parallel.md)：
+开启VPP需要添加以下参数（N为VPP切分数），特性说明[参考](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/virtual_pipeline_parallel.md)：
 ```shell
 --virtual-pipeline-model-parallel-size N \
 ```
@@ -438,4 +438,4 @@ NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量
 <a id="jump7"></a>
 
 ## 注意事项
-1. 在使用流水线并行策略进行多机训练可能会出现卡住现象，可参考[此处](https://gitee.com/ascend/MindSpeed/pulls/1627/files)修改。
+1. 在使用流水线并行策略进行多机训练可能会出现卡住现象，可参考[此处](https://gitcode.com/Ascend/MindSpeed/pulls/1627/files)修改。

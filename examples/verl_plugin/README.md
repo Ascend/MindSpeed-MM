@@ -123,7 +123,7 @@ pip install torch_npu-2.5.1*.manylinux2014_*.whl
 
 ```bash
 # 请确保 vllm 已正确安装并且之后不会做覆盖
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM/examples/verl_plugin
 pip install -v -e .
 scp -r scripts/* ../../../verl/examples/grpo_trainer/
@@ -244,12 +244,12 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 | 指标                                 | 说明                                                     |
 | ------------------------------------ | -------------------------------------------------------- |
-| `timing/gen`                     | 一次迭代中generation耗时                     |
-| `timing/reward`         | 一次迭代中reward时                                     |
-| `timing/old_log_p`                   | 一次迭代中actor model计算log p耗时                       |
-| `timing/ref`             | 一次迭代中reference model计算耗时                   |
-| `timing/adv`                         | 计算advantages耗时                                       |
-| `timing/reshard`         | 一次迭代中reshard耗时                                     |
+| `timing_s/gen`                     | 一次迭代中generation耗时                     |
+| `timing_s/reward`         | 一次迭代中reward时                                     |
+| `timing_s/old_log_prob`                   | 一次迭代中actor model计算log prob耗时                       |
+| `timing_s/ref`             | 一次迭代中reference model计算耗时                   |
+| `timing_s/adv`                         | 计算advantages耗时                                       |
+| `timing_s/reshard`         | 一次迭代中reshard耗时                                     |
 | `timing_s/update_actor`                      | 一次迭代中actor model进行update耗时                      |
 | `timing_s/step`                      | 一次迭代总时间                      |
 | `timing_s/generate_sequence`                      | 一次迭代中generate_sequence耗时                      |
@@ -264,7 +264,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 | `actor/pg_clipfrac`                     | GRPO中裁剪机制生效的比例，反映了策略更新幅度的稳定性         |
 | `actor/ppo_kl`                          | PPO算法的实际 KL 散度                                        |
 | `actor/grad_norm`                             | 梯度范数，表示当前反向传播中参数梯度的整体幅度               |
-| `timing_s/rewards/mean`                     | 规则奖励打分的平均总奖励值                                   |
+| `critic/rewards/mean`                     | 规则奖励打分的平均总奖励值                                   |
 | `actor/lr`                               | 学习率，优化器当前使用的学习率                               |
 | `critic/score/mean`                       | 开启奖励模型时的reward均值                                   |
 | `critic/score/max`                        | 奖励模型及规则奖励对同一个样本的reward最大值                 |

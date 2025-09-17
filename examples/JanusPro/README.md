@@ -3,17 +3,16 @@
 <p align="left">
 </p>
 
-
 ## 环境安装
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/deepseek-ai/Janus.git
 cd MindSpeed-MM
 mkdir ckpt
@@ -25,14 +24,13 @@ cp -r ./Janus ./MindSpeed-MM/examples/JanusPro
 #### 2. 环境搭建
 
 对./examples/JanusPro/Janus中的pyproject.toml文件的dependencies做如下修改：
+
 - torch==2.7.1
 - numpy==1.26.4
 - 增加依赖：decorator
 - 增加依赖：scipy
 - 增加依赖：attrs
   
-
-
 ```bash
 # python3.10
 conda create -n test python=3.10
@@ -79,10 +77,12 @@ cd ..
 ```
 
 #### 3. 启动脚本
-```bash 
+
+```bash
   cd /examples/JanusPro/
   bash multimodal_understanding.sh
 ```
+
 即可得到推理结果。
 
 推理结果示例：
@@ -95,8 +95,3 @@ cd ..
   reaching out with its front paws towards the person. The sun is setting, 
   casting a warm glow over the screen. 
 ```
-
-
-
-
-

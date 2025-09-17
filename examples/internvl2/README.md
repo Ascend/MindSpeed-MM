@@ -51,14 +51,14 @@ commit_id=c62fa4f
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 <a id="jump1.1"></a>
 
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -83,11 +83,11 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -117,9 +117,9 @@ pip install -e .
 
 #### 2. 权重转换
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及PP（Pipeline Parallel）和VPP（Virtual Pipeline Parallel）的权重切分(详细VPP配置参考[vpp特性说明](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/virtual_pipeline_parallel.md))。
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及PP（Pipeline Parallel）和VPP（Virtual Pipeline Parallel）的权重切分(详细VPP配置参考[vpp特性说明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/virtual_pipeline_parallel.md))。
 
-`mm-convert`工具详细用法参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 
 以InternVL2-8B为例，使用命令如下
 
@@ -515,7 +515,7 @@ bash examples/internvl2/evaluate_internvl2_8B.sh
 ### DistTrain(分离部署)
 
 #### 1. 特性介绍
-DistTrain特性详细介绍参考文档[分离部署特性](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dist-train.md)
+DistTrain特性详细介绍参考文档[分离部署特性](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dist-train.md)
 
 #### 2. 模型分离部署权重转换
 

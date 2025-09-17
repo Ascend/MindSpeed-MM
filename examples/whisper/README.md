@@ -19,6 +19,7 @@
   - [启动预训练](#jump4.3)
 - [模型推理与权重转换](#jump5)
 - [环境变量声明](#jump6)
+
 ---
 
 <a id="jump1"></a>
@@ -27,14 +28,14 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 <a id="jump1.1"></a>
 
 #### 1. 仓库拉取
 
 ```shell
-    git clone https://gitee.com/ascend/MindSpeed-MM.git 
+    git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
     git clone https://github.com/NVIDIA/Megatron-LM.git
     cd Megatron-LM
     git checkout core_v0.12.1
@@ -56,14 +57,14 @@
     pip install torch-2.7.1-cp310-cp310-manylinux2014_aarch64.whl 
     pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
     
-    # apex for Ascend 参考 https://gitee.com/ascend/apex
+    # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
     source /usr/local/Ascend/ascend-toolkit/set_env.sh 
 
     # 安装加速库
-    git clone https://gitee.com/ascend/MindSpeed.git
+    git clone https://gitcode.com/Ascend/MindSpeed.git
     cd MindSpeed
     # checkout commit from MindSpeed core_r0.12.1
     git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -210,10 +211,12 @@ torch.save(new_checkpoint, "whisper.pth")
 - 如果使用多机训练，需要在每个节点准备训练数据
 
 <a id="jump5"></a>
+
 #### 4. 模型推理与权重转换
 
 当前MindSpeed-MM未提供whisper模型的推理代码，需要将训练后模型转回huggingface格式自行推理
 转回脚本代码示例如下：
+
 ```python
 import torch
 import mindspeed.megatron_adaptor
@@ -239,7 +242,9 @@ torch.save(new_checkpoint, "whisper_hf.bin")
 
 - 该转回脚本需在MindSpeed-MM根目录下执行
 <a id="jump6"></a>
+
 ## 环境变量声明
+
 ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏  
 ASCEND_GLOBAL_LOG_LEVEL： 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志。0：对应DEBUG级别，1：对应INFO级别，2：对应WARNING级别，3：对应ERROR级别，4：对应NULL级别，不输出日志  
 TASK_QUEUE_ENABLE： 用于控制开启task_queue算子下发队列优化的等级，0：关闭，1：开启Level 1优化，2：开启Level 2优化  

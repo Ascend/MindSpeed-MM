@@ -2,8 +2,8 @@
 
 - [Wan2.1 使用指南](#wan21-使用指南)
   - [版本说明](#版本说明)
-      - [参考实现](#参考实现)
-      - [变更记录](#变更记录)
+    - [参考实现](#参考实现)
+    - [变更记录](#变更记录)
   - [任务支持列表](#任务支持列表)
   - [环境安装](#环境安装)
     - [仓库拉取](#仓库拉取)
@@ -68,12 +68,12 @@ commit_id=f8d4a1e
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 ### 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git 
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -91,14 +91,14 @@ conda activate test
 # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装 
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh 
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 6aff65eba929b4f39848a5153ac455467d0b0f9e
@@ -284,11 +284,11 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   - 默认使能方式为Ulysess序列并行。
 
-  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
+  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
 
-  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
+  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
 
-  - FPDT(Fully Pipelined Distributed Transformer): Ulysess Offload 并行请[参考文档](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/fpdt.md)
+  - FPDT(Fully Pipelined Distributed Transformer): Ulysess Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/fpdt.md)
 
 - layer_zero
 
@@ -372,15 +372,16 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存。
   
-  - 使能方式：`examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dist`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/fsdp2.md)
-
+  - 使能方式：`examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dist`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/fsdp2.md)
 
 #### 启动训练
 
 ```bash
 bash examples/wan2.1/{model_size}/{task}/pretrain.sh
 ```
+
 或
+
 ```
 bash examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh
 ```

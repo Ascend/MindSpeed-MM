@@ -48,14 +48,14 @@ commit_id=4b14d58
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 <a id="jump1.1"></a>
 
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git 
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -77,14 +77,14 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -458,7 +458,7 @@ bash examples/opensoraplan1.3/i2v/inference_i2v.sh
 ### DistTrain(分离部署)
 
 #### 1. 特性介绍
-DistTrain特性详细介绍参考文档[分离部署特性](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dist-train.md)
+DistTrain特性详细介绍参考文档[分离部署特性](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dist-train.md)
 
 #### 2. 模型分离部署权重转换
 
@@ -571,7 +571,7 @@ GPUS_PER_NODE=$(echo $ASCEND_RT_VISIBLE_DEVICES | tr ',' '\n' | grep -c '^[0-9]'
 
 ```
 
-由于该模型vae是冻结不训练的，使能分离部署时，还需要打开dummy_optimizer，使能方式参考[dummy_optimizer](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)
+由于该模型vae是冻结不训练的，使能分离部署时，还需要打开dummy_optimizer，使能方式参考[dummy_optimizer](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)
    ```shell
    GPT_ARGS="
        ...

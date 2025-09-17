@@ -40,7 +40,7 @@
 #### 1. 仓库拉取
 
 ```shell
-    git clone https://gitee.com/ascend/MindSpeed-MM.git 
+    git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
     git clone https://github.com/NVIDIA/Megatron-LM.git
     cd Megatron-LM
     git checkout core_r0.8.0
@@ -54,7 +54,7 @@
 
 #### 2. 环境搭建
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 ```bash
     # python3.10
@@ -65,11 +65,11 @@
     pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
     pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
     
-    # apex for Ascend 参考 https://gitee.com/ascend/apex
+    # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装
 
     # 安装加速库
-    git clone https://gitee.com/ascend/MindSpeed.git
+    git clone https://gitcode.com/Ascend/MindSpeed.git
     cd MindSpeed
     git checkout 3f09d6736571cf1e30f8ac97de77982d0ab32cc5
     pip install -r requirements.txt 
@@ -119,8 +119,11 @@ i2v 启动推理脚本
 ```shell
 sh examples/qihoo_t2x/inference_qihoo.sh
 ```
+
 <a id="jump3"></a>
+
 ## 环境变量声明
+
 ASCEND_RT_VISIBLE_DEVICES： 指定NPU设备的索引值  
 NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量
 
@@ -134,7 +137,6 @@ NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量
   year={2024}
 }
 ```
-
 
 ## 许可证
 

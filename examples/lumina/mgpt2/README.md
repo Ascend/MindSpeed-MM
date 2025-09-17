@@ -1,4 +1,5 @@
 # Lumina-mGPT2使用指南
+
 - [Lumina-mGPT2使用指南](#Lumina-mGPT2使用指南)
   - [版本说明](#版本说明)
     - [参考实现](#参考实现)
@@ -22,30 +23,30 @@
   - [环境变量声明](#环境变量声明)
 
 ## 版本说明
+
 ### 参考实现
 
 T2I微调任务
+
 ```
 url=https://github.com/Alpha-VLLM/Lumina-mGPT-2.0
 commit_id=978feb32473b57b79ea6a709687d01107e630478
 ```
 
-
 ### 变更记录
 
 2025.08.15：首次发布Lumina-mGPT2微调任务
-
 
 ## 环境安装
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 ### 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git 
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -65,14 +66,14 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装 
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh 
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout e92252f4f1b7cbd78868922e6fe5659f8b762bf8
@@ -107,25 +108,27 @@ pip install decord==0.6.0
 |   Lumina-mGPT2 7B  |   <https://huggingface.co/Alpha-VLLM/Lumina-mGPT-2.0/tree/main>   |
 |  MoVQGAN  |  <https://huggingface.co/ai-forever/MoVQGAN/resolve/main/movqgan_270M.ckpt>    |
 
-
 ### 权重转换
+
 需要对下载后的Lumina-mGPT2模型权重进行权重转换，运行权重转换脚本：
+
 ```shell
 mm-convert LuminaConverter hf_to_mm \
-	--cfg.source_path <./Alpha-VLLM/Lumina-mGPT-2.0/> \
-	--cfg.target_path <./Lumina/Lumina-mGPT-2.0-mm-convert/> \
+ --cfg.source_path <./Alpha-VLLM/Lumina-mGPT-2.0/> \
+ --cfg.target_path <./Lumina/Lumina-mGPT-2.0-mm-convert/> \
 ```
 
 权重转换脚本的参数说明如下：
+
 |参数| 含义 | 默认值 |
 |:------------|:----|:----|
 | --cfg.source_path | 原始权重路径 | / |
 | --cfg.target_path | 转换后的权重保存路径 | / |
 
-
 ---
 
 ## 预训练
+
 ### 数据预处理
 
 将数据处理成如下格式
@@ -201,7 +204,7 @@ bash examples/lumina/mgpt2/feature_extract/feature_extraction.sh
 
 当调整模型参数或者token序列长度时，需要根据实际情况启用以下并行策略，并通过调试确定最优并行策略。
 
-+ fsdp1
+- fsdp1
 
   - 使用场景：在模型参数规模较大时，单卡上无法承载完整的模型，可以通过开启fsdp1降低内存。
   
@@ -218,6 +221,7 @@ bash examples/lumina/mgpt2/pretrain.sh
 ```
 
 ## 环境变量声明
+
 ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏  
 ASCEND_GLOBAL_LOG_LEVEL： 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志。0：对应DEBUG级别，1：对应INFO级别，2：对应WARNING级别，3：对应ERROR级别，4：对应NULL级别，不输出日志  
 TASK_QUEUE_ENABLE： 用于控制开启task_queue算子下发队列优化的等级，0：关闭，1：开启Level 1优化，2：开启Level 2优化  

@@ -27,7 +27,9 @@
 - [环境变量声明](#jump6)
 
 ## 版本说明
+
 #### 参考实现
+
 ```
 url=https://github.com/PKU-YuanGroup/Open-Sora-Plan.git
 commit_id=adb2a20
@@ -44,14 +46,14 @@ commit_id=adb2a20
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 <a id="jump1.1"></a>
 
 #### 1. 仓库拉取
 
 ```shell
-    git clone https://gitee.com/ascend/MindSpeed-MM.git 
+    git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
     git clone https://github.com/NVIDIA/Megatron-LM.git
     cd Megatron-LM
     git checkout core_v0.12.1
@@ -73,14 +75,14 @@ commit_id=adb2a20
     pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
     pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
     
-    # apex for Ascend 参考 https://gitee.com/ascend/apex
+    # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
     source /usr/local/Ascend/ascend-toolkit/set_env.sh 
 
     # 安装加速库
-    git clone https://gitee.com/ascend/MindSpeed.git
+    git clone https://gitcode.com/Ascend/MindSpeed.git
     cd MindSpeed
     # checkout commit from MindSpeed core_r0.12.1
     git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -132,17 +134,17 @@ MindSpeed-MM修改了部分原始网络的结构名称，因此需要使用`conv
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.2 vae_convert \
-	--cfg.source_path <"./raw_ckpt/open-sora-plan/vae/checkpoint.ckpt">
-	--cfg.target_path <"./ckpt/vae/vae.pt">
+ --cfg.source_path <"./raw_ckpt/open-sora-plan/vae/checkpoint.ckpt">
+ --cfg.target_path <"./ckpt/vae/vae.pt">
 ```
 
 转换dit部分权重
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.2 hf_to_mm \
-	--cfg.source_path <"./raw_ckpt/open-sora-plan/93x480p/">
-	--cfg.target_path <"./ckpt/open-sora-plan-12/93x480p/">
-	--cfg.target_parallel_config.tp_size <tp_size>
+ --cfg.source_path <"./raw_ckpt/open-sora-plan/93x480p/">
+ --cfg.target_path <"./ckpt/open-sora-plan-12/93x480p/">
+ --cfg.target_parallel_config.tp_size <tp_size>
 ```
 
 权重转换工具的参数说明与默认值如下：
@@ -153,7 +155,6 @@ mm-convert OpenSoraPlanConverter --version v1.2 hf_to_mm \
 | --cfg.source_path | 原始权重路径 | / |
 | --cfg.target_path | 转换或切分后权重保存路径 | /                              |
 | --cfg.target_parallel_config.tp_size | dit部分切分时的tp size | 1 |
-
 
 同步修改examples/opensoraplan1.2/pretrain_opensoraplan1_2.sh 中的--load参数，该路径为转换后或者切分后的权重，注意--load配置的是转换到MindSpeed-MM后的dit权重路径，vae权重路径在model_opensoraplan1_2.json中配置
 
@@ -201,12 +202,12 @@ mm-convert OpenSoraPlanConverter --version v1.2 hf_to_mm \
 
 需根据实际情况修改`model_opensoraplan1_2.json`和`data.json`中的权重和数据集路径，包括`from_pretrained`、`data_path`、`data_folder`字段。
 
-+ Encoder-DP：Encoder数据并行
+- Encoder-DP：Encoder数据并行
   - 使用场景：在开启TP、CP时，DP较小，存在vae和text_encoder的冗余encode计算。开启以减小冗余计算，但会增加通信，需要按场景开启。
   - 使能方式：在xxx_model.json中设置"enable_encoder_dp": true。
   - 限制条件：暂不兼容PP、VAE-CP。支持与Encoder Interleaved Offload功能同时开启。
 
-+ Encoder Interleaved Offload: Encoder 交替卸载
+- Encoder Interleaved Offload: Encoder 交替卸载
   - 使用场景：在NPU内存瓶颈的训练场景中，可以一次性编码多步训练输入数据然后卸载编码器至cpu上，使得文本编码器无需常驻内存，减少内存占用。
     故可在不增加内存消耗的前提下实现在线训练，避免手动离线提取特征。
   - 使能方式：在xxx_model.json中，设置 encoder_offload_interval > 1. 建议设置根据实际场景设置大于10，可以极小化卸载带来的性能损耗
@@ -265,8 +266,8 @@ mm-convert OpenSoraPlanConverter --version v1.2 hf_to_mm \
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.2 resplit \
-	--cfg.source_path <"./ckpt/open-sora-plan-12/93x480p/">
-	--cfg.target_path <"./ckpt/open-sora-plan-12/93x480p_merge/">
+ --cfg.source_path <"./ckpt/open-sora-plan-12/93x480p/">
+ --cfg.target_path <"./ckpt/open-sora-plan-12/93x480p_merge/">
 ```
 
 <a id="jump5.2"></a>
@@ -287,7 +288,9 @@ bash examples/opensoraplan1.2/inference_opensoraplan1_2.sh
 
 ---
 <a id="jump6"></a>
+
 ## 环境变量声明
+
 ASCEND_RT_VISIBLE_DEVICES： 指定NPU设备的索引值  
 ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏  
 ASCEND_GLOBAL_LOG_LEVEL： 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志。0：对应DEBUG级别，1：对应INFO级别，2：对应WARNING级别，3：对应ERROR级别，4：对应NULL级别，不输出日志  

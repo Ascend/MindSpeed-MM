@@ -22,12 +22,12 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 ### 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git 
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -45,14 +45,14 @@ conda activate test
 # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装 
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh 
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -90,17 +90,17 @@ Text Encoder：[t5](https://huggingface.co/google/t5-v1_1-xl) 和 [CLIP](https:/
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.5 vae_convert \
-	--cfg.source_path <"./raw_ckpt/open-sora-plan/vae/checkpoint.ckpt">
-	--cfg.target_path <"./ckpt/vae/vae.pt">
+ --cfg.source_path <"./raw_ckpt/open-sora-plan/vae/checkpoint.ckpt">
+ --cfg.target_path <"./ckpt/vae/vae.pt">
 ```
 
 需要对下载后的opensoraplan1.5模型 `DiT`部分进行权重转换，运行权重转换脚本
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.5 source_to_mm \
-	--cfg.source_path <"./raw_ckpt/open-sora-plan/model_ema.pt/">
-	--cfg.target_path <"./ckpt/open-sora-plan/">
-	--cfg.target_parallel_config.tp_size <tp_size>
+ --cfg.source_path <"./raw_ckpt/open-sora-plan/model_ema.pt/">
+ --cfg.target_path <"./ckpt/open-sora-plan/">
+ --cfg.target_parallel_config.tp_size <tp_size>
 ```
 
 权重转换脚本的参数说明如下：
@@ -180,11 +180,11 @@ mm-convert OpenSoraPlanConverter --version v1.5 source_to_mm \
 
 当调整模型参数或者视频序列长度时，需要根据实际情况启用以下并行策略，并通过调试确定最优并行策略。
 
-+ TP: 张量模型并行
+- TP: 张量模型并行
   - 使用场景：模型参数规模较大时，单卡上无法承载完整的模型，通过开启TP可以降低静态内存和运行时内存。
   - 使能方式：在启动脚本 `examples/opensoraplan1.5/pretrain.sh`中设置 TP > 1，如：TP=8
   - 限制条件：head 数量需要能够被TP*CP整除（在 `examples/opensoraplan1.5/pretrain_model.json`中配置，默认为24）
-+ TP-SP
+- TP-SP
   - 使用场景：在张量模型并行的基础上，进一步对 LayerNorm 和 Dropout 模块的序列维度进行切分，以降低动态内存。
   - 使能方式：在 GPT_ARGS 设置 --sequence-parallel
   - 使用建议：建议在开启TP时同步开启该设置，该配置默认开启
@@ -221,8 +221,8 @@ bash examples/opensoraplan1.5/inference.sh
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.5 resplit \
-	--cfg.source_path <"./ckpt/open-sora-plan">
-	--cfg.target_path <"./ckpt/open-sora-plan_merge/">
+ --cfg.source_path <"./ckpt/open-sora-plan">
+ --cfg.target_path <"./ckpt/open-sora-plan_merge/">
 ```
 
 ## 环境变量声明

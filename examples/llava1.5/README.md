@@ -31,7 +31,9 @@
 - [环境变量声明](#jump7)
 
 ## 版本说明
+
 #### 参考实现
+
 ```
 url=https://github.com/haotian-liu/LLaVA.git
 commit_id=3e337ad
@@ -48,14 +50,14 @@ commit_id=3e337ad
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 <a id="jump1.1"></a>
 
 #### 1. 仓库拉取
 
 ```shell
-    git clone https://gitee.com/ascend/MindSpeed-MM.git 
+    git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
     git clone https://github.com/NVIDIA/Megatron-LM.git
     cd Megatron-LM
     git checkout core_v0.12.1
@@ -78,11 +80,11 @@ commit_id=3e337ad
     pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
     pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
     
-    # apex for Ascend 参考 https://gitee.com/ascend/apex
+    # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装 
 
     # 安装加速库
-    git clone https://gitee.com/ascend/MindSpeed.git
+    git clone https://gitcode.com/Ascend/MindSpeed.git
     cd MindSpeed
     # checkout commit from MindSpeed core_r0.12.1
     git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -398,6 +400,7 @@ examples/llava1.5/evaluate_llava1_5.json改完后，需要将json文件的路径
 ```shell
 MM_MODEL=examples/llava1.5/evaluate_llava1_5.json
 ```
+
 评测支持多卡DP评测需要更改的配置,为NPU卡数量
 
 ```shell
@@ -407,12 +410,15 @@ NPUS_PER_NODE=1
 <a id="jump6.3"></a>
 
 ### 启动评测
+
 评测额外依赖一些python包，使用下面命令进行安装
 
 ```shell
 pip install -e ".[evaluate]"
 ```
+
 启动shell开始评测
+
 ```shell
 bash examples/llava1.5/evaluate_llava1_5.sh
 ```
@@ -422,7 +428,9 @@ bash examples/llava1.5/evaluate_llava1_5.sh
 - *.xlsx文件，这个文件会输出每道题的预测结果和答案等详细信息。
 - *.csv文件，这个文件会输出统计准确率等数据。
 <a id="jump7"></a>
+
 ## 环境变量声明
+
 ASCEND_RT_VISIBLE_DEVICES： 指定NPU设备的索引值  
 ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏  
 ASCEND_GLOBAL_LOG_LEVEL： 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志。0：对应DEBUG级别，1：对应INFO级别，2：对应WARNING级别，3：对应ERROR级别，4：对应NULL级别，不输出日志  

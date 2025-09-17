@@ -44,7 +44,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 1. 软件与驱动安装
 
@@ -58,7 +58,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
 2. 克隆仓库到本地服务器
 
     ```shell
-    git clone https://gitee.com/ascend/MindSpeed-MM.git
+    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
     ```
 
 3. 模型搭建
@@ -211,7 +211,6 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
     bash finetune_qwen_image_dreambooth_lora_deepspeed_bf16.sh
     ```
 
-
 ## 推理
 
 ### 环境搭建及运行
@@ -282,4 +281,4 @@ OMP_NUM_THREADS： 设置执行期间使用的线程数
 
 ### 公网地址说明
 
-代码涉及公网地址参考 [公网地址](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/public_address_statement.md)
+代码涉及公网地址参考 [公网地址](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/public_address_statement.md)

@@ -48,7 +48,7 @@ commit_id=2149f36f22db601f9dbf70472fea11576f62a0f6
 ### 1. 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -76,7 +76,7 @@ pip install torch-2.7.1+cpu-cp310-cp310-*.whl
 pip install torch_npu-2.7.1*.whl
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
 cp -r mindspeed ../MindSpeed-MM/
