@@ -26,7 +26,7 @@ from megatron.training.training import (
     build_train_valid_test_data_iterators,
     setup_model_and_optimizer,
 )
-from megatron.training.utils import average_losses_across_data_parallel_group
+from megatron.training.utils import average_losses_across_data_parallel_group, unwrap_model
 from megatron.training.utils import print_rank_0
 from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.configs.config import merge_mm_args
@@ -51,6 +51,7 @@ class DPOTrainer(ABC):
             process_non_loss_data_func=None,
             extra_args_provider=None,
             args_defaults=None,
+            call_backs=None
     ):
         """
         Initializes the DPOTrainer instance.
@@ -65,6 +66,7 @@ class DPOTrainer(ABC):
         self.optimizer = None
         self.opt_param_scheduler = None
         self.args = None
+        self.call_backs = call_backs
         self.initialize()
 
     def initialize(self):
@@ -137,6 +139,11 @@ class DPOTrainer(ABC):
             model_provider, model_type
         )
 
+        if self.call_backs:
+            if isinstance(self.call_backs, list):
+                for call_back in self.call_backs:
+                    call_back.setup(unwrap_model(model)[0])
+
         self.args = get_args()
         self.train_model = model
         self.optimizer = optimizer
@@ -204,6 +211,7 @@ class DPOTrainer(ABC):
                     valid_data_iterator,
                     process_non_loss_data_func,
                     config,
+                    self.call_backs,
                 )
 
             print_datetime("after training is done")

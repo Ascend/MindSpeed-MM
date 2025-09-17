@@ -21,8 +21,8 @@ text_schema = PPStageSchema(
 )
 
 
-def create_videoalign_ops(new_transformers_weight_key: bool, model_prefix: str, resize_vocab_size: int, vit_embed_dim: int,
-                          vit_num_heads: int, llm_num_query_groups: int, llm_q_size: int, llm_kv_size: int) -> List[Operator]:
+def create_videoalign_ops(new_transformers_weight_key: bool, megatron_model: bool, model_prefix: str, resize_vocab_size: int,
+                          vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups: int, llm_q_size: int, llm_kv_size: int) -> List[Operator]:
     """videoalign权重转换逻辑"""
     model_prefix_name = model_prefix if model_prefix else ""
     if new_transformers_weight_key:
@@ -33,52 +33,32 @@ def create_videoalign_ops(new_transformers_weight_key: bool, model_prefix: str, 
         transformers_visual_model_name = 'visual.'
 
     ops = [
-        UpGateMergeOp(raw_names=[fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.gate_proj.base_layer.weight", fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.up_proj.base_layer.weight"],
-                      new_name=fr"text_decoder.decoder.layers.(\d+).mlp.linear_fc1.base_layer.weight"),
-        QKVMergeOp(raw_names=(fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.q_proj.base_layer.weight",
-                              fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.k_proj.base_layer.weight",
-                              fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.v_proj.base_layer.weight"),
-                   new_name=fr"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.base_layer.weight",
-                   group=llm_num_query_groups,
-                   q_size=llm_q_size,
-                   k_size=llm_kv_size,
-                   v_size=llm_kv_size,
-                   ),
-        QKVMergeOp(raw_names=(fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.q_proj.base_layer.bias",
-                              fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.k_proj.base_layer.bias",
-                              fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.v_proj.base_layer.bias"),
-                   new_name=fr"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.base_layer.bias",
-                   group=llm_num_query_groups,
-                   q_size=llm_q_size,
-                   k_size=llm_kv_size,
-                   v_size=llm_kv_size,
-                   ),
-        RelocateOp(name=fr"{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.qkv.weight",
-                   new_name=fr"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight",
-                   group=vit_num_heads,
-                   split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
-                   ),
-        RelocateOp(name=fr"{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.qkv.bias",
-                   new_name=fr"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias",
-                   group=vit_num_heads,
-                   split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
-                   ),
         RenameOp(
             (
                 (fr'{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.proj',
                  fr'image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_proj'),
                 (fr'{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.qkv',
                  fr'image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv'),
-                (fr'{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).mlp.fc', fr'image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc'),
-                (fr'{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).norm1', fr'image_encoder.encoder.blocks.layers.(\d+).input_layernorm'),
-                (fr'{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).norm2', fr'image_encoder.encoder.blocks.layers.(\d+).pre_mlp_layernorm'),
-                (fr'{model_prefix_name}{transformers_visual_model_name}merger.ln_q', fr'image_encoder.projector.layernorm'),
-                (fr'{model_prefix_name}{transformers_visual_model_name}merger.mlp.0', fr'image_encoder.projector.encoder.linear_fc1'),
-                (fr'{model_prefix_name}{transformers_visual_model_name}merger.mlp.2', fr'image_encoder.projector.encoder.linear_fc2'),
-                (fr'{model_prefix_name}{transformers_visual_model_name}patch_embed.proj', fr'image_encoder.encoder.patch_embed.proj'),
-                (fr'{model_prefix_name}{transformers_text_model_name}embed_tokens', fr'text_decoder.embedding.word_embeddings'),
-                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).input_layernorm', fr'text_decoder.decoder.layers.(\d+).input_layernorm'),
-                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.down_proj', fr'text_decoder.decoder.layers.(\d+).mlp.linear_fc2'),
+                (fr'{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).mlp.fc',
+                 fr'image_encoder.encoder.blocks.layers.(\d+).mlp.linear_fc'),
+                (fr'{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).norm1',
+                 fr'image_encoder.encoder.blocks.layers.(\d+).input_layernorm'),
+                (fr'{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).norm2',
+                 fr'image_encoder.encoder.blocks.layers.(\d+).pre_mlp_layernorm'),
+                (fr'{model_prefix_name}{transformers_visual_model_name}merger.ln_q',
+                 fr'image_encoder.projector.layernorm'),
+                (fr'{model_prefix_name}{transformers_visual_model_name}merger.mlp.0',
+                 fr'image_encoder.projector.encoder.linear_fc1'),
+                (fr'{model_prefix_name}{transformers_visual_model_name}merger.mlp.2',
+                 fr'image_encoder.projector.encoder.linear_fc2'),
+                (fr'{model_prefix_name}{transformers_visual_model_name}patch_embed.proj',
+                 fr'image_encoder.encoder.patch_embed.proj'),
+                (fr'{model_prefix_name}{transformers_text_model_name}embed_tokens',
+                 fr'text_decoder.embedding.word_embeddings'),
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).input_layernorm',
+                 fr'text_decoder.decoder.layers.(\d+).input_layernorm'),
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.down_proj',
+                 fr'text_decoder.decoder.layers.(\d+).mlp.linear_fc2'),
                 (
                     fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).post_attention_layernorm',
                     fr'text_decoder.decoder.layers.(\d+).pre_mlp_layernorm'),
@@ -87,23 +67,91 @@ def create_videoalign_ops(new_transformers_weight_key: bool, model_prefix: str, 
                 (fr'{model_prefix_name}lm_head', fr'text_decoder.output_layer'),
                 (fr'{model_prefix_name}{transformers_text_model_name}norm', fr'text_decoder.decoder.final_layernorm'),
                 (fr'{model_prefix_name}rm_head.weight', fr'rm_head.weight'),
-                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.linear_qkv', fr'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv'),
-                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.fc1', fr'text_decoder.decoder.layers.(\d+).mlp.linear_fc1')
             )
         ),
     ]
+
+    if megatron_model:
+        relocate_ops = [
+            RelocateOp(name=fr"{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.qkv.weight",
+                       new_name=fr"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight",
+                       group=vit_num_heads,
+                       split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
+                       ),
+            RelocateOp(name=fr"{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.qkv.bias",
+                       new_name=fr"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias",
+                       group=vit_num_heads,
+                       split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
+                       )
+        ]
+        merge_ops = [
+            UpGateMergeOp(raw_names=[
+                fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.gate_proj.base_layer.weight",
+                fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.up_proj.base_layer.weight"],
+                          new_name=fr"text_decoder.decoder.layers.(\d+).mlp.linear_fc1.base_layer.weight"),
+            QKVMergeOp(raw_names=(
+                fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.q_proj.base_layer.weight",
+                fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.k_proj.base_layer.weight",
+                fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.v_proj.base_layer.weight"),
+                       new_name=fr"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.base_layer.weight",
+                       group=llm_num_query_groups,
+                       q_size=llm_q_size,
+                       k_size=llm_kv_size,
+                       v_size=llm_kv_size,
+                       ),
+            QKVMergeOp(raw_names=(
+                fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.q_proj.base_layer.bias",
+                fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.k_proj.base_layer.bias",
+                fr"{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.v_proj.base_layer.bias"),
+                       new_name=fr"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.base_layer.bias",
+                       group=llm_num_query_groups,
+                       q_size=llm_q_size,
+                       k_size=llm_kv_size,
+                       v_size=llm_kv_size,
+                       ),
+        ]
+        rename_ops = RenameOp(
+            (
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.linear_qkv',
+                 fr'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv'),
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.fc1',
+                 fr'text_decoder.decoder.layers.(\d+).mlp.linear_fc1')
+            )
+        )
+        ops.extend(relocate_ops)
+        ops.extend(merge_ops)
+        ops.extend(rename_ops)
+
+    else:
+        rename_ops = RenameOp(
+            (
+                (fr"{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.qkv.weight",
+                 fr"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight"),
+                (fr"{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.qkv.bias",
+                 fr"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias"),
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.q_proj',
+                 fr'text_decoder.decoder.layers.(\d+).self_attention.q_proj'),
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.k_proj',
+                 fr'text_decoder.decoder.layers.(\d+).self_attention.k_proj'),
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.v_proj',
+                 fr'text_decoder.decoder.layers.(\d+).self_attention.v_proj'),
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.up_proj',
+                 fr'text_decoder.decoder.layers.(\d+).mlp.up_proj'),
+                (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).mlp.gate_proj',
+                 fr'text_decoder.decoder.layers.(\d+).mlp.gate_proj')
+            )
+        )
+        ops.append(rename_ops)
 
     if resize_vocab_size:
         ops.append(ResizeEmbedOp(fr'text_decoder.embedding.word_embeddings.weight', resize_vocab_size))
     return ops
 
+
 videoalign_tp_patterns = {
     r"text_decoder.output_layer.weight": RowSplit,
     r"text_decoder.embedding.word_embeddings.weight": RowSplit,
-    r'text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight': GLUSplit,
     r'text_decoder.decoder.layers.(\d+).mlp.linear_fc2.weight': ColSplit,
-    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowSplit,
-    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowSplit,
     r'text_decoder.decoder.layers.(\d+).self_attention.linear_proj.weight': ColSplit,
     r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_proj.weight": ColSplit,
     r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias": RowSplit,
@@ -116,10 +164,30 @@ videoalign_tp_patterns = {
     r"image_encoder.projector.encoder.linear_fc2.weight": ColSplit
 }
 
+megatron_videoalign_tp_patterns = {
+    r'text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight': GLUSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowSplit
+}
+
+canonical_videoalign_tp_patterns = {
+    r'text_decoder.decoder.layers.(\d+).self_attention.q_proj.weight': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.k_proj.weight': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.v_proj.weight': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.q_proj.bias': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.k_proj.bias': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).self_attention.v_proj.bias': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).mlp.gate_proj.weight': RowSplit,
+    r'text_decoder.decoder.layers.(\d+).mlp.up_proj.weight': RowSplit
+}
+
 
 class ModelConfigVideoAlign(CommonModelConfig):
     new_transformers_weight_key: Optional[bool] = None
     """是否使用新transformers版本下的模型权重名"""
+
+    megatron_model: Optional[bool] = True
+    """是否使用megatron标准模型结构"""
 
     model_prefix: Optional[str] = None
     """模型权重名包含额外前缀"""
@@ -151,20 +219,25 @@ class VideoAlignConverter(Converter):
         llm_q_size = llm_head_hidden_size * hf_config.num_attention_heads // hf_config.num_key_value_heads
         llm_kv_size = llm_head_hidden_size
         ops = create_videoalign_ops(common_model_config.new_transformers_weight_key,
-                                 common_model_config.model_prefix,
-                                 common_model_config.resize_vocab_size,
-                                 hf_config.vision_config.embed_dim,
-                                 hf_config.vision_config.num_heads,
-                                 hf_config.num_key_value_heads,
-                                 llm_q_size,
-                                 llm_kv_size
-                                 )
+                                    common_model_config.megatron_model,
+                                    common_model_config.model_prefix,
+                                    common_model_config.resize_vocab_size,
+                                    hf_config.vision_config.embed_dim,
+                                    hf_config.vision_config.num_heads,
+                                    hf_config.num_key_value_heads,
+                                    llm_q_size,
+                                    llm_kv_size
+                                    )
         return ops
 
     @staticmethod
     def hf_to_mm(cfg: ConvertVppMMConfigVideoAlign):
         """huggingface模型转换mindspeed mm模型权重"""
         ops = VideoAlignConverter._create_ops(cfg.hf_config.config, cfg.common_model_config)
+        if cfg.common_model_config.megatron_model:
+            videoalign_tp_patterns.update(megatron_videoalign_tp_patterns)
+        else:
+            videoalign_tp_patterns.update(canonical_videoalign_tp_patterns)
         convert_hf_to_mm(cfg, ops, videoalign_tp_patterns, [vision_schema, text_schema])
         # 安全管控权限
         set_directory_permissions(cfg.mm_dir)
@@ -173,6 +246,10 @@ class VideoAlignConverter(Converter):
     def mm_to_hf(cfg: ConvertHFConfig):
         """mindspeed mm模型转换huggingface模型权重"""
         ops = VideoAlignConverter._create_ops(cfg.hf_config.config)
+        if cfg.common_model_config.megatron_model:
+            videoalign_tp_patterns.update(megatron_videoalign_tp_patterns)
+        else:
+            videoalign_tp_patterns.update(canonical_videoalign_tp_patterns)
         convert_mm_to_hf(cfg, ops, videoalign_tp_patterns)
         # 安全管控权限
         set_directory_permissions(cfg.save_hf_dir)

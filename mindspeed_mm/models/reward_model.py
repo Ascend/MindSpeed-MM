@@ -21,6 +21,7 @@ class Qwen2VLRewardModelBT(VLMModel):
         self.reward_token = config.reward_token
         self.loss_type = config.loss_type
         self.loss_dtype = torch.bfloat16 if getattr(config.text_decoder, 'bf16', False) else torch.float32
+        self.use_remove_padding = getattr(config.text_decoder, 'use_remove_padding', False)
         self.rm_head = nn.Linear(config.text_decoder.hidden_size, self.output_dim, bias=False)
 
         self.pad_token_id = extra_config['pad_token_id']
@@ -74,7 +75,7 @@ class Qwen2VLRewardModelBT(VLMModel):
                     input_embeds = input_embeds.masked_scatter(image_mask, vit_embeds)
                     input_embeds = input_embeds.transpose(0, 1).clone()
 
-            attention_mask, position_ids = prepare_positionsids_mask_for_videoalign(config=self.config,
+            attention_mask_, position_ids = prepare_positionsids_mask_for_videoalign(config=self.config,
                                                                                     input_ids=input_ids,
                                                                                     inference_params=inference_params,
                                                                                     attention_mask=attention_mask,
@@ -84,6 +85,9 @@ class Qwen2VLRewardModelBT(VLMModel):
                                                                                     inputs_embeds=input_embeds,
                                                                                     cache_position=cache_position,
                                                                                     **kwargs)
+
+            if not self.use_remove_padding:
+                attention_mask = attention_mask_
 
             output = self.text_decoder(
                 input_ids=input_ids,

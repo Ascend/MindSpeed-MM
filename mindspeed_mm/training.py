@@ -303,6 +303,7 @@ def train(
     valid_data_iterator,
     process_non_loss_data_func,
     config,
+    call_backs=None,
 ):
     """Train the model function."""
     args = get_args()
@@ -449,6 +450,7 @@ def train(
             optimizer,
             opt_param_scheduler,
             config,
+            call_backs
         )
         iteration += 1
         batch_size = (
@@ -628,7 +630,7 @@ def train(
 
 
 def train_step(
-    forward_step_func, data_iterator, model, optimizer, opt_param_scheduler, config
+        forward_step_func, data_iterator, model, optimizer, opt_param_scheduler, config, call_backs
 ):
     """Single training step."""
     args = get_args()
@@ -667,6 +669,10 @@ def train_step(
     # Update parameters.
     timers("optimizer", log_level=1).start(barrier=args.barrier_with_L1_time)
     update_successful, grad_norm, num_zeros_in_grad = optimizer.step()
+    if call_backs:
+        if isinstance(call_backs, list):
+            for call_back in call_backs:
+                call_back(unwrap_model(model[0]))
     timers("optimizer").stop()
 
     # Vision momentum.
@@ -771,7 +777,7 @@ def training_log(loss_dict, total_loss_dict, learning_rate, decoupled_learning_r
 
     # Calculate batch size.
     batch_size = args.micro_batch_size * args.data_parallel_size * \
-        get_num_microbatches()
+                 get_num_microbatches()
 
     # Track app tag & app tag ID
     if one_logger:

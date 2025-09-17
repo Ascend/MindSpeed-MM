@@ -18,6 +18,7 @@ VISION_ENCODER_MAPPINGS = {
     "InternViT": InternViT,
     "qwen2vit": Qwen2VLViT,
     "qwen2_5_vit": Qwen2VLViT,
+    "videoalign_vit": Qwen2VLViT,
     "SigLip": create_siglip_vit,
     "glm4v_vit": GlmViT,
 }

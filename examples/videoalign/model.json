@@ -1,5 +1,5 @@
 {
-    "model_id": "qwen2vl",
+    "model_id": "videoalign",
     "img_context_token_id": 151656,
     "video_token_id": 151656,
     "vision_start_token_id": 151652,
@@ -11,7 +11,7 @@
     "lora_save_full_weight": true,
     "image_encoder": {
         "vision_encoder": {
-            "model_id": "qwen2vit",
+            "model_id": "videoalign_vit",
             "num_layers": 32,
             "hidden_size": 1280,
             "ffn_hidden_size": 5120,
@@ -51,7 +51,7 @@
         }
     },
     "text_decoder": {
-        "model_id": "qwen2lm",
+        "model_id": "videoalign_lm",
         "num_layers": 28,
         "pipeline_num_layers": [28],
         "hidden_size": 1536,
@@ -69,6 +69,7 @@
         "normalization": "RMSNorm",
         "activation_func": "silu",
         "use_fused_rotary_pos_emb": true,
+        "use_remove_padding": true,
         "attention_softmax_in_fp32": true,
         "params_dtype": "bf16",
         "bf16": true,
@@ -80,7 +81,9 @@
         "gated_linear_unit": true,
         "layernorm_epsilon": 1e-06,
         "add_bias_linear": false,
-        "add_qkv_bias": true
+        "add_qkv_bias": true,
+        "word_embeddings_training": true,
+        "word_embeddings_only_update_special": true
     },
     "text_encoder": null,
     "video_encoder": null

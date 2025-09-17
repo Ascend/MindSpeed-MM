@@ -21,6 +21,40 @@ from mindspeed_mm.utils.transformer_model_config import get_model_config
 from mindspeed_mm.data.data_utils.func_utils.convert import load_reward_tokenizer
 
 
+class PartialEmbeddingUpdater:
+    """Function: Update only the embeddings of special tokens, while freezing the embeddings of regular tokens."""
+
+    def __init__(self):
+        # The list of special token IDs that require updates.
+        self.special_token_ids = None
+        self.orig_embeds_params = None
+        self.vocab_size = None
+
+    def get_model_args(self, special_token_ids, enable_partial_update):
+        self.special_token_ids = special_token_ids
+        self.enable_partial_update = enable_partial_update
+
+    def setup(self, model):
+        """Pre-training Initialization: Backup the initial weights of the model's input embedding layer. """
+        self.device = torch.cuda.current_device()
+        input_embeddings = model.text_decoder.embedding.word_embeddings
+        self.orig_embeds_params = input_embeddings.weight.clone().detach()
+        self.orig_embeds_params = self.orig_embeds_params.to(self.device)
+        self.vocab_size = self.orig_embeds_params.shape[0]
+
+    def __call__(self, model, *kwargs):
+        """After each training step, execute: restore the embedding weights of the regular tokens. """
+        if self.special_token_ids and self.enable_partial_update:
+            # Generate "Recovery Index"
+            index_no_updates = torch.ones((self.vocab_size), dtype=torch.bool, device=self.device)
+            index_no_updates[self.special_token_ids] = False
+
+            # Restore regular token embedding (disable gradient)
+            with torch.no_grad():
+                input_embeddings = model.text_decoder.embedding.word_embeddings
+                input_embeddings.weight[index_no_updates] = self.orig_embeds_params[index_no_updates]
+
+
 class VideoVLMRewardTrainer(DPOTrainer):
     """
     A trainer class for Video Reward Model.
@@ -42,12 +76,14 @@ class VideoVLMRewardTrainer(DPOTrainer):
         Sets up the instance variables for the model provider, actual micro batch size,
         and initializes the VideoVLMReward model.
         """
+        self.partialEmbeddingUpdater = PartialEmbeddingUpdater()
         super().__init__(
             train_valid_test_dataset_provider,
             model_type,
             process_non_loss_data_func,
             extra_args_provider,
-            args_defaults
+            args_defaults,
+            call_backs=[self.partialEmbeddingUpdater]
         )
         self.disable_dropout()
 
@@ -79,7 +115,7 @@ class VideoVLMRewardTrainer(DPOTrainer):
         tokenizer_padding_side = "right"
         pad_token_id = tokenizer.pad_token_id
         model_args = {"special_token_ids": special_token_ids, "token_embedding_length": token_embedding_length,
-                    "tokenizer_padding_side": tokenizer_padding_side, "pad_token_id": pad_token_id}
+                      "tokenizer_padding_side": tokenizer_padding_side, "pad_token_id": pad_token_id}
 
         vlm_config.pre_process = pre_process
         vlm_config.post_process = post_process
@@ -98,8 +134,10 @@ class VideoVLMRewardTrainer(DPOTrainer):
 
         else:
             raise AttributeError("image_encoder config or text_decoder config not exist!")
-        
+
         self.token_embedding_length = token_embedding_length
+        enable_partial_update = getattr(vlm_config.text_decoder, 'word_embeddings_only_update_special', False)
+        self.partialEmbeddingUpdater.get_model_args(special_token_ids, enable_partial_update)
         return model
 
     def disable_dropout(self):
@@ -237,9 +275,9 @@ class VideoVLMRewardTrainer(DPOTrainer):
         chosen_label = batch['chosen_label']
 
         rewards_A = model(input_ids=input_ids_A, pixel_values=pixel_values_A, image_grid_thw=image_grid_thw_A,
-                            attention_mask=attention_mask_A).to(self.loss_dtype)
+                          attention_mask=attention_mask_A).to(self.loss_dtype)
         rewards_B = model(input_ids=input_ids_B, pixel_values=pixel_values_B, image_grid_thw=image_grid_thw_B,
-                            attention_mask=attention_mask_B).to(self.loss_dtype)
+                          attention_mask=attention_mask_B).to(self.loss_dtype)
 
         rewards_chosen, rewards_rejected, scores_chosen, scores_rejected, nontied_mask, valid_mask = self._convert_A_B_to_chosen_rejected(
             rewards_A, rewards_B, A_scores, B_scores, chosen_label
