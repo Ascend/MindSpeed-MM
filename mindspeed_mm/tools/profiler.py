@@ -102,7 +102,7 @@ class Profiler:
                 profile_memory=self.sp_with_memory,
                 activities=activites,
                 schedule=torch_npu.profiler.schedule(
-                    wait=0, warmup=1, active=active, repeat=1, skip_first=skip_first),
+                    wait=0, warmup=0, active=active, repeat=1, skip_first=skip_first),
                 on_trace_ready=torch_npu.profiler.tensorboard_trace_handler(self.sp_save_path),
                 experimental_config=experimental_config)
 
