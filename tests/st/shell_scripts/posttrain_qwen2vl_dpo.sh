@@ -62,6 +62,7 @@ GPT_ARGS="
     --use-fused-rmsnorm \
     --swiglu \
     --use-fused-swiglu \
+    --no-masked-softmax-fusion \
     --lr 5.0e-6 \
     --lr-decay-style cosine \
     --weight-decay 0 \
