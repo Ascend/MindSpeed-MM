@@ -65,9 +65,9 @@ GPT_ARGS="
     --bf16 \
     --recompute-granularity full \
     --recompute-method block \
-    --recompute-num-layers 30 \
+    --recompute-num-layers 33 \
     --recompute-skip-core-attention \
-    --recompute-num-layers-skip-core-attention 10 \
+    --recompute-num-layers-skip-core-attention 7 \
     --use-distributed-optimizer \
     --overlap-grad-reduce \
     --overlap-param-gather \
