@@ -1,0 +1,11 @@
+sub_modules_to_wrap:
+  - megatron.core.transformer.transformer_layer.TransformerLayer
+  - megatron.core.models.common.embeddings.language_model_embedding.LanguageModelEmbedding
+  - megatron.core.models.common.embeddings.rotary_pos_embedding.RotaryEmbedding
+param_dtype: "bf16"
+reduce_dtype: "fp32"
+cast_forward_inputs: True
+ignored_modules:
+  - mindspeed_mm.models.vision.vision_model.VisionModel
+recompute_modules:
+  - megatron.core.transformer.transformer_layer.TransformerLayer

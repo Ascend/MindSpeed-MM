@@ -41,6 +41,7 @@
         "vision_projector": {
             "model_id": "lnmlp",
             "num_layers": 1,
+            "context_parallel_size": 1,
             "gated_linear_unit": false,
             "bias_activation_fusion": false,
             "add_bias_linear": true,

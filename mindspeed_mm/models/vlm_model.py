@@ -14,7 +14,7 @@ from megatron.core.tensor_parallel.mappings import gather_from_sequence_parallel
 from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
 
-from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import gather_forward_split_backward, cal_split_sizes
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import gather_forward_split_backward, cal_split_sizes, split_forward_gather_backward
 
 from mindspeed_mm.utils.utils import split_forward_gather_backward_with_megatron_cp
 from mindspeed_mm.models.common.module_spec.get_layer_spec import get_vit_layer_spec, get_llm_layer_spec, \
@@ -94,7 +94,16 @@ class VLMModel(MultiModalModule):
         if self.add_text_decoder:
             self.position_embedding_type = config.text_decoder.position_embedding_type
             self.vocab_size = config.text_decoder.vocab_size
-            self.text_decoder = self._build_text_decoder_model(config.text_decoder)
+            if args.init_model_with_meta_device:
+                # Create model on meta device
+                if torch.distributed.get_rank() == 0:
+                    self.text_decoder = self._build_text_decoder_model(config.text_decoder)
+                else:
+                    with torch.device('meta'):
+                        self.text_decoder = self._build_text_decoder_model(config.text_decoder)
+            else:
+                # Create model normally (default device)
+                self.text_decoder = self._build_text_decoder_model(config.text_decoder)
         if self.add_audio_encoder:
             self.audio_encoder = self._build_audio_encoder_model(config.audio_encoder)
 
@@ -442,6 +451,27 @@ class VLMModel(MultiModalModule):
 
         loss = total_loss.sum() / token_nums
         return loss
+    
+    def compute_cp_loss(self, logits, labels):
+        # split and shift labels
+        shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
+        split_gather_sizes = cal_split_sizes(shift_labels.shape[-1], mpu.get_context_parallel_world_size())
+
+        shift_labels = split_forward_gather_backward(shift_labels, mpu.get_context_parallel_group(), -1, split_gather_sizes, "down")
+        if mpu.get_context_parallel_rank() == 0:
+            logits = logits[..., :-1, :].contiguous()
+            shift_labels = shift_labels[..., :-1].contiguous()
+
+        # 如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
+        loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), shift_labels)
+        loss = loss * (shift_labels > -1)
+        token_nums = torch.sum(shift_labels > -1)
+
+        total_loss = gather_forward_split_backward(loss, mpu.get_context_parallel_group(), dim=-1)
+        torch.distributed.all_reduce(token_nums, group=mpu.get_context_parallel_group())
+
+        loss = total_loss.sum() / token_nums
+        return loss
 
     def forward(
             self,
@@ -537,6 +567,8 @@ class VLMModel(MultiModalModule):
                 if labels is not None:
                     if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "megatron_cp_algo":
                         loss = self.compute_megatron_cp_loss(output, labels)
+                    elif mpu.get_context_parallel_world_size() > 1:
+                        loss = self.compute_cp_loss(output, labels)
                     else:
                         # if use TP then must use compute_megatron_loss, if do not use TP, then two loss are ok, but they are not equal
                         global_args = get_args()

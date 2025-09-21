@@ -282,9 +282,6 @@ class MMGPTModel(LanguageModule):
             **(extra_block_kwargs or {}),
         )
 
-        if self.post_process and mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
-            hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), 0,
-                                                        split_gather_sizes, "up")
         if not self.post_process or self.reward_process:
             return hidden_states
 
