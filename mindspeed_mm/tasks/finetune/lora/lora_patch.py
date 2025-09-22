@@ -215,7 +215,9 @@ def peft_model_load_state_dict(self, state_dict, strict):
         keys_to_rm = [key for key in state_dict.keys() if '._extra_state' in key]
         for key in keys_to_rm:
             del state_dict[key]
-    return self.module.load_state_dict(state_dict, strict)
+    if hasattr(self, "module"):
+        return self.module.load_state_dict(state_dict, strict)
+    return self.load_state_dict_before_patch(state_dict, strict)
 
 
 def apply_patches():
@@ -237,6 +239,7 @@ def apply_patches():
     # without errors. Therefore, this patch has been added as a replacement.
     # The `self.module` here is added through the `model.add_module` in `model_provider_func_wrapper`
     from peft.peft_model import PeftModel
+    PeftModel.load_state_dict_before_patch = PeftModel.load_state_dict
     PeftModel.load_state_dict = peft_model_load_state_dict
 
 

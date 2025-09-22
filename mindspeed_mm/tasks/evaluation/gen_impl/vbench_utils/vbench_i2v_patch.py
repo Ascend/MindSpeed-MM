@@ -75,13 +75,20 @@ def compute_i2v_subject(json_dir, device, submodules_list, **kwargs):
     return all_results, video_results
 
 
+def cuda_available_fun():
+    return False
+
+
 def compute_i2v_background(json_dir, device, submodules_list, **kwargs):
     from vbench2_beta_i2v.utils import load_i2v_dimension_info
     from vbench2_beta_i2v.i2v_background import i2v_background
+    ori_cuda_available_fun = torch.cuda.is_available
+    torch.cuda.is_available = cuda_available_fun
     from dreamsim import dreamsim
     from vbench.distributed import distribute_list_to_rank, get_world_size, gather_list_of_dict
 
     dream_model, preprocess = dreamsim(pretrained=True)
+    torch.cuda.is_available = ori_cuda_available_fun
     resolution = submodules_list['resolution']
     print("Initialize DreamSim success")
 

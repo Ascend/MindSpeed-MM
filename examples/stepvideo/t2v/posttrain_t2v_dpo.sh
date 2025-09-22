@@ -46,6 +46,7 @@ GPT_ARGS="
     --pipeline-model-parallel-size ${PP} \
     --virtual-pipeline-model-parallel-size ${VP} \
     --context-parallel-size ${CP} \
+    --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --lr 1e-5 \
