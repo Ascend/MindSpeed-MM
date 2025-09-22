@@ -16,6 +16,7 @@
   - [准备工作](#jump4.1)
   - [配置参数](#jump4.2)
   - [启动微调](#jump4.3)
+- [性能数据](#性能数据)
 - [环境变量声明](#jump5)
 
 ---
@@ -259,6 +260,15 @@ $save_dir
 ```shell
 bash examples/deepseekvl2/finetune_deepseekvl2.sh
 ```
+
+---
+## 性能数据
+
+| 模型                  | 机器型号           | 集群 | 任务 | 端到端 SPS |
+|----------------------|----------|-----|----------|---------|
+| DeepSeekVL2           | Atlas 800T A2 | 4*8  | 微调    | 4.924     |
+
+注：此处 SPS 代表 Samples per Second。
 
 ---
 
