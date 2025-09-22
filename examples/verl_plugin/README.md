@@ -19,6 +19,7 @@
   - [启动训练](#jump4.2)
   - [日志打点指标说明](#jump4.3)
 - [注意事项](#jump5)
+- [性能数据](#jump6)
 
 <a id="jump0"></a>
 
@@ -302,3 +303,12 @@ pip install "ray[default]" debugpy
 ```
 
 ---
+
+<a id="jump6"></a>
+
+## 性能数据
+
+| 模型                  | 机器型号     | GBS | n_samples | max_prompt_length | max_response_length | max_num_batched_tokens | 端到端 tps |
+|---------------------|----------|-----|-----------|-------------------|------------|---------|---------|
+| Qwen2.5VL-7B          | Atlas 200T A2 Box16 | 16  | 4        | 18,000              | 512       | 19,000 | 428.38     |
+| Qwen2.5VL-32B          | Atlas 200T A2 Box16 | 32  | 8        | 18,000              | 512       | 20,000 | 99.65     |
