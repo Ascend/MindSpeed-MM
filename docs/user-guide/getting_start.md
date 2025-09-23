@@ -2,16 +2,16 @@
 MindSpeed MM同时支持多模态生成和多模态理解模型，因此下面分别介绍wan2.1和Qwen2.5VL两个典型模型使用方法，引导开发者快速上手预置模型在昇腾NPU上的高效运行。
 
 ## Qwen2.5-VL-3B 快速上手指南
-更多细节请[参考](https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl)
+更多细节请[参考](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl)
 ### 1. 环境安装
 #### 1.1 昇腾软件安装
-昇腾环境安装请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/tree/master/docs/user-guide/installation.md)
+昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/user-guide/installation.md)
 (基于python3.10)
 
 #### 1.2 仓库拉取以及MindSpeed MM依赖安装
 仓库拉取：
 ```bash
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -32,7 +32,7 @@ conda activate test
 安装其它依赖：
 ```bash
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_v0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -60,7 +60,7 @@ pip install -e .
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-3B-Instruct`目录下。
 
 #### 2.2 权重转换
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 
 以下是hf2mm的转换示例：
 ```bash
@@ -217,16 +217,16 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_3b.sh
 ```
 
 ## Wan2.1（T2V 1.3B） 快速上手指南
-更多细节请[参考](https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/wan2.1)
+更多细节请[参考](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.1)
 ### 1. 环境安装
 #### 1.1 昇腾软件安装
-昇腾环境安装请参考[安装指南](https://gitee.com/ascend/MindSpeed-MM/tree/master/docs/user-guide/installation.md)
+昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/user-guide/installation.md)
 (基于python3.10)
 
 #### 1.2 仓库拉取以及MindSpeed MM依赖安装
 仓库拉取：
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git 
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -243,7 +243,7 @@ conda activate test
 安装其它依赖：
 ```bash
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_v0.12.1
 git checkout 6aff65eba929b4f39848a5153ac455467d0b0f9e

@@ -28,11 +28,11 @@
    ```bash
    --npu-deterministic
    ```
-   详细说明请参考：[MindSpeed确定性计算](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/npu_deterministic.md)
+   详细说明请参考：[MindSpeed确定性计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/npu_deterministic.md)
 
 2. **使用msprobe工具**  
    通过MindStudio Training Tools工具链中的msprobe包启用确定性计算。  
-   使用说明请参考：[msprobe文档](https://gitee.com/ascend/mstt/blob/master/debug/accuracy_tools/msprobe/docs/05.data_dump_PyTorch.md#18-seed_all)
+   使用说明请参考：[msprobe文档](https://gitcode.com/Ascend/mstt/blob/master/debug/accuracy_tools/msprobe/docs/05.data_dump_PyTorch.md#18-seed_all)
 
 ## 必需的环境变量配置
 

@@ -33,7 +33,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 ### 已支持特性概览
 
-|       模型 \ 特性       | [TP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) |
+|       模型 \ 特性       | [TP](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) |
 |:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|
 |   CogVideoX系列-T2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ |  |
 |   CogVideoX系列-I2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ |  |
@@ -79,7 +79,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td rowspan="7"> 多模态生成 </td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/cogvideox">CogVideoX-T2V</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-T2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -90,7 +90,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>✅</td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/cogvideox">CogVideoX-I2V</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-I2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -101,7 +101,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>✅</td>
     </tr>
   <tr>
-      <td rowspan="2"><a href="https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -122,7 +122,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>支持中</td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/cogvideox">CogVideoX 1.5-I2V</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-I2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -144,7 +144,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
     </tr>
     <tr>
       <td rowspan="9"> 多模态理解 </td>
-      <td rowspan="4"><a href="https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/internvl2">InternVL 2.0</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2-2B">2B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -185,7 +185,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>支持中</td>
     </tr>
     <tr>
-      <td rowspan="4"><a href="https://gitee.com/ascend/MindSpeed-MM/tree/2.1.0/examples/qwen2.5vl">Qwen2.5-VL</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/qwen2.5vl">Qwen2.5-VL</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct">3B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>

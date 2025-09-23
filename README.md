@@ -218,7 +218,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td rowspan="36"> 多模态生成 </td>
       </tr>
       <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/lumina">Lumina-mGPT 2.0</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/lumina">Lumina-mGPT 2.0</a></td>
       <td><a href="https://huggingface.co/Alpha-VLLM/Lumina-mGPT-2.0">7B</a></td>
       <td> 微调 </td>
       <td> 1x8</td>
@@ -229,7 +229,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
       <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/opensoraplan1.5/">OpenSoraPlan1.5</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensoraplan1.5/">OpenSoraPlan1.5</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.5.0">8.5B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -239,7 +239,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> / </td>
       <td>【北大贡献】</td>
     </tr>
-      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.1">Wan2.1-T2V</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/wan2.1">Wan2.1-T2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers">1.3B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -280,7 +280,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     </tr>
-      <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.1">Wan2.1-I2V</a></td>
+      <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/wan2.1">Wan2.1-I2V</a></td>
       <td>1.3B</td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -311,7 +311,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     </tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/hunyuanvideo">HunyuanVideo-T2V</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/hunyuanvideo">HunyuanVideo-T2V</a></td>
       <td><a href="https://huggingface.co/tencent/HunyuanVideo">13B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -322,7 +322,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
  </tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/hunyuanvideo">HunyuanVideo-I2V</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/hunyuanvideo">HunyuanVideo-I2V</a></td>
       <td><a href="https://huggingface.co/tencent/HunyuanVideo-I2V">13B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -333,7 +333,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensora1.0">OpenSora 1.0</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensora1.0">OpenSora 1.0</a></td>
       <td><a href="https://huggingface.co/hpcai-tech/Open-Sora/tree/main">5.5B</a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -344,7 +344,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensora1.2">OpenSora 1.2</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensora1.2">OpenSora 1.2</a></td>
       <td><a href="https://huggingface.co/hpcai-tech/OpenSora-STDiT-v3">5.2B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -355,7 +355,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensora2.0">OpenSora 2.0-T2V</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensora2.0">OpenSora 2.0-T2V</a></td>
       <td><a href="https://huggingface.co/hpcai-tech/Open-Sora-v2">11B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -366,7 +366,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensoraplan1.2">OpenSoraPlan 1.2</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensoraplan1.2">OpenSoraPlan 1.2</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.2.0">8.7B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -377,7 +377,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensoraplan1.3">OpenSoraPlan 1.3-T2V</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensoraplan1.3">OpenSoraPlan 1.3-T2V</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.3.0"> 8.6B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -388,7 +388,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensoraplan1.3">OpenSoraPlan 1.3-I2V</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensoraplan1.3">OpenSoraPlan 1.3-I2V</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.3.0"> 8.6B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -399,7 +399,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/vae">WFVAE</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/vae">WFVAE</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.3.0/tree/main/vae"> 0.18B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -410,7 +410,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/cogvideox">CogVideoX-T2V</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-T2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -421,7 +421,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/cogvideox">CogVideoX-I2V</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-I2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -432,7 +432,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
   <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -453,7 +453,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/cogvideox">CogVideoX 1.5-I2V</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-I2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -474,7 +474,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qihoo_t2x">Qihoo-T2X</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/qihoo_t2x">Qihoo-T2X</a></td>
       <td><a href="https://huggingface.co/qihoo360/Qihoo-T2X">1.1B</a></td>
       <td> 推理 </td>
       <td> 1x1 </td>
@@ -485,7 +485,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【奇虎360贡献】</td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/sdxl">SDXL</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/diffusers/sdxl">SDXL</a></td>
       <td><a href="https://github.com/huggingface/diffusers/tree/5956b68a6927126daffc2c5a6d1a9a189defe288">3.5B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -506,7 +506,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/sd3">SD3</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/diffusers/sd3">SD3</a></td>
       <td><a href="https://github.com/huggingface/diffusers/tree/5f724735437d91ed05304da478f3b2022fe3f6fb">2B</a></td>
       <td> 全参微调 </td>
       <td> 1x8</td>
@@ -517,7 +517,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/sd3">SD3.5</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/diffusers/sd3">SD3.5</a></td>
       <td><a href="https://github.com/huggingface/diffusers/tree/5f724735437d91ed05304da478f3b2022fe3f6fb"> 8.1B </a></td>
       <td> 全参微调 </td>
       <td> 1x8 </td>
@@ -538,7 +538,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/flux">Flux</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/diffusers/flux">Flux</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">12B</a></td>
       <td> 全参微调 </td>
       <td> 1x8 </td>
@@ -549,7 +549,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/flux-kontext">Flux-Kontext</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/diffusers/flux-kontext">Flux-Kontext</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">12B</a></td>
       <td> 全参微调 </td>
       <td> 1x8 </td>
@@ -560,7 +560,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/sana">Sana</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/diffusers/sana">Sana</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">1.6B</a></td>
       <td> Lora微调 </td>
       <td> 1x8 </td>
@@ -571,7 +571,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/hidream">HiDream</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/diffusers/hidream">HiDream</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">17B</a></td>
       <td> Lora微调 </td>
       <td> 1x8 </td>
@@ -582,7 +582,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/kolors">Kolors</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/diffusers/kolors">Kolors</a></td>
       <td><a href="https://github.com/Kwai-Kolors/Kolors">2.6B</a></td>
       <td> 推理 </td>
       <td> 1x1 </td>
@@ -594,7 +594,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td rowspan="17"> 多模态理解 </td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/glm4.1v">GLM-4.1V</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/glm4.1v">GLM-4.1V</a></td>
       <td><a href="https://github.com/THUDM/GLM-4.1V-Thinking">9B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -605,7 +605,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/llava1.5">LLaVA 1.5</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/llava1.5">LLaVA 1.5</a></td>
       <td><a href="https://github.com/haotian-liu/LLaVA">7B</a></td>
       <td> 全参微调 </td>
       <td> 1x8 </td>
@@ -616,7 +616,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
    <tr>
-      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/internvl2">InternVL 2.0</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2-2B">2B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -657,7 +657,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan=""><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/internvl2.5">InternVL 2.5</a></td>
+      <td rowspan=""><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl2.5">InternVL 2.5</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2_5-78B">78B</a></td>
       <td> 微调 </td>
       <td> 8x8 </td>
@@ -668,7 +668,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/internvl3">InternVL 3.0</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl3">InternVL 3.0</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL3-8B">8B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -689,7 +689,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2vl">Qwen2-VL</a></td>
+      <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/qwen2vl">Qwen2-VL</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct">2B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -720,7 +720,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl">Qwen2.5-VL</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/qwen2.5vl">Qwen2.5-VL</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct">3B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -773,7 +773,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td> 语音识别 </td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/whisper">Whisper</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/whisper">Whisper</a></td>
       <td><a href="https://github.com/openai/whisper">1.5B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>

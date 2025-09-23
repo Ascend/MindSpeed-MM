@@ -5,7 +5,7 @@
 
 当前大模型相关业务发展迅速，AI框架PyTorch因其编程友好受到业界大多数大模型训练、推理软件的青睐，华为昇腾也提供了基于PyTorch的[昇腾MindSpeed + 昇腾NPU训练解决方案](https://www.hiascend.com/software/mindspeed)。为此，MindSpore推出了动态图方案以及[动态图API接口](https://www.mindspore.cn/docs/zh-CN/master/api_python/mindspore.mint.html)，使用户也可以像使用PyTorch一样使用MindSpore AI框架。当前华为昇腾MindSpeed也已支持接入MindSpore AI框架作为后端引擎，打造华为全栈解决方案，使用户在友好编程的同时，也享受到华为全栈软硬结合带来的极致性能体验。
 
-**建议用户先参照《[MindSpeed MM迁移调优指南](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/user-guide/model-migration.md)》进行基于torch生态的代码开发，之后根据本指南迁移至Mindspore后端运行来获取更优的模型训练推理性能。**
+**建议用户先参照《[MindSpeed MM迁移调优指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/model-migration.md)》进行基于torch生态的代码开发，之后根据本指南迁移至Mindspore后端运行来获取更优的模型训练推理性能。**
 
 本指南侧重提供MindSpeed-MM MindSpore后端的迁移开发指导，帮助用户快速地将大模型训练从PyTorch后端迁移至MindSpore后端。在介绍迁移开发前，先简要介绍MindSpore动态图和API适配工具MSAdapter，供用户了解MindSpore后端和PyTorch后端的差异，以启发用户在模型迁移开发遇到问题时进行问题排查。
 

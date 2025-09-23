@@ -46,7 +46,7 @@ commit_id=c70b7470c108168339392a3a1908bc77e0c375db
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -77,11 +77,11 @@ pip install torch_npu-2.5.1*.manylinux2014_aarch64.whl
 # 安装MindSPeed MM依赖
 pip install -r MindSpeed-MM/examples/rl/requirements.txt
 
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装，需要先source CANN环境
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -89,7 +89,7 @@ cp -r mindspeed ../MindSpeed-MM/
 cd ..
 
 # 下载MindSpeed RL
-git clone https://gitee.com/ascend/MindSpeed-RL.git
+git clone https://gitcode.com/Ascend/MindSpeed-RL.git
 cd MindSpeed-RL
 git checkout d9212e12aec839af47f007b971a3e1454519c458
 pip install -r requirements.txt
@@ -183,7 +183,7 @@ export LD_PRELOAD="$LD_PRELOAD:/usr/local/lib/libjemalloc.so.2"
 <a id="jump2"></a>
 ## 权重下载及转换
 
-根据具体任务要求，参考Qwen2.5VL[权重下载及转换](https://gitee.com/ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl#权重下载及转换)获取相应的权重。
+根据具体任务要求，参考Qwen2.5VL[权重下载及转换](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl#权重下载及转换)获取相应的权重。
 
 > 若未安装`mm-convert`工具，可以使用`python checkpoint/convert_cli.py`代替，如：
 ```
@@ -224,7 +224,7 @@ python examples/rl/data_preprocess/geo3k.py --local_dir=./data/geo3k --local_dat
 以 Qwen2.5VL 7B 模型为例,在启动训练之前，需要修改[ 启动脚本 ](../../examples/rl/scripts/dapo_trainer_qwen25vl_7b.sh)的配置：
 1. 根据实际安装路径设置 jemalloc 环境变量，用于更好管理内存，避免长跑过程中内存 OOM ，例如：export LD_PRELOAD="$LD_PRELOAD:/usr/local/lib/libjemalloc.so.2"
 2. 可参考 [单卡多进程介绍](../../docs/features/integrated_worker.md)，进行actor与vit的共卡配置
-3. 修改 DEFAULT_YAML 为指定的 yaml，目前已支持的配置文件放置在`examples/rl/configs`文件夹下，具体参数说明可见 [配置文件参数介绍](https://gitee.com/ascend/MindSpeed-RL/blob/master/docs/features/grpo_yaml.md)
+3. 修改 DEFAULT_YAML 为指定的 yaml，目前已支持的配置文件放置在`examples/rl/configs`文件夹下，具体参数说明可见 [配置文件参数介绍](https://gitcode.com/Ascend/MindSpeed-RL/blob/master/docs/features/grpo_yaml.md)
 需要注意配置以下参数：
   ```yaml
 model: examples/rl/model/qwen2.5vl_7b.json

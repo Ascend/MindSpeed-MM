@@ -52,7 +52,7 @@ NVIDIA GPU采用CUDA（Compute Unified Device Architecture）的并行计算架�
 目前已知的不支持场景：
 
 当前不支持使用DP（Data Parallel，数据并行）模式的模型迁移。若用户训练脚本中包含NPU平台不支持的torch.nn.parallel.DataParallel接口，则需手动修改该接口为torch.nn.parallel.DistributedDataParallel接口，以执行多卡训练。原脚本需要在GPU环境下基于Python3.10及以上跑通。
-APEX库中的FusedAdam融合优化器，目前不支持使用自动迁移或PyTorch GPU2Ascend工具迁移该优化器，需用户手工进行迁移，具体修改方法可单击[Link](https://gitee.com/ascend/apex#apexoptimizers)。
+APEX库中的FusedAdam融合优化器，目前不支持使用自动迁移或PyTorch GPU2Ascend工具迁移该优化器，需用户手工进行迁移，具体修改方法可单击[Link](https://gitcode.com/Ascend/apex#apexoptimizers)。
 大模型迁移暂不支持bmtrain框架的迁移。
 bitsandbytes已支持在昇腾上进行安装，具体可单击[Supported Backends](https://github.com/bitsandbytes-foundation/bitsandbytes/blob/main/docs/source/installation.mdx#supported-backendsmulti-backend-supported-backends)进行参考，目前仅支持NF4量化/反量化迁移，用于LLM QLoRA微调，其余功能暂不支持。
 大模型迁移暂不支持colossai三方库中HybridAdam优化器相关接口的迁移。
@@ -123,27 +123,27 @@ CPU_AFFINITY_CONF=1,npu0:0-0
 
 **融合算子**
 当前已支持如下算子：
-[rms_norm融合优化](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/rms_norm.md)
-[swiglu融合优化](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/swiglu.md)
-[Rotary Position Embedding 融合优化](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/rotary-embedding.md)
-[flash attention](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/flash-attention.md)
+[rms_norm融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/rms_norm.md)
+[swiglu融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swiglu.md)
+[Rotary Position Embedding 融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/rotary-embedding.md)
+[flash attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/flash-attention.md)
 
 **内存优化**
 通过高效的device内存运用，能够更好发挥选择性重计算等方法：
-[激活函数重计算](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/activation-function-recompute.md)
-[Swap-attention](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/swap_attention.md)
-[Norm重计算](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/norm-recompute.md)
+[激活函数重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/activation-function-recompute.md)
+[Swap-attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swap_attention.md)
+[Norm重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/norm-recompute.md)
 
 ### 通信优化          
 当前主要支持DP域的计算通信并行掩盖：
-[Megatron 权重更新通信隐藏](https://gitee.com/ascend/MindSpeed/blob/master/docs/features/async-ddp-param-gather.md)
+[Megatron 权重更新通信隐藏](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/async-ddp-param-gather.md)
 
 ## 模型训练
 此处以Qwen2VL 7B模型为例，对MindSpeed MM训练进行介绍。
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_r0.8.0
@@ -167,11 +167,11 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 
-# apex for Ascend 参考 https://gitee.com/ascend/apex
+# apex for Ascend 参考 https://gitcode.com/Ascend/apex
 # 建议从原仓编译安装
 
 # 安装加速库
-git clone https://gitee.com/ascend/MindSpeed.git
+git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.8.0
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
@@ -191,7 +191,7 @@ pip install -e .
 
 #### 2. 权重转换(hf2mm)
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 ```bash
 # 7b
 mm-convert  Qwen2VLConverter hf_to_mm \
