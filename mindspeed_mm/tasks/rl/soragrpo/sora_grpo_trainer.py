@@ -42,6 +42,9 @@ class SoraGRPOTrainer(ABC):
         self.rank = int(os.environ["RANK"])
         self.world_size = int(os.environ["WORLD_SIZE"])
         self.local_world_size = int(os.environ["LOCAL_WORLD_SIZE"])
+        if self.local_world_size != int(torch.cuda.device_count()):
+            raise AssertionError(f"ASCEND_RT_VISIBLE_DEVICES which is {int(torch.cuda.device_count())} must specify the exact number of devices used per node which is {self.local_world_size}. "
+                                 "Please verify its value and whether the current devices are available.")
         self.train_valid_test_dataset_provider = train_valid_test_dataset_provider
         self.optimizer = None
         self.lr_scheduler = None
