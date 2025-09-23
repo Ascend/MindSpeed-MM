@@ -13,11 +13,18 @@
     </a>
 </p>
 
-MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件，同时支持多模态生成及多模态理解，旨在为华为 [昇腾芯片](https://www.hiascend.com/) 提供端到端的多模态训练解决方案, 包含预置业界主流模型，数据工程，分布式训练及加速，预训练、微调、在线推理任务等特性。
+# 简介
 
 ---
 
-# 🔥🔥🔥Latest News
+
+
+MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件，支持业界主流多模态大模型训练，旨在为华为 [昇腾芯片](https://www.hiAscend.com/) 提供端到端的多模态训练解决方案, 包含预置业界主流模型，数据工程，分布式训练及加速，预训练、微调、后训练、在线推理任务等特性。
+
+# 最新消息
+
+---
+
 
 * [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型 【Prototype】
 * [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
@@ -26,10 +33,10 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 * **[Jul. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 3B/7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/tree/2.1.0/examples/rl)**
 * [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型
 * [Jun. 30, 2025]: 🌴 MindSpeed MM版本2.1.0发布
-* [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型
+* [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型 
 * [Jun. 05, 2025]: 🚀 MindSpeed MM支持Qwen2.5Omni-7B模型
 * [Jun. 05, 2025]: 🤝 MindSpeed MM**原生支持**OpenSoraPlan 1.5模型
-* [Apr. 03, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-32B模型
+* [Apr. 03, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-32B模型 
 * [Mar. 27, 2025]: 🚀 MindSpeed MM支持Wan2.1-1.3B/14B模型
 * [Mar. 26, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-3B/7B/72B模型
 * [Feb. 20, 2025]: 🚀 MindSpeed MM支持InternVL2.5-78B模型
@@ -47,11 +54,13 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
 * [Oct. 21, 2024]: 🚀 MindSpeed MM支持InternVL2、以及Qwen2VL模型
 * [Oct. 16, 2024]: 🌱 MindSpeed MM首版本1.0.RC3发布
 
-> 注： **Prototype**特性未经过充分验证，可能存在不稳定和bug问题，**beta**表示非商用特性
+> 注意： **Prototype**特性未经过充分验证，可能存在不稳定和bug问题，**beta**表示非商用特性。
+
+# 效果展示
 
 ---
 
-# 效果展示
+
 
 ## 文生视频： OpensoraPlan 1.5 T2V
 
@@ -116,21 +125,47 @@ MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件�
   </tr>
 </table>
 
----
 
-# 环境部署
-
-具体部署步骤请查看[部署文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+# 版本说明
 
 ---
+
+
+
+MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态，软件版本配套表如下：
+
+| MindSpeed MM版本 | MindSpeed版本      | Megatron版本 | PyTorch版本  | torch_npu版本 | CANN版本 | Python版本            |
+| ---------------- | ------------------ | ------------ | ------------ | ------------- | -------- | --------------------- |
+| master（主线）   | 2.1.0_core_r0.12.1 | Core 0.12.1  | 2.6.0, 2.7.1 | 在研版本      | 在研版本 | Python3.10            |
+| 2.1.0（商用）    | 2.1.0_core_r0.8.0  | Core 0.8.0   | 2.1.0, 2.6.0 | 7.1.0         | 8.2.RC1  | Python3.8, Python3.10 |
+| 2.0.0（商用）    | 2.0.0_core_r0.8.0  | Core 0.8.0   | 2.1.0        | 7.0.0         | 8.1.RC1  | Python3.10            |
+| 1.0.0（商用）    | 1.0.0_core_r0.6.0  | Core 0.6.0   | 2.1.0        | 6.0.0         | 8.0.0    | Python3.10            |
+
+更多详情请参考[版本配套表](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md#%E7%89%88%E6%9C%AC%E9%85%8D%E5%A5%97%E8%A1%A8)。
+
+# 安装
+
+---
+
+
+
+MindSpeed MM具体的安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md#%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)。
 
 # 快速上手
 
-快速上手操作请查看[快速上手文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/getting_start.md)
+---
+
+
+
+MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者快速上手预置模型在昇腾NPU上的高效运行。具体的操作请参考[快速上手](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/getting_start.md#%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B)。
+
+
+
+# 特性/模型介绍
 
 ---
 
-# 特性/模型介绍
+
 
 ## 已支持特性概览
 
@@ -789,7 +824,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 ---
 
 <table>
-  <caption><a href="https://gitee.com/ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm">其他已适配昇腾的多模态大模型</a></caption>
+  <caption><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm">其他已适配昇腾的多模态大模型</a></caption>
   <thead>
     <tr>
       <th>模型</th>
@@ -804,7 +839,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </thead>
   <tbody>
     <tr>
-      <td><a href="https://gitee.com/ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/CogVLM2">CogVLM-2</a></td>
+      <td><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/CogVLM2">CogVLM-2</a></td>
       <td><a href="https://github.com/THUDM/CogVLM2">8B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -814,7 +849,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitee.com/ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/PLLaVA">PLLaVA</a></td>
+      <td rowspan="2"><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/PLLaVA">PLLaVA</a></td>
       <td><a href="https://github.com/magic-research/PLLaVA">7B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -833,7 +868,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitee.com/ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/MiniCPM-V">miniCPM-V 2.5</a></td>
+      <td rowspan="2"><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/MiniCPM-V">miniCPM-V 2.5</a></td>
       <td><a href="https://github.com/OpenBMB/MiniCPM-V">8B</a></td>
       <td> 全参微调 </td>
       <td> 1x8</td>
@@ -852,7 +887,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitee.com/ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/HunyuanDiT">HunYuanDiT</a></td>
+      <td><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/HunyuanDiT">HunYuanDiT</a></td>
       <td><a href="https://github.com/Tencent/HunyuanDiT">1.5B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -862,7 +897,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitee.com/ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/InternVL1.5">InternVL 1.5</a></td>
+      <td><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/InternVL1.5">InternVL 1.5</a></td>
       <td><a href="https://github.com/OpenGVLab/InternVL/tree/v1.5.0">26B</a></td>
       <td> 微调训练 </td>
       <td> 1x8</td>
@@ -874,9 +909,12 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </tbody>
 </table>
 
----
 
 # 特性规划
+
+---
+
+
 
 * 【新模型】  JanusPro
 * 【模型特性】 CogVideoX: PP
@@ -885,11 +923,15 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 * 【模型特性】 InternVL2: TP, CP (Ulysses & Ring Attention)
 * 【基础特性】 Distrain
 
----
+
 
 <a id="jump2"></a>
 
 # 工具使用
+
+---
+
+
 
 <a id="jump2.1"></a>
 
@@ -904,7 +946,7 @@ MindSpeed MM集成了昇腾profiling采集工具，以提供对模型运行情�
 针对大模型集群场景的性能调优，这里推荐一款优秀的可视化调优工具MindStudio Insight。
 MindStudio Insight提供了包括Timeline视图、通信分析、计算耗时等的可视化呈现，以便用户分析潜在的性能瓶颈，并指导如何采取措施消除或减少这些瓶颈。
 
-  具体使用方法见[《MindStudio Insight操作指南》](https://www.hiascend.com/document/detail/zh/mindstudio/80RC1/GUI_baseddevelopmenttool/msascendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/ascend-computing/mindstudio-pid-251913966/software/264465341?idAbsPath=fixnode01|23710424|251366513|254884019|261408772|251913966)
+  具体使用方法见[《MindStudio Insight操作指南》](https://www.hiAscend.com/document/detail/zh/mindstudio/80RC1/GUI_baseddevelopmenttool/msAscendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/Ascend-computing/mindstudio-pid-251913966/software/264465341?idAbsPath=fixnode01|23710424|251366513|254884019|261408772|251913966)
 
 ## Sora类模型特征提取
 
@@ -924,9 +966,13 @@ MindSpeed MM支持Tensorboard的使用
 
   具体方法见 [README](./mindspeed_mm/tools/README.md) 的Tensorboard使用章节
 
----
+
 
 # 版本维护
+
+---
+
+
 
 MindSpeed MM版本有以下五个维护阶段：
 
@@ -947,15 +993,23 @@ MindSpeed MM已发布版本维护策略：
 | 1.0.0             |  常规版本  | 维护   | 2024/12/30 | 预计2025/06/30起无维护  |           |
 | 1.0.RC3             |  常规版本  | 维护   | 2024/09/30 | 预计2025/03/30起无维护  |           |
 
----
+
 
 # 常见问题
 
+---
+
+
+
 相关FAQ请参考链接：[FAQ](./docs/FAQ.md)
+
+
+
+# 相关资源
 
 ---
 
-# 相关资源
+
 
 1. [面向大规模分布式训练的多模态套件](https://mp.weixin.qq.com/s/Qiw_qThKA72T0lLOSpjkKw)
 2. [凭借昇腾澎湃算力，Open-Sora Plan实现电影级视频生成](https://mp.weixin.qq.com/s/KY2tLthhre-SRbuWka3c2w)
@@ -966,34 +1020,42 @@ MindSpeed MM已发布版本维护策略：
 7. [联创首发-基于昇腾MindSpeed MM玩转Open-Sora Plan V1.5模型](https://mp.weixin.qq.com/s/3cgO8yqrOIEHYqW69VQQcQ)
 8. [开源即支持！基于昇腾MindSpeed MM玩转GLM-4.1V-Thinking多模态理解最新模型](https://mp.weixin.qq.com/s/FLgCfBVG7pOzNHji2uwcDg)
 
----
-
-# 安全申明
-
-[MindSpeed MM 安全申明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/SECURITYNOTE.md)
+# 安全声明
 
 ---
+
+
+
+[MindSpeed MM 安全声明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/SECURITYNOTE.md)
+
+
 
 # 免责声明
+
+---
+
+
 
 ## 致MindSpeed MM使用者
 
 1. MindSpeed MM提供的模型仅供您用于非商业目的。
 2. 对于各模型，MindSpeed MM平台仅提示性地向您建议可用于训练的数据集，华为不提供任何数据集，如您使用这些数据集进行训练，请您特别注意应遵守对应数据集的License，如您因使用数据集而产生侵权纠纷，华为不承担任何责任。
-3. 如您在使用MindSpeed MM模型过程中，发现任何问题（包括但不限于功能问题、合规问题），请在Gitee提交issue，我们将及时审视并解决。
+3. 如您在使用MindSpeed MM模型过程中，发现任何问题（包括但不限于功能问题、合规问题），请在Gitcode提交issue，我们将及时审视并解决。
 4. MindSpeed MM功能依赖的Megatron等第三方开源软件，均由第三方社区提供和维护，因第三方开源软件导致的问题的修复依赖相关社区的贡献和反馈。您应理解，MindSpeed MM仓库不保证第三方开源软件本身的问题进行修复，也不保证会测试，纠正所有第三方开源软件的漏洞和错误。
 
 ## 致数据集所有者
 
-如果您不希望您的数据集在MindSpeed MM中的模型被提及，或希望更新MindSpeed MM中的模型关于您的数据集的描述，请在Gitee提交issue，我们将根据您的issue要求删除或更新您的数据集描述。衷心感谢您对MindSpeed MM的理解和贡献。
+如果您不希望您的数据集在MindSpeed MM中的模型被提及，或希望更新MindSpeed MM中的模型关于您的数据集的描述，请在Gitcode提交issue，我们将根据您的issue要求删除或更新您的数据集描述。衷心感谢您对MindSpeed MM的理解和贡献。
 
 ## License声明
 
 Ascend MindSpeed MM提供的模型，如模型目录下存在License的，以该License为准。如模型目录下不存在License的，以Apache 2.0许可证许可，对应许可证文本可查阅Ascend MindSpeed MM根目录。
 
+# 致谢
+
 ---
 
-# 致谢
+
 
 MindSpeed MM 由华为公司的下列部门及昇腾生态合作伙伴联合贡献：
 
@@ -1010,6 +1072,4 @@ MindSpeed MM 由华为公司的下列部门及昇腾生态合作伙伴联合贡�
 * 北大OpenSoraPlan团队
 * 微信技术架构部基础架构中心
 
-感谢来自社区的每一个PR，欢迎贡献 MindSpeed MM
-
----
+感谢来自社区的每一个PR，欢迎贡献 MindSpeed MM。
