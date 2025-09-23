@@ -20,7 +20,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 # 安装MindSpeed-Core-MS转换工具
-git clone https://gitee.com/ascend/MindSpeed-Core-MS.git -b master
+git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b master
 
 # 使用MindSpeed-Core-MS内部脚本自动拉取相关代码仓并一键适配、提供配置环境
 cd MindSpeed-Core-MS
@@ -45,7 +45,7 @@ mkdir logs
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-7B-Instruct`目录下。
 
 #### 2.2 权重转换
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 
 以下是hf2mm的转换示例：
 ```bash

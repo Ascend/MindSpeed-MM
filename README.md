@@ -761,7 +761,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitee.com/zhaomingyu13/MindSpeed-MM/tree/master/examples/qwen2.5omni">Qwen2.5-Omni</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5omni">Qwen2.5-Omni</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-Omni-7B">7B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>

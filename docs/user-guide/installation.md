@@ -40,7 +40,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态。软件版本配套�
   </tr>
   <tr>
     <td>Python</td>
-    <td><a href="https://gitee.com/ascend/pytorch#pytorch%E4%B8%8Epython%E7%89%88%E6%9C%AC%E9%85%8D%E5%A5%97%E8%A1%A8">PT配套版本</a></td>
+    <td><a href="https://gitcode.com/Ascend/pytorch#pytorch%E4%B8%8Epython%E7%89%88%E6%9C%AC%E9%85%8D%E5%A5%97%E8%A1%A8">PT配套版本</a></td>
   </tr>
   <tr>
     <td>PyTorch</td>
@@ -78,7 +78,7 @@ source /usr/local/Ascend/nnal/atb/set_env.sh
 
 ### 4. PTA安装
 
-准备[torch_npu](https://www.hiascend.com/developer/download/community/result?module=pt)和[apex](https://gitee.com/ascend/apex)，参考[Ascend Extension for PyTorch 配置与安装](https://www.hiascend.com/document/detail/zh/Pytorch/700/configandinstg/instg/insg_0004.html)或执行以下命令安装：
+准备[torch_npu](https://www.hiascend.com/developer/download/community/result?module=pt)和[apex](https://gitcode.com/Ascend/apex)，参考[Ascend Extension for PyTorch 配置与安装](https://www.hiascend.com/document/detail/zh/Pytorch/700/configandinstg/instg/insg_0004.html)或执行以下命令安装：
 
 安装torch和torch_npu，以下以python 3.10 + torch 2.7.1为例：
 
@@ -93,6 +93,6 @@ pip install torch_npu-2.7.1*-cp310-cp310*.whl
 安装apex
 
 ```shell
-# apex for Ascend 构建参考 https://gitee.com/ascend/apex
+# apex for Ascend 构建参考 https://gitcode.com/Ascend/apex
 pip3 install --upgrade apex-0.1+ascend-{version}.whl # version为python版本和cpu架构
 ```

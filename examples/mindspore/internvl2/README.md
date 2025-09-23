@@ -78,9 +78,9 @@ mkdir logs
 
 ### 权重转换
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及PP（Pipeline Parallel）和VPP（Virtual Pipeline Parallel）的权重切分(详细VPP配置参考[vpp特性说明](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/virtual_pipeline_parallel.md))。
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及PP（Pipeline Parallel）和VPP（Virtual Pipeline Parallel）的权重切分(详细VPP配置参考[vpp特性说明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/virtual_pipeline_parallel.md))。
 
-`mm-convert`工具详细用法参考[权重转换工具](https://gitee.com/ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 **注意当前在MindSpore后端下，转换出的权重无法用于Torch后端的训练**。
 
 MindSpore后端默认在Device侧进行权重转换，在模型规模较大时存在OOM风险，因此建议用户手动修改`MindSpeed-MM/checkpoint/convert_cli.py`，加入如下代码将其设置为CPU侧权重转换：
