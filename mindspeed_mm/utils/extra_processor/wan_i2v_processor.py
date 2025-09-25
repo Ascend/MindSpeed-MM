@@ -7,16 +7,7 @@ from mindspeed_mm.data.data_utils.transform_pipeline import get_transforms
 class WanVideoI2VProcessor(torch.nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.image_encoder = CLIPVisionModel.from_pretrained(config["image_encoder"]).eval()
-
         args = get_args()
-        first_frame_clip_preprocess = {
-            "video": args.mm.data.dataset_param.preprocess_parameters.train_pipeline.first_frame_clip
-        }
-
-        first_frame_vae_preprocess = {
-            "video": args.mm.data.dataset_param.preprocess_parameters.train_pipeline.first_frame_vae
-        }
 
         global_shape_info = {
             "max_height": args.mm.data.dataset_param.preprocess_parameters.max_height,
@@ -24,9 +15,23 @@ class WanVideoI2VProcessor(torch.nn.Module):
             "max_hxw": args.mm.data.dataset_param.preprocess_parameters.max_hxw,
         }
 
-        self.first_frame_clip_transform = get_transforms(
-            is_video=True, train_pipeline=first_frame_clip_preprocess, transform_size=global_shape_info
-        )
+        if hasattr(config, "image_encoder"):
+            self.image_encoder = CLIPVisionModel.from_pretrained(config["image_encoder"]).eval()
+
+            first_frame_clip_preprocess = {
+                "video": args.mm.data.dataset_param.preprocess_parameters.train_pipeline.first_frame_clip
+            }
+
+            self.first_frame_clip_transform = get_transforms(
+                is_video=True, train_pipeline=first_frame_clip_preprocess, transform_size=global_shape_info
+            )
+        else:
+            self.image_encoder = None
+            self.first_frame_clip_transform = None
+
+        first_frame_vae_preprocess = {
+            "video": args.mm.data.dataset_param.preprocess_parameters.train_pipeline.first_frame_vae
+        }
 
         self.first_frame_vae_transform = get_transforms(
             is_video=True, train_pipeline=first_frame_vae_preprocess, transform_size=global_shape_info
@@ -39,10 +44,13 @@ class WanVideoI2VProcessor(torch.nn.Module):
         self.enable_i2v_vae_encode_tiling = config.get("i2v_vae_encode_tiling", "auto")
 
     def __call__(self, vae_model, videos, first_frame, **kwargs):
-        image_encoder_input = self.first_frame_clip_transform(first_frame).to(
-            dtype=self.image_encoder.dtype, device=self.image_encoder.device
-        )
-        clip_features = self.image_encoder(image_encoder_input, output_hidden_states=True).hidden_states[-2]
+        if self.image_encoder:
+            image_encoder_input = self.first_frame_clip_transform(first_frame).to(
+                dtype=self.image_encoder.dtype, device=self.image_encoder.device
+            )
+            clip_features = self.image_encoder(image_encoder_input, output_hidden_states=True).hidden_states[-2]
+        else:
+            clip_features = None
 
         bs, _, t, h, w = videos.shape
         mask = torch.ones(bs, t, h // 8, w // 8, device=videos.device)
@@ -51,8 +59,8 @@ class WanVideoI2VProcessor(torch.nn.Module):
         mask = mask.view(bs, mask.shape[1] // 4, 4, h // 8, w // 8).transpose(1, 2)
 
         vae_input = torch.concat(
-            [self.first_frame_vae_transform(first_frame).unsqueeze(2), torch.zeros(bs, 3, t - 1, h, w)], dim=2
-        ).to(dtype=videos.dtype, device=videos.device)
+            [self.first_frame_vae_transform(first_frame).unsqueeze(2).to(videos), torch.zeros(bs, 3, t - 1, h, w).to(videos)], dim=2
+        )
 
         # set vae tiling mode for i2v processor
         vae_model_tiling_state = vae_model.get_tiling_state()

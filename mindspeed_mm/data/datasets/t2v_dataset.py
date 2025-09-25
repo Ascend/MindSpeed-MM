@@ -180,6 +180,7 @@ class T2VDataset(MMBaseDataset):
         elif file_type == "video":
             vframes = self.video_reader(file_path)
             video_value = self.video_processer(vframes=vframes, **sample)
+            examples["first_frame"] = video_value[:, 0, :, :]
             if self.vid_img_fusion_by_splicing:
                 video_value = self.get_vid_img_fusion(video_value)
         examples[VIDEO] = video_value

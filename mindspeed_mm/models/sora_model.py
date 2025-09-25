@@ -253,6 +253,10 @@ class SoRAModel(nn.Module):
             return self.predictor.state_dict(prefix=prefix, keep_vars=keep_vars)
         return None
 
+    def state_dict(self):
+        """Customized state_dict for fsdp2"""
+        return self.predictor.state_dict()
+
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         """Customized load."""
         if get_args().dist_train:
