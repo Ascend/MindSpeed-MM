@@ -452,23 +452,24 @@ class VLMModel(MultiModalModule):
         loss = total_loss.sum() / token_nums
         return loss
     
-    def compute_cp_loss(self, logits, labels):
+    def compute_ulysses_cp_loss(self, logits, labels):
         # split and shift labels
-        shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
-        split_gather_sizes = cal_split_sizes(shift_labels.shape[-1], mpu.get_context_parallel_world_size())
+        shift_labels = labels[..., 1:].contiguous()
+        token_nums = torch.sum(shift_labels > -1)
 
+        split_gather_sizes = cal_split_sizes(labels.shape[-1], mpu.get_context_parallel_world_size())
+        split_gather_sizes[-1] = split_gather_sizes[-1] - 1
         shift_labels = split_forward_gather_backward(shift_labels, mpu.get_context_parallel_group(), -1, split_gather_sizes, "down")
-        if mpu.get_context_parallel_rank() == 0:
+
+        if mpu.get_context_parallel_rank() == mpu.get_context_parallel_world_size() - 1:
             logits = logits[..., :-1, :].contiguous()
-            shift_labels = shift_labels[..., :-1].contiguous()
 
         # 如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
         loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), shift_labels)
         loss = loss * (shift_labels > -1)
-        token_nums = torch.sum(shift_labels > -1)
 
         total_loss = gather_forward_split_backward(loss, mpu.get_context_parallel_group(), dim=-1)
-        torch.distributed.all_reduce(token_nums, group=mpu.get_context_parallel_group())
+
 
         loss = total_loss.sum() / token_nums
         return loss
@@ -567,8 +568,8 @@ class VLMModel(MultiModalModule):
                 if labels is not None:
                     if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "megatron_cp_algo":
                         loss = self.compute_megatron_cp_loss(output, labels)
-                    elif mpu.get_context_parallel_world_size() > 1:
-                        loss = self.compute_cp_loss(output, labels)
+                    elif mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
+                        loss = self.compute_ulysses_cp_loss(output, labels)
                     else:
                         # if use TP then must use compute_megatron_loss, if do not use TP, then two loss are ok, but they are not equal
                         global_args = get_args()
