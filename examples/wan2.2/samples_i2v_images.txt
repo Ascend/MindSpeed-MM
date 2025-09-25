@@ -1,0 +1,1 @@
+examples/wan2.2/i2v_input.jpg
