@@ -20,6 +20,7 @@ from mindspeed_mm.patchs import (
     infer_fa_patch,
     models_patches,
     fsdp1_patches,
+    hetero_patches,
     training_patches,
 )
 
@@ -42,10 +43,21 @@ class PatchesManager:
             ("megatron.core.optimizer.clip_grads.get_grad_norm_fp32", adaptive_clip_grad_patch.get_grad_norm_fp32_async),
             ("megatron.core.optimizer.clip_grads.clip_grad_by_total_norm_fp32", adaptive_clip_grad_patch.clip_grad_by_total_norm_fp32_async)
         ],
+        
         # Enable this patch when loading model weights from a .pt checkpoint file in distributed training.
         # This will override the default model loading behavior to handle distributed checkpoint format.
         "get_dist_model_load_from_pt": [
             ("megatron.training.training.get_model", training_patches.get_dist_model_load_from_pt)
+        ],
+        "hetero_parallel_cp": [
+            ("megatron.core.transformer.attention.Attention.__init__", \
+                hetero_patches.hetero_attention_init_wrapper),
+            ("mindspeed_mm.models.vlm_model.get_vit_layer_spec", \
+                hetero_patches.hetero_spec_wrapper),
+            ("mindspeed_mm.models.vlm_model.get_llm_layer_spec", \
+                hetero_patches.hetero_spec_wrapper),
+            ("mindspeed_mm.models.vlm_model.get_audio_layer_spec", \
+                hetero_patches.hetero_spec_wrapper),
         ]
     }
 
@@ -68,3 +80,5 @@ class PatchesManager:
                 for orig_func_name, new_func in PatchesManager.configs[key]:
                     PatchesManager.register_patch(orig_func_name, new_func)
         PatchesManager.apply_patches()
+
+    

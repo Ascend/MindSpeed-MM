@@ -35,7 +35,8 @@
                 15,
                 23,
                 31
-            ]
+            ],
+            "attention_mask_type": "general"
         },
         "vision_projector": {
             "model_id": "lnmlp",
@@ -81,7 +82,8 @@
             "max_source_positions": 1500,
             "n_window": 100,
             "scale_embedding": false,
-            "output_dim": 3584
+            "output_dim": 3584,
+            "attention_mask_type": "general"
         },
         "tp":1,
         "pp":1,
@@ -121,5 +123,8 @@
         "add_qkv_bias": true
     },
     "text_encoder": null,
-    "video_encoder": null
+    "video_encoder": null,
+    "patch": {
+        "hetero_parallel_cp": false
+    }
 }

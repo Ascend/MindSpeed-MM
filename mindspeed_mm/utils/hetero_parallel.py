@@ -5,6 +5,8 @@ from copy import deepcopy
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
+from mindspeed.megatron_adaptor import get_mindspeed_args
+from mindspeed.patch_utils import MindSpeedPatchesManager as mspm
 from megatron.training import get_args, print_rank_0
 from megatron.core.parallel_state import initialize_model_parallel, is_initialized
 import megatron.core.parallel_state as mpu
@@ -164,17 +166,18 @@ def initial_megatron_hetero_parallel_wrapper(fn):
     def wrapper(*args, **kwargs):
         fn(*args, **kwargs)
         args = get_args()
-        if args.hetero_parallel:
-            vlm_config = deepcopy(args.mm.model)
-            from pretrain_vlm import _configure_modules
-            _configure_modules(vlm_config, _HeteroParallelModules)
-            initial_modules_mpu(reuse_module='text_decoder', args=vlm_config)
+        vlm_config = deepcopy(args.mm.model)
+        from pretrain_vlm import _configure_modules
+        _configure_modules(vlm_config, _HeteroParallelModules)
+        initial_modules_mpu(reuse_module='text_decoder', args=vlm_config)
         return 
     return wrapper
 
 
-training.initialize_megatron = \
-    initial_megatron_hetero_parallel_wrapper(training.initialize_megatron)
+if hasattr(get_mindspeed_args(), 'hetero_parallel') and get_mindspeed_args().hetero_parallel:
+    mspm.register_patch('mindspeed_mm.training.initialize_megatron',
+                        initial_megatron_hetero_parallel_wrapper, force_patch=True)
+    mspm.apply_patches()
 
 
 def all_gather_dp_group(tensor, 
@@ -196,9 +199,6 @@ def all_gather_dp_group(tensor,
         world_size = torch.distributed.get_world_size(group=group)
     if tensor is None:
         return None, None
-
-    if world_size == 1:
-        return tensor, None
     
     if pad_token_id is not None or remove_padding:
         pad_token_id = 0 if pad_token_id is None else pad_token_id
@@ -257,9 +257,6 @@ def split_tensor_dp_group(tensor,
     if tensor is None:
         return None
 
-    if world_size == 1:
-        return tensor
-
     rank = torch.distributed.get_rank(group)
 
     if chunk_seq_lens:
@@ -313,3 +310,9 @@ class _AllGatherDp(torch.autograd.Function):
         grad_input = grad_output[tuple(idx)]
 
         return grad_input, None
+    
+
+def hetero_align_config(config_inner, config_outer):
+    config_inner.pipeline_model_parallel_size = config_outer.pp
+    config_inner.context_parallel_size = config_outer.cp
+    config_inner.tensor_model_parallel_size = config_outer.tp

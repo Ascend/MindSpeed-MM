@@ -22,6 +22,7 @@ from mindspeed_mm.training import pretrain
 from mindspeed_mm.utils.transformer_model_config import get_model_config
 from mindspeed_mm.utils.hetero_parallel import change_parallel_state, apply_hetero_parallel_hooks
 from mindspeed_mm.utils.utils import EncoderBalanceComm
+from mindspeed_mm.utils.hetero_parallel import hetero_align_config
 mindspeed_args = get_mindspeed_args()
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
     import mindspeed_mm.mindspore.mindspore_adaptor
@@ -70,12 +71,19 @@ def _configure_modules(vlm_config, modules):
 
 def _configure_image_encoder(vlm_config):
     """Configure image encoder module."""
+    if get_args().hetero_parallel:
+        hetero_align_config(vlm_config.image_encoder.vision_encoder, vlm_config.image_encoder)
+        hetero_align_config(vlm_config.image_encoder.vision_projector, vlm_config.image_encoder)
+
     vlm_config.image_encoder.vision_encoder = get_model_config(vlm_config.image_encoder.vision_encoder)
     vlm_config.image_encoder.vision_projector = get_model_config(vlm_config.image_encoder.vision_projector)
 
 
 def _configure_audio_encoder(vlm_config):
     """Configure audio encoder module."""
+    if get_args().hetero_parallel:
+        hetero_align_config(vlm_config.audio_encoder.audio_encoder, vlm_config.audio_encoder)
+
     vlm_config.audio_encoder.audio_encoder = get_model_config(vlm_config.audio_encoder.audio_encoder)
 
 

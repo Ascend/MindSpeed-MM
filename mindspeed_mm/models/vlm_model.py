@@ -135,6 +135,7 @@ class VLMModel(MultiModalModule):
             self.pp_rank = mpu.get_pipeline_model_parallel_rank()
             print_rank_0(f'initial: image_encoder pp size is {self.pp_size}')
             print_rank_0(f'initial: image_encoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
+            print_rank_0(f'initial: image_encoder cp size is {mpu.get_context_parallel_world_size()}')
             print_rank_0(f'initial: image_encoder dp size is {mpu.get_data_parallel_world_size()}')
 
         if self.pp_size <= 1:
@@ -212,6 +213,7 @@ class VLMModel(MultiModalModule):
             self.pp_rank = mpu.get_pipeline_model_parallel_rank()
             print_rank_0(f'initial: audio_encoder pp size is {self.pp_size}')
             print_rank_0(f'initial: audio_encoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
+            print_rank_0(f'initial: audio_encoder cp size is {mpu.get_context_parallel_world_size()}')
             print_rank_0(f'initial: audio_encoder dp size is {mpu.get_data_parallel_world_size()}')
 
         if self.pp_size <= 1:
@@ -287,6 +289,7 @@ class VLMModel(MultiModalModule):
             self.pp_rank = mpu.get_pipeline_model_parallel_rank()
             print_rank_0(f'initial: text_decoder pp size is {self.pp_size}')
             print_rank_0(f'initial: text_decoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
+            print_rank_0(f'initial: text_decoder cp size is {mpu.get_context_parallel_world_size()}')
             print_rank_0(f'initial: text_decoder dp size is {mpu.get_data_parallel_world_size()}')
 
         if self.pp_size <= 1:
