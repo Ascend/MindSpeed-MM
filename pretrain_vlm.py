@@ -147,7 +147,8 @@ def loss_func(output_tensor):
     if args.log_tps:
         B, S, _ = output_tensor['logits'].shape
         dp_size = torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
-        tokens_per_sample = torch.tensor(S, device=output_tensor['logits'].device) / dp_size
+        cp_size = torch.distributed.get_world_size(group=mpu.get_context_parallel_group())
+        tokens_per_sample = torch.tensor(S, device=output_tensor['logits'].device) / dp_size * cp_size
         torch.distributed.all_reduce(tokens_per_sample, group=mpu.get_data_parallel_group())
         loss_dir["tokens per sample"] = tokens_per_sample
     averaged_loss = average_losses_across_data_parallel_group([loss])
