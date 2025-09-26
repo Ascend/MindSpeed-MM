@@ -102,6 +102,12 @@ class WanFlowMatchScheduler():
         if noise is None:
             noise = torch.randn_like(latents)
         
+        # use first frame latents in noise
+        model_kwargs = kwargs.get("model_kwargs", {})
+        first_frame_latents = model_kwargs.get("first_frame_latents", None)
+        if first_frame_latents is not None:
+            noise[:, :, 0: 1] = first_frame_latents
+        
         if t is None:
             max_timestep_boundary = int(self.max_timestep_boundary * self.num_train_timesteps)
             min_timestep_boundary = int(self.min_timestep_boundary * self.num_train_timesteps)

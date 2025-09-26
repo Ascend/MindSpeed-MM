@@ -55,12 +55,13 @@ class WanDiT(MultiModalModule):
         global_layer_idx: Optional[Tuple] = None,
         attention_async_offload: bool = False,
         fp32_calculate: bool = False,
+        seperated_timestep: bool = False,
         **kwargs,
     ):
         super().__init__(config=None)
 
-        if model_type not in ["t2v", "i2v", "flf2v", "wan2.2-t2v", "wan2.2-i2v"]:
-            raise ValueError("Please only select among 't2v', 'i2v', 'flf2v', 'wan2.2-t2v' and 'wan2.2-i2v' tasks")
+        if model_type not in ["t2v", "i2v", "flf2v", "ti2v", "wan2.2-t2v", "wan2.2-i2v"]:
+            raise ValueError("Please only select among 't2v', 'i2v', 'ti2v', 'flf2v', 'wan2.2-t2v' and 'wan2.2-i2v' tasks")
 
         if not ((hidden_size % num_heads) == 0 and (hidden_size // num_heads) % 2 == 0):
             raise ValueError(
@@ -199,6 +200,7 @@ class WanDiT(MultiModalModule):
             self.head = Head(self.hidden_size, self.out_dim, self.patch_size, self.eps)
 
         self.use_dpo = getattr(args.mm.model, "dpo", None)
+        self.seperated_timestep = seperated_timestep
 
     @property
     def dtype(self) -> torch.dtype:
@@ -326,11 +328,30 @@ class WanDiT(MultiModalModule):
     ):
         if self.pre_process:
             timestep = timestep.to(x[0].device)
+            if self.seperated_timestep: # wan2.2 5B
+                timestep = torch.concat([
+                    torch.zeros((1, x.shape[3] * x.shape[4] // 4), dtype=x.dtype, device=x.device),
+                    torch.ones((x.shape[2] - 1, x.shape[3] * x.shape[4] // 4), dtype=x.dtype,
+                               device=x.device) * timestep
+                ])
+            if timestep.ndim == 2:
+                ts_seq_len = timestep.shape[1]
+                timestep = timestep.flatten()
+            else:
+                ts_seq_len = None
+
             # time embeddings
-            times = self.time_embedding(
-                self.sinusoidal_embedding_1d(self.freq_dim, timestep)
-            )
-            time_emb = self.time_projection(times).unflatten(1, (6, self.hidden_size))
+            timestep = self.sinusoidal_embedding_1d(self.freq_dim, timestep)
+            if ts_seq_len is not None and not self.seperated_timestep:
+                timestep = timestep.unflatten(0, (-1, ts_seq_len))
+            times = self.time_embedding(timestep)
+            if self.seperated_timestep:
+                times = times.unsqueeze(0)
+            time_emb = self.time_projection(times)
+            if ts_seq_len is None:
+                time_emb = time_emb.unflatten(1, (6, self.hidden_size))
+            else:
+                time_emb = time_emb.unflatten(2, (6, self.hidden_size))
 
             # prompt embeddings
             bs = prompt.size(0)
@@ -690,9 +711,17 @@ class WanDiTBlock(nn.Module):
         dtype = time_emb.dtype
         modu_dtype = torch.float32 if self.fp32_calculate else dtype
         device = time_emb.device
+        has_seq = time_emb.ndim == 4
+        chunk_dim = 2 if has_seq else 1
+
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
             self.modulation.to(dtype=modu_dtype, device=device) + time_emb.to(modu_dtype)
-        ).chunk(6, dim=1)
+        ).chunk(6, dim=chunk_dim)
+        if has_seq:
+            shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
+                shift_msa.squeeze(2), scale_msa.squeeze(2), gate_msa.squeeze(2),
+                shift_mlp.squeeze(2), scale_mlp.squeeze(2), gate_mlp.squeeze(2),
+            )
 
         self_attn_input = self.modulate(
             self.norm1(latents.to(torch.float32)), shift_msa, scale_msa
@@ -1079,10 +1108,16 @@ class Head(nn.Module):
         self.modulation = nn.Parameter(torch.randn(1, 2, dim) / dim**0.5)
 
     def forward(self, latents, times):
-        shift, scale = (
-            self.modulation.to(dtype=torch.float32 if self.fp32_calculate else times.dtype, device=times.device) + times
-        ).chunk(2, dim=1)
-        out = self.head((self.norm(latents.float() if self.fp32_calculate else latents) * (1 + scale) + shift).to(latents.dtype))
+        if times.ndim == 3:
+            shift, scale = (
+                self.modulation.unsqueeze(0).to(dtype=torch.float32 if self.fp32_calculate else times.dtype, device=times.device) + times.unsqueeze(2)
+            ).chunk(2, dim=2)
+            out = self.head((self.norm(latents.float() if self.fp32_calculate else latents) * (1 + scale.squeeze(2)) + shift.squeeze(2)).to(latents.dtype))
+        else:
+            shift, scale = (
+                self.modulation.to(dtype=torch.float32 if self.fp32_calculate else times.dtype, device=times.device) + times
+            ).chunk(2, dim=1)
+            out = self.head((self.norm(latents.float() if self.fp32_calculate else latents) * (1 + scale) + shift).to(latents.dtype))
         return out
 
 

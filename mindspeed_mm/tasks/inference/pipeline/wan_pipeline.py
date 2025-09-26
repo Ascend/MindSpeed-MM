@@ -34,7 +34,11 @@ from .pipeline_base import MMPipeline
 from .pipeline_mixin.encode_mixin import MMEncoderMixin
 from .pipeline_mixin.inputs_checks_mixin import InputsCheckMixin
 
-NEGATIVE_PROMOPT = "Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards"
+NEGATIVE_PROMOPT_DEFAULT = "Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards"
+NEGATIVE_PROMOPT = {
+    "flf2v": "Lens switching, lens shaking, b" + NEGATIVE_PROMOPT_DEFAULT[1:],
+    "ti2v": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+}
 
 
 class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
@@ -81,6 +85,9 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         self.generator = None if not hasattr(config, "seed") else torch.Generator().manual_seed(config.seed)
         if hasattr(args, "boundary_ratio"):
             self.boundary_timestep = self.scheduler.num_train_timesteps * args.boundary_ratio
+        
+        self.expand_timesteps = getattr(config, "expand_timesteps", False)
+        self.vae_scale_factor_spatial = getattr(config, "vae_scale_factor_spatial", self.vae_scale_factor_spatial)
 
         self.cpu_offload = getattr(config, "cpu_offload", False)
         if self.cpu_offload:
@@ -137,10 +144,10 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
     ):
         # 1. Check inputs. Raise error if not correct
         if negative_prompt is None or negative_prompt == "":
-            if self.model_type == "flf2v":
-                negative_prompt = "Lens switching, lens shaking, b" + NEGATIVE_PROMOPT[1:]
+            if self.model_type in NEGATIVE_PROMOPT:
+                negative_prompt = NEGATIVE_PROMOPT[self.model_type]
             else:
-                negative_prompt = NEGATIVE_PROMOPT
+                negative_prompt = NEGATIVE_PROMOPT_DEFAULT
         self.check_inputs(
             prompt,
             negative_prompt,
@@ -173,7 +180,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
 
         # 4. Prepare latents and model_kwargs
         if image is not None:
-            latents, clip_features, vae_features = self.prepare_image_latents(
+            latents, clip_features, vae_features, first_frame_mask = self.prepare_image_latents(
                 batch_size, image, device, prompt_embeds.dtype
             )
         elif video is not None:
@@ -181,6 +188,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
                 batch_size, video, device, prompt_embeds.dtype
             )
             clip_features, vae_features = None, None
+            first_frame_mask = None
         else:
             shape = (
                 batch_size,
@@ -191,6 +199,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             )
             latents = self.prepare_latents(shape, generator=self.generator, device=device, dtype=prompt_embeds.dtype)
             clip_features, vae_features = None, None
+            first_frame_mask = torch.ones(latents.shape, dtype=torch.float32, device=device)
 
         model_kwargs = {
             "prompt_embeds": prompt_embeds,
@@ -214,8 +223,18 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         self.scheduler.diffusion.set_timesteps(num_inference_steps)  # reset timesteps
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                latent_model_input = latents.to(self.predict_model.dtype)
-                timestep = t.expand(latents.shape[0]).to(device=latents.device).float()
+                if self.expand_timesteps:
+                    if self.model_type == "ti2v":
+                        latent_model_input = (1 - first_frame_mask) * vae_features + first_frame_mask * latents
+                        latent_model_input = latent_model_input.to(self.predict_model.dtype)
+                    else:
+                        latent_model_input = latents.to(self.predict_model.dtype)
+                    temp_ts = (first_frame_mask[0][0][:, ::2, ::2] * t).flatten()
+                    # batch_size, seq_len
+                    timestep = temp_ts.unsqueeze(0).expand(latents.shape[0], -1).float()
+                else:
+                    latent_model_input = latents.to(self.predict_model.dtype)
+                    timestep = t.expand(latents.shape[0]).to(device=latents.device).float()
 
                 curr_predict_model, curr_guidance_scale = self._prepare_predict_model(t, guidance_scale)
 
@@ -234,6 +253,9 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
 
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps):
                     progress_bar.update()
+        
+        if self.expand_timesteps and self.model_type == "ti2v":
+            latents = (1 - first_frame_mask) * vae_features + first_frame_mask * latents
 
         # 6. Post process latents to get video
         latents = latents.to(self.vae.model.dtype)
@@ -426,9 +448,16 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
                 [vae_input.unsqueeze(2), torch.zeros(batch_size, 3, self.num_frames - 1, h, w)], dim=2
             ).to(device=device, dtype=dtype)
         vae_feature = self.vae.encode(vae_input)
+        if self.expand_timesteps:
+            num_latent_frames = (self.num_frames - 1) // self.vae_scale_factor_temporal + 1
+            first_frame_mask = torch.ones(
+                1, 1, num_latent_frames, latent_h, latent_w, dtype=dtype, device=device
+            )
+            first_frame_mask[:, :, 0] = 0
+            return noise, None, vae_feature, first_frame_mask
         vae_feature = torch.concat([msk, vae_feature], dim=1)
 
-        return noise, clip_feature, vae_feature
+        return noise, clip_feature, vae_feature, None
 
     def prepare_video_latents(self, batch_size, video, device, dtype):
         # process video data
