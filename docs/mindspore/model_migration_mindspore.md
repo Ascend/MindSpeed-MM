@@ -101,12 +101,12 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
 - 下载MindSpeed-Core-MS源码master分支，执行一键适配。
 
   ```shell
-    git clone https://gitee.com/ascend/MindSpeed-Core-MS.git -b master
+    git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b master
     cd MindSpeed-Core-MS
     source auto_convert_mm.sh
   ```
 
-  **说明：** MindSpeed-Core-MS源码提供了一键适配，用户无需再手动拉取MindSpeed等仓库源码。`auto_convert_xxx.sh`中`xxx`代表使用场景，可以是`llm`（大语言模型场景）、`mm`（多模态模型场景）、`rl`（强化学习场景），具体使用见[README](https://gitee.com/ascend/MindSpeed-Core-MS)。
+  **说明：** MindSpeed-Core-MS源码提供了一键适配，用户无需再手动拉取MindSpeed等仓库源码。`auto_convert_xxx.sh`中`xxx`代表使用场景，可以是`llm`（大语言模型场景）、`mm`（多模态模型场景）、`rl`（强化学习场景），具体使用见[README](https://gitcode.com/Ascend/MindSpeed-Core-MS)。
 
 ## 2 MindSpore后端适配
 
