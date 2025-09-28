@@ -71,7 +71,7 @@ pip install mindspore==2.7.0
 MindSpeed-Core-MS提供了代码、环境的一键适配功能，执行以下命令完成一键适配后，用户即可开启基于MindSpore AI框架的多模态模型之旅。
 
 ```shell
-git clone https://gitee.com/ascend/MindSpeed-Core-MS.git -b master
+git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b master
 cd MindSpeed-Core-MS
 pip install -r requirements.txt
 source auto_convert_mm.sh
