@@ -450,9 +450,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 预训练 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 0.37 (SPS) </td>
-      <td> 0.46 (SPS) </td>
-      <td> / </td>
+      <td> 1.14 (SPS) </td>
+      <td> 1.00 (SPS) </td>
+      <td> 6976 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -461,9 +461,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 预训练 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 0.37 (SPS) </td>
-      <td> 0.46 (SPS) </td>
-      <td> / </td>
+      <td> 1.13 (SPS) </td>
+      <td> 0.84 (SPS) </td>
+      <td> 6976 </td>
       <td>【Pass】</td>
     </tr>
   <tr>
@@ -472,9 +472,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 预训练 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 1.88 (SPS) </td>
-      <td> 2.09 (SPS) </td>
-      <td> / </td>
+      <td> 1.44 (SPS) </td>
+      <td> 1.75 (SPS) </td>
+      <td> 6976 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -493,9 +493,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 预训练 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 1.81 (SPS) </td>
-      <td> 2.01 (SPS) </td>
-      <td> / </td>
+      <td> 1.43 (SPS) </td>
+      <td> 1.44 (SPS) </td>
+      <td> 6976 </td>
       <td>【Pass】</td>
     </tr>
     <tr>

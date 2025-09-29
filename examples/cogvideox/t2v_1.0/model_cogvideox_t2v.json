@@ -1,15 +1,16 @@
 {
-    "frames": 25,
+    "frames": 17,
     "resolution": [480, 720],
     "allow_internal_format":false,
     "load_video_features": false,
     "load_text_features": false,
     "task": "t2v",
+    "enable_encoder_dp": true,
     "predictor": {
         "model_id": "satdit",
         "from_pretrained": null,
         "dtype": "bf16",
-        "num_layers": 2,
+        "num_layers": 42,
         "pipeline_num_layers":null,
         "num_heads": 48,
         "head_dim": 64,

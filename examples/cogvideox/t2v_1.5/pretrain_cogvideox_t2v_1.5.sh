@@ -17,7 +17,7 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
-TP=1
+TP=4
 PP=1
 CP=1
 MBS=1
@@ -56,6 +56,7 @@ GPT_ARGS="
     --clip-grad 1.0 \
     --train-iters 5000 \
     --no-gradient-accumulation-fusion \
+    --qk-layernorm \
     --load $LOAD_PATH \
     --no-load-optim \
     --no-load-rng \
@@ -70,6 +71,7 @@ GPT_ARGS="
     --overlap-param-gather \
     --allow-tf32 \
     --num-workers 8 \
+    --sequence-parallel \
 "
 
 MM_ARGS="

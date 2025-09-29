@@ -17,7 +17,7 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
-TP=1
+TP=4
 PP=1
 CP=1
 MBS=1
@@ -70,6 +70,7 @@ GPT_ARGS="
     --overlap-grad-reduce \
     --allow-tf32 \
     --num-workers 8 \
+    --sequence-parallel \
 "
 
 MM_ARGS="
