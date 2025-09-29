@@ -1,5 +1,7 @@
 import argparse
 import os
+import subprocess
+import shlex
 from pathlib import Path
 
 
@@ -70,9 +72,27 @@ def alter_skip_ci():
 
 
 def acquire_exitcode(command):
-    exitcode = os.system(command)
-    real_code = os.WEXITSTATUS(exitcode)
-    return real_code
+    """不使用 shell 的更安全版本"""
+    args = shlex.split(command)
+    process = subprocess.Popen(
+        args,
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,  # 将stderr合并到stdout
+        universal_newlines=True,   # 文本模式
+        bufsize=1                 # 行缓冲
+    )
+    
+    # 实时读取并输出
+    while True:
+        output = process.stdout.readline()
+        if output == '' and process.poll() is not None:
+            break
+        if output:
+            print(output, end='', flush=True)
+    
+    # 等待进程结束
+    return process.wait()
 
 
 # =============================
