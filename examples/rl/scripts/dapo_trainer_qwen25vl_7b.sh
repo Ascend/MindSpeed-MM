@@ -20,7 +20,7 @@ export CPU_AFFINITY_CONF=2
 export HCCL_IF_BASE_PORT=24703
 
 # 使能 jemalloc（以OpenEuler系统为例）
-# export LD_PRELOAD="$LD_PRELOAD:/usr/local/lib/libjemalloc.so.2"
+export LD_PRELOAD="$LD_PRELOAD:/usr/local/lib/libjemalloc.so.2"
 
 NNODES=1
 NPUS_PER_NODE=8

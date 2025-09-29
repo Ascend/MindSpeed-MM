@@ -209,6 +209,7 @@ python examples/rl/data_preprocess/geo3k.py --local_dir=./data/geo3k
 # 基于本地原始数据集预处理
 python examples/rl/data_preprocess/geo3k.py --local_dir=./data/geo3k --local_data=/path/geometry3k
 ```
+**特别说明**：geo3k数据集较小，训练太多epoch容易过拟合导致训练不稳定
 
 <a id="jump4"></a>
 ## 训练
