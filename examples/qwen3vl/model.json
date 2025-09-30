@@ -1,0 +1,30 @@
+{
+    "model_id": "qwen3_vl_moe",
+    "image_encoder": {
+        "vision_encoder": {
+            "model_id": "qwen3vit",
+            "num_layers": 27,
+            "hidden_size": 1152,
+            "num_attention_heads": 16,
+            "freeze": false
+        },
+        "vision_projector": {
+            "model_id": "lnmlp",
+            "num_layers": 1,
+            "freeze": false
+        }
+    },
+    "text_decoder": {
+        "model_id": "qwen3lm",
+        "num_layers": 94,
+        "hidden_size": 4096,
+        "num_attention_heads": 64,
+        "max_position_embeddings": 262144,
+
+
+        "freeze": false
+    },
+    "patch": {
+        "clip_grad_async": true
+    }
+}

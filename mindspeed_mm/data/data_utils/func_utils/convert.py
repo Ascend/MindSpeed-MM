@@ -310,6 +310,10 @@ class DataArguments:
         metadata={
             "help": "Which template to use for constructing prompts in training and inference."},
     )
+    enable_thinking: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether or not to enable thinking mode for reasoning models."},
+    )
     dataset_dir: str = field(
         default="data",
         metadata={"help": "Path to the folder containing the datasets."},
@@ -805,7 +809,7 @@ class VideoRewardProcessor(DatasetProcessor):
 
         sequences_padded = torch.nn.functional.pad(sequences, padding, 'constant', self.processor.tokenizer.pad_token_id)
         attention_mask_padded = torch.nn.functional.pad(attention_mask, padding, 'constant', 0)
-        
+
         return sequences_padded, attention_mask_padded
 
     def _encode_data_example(
@@ -989,7 +993,7 @@ def load_reward_tokenizer(model_args) -> "TokenizerModule":
     """
     try:
         processor = AutoProcessor.from_pretrained(model_args['model_name_or_path'], padding_side="right", local_files_only=getattr(model_args, 'local_files_only', False))
-        
+
     except Exception as e:
         logger.warning("Processor was not found: %s.", e)
         processor = None

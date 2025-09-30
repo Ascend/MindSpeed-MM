@@ -597,6 +597,7 @@ DATA_COLLATOR = {
     "whisper": DataCollatorSpeechSeq2SeqWithPadding,
     "qwen2vl": DataCollatorForQwen2vl,
     "qwen2vl_dpo": DataCollatorForQwen2vlDPO,
+    "qwen3vl": DataCollatorForQwen2vl,
     "open_sora_plan": DataCollatorForOpenSoraPlan,
     "deepseekvl2": DataCollatorForDeepSeekVL,
     "videoalign": DataCollatorForVideoAlign
