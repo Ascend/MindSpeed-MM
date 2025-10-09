@@ -5,7 +5,7 @@
     "load_video_features": false,
     "load_text_features": false,
     "task": "t2v",
-    "enable_encoder_dp": true,
+    "enable_encoder_dp": false,
     "predictor": {
         "model_id": "satdit",
         "from_pretrained": null,

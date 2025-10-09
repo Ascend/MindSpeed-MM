@@ -21,7 +21,9 @@ TP=4
 PP=1
 CP=1
 MBS=1
-GBS=$(($WORLD_SIZE*$MBS/$CP/$TP))
+GRAD_ACC_STEP=4
+DP=$(($WORLD_SIZE/$TP/$PP/$CP))
+GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
 MM_DATA="./examples/cogvideox/t2v_1.0/data.json"
 MM_MODEL="./examples/cogvideox/t2v_1.0/model_cogvideox_t2v.json"
