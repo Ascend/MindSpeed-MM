@@ -11,7 +11,7 @@
 			"video_reader_type": "DecordVideo",
             "train_fps": 8,
             "skip_frame_num": 3,
-			"num_frames": 25,
+			"num_frames": 17,
 			"max_height": 480,
 			"max_width": 720,
 			"train_pipeline": {

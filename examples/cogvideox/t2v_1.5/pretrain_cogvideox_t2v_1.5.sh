@@ -17,11 +17,13 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
-TP=1
+TP=4
 PP=1
 CP=1
 MBS=1
-GBS=$(($WORLD_SIZE*$MBS/$CP/$TP))
+GRAD_ACC_STEP=4
+DP=$(($WORLD_SIZE/$TP/$PP/$CP))
+GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
 MM_DATA="./examples/cogvideox/t2v_1.5/data.json"
 MM_MODEL="./examples/cogvideox/t2v_1.5/model_cogvideox_t2v_1.5.json"
@@ -56,6 +58,7 @@ GPT_ARGS="
     --clip-grad 1.0 \
     --train-iters 5000 \
     --no-gradient-accumulation-fusion \
+    --qk-layernorm \
     --load $LOAD_PATH \
     --no-load-optim \
     --no-load-rng \
@@ -70,6 +73,7 @@ GPT_ARGS="
     --overlap-param-gather \
     --allow-tf32 \
     --num-workers 8 \
+    --sequence-parallel \
 "
 
 MM_ARGS="

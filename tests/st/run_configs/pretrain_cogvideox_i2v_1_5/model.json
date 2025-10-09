@@ -5,6 +5,7 @@
     "load_video_features": false,
     "load_text_features": false,
     "task": "i2v",
+    "enable_encoder_dp": false,
     "predictor": {
         "model_id": "satdit",
         "from_pretrained": null,
@@ -32,7 +33,7 @@
         "text_hidden_size": 4096,
         "concat_text_embed": true,
         "interpolation_scale": [1.0, 1.0, 1.0],
-        "learnable_pos_embed": true,
+        "ofs_embed_dim": 512,
         "use_rope": true
     },
     "diffusion": {

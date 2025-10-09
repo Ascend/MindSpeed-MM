@@ -46,6 +46,10 @@ url=https://github.com/THUDM/CogVideo.git
 commit_id=806a7f6
 ```
 
+参考实现为SAT官方开源版本，由于源仓默认配置在竞品无法实现训练，参考实现调整了如下配置：
+- 序列长度调整为6976
+- 优化器调整为AdamW
+
 #### 变更记录
 
 2025.01.24: 首次发布CogVideoX 1.5
