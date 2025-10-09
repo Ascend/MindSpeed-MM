@@ -52,7 +52,6 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             batch_audios.extend(audios)
             batch_imglens.append(len(images))
             batch_vidlens.append(len(videos))
-            batch_vidlens.append(len(videos))
             batch_audlens.append(len(audios))
             batch_input_ids.append(feature["input_ids"])
         fake_input_ids = []
