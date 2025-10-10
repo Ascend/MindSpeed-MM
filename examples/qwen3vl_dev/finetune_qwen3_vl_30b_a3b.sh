@@ -98,6 +98,7 @@ MOE_ARGS="
     --moe-grouped-gemm \
     --moe-permutation-async-comm \
     --moe-token-dispatcher-type alltoall \
+    --moe-permute-fusion \
 "
 
 OUTPUT_ARGS="
