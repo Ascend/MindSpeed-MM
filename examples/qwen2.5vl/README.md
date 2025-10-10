@@ -281,7 +281,7 @@ dataset_param->basic_parameters->dataset
 
 | **训练数据配置** | **模型规模** | **集群规模** | **模型及切分配置** | **性能数据** |
 | --------------- | ----------- | ----------- | ----------- | ------------ |
-| "video_max_pixels":262144,<br>"video_fps":60.0,<br>"video_maxlen":768,<br>"seq-length":131072 | 72B | 8*8(A3) | TP8<br>PP4(vit pp_layers:[32,0,0,0], llm pp_layers:[6,25,25,24])<br>CP4(context-parallel-algo:megatron_cp_algo)<br>text_decoder full recompute:<br> &ensp; "recompute_granularity": "full",<br> &ensp; "recompute_method": "uniform",<br> &ensp; "recompute_num_layers": 1 |/|
+| "video_max_pixels":262144,<br>"video_fps":60.0,<br>"video_maxlen":768,<br>"seq-length":131072 | 72B | 8*8(A3) | TP8<br>PP4(vit pp_layers:[32,0,0,0], llm pp_layers:[6,25,25,24])<br>CP4(context-parallel-algo:megatron_cp_algo)<br>text_decoder full recompute:<br> &ensp; "recompute_granularity": "full",<br> &ensp; "recompute_method": "uniform",<br> &ensp; "recompute_num_layers": 1 |端到端tps：1105.175|
 
 ---
 
