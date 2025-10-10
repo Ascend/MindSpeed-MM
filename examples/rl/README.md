@@ -100,7 +100,7 @@ cp -r mindspeed_rl ../MindSpeed-MM/
 cd ..
 
 cd MindSpeed-MM
-# MindSpeed/Megatron 中文件替换（必选）
+# MindSpeed/Megatron/MindSpeed-RL 中文件替换（必选）
 bash examples/rl/scripts/copy_adaptor_to_mindspeed.sh
 cd ..
 ```
