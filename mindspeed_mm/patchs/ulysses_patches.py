@@ -93,9 +93,12 @@ class UlyssesContextAttention(torch.nn.Module):
             value_layer = all_to_all(value, self.spg, self.scatter_idx, self.gather_idx, scatter_sizes_value, gather_sizes)
             
         context_layer = self.local_attn(query_layer, key_layer, value_layer, *args, **kwargs)
-        context_shape = context_layer.shape
-        context_layer = context_layer.reshape(context_shape[0], context_shape[1],
-                                            scatter_sizes_query[dist.get_rank(self.spg)], -1)
+        if get_mindspeed_args().context_parallel_algo == "hybrid_cp_algo" and context_layer.dim() == 3:
+            context_layer = context_layer.unsqueeze(1)
+        else:
+            context_shape = context_layer.shape
+            context_layer = context_layer.reshape(context_shape[0], context_shape[1],
+                                                  scatter_sizes_query[dist.get_rank(self.spg)], -1)
         
         if not native_all_to_all:
             output = all_to_all(context_layer, self.spg, self.gather_idx, self.scatter_idx, query.shape[self.scatter_idx])
@@ -135,7 +138,7 @@ def get_rotary_seq_len(
 
 mindspeed_args = get_mindspeed_args()
 if hasattr(mindspeed_args, 'context_parallel_algo') and hasattr(mindspeed_args, 'context_parallel_size'):
-    if mindspeed_args.context_parallel_algo == "ulysses_cp_algo" and int(mindspeed_args.context_parallel_size) > 1:
+    if mindspeed_args.context_parallel_algo in ["ulysses_cp_algo", "hybrid_cp_algo"] and int(mindspeed_args.context_parallel_size) > 1:
         pm.register_patch('mindspeed.core.context_parallel.ulysses_context_parallel.ulysses_context_parallel.UlyssesContextAttention', 
                         UlyssesContextAttention, force_patch=True)
         pm.register_patch('megatron.core.models.common.embeddings.rotary_pos_embedding.RotaryEmbedding.get_rotary_seq_len',

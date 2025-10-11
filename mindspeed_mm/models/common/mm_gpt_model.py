@@ -18,7 +18,12 @@ from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.training import get_args
 
-from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, gather_forward_split_backward
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward
+from mindspeed.core.context_parallel.model_parallel_utils import (
+    get_context_parallel_group_for_hybrid_ulysses, 
+    get_context_parallel_group_for_hybrid_ring, 
+    get_context_parallel_for_hybrid_ulysses_world_size
+)
 from mindspeed.utils import set_actual_seq_len
 from mindspeed_mm.models.common.embeddings.rope import DynamicRotaryEmbedding
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2VLRotaryEmbedding_llm
@@ -245,6 +250,21 @@ class MMGPTModel(LanguageModule):
                     position_ids = split_forward_gather_backward_with_megatron_cp(position_ids, mpu.get_context_parallel_group(), dim=2)
                 if self.pre_process:
                     decoder_input = split_forward_gather_backward_with_megatron_cp(decoder_input, mpu.get_context_parallel_group(), dim=0)
+
+            elif get_args().context_parallel_algo == "hybrid_cp_algo":
+                seq_len = input_ids.shape[-1]
+                split_gather_sizes = cal_split_sizes(seq_len, get_context_parallel_for_hybrid_ulysses_world_size())
+
+                input_ids = split_forward_gather_backward(input_ids, get_context_parallel_group_for_hybrid_ulysses(), 1, split_gather_sizes, "down")
+                input_ids = split_forward_gather_backward_with_megatron_cp(input_ids, get_context_parallel_group_for_hybrid_ring(), dim=1)
+
+                if position_ids is not None:
+                    position_ids = split_forward_gather_backward(position_ids, get_context_parallel_group_for_hybrid_ulysses(), 2, split_gather_sizes, "down")
+                    position_ids = split_forward_gather_backward_with_megatron_cp(position_ids, get_context_parallel_group_for_hybrid_ring(), dim=2)
+
+                if self.pre_process:
+                    decoder_input = split_forward_gather_backward(decoder_input, get_context_parallel_group_for_hybrid_ulysses(), 0, split_gather_sizes, "down")
+                    decoder_input = split_forward_gather_backward_with_megatron_cp(decoder_input, get_context_parallel_group_for_hybrid_ring(), dim=0)
 
         # sp must be after cp
         if self.config.sequence_parallel and self.pre_process:

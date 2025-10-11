@@ -85,7 +85,7 @@ def vlm_cp_dot_product_attention_forward(
                         self.config.sparse_mode = 1
 
     sparse_mode = self.config.sparse_mode
-    is_ulysses_algo = (getattr(self.config, 'context_parallel_algo', None) == 'ulysses_cp_algo')
+    is_ulysses_algo = getattr(self.config, 'context_parallel_algo', None) in ['ulysses_cp_algo', 'hybrid_cp_algo']
     if packed_seq_params is not None and self.config.attention_mask_type == 'causal':
         attention_mask = torch.triu(
                         torch.ones((2048, 2048), 
@@ -179,7 +179,7 @@ def vlm_cp_dot_product_attention_forward(
 
         if self.config.context_parallel_algo in ['megatron_cp_algo', 'hybrid_cp_algo']:
             is_general_eod = ((getattr(self.config, 'attention_mask_type', None) == 'general') and (packed_seq_params is not None))
-            if is_general_eod:
+            if is_general_eod and not is_ulysses_algo:
                 query, key, value = [rearrange(x, '(b s) n d -> s b (n d)', b=self.config.micro_batch_size) for x in [query, key, value]]
             cp_para['cp_global_ranks'] = cp_global_ranks
             if self.config.use_cp_send_recv_overlap:
@@ -257,7 +257,9 @@ def vlm_cp_dot_product_attention_forward(
 
 
 mindspeed_args = get_mindspeed_args()
-if getattr(mindspeed_args, 'context_parallel_algo') == 'megatron_cp_algo' and int(getattr(mindspeed_args, 'context_parallel_size', 1)) > 1:
+if getattr(mindspeed_args, 'context_parallel_algo') in ['megatron_cp_algo', 'hybrid_cp_algo'] and \
+    int(getattr(mindspeed_args, 'context_parallel_size', 1)) > 1:
+
     pm.register_patch('mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel.AttentionWithCp.compute_mask', 
                     vlm_cp_compute_mask, force_patch=True)
     pm.register_patch('mindspeed.core.context_parallel.dot_product_attention.CPDotProductAttentionImpl.forward',

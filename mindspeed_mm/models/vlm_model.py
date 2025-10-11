@@ -15,6 +15,11 @@ from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
 
 from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import gather_forward_split_backward, cal_split_sizes, split_forward_gather_backward
+from mindspeed.core.context_parallel.model_parallel_utils import (
+    get_context_parallel_group_for_hybrid_ulysses, 
+    get_context_parallel_group_for_hybrid_ring,
+    get_context_parallel_for_hybrid_ulysses_world_size
+)
 
 from mindspeed_mm.utils.utils import split_forward_gather_backward_with_megatron_cp
 from mindspeed_mm.models.common.module_spec.get_layer_spec import get_vit_layer_spec, get_llm_layer_spec, \
@@ -473,6 +478,26 @@ class VLMModel(MultiModalModule):
 
         total_loss = gather_forward_split_backward(loss, mpu.get_context_parallel_group(), dim=-1)
 
+        loss = total_loss.sum() / token_nums
+        return loss
+    
+    def compute_hybrid_cp_loss(self, logits, labels):
+        # shift labels, 
+        shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
+        shift_labels[..., -1] = -100  # use padding flag
+        token_nums = torch.sum(shift_labels > -1)
+
+        # split shift_labels
+        split_gather_sizes = cal_split_sizes(shift_labels.shape[-1], get_context_parallel_for_hybrid_ulysses_world_size())
+
+        shift_labels = split_forward_gather_backward(shift_labels, get_context_parallel_group_for_hybrid_ulysses(), 1, split_gather_sizes, "down")
+        shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels, get_context_parallel_group_for_hybrid_ring(), dim=1)
+
+        # 如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
+        loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), shift_labels)
+        loss = loss * (shift_labels > -1)
+
+        total_loss = gather_forward_split_backward(loss, mpu.get_context_parallel_group(), dim=-1)
 
         loss = total_loss.sum() / token_nums
         return loss
@@ -573,6 +598,8 @@ class VLMModel(MultiModalModule):
                         loss = self.compute_megatron_cp_loss(output, labels)
                     elif mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
                         loss = self.compute_ulysses_cp_loss(output, labels)
+                    elif mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "hybrid_cp_algo":
+                        loss = self.compute_hybrid_cp_loss(output, labels)
                     else:
                         # if use TP then must use compute_megatron_loss, if do not use TP, then two loss are ok, but they are not equal
                         global_args = get_args()
