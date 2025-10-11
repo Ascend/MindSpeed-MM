@@ -1,7 +1,7 @@
 accelerate==1.10.0
 torchvision
 torch==2.7.1
-transformers==4.47.1
+transformers==4.56.1
 ftfy
 tensorboard
 Jinja2

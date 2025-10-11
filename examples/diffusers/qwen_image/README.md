@@ -122,8 +122,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
     ```shell
     # Example
     accelerate launch --config_file $config_file \
-      --num_process $num_processors \
-      ./train_dreambooth_lora_qwen_image.py \
+      ./examples/dreambooth/train_dreambooth_lora_qwen_image.py \
       --pretrained_model_name_or_path=$model_name  \
       --dataset_name=$dataset_name \
       --caption_column="text" \
@@ -149,7 +148,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
     mixed_precision="bf16"
     resolution=512
     gradient_accumulation_steps=1
-    config_file="bf16_accelerate_config.yaml"
+    config_file="./examples/dreambooth/bf16_accelerate_config.yaml"
 
     # accelerate launch --config_file $config_file \ 目录下
     --dataloader_num_workers=0 \ # 请基于系统配置与数据大小进行调整num workers
@@ -186,7 +185,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
         修改config文件
 
         ```bash
-        vim bf16_accelerate_config.yaml
+        vim ./examples/dreambooth/bf16_accelerate_config.yaml
         ```
 
         将文件中的`deepspeed_multinode_launcher`, `main_process_ip`, 以及`main_process_port`消除注释而进行使用。
@@ -208,7 +207,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
     启动Qwen Image dreambooth_lora微调脚本
 
     ```shell
-    bash finetune_qwen_image_dreambooth_lora_deepspeed_bf16.sh
+    bash examples/dreambooth/finetune_qwen_image_dreambooth_lora_deepspeed_bf16.sh
     ```
 
 ## 推理
@@ -217,14 +216,10 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
 
   **同微调对应章节**
 
-```shell
-cd examples/dreambooth/ # 从diffusers目录进入dreambooth目录
-```
-
 【DREAMBOOTH微调Qwen Image模型推理】
 
 ```shell
-vim infer_qwen_image_text2img_bf16.py # 进入运行推理的Python文件
+vim ./examples/dreambooth/infer_qwen_image_text2img_bf16.py # 进入运行推理的Python文件
 ```
 
   1. 修改路径
@@ -237,13 +232,13 @@ vim infer_qwen_image_text2img_bf16.py # 进入运行推理的Python文件
   2. 运行代码
 
       ```shell
-      python infer_qwen_image_text2img_bf16.py
+      python examples/dreambooth/infer_qwen_image_text2img_bf16.py
       ```
 
-【lora微调FLUX模型推理】
+【lora微调Qwen Image模型推理】
 
   ```shell
-  vim infer_qwen_image_text2img_lora_bf16.py
+  vim ./examples/dreambooth/infer_qwen_image_text2img_lora_bf16.py
   ```
 
   1. 修改路径
@@ -257,7 +252,7 @@ vim infer_qwen_image_text2img_bf16.py # 进入运行推理的Python文件
   2. 运行代码
 
       ```shell
-      python infer_qwen_image_text2img_lora_bf16.py
+      python examples/dreambooth/infer_qwen_image_text2img_lora_bf16.py
       ```
   
 <a id="jump3"></a>

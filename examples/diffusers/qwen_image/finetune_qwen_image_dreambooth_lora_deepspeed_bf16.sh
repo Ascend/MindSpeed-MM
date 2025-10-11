@@ -58,7 +58,7 @@ start_time=$(date +%s)
 echo "start_time: ${start_time}"
 
 accelerate launch --config_file $config_file \
-  ./train_dreambooth_lora_qwen_image.py \
+  ./examples/dreambooth/train_dreambooth_lora_qwen_image.py \
   --pretrained_model_name_or_path=$model_name  \
   --dataset_name=$dataset_name \
   --caption_column="text" \
