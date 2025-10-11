@@ -61,7 +61,7 @@ class TestCIST:
         # lm loss in case of approximation.
         for step, (expected_val, actual_val) in enumerate(zip(expected_list, actual_list)):
             print(f"Checking step {step + 1} for loss")
-            if actual_val == pytest.approx(expected=expected_val, rel=self.margin_loss):
+            if actual_val != pytest.approx(expected=expected_val, rel=self.margin_loss):
                 raise AssertionError(f"The loss at step {step} should be approximate to {expected_val} but it is {actual_val}.")
 
     def _compare_time(self, expected_list, actual_list):
@@ -107,3 +107,8 @@ class TestCIST:
         self._get_baseline(baseline_json)
         self._get_actual(generate_log, generate_json)
         self._test_helper("memo info")
+
+    def test_loss(self, baseline_json, generate_log, generate_json):
+        self._get_baseline(baseline_json)
+        self._get_actual(generate_log, generate_json)
+        self._test_helper('loss')

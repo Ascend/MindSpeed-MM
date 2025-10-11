@@ -5,6 +5,11 @@ import shlex
 from pathlib import Path
 
 
+TEST_RESULT_SUCCESS = 0
+TEST_RESULT_FAILURE = 1
+TEST_RESULT_INVALID_INPUT = 2
+
+
 def read_files_from_txt(txt_file):
     with open(txt_file, "r") as f:
         return [line.strip() for line in f.readlines()]
@@ -132,9 +137,15 @@ class ST_Test:
         self.st_shell = os.path.join(
             test_dir, st_dir, "st_run.sh"
         )
+        self.local_st_shell = os.path.join(
+            test_dir, st_dir, 'local_st_run.sh'
+        )
 
-    def run_st(self):
-        command = f"bash {self.st_shell}"
+    def run_st(self, local=False):
+        if local:
+            command = f'bash {self.local_st_shell}'
+        else:
+            command = f"bash {self.st_shell}"
         code = acquire_exitcode(command)
 
         if code == 0:
@@ -154,25 +165,39 @@ def run_st_tests():
     return st.run_st()
 
 
+def run_st_local_tests():
+    st = ST_Test()
+    return st.run_st(local=True)
+
+
 def run_tests(options):
     if options.type == "st":
-        return run_st_tests()
+        st_code = run_st_tests()
+        return TEST_RESULT_FAILURE if st_code != 0 else TEST_RESULT_SUCCESS
     elif options.type == "ut":
-        return run_ut_tests()
+        ut_code = run_ut_tests()
+        return TEST_RESULT_FAILURE if ut_code != 0 else TEST_RESULT_SUCCESS
     elif options.type == "all":
         code = run_ut_tests()
-        if code == 0:
-            return run_st_tests()
-        return code
+        if code != 0:
+            return TEST_RESULT_FAILURE
+        st_code = run_st_tests()
+        return TEST_RESULT_FAILURE if st_code != 0 else TEST_RESULT_SUCCESS
+    elif options.type == 'all_loss':
+        code = run_ut_tests()
+        if code != 0:
+            return TEST_RESULT_FAILURE
+        st_code = run_st_local_tests()
+        return TEST_RESULT_FAILURE if st_code != 0 else TEST_RESULT_SUCCESS
     else:
-        raise ValueError(f"TEST CASE TYPE ERROR: no type `{options.type}`")
-
+        print(f"TEST CASE TYPE ERROR: no type '{options.type}'")
+        return TEST_RESULT_INVALID_INPUT
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Control needed test cases")
     parser.add_argument("--type", type=str, default="all",
-                        choices=["all", "ut", "st", "codecheck"],
-                        help='Test cases type. `all`: run all test cases; `ut`: run ut case, `st`: run st cases; `codecheck`: used for codecheck;')
+                        choices=["all", "ut", "st", "codecheck", "all_loss"],
+                        help='Test cases type. `all`: run all test cases; `ut`: run ut case, `st`: run st cases; `codecheck`: used for codecheck; `all_loss`: used for local ci')
     args = parser.parse_args()
     print(f"options: {args}")
     if alter_skip_ci():

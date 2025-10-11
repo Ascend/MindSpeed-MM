@@ -55,7 +55,7 @@ for test_case in "$SHELL_SCRIPTS_DIR"/*.sh; do
             echo "st is an inference task, skip compare result"
         else
             # begin to execute the logic of compare
-            pytest -x $BASE_DIR/test_tools/test_ci_st.py \
+            pytest -k "not loss" -x $BASE_DIR/test_tools/test_ci_st.py \
                 --baseline-json $BASELINE_DIR/$file_name_prefix.json \
                 --generate-log $GENERATE_LOG_DIR/$file_name_prefix.log \
                 --generate-json $GENERATE_JSON_DIR/$file_name_prefix.json
