@@ -97,8 +97,8 @@ cp -r mindspeed_rl ../MindSpeed-MM/
 cd ..
 
 cd MindSpeed-MM
-# MindSpeed/Megatron 中文件替换（必选）
-bash examples/rl/scripts/copy_adaptor_to_mindspeed.sh
+# MindSpeed/Megatron 中文件替换（必选，MindSpeed-RL使用的mindspeed版本是080，而MindSpeed-MM使用的是012）
+bash examples/rl/scripts/apply_dapo_mindspeed_patches.sh
 cd ..
 ```
 
