@@ -2,9 +2,11 @@
 # Copyright 2025 The Qwen Team and The HuggingFace Inc. team. All rights reserved.
 # Copyright 2024 The Qwen team, Alibaba Group and the HuggingFace Inc. team. All rights reserved.
 
-from typing import Tuple, Optional
+from typing import Optional
+import math
 
 import torch
+import torch_npu
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -18,10 +20,13 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_region, gather_from_sequence_parallel_region
 from megatron.training import get_args
 
+from mindspeed.core.context_parallel import DotProductAttention
 from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, \
     gather_forward_split_backward
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.vision.vision_encoders.vision_transformer_block import Qwen2VLVisionTransformerBlock
+from mindspeed_mm.models.common.communications import split_forward_gather_backward
+from mindspeed_mm.patchs.ulysses_patches import UlyssesContextAttention
 
 
 # Copied from transformers.models.llama.modeling_llama.rotate_half
@@ -35,7 +40,6 @@ def rotate_half(x):
 # Modified based on transformers.models.qwen2_vl.modeling_qwen2_vl
 def apply_multimodal_rotary_pos_emb(q, k, cos, sin, use_fused_rope=True):
     if use_fused_rope:
-        import torch_npu
         q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
         k_embed = torch_npu.npu_rotary_mul(k, cos, sin)
     else:
@@ -50,7 +54,6 @@ def apply_rotary_pos_emb_vision(tensor: torch.Tensor, freqs: torch.Tensor, use_f
     tensor = tensor.float()
     cos, sin = torch.chunk(freqs, 2, dim=0)
     if use_fused_rope:
-        import torch_npu
         output = torch_npu.npu_rotary_mul(tensor, cos, sin).to(orig_dtype)
     else:
         output = ((tensor * cos) + (rotate_half(tensor) * sin)).to(orig_dtype)
@@ -210,6 +213,11 @@ class Qwen2vlVitSelfAttention(SelfAttention):
             layer_number=layer_number,
             attn_mask_type=attn_mask_type
         )
+
+        if hasattr(config, "use_vit_dp") and config.use_vit_dp and isinstance(self.core_attention, UlyssesContextAttention):
+            # for ulysses context parallel, we need to remove ulysses wrapper
+            # eg: self_attention.core_attention.local_attn --> self_attention.core_attention
+            self.core_attention = self.core_attention.local_attn
 
     def apply_rotary_pos_emb_qk(self, rotary_pos_emb, query, key):
         query = apply_rotary_pos_emb_vision(query, rotary_pos_emb,
@@ -541,6 +549,11 @@ class Qwen2VLViT(MultiModalModule):
             for i in range(1, len(cu_seqlens)):
                 attention_mask[..., cu_seqlens[i - 1]: cu_seqlens[i], cu_seqlens[i - 1]: cu_seqlens[i]] = 0
 
+        if cu_seqlens is not None and cu_seqlens.numel() > 1:
+            cu_seqlens = cu_seqlens[1:]
+        if cu_window_seqlens is not None and cu_window_seqlens.numel() > 1:
+            cu_window_seqlens = cu_window_seqlens[1:]
+
         if get_args().sequence_parallel:
             hidden_states = scatter_to_sequence_parallel_region(hidden_states)
 
@@ -560,6 +573,33 @@ class Qwen2VLViT(MultiModalModule):
                 split_gather_sizes,
                 "down"
             )
+
+            if hasattr(self.config, "use_vit_dp") and self.config.use_vit_dp:
+                window_size = cu_seqlens.shape[0]
+
+                if window_size < mpu.get_context_parallel_world_size():
+                    raise NotImplementedError(
+                        f"cu_seqlens shape: {cu_seqlens.shape}, cp size: {mpu.get_context_parallel_world_size()}"  # Need all_to_all and ulysses cp
+                    )
+
+                split_gather_sizes_cu_seqlens = cal_split_sizes(window_size, mpu.get_context_parallel_world_size())
+                split_gather_sizes_cu_window_seqlens = cal_split_sizes(cu_window_seqlens.shape[0], mpu.get_context_parallel_world_size())
+
+                cu_seqlens = split_forward_gather_backward(
+                    cu_seqlens,
+                    mpu.get_context_parallel_group(),
+                    dim=0,
+                    split_sizes=split_gather_sizes_cu_seqlens,
+                    shift=True
+                )
+
+                cu_window_seqlens = split_forward_gather_backward(
+                    cu_window_seqlens,
+                    mpu.get_context_parallel_group(),
+                    dim=0,
+                    split_sizes=split_gather_sizes_cu_window_seqlens,
+                    shift=True
+                    )
 
         cos_cache = rotary_pos_emb.cos().unsqueeze(1).repeat(1, 1, 2).unsqueeze(1).float()
         sin_cache = rotary_pos_emb.sin().unsqueeze(1).repeat(1, 1, 2).unsqueeze(1).float()
@@ -586,3 +626,56 @@ class Qwen2VLViT(MultiModalModule):
             hidden_states = gather_from_sequence_parallel_region(hidden_states)
 
         return hidden_states, window_index
+
+
+class Qwen2_5VitDotProductAttention(DotProductAttention):
+    def __init__(
+        self,
+        config: TransformerConfig,
+        layer_number: int,
+        attn_mask_type: AttnMaskType,
+        attention_type: str,
+        attention_dropout: float = None,
+        softmax_scale: float = None,
+        cp_comm_type: str = None,
+    ):
+
+        super().__init__(
+            config=config,
+            layer_number=layer_number,
+            attn_mask_type=attn_mask_type,
+            attention_type=attention_type,
+            attention_dropout=attention_dropout,
+            softmax_scale=softmax_scale,
+            cp_comm_type=cp_comm_type
+        )
+
+    def forward(self, query, key, value, attention_mask, attn_mask_type=None, attention_bias=None, packed_seq_params=None):
+        if query.ndim == 4:
+            query = query.squeeze(1)
+            key = key.squeeze(1)
+            value = value.squeeze(1)
+
+        T, n_head, D = query.shape
+        sparse_mode = 0
+        actual_seq_qlen = packed_seq_params.cu_seqlens_q.tolist()
+        actual_seq_kvlen = packed_seq_params.cu_seqlens_kv.tolist()
+
+        scale = 1.0 / math.sqrt(
+            self.hidden_size_per_attention_head) if self.scale_mask_softmax.scale is None else self.softmax_scale
+
+        output = torch_npu.npu_fusion_attention(
+                    query, key, value, n_head, 'TND',
+                    pse=None,
+                    padding_mask=None,
+                    atten_mask=None,
+                    scale=scale,
+                    pre_tockens=self.config.pre_tockens,
+                    next_tockens=self.config.next_tockens,
+                    keep_prob=1 - self.attention_dropout.p,
+                    inner_precise=0,
+                    sparse_mode=sparse_mode,
+                    actual_seq_qlen=actual_seq_qlen,
+                    actual_seq_kvlen=actual_seq_kvlen
+                )[0]
+        return output

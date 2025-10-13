@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 import torch
 import torch.distributed as dist
@@ -193,10 +193,12 @@ def all_to_all_SBH(
 # ====================
 
 
-def _split(input_: torch.Tensor,
+def _split(
+    input_: torch.Tensor,
     pg: dist.ProcessGroup,
     dim: int = -1,
-    split_sizes: List = None
+    split_sizes: List = None,
+    shift: bool = False
 ):
     # skip if only one rank involved
     world_size = dist.get_world_size(pg)
@@ -215,7 +217,13 @@ def _split(input_: torch.Tensor,
             )
         tensor_list = torch.split(input_, dim_size // world_size, dim=dim)
 
-    output = tensor_list[rank].contiguous()
+    if shift:
+        output = tensor_list[rank]
+        if rank > 0:
+            output = (output - tensor_list[rank - 1][-1]).contiguous()
+
+    else:
+        output = tensor_list[rank].contiguous()
 
     return output
 
@@ -286,7 +294,8 @@ class _GatherForwardSplitBackward(torch.autograd.Function):
 
 class _SplitForwardGatherBackward(torch.autograd.Function):
     """
-    Split the input and keep only the corresponding chuck to the rank.
+    Custom autograd function that splits the input tensor and keeps only the corresponding chunk for the current rank.
+    During the backward pass, it gathers the gradients and scales them according to the gradient scaling mode.
 
     Args:
         input_: input matrix.
@@ -295,16 +304,16 @@ class _SplitForwardGatherBackward(torch.autograd.Function):
     """
 
     @staticmethod
-    def symbolic(graph, input_):
-        return _split(input_)
+    def symbolic(graph, input_, process_group, dim, split_sizes, shift):
+        return _split(input_, process_group, dim, split_sizes, shift)
 
     @staticmethod
-    def forward(ctx, input_, process_group, dim, grad_scale, split_sizes):
+    def forward(ctx, input_, process_group, dim, grad_scale, split_sizes, shift):
         ctx.mode = process_group
         ctx.dim = dim
         ctx.grad_scale = grad_scale
         ctx.split_sizes = split_sizes
-        return _split(input_, process_group, dim, split_sizes)
+        return _split(input_, process_group, dim, split_sizes, shift)
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -312,11 +321,35 @@ class _SplitForwardGatherBackward(torch.autograd.Function):
             grad_output = grad_output * dist.get_world_size(ctx.mode)
         elif ctx.grad_scale == "down":
             grad_output = grad_output / dist.get_world_size(ctx.mode)
-        return _gather(grad_output, ctx.mode, ctx.dim, ctx.split_sizes), None, None, None, None
+        return _gather(grad_output, ctx.mode, ctx.dim, ctx.split_sizes), None, None, None, None, None
 
 
-def split_forward_gather_backward(input_, process_group, dim, grad_scale=1.0, split_sizes=None):
-    return _SplitForwardGatherBackward.apply(input_, process_group, dim, grad_scale, split_sizes)
+def split_forward_gather_backward(
+    input_: torch.Tensor,
+    process_group: torch.distributed.ProcessGroup,
+    dim: int,
+    grad_scale: str = "down",
+    split_sizes: Optional[List[int]] = None,
+    shift=False
+
+) -> torch.Tensor:
+    """
+    Splits the input tensor and keeps only the corresponding chunk for the current rank.
+    During the backward pass, it gathers the gradients and scales them according to the gradient scaling mode.
+    This function supports both aligned and unaligned data.
+    Args:
+        input_ (torch.Tensor): The input tensor to be processed.
+        process_group (dist.ProcessGroup): The process group to perform the operation within.
+        dim (int): The dimension along which to split the tensor.
+        split_sizes (Optional[List[int]], optional): A list of sizes for each part of the tensor to be split.
+            If not provided, the tensor will be split equally among the processes. Defaults to None.
+        grad_scale (str, optional): Gradient scaling mode. Can be "up", "down", or None. Defaults to "down".
+        shift (bool, optional): Whether to apply a shift operation during splitting. Defaults to False.
+
+    Returns:
+        torch.Tensor: The resulting tensor after splitting and keeping only the corresponding chunk.
+    """
+    return _SplitForwardGatherBackward.apply(input_, process_group, dim, grad_scale, split_sizes, shift)
 
 
 def gather_forward_split_backward(input_, process_group, dim, grad_scale=None, gather_sizes=None):

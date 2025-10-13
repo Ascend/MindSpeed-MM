@@ -18,7 +18,7 @@ from megatron.core.transformer.transformer_layer import (
 from megatron.core.models.gpt.gpt_layer_specs import _get_mlp_module_spec
 
 from mindspeed_mm.models.common.module_spec.llava_layer_spec import get_mlp_module_spec
-from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlVitSelfAttention, Qwen2vlSelfAttention
+from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlVitSelfAttention, Qwen2vlSelfAttention, Qwen2_5VitDotProductAttention
 
 
 def get_qwen2vl_llm_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
@@ -68,6 +68,40 @@ def get_qwen2vl_layer_spec(config=None, is_vit=True, *args, **kwargs) -> ModuleS
                 submodules=SelfAttentionSubmodules(
                     linear_qkv=ColumnParallelLinear,
                     core_attention=DotProductAttention,
+                    linear_proj=RowParallelLinear,
+                    q_layernorm=IdentityOp,
+                    k_layernorm=IdentityOp,
+                ),
+            ),
+            self_attn_bda=get_bias_dropout_add,
+            pre_mlp_layernorm=TENorm,
+            mlp=mlp,
+            mlp_bda=get_bias_dropout_add,
+        ),
+    )
+
+
+def get_qwen2_5_vit_layer_spec(config=None, is_vit=True, *args, **kwargs) -> ModuleSpec:
+    if hasattr(config, "use_vit_dp") and config.use_vit_dp:
+        core_attention = Qwen2_5VitDotProductAttention
+    else:
+        core_attention = DotProductAttention
+
+    attn_mask_type = AttnMaskType.no_mask if is_vit else AttnMaskType.causal
+
+    mlp = get_mlp_module_spec(use_te=False)
+    return ModuleSpec(
+        module=TransformerLayer,
+        submodules=TransformerLayerSubmodules(
+            input_layernorm=TENorm,
+            self_attention=ModuleSpec(
+                module=Qwen2vlVitSelfAttention,
+                params={
+                    "attn_mask_type": attn_mask_type
+                },
+                submodules=SelfAttentionSubmodules(
+                    linear_qkv=ColumnParallelLinear,
+                    core_attention=core_attention,
                     linear_proj=RowParallelLinear,
                     q_layernorm=IdentityOp,
                     k_layernorm=IdentityOp,
