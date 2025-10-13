@@ -706,11 +706,29 @@ def train_step(
     if mpu.is_pipeline_last_stage(ignore_virtual=True):
         # Average loss across microbatches.
         loss_reduced = {}
-        for key in losses_reduced[0]:
-            losses_reduced_for_key = [x[key] for x in losses_reduced]
-            loss_reduced[key] = sum(losses_reduced_for_key) / len(
-                losses_reduced_for_key
-            )
+        if not config.calculate_per_token_loss:
+            for key in losses_reduced[0]:
+                losses_reduced_for_key = [x[key] for x in losses_reduced]
+                loss_reduced[key] = sum(losses_reduced_for_key) / len(
+                    losses_reduced_for_key
+                )
+        else:
+            for key in losses_reduced[0].keys():
+                numerator = 0
+                denominator = 0
+                for x in losses_reduced:
+                    val = x[key]
+                    # there is one dict per microbatch. in new reporting, we average
+                    # over the total number of tokens across the global batch.
+                    if isinstance(val, tuple) or isinstance(val, list):
+                        numerator += val[0]
+                        denominator += val[1]
+                    else:
+                        # legacy behavior. we average over the number of microbatches,
+                        # and so the denominator is 1.
+                        numerator += val
+                        denominator += 1
+                loss_reduced[key] = numerator / denominator
         return loss_reduced, skipped_iter, grad_norm, num_zeros_in_grad
     return {}, skipped_iter, grad_norm, num_zeros_in_grad
 

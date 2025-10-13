@@ -271,15 +271,12 @@ def get_context_parallel_group_rank():
 
 
 class IsNotValidError(Exception):
-    def __init__(self, error_message):
-        super().__init__()
-        self._error_message = error_message
+    def __init__(self, error_message=None):
+        self.error_message = error_message
+        super().__init__(error_message or "Expression is not valid")
 
-    def __repr__(self):
-        if self._error_message:
-            return self._error_message
-        else:
-            return "Expression is not valid"
+    def __str__(self):
+        return self.error_message or "Expression is not valid"
 
 
 def ensure_valid(expression, error_message=None):

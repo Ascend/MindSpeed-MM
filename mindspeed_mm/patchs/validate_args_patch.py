@@ -762,6 +762,12 @@ def validate_args(args, defaults=None):
     # Print arguments.
     _print_args("arguments", args)
 
+    ensure_valid(not (args.calculate_per_sample_loss and args.calculate_per_token_loss),
+                 ("calculate_per_sample_loss and calculate_per_token_loss cannot be used simultaneously; "
+                  "only one of them can be enabled. If neither is specified, loss computation will fall back to the default behavior. "
+                  "For more details, please refer to the relevant documentation: vlm-model_loss_calculate_type.md"
+                  ))
+
     return args
 
 pm.register_patch("megatron.training.arguments.validate_args", validate_args, force_patch=True)

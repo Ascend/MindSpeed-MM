@@ -139,18 +139,63 @@ def get_batch(data_iterator, is_vit_last_stage=False):
     return batch
 
 
+def get_tps(output_tensor):
+    """Get the tokens per sample"""
+    B, S, _ = output_tensor.shape
+    dp_size = torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
+    cp_size = torch.distributed.get_world_size(group=mpu.get_context_parallel_group())
+    tokens_per_sample = torch.tensor(S, device=output_tensor.device) / dp_size * cp_size
+    torch.distributed.all_reduce(tokens_per_sample, group=mpu.get_data_parallel_group())
+    return tokens_per_sample
+
+
+def compute_token_level_loss(loss_dict):
+    """Token level loss function"""
+    args = get_args()
+
+    if args.context_parallel_size > 1:
+        loss = loss_dict['loss']
+        total_tokens = loss_dict["token_nums"]
+        loss = torch.cat([loss.sum().view(1), total_tokens.sum().view(1)])
+    else:
+        loss = loss_dict['loss']
+        loss_mask = loss_dict['loss_mask']
+        loss_mask = loss_mask.view(-1).float()
+        total_tokens = loss_mask.sum()
+        loss = torch.cat([torch.sum(loss.view(-1) * loss_mask).view(1), total_tokens.view(1)])
+
+    # Reduce loss for logging.
+    reporting_loss = loss.clone().detach()
+    loss[0] = loss[0] / mpu.get_context_parallel_world_size()
+    torch.distributed.all_reduce(reporting_loss, group=mpu.get_data_parallel_group())
+    # loss[0] is a view of loss, so it has ._base not None, which triggers assert error
+    # in core/pipeline_parallel/schedule.py::deallocate_output_tensor, calling .clone()
+    # on loss[0] fixes this
+    local_num_tokens = loss[1].clone().detach().to(torch.int)
+
+    return loss, local_num_tokens, reporting_loss
+
+
 def loss_func(output_tensor):
     """Loss function."""
     args = get_args()
-    loss = output_tensor['loss'].mean()
+    loss_dict = output_tensor['loss_dict']
+
     loss_dir = {}
     if args.log_tps:
-        B, S, _ = output_tensor['logits'].shape
-        dp_size = torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
-        cp_size = torch.distributed.get_world_size(group=mpu.get_context_parallel_group())
-        tokens_per_sample = torch.tensor(S, device=output_tensor['logits'].device) / dp_size * cp_size
-        torch.distributed.all_reduce(tokens_per_sample, group=mpu.get_data_parallel_group())
+        tokens_per_sample = get_tps(output_tensor['logits'])
         loss_dir["tokens per sample"] = tokens_per_sample
+
+    if args.calculate_per_token_loss:
+        loss, local_num_tokens, reporting_loss = compute_token_level_loss(loss_dict)
+        loss_dir["loss"] = (reporting_loss[0], reporting_loss[1])
+        return (
+            loss[0].clone(),
+            local_num_tokens,
+            loss_dir
+        )
+
+    loss = loss_dict['loss']
     averaged_loss = average_losses_across_data_parallel_group([loss])
     loss_dir["loss"] = averaged_loss[0]
     loss = loss.unsqueeze(0).clone()
