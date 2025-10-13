@@ -1,7 +1,6 @@
 # Copyright (c) 2023; NVIDIA CORPORATION. All rights reserved.
 from typing import Optional, Dict, Tuple, Union
 
-import torch 
 import torch
 import numpy
 from torch.nn import CrossEntropyLoss
@@ -25,7 +24,6 @@ from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.text_encoder.text_encoder import TextEncoder
 from mindspeed_mm.models.common.mm_gpt_model import MMGPTModel
 from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positionsids_mask_for_llm
-from mindspeed_mm.utils.hetero_parallel import change_parallel_state
 from mindspeed_mm.utils.hetero_parallel import change_parallel_state
 from mindspeed_mm.utils.utils import EncoderBalanceComm
 
@@ -403,75 +401,119 @@ class VLMModel(MultiModalModule):
                 param.requires_grad = False
 
 
-    def compute_loss(self, logits, labels, ignore_flag=False):
-        # shift tokens
-        shift_logits = logits[..., :-1, :].contiguous()
-        shift_labels = labels[..., 1:].contiguous()
-
-        loss_fct = CrossEntropyLoss()
-        shift_logits = shift_logits.view(-1, self.vocab_size)
-        shift_labels = shift_labels.view(-1)
-
-        shift_labels = shift_labels.to(shift_logits.device)
-        loss = loss_fct(shift_logits, shift_labels)
-        if ignore_flag:
-            loss = loss * 0.0
-
-        return loss
-
-
-    def compute_megatron_loss(self, logits, labels):
-        # shift tokens
-        shift_logits = logits[..., :-1, :].contiguous()
-        shift_labels = labels[..., 1:].contiguous()
-
-        #如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
-        loss = tensor_parallel.vocab_parallel_cross_entropy(shift_logits.float(), shift_labels)
-        loss = loss * (shift_labels > -1)
-        loss = torch.sum(loss) / torch.sum(shift_labels > -1)
-
-        return loss
-
-    def compute_megatron_cp_loss(self, logits, labels):
-        # split and shift labels
-        shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
-        labels = split_forward_gather_backward_with_megatron_cp(shift_labels, mpu.get_context_parallel_group(), 1)
-
-        if mpu.get_context_parallel_rank() == 0:
-            logits = logits[..., :-1, :].contiguous()
-            labels = labels[..., :-1].contiguous()
-
+    def compute_loss_with_tensor_parallel(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        args = get_args()
         # 如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
         loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), labels)
-        loss = loss * (labels > -1)
-        token_nums = torch.sum(labels > -1)
 
-        total_loss = gather_forward_split_backward(loss, mpu.get_context_parallel_group(), dim=-1)
-        torch.distributed.all_reduce(token_nums, group=mpu.get_context_parallel_group())
+        # The three loss calculation modes are mutually exclusive:
+        # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
+        #    Calculate the average loss for the entire batch by summing all valid token losses and dividing by total token count
+        # 2. Token level (calculate_per_token_loss=True):
+        #    Keep per-token losses without any aggregation, used for scenarios requiring token-level loss
+        # 3. Sample level (calculate_per_sample_loss=True):
+        #    Calculate per-sample average loss by first computing the average loss of valid tokens within each sample, then averaging across all samples
+        if args.calculate_per_sample_loss:
+            loss = loss * (labels > -1)
+            batch_mean_loss = loss.sum(dim=1) / (labels > -1).sum(dim=1)
+            loss = batch_mean_loss.mean()
+        elif args.calculate_per_token_loss:
+            pass
+        else:
+            loss = loss * (labels > -1)
+            loss = torch.sum(loss) / torch.sum(labels > -1)
 
-        loss = total_loss.sum() / token_nums
         return loss
-    
-    def compute_ulysses_cp_loss(self, logits, labels):
-        # split and shift labels
-        shift_labels = labels[..., 1:].contiguous()
-        token_nums = torch.sum(shift_labels > -1)
 
-        split_gather_sizes = cal_split_sizes(labels.shape[-1], mpu.get_context_parallel_world_size())
-        split_gather_sizes[-1] = split_gather_sizes[-1] - 1
-        shift_labels = split_forward_gather_backward(shift_labels, mpu.get_context_parallel_group(), -1, split_gather_sizes, "down")
 
-        if mpu.get_context_parallel_rank() == mpu.get_context_parallel_world_size() - 1:
-            logits = logits[..., :-1, :].contiguous()
+    def compute_loss_with_context_parallel(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        args = get_args()
+        token_nums = None
 
-        # 如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
-        loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), shift_labels)
-        loss = loss * (shift_labels > -1)
+        if args.context_parallel_algo == "megatron_cp_algo":
+            shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
+            # split and shift labels
+            # The default value of the ignore index is -100
+            shift_labels[..., -1] = -100
+            # shape [batch size, s / cp size] --> [batch size]
+            token_nums = (shift_labels > -1).sum(dim=1)
+            labels = split_forward_gather_backward_with_megatron_cp(shift_labels, mpu.get_context_parallel_group(), 1)
+        elif args.context_parallel_algo == "ulysses_cp_algo":
+            # split and shift labels
+            shift_labels = labels[..., 1:].contiguous()
+            # shape [batch size, s / cp size] --> [batch size]
+            token_nums = (shift_labels > -1).sum(dim=1)
+            # Calculate the split sizes for each device in context parallelism
+            split_gather_sizes = cal_split_sizes(labels.shape[-1], mpu.get_context_parallel_world_size())
+            # Reduce the last device's split size by 1 to handle the shifted labels
+            split_gather_sizes[-1] = split_gather_sizes[-1] - 1
+            labels = split_forward_gather_backward(shift_labels, mpu.get_context_parallel_group(), -1, split_gather_sizes, "down")
+            if mpu.get_context_parallel_rank() == mpu.get_context_parallel_world_size() - 1:
+                logits = logits[..., :-1, :].contiguous()
 
+        loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), labels)
+        loss = loss * (labels > -1)
+
+        # total_loss shape : [batch size, s]
         total_loss = gather_forward_split_backward(loss, mpu.get_context_parallel_group(), dim=-1)
 
+        # The three loss calculation modes are mutually exclusive:
+        # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
+        #    Calculate the average loss for the entire batch by summing all valid token losses and dividing by total token count
+        # 2. Token level (calculate_per_token_loss=True):
+        #    Keep per-token losses without any aggregation, used for scenarios requiring token-level loss
+        # 3. Sample level (calculate_per_sample_loss=True):
+        #    Calculate per-sample average loss by first computing the average loss of valid tokens within each sample, then averaging across all samples
+        if args.calculate_per_sample_loss:
+            batch_mean_loss = total_loss.sum(dim=1) / token_nums
+            total_loss = batch_mean_loss.mean()
+            token_nums = token_nums.mean()
+        elif args.calculate_per_token_loss:
+            pass
+        else:
+            token_nums = torch.sum(token_nums)
+            total_loss = total_loss.sum() / token_nums
 
-        loss = total_loss.sum() / token_nums
+        return total_loss, token_nums
+
+    def compute_language_model_loss(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        args = get_args()
+        loss = None
+
+        # The three loss calculation modes are mutually exclusive:
+        # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
+        #    Calculate the average loss for the entire batch by summing all valid token losses and dividing by total token count
+        # 2. Token level (calculate_per_token_loss=True):
+        #    Keep per-token losses without any aggregation, used for scenarios requiring token-level loss
+        # 3. Sample level (calculate_per_sample_loss=True):
+        #    Calculate per-sample average loss by first computing the average loss of valid tokens within each sample, then averaging across all samples
+        if args.calculate_per_sample_loss:
+            batch_size, _, _ = logits.shape
+            # To align with huggingface transformers
+            if batch_size == 1:
+                loss_fct = CrossEntropyLoss()
+                logits = logits.view(-1, self.vocab_size)
+                labels = labels.view(-1)
+                loss = loss_fct(logits.float(), labels)
+            else:
+                loss_fct = CrossEntropyLoss(reduction='none')
+                logits = logits.permute(0, 2, 1).contiguous()
+                loss = loss_fct(logits.float(), labels)
+                batch_mean_loss = loss.sum(dim=1) / (labels > -1).sum(dim=1)
+                loss = batch_mean_loss.mean()
+        elif args.calculate_per_token_loss:
+            loss_fct = CrossEntropyLoss(reduction='none')
+            # Flatten the tokens
+            logits = logits.view(-1, self.vocab_size)
+            labels = labels.view(-1)
+            loss = loss_fct(logits.float(), labels)
+        else:
+            loss_fct = CrossEntropyLoss()
+            # Flatten the tokens
+            logits = logits.view(-1, self.vocab_size)
+            labels = labels.view(-1)
+            loss = loss_fct(logits.float(), labels)
+
         return loss
 
     def forward(
@@ -564,21 +606,34 @@ class VLMModel(MultiModalModule):
 
             if self.text_decoder.post_process:
                 output = output.contiguous().float()
-                loss = None
+                loss_dict = {}
                 if labels is not None:
-                    if mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "megatron_cp_algo":
-                        loss = self.compute_megatron_cp_loss(output, labels)
-                    elif mpu.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
-                        loss = self.compute_ulysses_cp_loss(output, labels)
+                    if mpu.get_context_parallel_world_size() > 1:
+                        loss, token_nums = self.compute_loss_with_context_parallel(output, labels)
+
+                        loss_dict["loss"] = loss
+                        loss_dict["token_nums"] = token_nums
+
+                        return {
+                            "loss_dict": loss_dict,
+                            "logits": output
+                        }
                     else:
-                        # if use TP then must use compute_megatron_loss, if do not use TP, then two loss are ok, but they are not equal
-                        global_args = get_args()
-                        if global_args.tensor_model_parallel_size > 1:
-                            loss = self.compute_megatron_loss(output, labels)
+                        # output shape [b, s, vocab_size]
+                        shift_logits = output[..., :-1, :].contiguous()
+                        # labels shape [b, s]
+                        shift_labels = labels[..., 1:].contiguous()
+
+                        if mpu.get_tensor_model_parallel_world_size() > 1:
+                            loss = self.compute_loss_with_tensor_parallel(shift_logits, shift_labels)
                         else:
-                            loss = self.compute_loss(output, labels)
-                return {
-                    "loss": loss,
-                    "logits": output
-                }
+                            loss = self.compute_language_model_loss(shift_logits, shift_labels)
+
+                        loss_dict["loss"] = loss
+                        loss_dict["loss_mask"] = shift_labels > -1
+
+                        return {
+                            "loss_dict": loss_dict,
+                            "logits": output
+                        }
         return output

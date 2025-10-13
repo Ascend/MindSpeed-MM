@@ -102,7 +102,11 @@ def _add_training_args(parser):
                        action='store_true',
                        default=False,
                        help='apply different parallelism to different models')
-
+    group.add_argument('--calculate-per-sample-loss',
+                       action='store_true',
+                       default=False,
+                       help=('Calculate the loss at the sample level: perform token-level mean '
+                       'within each sample, and sequence-level mean across samples.'))
     return parser
 
 
