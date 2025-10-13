@@ -75,8 +75,16 @@ OUTPUT_ARGS="
     --eval-iters 5000 \
 "
 
+LORA_ARGS="
+    --lora-r 64 \
+    --lora-alpha 128 \
+    --lora-dropout 0 \
+    --lora-target-modules linear_proj linear_fc2 q_proj k_proj v_proj gate_proj up_proj \
+"
+
 torchrun $DISTRIBUTED_ARGS inference_videoalign.py \
     $GPT_ARGS \
     $MM_ARGS \
     $OUTPUT_ARGS \
+    $LORA_ARGS \
     --distributed-backend nccl

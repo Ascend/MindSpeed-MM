@@ -877,7 +877,7 @@ def glm_get_rope_index(
             mrope_position_deltas = torch.zeros(
                 [input_ids.shape[0], 1],
                 device=input_ids.device,
-                dtype=input_ids.dtype, 
+                dtype=input_ids.dtype,
             )
 
         return position_ids, mrope_position_deltas
@@ -891,17 +891,6 @@ def qwen2_position(config,
                   **kwargs):
     position_ids, rope_deltas = qwen2vl_get_rope_index(config, input_ids, image_grid_thw, video_grid_thw,
                                      kwargs.get('second_per_grid_ts', None), attention_mask=attention_mask)
-    return position_ids, rope_deltas
-
-
-def videoalign_position(config,
-                  input_ids,
-                  image_grid_thw=None,
-                  video_grid_thw=None,
-                  attention_mask=None,
-                  **kwargs):
-    position_ids, rope_deltas = qwen2vl_get_rope_index(config, input_ids, image_grid_thw, video_grid_thw,
-                                     kwargs.get('second_per_grid_ts', None), attention_mask=None)
     return position_ids, rope_deltas
 
 
@@ -993,10 +982,15 @@ def _build_attentionmask_positionid_qwenllm(config, input_ids, attention_mask, i
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
     
     # if context parallel is enabled, we do not need to build attention mask, it is already handled by the context parallel algorithm
-    if get_args().context_parallel_size > 1 and get_args().context_parallel_algo == "megatron_cp_algo":
+    args = get_args()
+    if args.context_parallel_size > 1 and args.context_parallel_algo == "megatron_cp_algo":
         attention_mask = None
         return attention_mask, position_ids
-    
+    elif getattr(args.mm.model.text_decoder, 'use_remove_padding', False) and config.use_flash_attn:
+        from mindspeed.core.transformer.flash_attention.generate_mask.generate_mask import get_attention_mask
+        attention_mask = get_attention_mask(config)
+        return attention_mask, position_ids
+
     seq_len = input_ids.shape[1]
     past_seen_token = 0
     cache_position = kwargs.get('cache_position', None)
@@ -1157,6 +1151,7 @@ attention_mask_list = {'qwen2lm': partial(_build_attentionmask_positionid_qwenll
                        'qwen3_lm': partial(_build_attentionmask_positionid_qwenllm, pos_func=qwen2_5_position),
                        'qwen2_5_omni_thinker': partial(_build_attentionmask_positionid_qwenllm, pos_func=qwen2_5_omni_position),
                        'glm4v_lm': partial(_build_attentionmask_positionid_glm4v, pos_func=glm_position),
+                       'videoalign_lm': partial(_build_attentionmask_positionid_qwenllm, pos_func=qwen2_position),
                        }
 
 
@@ -1169,7 +1164,3 @@ def prepare_positionsids_mask_for_llm(config=None, input_ids=None, inference_par
                                                  attention_mask=attention_mask, position_ids=position_ids, **kwargs)
     else:
         raise AssertionError(f'the attention mask for llm is not build or model_id has error {llm_model_id}')
-
-
-def prepare_positionsids_mask_for_videoalign(config=None, input_ids=None, inference_params=None, attention_mask=None, position_ids=None, *args, **kwargs):
-    return partial(_build_attentionmask_positionid_qwenllm, pos_func=videoalign_position)(config=config, input_ids=input_ids, inference_params=inference_params, attention_mask=attention_mask, position_ids=position_ids, **kwargs)

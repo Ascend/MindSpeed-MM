@@ -11,8 +11,10 @@ from transformers import AutoProcessor
 from qwen_vl_utils import process_vision_info
 
 import mindspeed.megatron_adaptor
+from megatron.core.enums import ModelType
 from megatron.training import get_args
 from megatron.training.checkpointing import load_checkpoint
+from megatron.training.training import get_model
 from mindspeed_mm.utils.transformer_model_config import get_model_config
 from mindspeed_mm.tasks.inference.pipeline.pipeline_mixin.generation_mixin import GenerationMixin
 from mindspeed_mm.models.text_encoder import Tokenizer
@@ -33,17 +35,20 @@ class VideoAlignPipeline(GenerationMixin):
 
         self.video_reader, self.video_processor, self.tokenizer, self.processor, self.model_args = reward_setting_processor(
             model_preprocess_params)
-        self.model = self.model_provider()
-        load_checkpoint([self.model], None, None, 'load')
 
-        self.model = self.model.to(self.device, self.dtype)
+        model_type = ModelType.encoder_or_decoder
+        self.model = get_model(self.model_provider, model_type, wrap_with_ddp=False)
 
-    def model_provider(self):
+        load_checkpoint(self.model, None, None, strict=True)
+
+        self.model = self.model[0].to(self.device, self.dtype)
+
+    def model_provider(self, pre_process=True, post_process=True):
         """Builds the model."""
         vlm_config = deepcopy(self.model_config)
 
-        vlm_config.pre_process = True
-        vlm_config.post_process = True
+        vlm_config.pre_process = pre_process
+        vlm_config.post_process = post_process
         vlm_config.reward_process = True
 
         if vlm_config.image_encoder and vlm_config.text_decoder:
@@ -52,7 +57,9 @@ class VideoAlignPipeline(GenerationMixin):
             vlm_config.text_decoder = get_model_config(vlm_config.text_decoder)
 
         model = Qwen2VLRewardModelBT(config=vlm_config, extra_config=self.model_args)
-        model.freeze(freeze_image_encoder=True, freeze_image_projection=True, freeze_text_decoder=True)
+        model.freeze(freeze_image_encoder=getattr(vlm_config.image_encoder.vision_encoder, 'freeze', False),
+                     freeze_image_projection=getattr(vlm_config.image_encoder.vision_projector, 'freeze', False),
+                     freeze_text_decoder=getattr(vlm_config.text_decoder, 'freeze', False))
         return model
 
     def _norm(self, reward):
@@ -88,7 +95,7 @@ class VideoAlignPipeline(GenerationMixin):
 
     def _prepare_inputs(self, inputs):
         """
-        Prepare `inputs` before HH them to the model, converting them to tensors if they are not already and
+        Prepare `inputs` before feeding them to the model, converting them to tensors if they are not already and
         handling potential state.
         """
         inputs = self._prepare_input(inputs)

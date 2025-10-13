@@ -119,12 +119,17 @@ def model_provider_func_wrapper(model_provider_func):
                     for p in _moudle.parameters():
                         p.requires_grad = requires_grad
                 if isinstance(model.model, mindspeed_mm.models.reward_model.Qwen2VLRewardModelBT):
-                    if text_config and 'text_decoder' not in lora_apply_modules:
-                        set_requires_grad(model.model.text_decoder)
+                    if text_config:
+                        if 'text_decoder' not in lora_apply_modules:
+                            set_requires_grad(model.model.text_decoder, not getattr(text_config, 'freeze', False))
+                        elif getattr(text_config, "word_embeddings_training", False):
+                            set_requires_grad(model.model.text_decoder.embedding.word_embeddings,
+                                              not getattr(text_config, 'freeze', False))
                     if vis_config and 'vision_encoder' not in lora_apply_modules:
                         set_requires_grad(model.model.image_encoder.encoder, not getattr(vis_config, 'freeze', False))
                     if projector_config and 'vision_projector' not in lora_apply_modules:
-                        set_requires_grad(model.model.image_encoder.projector, not getattr(projector_config, 'freeze', False))
+                        set_requires_grad(model.model.image_encoder.projector,
+                                          not getattr(projector_config, 'freeze', False))
                     if 'rm_head' not in lora_apply_modules:
                         set_requires_grad(model.model.rm_head, True)
 

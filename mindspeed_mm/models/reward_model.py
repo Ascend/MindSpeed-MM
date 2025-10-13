@@ -10,7 +10,7 @@ from megatron.core import tensor_parallel
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_region
 
-from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positionsids_mask_for_videoalign
+from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positionsids_mask_for_llm
 from mindspeed_mm.models.vlm_model import VLMModel
 
 
@@ -48,7 +48,7 @@ class Qwen2VLRewardModelBT(VLMModel):
     ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
         if self.add_image_encoder and pixel_values is not None:
             pixel_values = pixel_values.to(self.loss_dtype)
-            vit_embeds = self.image_encoder(pixel_values, image_grid_thw)
+            vit_embeds = self.image_encoder(pixel_values, image_grid_thw).to(pixel_values.dtype)
 
             if image_flags is not None:
                 if self.image_encoder.post_process:
@@ -75,19 +75,17 @@ class Qwen2VLRewardModelBT(VLMModel):
                     input_embeds = input_embeds.masked_scatter(image_mask, vit_embeds)
                     input_embeds = input_embeds.transpose(0, 1).clone()
 
-            attention_mask_, position_ids = prepare_positionsids_mask_for_videoalign(config=self.config,
-                                                                                    input_ids=input_ids,
-                                                                                    inference_params=inference_params,
-                                                                                    attention_mask=attention_mask,
-                                                                                    position_ids=position_ids,
-                                                                                    image_grid_thw=None,
-                                                                                    rope_deltas=rope_deltas,
-                                                                                    inputs_embeds=input_embeds,
-                                                                                    cache_position=cache_position,
-                                                                                    **kwargs)
+            attention_mask, position_ids = prepare_positionsids_mask_for_llm(config=self.config,
+                                                                             input_ids=input_ids,
+                                                                             inference_params=inference_params,
+                                                                             attention_mask=None if self.use_remove_padding else attention_mask,
+                                                                             position_ids=position_ids,
+                                                                             image_grid_thw=None,
+                                                                             rope_deltas=rope_deltas,
+                                                                             inputs_embeds=input_embeds,
+                                                                             cache_position=cache_position,
+                                                                             **kwargs)
 
-            if not self.use_remove_padding:
-                attention_mask = attention_mask_
 
             output = self.text_decoder(
                 input_ids=input_ids,
@@ -104,7 +102,7 @@ class Qwen2VLRewardModelBT(VLMModel):
             if input_ids is not None:
                 batch_size = input_ids.shape[0]
             else:
-                batch_size = inputs_embeds.shape[0]
+                batch_size = input_embeds.shape[0]
 
             ## get sequence length
             if self.pad_token_id is None and batch_size != 1:

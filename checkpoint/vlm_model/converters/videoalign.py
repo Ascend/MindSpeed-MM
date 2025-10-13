@@ -21,7 +21,7 @@ text_schema = PPStageSchema(
 )
 
 
-def create_videoalign_ops(new_transformers_weight_key: bool, megatron_model: bool, model_prefix: str, resize_vocab_size: int,
+def create_videoalign_ops(new_transformers_weight_key: bool, enable_canonical_hf_struct: bool, model_prefix: str, resize_vocab_size: int,
                           vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups: int, llm_q_size: int, llm_kv_size: int) -> List[Operator]:
     """videoalign权重转换逻辑"""
     model_prefix_name = model_prefix if model_prefix else ""
@@ -71,7 +71,7 @@ def create_videoalign_ops(new_transformers_weight_key: bool, megatron_model: boo
         ),
     ]
 
-    if megatron_model:
+    if not enable_canonical_hf_struct:
         relocate_ops = [
             RelocateOp(name=fr"{model_prefix_name}{transformers_visual_model_name}blocks.(\d+).attn.qkv.weight",
                        new_name=fr"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight",
@@ -170,7 +170,7 @@ megatron_videoalign_tp_patterns = {
     r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowSplit
 }
 
-canonical_videoalign_tp_patterns = {
+canonical_hf_videoalign_tp_patterns = {
     r'text_decoder.decoder.layers.(\d+).self_attention.q_proj.weight': RowSplit,
     r'text_decoder.decoder.layers.(\d+).self_attention.k_proj.weight': RowSplit,
     r'text_decoder.decoder.layers.(\d+).self_attention.v_proj.weight': RowSplit,
@@ -186,8 +186,8 @@ class ModelConfigVideoAlign(CommonModelConfig):
     new_transformers_weight_key: Optional[bool] = None
     """是否使用新transformers版本下的模型权重名"""
 
-    megatron_model: Optional[bool] = True
-    """是否使用megatron标准模型结构"""
+    enable_canonical_hf_struct: Optional[bool] = False
+    """是否使用标准huggingface模型结构"""
 
     model_prefix: Optional[str] = None
     """模型权重名包含额外前缀"""
@@ -219,7 +219,7 @@ class VideoAlignConverter(Converter):
         llm_q_size = llm_head_hidden_size * hf_config.num_attention_heads // hf_config.num_key_value_heads
         llm_kv_size = llm_head_hidden_size
         ops = create_videoalign_ops(common_model_config.new_transformers_weight_key,
-                                    common_model_config.megatron_model,
+                                    common_model_config.enable_canonical_hf_struct,
                                     common_model_config.model_prefix,
                                     common_model_config.resize_vocab_size,
                                     hf_config.vision_config.embed_dim,
@@ -234,10 +234,10 @@ class VideoAlignConverter(Converter):
     def hf_to_mm(cfg: ConvertVppMMConfigVideoAlign):
         """huggingface模型转换mindspeed mm模型权重"""
         ops = VideoAlignConverter._create_ops(cfg.hf_config.config, cfg.common_model_config)
-        if cfg.common_model_config.megatron_model:
+        if not cfg.common_model_config.enable_canonical_hf_struct:
             videoalign_tp_patterns.update(megatron_videoalign_tp_patterns)
         else:
-            videoalign_tp_patterns.update(canonical_videoalign_tp_patterns)
+            videoalign_tp_patterns.update(canonical_hf_videoalign_tp_patterns)
         convert_hf_to_mm(cfg, ops, videoalign_tp_patterns, [vision_schema, text_schema])
         # 安全管控权限
         set_directory_permissions(cfg.mm_dir)
@@ -246,10 +246,10 @@ class VideoAlignConverter(Converter):
     def mm_to_hf(cfg: ConvertHFConfig):
         """mindspeed mm模型转换huggingface模型权重"""
         ops = VideoAlignConverter._create_ops(cfg.hf_config.config)
-        if cfg.common_model_config.megatron_model:
+        if not cfg.common_model_config.enable_canonical_hf_struct:
             videoalign_tp_patterns.update(megatron_videoalign_tp_patterns)
         else:
-            videoalign_tp_patterns.update(canonical_videoalign_tp_patterns)
+            videoalign_tp_patterns.update(canonical_hf_videoalign_tp_patterns)
         convert_mm_to_hf(cfg, ops, videoalign_tp_patterns)
         # 安全管控权限
         set_directory_permissions(cfg.save_hf_dir)

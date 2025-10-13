@@ -31,7 +31,10 @@
             "activation_func": "quick_gelu",
             "use_fused_rotary_pos_emb": false,
             "post_layer_norm": false,
-            "pipeline_num_layers": [32]
+            "pipeline_num_layers": [32],
+            "recompute_granularity": "full",
+            "recompute_method": "block",
+            "recompute_num_layers": 12
         },
         "vision_projector": {
             "model_id": "lnmlp",

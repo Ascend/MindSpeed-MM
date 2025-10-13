@@ -99,7 +99,7 @@ LORA_ARGS="
     --lora-r 64 \
     --lora-alpha 128 \
     --lora-dropout 0 \
-    --lora-target-modules linear_qkv linear_proj linear_fc1 linear_fc2 \
+    --lora-target-modules linear_proj linear_fc2 q_proj k_proj v_proj gate_proj up_proj \
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)

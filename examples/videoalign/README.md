@@ -82,7 +82,7 @@ mkdir logs data ckpt
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
-git checkout 6d63944cb2470a0bebc38dfb65299b91329b8d92
+git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
 # 安装mindspeed及依赖
 pip install -e .
 cd ..
@@ -115,17 +115,18 @@ pip install peft==0.10.0
 
 MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重到MindSpeed-MM权重的转换。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 
-| 参数 | 含义及用法                                                                                                                                                                                                                                      |
-| --- |--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|mm_dir| 转换后保存目录                                                                                                                                                                                                                                    |
-|hf_dir| huggingface权重目录                                                                                                                                                                                                                            |
-|pt_path| videoalign模型 .pth格式路径                                                                                                                                                                                                                      |
-|llm_pp_layers| llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致                                                                                                                                                                                      |
-|vit_pp_layers| vit在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致                                                                                                                                                                                      |
-|tp_size| tp并行数量，注意要和微调启动脚本中的配置一致                                                                                                                                                                                                                    |
-|resize_vocab_size| 采用评测指标tokens后的vocab_size<br>会根据vocab_siz变化对Qwen2-VL-2B模型embed_tokens.weight层权重进行resize<br>['VQ', 'MQ', 'TA']打分指标对应vocab_size为151660                                                                                                        |
-|model_prefix| 消除huggingface中VideoAlign权重里因peft包裹产生的前缀（"base_model.model."）                                                                                                                                                                               |
-|new_transformers_weight_key| 是否使用新Qwen2VL权重名的huggingface权重<br>若huggface的权重名为transformers新权重名：model.language_model.layers.xx, model.visual.blocks.xx（原来权重名为：model.layers.xx, visual.blocks.xx）, 设置如下命令：<br>--cfg.common_model_config.new_transformers_weight_key true \  |
+| 参数 | 含义及用法                                                                                                                                                                                                                                     |
+| --- |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|mm_dir| 转换后保存目录                                                                                                                                                                                                                                   |
+|hf_dir| huggingface权重目录                                                                                                                                                                                                                           |
+|pt_path| videoalign模型 .pth格式路径                                                                                                                                                                                                                     |
+|llm_pp_layers| llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致                                                                                                                                                                                     |
+|vit_pp_layers| vit在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致                                                                                                                                                                                     |
+|tp_size| tp并行数量，注意要和微调启动脚本中的配置一致                                                                                                                                                                                                                   |
+|resize_vocab_size| 采用评测指标tokens后的vocab_size<br>会根据vocab_siz变化对Qwen2-VL-2B模型embed_tokens.weight层权重进行resize<br>['VQ', 'MQ', 'TA']打分指标对应vocab_size为151660                                                                                                       |
+|model_prefix| 消除huggingface中VideoAlign权重里因peft包裹产生的前缀（"base_model.model."）                                                                                                                                                                              |
+|new_transformers_weight_key| 是否使用新Qwen2VL权重名的huggingface权重<br>若huggface的权重名为transformers新权重名：model.language_model.layers.xx, model.visual.blocks.xx（原来权重名为：model.layers.xx, visual.blocks.xx）, 设置如下命令：<br>--cfg.common_model_config.new_transformers_weight_key true \ |
+|enable_canonical_hf_struct| MM权重是否使用标准huggingface模型结构。true: 使用huggingface的transformers模型结构；false: 使用megatron原生模型结构。默认为false，启用lora微调时建议开启                                                                                                                             |
 
 
 ```bash
@@ -136,7 +137,8 @@ mm-convert  VideoAlignConverter hf_to_mm \
   --cfg.parallel_config.llm_pp_layers [[28]] \
   --cfg.parallel_config.vit_pp_layers [[32]] \
   --cfg.parallel_config.tp_size 1 \
-  --cfg.common_model_config.resize_vocab_size 151660
+  --cfg.common_model_config.resize_vocab_size 151660 \
+  --cfg.enable_canonical_hf_struct true
 
 # VideoAlign权重转mm用于微调/推理/评测
 mm-convert  VideoAlignConverter hf_to_mm \
@@ -146,7 +148,8 @@ mm-convert  VideoAlignConverter hf_to_mm \
   --cfg.parallel_config.llm_pp_layers [[28]] \
   --cfg.parallel_config.vit_pp_layers [[32]] \
   --cfg.parallel_config.tp_size 1 \
-  --cfg.common_model_config.model_prefix "base_model.model."
+  --cfg.common_model_config.model_prefix "base_model.model." \
+  --cfg.enable_canonical_hf_struct true
 
 ```
 
@@ -255,6 +258,62 @@ LOAD_PATH="ckpt/mm_path/VideoReward"
 ```
 
 注：默认配置image-encoder全参训练，text-decoder采用lora微调的混合训练方式，否则容易出现显存不足
+
+【vit模块重计算配置（可选）】
+
+当放开vit训练时（默认配置中冻结vit，若要放开请将model.json文件中`vision_encoder`部分配置为`"vision_encoder": {"freeze": false}`。），可以启用重计算以降低显存（注意，此举会对性能产生影响）
+
+若要开启vit重计算，需在model.json中的vision_encoder部分添加重计算相关参数。
+通过`recompute_granularity`参数可以配置重计算模块为`full`或`selective`。
+
+1. full模式
+
+TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重计算，此时可以配置重计算的层数。
+- `recompute_method`: 控制重计算层数计算的方法，可选值为`uniform`（均匀重计算）或`block`（按块重计算）。
+- `recompute_num_layers`: 控制重计算的层数，指定需要重计算的层数量。
+
+示例配置如下：
+
+```json
+{
+  "model_id": "videoalign",
+  "img_context_token_id": 151656,
+  "video_token_id": 151656,
+  "vision_start_token_id": 151652,
+  ...
+  "image_encoder": {
+    "vision_encoder": {
+      ...
+      "recompute_granularity": "full",
+      "recompute_method": "uniform",
+      "recompute_num_layers": 1
+    }
+  },
+  ...
+}
+```
+2. selective模式
+
+仅对TransformerLayer中attention的core_attention组件进行重计算。注意：lora场景无法使用。
+
+示例配置如下：
+
+```json
+{
+  "model_id": "videoalign",
+  "img_context_token_id": 151656,
+  "video_token_id": 151656,
+  "vision_start_token_id": 151652,
+  ...
+  "image_encoder": {
+    "vision_encoder": {
+      ...
+      "recompute_granularity": "selective"
+    }
+  },
+  ...
+}
+```
 
 【模型保存加载及日志信息配置】
 
