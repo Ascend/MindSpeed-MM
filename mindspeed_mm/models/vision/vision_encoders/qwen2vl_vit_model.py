@@ -562,16 +562,14 @@ class Qwen2VLViT(MultiModalModule):
             rotary_pos_emb = split_forward_gather_backward(
                 rotary_pos_emb,
                 mpu.get_context_parallel_group(),
-                0,
-                split_gather_sizes,
-                "down"
+                dim=0,
+                split_sizes=split_gather_sizes
             )
             hidden_states = split_forward_gather_backward(
                 hidden_states,
                 mpu.get_context_parallel_group(),
                 0,
-                split_gather_sizes,
-                "down"
+                split_sizes=split_gather_sizes,
             )
 
             if hasattr(self.config, "use_vit_dp") and self.config.use_vit_dp:
