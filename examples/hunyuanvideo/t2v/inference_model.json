@@ -73,6 +73,8 @@
         "patch_size": [1, 2, 2], 
         "in_channels": 16,
         "out_channels": 16,
+        "num_heads": 24,
+        "head_dim": 128,
         "mlp_width_ratio": 4,
         "mlp_act_type": "gelu_tanh",
         "mm_double_blocks_depth": 20,
