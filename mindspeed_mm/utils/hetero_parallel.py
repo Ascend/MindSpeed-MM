@@ -114,7 +114,8 @@ def initial_modules_mpu(reuse_module, args):
     if is_initialized:
         _ParallelStatesDict[reuse_module] = {}
         state_snapshot = {
-            k: v for k, v in vars((mpu)).items()
+            k: v
+            for k, v in vars((mpu)).items()
             if k.startswith('_') and not k.startswith('__') and not inspect.isfunction(v)
         }
         _ParallelStatesDict[reuse_module].update(state_snapshot)
@@ -142,7 +143,8 @@ def initial_modules_mpu(reuse_module, args):
                 order="tp-cp-ep-dp-pp")
 
         state_snapshot = {
-            k: v for k, v in vars((mpu)).items()
+            k: v
+            for k, v in vars((mpu)).items()
             if k.startswith('_') and not k.startswith('__') and not inspect.isfunction(v)
         }
         _ParallelStatesDict[module].update(state_snapshot)
