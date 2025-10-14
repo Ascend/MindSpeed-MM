@@ -636,4 +636,10 @@ class VLMModel(MultiModalModule):
                             "loss_dict": loss_dict,
                             "logits": output
                         }
+                
+                return {
+                    "loss": None,
+                    "logits": output
+                }
+            
         return output
