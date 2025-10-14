@@ -413,7 +413,7 @@ mm-convert  Qwen2_5_OmniConverter hf_to_mm \
   --cfg.parallel_config.audio_pp_layers [[32]] \
   --cfg.parallel_config.tp_size 4 \
   --cfg.parallel_config.vit_tp_size 1 \
-  --cfg.parallel_config.audio_tp_layers 1
+  --cfg.parallel_config.audio_tp_size 1
 
 # 其中：
 # mm_dir: 转换后保存目录
@@ -423,7 +423,7 @@ mm-convert  Qwen2_5_OmniConverter hf_to_mm \
 # audio_pp_layers: audio在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 # tp_size: 默认tp并行数量，注意要和微调启动脚本中的配置一致
 # vit_tp_size: vit的tp并行数量，不配置时vit使用默认的tp并行数量
-# audio_tp_layers: audio的tp并行数量，不配置时vit使用默认的tp并行数量
+# audio_tp_size: audio的tp并行数量，不配置时vit使用默认的tp并行数量
 ```
 
 <a id="jump5.2"></a>

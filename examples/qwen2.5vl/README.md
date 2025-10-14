@@ -536,7 +536,7 @@ bash examples/qwen2.5vl/inference_qwen2_5_vl_7b.sh
 ```
 "img_context_token_id": 151656
 ```
-注意， `image_token_id` 和 `img_context_token_id`两个参数作用不一样。前者是固定的，是标识图片的 token ID，在qwen2_5_vl_get_rope_index中用于计算图文输入情况下序列中的图片数量。后者是标识视觉内容的 token ID，用于在forward中标记视觉token的位置，所以需要根据输入做相应修改。
+说明：img_context_token_id 是标识视觉内容的 token ID，用于在forward中标记视觉token的位置，所以需要根据输入做相应修改。
 
 <a id="jump6.3"></a>
 ### 3、启动微调
