@@ -419,6 +419,14 @@ def train(
     prof = Profiler(args.mm.tool.profile)
     prof.start()
 
+    curr_step_lr = None
+    curr_step_dlr = None
+    for param_group in optimizer.param_groups:
+        if param_group["is_decoupled_lr"]:
+            curr_step_dlr = param_group["lr"]
+        else:
+            curr_step_lr = param_group["lr"]
+
     while iteration < args.train_iters:
         memory_profiler.step()
         # Update number of microbatches first without consistency check to decide if a
@@ -472,18 +480,11 @@ def train(
         if iteration % args.log_interval == 0:
             track_e2e_metrics()
 
-        learning_rate = None
-        decoupled_learning_rate = None
-        for param_group in optimizer.param_groups:
-            if param_group["is_decoupled_lr"]:
-                decoupled_learning_rate = param_group["lr"]
-            else:
-                learning_rate = param_group["lr"]
         report_memory_flag = training_log(
             loss_dict,
             total_loss_dict,
-            learning_rate,
-            decoupled_learning_rate,
+            curr_step_lr,
+            curr_step_dlr,
             iteration,
             loss_scale,
             report_memory_flag,
@@ -492,6 +493,11 @@ def train(
             params_norm,
             num_zeros_in_grad,
         )
+        for param_group in optimizer.param_groups:
+            if param_group["is_decoupled_lr"]:
+                curr_step_dlr = param_group["lr"]
+            else:
+                curr_step_lr = param_group["lr"]
 
         # Autoresume
         if args.adlr_autoresume and (iteration % args.adlr_autoresume_interval == 0):
