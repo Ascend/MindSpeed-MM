@@ -110,9 +110,9 @@ pip install -v -e .
 cd ..
 
 # 安装三方库
-pip install transformers==4.52.4 mathruler==0.1.0 decorator qwen-vl-utils==0.0.11 viztracer
+pip install transformers==4.52.4 mathruler==0.1.0 decorator qwen-vl-utils==0.0.11 viztracer cloudpickle==2.1.0
 # for x86 machine [Optional]
-# pip install transformers==4.52.4 mathruler==0.1.0 decorator qwen-vl-utils==0.0.11 viztracer --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
+# pip install transformers==4.52.4 mathruler==0.1.0 decorator qwen-vl-utils==0.0.11 viztracer cloudpickle==2.1.0 --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 
 # 因安装环境可能导致覆盖，需重新安装torch_npu
 pip install torch_npu-2.5.1*.manylinux2014_*.whl
