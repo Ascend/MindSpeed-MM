@@ -5,8 +5,8 @@
 更多细节请[参考](../../examples/mindspore/qwen2.5vl)
 ### 1. 环境安装
 #### 1.1 昇腾软件安装
-昇腾环境安装请参考[MindSpore后端安装指南](./install_guide.md)。
-(基于python3.10)
+基于Python3.10版本，昇腾环境安装请参考[MindSpore后端安装指南](./install_guide.md)。
+
 
 针对MindSpeed MindSpore后端，昇腾社区提供了一键转换工具MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在华为MindSpore+CANN环境下一键拉起模型训练。在进行一键转换前，用户需要拉取相关的代码仓以及进行环境搭建：
 
@@ -94,12 +94,12 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-7B-Instruct"
 
 ### 3. 数据集准备及处理
 #### 3.1 数据集下载(以coco2017数据集为例)
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中;
+(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下;
+(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
 
 #### 3.2 数据集处理
-运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py;
+运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py。
 
    ```
    $playground
@@ -189,7 +189,7 @@ $save_dir
 
 【单机运行配置】
 
-配置`examples/mindspore/qwen2.5vl/finetune_qwen2_5_vl_7b.sh`参数如下
+配置`examples/mindspore/qwen2.5vl/finetune_qwen2_5_vl_7b.sh`参数如下。
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
