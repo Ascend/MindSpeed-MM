@@ -5,7 +5,7 @@ from tqdm import tqdm
 from checkpoint.common.converter import Converter
 from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.vlm_model import hf_to_mm, mm_to_hf
-from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
+from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig, ConvertTorchDCPConfig
 from checkpoint.vlm_model.converters.qwen2vl import create_qwen2vl_ops, qwen2vl_tp_patterns
 from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema, split_by_tp, merge_vpp_index, \
     partition_state_dict_by_pp, save_by_vpp
@@ -41,6 +41,16 @@ qwen2_5_vl_tp_patterns = {**qwen2vl_tp_patterns,
 
 class ConvertVppMMConfigQwen2_5(ConvertVppMMConfig):
 
+    def model_post_init(self, _context):
+        from transformers.models.qwen2_5_vl import Qwen2_5_VLConfig
+        config = cast(Qwen2_5_VLConfig, self.hf_config.config)
+        self.common_model_config.num_key_value_heads = config.num_key_value_heads
+        self.common_model_config.llm_num_layers = config.num_hidden_layers
+        self.common_model_config.vit_num_layers = config.vision_config.depth
+        self.common_model_config.tie_word_embeddings = config.tie_word_embeddings
+
+
+class ConvertTorchDCPMMConfigQwen2_5(ConvertTorchDCPConfig):
     def model_post_init(self, _context):
         from transformers.models.qwen2_5_vl import Qwen2_5_VLConfig
         config = cast(Qwen2_5_VLConfig, self.hf_config.config)
@@ -86,6 +96,13 @@ class Qwen2_5_VLConverter(Converter):
         mm_to_hf.convert_mm_to_hf(cfg, ops, qwen2_5_vl_tp_patterns)
         # 安全管控权限
         set_directory_permissions(cfg.save_hf_dir)
+
+    @staticmethod
+    def hf_to_mm_dcp(cfg: ConvertTorchDCPMMConfigQwen2_5):
+        ops = Qwen2_5_VLConverter._create_ops(cfg.hf_config.config)
+        hf_to_mm.convert_hf_to_mm_dcp(cfg, ops)
+        # set directory permission for security control 
+        set_directory_permissions(cfg.mm_dir)
 
     @staticmethod
     def resplit(cfg: ConvertResplitConfig):

@@ -285,6 +285,20 @@ class ConvertVppMMConfig(BaseModel):
                 raise AssertionError(f'Sum of audio_pipeline_num_layers_flat must be equal to audio_num_layers, '
                                      f'but got {sum(audio_pipeline_num_layers_flat)} and {self.common_model_config.audio_num_layers}.')
         return self
+    
+
+class ConvertTorchDCPConfig(BaseModel):
+    """Config for convert huggingface ckpt to mindspeed-mm torch dcp ckpt"""
+
+    mm_dir: Path
+
+    hf_config: HfConfig
+
+    # trust_remote_code default false, user need to set true when use
+    trust_remote_code: bool = False
+
+    # common config
+    common_model_config: CommonModelConfig = CommonModelConfig()
 
 
 def get_first_available(

@@ -47,12 +47,14 @@ from typing import Callable, Any, List, Dict, Optional, Union, Tuple
 
 import numpy as np
 import torch
+from torch.distributed.checkpoint.state_dict_saver import _save_state_dict
+from torch.distributed.checkpoint import FileSystemWriter
 from safetensors.torch import load_file
 from tqdm import tqdm
 
 from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME, IMAGE_ENCODER, AUDIO_ENCODER, TEXT_DECODER
 from checkpoint.common.types import STATE_DICT_T, VPP_LAYER_NUM_T
-from checkpoint.vlm_model.config import ConvertVppMMConfig
+from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertTorchDCPConfig
 from checkpoint.vlm_model.operator import Operator, TieOp, TP_PATTERN_T
 
 
@@ -170,6 +172,23 @@ def save_by_vpp(state_dicts: List[Dict[str, torch.Tensor]],
         # 用于规避megatron对checkpoint_version的校验
         save_dict[CHECKPOINT_VERSION_KEY] = CHECKPOINT_VERSION_VALUE
         torch.save(save_dict, save_path.joinpath(MEGATRON_CKPT_NAME))
+    save_root_dir.joinpath(LATEST_TXT).write_text(str(iteration))
+
+
+def save_by_dcp(state_dicts: List[Dict[str, torch.Tensor]],
+                save_root_dir: Path,
+                iteration: Optional[Union[str, int]] = 'release'):
+
+    iter_name = iteration if isinstance(iteration, str) else f"iter_{iteration:07d}"
+    save_path = save_root_dir.joinpath(iter_name)
+    save_path.mkdir(exist_ok=True, parents=True)
+    save_dict = {
+        'model': state_dicts,
+        'checkpoint_version': CHECKPOINT_VERSION_VALUE
+    }
+    _save_state_dict(
+        save_dict, storage_writer=FileSystemWriter(save_path), no_dist=True
+    )
     save_root_dir.joinpath(LATEST_TXT).write_text(str(iteration))
 
 
@@ -363,3 +382,18 @@ def convert_hf_to_mm(convert_config: ConvertVppMMConfig, ops: List[Operator], tp
             save_by_vpp(pp_state_dicts, convert_config.mm_dir,
                         pp_and_vpp_size=(parallel_config.pp_size, parallel_config.vpp_size),
                         ep_size=parallel_config.ep_size, ep_rank=ep_rank, tp_rank=tp_rank)
+
+
+def convert_hf_to_mm_dcp(convert_config: ConvertTorchDCPConfig, ops: List[Operator]):
+    # load state dict from huggingface
+    state_dict = load_from_hf(convert_config.hf_config.hf_dir)
+
+    # load llm weight and merge to state_dict
+    if convert_config.common_model_config.llm_hf_dir is not None:
+        llm_state_dict = load_from_hf(convert_config.common_model_config.llm_hf_dir)
+        state_dict = merge_llm_weights_to_state_dict(state_dict, llm_state_dict)
+
+    # format and merge ckpt
+    state_dict = convert(state_dict, ops, convert_config.common_model_config.tie_word_embeddings, is_pp=False)
+
+    save_by_dcp(state_dict, convert_config.mm_dir)
