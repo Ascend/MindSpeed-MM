@@ -55,12 +55,12 @@ pip install -e .
 
 从Huggingface库下载对应的模型权重:
 
-- 模型地址: [Qwen2.5-VL-3B](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct/tree/main)；
+模型地址: [Qwen2.5-VL-3B](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct/tree/main)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-3B-Instruct`目录下。
 
 #### 2.2 权重转换
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分，详情参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
 
 以下是hf2mm的转换示例：
 ```bash
@@ -110,10 +110,10 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 #### 3.1 数据集下载(以coco2017数据集为例)
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
 
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下;
+(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下
 
 #### 3.2 数据集处理
-运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py;
+运行数据转换脚本Python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py
 
    ```
    $playground
@@ -195,7 +195,7 @@ OUTPUT_ARGS="
 
 【单机运行配置】
 
-配置`examples/qwen2.5vl/finetune_qwen2_5_vl_3b.sh`参数如下
+配置`examples/qwen2.5vl/finetune_qwen2_5_vl_3b.sh`参数如下所示。
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
@@ -396,7 +396,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
 #### 5.2 参数配置
 
-检查模型权重路径、并行参数配置等是否完成
+检查模型权重路径、并行参数配置等是否完成。
 
 | 配置文件   |      修改字段       | 修改说明      |
 | --- | :---: | :--- |
@@ -411,7 +411,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
 
 #### 5.3 启动训练
- * feature_data.json中修改tokenizer权重路径
+feature_data.json中修改tokenizer权重路径
 
 ```bash
 bash examples/wan2.1/1.3b/t2v/pretrain.sh

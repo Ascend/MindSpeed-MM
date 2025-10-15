@@ -86,7 +86,7 @@ bitsandbytes已支持在昇腾上进行安装，具体可单击[Supported Backen
 
 使能说明
 
-该特性可以通过环境变量设置，一般用于以下场景：host-bound严重的网络场景。
+该特性可以通过环境变量设置，一般用于host-bound严重的网络场景。
 
 使用方法如下：
 ```
@@ -115,7 +115,7 @@ mode=1时此项设置生效，mode=1时可以缺省该项。
 支持部分NPU卡自定义绑核。
 例如，有两张卡npu0和npu1，对于设置
 ```
-CPU_AFFINITY_CONF=1,npu0:0-0
+export CPU_AFFINITY_CONF=1,npu0:0-0
 ```
 绑核策略中0卡会被覆写为绑定0核，而1卡则保持mode=1的绑核策略。
 
@@ -123,20 +123,20 @@ CPU_AFFINITY_CONF=1,npu0:0-0
 
 **融合算子**
 当前已支持如下算子：
-[rms_norm融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/rms_norm.md)
-[swiglu融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swiglu.md)
-[Rotary Position Embedding 融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/rotary-embedding.md)
-[flash attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/flash-attention.md)
+- [rms_norm融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/rms_norm.md)
+- [swiglu融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swiglu.md)
+- [Rotary Position Embedding 融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/rotary-embedding.md)
+- [flash attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/flash-attention.md)
 
 **内存优化**
 通过高效的device内存运用，能够更好发挥选择性重计算等方法：
-[激活函数重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/activation-function-recompute.md)
-[Swap-attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swap_attention.md)
-[Norm重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/norm-recompute.md)
+- [激活函数重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/activation-function-recompute.md)
+- [Swap-attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swap_attention.md)
+- [Norm重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/norm-recompute.md)
 
 ### 通信优化          
 当前主要支持DP域的计算通信并行掩盖：
-[Megatron 权重更新通信隐藏](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/async-ddp-param-gather.md)
+[Megatron 权重更新通信隐藏](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/async-ddp-param-gather.md)。
 
 ## 模型训练
 此处以Qwen2VL 7B模型为例，对MindSpeed MM训练进行介绍。
@@ -186,8 +186,9 @@ pip install -e .
 
 从Huggingface库下载对应的模型权重:
 
-- 模型地址: [Qwen2-VL-7B](https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct/tree/main)；
- 将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2-VL-*B-Instruct`目录下。(*表示对应的尺寸)
+模型地址: [Qwen2-VL-7B](https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct/tree/main)，
+将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2-VL-*B-Instruct`目录下。
+注意：(*表示对应的尺寸)。
 
 #### 2. 权重转换(hf2mm)
 
@@ -228,11 +229,11 @@ mm-convert  Qwen2VLConverter mm_to_hf \
 ### 数据集准备
 **以coco2017数据集为例**
 
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
+(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下;
+(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
 
-(3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py;
+(3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py。
 
    ```
    $playground
@@ -257,11 +258,11 @@ dataset_param->basic_parameters->dataset
 
 **配置参数**
 
-根据实际情况修改examples/qwen2vl/data_7b.json和examples/qwen2vl/finetune_qwen2vl_7b.sh中的路径配置，包括tokenizer的加载路径from_pretrained、以及图片处理器的路径image_processer_path。需注意
+根据自己实际情况修改examples/qwen2vl/data_7b.json和examples/qwen2vl/finetune_qwen2vl_7b.sh中的路径配置，包括tokenizer的加载路径from_pretrained、以及图片处理器的路径image_processer_path。
+在实际操作过程中请注意以下两点：
+- tokenizer/from_pretrained配置的路径为从huggingface下载的原始Qwen2-VL-7B-Instruct路径。
 
-（1）tokenizer/from_pretrained配置的路径为从huggingface下载的原始Qwen2-VL-7B-Instruct路径。
-
-（2）shell文件中的LOAD_PATH的路径为经过权重转换后的模型路径(可PP切分)。
+- shell文件中的LOAD_PATH的路径为经过权重转换后的模型路径(可PP切分)。
 
 **单机启动**
 在单机场景下，直接使能仓上默认脚本即可：
