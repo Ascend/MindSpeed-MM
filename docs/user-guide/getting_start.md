@@ -108,12 +108,12 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 
 ### 3. 数据集准备及处理
 #### 3.1 数据集下载(以coco2017数据集为例)
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
+(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下
+(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
 
 #### 3.2 数据集处理
-运行数据转换脚本Python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py
+运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
 
    ```
    $playground
@@ -205,6 +205,21 @@ MASTER_ADDR=localhost
 MASTER_PORT=29501
 NNODES=1
 NODE_RANK=0
+WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
+```
+
+【多机运行配置】
+
+配置`examples/qwen2.5vl/finetune_qwen2_5_vl_3b.sh`参数如下
+
+```shell
+# 根据实际情况修改 ascend-toolkit 路径
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+NPUS_PER_NODE=8
+MASTER_ADDR=xx.xx.xx.xx  # 主节点IP
+MASTER_PORT=29501
+NNODES=N  # N为实际节点数
+NODE_RANK=i  # i为节点顺序编号，取值[0:N-1]
 WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```
 
@@ -376,8 +391,7 @@ python examples/wan2.1/convert_ckpt.py --source_path <path for your saved weight
 | examples/wan2.1/feature_extract/data.json |    from_pretrained    | 修改为下载的tokenizer权重所对应路径 |
 | examples/wan2.1/feature_extract/feature_extraction.sh  |     NPUS_PER_NODE     | 卡数                                                |
 | examples/wan2.1/feature_extract/model.json |    from_pretrained    | 修改为下载的权重所对应路径（包括vae, text_encoder） |
-| examples/wan2.1/feature_extract/tools.json             |       save_path       | 提取后的特征保存路径                                |
-| examples/wan2.1/feature_extract/tools.json | task | 修改为当前的任务类型t2v(可选的任务类型为t2v和i2v) |
+| mindspeed_mm/tools/tools.json                 |    save_path          | 提取后的特征保存路径                               |
 
 #### 4.4 启动特征提取
 * 修改`examples/wan2.1/feature_extract/data.txt`文件，其中每一行表示个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔。

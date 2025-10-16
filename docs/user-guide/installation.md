@@ -40,7 +40,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态。软件版本配套�
   </tr>
   <tr>
     <td>Python</td>
-    <td><a href="https://gitcode.com/Ascend/pytorch#pytorch%E4%B8%8Epython%E7%89%88%E6%9C%AC%E9%85%8D%E5%A5%97%E8%A1%A8">PT配套版本</a></td>
+    <td><a href="https://gitcode.com/Ascend/pytorch#pytorch%E4%B8%8Epython%E7%89%88%E6%9C%AC%E9%85%8D%E5%A5%97%E8%A1%A8">配套版本</a></td>
   </tr>
   <tr>
     <td>PyTorch</td>
@@ -54,7 +54,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态。软件版本配套�
 
 ### 2. 驱动固件安装
 
-下载[驱动固件](https://www.hiascend.com/hardware/firmware-drivers/community?product=4&model=26&cann=8.2.RC1&driver=Ascend+HDK+25.2.0)，请根据系统和硬件产品型号选择对应版本的`driver`和`firmware`。参考[安装NPU驱动固件](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/softwareinst/instg/instg_0003.html?Mode=PmIns&InstallType=local&OS=Debian&Software=cannToolKit)或执行以下命令安装：
+下载[驱动固件](https://www.hiascend.com/hardware/firmware-drivers/community?product=4&model=26&cann=8.2.RC1&driver=Ascend+HDK+25.2.0)，请根据系统和硬件产品型号选择对应版本的`driver`和`firmware`。参考[安装NPU驱动固件](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/softwareinst/instg/instg_0005.html?Mode=PmIns&InstallType=local&OS=Debian&Software=cannToolKit)或执行以下命令安装：
 
 ```shell
 bash Ascend-hdk-*-npu-driver_*.run --full --force
@@ -63,7 +63,7 @@ bash Ascend-hdk-*-npu-firmware_*.run --full
 
 ### 3. CANN安装
 
-下载[CANN](https://www.hiascend.com/developer/download/community/result?module=cann)，请根据根据系统选择`aarch64`或`x86_64`对应版本的`cann-toolkit`、`cann-kernel`和`cann-nnal`。参考[CANN安装](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/softwareinst/instg/instg_0003.html?Mode=PmIns&InstallType=local&OS=Debian&Software=cannToolKit)或执行以下命令安装：
+下载[CANN](https://www.hiascend.com/developer/download/commercial/result?module=cann)，请根据根据系统选择`aarch64`或`x86_64`对应版本的`cann-toolkit`、`cann-kernel`和`cann-nnal`。参考[CANN安装](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=Debian&Software=cannToolKit)或执行以下命令安装：
 
 ```shell
 # 因为版本迭代，包名存在出入，根据实际修改
@@ -78,7 +78,7 @@ source /usr/local/Ascend/nnal/atb/set_env.sh
 
 ### 4. PTA安装
 
-准备[torch_npu](https://www.hiascend.com/developer/download/community/result?module=pt)和[apex](https://gitcode.com/Ascend/apex)，参考[Ascend Extension for PyTorch 配置与安装](https://www.hiascend.com/document/detail/zh/Pytorch/700/configandinstg/instg/insg_0004.html)或执行以下命令安装：
+准备[torch_npu](https://www.hiascend.com/developer/download/community/result?module=pt)和[apex](https://gitcode.com/Ascend/apex)，参考[Ascend Extension for PyTorch 配置与安装](https://www.hiascend.com/document/detail/zh/Pytorch/710/configandinstg/instg/insg_0004.html)或执行以下命令安装：
 
 安装torch和torch_npu，以下以python 3.10 + torch 2.7.1为例：
 
