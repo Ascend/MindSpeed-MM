@@ -6,7 +6,7 @@ MindSpeed-MM已支持接入华为自研AI框架MindSpore，旨在提供华为全
 
 ## 🔥🔥🔥Latest News
 
-🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../examples/mindspore/cogvideox/)、[InternVL2](../../examples/mindspore/internvl2)、[Qwen2.5VL](../../examples/mindspore/qwen2.5vl/README.md)模型 
+🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../examples/mindspore/cogvideox/)、[InternVL2](../../examples/mindspore/internvl2)、[Qwen2.5VL](../../examples/mindspore/qwen2.5vl/README.md)模型。
 
 ## 版本配套
 
@@ -21,11 +21,11 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 ## 环境部署
 
-具体部署步骤请查看[部署文档](./install_guide.md)
+具体部署步骤请查看[部署文档](./install_guide.md)。
 
 ## 快速上手
 
-快速上手操作请查看[快速上手文档](./getting_start.md)
+快速上手操作请查看[快速上手文档](./getting_start.md)。
 
 ---
 
@@ -33,7 +33,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 ### 已支持特性概览
 
-|       模型 \ 特性       | [TP](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend//MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) |
+|       模型 \ 特性       | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) |
 |:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|
 |   CogVideoX系列-T2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ |  |
 |   CogVideoX系列-I2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ |  |
@@ -79,7 +79,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td rowspan="7"> 多模态生成 </td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-T2V</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-T2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -90,7 +90,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>✅</td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-I2V</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-I2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -101,7 +101,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>✅</td>
     </tr>
   <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -122,7 +122,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>支持中</td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-I2V</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-I2V</a></td>
       <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -144,7 +144,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
     </tr>
     <tr>
       <td rowspan="9"> 多模态理解 </td>
-      <td rowspan="4"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2-2B">2B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -185,7 +185,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>支持中</td>
     </tr>
     <tr>
-      <td rowspan="4"><a href="https://gitcode.com/Ascend//MindSpeed-MM/tree/2.2.0/examples/qwen2.5vl">Qwen2.5-VL</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/qwen2.5vl">Qwen2.5-VL</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct">3B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -240,11 +240,11 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 MindSpeed MM集成了昇腾profiling采集工具，以提供对模型运行情况的分析。该工具能够依照配置采集模型的算子、显存等关键信息，同时支持动静态两种采集方式，协助开发者分析模型瓶颈，并可根据实际场景需求选择使用。
 
-具体方法见 [README](../../mindspeed_mm/tools/README.md) 的profiling章节
+具体方法见 [README](../../mindspeed_mm/tools/README.md) 的profiling章节。
 
 ## MindStudio Insight性能分析工具
 
 针对大模型集群场景的性能调优，这里推荐一款优秀的可视化调优工具MindStudio Insight。
 MindStudio Insight提供了包括Timeline视图、通信分析、计算耗时等的可视化呈现，以便用户分析潜在的性能瓶颈，并指导如何采取措施消除或减少这些瓶颈。
 
-具体使用方法见[《MindStudio Insight操作指南》](https://www.hiascend.com/document/detail/zh/mindstudio/70RC3/msinsightug/msascendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/ascend-computing/mindstudio-pid-251913966/software/262029358?idAbsPath=fixnode01%7C23710424%7C251366513%7C22892968%7C251913966)
+具体使用方法见[《MindStudio Insight操作指南》](https://www.hiascend.com/document/detail/zh/mindstudio/70RC3/msinsightug/msascendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/ascend-computing/mindstudio-pid-251913966/software/262029358?idAbsPath=fixnode01%7C23710424%7C251366513%7C22892968%7C251913966)。
