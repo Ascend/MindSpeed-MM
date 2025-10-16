@@ -909,6 +909,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </tbody>
 </table>
 
+# 常用参数解释说明
+针对MindSpeed MM套件中运行所使用的参数做解释说明，具体见[README](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/args_readme.md)
 
 # 特性规划
 
