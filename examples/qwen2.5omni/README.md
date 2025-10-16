@@ -262,7 +262,7 @@ dataset_param->basic_parameters->dataset
 
 ##### 2）修改模型配置
 
-在model_xxx.json中，修改`img_context_token_id`为下图所示：
+在model.json中，修改`img_context_token_id`为下图所示：
 ```
 "img_context_token_id": 151656
 ```

@@ -174,12 +174,12 @@ dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件
     pip install tensorboard
     ```
 
-2. 设置tensorboard的保存路经`TENSORBOARD_LOGS_PATH`，然后在运行脚本中的`OUTPUT_ARGS`中添加`--tensorboard-dir`从而进行使能：
+2. 设置tensorboard的保存路径`TENSORBOARD_LOGS_PATH`，然后在运行脚本中的`OUTPUT_ARGS`中添加`--tensorboard-dir`从而进行使能：
 
     ```shell
     TENSORBOARD_LOGS_PATH="./tensorboard_dir/" # tensorboard保存路径
 
-    # 在args里添加 tensorboard--dir
+    # 在args里添加 --tensorboard-dir
     OUTPUT_ARGS="
         --log-interval 1 \
         --save-interval 10000 \
