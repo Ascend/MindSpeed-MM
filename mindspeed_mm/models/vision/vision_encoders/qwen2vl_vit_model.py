@@ -20,13 +20,12 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_region, gather_from_sequence_parallel_region
 from megatron.training import get_args
 
+from mindspeed.core.context_parallel.ulysses_context_parallel.ulysses_context_parallel import UlyssesContextAttention
 from mindspeed.core.context_parallel import DotProductAttention
-from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, \
-    gather_forward_split_backward
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, gather_forward_split_backward
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.vision.vision_encoders.vision_transformer_block import Qwen2VLVisionTransformerBlock
 from mindspeed_mm.models.common.communications import split_forward_gather_backward
-from mindspeed_mm.patchs.ulysses_patches import UlyssesContextAttention
 
 
 # Copied from transformers.models.llama.modeling_llama.rotate_half
@@ -568,7 +567,7 @@ class Qwen2VLViT(MultiModalModule):
             hidden_states = split_forward_gather_backward(
                 hidden_states,
                 mpu.get_context_parallel_group(),
-                0,
+                dim=0,
                 split_sizes=split_gather_sizes,
             )
 
