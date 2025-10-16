@@ -112,8 +112,11 @@ class UT_Test:
         test_dir = os.path.join(base_dir, 'tests')
         self.ut_file = os.path.join(test_dir, "ut")
 
-    def run_ut(self):
-        command = f"pytest -x {self.ut_file}"
+    def run_ut(self, local=False):
+        if not local:
+            command = f"pytest -x {self.ut_file}"
+        else:
+            command = f"pytest {self.ut_file}"
         code = acquire_exitcode(command)
         if code == 0:
             print("UT test success")
@@ -160,6 +163,11 @@ def run_ut_tests():
     return ut.run_ut()
 
 
+def run_ut_local_tests():
+    ut = UT_Test()
+    return ut.run_ut(local=True)
+
+
 def run_st_tests():
     st = ST_Test()
     return st.run_st()
@@ -184,11 +192,9 @@ def run_tests(options):
         st_code = run_st_tests()
         return TEST_RESULT_FAILURE if st_code != 0 else TEST_RESULT_SUCCESS
     elif options.type == 'all_loss':
-        code = run_ut_tests()
-        if code != 0:
-            return TEST_RESULT_FAILURE
+        ut_code = run_ut_local_tests()
         st_code = run_st_local_tests()
-        return TEST_RESULT_FAILURE if st_code != 0 else TEST_RESULT_SUCCESS
+        return TEST_RESULT_FAILURE if st_code != 0 or ut_code != 0 else TEST_RESULT_SUCCESS
     else:
         print(f"TEST CASE TYPE ERROR: no type '{options.type}'")
         return TEST_RESULT_INVALID_INPUT
