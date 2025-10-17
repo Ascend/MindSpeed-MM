@@ -25,6 +25,7 @@
         "freeze": false
     },
     "patch": {
-        "clip_grad_async": true
+        "clip_grad_async": true,
+        "scale_grad": true
     }
 }

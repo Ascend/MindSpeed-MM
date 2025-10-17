@@ -416,7 +416,7 @@ class VLMModel(MultiModalModule):
 
         # The three loss calculation modes are mutually exclusive:
         # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
-        #    Calculate the average loss for the entire batch by summing all valid token losses and dividing by total token count
+        #    Calculate the average loss for the micro batch and dividing by micro batch num
         # 2. Token level (calculate_per_token_loss=True):
         #    Keep per-token losses without any aggregation, used for scenarios requiring token-level loss
         # 3. Sample level (calculate_per_sample_loss=True):
@@ -478,7 +478,7 @@ class VLMModel(MultiModalModule):
 
         # The three loss calculation modes are mutually exclusive:
         # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
-        #    Calculate the average loss for the entire batch by summing all valid token losses and dividing by total token count
+        #    Calculate the average loss for the micro batch and dividing by micro batch num
         # 2. Token level (calculate_per_token_loss=True):
         #    Keep per-token losses without any aggregation, used for scenarios requiring token-level loss
         # 3. Sample level (calculate_per_sample_loss=True):
@@ -501,7 +501,7 @@ class VLMModel(MultiModalModule):
 
         # The three loss calculation modes are mutually exclusive:
         # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
-        #    Calculate the average loss for the entire batch by summing all valid token losses and dividing by total token count
+        #    Calculate the average loss for the micro batch and dividing by micro batch num
         # 2. Token level (calculate_per_token_loss=True):
         #    Keep per-token losses without any aggregation, used for scenarios requiring token-level loss
         # 3. Sample level (calculate_per_sample_loss=True):

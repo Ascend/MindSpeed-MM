@@ -17,6 +17,7 @@ from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.data.data_utils.utils import build_iterations
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.models.transformers_model import TransformersModel
+from mindspeed_mm.utils.utils import compute_token_level_loss
 
 
 def model_provider(*args, **kwargs):
@@ -53,8 +54,18 @@ def get_batch(data_iterator):
 def loss_func(output_tensor):
     """Loss function."""
     args = get_args()
-    loss = output_tensor.mean()
     loss_dir = {}
+
+    if args.calculate_per_token_loss:
+        loss, local_num_tokens, reporting_loss = compute_token_level_loss(output_tensor)
+        loss_dir["loss"] = (reporting_loss[0], reporting_loss[1])
+        return (
+            loss[0].clone(),
+            local_num_tokens,
+            loss_dir
+        )
+
+    loss = output_tensor['loss']
     averaged_loss = average_losses_across_data_parallel_group([loss])
     loss_dir["loss"] = averaged_loss[0]
     loss = loss.unsqueeze(0).clone()

@@ -22,6 +22,7 @@ from mindspeed_mm.patchs import (
     fsdp1_patches,
     hetero_patches,
     training_patches,
+    fsdp2_patches
 )
 
 
@@ -58,6 +59,9 @@ class PatchesManager:
                 hetero_patches.hetero_spec_wrapper),
             ("mindspeed_mm.models.vlm_model.get_audio_layer_spec", \
                 hetero_patches.hetero_spec_wrapper),
+        ],
+        "scale_grad": [
+            ("megatron.core.distributed.TorchFullyShardedDataParallel.scale_gradients", fsdp2_patches.scale_gradients)
         ]
     }
 

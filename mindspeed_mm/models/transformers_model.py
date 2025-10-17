@@ -40,14 +40,37 @@ class TransformersModel(MultiModalModule):
             self.model.gradient_checkpointing_enable()
 
 
-    def compute_language_model_loss(self, logits: Tensor, labels: Tensor, ignore_index: int = -100) -> Tensor:
+    def compute_language_model_loss(self, logits: Tensor, labels: Tensor, ignore_index: int = -100, **kwargs) -> Tensor:
+        args = get_args()
+        loss = None
         labels = F.pad(labels, (0, 1), value=ignore_index)
         shift_labels = labels[..., 1:].contiguous()
+        loss_mask = shift_labels > 1
 
-        shift_labels = shift_labels.view(-1)
-        logits = logits.view(-1, logits.shape[-1])
-        loss = F.cross_entropy(logits, shift_labels, ignore_index=ignore_index)
-        return loss
+        # The three loss calculation modes are mutually exclusive:
+        # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
+        #   Calculate the average loss for the micro batch and dividing by micro batch num
+        # 2. Token level (calculate_per_token_loss=True):
+        #    Keep per-token losses without any aggregation, used for scenarios requiring token-level loss
+        # 3. Sample level (calculate_per_sample_loss=True):
+        #    Calculate per-sample average loss by first computing the average loss of valid tokens within each sample, then averaging across all samples
+        if args.calculate_per_sample_loss:
+            logits = logits.permute(0, 2, 1).contiguous()
+            loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
+            batch_mean_loss = loss.sum(dim=1) / (shift_labels > -1).sum(dim=1)
+            loss = batch_mean_loss.mean()
+        elif args.calculate_per_token_loss:
+            shift_labels = shift_labels.view(-1)
+            # Flatten the tokens
+            logits = logits.view(-1, logits.shape[-1])
+            loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
+        else:
+            shift_labels = shift_labels.view(-1)
+            # Flatten the tokens
+            logits = logits.view(-1, logits.shape[-1])
+            loss = F.cross_entropy(logits, shift_labels, ignore_index=ignore_index)
+
+        return loss, loss_mask
 
 
     def forward(
@@ -72,5 +95,9 @@ class TransformersModel(MultiModalModule):
             **kwargs
         )
         logits = outputs.logits.contiguous().float()
-        loss = self.compute_language_model_loss(logits, labels)
-        return loss
+        loss_dict = {}
+
+        loss, loss_mask = self.compute_language_model_loss(logits, labels, **kwargs)
+        loss_dict["loss"] = loss
+        loss_dict["loss_mask"] = loss_mask
+        return loss_dict
