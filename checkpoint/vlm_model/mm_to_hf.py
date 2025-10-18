@@ -9,7 +9,7 @@ import torch
 from safetensors.torch import save_file
 
 from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME, IMAGE_ENCODER, AUDIO_ENCODER, TEXT_DECODER
-from checkpoint.common.types import STATE_DICT_T, PP_LAYER_NUM_T
+from checkpoint.common.mm_types import STATE_DICT_T, PP_LAYER_NUM_T
 from checkpoint.vlm_model.config import ConvertHFConfig
 from checkpoint.vlm_model.hf_to_mm import load_from_hf
 from checkpoint.vlm_model.operator import Operator, TP_PATTERN_T

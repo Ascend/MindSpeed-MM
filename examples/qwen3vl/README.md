@@ -20,6 +20,7 @@
   - [准备工作](#jump4.1)
   - [配置参数](#jump4.2)
   - [启动微调](#jump4.3)
+  - [启动推理](#jump4.4)
 - [环境变量声明](#jump10)
 - [注意事项](#jump11)
 
@@ -101,9 +102,9 @@ pip install -e .
 <a id="jump3.1"></a>
 #### 1. 数据集下载(以coco2017数据集为例)
 
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
+(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。	
 
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
+(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。	
 
 (3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
 
@@ -224,8 +225,8 @@ dataset_param->basic_parameters->dataset
 
 ```shell
 ...
-# 加载路径
-LOAD_PATH="./ckpt/hf_path/Qwen3-VL-xxB-Instruct"
+# 断点续训权重加载路径
+LOAD_PATH="./ckpt/save_dir/Qwen3-VL-xxB-Instruct"
 # 保存路径
 SAVE_PATH="save_dir"
 ...
@@ -244,6 +245,8 @@ OUTPUT_ARGS="
     ...
 "
 ```
+
+根据实际情况配置`examples/qwen3vl/model.json`中的`init_from_hf_path`参数，该参数表示初始权重的加载路径。
 
 【单机运行配置】
 
@@ -269,6 +272,23 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 bash examples/qwen3vl/finetune_qwen3vl.sh
 ```
 ---
+
+<a id="jump4.4"></a>
+#### 4. 启动推理
+训练完成之后，以Qwen3VL-xxB为例，将保存在`save_dir`目录下的权重转换成huggingface格式
+```shell
+python checkpoint/common/merge_dcp_to_hf.py \
+  --load-dir save_dir/iter_000xx/ \
+  --save-dir save_dir/iter_000xx_hf/ \
+  --model-assets-dir ./ckpt/Qwen3-VL-xxB-Instruct \
+  --prefix model.
+```
+其中，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径，`--model_assets_dir`原始huggingface权重的路径。
+
+完成权重转换之后，即可使用transformers库进行推理。
+
+---
+
 
 <a id="jump10"></a>
 ## 环境变量声明

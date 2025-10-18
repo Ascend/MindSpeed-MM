@@ -53,7 +53,7 @@ from safetensors.torch import load_file
 from tqdm import tqdm
 
 from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME, IMAGE_ENCODER, AUDIO_ENCODER, TEXT_DECODER
-from checkpoint.common.types import STATE_DICT_T, VPP_LAYER_NUM_T
+from checkpoint.common.mm_types import STATE_DICT_T, VPP_LAYER_NUM_T
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertTorchDCPConfig
 from checkpoint.vlm_model.operator import Operator, TieOp, TP_PATTERN_T
 

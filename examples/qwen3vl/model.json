@@ -1,5 +1,6 @@
 {
     "model_id": "qwen3_vl_moe",
+    "init_from_hf_path": "./ckpt/hf_path/Qwen3-VL-xxB-Instruct",
     "image_encoder": {
         "vision_encoder": {
             "model_id": "qwen3vit",
@@ -20,8 +21,6 @@
         "hidden_size": 4096,
         "num_attention_heads": 64,
         "max_position_embeddings": 262144,
-
-
         "freeze": false
     },
     "patch": {

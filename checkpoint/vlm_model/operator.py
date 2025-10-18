@@ -6,7 +6,7 @@ import torch
 from torch import Tensor
 
 from checkpoint.common.constant import DIGIT_FMT
-from checkpoint.common.types import STATE_DICT_T, QV_NAME_T, QKV_NAME_T
+from checkpoint.common.mm_types import STATE_DICT_T, QV_NAME_T, QKV_NAME_T
 
 
 def interleaved_qkv_to_concated(megatron_qkv: Tensor, num_key_value_heads: int, split_size: List[int]) -> Tensor:

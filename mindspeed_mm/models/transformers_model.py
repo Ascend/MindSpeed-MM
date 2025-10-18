@@ -20,12 +20,13 @@ class TransformersModel(MultiModalModule):
         super().__init__(config=config)
         args = get_args()
 
+        hf_path = args.mm.model.init_from_hf_path
         self.config = core_transformer_config_from_args(args)
-        self.transformer_config = AutoConfig.from_pretrained(args.load)
+        self.transformer_config = AutoConfig.from_pretrained(hf_path)
 
         model_cls = ModelZoo.build(config, self.transformer_config)
         self.model = model_cls.from_pretrained(
-            args.load,
+            hf_path,
             config=self.transformer_config,
             attn_implementation="flash_attention_2",
             dtype=torch.bfloat16,

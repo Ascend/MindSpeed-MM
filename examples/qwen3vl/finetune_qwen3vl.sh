@@ -89,7 +89,7 @@ GPT_ARGS="
     --num-workers 8 \
     --use-torch-fsdp2 \
     --untie-embeddings-and-output-weights \
-    --ckpt-format torch_dist \
+    --ckpt-format torch_dcp \
     --fsdp2-config-path $FSDP2_PATH \
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
