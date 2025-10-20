@@ -297,6 +297,11 @@ dataset_param->basic_parameters->dataset
 
 根据实际情况修改`data.json`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段。
 
+实例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/video_data_path.json，此时配置如下：
+`dataset_dir`配置为/home/user/data/;
+`dataset`配置为./data/video_data_path.json
+注意此时`dataset`需要配置为相对路径
+
 以Qwen2.5VL-7B为例，`data.json`进行以下修改，注意`model_name_or_path`的权重路径为转换前的权重路径。
 
 **注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。
