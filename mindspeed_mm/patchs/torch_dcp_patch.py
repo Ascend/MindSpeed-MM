@@ -2,6 +2,7 @@
 import os
 import sys
 import torch
+from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 
 from megatron.training.checkpointing import (
     _NON_PERSISTENT_CKPT_SUBDIR,
@@ -159,6 +160,7 @@ def _load_base_checkpoint(
             torch.distributed.checkpoint.load_state_dict(
                 state_dict=state_dict,
                 storage_reader=fs_storage_reader,
+                planner=DefaultLoadPlanner(allow_partial_load=True)
             )
     else:
         raise NotImplementedError(f"checkpoint format {ckpt_format} not supported")

@@ -63,7 +63,7 @@ mkdir logs data ckpt
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
-git checkout 3cd3ebb2f02e0ea991a73e2115bc3d01ee14f5b3
+git checkout 0c48d2cdf7602319fe31aa171cd6939a7cb13230
 
 # 安装mindspeed及依赖
 pip install -e .

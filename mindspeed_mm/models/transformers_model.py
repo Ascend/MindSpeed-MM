@@ -25,20 +25,22 @@ class TransformersModel(MultiModalModule):
         self.transformer_config = AutoConfig.from_pretrained(hf_path)
 
         model_cls = ModelZoo.build(config, self.transformer_config)
-        self.model = model_cls.from_pretrained(
-            hf_path,
-            config=self.transformer_config,
-            attn_implementation="flash_attention_2",
-            dtype=torch.bfloat16,
-            low_cpu_mem_usage=True,
-            device_map="cpu"
-        )
+        
+        if args.init_model_with_meta_device:
+            with torch.device("meta"):
+                self.model = model_cls._from_config(self.transformer_config).float()
+        else:
+            self.model = model_cls.from_pretrained(
+                hf_path,
+                config=self.transformer_config,
+                dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+                device_map="cpu"
+            )
         print_rank_0("> load model successfully")
 
-        with open(args.fsdp2_config_path, "r", encoding="utf-8") as fr:
-            fsdp2_config = yaml.safe_load(fr)
-        if fsdp2_config.get("recompute_modules", None):
-            self.model.gradient_checkpointing_enable()
+        self.model.train()
+        self.model.use_cache = False
 
 
     def compute_language_model_loss(self, logits: Tensor, labels: Tensor, ignore_index: int = -100, **kwargs) -> Tensor:
@@ -102,3 +104,18 @@ class TransformersModel(MultiModalModule):
         loss_dict["loss"] = loss
         loss_dict["loss_mask"] = loss_mask
         return loss_dict
+    
+    def fully_shard(
+        self,
+        process_group,
+        fsdp2_config_path,
+        **kwargs
+    ):
+        # If the model has its own 'fully_shard' method, use it directly
+        if hasattr(self.model, 'fully_shard') and callable(getattr(self.model, 'fully_shard')):
+            return self.model.fully_shard(
+                process_group=process_group,
+                fsdp2_config_path=fsdp2_config_path,
+                **kwargs
+            )
+        return False
