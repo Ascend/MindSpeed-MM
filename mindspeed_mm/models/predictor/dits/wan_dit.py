@@ -408,6 +408,11 @@ class WanDiT(MultiModalModule):
                 embs = split_forward_gather_backward(
                     embs, mpu.get_context_parallel_group(), dim=1, grad_scale="down"
                 )  # b s h
+                if time_emb.ndim == 4:
+                    # b s 6 h for adaLN in wan2.2 5b
+                    time_emb = split_forward_gather_backward(
+                        time_emb, mpu.get_context_parallel_group(), dim=1, grad_scale="down"
+                    )
             rotary_pos_emb = split_forward_gather_backward(
                 rotary_pos_emb,
                 mpu.get_context_parallel_group(),
@@ -434,6 +439,11 @@ class WanDiT(MultiModalModule):
                 embs = gather_forward_split_backward(
                     embs, mpu.get_context_parallel_group(), dim=1, grad_scale="up"
                 )
+                if time_emb.ndim == 4:
+                    # b s 6 h for adaLN in wan2.2 5b
+                    time_emb = gather_forward_split_backward(
+                        time_emb, mpu.get_context_parallel_group(), dim=1, grad_scale="up"
+                    )
             embs_out = self.head(embs, times)
             out = self.unpatchify(embs_out, frames, height, width)
 

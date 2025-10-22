@@ -101,8 +101,7 @@ cd ..
 pip install -e .
 
 # 更新diffusers、peft
-pip install diffusers==0.35.1
-pip install peft==0.17.1
+pip install diffusers==0.35.1 peft==0.17.1
 ```
 
 ### Decord搭建
@@ -231,8 +230,23 @@ mm-convert WanConverter mm_to_hf \
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |       NNODES      | 节点数量                                          |
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |      LOAD_PATH    | 权重转换后的预训练权重路径                          |
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |      SAVE_PATH    | 训练过程中保存的权重路径                            |
+| examples/wan2.2/{model_size}/{task}/pretrain*.sh         |        CP         | 训练时的CP size（建议根据训练时设定的分辨率调整）   |
 
 【并行化配置参数说明】：
+
+- CP: 序列并行。
+
+  - 使用场景：在视频序列（分辨率X帧数）较大时，可以开启来降低内存占用。
+  
+  - 使能方式：在启动脚本中设置 CP > 1，如：CP=2；
+  
+  - 限制条件：head 数量需要能够被CP整除（在`examples/wan2.2/{model_size}/{task}/pretrain_model*.json`中配置，参数为`num_heads`）
+
+  - 默认使能方式为Ulysess序列并行。
+
+  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
+
+  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
 
 - fsdp2
 

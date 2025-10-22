@@ -23,6 +23,7 @@
             "hw_stride": 8,
             "force_resolution": false,
             "hw_aspect_thr": 5.0,
+            "truncate_t_by_sp": false,
             "train_pipeline": {"video": [
             {
                 "trans_type": "ResizeVideo",

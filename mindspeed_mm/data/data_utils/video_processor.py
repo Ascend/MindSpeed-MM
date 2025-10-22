@@ -289,6 +289,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         min_hxw (int): Minimum height×width product
         hw_stride (int): Height/width alignment stride (default: 32)
         hw_aspect_thr (float): Aspect ratio threshold (default: 1.5)
+        truncate_t_by_sp (bool): Whether to truncate dimension t to a multiple of sp_size (default: True)
         vae_scale_factor (list): VAE down sample scale factor (default: [4, 8, 8]])
         train_sp_batch_size (int): Sequence parallel batch size (default: 1)
         seed (int): Random seed (default: 42)
@@ -309,6 +310,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         min_hxw: int = None,
         hw_stride: int = 32,
         hw_aspect_thr: float = 1.5,
+        truncate_t_by_sp: bool = True,
         vae_scale_factor: Optional[List[int]] = None,
         train_sp_batch_size: int = 1,
         seed: int = 42,
@@ -343,7 +345,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
 
         # Training configuration
         self.ae_stride_t = vae_scale_factor[0]
-        self.sp_size = mpu.get_context_parallel_world_size() # For sequence parallel
+        self.sp_size = mpu.get_context_parallel_world_size() if truncate_t_by_sp else 1 # For sequence parallel
         self.train_sp_batch_size = train_sp_batch_size
         self.gradient_accumulation_size = cal_gradient_accumulation_size()
         self.batch_size = get_value_from_args("micro_batch_size")
