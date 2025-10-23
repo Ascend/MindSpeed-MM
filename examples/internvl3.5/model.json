@@ -1,0 +1,16 @@
+{
+    "model_id": "internvl",
+    "init_from_hf_path": "./ckpt/hf_path/InternVL3_5-30B-A3B-Instruct",
+    "img_context_token_id": 151671,
+    "text_decoder": {
+        "model_id": "qwen3lm",
+        "num_layers": 999,
+        "hidden_size": 999,
+        "num_attention_heads": 999,
+        "max_position_embeddings": 9999999
+    },
+    "patch": {
+        "clip_grad_async": true,
+        "scale_grad": true
+    }
+}
