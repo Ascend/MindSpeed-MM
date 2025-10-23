@@ -83,7 +83,7 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
     <td> Toolkit（开发套件） </td>
   </tr>
   <tr>
-    <td> Kenels（算子包） </td>
+    <td> Kernels（算子包） </td>
   </tr>
   <tr>
     <td> NNAL（Ascend Transformer Boost加速库） </td>
@@ -112,7 +112,7 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
 
 对于MindSpeed PyTorch后端已支持但MindSpore后端不支持的模型，用户只需针对PyTorch后端提供的模型shell脚本进行少量适配修改，即可迁移至MindSpore后端。shell脚本适配的主体原则如下：
 
-- 启动命修改为 `msrun`，并加入 `--ai-framework mindspore`参数；
+- 启动命令修改为 `msrun`，并加入 `--ai-framework mindspore`参数；
   以下是一个启动命令适配的示例。
 
   适配前（Pytorch后端）：

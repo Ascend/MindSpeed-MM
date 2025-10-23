@@ -267,7 +267,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 | 指标                                 | 说明                                                     |
 | ------------------------------------ | -------------------------------------------------------- |
 | `timing_s/gen`                     | 一次迭代中generation耗时                     |
-| `timing_s/reward`         | 一次迭代中reward时                                     |
+| `timing_s/reward`         | 一次迭代中reward耗时                                     |
 | `timing_s/old_log_prob`                   | 一次迭代中actor model计算log prob耗时                       |
 | `timing_s/ref`             | 一次迭代中reference model计算耗时                   |
 | `timing_s/adv`                         | 计算advantages耗时                                       |
@@ -300,8 +300,8 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 | `prompt_length/mean`                    | 平均输入长度，输入 prompt 的平均长度                         |
 | `prompt_length/max`                     | 最长输入长度，当前 batch 中最长的 prompt长度                 |
 | `prompt_length/min`                     | 最短输入长度，当前 batch 中最长的 prompt长度                 |
-| `perf/total_num_tokens`                               | 总tokens数标                                       |
-| `perf/time_per_step`                            | 每步耗时标                                         |
+| `perf/total_num_tokens`                               | 总tokens数                                       |
+| `perf/time_per_step`                            | 每步耗时                                         |
 | `perf/throughput`                              | 吞吐指标                                         |
 
 ---

@@ -280,7 +280,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
   
   - 使能方式：在启动脚本中设置 CP > 1，如：CP=2；
   
-  - 限制条件：head 数量需要能够被CP整除（在`exmaples/wan2.1/{model_size}/{task}/pretrain_model.json`中配置，参数为`num_heads`）
+  - 限制条件：head 数量需要能够被CP整除（在`examples/wan2.1/{model_size}/{task}/pretrain_model.json`中配置，参数为`num_heads`）
 
   - 默认使能方式为Ulysess序列并行。
 
@@ -353,7 +353,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   - 选择性重计算
 
-    - 在`exmaples/wan2.1/{model_size}/{task}/pretrain.sh`中，添加参数`--recompute-skip-core-attention`和`--recompute-num-layers-skip-core-attention x`可以开启选择性重计算，其中`--recompute-num-layers-skip-core-attention`后的数字表示跳过self attention计算的层数，`--recompute-num-layers`后的数字表示全重计算的层数，建议调小`recompute-num-layers`的同时增大`recompute-num-layers-skip-core-attention`直至显存打满。
+    - 在`examples/wan2.1/{model_size}/{task}/pretrain.sh`中，添加参数`--recompute-skip-core-attention`和`--recompute-num-layers-skip-core-attention x`可以开启选择性重计算，其中`--recompute-num-layers-skip-core-attention`后的数字表示跳过self attention计算的层数，`--recompute-num-layers`后的数字表示全重计算的层数，建议调小`recompute-num-layers`的同时增大`recompute-num-layers-skip-core-attention`直至显存打满。
 
       ```bash
       GPT_ARGS="
@@ -366,7 +366,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
       ```
 
   - 不进行重计算的self-attention激活值异步offload
-    - 在`exmaples/wan2.1/{model_size}/{task}/pretrain_model.json`中，通过`attention_async_offload`字段可以开启异步offload，建议开启该功能，节省更多的显存
+    - 在`examples/wan2.1/{model_size}/{task}/pretrain_model.json`中，通过`attention_async_offload`字段可以开启异步offload，建议开启该功能，节省更多的显存
 
 - fsdp2
 
