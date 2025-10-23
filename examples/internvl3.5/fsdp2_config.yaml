@@ -1,6 +1,6 @@
 sharding_size: null
 sub_modules_to_wrap:
-  - transformers.models.qwen3_moe.modeling_qwen3_moe.Qwen3VLMoeDecoderLayer
+  - transformers.models.qwen3_moe.modeling_qwen3_moe.Qwen3MoeDecoderLayer
   - transformers_modules.InternVL3_5-30B-A3B-Instruct.modeling_intern_vit.InternVisionEncoderLayer
 recompute_modules:
 
