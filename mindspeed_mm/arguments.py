@@ -38,6 +38,7 @@ def process_args(parser):
     parser = _add_auto_parallel_mm_args(parser)
     parser = _add_rlfh_args(parser)
     parser = _add_network_args(parser)
+    parser = _add_data_balance_args(parser)
     return parser
 
 
@@ -211,5 +212,18 @@ def _add_network_args(parser):
         choices=["ray_grpo"],
         help='Determine training mode'
     )
+
+    return parser
+
+
+def _add_data_balance_args(parser):
+    group = parser.add_argument_group(title="data_balance")
+    group.add_argument("--use-data-balance",
+                       action='store_true',
+                       default=False,
+                       help="Enable data balance")
+    group.add_argument("--data_balance_sorting_algo", type=str, default="post_global_balancing_greedy_without_pad",
+                       help="data balance sorting algorithm:"
+                            "post_global_balancing_greedy_without_pad: a greedy post global balancing algorithm without padding")
 
     return parser

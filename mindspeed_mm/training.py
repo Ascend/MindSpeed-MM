@@ -59,6 +59,7 @@ from mindspeed_mm.tools.profiler import Profiler
 from mindspeed_mm.tools.mem_profiler import memory_profiler
 from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.patchs.patch_manager import PatchesManager
+from mindspeed_mm.utils.data_balance.data_balance import DataBalance
 from mindspeed_mm.utils.random import seed_all
 
 
@@ -316,6 +317,21 @@ def train(
     for model_module in model:
         model_module.train()
 
+    # Data balance initialize
+    if args.use_data_balance:
+        print_rank_0("[INFO] initializing data_balance ...")
+        data_balance_algo = DataBalance(
+            args.virtual_pipeline_model_parallel_size,
+            args.mm_model,
+            args.data_balance_sorting_algo,
+            len(model),
+            train_data_iterator
+        )
+        print_rank_0("[INFO] initialize data_balance successfully")
+        print_rank_0(f"[INFO] image encoder DP (in DataBalance): {data_balance_algo.image_encoder_dp}")
+    else:
+        data_balance_algo = None
+
     # Tracking loss.
     total_loss_dict = {}
 
@@ -449,6 +465,16 @@ def train(
             )
         num_microbatches = get_num_microbatches()
         update_num_microbatches(args.consumed_train_samples, consistency_check=True)
+
+        if args.use_data_balance:
+            train_data_iterator = data_balance_algo.build_balanced_train_data_iterator(
+                model_add_image_encoder=model[0].module.module.add_image_encoder,
+                model_post_process=model[0].module.module.image_encoder.post_process,
+                max_batch_capacity=args.micro_batch_size,
+                micro_batch_size=args.micro_batch_size,
+                num_microbatches=num_microbatches,
+                data_type='image',
+            )
 
         args.curr_iteration = iteration
         loss_dict, skipped_iter, grad_norm, num_zeros_in_grad = train_step(

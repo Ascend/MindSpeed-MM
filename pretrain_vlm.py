@@ -11,6 +11,7 @@ import mindspeed.megatron_adaptor
 from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.core import mpu
 from megatron.core.enums import ModelType
+from megatron.core.num_microbatches_calculator import get_num_microbatches
 from megatron.training import get_args, print_rank_0
 from megatron.training.utils import average_losses_across_data_parallel_group
 from mindspeed_mm.configs.config import mm_extra_args_provider
@@ -201,9 +202,16 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
         dataset_param=data_config.dataset_param,
         consumed_samples=args.consumed_train_samples
     )
+
+    micro_batch_size = args.micro_batch_size
+    if args.use_data_balance:
+        global_batch_size = args.micro_batch_size * get_num_microbatches()
+        args.micro_batch_size = global_batch_size
+
     if isinstance(datasets, tuple) and len(datasets) == 2:
         train_dataset, valid_dataset = datasets
         train_dataloader = build_dataloader(train_dataset)
+        args.micro_batch_size = micro_batch_size
         valid_dataloader = build_dataloader(valid_dataset)
         train_dataloader, valid_dataloader, test_dataloader = build_iterations(train_dataloader, valid_dataloader)
     else:
@@ -215,10 +223,12 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
             dataset = train_dataset.train_test_split(test_size=val_rate, seed=args.seed)
             train_dataset, valid_dataset = dataset['train'], dataset['test']
             train_dataloader = build_dataloader(train_dataset)
+            args.micro_batch_size = micro_batch_size
             valid_dataloader = build_dataloader(valid_dataset)
             train_dataloader, valid_dataloader, test_dataloader = build_iterations(train_dataloader, valid_dataloader)
         else:
             train_dataloader = build_dataloader(train_dataset)
+            args.micro_batch_size = micro_batch_size
             train_dataloader, valid_dataloader, test_dataloader = build_iterations(train_dataloader)
     return train_dataloader, valid_dataloader, test_dataloader
 
