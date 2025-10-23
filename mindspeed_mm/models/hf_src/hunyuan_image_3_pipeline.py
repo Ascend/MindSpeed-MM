@@ -43,7 +43,7 @@ from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from diffusers.utils import BaseOutput, logging
 from diffusers.utils.torch_utils import randn_tensor
 
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+logger = logging.get_logger(__name__)
 
 
 def retrieve_timesteps(
@@ -109,7 +109,7 @@ def rescale_noise_cfg(noise_cfg, noise_pred_text, guidance_rescale=0.0):
     r"""
     Rescales `noise_cfg` tensor based on `guidance_rescale` to improve image quality and fix overexposure. Based on
     Section 3.4 from [Common Diffusion Noise Schedules and Sample Steps are
-    Flawed](https://arxiv.org/pdf/2305.08891.pdf).
+    Flawed].
 
     Args:
         noise_cfg (`torch.Tensor`):
@@ -161,7 +161,7 @@ class FlowMatchDiscreteScheduler(SchedulerMixin, ConfigMixin):
             The number of diffusion steps to train the model.
         timestep_spacing (`str`, defaults to `"linspace"`):
             The way the timesteps should be scaled. Refer to Table 2 of the [Common Diffusion Noise Schedules and
-            Sample Steps are Flawed](https://huggingface.co/papers/2305.08891) for more information.
+            Sample Steps are Flawed] for more information.
         shift (`float`, defaults to 1.0):
             The shift value for the timestep schedule.
         reverse (`bool`, defaults to `True`):
@@ -604,7 +604,7 @@ class HunyuanImage3Text2ImagePipeline(DiffusionPipeline):
     def prepare_extra_func_kwargs(self, func, kwargs):
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
-        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
+        # eta corresponds to η in DDIM paper
         # and should be between [0, 1]
         extra_kwargs = {}
 
@@ -661,7 +661,7 @@ class HunyuanImage3Text2ImagePipeline(DiffusionPipeline):
         return self._guidance_rescale
 
     # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
-    # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
+    # of the Imagen paper. `guidance_scale = 1`
     # corresponds to doing no classifier free guidance.
     @property
     def do_classifier_free_guidance(self):
@@ -718,7 +718,7 @@ class HunyuanImage3Text2ImagePipeline(DiffusionPipeline):
                 A higher guidance scale value encourages the model to generate samples closely linked to the
                 `condition` at the expense of lower sample quality. Guidance scale is enabled when `guidance_scale > 1`.
             generator (`torch.Generator` or `List[torch.Generator]`, *optional*):
-                A [`torch.Generator`](https://pytorch.org/docs/stable/generated/torch.Generator.html) to make
+                A [`torch.Generator`] to make
                 generation deterministic.
             latents (`torch.Tensor`, *optional*):
                 Pre-generated noisy latents sampled from a Gaussian distribution, to be used as inputs for sample
@@ -731,7 +731,7 @@ class HunyuanImage3Text2ImagePipeline(DiffusionPipeline):
                 plain tuple.
             guidance_rescale (`float`, *optional*, defaults to 0.0):
                 Guidance rescale factor from [Common Diffusion Noise Schedules and Sample Steps are
-                Flawed](https://arxiv.org/pdf/2305.08891.pdf). Guidance rescale factor should fix overexposure when
+                Flawed]. Guidance rescale factor should fix overexposure when
                 using zero terminal SNR.
             callback_on_step_end (`Callable`, `PipelineCallback`, `MultiPipelineCallbacks`, *optional*):
                 A function or a subclass of `PipelineCallback` or `MultiPipelineCallbacks` that is called at the end of
@@ -823,7 +823,6 @@ class HunyuanImage3Text2ImagePipeline(DiffusionPipeline):
                     pred = self.cfg_operator(pred_cond, pred_uncond, self.guidance_scale, step=i)
 
                 if self.do_classifier_free_guidance and self.guidance_rescale > 0.0:
-                    # Based on 3.4. in https://arxiv.org/pdf/2305.08891.pdf
                     pred = rescale_noise_cfg(pred, pred_cond, guidance_rescale=self.guidance_rescale)
 
                 # compute the previous noisy sample x_t -> x_t-1
