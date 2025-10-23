@@ -120,7 +120,7 @@ pip install decord==0.6.0
 
 从Huggingface等网站下载开源模型权重
 
-- [LanguageBind/Open-Sora-Plan-v1.2.0](https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.2.0/tree/main)：CasualVAE模型和VideoDiT模型；
+- [LanguageBind/Open-Sora-Plan-v1.2.0](https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.2.0/tree/main)：CausalVAE模型和VideoDiT模型；
 
 - [DeepFloyd/mt5-xxl](https://huggingface.co/google/mt5-xxl/)： MT5模型；
 

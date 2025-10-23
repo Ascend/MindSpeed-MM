@@ -234,7 +234,7 @@ mm-convert HunyuanVideoConverter --version i2v-lora source_to_mm \
 ]
 ```
 
-修改`examples/hunyuanvideo/feature_extract/data.txt`文件，其中每一行表示个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
+修改`examples/hunyuanvideo/feature_extract/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
 
 ### 特征提取
 
@@ -286,7 +286,7 @@ bash examples/hunyuanvideo/feature_extract/feature_extraction.sh
 
 当调整模型参数或者视频序列长度时，需要根据实际情况启用以下并行策略，并通过调试确定最优并行策略。
 
-+ CP: 序列并行，当前支持Ulysess，RingAttention 和USP序列并行。
++ CP: 序列并行，当前支持Ulysses，RingAttention 和USP序列并行。
 
   - 使用场景：在视频序列（分辨率X帧数）较大时，可以开启来降低内存占用。
   - 使能方式：在启动脚本中设置 CP > 1，如：CP=2；

@@ -30,7 +30,7 @@ actor_config:
 
 vit_config:
     tensor_model_parallel_size: 1     # vit TP 切分
-    pipeline_model_paralell_size: 1   # vit PP 切分
+    pipeline_model_parallel_size: 1   # vit PP 切分
 ```
 
 在 **MindSpeed-MM/examples/rl/envs/runtime_env.yaml** 下配置以下环境变量：
