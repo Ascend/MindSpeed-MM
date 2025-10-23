@@ -312,7 +312,7 @@ _register_template(
 
 # copied from qwen template
 _register_template(
-    name="qwen3vl",
+    name="qwen3_vl",
     params=RegisterParams(
         format_user=StringFormatter(slots=["<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n"]),
         format_assistant=StringFormatter(slots=["{{content}}<|im_end|>\n"]),
@@ -320,11 +320,26 @@ _register_template(
         format_observation=StringFormatter(
             slots=["<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
         ),
-        default_system="You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
         stop_words=["<|im_end|>"],
         replace_eos=True),
-    mm_plugin=get_mm_plugin(name="qwen2_vl", image_token="<|image_pad|>", video_token="<|video_pad|>"),
+    mm_plugin=get_mm_plugin(name="qwen3_vl", image_token="<|image_pad|>", video_token="<|video_pad|>"),
     template_class=ReasoningTemplate,
+)
+
+
+# copied from qwen template
+_register_template(
+    name="qwen3_vl_nothink",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n"]),
+        format_assistant=StringFormatter(slots=["{{content}}<|im_end|>\n"]),
+        format_system=StringFormatter(slots=["<|im_start|>system\n{{content}}<|im_end|>\n"]),
+        format_observation=StringFormatter(
+            slots=["<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
+        ),
+        stop_words=["<|im_end|>"],
+        replace_eos=True),
+    mm_plugin=get_mm_plugin(name="qwen3_vl", image_token="<|image_pad|>", video_token="<|video_pad|>"),
 )
 
 

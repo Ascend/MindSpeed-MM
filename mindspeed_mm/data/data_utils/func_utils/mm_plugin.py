@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from av.stream import Stream
     from transformers import PreTrainedTokenizer, ProcessorMixin
     from transformers.image_processing_utils import BaseImageProcessor
+    from transformers.image_utils import get_image_size, is_valid_image, to_numpy_array
     from numpy.typing import NDArray
     from transformers.feature_extraction_sequence_utils import SequenceFeatureExtractor
 
@@ -57,6 +58,11 @@ def _make_batched_images(images: List["ImageObject"], imglens: List[int]) -> Lis
         images = images[imglen:]
 
     return batch_images
+
+
+def _check_video_is_nested_images(video: "VideoInput") -> bool:
+    r"""Check if the video is nested images."""
+    return isinstance(video, list) and all(isinstance(frame, (str, BinaryIO, dict, ImageObject)) for frame in video)
 
 
 @dataclass
@@ -137,18 +143,24 @@ class MMPluginMixin:
 
     @staticmethod
     def _preprocess_image(
-            image: "ImageObject", image_max_pixels: int, image_min_pixels: int, **kwargs
+            image: "ImageObject", image_max_pixels: int, image_min_pixels: int, resample=True, **kwargs
     ) -> "ImageObject":
         r"""Pre-process a single image."""
         if (image.width * image.height) > image_max_pixels:
             resize_factor = math.sqrt(image_max_pixels / (image.width * image.height))
             width, height = int(image.width * resize_factor), int(image.height * resize_factor)
-            image = image.resize((width, height), resample=Image.Resampling.NEAREST)
+            if resample:
+                image = image.resize((width, height), resample=Image.Resampling.NEAREST)
+            else:
+                image = image.resize((width, height))
 
         if (image.width * image.height) < image_min_pixels:
             resize_factor = math.sqrt(image_min_pixels / (image.width * image.height))
             width, height = int(image.width * resize_factor), int(image.height * resize_factor)
-            image = image.resize((width, height), resample=Image.Resampling.NEAREST)
+            if resample:
+                image = image.resize((width, height), resample=Image.Resampling.NEAREST)
+            else:
+                image = image.resize((width, height))
 
         if image.mode != "RGB":
             image = image.convert("RGB")
@@ -370,6 +382,9 @@ class BasePlugin(MMPluginMixin):
 
 @dataclass
 class Qwen2VLPlugin(BasePlugin):
+    vision_bos_token: str = "<|vision_start|>"
+    vision_eos_token: str = "<|vision_end|>"
+
     @override
     def _preprocess_image(self, image: "ImageObject", **kwargs) -> "ImageObject":
         image = super()._preprocess_image(image, **kwargs)
@@ -393,24 +408,33 @@ class Qwen2VLPlugin(BasePlugin):
     ) -> Dict[str, Union[List[List["ImageObject"]], List[float]]]:
         results, fps_per_video = [], []
         for video in videos:
-            with av.open(video, "r") as container:
-                video_stream = next(stream for stream in container.streams if stream.type == "video")
-                sample_indices = self._get_video_sample_indices(video_stream, **kwargs)
-                frames: List[ImageObject] = []
-                container.seek(0)
-                for frame_idx, frame in enumerate(container.decode(video_stream)):
-                    if frame_idx in sample_indices:
-                        frames.append(frame.to_image())
+            frames: List[ImageObject] = []
+            if _check_video_is_nested_images(video):
+                for frame in video:
+                    if not is_valid_image(frame) and not isinstance(frame, dict) and not os.path.exists(frame):
+                        raise ValueError("Invalid image found in video frames.")
 
-                if len(frames) % 2 != 0:  # qwen2-vl requires even number of frames
-                    frames.append(frames[-1])
+                frames = video
+                fps_per_video.append(kwargs.get("video_fps", 2.0))
+            else:
+                with av.open(video, "r") as container:
+                    video_stream = next(stream for stream in container.streams if stream.type == "video")
+                    sample_indices = self._get_video_sample_indices(video_stream, **kwargs)
+                    container.seek(0)
+                    for frame_idx, frame in enumerate(container.decode(video_stream)):
+                        if frame_idx in sample_indices:
+                            frames.append(frame.to_image())
 
-                frames = self._regularize_images(frames, **kwargs)["images"]
-                results.append(frames)
-                if video_stream.duration is None:
-                    fps_per_video.append(2.0)
-                else:
-                    fps_per_video.append(len(sample_indices) / float(video_stream.duration * video_stream.time_base))
+                    if video_stream.duration is None:
+                        fps_per_video.append(kwargs.get("video_fps", 2.0))
+                    else:
+                        fps_per_video.append(len(sample_indices) / float(video_stream.duration * video_stream.time_base))
+
+            if len(frames) % 2 != 0:
+                frames.append(frames[-1])
+
+            frames = self._regularize_images(frames, **kwargs)["images"]
+            results.append(frames)
 
         return {"videos": results, "fps_per_video": fps_per_video}
 
@@ -476,15 +500,138 @@ class Qwen2VLPlugin(BasePlugin):
             while IMAGE_PLACEHOLDER in content:
                 image_seqlen = image_grid_thw[num_image_tokens].prod() // merge_length if self.expand_mm_tokens else 1
                 content = content.replace(
-                    IMAGE_PLACEHOLDER, f"<|vision_start|>{self.image_token * image_seqlen}<|vision_end|>", 1
+                    IMAGE_PLACEHOLDER,
+                    f"{self.vision_bos_token}{self.image_token * image_seqlen}{self.vision_eos_token}",
+                    1,
                 )
                 num_image_tokens += 1
 
             while VIDEO_PLACEHOLDER in content:
                 video_seqlen = video_grid_thw[num_video_tokens].prod() // merge_length if self.expand_mm_tokens else 1
                 content = content.replace(
-                    VIDEO_PLACEHOLDER, f"<|vision_start|>{self.video_token * video_seqlen}<|vision_end|>", 1
+                    VIDEO_PLACEHOLDER,
+                    f"{self.vision_bos_token}{self.video_token * video_seqlen}{self.vision_eos_token}",
+                    1,
                 )
+                num_video_tokens += 1
+
+            message["content"] = content
+
+        return messages
+
+
+@dataclass
+class Qwen3VLPlugin(Qwen2VLPlugin):
+    @override
+    def _get_mm_inputs(
+        self,
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        processor: "MMProcessor",
+    ) -> Dict[str, "torch.Tensor"]:
+        image_processor: BaseImageProcessor = getattr(processor, "image_processor", None)
+        video_processor: BaseImageProcessor = getattr(processor, "video_processor", None)
+        mm_inputs = {}
+        if len(images) != 0:
+            images = self._regularize_images(
+                images,
+                image_max_pixels=getattr(processor, "image_max_pixels", 768 * 768),
+                image_min_pixels=getattr(processor, "image_min_pixels", 32 * 32),
+                resample=False,
+            )["images"]
+            mm_inputs.update(image_processor(images, return_tensors="pt"))
+
+        if len(videos) != 0:
+            videos = self._regularize_videos(
+                videos,
+                image_max_pixels=getattr(processor, "video_max_pixels", 256 * 256),
+                image_min_pixels=getattr(processor, "video_min_pixels", 16 * 16),
+                video_fps=getattr(processor, "video_fps", 2.0),
+                video_maxlen=getattr(processor, "video_maxlen", 128),
+            )
+            video_metadata = [
+                {"fps": getattr(processor, "video_fps", 24.0), "duration": len(video), "total_num_frames": len(video)}
+                for video in videos["videos"]
+            ]
+            mm_inputs.update(
+                video_processor(videos=videos["videos"], video_metadata=video_metadata, return_metadata=True)
+            )
+            temporal_patch_size: int = getattr(image_processor, "temporal_patch_size", 2)
+            if "second_per_grid_ts" in processor.model_input_names:
+                mm_inputs["second_per_grid_ts"] = [temporal_patch_size / fps for fps in videos["fps_per_video"]]
+
+        return mm_inputs
+
+    @override
+    def process_messages(
+        self,
+        messages: List[Dict[str, str]],
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        processor: Optional["MMProcessor"],
+    ) -> List[Dict[str, str]]:
+        self._validate_input(processor, images, videos, audios)
+        self._validate_messages(messages, images, videos, audios)
+        num_image_tokens, num_video_tokens = 0, 0
+        messages = deepcopy(messages)
+        image_processor: BaseImageProcessor = getattr(processor, "image_processor")
+        video_processor: BaseImageProcessor = getattr(processor, "video_processor")
+
+        image_merge_length: int = getattr(image_processor, "merge_size") ** 2
+        video_merge_length: int = getattr(video_processor, "merge_size") ** 2
+        if self.expand_mm_tokens:
+            mm_inputs = self._get_mm_inputs(images, videos, audios, processor)
+            image_grid_thw = mm_inputs.get("image_grid_thw", [])
+            video_grid_thw = mm_inputs.get("video_grid_thw", [])
+            num_frames = video_grid_thw[0][0] if len(video_grid_thw) > 0 else 0  # hard code for now
+            video_metadata = mm_inputs.get("video_metadata", {})
+
+        else:
+            image_grid_thw = [None] * len(images)
+            video_grid_thw = [None] * len(videos)
+            num_frames = 0
+            timestamps = [0]
+
+        for idx, message in enumerate(messages):
+            content = message["content"]
+            while IMAGE_PLACEHOLDER in content:
+                image_seqlen = (
+                    image_grid_thw[num_image_tokens].prod() // image_merge_length if self.expand_mm_tokens else 1
+                )
+                content = content.replace(
+                    IMAGE_PLACEHOLDER,
+                    f"{self.vision_bos_token}{self.image_token * image_seqlen}{self.vision_eos_token}",
+                    1,
+                )
+                num_image_tokens += 1
+
+            while VIDEO_PLACEHOLDER in content:
+                metadata = video_metadata[idx]
+                timestamps = processor._calculate_timestamps(
+                    metadata.frames_indices,
+                    metadata.fps,
+                    video_processor.merge_size,
+                )
+                video_structure = ""
+                for frame_index in range(num_frames):
+                    video_seqlen = (
+                        video_grid_thw[num_video_tokens][1:].prod() // video_merge_length
+                        if self.expand_mm_tokens
+                        else 1
+                    )
+                    timestamp_sec = timestamps[frame_index]
+                    frame_structure = (
+                        f"<{timestamp_sec:.1f} seconds>"
+                        f"{self.vision_bos_token}{self.video_token * video_seqlen}{self.vision_eos_token}"
+                    )
+                    video_structure += frame_structure
+
+                if not self.expand_mm_tokens:
+                    video_structure = f"{self.vision_bos_token}{self.video_token}{self.vision_eos_token}"
+
+                content = content.replace(VIDEO_PLACEHOLDER, video_structure, 1)
                 num_video_tokens += 1
 
             message["content"] = content
@@ -789,6 +936,7 @@ PLUGINS = {
     "base": BasePlugin,
     "qwen2_vl": Qwen2VLPlugin,
     "qwen2_omni": Qwen2OmniPlugin,
+    "qwen3_vl": Qwen3VLPlugin,
     "glm4.1v": GLM4VPlugin,
 }
 
