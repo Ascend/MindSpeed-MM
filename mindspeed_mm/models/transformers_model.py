@@ -1,7 +1,5 @@
-from typing import Optional, Dict, Union
+from typing import Optional
 
-import re
-import yaml
 import torch
 import torch.nn.functional as F
 from torch import Tensor
@@ -25,7 +23,7 @@ class TransformersModel(MultiModalModule):
         self.transformer_config = AutoConfig.from_pretrained(hf_path)
 
         model_cls = ModelZoo.build(config, self.transformer_config)
-        
+
         if args.init_model_with_meta_device:
             with torch.device("meta"):
                 self.model = model_cls._from_config(self.transformer_config).float()
@@ -33,7 +31,7 @@ class TransformersModel(MultiModalModule):
             self.model = model_cls.from_pretrained(
                 hf_path,
                 config=self.transformer_config,
-                dtype=torch.bfloat16,
+                dtype=torch.float32,
                 low_cpu_mem_usage=True,
                 device_map="cpu"
             )
@@ -104,7 +102,7 @@ class TransformersModel(MultiModalModule):
         loss_dict["loss"] = loss
         loss_dict["loss_mask"] = loss_mask
         return loss_dict
-    
+
     def fully_shard(
         self,
         process_group,
