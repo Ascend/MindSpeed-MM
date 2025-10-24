@@ -221,13 +221,34 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 4. 实际运行场景与默认配置脚本不一致时，需要根据实际场景调整`micro_batch_size`、`dispatch_size`等相关配置参数。
 
-5. 启动ray, 若多机运行，需主节点到副节点依次运行此脚本：
+5. 以 Qwen2.5VL 32B 模型为例,若增加机器规模的情况下，可通过修改[启动脚本](../../examples/verl_plugin/scripts/train_qwen2_5_vl_32b_grpo_full.sh)的配置：
+
+    ```shell
+    vim examples/grpo_trainer/train_qwen2_5_vl_32b_grpo_full.sh
+    ```
+
+    修改以下配置，设置多机规模：
+
+    ```shell
+    nnodes=1 # 节点数
+    n_gpus_per_node=16 # NPU卡数
+    ```
+
+    规模增加，可修改以下配置，将推理部分减少FSDP切分参数，减少冗余通讯：
+
+     ```shell
+    train_batch_size=256 # 增大GBS，如修改为512
+    log_prob_micro_batch_size_per_gpu=4 # 增加推理阶段对通讯的掩盖，如修改为16
+    parameters=0  # 减少wrap参数，如修改为1e7
+    ```
+
+6. 启动ray, 若多机运行，需主节点到副节点依次运行此脚本：
 
     ```bash
     bash examples/grpo_trainer/ray_start.sh
     ```
 
-6. 启动训练脚本：
+7. 启动训练脚本：
     - `model_path`为模型权重路径，`data_path`为数据集路径
     - 若多机运行，*仅需主节点*需运行此脚本
 
@@ -307,6 +328,15 @@ pip install "ray[default]" debugpy
 <a id="jump6"></a>
 
 ## 性能数据
+
+**注**：geo3k数据集。
+
+| 模型                  | 机器型号     | GBS | n_samples | max_prompt_length | max_response_length | max_num_batched_tokens | 端到端 tps |
+|---------------------|----------|-----|-----------|-------------------|------------|---------|---------|
+| Qwen2.5VL-7B          | Atlas 200T A2 Box16 | 512  | 5        | 1024              | 2048       | 8192 | 142.42     |
+| Qwen2.5VL-32B          | Atlas 200T A2 Box16 | 256  | 5        | 1024              | 2048       | 8192 | 103.50     |
+
+**注**：因数据集为非公开数据，此性能结果仅供参考。
 
 | 模型                  | 机器型号     | GBS | n_samples | max_prompt_length | max_response_length | max_num_batched_tokens | 端到端 tps |
 |---------------------|----------|-----|-----------|-------------------|------------|---------|---------|
