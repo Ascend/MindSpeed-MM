@@ -53,7 +53,7 @@ commit_id=2d57e21
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 2.2.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -74,12 +74,9 @@ mkdir ckpt
 conda create -n test python=3.10
 conda activate test
 
-# 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
+# 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch及torch_npu包
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
-
-# apex for Ascend 参考 https://gitcode.com/Ascend/apex
-# 建议从原仓编译安装
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git

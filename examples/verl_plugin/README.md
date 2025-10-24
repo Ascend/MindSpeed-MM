@@ -124,7 +124,7 @@ pip install torch_npu-2.5.1*.manylinux2014_*.whl
 
 ```bash
 # 请确保 vllm 已正确安装并且之后不会做覆盖
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 2.2.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM/examples/verl_plugin
 pip install -v -e .
 scp -r scripts/* ../../../verl/examples/grpo_trainer/

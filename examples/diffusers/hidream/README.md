@@ -55,12 +55,9 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
     conda create -n test python=3.10
     conda activate test
 
-    # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
+    # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch及torch_npu包
     pip install torch-2.7.1-cp310-cp310m-manylinux2014_aarch64.whl 
     pip install torch_npu-2.7.1*-cp310-cp310m-linux_aarch64.whl
-    
-    # apex for Ascend 参考 https://gitcode.com/Ascend/apex
-    # 建议从原仓编译安装
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
     source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -69,7 +66,7 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
 2. 克隆仓库到本地服务器
 
     ```shell
-    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+    git clone --branch 2.2.0 https://gitcode.com/Ascend/MindSpeed-MM.git
     ```
 
 3. 模型搭建

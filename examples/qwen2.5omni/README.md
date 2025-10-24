@@ -69,7 +69,7 @@ commit id: 52f25651a2016ddede2283be17cf40c2c1b906ed
 <a id="jump1.2"></a>
 #### 2. 环境搭建
 ```bash
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 2.2.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1

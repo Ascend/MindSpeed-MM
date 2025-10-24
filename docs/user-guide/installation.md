@@ -89,10 +89,3 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310*.whl 
 pip install torch_npu-2.7.1*-cp310-cp310*.whl
 ```
-
-安装apex
-
-```shell
-# apex for Ascend 构建参考 https://gitcode.com/Ascend/apex
-pip3 install --upgrade apex-0.1+ascend-{version}.whl # version为python版本和cpu架构
-```

@@ -49,7 +49,7 @@ commit_id=d13434fd7b46fcc147f0fa82f4a73b0eeeb1fea4
 #### 1. 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 2.2.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -80,8 +80,7 @@ pip install torch_npu-2.5.1*.manylinux2014_aarch64.whl
 # 安装MindSPeed MM依赖
 pip install -r MindSpeed-MM/examples/rl/requirements.txt
 
-# apex for Ascend 参考 https://gitcode.com/Ascend/apex
-# 建议从原仓编译安装，需要先source CANN环境
+，需要先source CANN环境
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git

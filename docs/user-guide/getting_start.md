@@ -11,7 +11,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，因此下面�
 #### 1.2 仓库拉取以及MindSpeed MM依赖安装
 仓库拉取：
 ```bash
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 2.2.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -241,7 +241,7 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_3b.sh
 #### 1.2 仓库拉取以及MindSpeed MM依赖安装
 仓库拉取：
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+git clone --branch 2.2.0 https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
