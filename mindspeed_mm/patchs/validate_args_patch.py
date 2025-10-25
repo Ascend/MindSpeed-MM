@@ -1,4 +1,4 @@
-# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
 import os
 import warnings
 import torch
@@ -762,7 +762,7 @@ def validate_args(args, defaults=None):
     ensure_valid(not (getattr(args, 'calculate_per_sample_loss', False) and getattr(args, 'calculate_per_token_loss', False)),
                  ("calculate_per_sample_loss and calculate_per_token_loss cannot be used simultaneously; "
                   "only one of them can be enabled. If neither is specified, loss computation will fall back to the default behavior. "
-                  "For more details, please refer to the relevant documentation: vlm-model_loss_calculate_type.md"
+                  "For more details, please refer to the relevant documentation: vlm_model_loss_calculate_type.md"
                   ))
 
     # Print arguments.
