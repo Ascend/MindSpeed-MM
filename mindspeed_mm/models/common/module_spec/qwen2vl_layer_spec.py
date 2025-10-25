@@ -18,22 +18,41 @@ from megatron.core.transformer.transformer_layer import (
 from megatron.core.models.gpt.gpt_layer_specs import _get_mlp_module_spec
 
 from mindspeed_mm.models.common.module_spec.llava_layer_spec import get_mlp_module_spec
-from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlVitSelfAttention, Qwen2vlSelfAttention, Qwen2_5VitDotProductAttention
+from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlVitSelfAttention, Qwen2vlSelfAttention
+from mindspeed_mm.patchs.canonical_layer_patch import (
+    PatchSplitQKVSelfAttention,
+    _patch_get_mlp_module_spec,
+    PatchViTSelfAttention,
+    SplitQKVSelfAttentionSubmodules
+    )
 
 
 def get_qwen2vl_llm_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
     qk_layernorm = False
-
-    mlp = _get_mlp_module_spec(use_te=False)
+    canonical_model = getattr(config, 'canonical_model', False)
+    if canonical_model:
+        mlp = _patch_get_mlp_module_spec(use_te=False)
+    else:
+        mlp = _get_mlp_module_spec(use_te=False)
     return ModuleSpec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
             input_layernorm=TENorm,
             self_attention=ModuleSpec(
-                module=Qwen2vlSelfAttention,
+                module=Qwen2vlSelfAttention if not canonical_model else PatchSplitQKVSelfAttention,
                 params={"attn_mask_type": AttnMaskType.causal},
                 submodules=SelfAttentionSubmodules(
                     linear_qkv=ColumnParallelLinear,
+                    core_attention=DotProductAttention,
+                    linear_proj=RowParallelLinear,
+                    q_layernorm=TENorm if qk_layernorm else IdentityOp,
+                    k_layernorm=TENorm if qk_layernorm else IdentityOp,
+                ) if not canonical_model else
+                SplitQKVSelfAttentionSubmodules(
+                    linear_qkv=ColumnParallelLinear,
+                    q_proj=ColumnParallelLinear,
+                    k_proj=ColumnParallelLinear,
+                    v_proj=ColumnParallelLinear,
                     core_attention=DotProductAttention,
                     linear_proj=RowParallelLinear,
                     q_layernorm=TENorm if qk_layernorm else IdentityOp,
@@ -55,13 +74,17 @@ def get_qwen2vl_llm_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
 def get_qwen2vl_layer_spec(config=None, is_vit=True, *args, **kwargs) -> ModuleSpec:
     attn_mask_type = AttnMaskType.no_mask if is_vit else AttnMaskType.causal
 
-    mlp = get_mlp_module_spec(use_te=False)
+    canonical_model = getattr(config, 'canonical_model', False)
+    if canonical_model:
+        mlp = _patch_get_mlp_module_spec(use_te=False)
+    else:
+        mlp = _get_mlp_module_spec(use_te=False)
     return ModuleSpec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
             input_layernorm=TENorm,
             self_attention=ModuleSpec(
-                module=Qwen2vlVitSelfAttention,
+                module=Qwen2vlVitSelfAttention if not canonical_model else PatchViTSelfAttention,
                 params={
                     "attn_mask_type": attn_mask_type
                 },

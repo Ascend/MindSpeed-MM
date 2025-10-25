@@ -138,7 +138,7 @@ mm-convert  VideoAlignConverter hf_to_mm \
   --cfg.parallel_config.vit_pp_layers [[32]] \
   --cfg.parallel_config.tp_size 1 \
   --cfg.common_model_config.resize_vocab_size 151660 \
-  --cfg.enable_canonical_hf_struct true
+  --cfg.common_model_config.enable_canonical_hf_struct true
 
 # VideoAlign权重转mm用于微调/推理/评测
 mm-convert  VideoAlignConverter hf_to_mm \
@@ -149,7 +149,7 @@ mm-convert  VideoAlignConverter hf_to_mm \
   --cfg.parallel_config.vit_pp_layers [[32]] \
   --cfg.parallel_config.tp_size 1 \
   --cfg.common_model_config.model_prefix "base_model.model." \
-  --cfg.enable_canonical_hf_struct true
+  --cfg.common_model_config.enable_canonical_hf_struct true
 
 ```
 

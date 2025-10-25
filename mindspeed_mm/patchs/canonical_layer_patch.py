@@ -5,6 +5,7 @@ import warnings
 
 from dataclasses import dataclass
 import torch
+import torch.nn.functional as F
 
 import megatron
 from megatron.core.transformer.module import MegatronModule

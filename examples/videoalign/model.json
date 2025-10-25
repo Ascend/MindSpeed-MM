@@ -73,6 +73,7 @@
         "activation_func": "silu",
         "use_fused_rotary_pos_emb": true,
         "use_remove_padding": true,
+        "sparse_mode": 3,
         "attention_softmax_in_fp32": true,
         "params_dtype": "bf16",
         "bf16": true,

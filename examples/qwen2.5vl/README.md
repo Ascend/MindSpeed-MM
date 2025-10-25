@@ -143,12 +143,21 @@ mm-convert  Qwen2_5_VLConverter hf_to_mm \
   --cfg.parallel_config.vit_pp_layers [[32,0,0,0,0,0,0,0]] \
   --cfg.parallel_config.tp_size 2
 
+# 7b 采用huggingface一致的模型结构的权重转换
+mm-convert  Qwen2_5_VLConverter hf_to_mm \
+  --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
+  --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-7B-Instruct" \
+  --cfg.parallel_config.llm_pp_layers [[12,16]] \
+  --cfg.parallel_config.vit_pp_layers [[32,0]] \
+  --cfg.parallel_config.tp_size 1 \
+  --cfg.common_model_config.enable_canonical_hf_struct true
 # 其中：
 # mm_dir: 转换后保存目录
 # hf_dir: huggingface权重目录
 # llm_pp_layers: llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 # vit_pp_layers: vit在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 # tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
+# enable_canonical_hf_struct: 是否采用和huggingface一致的模型结构（llm无qkv融合、mlp融合），lora微调建议开启
 ```
 
 <a id="jump2.3"></a>
@@ -164,6 +173,16 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
   --cfg.parallel_config.llm_pp_layers [1,10,10,7] \
   --cfg.parallel_config.vit_pp_layers [32,0,0,0] \
   --cfg.parallel_config.tp_size 1
+
+# 采用和huggingface一致的模型结构
+mm-convert  Qwen2_5_VLConverter mm_to_hf \
+  --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-VL-7B-Instruct" \
+  --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
+  --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-7B-Instruct" \
+  --cfg.parallel_config.llm_pp_layers [1,10,10,7] \
+  --cfg.parallel_config.vit_pp_layers [32,0,0,0] \
+  --cfg.parallel_config.tp_size 1 \
+  --cfg.common_model_config.enable_canonical_hf_struct true
 # 其中：
 # save_hf_dir: mm微调后转换回hf模型格式的目录
 # mm_dir: 微调后保存的权重目录
@@ -171,6 +190,7 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
 # llm_pp_layers: llm在每个卡上切分的层数，注意要和微调时model.json中配置的pipeline_num_layers一致
 # vit_pp_layers: vit在每个卡上切分的层数，注意要和微调时model.json中配置的pipeline_num_layers一致
 # tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
+# enable_canonical_hf_struct: 是否采用和huggingface一致的模型结构（llm无qkv融合、mlp融合），lora微调建议开启
 ```
 如果需要用转换后模型训练的话，同步修改`examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh`中的`LOAD_PATH`参数，该路径为转换后或者切分后的权重，注意与原始权重 `ckpt/hf_path/Qwen2.5-VL-7B-Instruct`进行区分。
 
@@ -431,6 +451,49 @@ TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重�
 }
 ```
 
+【huggingface等价模型结构配置（可选）】
+
+Megatron框架下的qwen2.5VL模型结构相比于huggingface的模型结构实现有差异：Megatron会对vit模型的qkv权重矩阵进行交织重排、mlp的gate_proj和up_proj权重矩阵进行融合，llm模型的q、k、v权重矩阵、mlp的gate_proj和up_proj权重矩阵进行融合。
+
+开启该功能可以使用完全与huggingface一致的模型结构进行训练。Lora微调场景建议开启该功能。
+
+相关配置修改如下：
+
+`model_xxb.json`使能`canonical_model`
+```json
+{
+  "model_id": "qwen2_5vl",
+  "img_context_token_id": 151655,
+  "vision_start_token_id": 151652,
+  "image_encoder": {
+    "vision_encoder": {
+      "model_id": "qwen2vit",
+      "canonical_model": true,
+      ...
+    },
+    ...
+    "text_decoder": {
+      "model_id": "qwen2lm",
+      "canonical_model": true,
+      ...
+    }        
+  }
+}
+```
+
+若开启lora微调，`examples/qwen2.5vl/finetune_qwen2_5_vl_xxb.sh`中的`lora-target-modules`需要做如下替换：
+
+
+| 参数         | 替换参数                  |
+|------------|-----------------------|
+| `linear_fc1` | `gate_proj` `up_proj`     |
+| `linear_qkv` | `q_proj` `k_proj` `v_proj`  |
+
+示例配置为：
+
+`--lora-target-modules linear_proj linear_fc2 q_proj k_proj v_proj gate_proj up_proj \`
+
+注：开启该功能需在权重转换中将`enable_canonical_hf_struct`置为true
 
 <a id="jump4.3"></a>
 #### 3. 启动微调

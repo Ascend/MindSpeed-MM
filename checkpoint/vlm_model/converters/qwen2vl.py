@@ -1,10 +1,10 @@
-from typing import Any, cast, List
+from typing import Any, cast, List, Optional
 
 from tqdm import tqdm
 
 from checkpoint.common.converter import Converter
 from checkpoint.common.permissions import set_directory_permissions
-from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
+from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig, CommonModelConfig
 from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema, split_by_tp, convert_hf_to_mm, merge_vpp_index, \
     partition_state_dict_by_pp, save_by_vpp
 from checkpoint.vlm_model.mm_to_hf import load_from_mm, convert_mm_to_hf, merge_by_tp
@@ -13,40 +13,11 @@ from checkpoint.vlm_model.operator import (
 )
 
 
-def create_qwen2vl_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_groups: int,
+def create_qwen2vl_ops(enable_canonical_hf_struct: bool, vit_embed_dim: int, vit_num_heads: int,
+                       llm_num_query_groups: int,
                        llm_q_size: int, llm_kv_size: int) -> List[Operator]:
     """qwen2vl权重转换逻辑"""
     ops = [
-        UpGateMergeOp(raw_names=[r"model.layers.(\d+).mlp.gate_proj.weight", r"model.layers.(\d+).mlp.up_proj.weight"],
-                      new_name=r"text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight"),
-        QKVMergeOp(raw_names=(r"model.layers.(\d+).self_attn.q_proj.weight",
-                              r"model.layers.(\d+).self_attn.k_proj.weight",
-                              r"model.layers.(\d+).self_attn.v_proj.weight"),
-                   new_name=r"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight",
-                   group=llm_num_query_groups,
-                   q_size=llm_q_size,
-                   k_size=llm_kv_size,
-                   v_size=llm_kv_size,
-                   ),
-        QKVMergeOp(raw_names=(r"model.layers.(\d+).self_attn.q_proj.bias",
-                              r"model.layers.(\d+).self_attn.k_proj.bias",
-                              r"model.layers.(\d+).self_attn.v_proj.bias"),
-                   new_name=r"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias",
-                   group=llm_num_query_groups,
-                   q_size=llm_q_size,
-                   k_size=llm_kv_size,
-                   v_size=llm_kv_size,
-                   ),
-        RelocateOp(name=r"visual.blocks.(\d+).attn.qkv.weight",
-                   new_name=r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight",
-                   group=vit_num_heads,
-                   split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
-                   ),
-        RelocateOp(name=r"visual.blocks.(\d+).attn.qkv.bias",
-                   new_name=r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias",
-                   group=vit_num_heads,
-                   split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
-                   ),
         RenameOp(
             (
                 (r'visual.blocks.(\d+).attn.proj',
@@ -73,16 +44,65 @@ def create_qwen2vl_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_gro
             )
         ),
     ]
+
+    if not enable_canonical_hf_struct:
+        mega_ops = [
+            UpGateMergeOp(
+                raw_names=[r"model.layers.(\d+).mlp.gate_proj.weight", r"model.layers.(\d+).mlp.up_proj.weight"],
+                new_name=r"text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight"),
+            QKVMergeOp(raw_names=(r"model.layers.(\d+).self_attn.q_proj.weight",
+                                  r"model.layers.(\d+).self_attn.k_proj.weight",
+                                  r"model.layers.(\d+).self_attn.v_proj.weight"),
+                       new_name=r"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight",
+                       group=llm_num_query_groups,
+                       q_size=llm_q_size,
+                       k_size=llm_kv_size,
+                       v_size=llm_kv_size,
+                       ),
+            QKVMergeOp(raw_names=(r"model.layers.(\d+).self_attn.q_proj.bias",
+                                  r"model.layers.(\d+).self_attn.k_proj.bias",
+                                  r"model.layers.(\d+).self_attn.v_proj.bias"),
+                       new_name=r"text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias",
+                       group=llm_num_query_groups,
+                       q_size=llm_q_size,
+                       k_size=llm_kv_size,
+                       v_size=llm_kv_size,
+                       ),
+            RelocateOp(name=r"visual.blocks.(\d+).attn.qkv.weight",
+                       new_name=r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight",
+                       group=vit_num_heads,
+                       split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
+                       ),
+            RelocateOp(name=r"visual.blocks.(\d+).attn.qkv.bias",
+                       new_name=r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias",
+                       group=vit_num_heads,
+                       split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
+                       ),
+        ]
+        ops.extend(mega_ops)
+
+    else:
+        canonical_ops = RenameOp(
+            (
+                (r"visual.blocks.(\d+).attn.qkv.weight",
+                 r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight"),
+                (r"visual.blocks.(\d+).attn.qkv.bias",
+                 r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias"),
+                (r'model.layers.(\d+).self_attn.q_proj', r'text_decoder.decoder.layers.(\d+).self_attention.q_proj'),
+                (r'model.layers.(\d+).self_attn.k_proj', r'text_decoder.decoder.layers.(\d+).self_attention.k_proj'),
+                (r'model.layers.(\d+).self_attn.v_proj', r'text_decoder.decoder.layers.(\d+).self_attention.v_proj'),
+                (r'model.layers.(\d+).mlp.up_proj', r'text_decoder.decoder.layers.(\d+).mlp.up_proj'),
+                (r'model.layers.(\d+).mlp.gate_proj', r'text_decoder.decoder.layers.(\d+).mlp.gate_proj')
+            )
+        )
+        ops.append(canonical_ops)
     return ops
 
 
-qwen2vl_tp_patterns = {
+base_qwen2vl_tp_patterns = {
     r"text_decoder.output_layer.weight": RowSplit,
     r"text_decoder.embedding.word_embeddings.weight": RowSplit,
-    r'text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight': GLUSplit,
     r'text_decoder.decoder.layers.(\d+).mlp.linear_fc2.weight': ColSplit,
-    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowSplit,
-    r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowSplit,
     r'text_decoder.decoder.layers.(\d+).self_attention.linear_proj.weight': ColSplit,
     r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_proj.weight": ColSplit,
     r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias": RowSplit,
@@ -95,8 +115,38 @@ qwen2vl_tp_patterns = {
     r"image_encoder.projector.encoder.linear_fc2.weight": ColSplit
 }
 
+qwen2vl_tp_patterns = {
+    **base_qwen2vl_tp_patterns,
+    **{
+        r'text_decoder.decoder.layers.(\d+).mlp.linear_fc1.weight': GLUSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.weight': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv.bias': RowSplit,
+    }
+}
+
+canonical_qwen2vl_tp_patterns = {
+    **base_qwen2vl_tp_patterns,
+    **{
+        r'text_decoder.decoder.layers.(\d+).self_attention.q_proj.weight': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.k_proj.weight': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.v_proj.weight': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.q_proj.bias': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.k_proj.bias': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).self_attention.v_proj.bias': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).mlp.gate_proj.weight': RowSplit,
+        r'text_decoder.decoder.layers.(\d+).mlp.up_proj.weight': RowSplit
+    }
+}
+
+
+class ModelConfigQwen2(CommonModelConfig):
+    enable_canonical_hf_struct: Optional[bool] = False
+    """是否使用标准huggingface模型结构"""
+
 
 class ConvertVppMMConfigQwen2(ConvertVppMMConfig):
+    common_model_config: ModelConfigQwen2 = ModelConfigQwen2()
+    """权重转换框架的模型配置"""
 
     def model_post_init(self, _context):
         from transformers.models.qwen2_vl import Qwen2VLConfig
@@ -107,18 +157,24 @@ class ConvertVppMMConfigQwen2(ConvertVppMMConfig):
         self.common_model_config.tie_word_embeddings = config.tie_word_embeddings
 
 
+class ConvertHFConfigQwen2(ConvertHFConfig):
+    common_model_config: ModelConfigQwen2 = ModelConfigQwen2()
+    """权重转换框架的模型配置"""
+
+
 class Qwen2VLConverter(Converter):
     """Qwen2VL模型转换工具"""
 
     @staticmethod
     # 创建转换操作,加下划线之后命令行会自动忽略这条子命令
-    def _create_ops(config: Any) -> List[Operator]:
+    def _create_ops(config: Any, common_model_config: Any) -> List[Operator]:
         from transformers.models.qwen2_vl import Qwen2VLConfig
         config = cast(Qwen2VLConfig, config)
         llm_head_hidden_size = config.hidden_size // config.num_attention_heads
         llm_q_size = llm_head_hidden_size * config.num_attention_heads // config.num_key_value_heads
         llm_kv_size = llm_head_hidden_size
-        ops = create_qwen2vl_ops(config.vision_config.embed_dim,
+        ops = create_qwen2vl_ops(common_model_config.enable_canonical_hf_struct,
+                                 config.vision_config.embed_dim,
                                  config.vision_config.num_heads,
                                  config.num_key_value_heads,
                                  llm_q_size,
@@ -129,17 +185,24 @@ class Qwen2VLConverter(Converter):
     @staticmethod
     def hf_to_mm(cfg: ConvertVppMMConfigQwen2):
         """huggingface模型转换mindspeed-mm模型权重"""
-        ops = Qwen2VLConverter._create_ops(cfg.hf_config.config)
-
-        convert_hf_to_mm(cfg, ops, qwen2vl_tp_patterns, [vision_schema, text_schema])
+        ops = Qwen2VLConverter._create_ops(cfg.hf_config.config, cfg.common_model_config)
+        if cfg.common_model_config.enable_canonical_hf_struct:
+            qwen2vl_tp_patterns_indeed = canonical_qwen2vl_tp_patterns
+        else:
+            qwen2vl_tp_patterns_indeed = qwen2vl_tp_patterns
+        convert_hf_to_mm(cfg, ops, qwen2vl_tp_patterns_indeed, [vision_schema, text_schema])
         # 安全管控权限
         set_directory_permissions(cfg.mm_dir)
 
     @staticmethod
-    def mm_to_hf(cfg: ConvertHFConfig):
+    def mm_to_hf(cfg: ConvertHFConfigQwen2):
         """mindspeed-mm模型转换huggingface模型权重"""
-        ops = Qwen2VLConverter._create_ops(cfg.hf_config.config)
-        convert_mm_to_hf(cfg, ops, qwen2vl_tp_patterns)
+        ops = Qwen2VLConverter._create_ops(cfg.hf_config.config, cfg.common_model_config)
+        if cfg.common_model_config.enable_canonical_hf_struct:
+            qwen2vl_tp_patterns_indeed = canonical_qwen2vl_tp_patterns
+        else:
+            qwen2vl_tp_patterns_indeed = qwen2vl_tp_patterns
+        convert_mm_to_hf(cfg, ops, qwen2vl_tp_patterns_indeed)
         # 安全管控权限
         set_directory_permissions(cfg.save_hf_dir)
 
