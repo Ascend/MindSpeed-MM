@@ -93,6 +93,9 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         if self.cpu_offload:
             local_rank = int(os.getenv("LOCAL_RANK"))
             self.enable_model_cpu_offload(local_rank)
+        else:
+            if self.model_type in ["wan2.2-t2v", "wan2.2-i2v"]:
+                raise ValueError("Wan2.2-A14B requires setting cpu_offload to true to avoid OOM.")
 
     def enable_model_cpu_offload(self, npu_id: Optional[int] = 0, device: Union[torch.device, str] = "npu"):
         torch_device = torch.device(device)
