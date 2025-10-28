@@ -242,13 +242,26 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
     parameters=0  # 减少wrap参数，如修改为1e7
     ```
 
-6. 启动ray, 若多机运行，需主节点到副节点依次运行此脚本：
+6. 以 Qwen2.5VL 32B 模型为例，若想要增大步数，可修改以下配置参数：
+
+    ```shell
+    vim examples/grpo_trainer/train_qwen2_5_vl_32b_grpo_full.sh
+    ```
+
+    增加`total_epochs`配置参数（需大于total_training_steps）：
+
+    ```shell
+    trainer.total_epochs=300 \
+    trainer.total_training_steps=150 \ # 原代码
+    ```
+
+7. 启动ray, 若多机运行，需主节点到副节点依次运行此脚本：
 
     ```bash
     bash examples/grpo_trainer/ray_start.sh
     ```
 
-7. 启动训练脚本：
+8. 启动训练脚本：
     - `model_path`为模型权重路径，`data_path`为数据集路径
     - 若多机运行，*仅需主节点*需运行此脚本
 
