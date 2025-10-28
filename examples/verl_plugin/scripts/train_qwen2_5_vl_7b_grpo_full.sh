@@ -104,6 +104,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.nnodes=$nnodes \
     trainer.save_freq=20 \
     trainer.test_freq=-1 \
+    trainer.total_epochs=30 \
     trainer.total_training_steps=100 \
     trainer.device=npu \
     trainer.val_before_train=False \

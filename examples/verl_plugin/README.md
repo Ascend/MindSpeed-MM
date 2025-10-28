@@ -248,11 +248,11 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
     vim examples/grpo_trainer/train_qwen2_5_vl_32b_grpo_full.sh
     ```
 
-    增加`total_epochs`配置参数（需大于total_training_steps）：
+    增大`total_epochs`配置参数为想要训练的总步数（以300个epochs为例），并将`total_training_steps`设置为null：
 
     ```shell
     trainer.total_epochs=300 \
-    trainer.total_training_steps=150 \ # 原代码
+    trainer.total_training_steps='null' \
     ```
 
 7. 启动ray, 若多机运行，需主节点到副节点依次运行此脚本：
