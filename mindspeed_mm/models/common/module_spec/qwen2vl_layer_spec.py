@@ -18,7 +18,7 @@ from megatron.core.transformer.transformer_layer import (
 from megatron.core.models.gpt.gpt_layer_specs import _get_mlp_module_spec
 
 from mindspeed_mm.models.common.module_spec.llava_layer_spec import get_mlp_module_spec
-from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlVitSelfAttention, Qwen2vlSelfAttention
+from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlVitSelfAttention, Qwen2vlSelfAttention, Qwen2_5VitDotProductAttention
 from mindspeed_mm.patchs.canonical_layer_patch import (
     PatchSplitQKVSelfAttention,
     _patch_get_mlp_module_spec,
