@@ -94,6 +94,13 @@ pip install -e .
 
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen3-VL-*B-Instruct`目录下。(*表示对应的尺寸)
 
+如果使用fsdp2的meta init初始化模型，需要先完成以下权重转换
+```bash
+mm-convert Qwen3VLConverter hf_to_dcp \
+  --hf_dir Qwen3-VL-xxB \
+  --dcp_dir Qwen3-VL-xxB-dcp \
+```
+并在examples/qwen3vl/finetune_qwen3vl.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数
 
  ---
 <a id="jump3"></a>
@@ -282,11 +289,10 @@ bash examples/qwen3vl/finetune_qwen3vl.sh
 #### 4. 启动推理
 训练完成之后，以Qwen3VL-xxB为例，将保存在`save_dir`目录下的权重转换成huggingface格式
 ```shell
-python checkpoint/common/merge_dcp_to_hf.py \
+mm-convert Qwen3VLConverter dcp_to_hf \
   --load-dir save_dir/iter_000xx/ \
   --save-dir save_dir/iter_000xx_hf/ \
   --model-assets-dir ./ckpt/Qwen3-VL-xxB-Instruct \
-  --prefix model.
 ```
 其中，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径，`--model_assets_dir`原始huggingface权重的路径。
 
