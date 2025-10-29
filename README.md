@@ -26,6 +26,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 ---
 
 
+* [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型 【Prototype】
 * [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型 【Prototype】
 * [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
 * [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
@@ -171,6 +172,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 
 |       模型 \ 特性       | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) | RL |
 |:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|:------:|
+|       Wan2.2        |  |  |  |  | CP (Ulysses) | ✔ | ✔ |  |  |
 | OpenSoraPlan1.5-T2V | ✔ | ✔ |  |  |  |  | ✔ |  |  |
 |       Wan2.1        |  |  |  |  | CP (Ulysses) | ✔ | ✔ | ✔ |  |
 |    HunyuanVideo     | ✔ | ✔ |  |  | CP (Ulysses) | ✔ | ✔ | ✔ |  |
@@ -191,8 +193,8 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 |    Qwen2.5VL-7B     | ✔ | ✔ |  | ✔ |  | ✔ | ✔ |  | GRPO |
 |    Qwen2.5VL-32B    | ✔ | ✔ |  | ✔ |  | ✔ | ✔ |  | GRPO |
 |    Qwen2.5VL-72B    | ✔ | ✔ |  | ✔ |  | ✔ | ✔ | ✔ |  |
-|    Qwen2.5Omni-7B   | ✔ |  |  | ✔ |  | ✔ |  | ✔ |  |
-|    InternVL3-8B    | ✔ | ✔ | ✔ | ✔ | CP (Ring) | ✔ | ✔ |  |
+|   Qwen2.5Omni-7B    | ✔ |  |  | ✔ |  | ✔ |  | ✔ |  |
+|    InternVL3-8B     | ✔ | ✔ | ✔ | ✔ | CP (Ring) | ✔ | ✔ |  |
 |    InternVL3-78B    | ✔ | ✔ | ✔ | ✔ | CP (Ring) | ✔ | ✔ |  |
 
 备注：
@@ -250,7 +252,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </thead>
   <tbody>
     <tr>
-      <td rowspan="36"> 多模态生成 </td>
+      <td rowspan="40"> 多模态生成 </td>
       </tr>
       <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/lumina">Lumina-mGPT 2.0</a></td>
@@ -273,6 +275,49 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> / </td>
       <td> / </td>
       <td>【北大贡献】</td>
+    </tr>
+      <tr>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.2">Wan2.2-T2V</a></td>
+      <td><a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">5B</a></td>
+      <td> 预训练 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 5.16 (SPS)(A3) </td>
+      <td> 3.81 (SPS) </td>
+      <td> / </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td><a href="https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers">A14B</a></td>
+      <td> 预训练 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 0.727 (SPS)(A3) </td>
+      <td> / </td>
+      <td> / </td>
+      <td>【Test】</td>
+    </tr>
+      <tr>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.2">Wan2.2-TI2V</a></td>
+      <td><a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">5B</a></td>
+      <td> 预训练 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 5.16 (SPS)(A3) </td>
+      <td> 3.81 (SPS) </td>
+      <td> / </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.2">Wan2.2-I2V</a></td>
+      <td><a href="https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers">A14B</a></td>
+      <td> 预训练 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 0.670 (SPS)(A3) </td>
+      <td> 0.571 (SPS) </td>
+      <td> / </td>
+      <td>【Test】</td>
     </tr>
       <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.1">Wan2.1-T2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers">1.3B</a></td>
