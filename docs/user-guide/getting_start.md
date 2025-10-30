@@ -6,7 +6,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，因此下面�
 ### 1. 环境安装
 #### 1.1 昇腾软件安装
 昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/user-guide/installation.md)
-(基于python3.10)
+(基于Python3.10)
 
 #### 1.2 仓库拉取以及MindSpeed MM依赖安装
 仓库拉取：
@@ -107,7 +107,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 ```
 
 ### 3. 数据集准备及处理
-#### 3.1 数据集下载(以coco2017数据集为例)
+#### 3.1 数据集下载（以coco2017数据集为例）
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
 (2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
@@ -317,7 +317,7 @@ python examples/wan2.1/convert_ckpt.py --source_path <./weights/Wan-AI/Wan2.1-{T
 
 如需转回Hugging Face格式，需运行权重转换脚本：
 
-**注**： 如进行layer zero进行训练，则需首先进行其[训练权重后处理](#jump1)，在进行如下操作：
+**注**： 如进行layer zero训练，则需首先进行其[训练权重后处理](#jump1)，再进行如下操作：
 
 ```shell
 python examples/wan2.1/convert_ckpt.py --source_path <path for your saved weight/> --ckpt_path <./weights/Wan-AI/Wan2.1-{T2V/I2V}-{1.3/14}B-Diffusers/transformer/> --target_path <path for your saved weight/> --mode convert_to_hf
@@ -372,7 +372,7 @@ python examples/wan2.1/convert_ckpt.py --source_path <path for your saved weight
 ]
 ```
 
-修改`examples/wan2.1/feature_extract/data.txt`文件，其中每一行表示个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
+修改`examples/wan2.1/feature_extract/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
 
 ### 4.1 特征提取
 
