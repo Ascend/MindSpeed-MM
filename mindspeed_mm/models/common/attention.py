@@ -80,15 +80,15 @@ def do_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask, dropou
 
 
 def do_npu_fusion_attention(
-        q, k, v, 
-        head_num, 
-        softmax_scale, 
-        layout="BNSD", 
+        q, k, v,
+        head_num,
+        softmax_scale,
+        layout="BNSD",
         attn_mask=None,
         actual_seq_qlen=None,
-        actual_seq_kvlen=None, 
-        dropout_p=0., 
-        pse=None, 
+        actual_seq_kvlen=None,
+        dropout_p=0.,
+        pse=None,
         sparse_mode=0,
         async_offload=False,
         block_idx=0,
@@ -203,7 +203,7 @@ class FlashAttention(nn.Module):
             else:
                 if attention_mask is not None:
                     attention_mask.view(batch_size, 1, -1, attention_mask.shape[-1])
-            
+
             output = do_npu_fusion_attention(
                 query, key, value,
                 head_num=n_head,
@@ -219,7 +219,7 @@ class FlashAttention(nn.Module):
 
         output = change_tensor_layout(output, self.fa_layout, "sbh", batch_size=batch_size)
         return output
-    
+
 
 class ParallelAttention(nn.Module):
     """
@@ -291,7 +291,7 @@ class ParallelAttention(nn.Module):
         self.head_dim = core.utils.divide(hidden_size, num_attention_heads)
         self.num_attention_heads_per_partition = core.utils.divide(num_attention_heads, self.tp_size)
         self.attention_mask_type = args.attention_mask_type
-        
+
         # Strided linear layer.
         if self.attention_type == AttnType.self_attn and self.is_qkv_concat:
             self.proj_qkv = tensor_parallel.ColumnParallelLinear(
@@ -309,7 +309,7 @@ class ParallelAttention(nn.Module):
                 init_method=config.init_method,
                 bias=proj_q_bias,
                 gather_output=False)
-            
+
             self.proj_kv = tensor_parallel.ColumnParallelLinear(
                 key_dim,
                 hidden_size * 2,
@@ -342,7 +342,7 @@ class ParallelAttention(nn.Module):
                 bias=proj_v_bias,
                 gather_output=False
             )
-        
+
         # Normalize
         if self.use_qk_norm:
             self.q_norm = normalize(
@@ -365,7 +365,7 @@ class ParallelAttention(nn.Module):
             if isinstance(self.k_norm, nn.LayerNorm):
                 for param in self.k_norm.parameters():
                     setattr(param, "sequence_parallel", self.sequence_parallel)
-        
+
         # Flash Attention
         self.core_attention_flash = FlashAttention(
             attention_dropout=dropout,
@@ -415,7 +415,7 @@ class ParallelAttention(nn.Module):
             query = self.proj_q(hidden_states)[0]
             key = self.proj_k(key_value_states)[0]
             value = self.proj_v(key_value_states)[0]
-        
+
         # [s, b, h] --> [s, b, n, d]
         batch_size = query.shape[1]
         query = query.view(-1, batch_size, self.num_attention_heads_per_partition, self.head_dim)
@@ -425,9 +425,9 @@ class ParallelAttention(nn.Module):
         if self.use_qk_norm:
             query = self.q_norm(query)
             key = self.k_norm(key)
-        
+
         return query, key, value
-    
+
     def function_before_core_attention(
         self,
         query: torch.Tensor,
@@ -438,7 +438,7 @@ class ParallelAttention(nn.Module):
         # For self attention we just duplicate the rotary_pos_emb if it isn't already
         if rotary_pos_emb is not None and not isinstance(rotary_pos_emb, tuple):
             rotary_pos_emb = (rotary_pos_emb,) * 2
-        
+
         # Reshape inputs into `sbh`
         query = change_tensor_layout(query, input_layout, "sbh")
         key = query if key is None else change_tensor_layout(key, input_layout, "sbh")
@@ -454,9 +454,9 @@ class ParallelAttention(nn.Module):
             q_pos_emb, k_pos_emb = rotary_pos_emb
             query = self.rope.apply_rotary_pos_emb(query, q_pos_emb)
             key = self.rope.apply_rotary_pos_emb(key, k_pos_emb)
-        
+
         return query, key, value
-    
+
     def function_after_core_attention(
         self,
         core_attn_out,
@@ -559,7 +559,7 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
             in_hybrid_mode = False
             if get_context_parallel_group_for_hybrid_ring(check_initialized=False) is not None:
                 in_hybrid_mode = True
-            
+
             if not in_hybrid_mode:
                 cp_group = mpu.get_context_parallel_group()
                 cp_size = mpu.get_context_parallel_world_size()
@@ -625,7 +625,7 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
         """
         x = repeat(x, 's b d -> s (k b) d', k=self.sparse_n)
         return x
-    
+
     def function_before_core_attention(
         self,
         query: torch.Tensor,
@@ -688,7 +688,7 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
         height=None,
         width=None,
         dtype=torch.bfloat16
-    ): 
+    ):
         args = get_args()
         total_frames = frames
         if self.cp_size > 1:
@@ -696,14 +696,14 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
             if args.context_parallel_algo == 'ulysses_cp_algo':
                 cp_group = mpu.get_context_parallel_group()
                 total_frames = frames * self.cp_size
-                
+
             if args.context_parallel_algo == 'hybrid_cp_algo':
                 cp_group = get_context_parallel_group_for_hybrid_ulysses()
                 total_frames = frames * args.ulysses_degree_in_cp
 
         if self.sparse1d:
             out = self._reverse_sparse_1d(out, total_frames, height, width)
-            
+
         if self.cp_size > 1:
             if args.context_parallel_algo == 'ulysses_cp_algo':
                 cp_group = mpu.get_context_parallel_group()
@@ -744,7 +744,7 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
                 input_layout="SBH",
                 scale=1 / math.sqrt(self.head_dim)
             )[0]
-        
+
         return out
 
     def forward(
@@ -758,7 +758,7 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
         input_layout: str = "sbh",
         rotary_pos_emb: Optional[torch.Tensor] = None,
     ):
-        
+
         # =====================
         # Query, Key, and Value
         # =====================
@@ -817,10 +817,10 @@ class MultiHeadSparseMMAttentionSBH(MultiHeadSparseAttentionSBH):
             sparse_group=sparse_group,
             elementwise_affine=elementwise_affine,
         )
-        
+
         self.head_dim = head_dim
         self.inner_dim = num_heads * self.head_dim
-        
+
         if qk_norm is None:
             self.norm_proj_q = None
             self.norm_proj_k = None
@@ -886,7 +886,7 @@ class MultiHeadSparseMMAttentionSBH(MultiHeadSparseAttentionSBH):
                 input_is_parallel=True,
                 skip_bias_add=False
             )
-    
+
     def rotate_half(self, x):
         x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2:]
         return torch.cat((-x2, x1), dim=-1)
@@ -917,7 +917,7 @@ class MultiHeadSparseMMAttentionSBH(MultiHeadSparseAttentionSBH):
         """
         x = rearrange(x, 's (k b) d -> s k b d', k=self.sparse_n).mean(1)
         return x
-    
+
     def _sparse_1d_enc(self, x):
         """
         require the shape of (ntokens x batch_size x dim)
@@ -945,7 +945,7 @@ class MultiHeadSparseMMAttentionSBH(MultiHeadSparseAttentionSBH):
             attention_mask: The attention mask to use.
             video_rotary_emb: The rotary embeddings for the video
         """
-        
+
         # Step 1: Project the hidden states and encoder hidden states
         q, _ = self.proj_q(hidden_states)
         k, _ = self.proj_k(hidden_states)
@@ -1075,7 +1075,7 @@ class ParallelMultiHeadAttentionSBH(nn.Module):
                                                                           self.sp_size)
 
         key_dim = key_dim if key_dim is not None else query_dim
-        
+
         self.proj_q = tensor_parallel.ColumnParallelLinear(
             query_dim,
             self.inner_dim,
@@ -1100,7 +1100,7 @@ class ParallelMultiHeadAttentionSBH(nn.Module):
             bias=proj_qkv_bias,
             gather_output=False
         )
-        
+
         self.proj_out = tensor_parallel.RowParallelLinear(
             self.inner_dim,
             query_dim,
@@ -1110,7 +1110,7 @@ class ParallelMultiHeadAttentionSBH(nn.Module):
             input_is_parallel=True,
             skip_bias_add=False
         )
-        
+
         self.dropout = nn.Dropout(dropout)
 
     def forward(
@@ -1154,10 +1154,10 @@ class ParallelMultiHeadAttentionSBH(nn.Module):
         sp_group = mpu.get_context_parallel_group()
 
         q = all_to_all_SBH(q, sp_group, scatter_dim=1, gather_dim=0)
-        if not is_cross_attention:  
+        if not is_cross_attention:
             k = all_to_all_SBH(k, sp_group, scatter_dim=1, gather_dim=0)
             v = all_to_all_SBH(v, sp_group, scatter_dim=1, gather_dim=0)
-        else:    
+        else:
             k = split_forward_gather_backward(k, sp_group, dim=1, grad_scale="down")
             v = split_forward_gather_backward(v, sp_group, dim=1, grad_scale="down")
 
@@ -1579,8 +1579,10 @@ class Conv2dAttnBlock(nn.Module):
         stride=1,
         padding=0,
         affine=True,
+        use_sdp_attention=False,
     ):
         super().__init__()
+        self.use_sdp_attention = use_sdp_attention
         self.norm = nn.GroupNorm(
             num_groups=num_groups, num_channels=in_channels, eps=eps, affine=affine
         )
@@ -1597,8 +1599,21 @@ class Conv2dAttnBlock(nn.Module):
             in_channels, out_channels, kernel_size, stride, padding
         )
 
-    @video_to_image
-    def forward(self, x):
+    def attention_sdp(self, h_):
+        h_ = self.norm(h_)
+        q = self.q(h_)
+        k = self.k(h_)
+        v = self.v(h_)
+
+        b, c, h, w = q.shape
+        q = rearrange(q, "b c h w -> b 1 (h w) c").contiguous()
+        k = rearrange(k, "b c h w -> b 1 (h w) c").contiguous()
+        v = rearrange(v, "b c h w -> b 1 (h w) c").contiguous()
+        h_ = nn.functional.scaled_dot_product_attention(q, k, v)
+
+        return rearrange(h_, "b 1 (h w) c -> b c h w", h=h, w=w, c=c, b=b)
+
+    def attention_manual(self, x):
         y = x
         y = self.norm(y)
         q = self.q(y)
@@ -1620,9 +1635,16 @@ class Conv2dAttnBlock(nn.Module):
         y = torch.bmm(v, z)  # [b, c, hw] (hw of q)
         y = y.reshape(b, c, h, w)
 
-        y = self.proj_out(y)
+        return y
 
-        return x + y
+    @video_to_image
+    def forward(self, x):
+        if self.use_sdp_attention:
+            attention_output = self.attention_sdp(x)
+        else:
+            attention_output = self.attention_manual(x)
+
+        return x + self.proj_out(attention_output)
 
 
 class CausalConv3dAttnBlock(nn.Module):

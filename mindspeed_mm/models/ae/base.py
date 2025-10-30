@@ -25,6 +25,7 @@ from mindspeed_mm.models.ae.autoencoder_kl_hunyuanvideo import AutoencoderKLHuny
 from mindspeed_mm.models.ae.wan_video_vae import WanVideoVAE
 from mindspeed_mm.models.ae.stepvideo_vae import StepVideoVae
 from mindspeed_mm.models.ae.movqvae import MOVQ
+from mindspeed_mm.models.ae.flux_vae import FluxVae
 
 
 AE_MODEL_MAPPINGS = {
@@ -36,7 +37,8 @@ AE_MODEL_MAPPINGS = {
     "autoencoder_kl_hunyuanvideo": AutoencoderKLHunyuanVideo,
     "wan_video_vae": WanVideoVAE,
     "stepvideovae": StepVideoVae,
-    "movqvae": MOVQ
+    "movqvae": MOVQ,
+    "flux_vae": FluxVae
 }
 
 

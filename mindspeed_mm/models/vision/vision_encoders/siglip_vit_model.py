@@ -9,7 +9,7 @@ from typing import Final, Optional, Callable, Union, Tuple, List, Set, Dict, Typ
 import math
 import warnings
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import numpy as np
 import torch
 import torch.nn as nn
@@ -22,6 +22,108 @@ from timm.layers import (
 from timm.models._manipulate import named_apply, checkpoint_seq, adapt_input_conv
 
 from mindspeed_mm.models.common.module import MultiModalModule
+
+
+class LinearEmbed(nn.Module):
+    def __init__(
+            self,
+            img_size=224,
+            patch_size=16,
+            in_chans=3,
+            embed_dim=768,
+            bias=True,
+            rope=False,
+            **kwargs
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.image_size = img_size
+        self.patch_size = patch_size
+        self.rope = rope
+
+        self.patch_embedding = nn.Linear(
+            in_features=in_chans * self.patch_size ** 2,
+            out_features=self.embed_dim,
+            bias=bias
+        )
+        self.num_patches_per_side = self.image_size // self.patch_size
+        self.num_patches = self.num_patches_per_side ** 2
+        if not self.rope:
+            self.position_embedding = nn.Embedding(self.num_patches, self.embed_dim)
+
+    def forward(
+            self,
+            packed_pixel_values: torch.FloatTensor,
+            packed_flattened_position_ids: torch.LongTensor
+    ) -> torch.Tensor:
+        patch_embeds = self.patch_embedding(packed_pixel_values)
+        if not self.rope:
+            patch_embeds = patch_embeds + self.position_embedding(packed_flattened_position_ids)
+
+        return patch_embeds
+
+
+class AttentionPacked(nn.Module):
+    def __init__(
+            self,
+            dim: int,
+            num_heads: int = 8,
+            attn_drop: float = 0.,
+            **kwargs
+    ) -> None:
+        super().__init__()
+        self.embed_dim = dim
+        self.num_heads = num_heads
+        self.head_dim = self.embed_dim // self.num_heads
+        if self.head_dim * self.num_heads != self.embed_dim:
+            raise ValueError(
+                f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim} and `num_heads`:"
+                f" {self.num_heads})."
+            )
+        self.scale = self.head_dim ** -0.5
+        self.dropout = attn_drop
+
+        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim)
+        self.v_proj = nn.Linear(self.embed_dim, self.embed_dim)
+        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim)
+        self.out_proj = nn.Linear(self.embed_dim, self.embed_dim)
+
+    def forward(
+            self,
+            hidden_states: torch.Tensor,
+            cu_seqlens: torch.IntTensor,
+            **kwargs,
+    ) -> torch.Tensor:
+        total_q_len, _ = hidden_states.size()
+
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+
+        query_states = query_states.view(total_q_len, self.num_heads, self.head_dim)
+        key_states = key_states.view(total_q_len, self.num_heads, self.head_dim)
+        value_states = value_states.view(total_q_len, self.num_heads, self.head_dim)
+
+        head_num = query_states.shape[1]
+        attn_output = torch_npu.npu_fusion_attention(
+            query_states.to(torch.bfloat16),
+            key_states.to(torch.bfloat16),
+            value_states.to(torch.bfloat16),
+            head_num,
+            padding_mask=None,
+            atten_mask=None,
+            scale=1.0 / math.sqrt(query_states.shape[-1]),
+            keep_prob=1,
+            input_layout="TND",
+            actual_seq_qlen=tuple(cu_seqlens[1:].cpu().numpy().tolist()),
+            actual_seq_kvlen=tuple(cu_seqlens[1:].cpu().numpy().tolist()),
+            pre_tockens=2147483647,
+            next_tockens=2147483647,
+            sparse_mode=0
+        )[0]
+
+        attn_output = self.out_proj(attn_output.reshape(total_q_len, -1))
+        return attn_output
 
 
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):
@@ -213,10 +315,11 @@ class Block(nn.Module):
             norm_layer: nn.Module = nn.LayerNorm,
             mlp_layer: nn.Module = Mlp,
             deterministic: bool = False,
+            attn: nn.Module = Attention
     ) -> None:
         super().__init__()
         self.norm1 = norm_layer(dim)
-        self.attn = Attention(
+        self.attn = attn(
             dim,
             num_heads=num_heads,
             qkv_bias=qkv_bias,
@@ -239,8 +342,11 @@ class Block(nn.Module):
         self.ls2 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         self.drop_path2 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x + self.drop_path1(self.ls1(self.attn(self.norm1(x))))
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        if 'cu_seqlens' in kwargs:
+            x = x + self.drop_path1(self.ls1(self.attn(self.norm1(x), kwargs['cu_seqlens'])))
+        else:
+            x = x + self.drop_path1(self.ls1(self.attn(self.norm1(x))))
         x = x + self.drop_path2(self.ls2(self.mlp(self.norm2(x))))
         return x
 
@@ -289,7 +395,8 @@ class VisionTransformer(MultiModalModule):
             mlp_layer: Type[nn.Module] = Mlp,
             ignore_head: bool = False,
             deterministic: bool = False,
-            num_recomputing_layers: int = 0
+            num_recomputing_layers: int = 0,
+            attn: Type[nn.Module] = Attention
     ) -> None:
         """
         Args:
@@ -372,7 +479,7 @@ class VisionTransformer(MultiModalModule):
         self.norm_pre = norm_layer(embed_dim) if pre_norm else nn.Identity()
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
-        self.blocks = nn.Sequential(*[
+        self.blocks = nn.ModuleList([
             block_fn(
                 dim=embed_dim,
                 num_heads=num_heads,
@@ -387,6 +494,7 @@ class VisionTransformer(MultiModalModule):
                 act_layer=act_layer,
                 mlp_layer=mlp_layer,
                 deterministic=deterministic,
+                attn=attn,
             )
             for i in range(depth)])
         self.norm = norm_layer(embed_dim) if not use_fc_norm else nn.Identity()
@@ -541,7 +649,8 @@ class VisionTransformer(MultiModalModule):
             skip_last = max(1, len(self.blocks) - self.num_recomputing_layers)
             x = checkpoint_seq(self.blocks, x, skip_last=skip_last)
         else:
-            x = self.blocks(x)
+            for block in self.blocks:
+                x = block(x)
         if getattr(self, "is_last_stage", True):
             x = self.norm(x)
         return x
@@ -559,7 +668,31 @@ class VisionTransformer(MultiModalModule):
         x = self.head_drop(x)
         return x if pre_logits else self.head(x)
 
-    def forward(self, pixel_values: torch.Tensor, **kwargs) -> torch.Tensor:
+    def forward_packed_features(
+            self,
+            packed_pixel_values: torch.Tensor,
+            packed_flattened_position_ids: Optional[torch.LongTensor],
+            cu_seqlens: torch.IntTensor
+    ) -> torch.Tensor:
+        x = self.patch_embed(
+            packed_pixel_values=packed_pixel_values,
+            packed_flattened_position_ids=packed_flattened_position_ids
+        )
+        for block in self.blocks:
+            x = block(x=x, cu_seqlens=cu_seqlens)
+        return self.norm(x)
+
+    def forward(self, pixel_values, **kwargs) -> torch.Tensor:
+        if 'vit_token_seqlens' in kwargs and pixel_values is None:
+            vit_token_seqlens = kwargs['vit_token_seqlens']
+            cu_seqlens = torch.nn.functional.pad(
+                torch.cumsum(vit_token_seqlens, dim=0), (1, 0), value=0
+            ).to(torch.int32).to(vit_token_seqlens.device)
+            return self.forward_packed_features(
+                packed_pixel_values=kwargs.get('packed_vit_tokens'),
+                packed_flattened_position_ids=kwargs.get('packed_vit_position_ids'),
+                cu_seqlens=cu_seqlens
+            )
         x = pixel_values
         x = self.forward_features(x)
         if not self.ignore_head:
@@ -630,6 +763,16 @@ SigLIP_MODEL_CONFIG = {
     }
 }
 
+EMBED_LAYER_MAP = {
+    'patch': PatchEmbed,
+    'linear': LinearEmbed,
+}
+
+ATTENTION_MAP = {
+    'attn': Attention,
+    'attn_packed': AttentionPacked
+}
+
 
 def create_siglip_vit(
         config,
@@ -638,14 +781,15 @@ def create_siglip_vit(
 ):
     config_dict = config.to_dict()
     model_name = config_dict.get("model_name", "siglip_so400m_patch14_384")
-    image_size = config_dict.get("image_size", 384)
-    select_layer = config_dict.get("image_size", -1)
+    select_layer = config_dict.get("select_layer", -1)
+    embed_layer = config_dict.get("embed_layer", "patch")
+    attn = config_dict.get("attn", "attn")
 
     if model_name not in SigLIP_MODEL_CONFIG.keys():
         raise AssertionError(f"model name should be in {SigLIP_MODEL_CONFIG.keys()}")
 
-    vision_cfg = SigLIPVisionCfg(**SigLIP_MODEL_CONFIG[model_name])
-
+    merged_config = {**SigLIP_MODEL_CONFIG[model_name], **config_dict}
+    vision_cfg = SigLIPVisionCfg(**{k: v for k, v in merged_config.items() if k in asdict(SigLIPVisionCfg())})
     if select_layer <= 0:
         layers = min(vision_cfg.layers, vision_cfg.layers + select_layer + 1)
     else:
@@ -653,7 +797,7 @@ def create_siglip_vit(
 
     model = VisionTransformer(
         config=config,
-        img_size=image_size,
+        img_size=vision_cfg.image_size,
         patch_size=vision_cfg.patch_size,
         embed_dim=vision_cfg.width,
         depth=layers,
@@ -665,7 +809,9 @@ def create_siglip_vit(
         weight_init=kwargs.get("weight_init", "skip"),
         num_classes=0,
         deterministic=kwargs.get("deterministic", False),
-        num_recomputing_layers=kwargs.get("num_recomputing_layers", 0)
+        num_recomputing_layers=kwargs.get("num_recomputing_layers", 0),
+        embed_layer=EMBED_LAYER_MAP[embed_layer],
+        attn=ATTENTION_MAP[attn]
     )
 
     if ckpt_path:

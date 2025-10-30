@@ -103,9 +103,9 @@ class VisionModel(MultiModalModule):
             for param in module.parameters():
                 param.requires_grad = False
 
-    def forward(self, images: torch.Tensor, image_grid_thw: torch.Tensor = None, *args, **kwargs) -> torch.Tensor:
+    def forward(self, images: torch.Tensor = None, image_grid_thw: torch.Tensor = None, *args, **kwargs) -> torch.Tensor:
         if self.add_encoder:
-            encoder_out = self.encoder(pixel_values=images, grid_thw=image_grid_thw)
+            encoder_out = self.encoder(pixel_values=images, grid_thw=image_grid_thw, **kwargs)
         if isinstance(encoder_out, tuple):
             image_embeddings, window_index = encoder_out
         else:

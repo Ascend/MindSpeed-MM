@@ -80,6 +80,8 @@ def get_2d_sincos_pos_embed(
     return:
         pos_embed: [grid_size*grid_size, embed_dim] or [1+grid_size*grid_size, embed_dim] (w/ or w/o cls_token)
     """
+    if isinstance(grid_size, int):
+        grid_size = (grid_size, grid_size)
     grid_h = np.arange(grid_size[0], dtype=np.float32) / interpolation_scale[0]
     grid_w = np.arange(grid_size[1], dtype=np.float32) / interpolation_scale[1]
     if base_size is not None:
@@ -273,13 +275,32 @@ def get_nd_rotary_pos_embed(
     return cos, sin
 
 
+class PositionEmbedding(nn.Module):
+    def __init__(self, max_num_patch_per_side, hidden_size):
+        super().__init__()
+        self.max_num_patch_per_side = max_num_patch_per_side
+        self.hidden_size = hidden_size
+        self.pos_embed = nn.Parameter(
+            torch.zeros(max_num_patch_per_side ** 2, hidden_size),
+            requires_grad=False
+        )
+        self._init_weights()
+
+    def _init_weights(self):
+        pos_embed = get_2d_sincos_pos_embed(self.hidden_size, self.max_num_patch_per_side)
+        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float())
+
+    def forward(self, position_ids):
+        return self.pos_embed[position_ids]
+
+
 class PositionEmbedding2D(nn.Module):
     def __init__(self, dim: int) -> None:
         super().__init__()
         self.dim = dim
         if dim % 4 != 0:
             raise Exception("dim must be divisible by 4")
-        
+
         half_dim = dim // 2
         inv_freq = 1.0 / (10000 ** (torch.arange(0, half_dim, 2).float() / half_dim))
         self.register_buffer("inv_freq", inv_freq, persistent=False)
@@ -325,8 +346,8 @@ class PositionEmbedding2D(nn.Module):
         base_size: Optional[int] = None,
     ) -> torch.Tensor:
         return self._get_cached_emb(x.device, x.dtype, h, w, scale, base_size)
-    
-    
+
+
 def exists(val):
     return val is not None
 
@@ -480,7 +501,7 @@ class NpuRotaryEmbedding(nn.Module):
 
     def rotate_queries_and_keys(self, q, k, seq_dim=None):
         seq_dim = default(seq_dim, self.default_seq_dim)
-        
+
         if not self.use_xpos:
             raise Exception("use_xpos must be true when we use rotate_queries_and_keys")
 
@@ -685,7 +706,7 @@ class Rotary3DPositionEmbedding(nn.Module):
         freqs_text_padding = torch.zeros([self.text_length, 1, 1, freqs.shape[-1]], device=freqs.device,
                                          dtype=freqs.dtype)
         freqs = torch.cat((freqs_text_padding, freqs), dim=0)
-  
+
         return freqs
 
 
@@ -725,7 +746,7 @@ class RoPE3DSORA(nn.Module):
             self.cache_positions[b, t, h, w] = (poses, max_poses)
         pos = self.cache_positions[b, t, h, w]
         return pos
-    
+
     def get_freq(self, seq_len, pos1d, device, interpolation_scale=1):
         freqs = None
         if (self.dim, seq_len, device) not in self.cache:
@@ -736,7 +757,7 @@ class RoPE3DSORA(nn.Module):
             self.cache[self.dim, seq_len, device] = freqs
         freqs = self.cache[self.dim, seq_len, device]
         return F.embedding(pos1d, freqs)[:, :, None, :] # s, b, 1, d
-    
+
     @staticmethod
     def rotate_half(x):
         x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2:]
@@ -747,7 +768,7 @@ class RoPE3DSORA(nn.Module):
         sin = freq.sin()
 
         return (tokens * cos) + (self.rotate_half(tokens) * sin)
-    
+
     def apply_rotary_pos_emb(self, tokens, freq):
         if tokens.size(3) % 3 != 0:
             raise AssertionError("number of dimensions should be a multiple of three")
@@ -762,7 +783,7 @@ class RoPE3DSORA(nn.Module):
         tokens = torch.cat((t, y, x), dim=-1)
 
         return tokens
-    
+
     def forward(self, b, t, h, w, device):
         poses, max_poses = self.get_position(b, t, h, w, device) # [3, seq, batch]
         freq_t = self.get_freq(max_poses[0] + 1, poses[0], device, self.interpolation_scale_t)
@@ -779,7 +800,7 @@ class RoPE3DStepVideo(RoPE3DSORA):
         super().__init__(head_dim=3)
         self.base = freq
         self.ch_split = ch_split
-    
+
     def apply_rotary_pos_emb(self, tokens, freqs):
         freqs = freqs.to(tokens.dtype)
 
@@ -788,7 +809,7 @@ class RoPE3DStepVideo(RoPE3DSORA):
         for _, (x, freq) in enumerate(zip(torch.split(tokens, self.ch_split, dim=-1), torch.split(freqs, self.ch_split, dim=-1))):
             x_i = self.apply_rope1d(x, freq)
             out.append(x_i)
-        
+
         tokens = torch.cat(out, dim=-1)
         return tokens
 
@@ -810,6 +831,6 @@ class RoPE3DStepVideo(RoPE3DSORA):
         for i, dim in enumerate(self.ch_split):
             freq_i = self.get_freq(max_poses[i] + 1, poses[i], dim, device)
             out.append(freq_i)
-        
+
         freqs = torch.cat(out, dim=-1)
         return freqs

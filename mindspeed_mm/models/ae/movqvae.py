@@ -57,7 +57,8 @@ class MOVQ(nn.Module):
 class Encoder(nn.Module):
     def __init__(self, *, ch, out_ch, ch_mult=None, num_res_blocks=2,
                  attn_resolutions, dropout=0.0, resamp_with_conv=True, in_channels=3,
-                 resolution=256, z_channels=4, double_z=True, **ignore_kwargs):
+                 resolution=256, z_channels=4, double_z=True, use_sdp_attention=False,
+                 **ignore_kwargs):
         super().__init__()
         if ch_mult is None:
             ch_mult = (1, 2, 4, 8)
@@ -84,7 +85,7 @@ class Encoder(nn.Module):
                 block.append(ResnetBlock2D(in_channels=block_in, out_channels=block_out, dropout=dropout, act_type="swish"))
                 block_in = block_out
                 if curr_res in attn_resolutions:
-                    attn.append(Conv2dAttnBlock(block_in, block_in))
+                    attn.append(Conv2dAttnBlock(block_in, block_in, use_sdp_attention=use_sdp_attention))
             down = nn.Module()
             down.block = block
             down.attn = attn
@@ -96,7 +97,7 @@ class Encoder(nn.Module):
         # middle
         self.mid = nn.Module()
         self.mid.block_1 = ResnetBlock2D(in_channels=block_in, out_channels=block_in, dropout=dropout, act_type="swish")
-        self.mid.attn_1 = Conv2dAttnBlock(block_in, block_in)
+        self.mid.attn_1 = Conv2dAttnBlock(block_in, block_in, use_sdp_attention=use_sdp_attention)
         self.mid.block_2 = ResnetBlock2D(in_channels=block_in, out_channels=block_in, dropout=dropout, act_type="swish")
 
         # end
