@@ -2,6 +2,7 @@
 """Pretrain InternVL."""
 
 from copy import deepcopy
+import os
 import torch
 import torch.distributed
 import mindspeed.megatron_adaptor
@@ -21,15 +22,33 @@ from mindspeed_mm.utils.utils import EncoderBalanceComm
 from mindspeed_mm.patchs import dummy_optimizer_patch
 
 
+def is_auto_tuning():
+    if (os.getenv("OOTB_OPTIMIZER_PROFILING", "FALSE") == "TRUE" or
+        os.getenv("OOTB_OPTIMIZER_PARSE_ARGS", "FALSE") == "TRUE" or
+        os.getenv("OOTB_OPTIMIZER_PARSE_MODEL", "FALSE") == "TRUE"):
+        return True
+    return False
+
+
 def model_provider(pre_process=True, post_process=True):
     """Builds the model."""
     args = get_args()
     print_rank_0("building InternVL model ...")
     model_config = deepcopy(args.mm.model)
-    model_config.image_encoder.vision_encoder = get_model_config(
-        model_config.image_encoder.vision_encoder
-    )
-    model_config.text_decoder = get_model_config(model_config.text_decoder)
+    if is_auto_tuning():
+        if model_config.image_encoder:
+            model_config.image_encoder.vision_encoder = get_model_config(model_config.image_encoder.vision_encoder)
+        if model_config.text_decoder:
+            model_config.text_decoder = get_model_config(model_config.text_decoder)
+            model_config.text_decoder.vocab_size = args.padded_vocab_size
+            if get_args().sequence_parallel and get_args().dist_train and is_in_subworld("gpt"):
+                model_config.text_decoder.sequence_parallel = True
+                model_config.text_decoder.tensor_model_parallel_size = get_dist_model_config().tensor_parallel_size
+    else:
+        model_config.image_encoder.vision_encoder = get_model_config(
+            model_config.image_encoder.vision_encoder
+        )
+        model_config.text_decoder = get_model_config(model_config.text_decoder)
 
     model = InternVLModel(model_config)
     if model_config.image_encoder.vision_encoder.freeze:
@@ -135,6 +154,15 @@ def get_batch(data_iterator, is_vit_last_stage=False):
 
 def loss_func(output_tensor):
     """Loss function."""
+    if len(output_tensor) == 1 and is_auto_tuning():
+        loss_mock = torch.zeros((output_tensor.shape[1], 1),
+                                dtype=torch.bfloat16, requires_grad=True).to('npu')
+        loss_mock = loss_mock.transpose(0, 1)
+        output_tensor = {
+            'logits': output_tensor,
+            'loss': loss_mock
+        }
+        output_tensor["loss"] = torch.tensor(0.0).to('npu')
     args = get_args()
     loss = output_tensor["loss"].mean()
     loss_dir = {}

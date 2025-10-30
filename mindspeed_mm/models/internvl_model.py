@@ -1,4 +1,6 @@
 from typing import List, Optional
+import os
+import sys
 import numpy
 import torch
 from torch import nn
@@ -352,6 +354,7 @@ class InternVLModel(MultiModalModule):
         return_dict: Optional[bool] = None,
     ) -> torch.Tensor:
         output = None
+        args = get_args()
         if self.add_image_encoder:
             vit_embeds = self.image_encoder(image)
             if self.image_encoder.post_process:
@@ -379,7 +382,6 @@ class InternVLModel(MultiModalModule):
 
         if self.add_text_decoder:
             input_embeds = None
-            seq_len = input_ids.shape[1]
             if self.text_decoder.pre_process:
                 input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
                 input_embeds = input_embeds.transpose(0, 1)
@@ -387,6 +389,9 @@ class InternVLModel(MultiModalModule):
                 input_embeds = input_embeds.reshape(B * S, H)
                 input_ids = input_ids.reshape(B * S)
                 selected = (input_ids == self.img_context_token_id)
+                if os.getenv('OOTB_OPTIMIZER_PROFILING', 'FALSE') == 'TRUE' \
+                    and (vit_embeds is None or len(vit_embeds) == 0):
+                    vit_embeds = torch.zeros((1, input_embeds.shape[1]), dtype=torch.bfloat16).to('npu:0')
                 input_embeds[selected] = input_embeds[selected] * 0.0 + vit_embeds.squeeze(0)
                 input_embeds = input_embeds.reshape(B, S, H).transpose(0, 1)
 
@@ -423,4 +428,30 @@ class InternVLModel(MultiModalModule):
                     "logits": logits
                 }
 
+        #auto_tuning
+        if os.getenv('OOTB_OPTIMIZER_PROFILING', 'FALSE') == 'TRUE' \
+            and self.image_encoder is not None and self.image_encoder.post_process:
+            required_size = args.micro_batch_size * input_ids.shape[1] * self.vocab_size
+            current_size = vit_embeds.numel()
+            diff = required_size - current_size
+
+            # Pad with zeros at the end of the data.
+            padded = torch.cat([
+                vit_embeds.flatten(),
+                torch.zeros(diff, device=vit_embeds.device)
+            ])
+
+            output = padded.reshape(args.micro_batch_size, input_ids.shape[1], self.vocab_size)
+
+            logits = output
+            logits = logits.float()
+
+            loss = None
+            if labels is not None:
+                loss = self.compute_loss(logits, labels)
+
+            return {
+                "loss": loss,
+                "logits": logits
+            }
         return output

@@ -42,6 +42,8 @@ from megatron.training.training import (
     build_train_valid_test_data_iterators,
     setup_model_and_optimizer,
     disable_forward_pre_hook,
+    get_model,
+    load_checkpoint,
 )
 from megatron.training.utils import (
     calc_params_l2_norm,
@@ -50,6 +52,7 @@ from megatron.training.utils import (
     print_rank_last,
     unwrap_model,
 )
+from mindspeed.core.multi_modal.dist_train.dist_train_config import is_forward_only_model
 from megatron.training.arguments import parse_args
 from megatron.training.global_vars import set_args
 
@@ -61,6 +64,14 @@ from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.patchs.patch_manager import PatchesManager
 from mindspeed_mm.utils.data_balance.data_balance import DataBalance
 from mindspeed_mm.utils.random import seed_all
+from mindspeed_mm.utils.auto_setting import (
+    auto_settings_fun,
+    auto_settings_parse_args,
+    auto_settings_parse_model,
+    auto_settings_profile,
+    train_decorator,
+    train_step_decorator
+)
 
 
 _TRAIN_START_TIME = time.time()
@@ -119,6 +130,19 @@ def pretrain(
     initialize_megatron(
         extra_args_provider=extra_args_provider, args_defaults=args_defaults
     )
+
+    argument = get_args()
+    if argument.auto_settings:
+        auto_settings_fun(argument)
+        return
+
+    if (os.getenv("OOTB_OPTIMIZER_PARSE_ARGS", "FALSE") == "TRUE"):
+        auto_settings_parse_args()
+        return
+
+    init_func = args_defaults.get("init_func", None)
+    if init_func:
+        init_func()
 
     args = get_args()
     merge_mm_args(args)
@@ -185,8 +209,21 @@ def pretrain(
 
     # Model, optimizer, and learning rate.
     timers("model-and-optimizer-setup", log_level=0).start(barrier=True)
-    model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
-        model_provider, model_type
+    if args.dist_train and is_forward_only_model():
+        model = get_model(model_provider, model_type)
+        optimizer, opt_param_scheduler = None, None
+        if args.load is not None or args.pretrained_checkpoint is not None:
+            timers('load-checkpoint', log_level=0).start(barrier=True)
+            args.iteration, args.num_floating_point_operations_so_far = load_checkpoint(
+                model, optimizer, opt_param_scheduler)
+            timers('load-checkpoint').stop(barrier=True)
+            timers.log(['load-checkpoint'])
+        else:
+            args.iteration = 0
+            args.num_floating_point_operations_so_far = 0
+    else:
+        model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+            model_provider, model_type
     )
 
     if getattr(args, "auto_parallel_profile", False):
@@ -198,6 +235,10 @@ def pretrain(
     timers("model-and-optimizer-setup").stop()
     print_datetime("after model, optimizer, and learning rate scheduler are built")
     config = get_model_config(model[0])
+
+    if (os.getenv("OOTB_OPTIMIZER_PARSE_MODEL", "FALSE") == "TRUE"):
+        auto_settings_parse_model(model, mpu, args)
+        return
 
     # Data stuff.
     timers("train/valid/test-data-iterators-setup", log_level=0).start(barrier=True)
@@ -251,7 +292,7 @@ def pretrain(
 
         print_datetime("after training is done")
 
-        if args.save and iteration != 0 and iteration % args.save_interval != 0:
+        if judge_save_checkpoint(args, iteration):
             save_checkpoint(
                 iteration,
                 model,
@@ -292,9 +333,12 @@ def pretrain(
             write_to_tensorboard=not args.skip_train,
         )
 
-    memory_profiler.stop()
+    # profiling parser
+    if os.getenv('OOTB_OPTIMIZER_PROFILING', 'FALSE') == 'TRUE':
+        auto_settings_profile(args)
 
 
+@train_decorator
 def train(
     forward_step_func,
     model,
@@ -354,7 +398,7 @@ def train(
     num_floating_point_operations_so_far = args.num_floating_point_operations_so_far
 
     # Setup some training config params
-    config.grad_scale_func = optimizer.scale_loss
+    config.grad_scale_func = optimizer.scale_loss if optimizer is not None else None
     config.timers = timers
     if isinstance(model[0], DDP) and args.overlap_grad_reduce:
         if config.no_sync_func is not None:
@@ -378,7 +422,7 @@ def train(
                 model_index, x
             )
             for model_index in range(len(model))
-        ]
+        ] if optimizer is not None else []
         if len(model) == 1:
             config.param_sync_func = config.param_sync_func[0]
     config.finalize_model_grads_func = finalize_model_grads
@@ -432,8 +476,9 @@ def train(
                 }
             )
 
-    prof = Profiler(args.mm.tool.profile)
-    prof.start()
+    if os.getenv('OOTB_OPTIMIZER_PROFILING', 'FALSE') != 'TRUE':
+        prof = Profiler(args.mm.tool.profile)
+        prof.start()
 
     curr_step_lr = None
     curr_step_dlr = None
@@ -534,7 +579,7 @@ def train(
         # Evaluation
         if args.eval_interval and iteration % args.eval_interval == 0 and args.do_valid:
             timers("interval-time").stop()
-            if args.use_distributed_optimizer and args.overlap_param_gather and isinstance(model, DDP):
+            if judge_forward_pre_hook(args, model, optimizer):
                 disable_forward_pre_hook(model)
             if args.manual_gc and args.manual_gc_eval:
                 # Collect all objects.
@@ -557,7 +602,7 @@ def train(
             if args.manual_gc and args.manual_gc_eval:
                 # Collect only the objects created and used in evaluation.
                 gc.collect(generation=0)
-            if args.use_distributed_optimizer and args.overlap_param_gather:
+            if args.use_distributed_optimizer and args.overlap_param_gather and optimizer is not None:
                 optimizer.enable_pre_hook()
             timers("interval-time", log_level=0).start(barrier=True)
 
@@ -633,8 +678,10 @@ def train(
             if args.manual_gc_interval != 0 and iteration % args.manual_gc_interval == 0:
                 gc.collect()
 
-        prof.step()
-    prof.stop()
+        if os.getenv('OOTB_OPTIMIZER_PROFILING', 'FALSE') != 'TRUE':
+            prof.step()
+    if os.getenv('OOTB_OPTIMIZER_PROFILING', 'FALSE') != 'TRUE':
+        prof.stop()
 
     track_e2e_metrics()
 
@@ -647,7 +694,7 @@ def train(
         wandb_writer.finish()
 
     # Close out pre-hooks if using distributed optimizer and overlapped param gather.
-    if args.use_distributed_optimizer and args.overlap_param_gather and isinstance(model, DDP):
+    if judge_forward_pre_hook(args, model, optimizer):
         disable_forward_pre_hook(model)
 
     # If any exit conditions (signal handler, duration, iterations) have been reached, exit.
@@ -661,6 +708,7 @@ def train(
     return iteration, num_floating_point_operations_so_far
 
 
+@train_step_decorator
 def train_step(
         forward_step_func, data_iterator, model, optimizer, opt_param_scheduler, config, call_backs
 ):
@@ -671,7 +719,8 @@ def train_step(
     # Set grad to zero.
     for model_chunk in model:
         model_chunk.zero_grad_buffer()
-    optimizer.zero_grad()
+    if optimizer is not None:
+        optimizer.zero_grad()
 
     # Forward pass.
     forward_backward_func = get_forward_backward_func()
@@ -700,7 +749,13 @@ def train_step(
 
     # Update parameters.
     timers("optimizer", log_level=1).start(barrier=args.barrier_with_L1_time)
-    update_successful, grad_norm, num_zeros_in_grad = optimizer.step()
+    if optimizer is not None:
+        update_successful, grad_norm, num_zeros_in_grad = optimizer.step()
+    else:
+        torch.distributed.barrier()
+        update_successful = True
+        grad_norm = 0
+        num_zeros_in_grad = 0
     if call_backs:
         if isinstance(call_backs, list):
             for call_back in call_backs:
@@ -720,7 +775,8 @@ def train_step(
         increment = (
             get_num_microbatches() * args.micro_batch_size * args.data_parallel_size
         )
-        opt_param_scheduler.step(increment=increment)
+        if opt_param_scheduler is not None:
+            opt_param_scheduler.step(increment=increment)
         skipped_iter = 0
     else:
         skipped_iter = 1
@@ -986,3 +1042,24 @@ def training_log(loss_dict, total_loss_dict, learning_rate, decoupled_learning_r
         timers.log(timers_to_log, normalizer=args.log_interval)
 
     return report_memory_flag
+
+
+def judge_save_checkpoint(args, iteration):
+    if not args.save or iteration == 0:
+        return False
+    if iteration % args.save_interval == 0:
+        return False
+    if os.getenv('OOTB_OPTIMIZER_PROFILING', 'FALSE') == 'TRUE':
+        return False
+    return True
+
+
+# Close out pre-hooks if using distributed optimizer and overlapped param gather.
+def judge_forward_pre_hook(args, model, optimizer):
+    if not args.use_distributed_optimizer and not args.overlap_param_gather:
+        return False
+    if not isinstance(model, DDP):
+        return False
+    if optimizer:
+        return False
+    return True

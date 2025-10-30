@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from functools import wraps
+from mindspeed.arguments import _add_auto_settings_args
 
 
 def extra_args_provider_decorator(extra_args_provider):
@@ -39,6 +40,7 @@ def process_args(parser):
     parser = _add_rlfh_args(parser)
     parser = _add_network_args(parser)
     parser = _add_data_balance_args(parser)
+    parser = _add_auto_settings_args(parser)
     return parser
 
 
