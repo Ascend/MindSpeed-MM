@@ -35,10 +35,6 @@ from .pipeline_mixin.encode_mixin import MMEncoderMixin
 from .pipeline_mixin.inputs_checks_mixin import InputsCheckMixin
 
 NEGATIVE_PROMOPT_DEFAULT = "Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards"
-NEGATIVE_PROMOPT = {
-    "flf2v": "Lens switching, lens shaking, b" + NEGATIVE_PROMOPT_DEFAULT[1:],
-    "ti2v": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
-}
 
 
 class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
@@ -130,6 +126,15 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             curr_guidance_scale = guidance_scale[1] if isinstance(guidance_scale, (list, tuple)) else guidance_scale
         
         return curr_predict_model, curr_guidance_scale
+    
+    def get_negative_prompt(self):
+        if self.model_type == "flf2v":
+            # for wan2.1 flf2v
+            return "Lens switching, lens shaking, b" + NEGATIVE_PROMOPT_DEFAULT[1:]
+        if self.expand_timesteps or self.model_type.startswith("wan2.2"):
+            # for wan2.2
+            return "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走"
+        return NEGATIVE_PROMOPT_DEFAULT
 
     @torch.no_grad()
     def __call__(
@@ -147,10 +152,8 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
     ):
         # 1. Check inputs. Raise error if not correct
         if negative_prompt is None or negative_prompt == "":
-            if self.model_type in NEGATIVE_PROMOPT:
-                negative_prompt = NEGATIVE_PROMOPT[self.model_type]
-            else:
-                negative_prompt = NEGATIVE_PROMOPT_DEFAULT
+            negative_prompt = self.get_negative_prompt()
+
         self.check_inputs(
             prompt,
             negative_prompt,
