@@ -127,11 +127,11 @@ mm-convert Qwen3VLConverter hf_to_dcp \
    ```
 
 ---
-当前支持读取多个以`,`（注意不要加空格）分隔的数据集，配置方式为`data.json`中
+当前支持读取多个以`,`（注意不要加空格）分隔的数据集，配置方式为`data_xxB.json`中
 dataset_param->basic_parameters->dataset
 从"./data/mllm_format_llava_instruct_data.json"修改为"./data/mllm_format_llava_instruct_data.json,./data/mllm_format_llava_instruct_data2.json"
 
-同时注意`data.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
+同时注意`data_xxB.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
 
 <a id="jump3.2"></a>
 #### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
@@ -176,14 +176,14 @@ dataset_param->basic_parameters->dataset
 
 【数据目录配置】
 
-根据实际情况修改`data.json`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段。
+根据实际情况修改`data_xxB.json`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段。
 
 示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/video_data_path.json，此时配置如下：
 `dataset_dir`配置为/home/user/data/;
 `dataset`配置为./data/video_data_path.json
 注意此时`dataset`需要配置为相对路径
 
-以Qwen3VL-xxB为例，`data.json`进行以下修改，注意`model_name_or_path`的权重路径为转换前的权重路径。
+以Qwen3VL-xxB为例，`data_xxB.json`进行以下修改，注意`model_name_or_path`的权重路径为转换前的权重路径,即原始hf权重路径。
 
 **注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。
 
@@ -208,7 +208,7 @@ dataset_param->basic_parameters->dataset
 }
 ```
 
-如果需要加载大批量数据，可使用流式加载，修改`data.json`中的`sampler_type`字段，增加`streaming`字段。（注意：使用流式加载后当前仅支持`num_workers=0`，单进程处理数据，会有性能波动，并且不支持断点续训功能。）
+如果需要加载大批量数据，可使用流式加载，修改`data_xxB.json`中的`sampler_type`字段，增加`streaming`字段。（注意：使用流式加载后当前仅支持`num_workers=0`，单进程处理数据，会有性能波动，并且不支持断点续训功能。）
 
 
 ```json
@@ -233,7 +233,7 @@ dataset_param->basic_parameters->dataset
 
 【模型保存加载及日志信息配置】
 
-根据实际情况配置`examples/qwen3vl/finetune_qwen3vl.sh`的参数，包括加载、保存路径以及保存间隔`--save-interval`（注意：分布式优化器保存文件较大耗时较长，请谨慎设置保存间隔）
+根据实际情况配置`examples/qwen3vl/finetune_qwen3vl_xxB.sh`的参数，包括加载、保存路径以及保存间隔`--save-interval`（注意：分布式优化器保存文件较大耗时较长，请谨慎设置保存间隔）
 
 ```shell
 ...
@@ -254,16 +254,17 @@ GPT_ARGS="
 OUTPUT_ARGS="
     --log-interval 1 \  # 日志间隔
     --save-interval 5000 \  # 保存间隔
-    ...
+    --save $SAVE_PATH \ # 保存路径
 "
 ```
 
-根据实际情况配置`examples/qwen3vl/model.json`中的`init_from_hf_path`参数，该参数表示初始权重的加载路径。
-根据实际情况配置`examples/qwen3vl/model.json`中的`image_encoder.vision_encoder.freeze`、`image_encoder.vision_projector.freeze`、`text_decoder.freeze`参数，该参数分别代表是否冻结vision model模块、projector模块、及language model模块。
+根据实际情况配置`examples/qwen3vl/model_xxB.json`中的`init_from_hf_path`参数，该参数表示初始权重的加载路径。
+根据实际情况配置`examples/qwen3vl/model_xxB.json`中的`image_encoder.vision_encoder.freeze`、`image_encoder.vision_projector.freeze`、`text_decoder.freeze`参数，该参数分别代表是否冻结vision model模块、projector模块、及language model模块。
+注：当前`examples/qwen3vl/model_xxB.json`中点各网络层数均为未过校验的无效配置，如需减层请修改原始hf路径下相关配置文件。
 
 【单机运行配置】
 
-配置`examples/qwen3vl/finetune_qwen3vl.sh`参数如下
+配置`examples/qwen3vl/finetune_qwen3vl_xxB.sh`参数如下
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
@@ -282,7 +283,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 以Qwen3VL-xxB为例，启动微调训练任务。
 
 ```shell
-bash examples/qwen3vl/finetune_qwen3vl.sh
+bash examples/qwen3vl/finetune_qwen3vl_xxB.sh
 ```
 ---
 

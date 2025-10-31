@@ -19,7 +19,7 @@ export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 # export GLOO_SOCKET_IFNAME=
 # export ASCEND_RT_VISIBLE_DEVICES=
 
-NPUS_PER_NODE=8
+NPUS_PER_NODE=16
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1
@@ -27,10 +27,10 @@ NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 
-MM_DATA="./examples/qwen3vl/data.json"
-MM_MODEL="./examples/qwen3vl/model.json"
+MM_DATA="./examples/qwen3vl/data_30B.json"
+MM_MODEL="./examples/qwen3vl/model_30B.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-LOAD_PATH="ckpt/mm_path/Qwen3-VL-xxB-Instruct"
+LOAD_PATH="ckpt/mm_path/Qwen3-VL-30B-Instruct"
 SAVE_PATH="save_dir"
 FSDP2_PATH="./examples/qwen3vl/fsdp2_config.yaml"
 
@@ -107,6 +107,7 @@ OUTPUT_ARGS="
     --save-interval 10000 \
     --eval-interval 10000 \
     --eval-iters 5000 \
+    --save $SAVE_PATH \
 "
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
