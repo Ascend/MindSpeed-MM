@@ -2,6 +2,7 @@
 from typing import Optional, Dict, Tuple, Union
 
 import torch
+import torch.distributed as dist
 import numpy
 from torch.nn import CrossEntropyLoss
 
@@ -535,6 +536,26 @@ class VLMModel(MultiModalModule):
 
         return loss
 
+    def process_multimodal_embeddings(self, input_embeds, input_ids, vit_embeds, **kwargs):
+        if vit_embeds is not None:
+            if self.config.sequence_parallel:
+                input_embeds = gather_from_sequence_parallel_region(input_embeds)
+            input_embeds = input_embeds.transpose(0, 1)  # bsh -> sbh
+
+            image_mask = torch.eq(input_ids, self.img_context_token_id)
+            vit_embeds = vit_embeds[:, 0, :]
+            indices_tuple = torch.nonzero(image_mask, as_tuple=True)
+            input_embeds[indices_tuple] = vit_embeds
+
+            if 'input_features' in kwargs:
+                audio_features = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
+                audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds)
+                audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
+                input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
+
+            input_embeds = input_embeds.transpose(0, 1)  # sbh -> bsh
+        return input_embeds
+
     def forward(
             self,
             input_ids: torch.Tensor,
@@ -554,10 +575,15 @@ class VLMModel(MultiModalModule):
             *args, **kwargs
     ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
 
+        # hetero pipeline use
+        hetero_pp = False
+        if get_args().hetero_parallel and mpu.get_pipeline_model_parallel_world_size() > 1:
+            hetero_pp = True
+
         # MM_GRPO use, if llm_only is True, directly get vit_embeds
         if self.add_image_encoder and self.image_encoder.pre_process and kwargs.get('llm_only', False):
             vit_embeds = kwargs.get('vit_embeds').unsqueeze(1)
-        elif self.add_image_encoder and pixel_values is not None:
+        elif self.add_image_encoder and pixel_values is not None and not hetero_pp:
             vit_embeds = self.image_encoder(pixel_values, image_grid_thw)
             if get_args().encoder_dp_balance and self.encoder_dp_enable:
                 vit_embeds = EncoderBalanceComm.apply(
@@ -582,27 +608,34 @@ class VLMModel(MultiModalModule):
             return {"vit_embeds": vit_embeds}
 
         if self.add_text_decoder:
-            input_embeds = None
-            if self.text_decoder.pre_process:
+            if kwargs.get('vit_embeds') is not None:
+                input_embeds = kwargs.get('vit_embeds')
+            elif get_args().hetero_parallel and mpu.get_pipeline_model_parallel_world_size() > 1:
+                device = torch.device(f'npu:{dist.get_rank()}')
+                pp_group = mpu.get_pipeline_model_parallel_group()
+                src_global_rank = dist.get_global_rank(pp_group, group_rank=0)
+                if dist.get_rank() == src_global_rank:
+                    input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
+                    ndim = torch.tensor([len(input_embeds.shape)], device=device, dtype=torch.int8)
+                    dist.broadcast(ndim, src=src_global_rank, group=pp_group)
+                    shape_tensor = torch.tensor(input_embeds.shape, device=device, dtype=torch.long)
+                    dist.broadcast(shape_tensor, src=src_global_rank, group=pp_group)
+                    input_embeds = torch.empty(tuple(shape_tensor.tolist()), device=device, dtype=torch.bfloat16)
+                else:
+                    ndim = torch.empty(1, device=device, dtype=torch.int8)
+                    dist.broadcast(ndim, src=src_global_rank, group=pp_group)
+                    shape_tensor = torch.empty(ndim.item(), device=device, dtype=torch.long)
+                    dist.broadcast(shape_tensor, src=src_global_rank, group=pp_group)
+                    input_embeds = torch.empty(tuple(shape_tensor.tolist()), device=device, dtype=torch.bfloat16)
+                dist.broadcast(input_embeds, src=src_global_rank, group=pp_group)
+                input_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, vit_embeds, **kwargs)
+                change_parallel_state('image_encoder')
+                return input_embeds
+            elif self.text_decoder.pre_process:
                 input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
-
-                if vit_embeds is not None:
-                    if self.config.sequence_parallel:
-                        input_embeds = gather_from_sequence_parallel_region(input_embeds)
-                    input_embeds = input_embeds.transpose(0, 1)  # bsh
-                    image_mask = torch.eq(input_ids, self.img_context_token_id)
-                    vit_embeds = vit_embeds[:, 0, :]
-                    indices_tuple = torch.nonzero(image_mask, as_tuple=True)
-                    input_embeds[indices_tuple] = vit_embeds
-
-                    # 音频模态处理
-                    if 'input_features' in kwargs:  # 使用WhisperFeatureExtractor提取音频特征后输出值名为input_feature
-                        audio_features = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
-                        # 151646 表示音频模态的token id
-                        audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds)
-                        audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
-                        input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
-                    input_embeds = input_embeds.transpose(0, 1)
+                input_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, vit_embeds, **kwargs)
+            else:
+                input_embeds = None
 
             attention_mask, position_ids = prepare_positionsids_mask_for_llm(config=self.config, input_ids=input_ids,
                                                                              inference_params=inference_params,

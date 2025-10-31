@@ -12,7 +12,6 @@ from megatron.core import mpu
 from megatron.core.utils import get_model_config
 from megatron.core.distributed import DistributedDataParallel as DDP
 from megatron.core.distributed import finalize_model_grads
-from megatron.core.pipeline_parallel import get_forward_backward_func
 from megatron.training.checkpointing import save_checkpoint
 from megatron.training.initialize import initialize_megatron
 from megatron.training.initialize import set_jit_fusion_options
@@ -723,6 +722,11 @@ def train_step(
         optimizer.zero_grad()
 
     # Forward pass.
+    from megatron.core.pipeline_parallel import get_forward_backward_func
+    if args.hetero_parallel and args.pipeline_model_parallel_size > 1:
+        import mindspeed_mm.patchs.hetero_pipeline_patches as hetero_pp
+        get_forward_backward_func = hetero_pp.hp_get_forward_backward_func
+
     forward_backward_func = get_forward_backward_func()
     losses_reduced = forward_backward_func(
         forward_step_func=forward_step_func,
