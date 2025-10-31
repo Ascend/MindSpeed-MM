@@ -76,6 +76,9 @@ def _configure_image_encoder(vlm_config):
     if get_args().hetero_parallel:
         hetero_align_config(vlm_config.image_encoder.vision_encoder, vlm_config.image_encoder)
         hetero_align_config(vlm_config.image_encoder.vision_projector, vlm_config.image_encoder)
+        # MindSpeed needs to validate the CP configuration; the attention head must be divisible by the CP sizes.
+        # However, since the vision projector does not have an attention head, special handling is required.
+        vlm_config.image_encoder.vision_projector.context_parallel_size = 1
 
     vlm_config.image_encoder.vision_encoder = get_model_config(vlm_config.image_encoder.vision_encoder)
     vlm_config.image_encoder.vision_projector = get_model_config(vlm_config.image_encoder.vision_projector)
