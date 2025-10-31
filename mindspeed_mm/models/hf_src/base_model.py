@@ -18,6 +18,8 @@ class FSDP2Mixin:
     """
     Mixin class for FSDP2
     """
+    def freeze(self, config):
+        pass
 
     def post_meta_init(self):
         pass

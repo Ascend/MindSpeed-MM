@@ -4,7 +4,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
     CheckpointImpl
 )
-
+from megatron.training import print_rank_0
 from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin
 
 
@@ -46,6 +46,27 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
 
         self.visual.rotary_pos_emb.to(device="cuda")
         self.language_model.rotary_emb.to(device="cuda")
+
+    def freeze(self, config):
+        forbidden_modules = set()
+        if config.image_encoder.vision_encoder.freeze:
+            vision_model_keys = ["visual.patch_embed", "visual.blocks"]
+            print_rank_0(f"Set vision model not trainable: {vision_model_keys}")
+            forbidden_modules.update(vision_model_keys)
+
+        if config.image_encoder.vision_projector.freeze:
+            projector_keys = ["visual.merger"]
+            print_rank_0(f"Set vision model not trainable: {projector_keys}")
+            forbidden_modules.update(projector_keys)
+
+        if config.text_decoder.freeze:
+            language_model_keys = ["language_model", "lm_head"]
+            print_rank_0(f"Set vision model not trainable: {language_model_keys}")
+            forbidden_modules.update(language_model_keys)
+
+        for name, param in self.model.named_parameters():
+            if any(forbidden_module in name for forbidden_module in forbidden_modules):
+                param.requires_grad_(False)
 
 
 class Qwen3VLForConditionalGeneration(transformers.Qwen3VLForConditionalGeneration, Qwen3VLFSDP2Mixin):

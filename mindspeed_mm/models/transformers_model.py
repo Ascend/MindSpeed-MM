@@ -38,8 +38,9 @@ class TransformersModel(MultiModalModule):
         print_rank_0("> load model successfully")
 
         self.model.train()
+        if hasattr(self.model, 'freeze') and callable(getattr(self.model, 'freeze')):
+            self.model.freeze(config)
         self.model.use_cache = False
-
 
     def compute_language_model_loss(self, logits: Tensor, labels: Tensor, ignore_index: int = -100, **kwargs) -> Tensor:
         args = get_args()

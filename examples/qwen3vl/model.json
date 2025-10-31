@@ -7,12 +7,12 @@
             "num_layers": 27,
             "hidden_size": 1152,
             "num_attention_heads": 16,
-            "freeze": false
+            "freeze": true
         },
         "vision_projector": {
             "model_id": "lnmlp",
             "num_layers": 1,
-            "freeze": false
+            "freeze": true
         }
     },
     "text_decoder": {

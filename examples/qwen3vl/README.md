@@ -259,6 +259,7 @@ OUTPUT_ARGS="
 ```
 
 根据实际情况配置`examples/qwen3vl/model.json`中的`init_from_hf_path`参数，该参数表示初始权重的加载路径。
+根据实际情况配置`examples/qwen3vl/model.json`中的`image_encoder.vision_encoder.freeze`、`image_encoder.vision_projector.freeze`、`text_decoder.freeze`参数，该参数分别代表是否冻结vision model模块、projector模块、及language model模块。
 
 【单机运行配置】
 
