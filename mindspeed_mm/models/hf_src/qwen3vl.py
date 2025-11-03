@@ -39,7 +39,6 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         Moves the model from meta device to NPU and reinitializes buffers
         (e.g., rotary position embeddings) after FSDP sharding.
         """
-        self.to_empty(device="cuda")
         # reset buffer
         self.visual.rotary_pos_emb.__init__(dim=self.config.vision_config.hidden_size // self.config.vision_config.num_heads // 2)
         self.language_model.rotary_emb.__init__(self.config.text_config)

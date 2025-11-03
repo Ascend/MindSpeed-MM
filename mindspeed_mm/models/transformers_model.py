@@ -25,8 +25,10 @@ class TransformersModel(MultiModalModule):
         model_cls = ModelZoo.build(config, self.transformer_config)
 
         if args.init_model_with_meta_device:
-            with torch.device("meta"):
-                self.model = model_cls._from_config(self.transformer_config).float()
+            self.model = model_cls._from_config(self.transformer_config).float()
+            for m in self.model.modules():
+                if getattr(m, "_is_hf_initialized", False):
+                    m._is_hf_initialized = False
         else:
             self.model = model_cls.from_pretrained(
                 hf_path,
