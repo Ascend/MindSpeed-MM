@@ -1,0 +1,48 @@
+{
+    "dataset_param": {
+        "dataset_type": "feature",
+        "basic_parameters": {
+            "data_path": "./vace_opensora_features/data.jsonl",
+            "data_folder": "./vace_opensora_features"
+        },
+        "preprocess_parameters": {
+            "video_processor_type": "VACEVideoProcessor",
+            "video_reader_type": "DecordVideo",
+            "image_reader_type": "Image",
+            "image_processer_type": "image2image",
+            "num_frames": 17,
+            "frame_interval": 1,
+            "auto_interval": false,
+            "max_height": 480,
+            "max_width": 832,
+            "max_hxw": 399360,
+            "train_fps": 24,
+            "speed_factor": 1.0,
+            "cfg": 0.0,
+            "vae_stride": [4, 8, 8],
+            "vae_patch_size": [1, 2, 2],
+            "force_resolution": false
+        },
+        "use_text_processer": true,
+        "enable_text_preprocessing": false,
+        "tokenizer_config": [
+            {
+                "autotokenizer_name": "AutoTokenizer",
+                "hub_backend": "hf",
+                "from_pretrained": "Wan2.1-T2V-1.3B-Diffusers/tokenizer",
+                "model_max_length": 256
+            }
+        ]
+    },
+    "dataloader_param": {
+        "dataloader_mode": "sampler",
+        "sampler_type": "stateful_distributed_sampler",
+        "shuffle": false,
+        "drop_last": true,
+        "pin_memory": true,
+        "group_frame": false,
+        "group_resolution": false,
+        "group_data": true,
+        "initial_global_step_for_sampler": 0
+    }
+}

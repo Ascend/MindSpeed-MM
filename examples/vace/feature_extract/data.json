@@ -1,0 +1,100 @@
+{
+    "dataset_param": {
+        "dataset_type": "vace",
+        "basic_parameters": {
+            "data_path": "./examples/vace/feature_extract/data.txt",
+            "data_storage_mode": "vace",
+            "data_file_keys": ["cap", "vace_video", "vace_video_mask", "image"]
+        },
+        "preprocess_parameters": {
+            "video_processor_type": "VACEVideoProcessor",
+            "video_reader_type": "DecordVideo",
+            "image_reader_type": "Image",
+            "image_processer_type": "image2image",
+            "num_frames": 17,
+            "frame_interval": 1,
+            "auto_interval": false,
+            "max_height": 480,
+            "max_width": 832,
+            "max_hxw": 399360,
+            "train_fps": 24,
+            "speed_factor": 1.0,
+            "cfg": 0.0,
+            "keep_last": false,
+            "zero_start": true,
+            "vae_stride": [4, 8, 8],
+            "vae_patch_size": [1, 2, 2],
+            "force_resolution": false,
+            "train_pipeline": {
+                "video": [
+                    {
+                        "trans_type": "ResizeCropVideo",
+                        "param": {
+							"antialias": true,
+							"size": "auto",
+                            "interpolation_mode": "bicubic"
+                        }
+                    },
+                    {
+                        "trans_type": "ToTensorVideo"
+                    },
+                    {
+                        "trans_type": "norm_fun",
+                        "param": {
+                            "mean": 0.5,
+                            "std": 0.5
+                        }
+                    }
+                ],
+                "image": [
+                    {
+					    "trans_type": "ToTensorVideo"
+					},
+                    {
+						"trans_type": "norm_fun",
+                        "param": {
+                            "mean": 0.5,
+                            "std": 0.5
+                        }
+					},
+					{
+						"trans_type": "ResizeToFill",
+						"param": {
+							"size": "auto",
+							"interpolation_mode": "bilinear",
+                            "align_corners": false
+                        }
+					}
+                ]
+            }
+        },
+        "use_text_processer": true,
+        "enable_text_preprocessing": true,
+        "text_preprocess_methods":[
+            {
+                "method": "basic_clean"
+            },
+            {
+                "method": "whitespace_clean"
+            }
+        ],
+        "tokenizer_config":
+        {
+            "autotokenizer_name": "AutoTokenizer",
+            "hub_backend": "hf",
+            "from_pretrained": "./Wan2.1-VACE-1.3B/google/umt5-xxl",
+            "model_max_length": 512
+        },
+        "support_chinese": true
+    },
+    "dataloader_param": {
+        "dataloader_mode": "base",
+        "shuffle": false,
+        "drop_last": true,
+        "pin_memory": true,
+        "group_frame": false,
+        "group_resolution": false,
+        "group_data": true,
+        "initial_global_step_for_sampler": 0
+    }
+}
