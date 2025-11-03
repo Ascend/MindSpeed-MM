@@ -864,7 +864,7 @@ class Qwen2OmniPlugin(Qwen2VLPlugin):
 
             if (
                     use_audio_in_video and len(audios) and len(videos)
-            ):  # if use the audio of video # deal video token and audio token togather
+            ):  # if use the audio of video # deal video token and audio token together
                 if len(videos) != len(audios):
                     raise ValueError(
                         f"Number of videos ({len(videos)}) must match number of audios ({len(audios)}) when using audio in video."

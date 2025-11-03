@@ -303,7 +303,7 @@ class DeepseekVLV2Processor(ProcessorMixin):
             elif message['role'] == 'system' or message['role'] == 'deepseekapi-sys':
                 # 如果message里面有system，那就只允许出现在message的第一句，同时conv原本的system就会失效
                 if idx != 0:
-                    raise AssertionError("system information should only exist in the begining of the conversation")
+                    raise AssertionError("system information should only exist in the beginning of the conversation")
                 formatted_system = message['content'].strip()
                 tokenized_str = self.encode(formatted_system, bos=False, eos=False)
                 tokenized_data += tokenized_str
@@ -584,9 +584,9 @@ class DeepseekVLV2Processor(ProcessorMixin):
 
             """add image tokens"""
             h = w = math.ceil((self.image_size // self.patch_size) / self.downsample_ratio)
-            # global views tokens h * (w + 1), 1 is for line seperator
+            # global views tokens h * (w + 1), 1 is for line separator
             tokenized_image = [self.image_token_id] * h * (w + 1)
-            # add a seperator between global and local views
+            # add a separator between global and local views
             tokenized_image += [self.image_token_id]
             # local views tokens, (num_height_tiles * h) * (num_width_tiles * w + 1)
             tokenized_image += [self.image_token_id] * (num_height_tiles * h) * (num_width_tiles * w + 1)

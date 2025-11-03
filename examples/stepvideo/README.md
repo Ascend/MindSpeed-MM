@@ -291,7 +291,7 @@ stepvideo训练阶段的启动文件为shell脚本，主要分为如下2个：
   
   - 使能方式：在启动脚本中设置 CP > 1，如：CP=2；
   
-  - 限制条件：num_attention_heads 数量需要能够被TP*CP整除（在`exmaples/stepvideo/{task_name}/pretrain_xx_model.json`中配置，默认为48）
+  - 限制条件：num_attention_heads 数量需要能够被TP*CP整除（在`examples/stepvideo/{task_name}/pretrain_xx_model.json`中配置，默认为48）
   
 + TP: 张量模型并行
 
@@ -299,7 +299,7 @@ stepvideo训练阶段的启动文件为shell脚本，主要分为如下2个：
 
   - 使能方式：在启动脚本中设置 TP > 1，如：TP=8
 
-  - 限制条件：num_attention_heads 数量需要能够被TP*CP整除（在`exmaples/stepvideo/{task_name}/pretrain_xx_model.json`中配置，默认为48）
+  - 限制条件：num_attention_heads 数量需要能够被TP*CP整除（在`examples/stepvideo/{task_name}/pretrain_xx_model.json`中配置，默认为48）
 
 
 #### 启动预训练
@@ -415,7 +415,7 @@ bash examples/stepvideo/{task_name}/inference_{task_name}.sh
 
 执行如下命令，为生成的视频样本打分，并生成偏好数据文件
 ```bash
-python examples/stepvideo/histgram_generator.py --prompt_file <prompt文件路径> --videos_path <视频样本路径> --num_inference_videos_per_sample <每个prompt生成的视频样本数量>
+python examples/stepvideo/histogram_generator.py --prompt_file <prompt文件路径> --videos_path <视频样本路径> --num_inference_videos_per_sample <每个prompt生成的视频样本数量>
 ```
 
 生成偏好数据集脚本的参数说明如下：
@@ -470,7 +470,7 @@ data.jsonl中包含成对的视频偏好数据和文本信息，具体示例如�
 
 4. dpo参数配置
 
-  根据实际情况修改`posttrain_t2v_model.json`中的直方图文件路径，即将`histgram_path`的值配置为执行生成偏好数据集脚本后，生成的"video_score_histogram.json"文件路径
+  根据实际情况修改`posttrain_t2v_model.json`中的直方图文件路径，即将`histogram_path`的值配置为执行生成偏好数据集脚本后，生成的"video_score_histogram.json"文件路径
 
 #### 启动dpo训练
 

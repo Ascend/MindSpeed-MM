@@ -53,7 +53,7 @@ class PredictModel(nn.Module):
         self.predictor = model_cls(**config.to_dict())
         if hasattr(config, "from_pretrained") and config.from_pretrained is not None:
             load_checkpoint(self.predictor, config.from_pretrained)
-            print_rank_0("load predictor's checkpoint sucessfully")
+            print_rank_0("load predictor's checkpoint successfully")
 
     def get_model(self):
         return self.predictor

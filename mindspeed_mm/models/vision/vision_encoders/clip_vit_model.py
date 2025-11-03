@@ -50,9 +50,9 @@ class CLIPViT(MultiModalModule):
         self.use_flash_attn = getattr(get_args(), "use_flash_attn", False)
 
         if self.img_h % self.patch_size != 0:
-            raise AssertionError("patch_size shoule be an exact divisor of img_height")
+            raise AssertionError("patch_size should be an exact divisor of img_height")
         if self.img_w % self.patch_size != 0:
-            raise AssertionError("patch_size shoule be an exact divisor of img_width")
+            raise AssertionError("patch_size should be an exact divisor of img_width")
         self.num_patches_per_dim_h = self.img_h // self.patch_size
         self.num_patches_per_dim_w = self.img_w // self.patch_size
         self.num_patches = self.num_patches_per_dim_h * self.num_patches_per_dim_w

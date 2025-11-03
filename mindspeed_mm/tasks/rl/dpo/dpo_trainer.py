@@ -77,7 +77,7 @@ class DPOTrainer(ABC):
         model_type = self.model_type
 
         extra_args_provider = extra_args_provider_decorator(extra_args_provider)
-        # Initalize and get arguments, timers, and Tensorboard writer.
+        # Initialize and get arguments, timers, and Tensorboard writer.
         initialize_megatron(
             extra_args_provider=extra_args_provider, args_defaults=args_defaults
         )

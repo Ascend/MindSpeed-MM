@@ -311,7 +311,7 @@ if __name__ == '__main__':
     eval_result_files = os.path.join(eval_result_path,
                                      f'{name}_eval_results.json')  # File path for storing video scores.
 
-    # 2. generate score histgram of video eval results
+    # 2. generate score histogram of video eval results
     # weight from VideoDPO
     dimension_weight = {'subject_consistency': 4.0,
                         'background_consistency': 4.0,

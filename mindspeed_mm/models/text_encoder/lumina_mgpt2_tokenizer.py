@@ -25,7 +25,7 @@ class LuminaMGPT2Tokenizer:
         if self.need_space_before_segment:
             return self.encode(s, bos=False, eos=False)
         else:
-            # prefix chars that, when preceding other strings without seperator in between,
+            # prefix chars that, when preceding other strings without separator in between,
             # are relatively more likely to be tokenized independently rather than getting
             # merged into the following strings.
             l_prefix = ["@", "\n", "\\", "=", ">", "`"]
@@ -37,7 +37,7 @@ class LuminaMGPT2Tokenizer:
 
             raise NotImplementedError(
                 f"All prefixes are merged into {s} during tokenization,"
-                f"This is wierd behavior, please open an issue to report this problem",
+                f"This is weird behavior, please open an issue to report this problem",
             )
 
     def _probe_tokenizer_style(self):

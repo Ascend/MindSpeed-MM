@@ -135,7 +135,7 @@ class CudaRNGStatesTracker:
         self.is_inference_rng_tracker = is_inference_rng_tracker
 
     def is_initialized(self):
-        """Checks if the internal RNG state has been set wirth set_states()."""
+        """Checks if the internal RNG state has been set with set_states()."""
         return self._is_initialized
 
     def reset(self):

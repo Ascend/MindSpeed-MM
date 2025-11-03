@@ -282,7 +282,7 @@ class MOETransformerBlock(TransformerBlock):
             ]
         )
 
-        # mtp require seperate layernorms for main model and mtp modules, thus move finalnorm out of block
+        # mtp require separate layernorms for main model and mtp modules, thus move finalnorm out of block
         has_layernorm = self.post_layer_norm and self.submodules.layer_norm
         mtp_process = hasattr(self.config, "mtp_num_layers") and self.config.mtp_num_layers
         if self.post_process and has_layernorm and not mtp_process:

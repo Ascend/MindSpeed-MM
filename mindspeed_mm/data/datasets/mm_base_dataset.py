@@ -11,7 +11,7 @@ from mindspeed_mm.data.data_utils.utils import VID_EXTENSIONS, DataFileReader
 
 class MMBaseDataset(Dataset):
     """
-    A base mutilmodal dataset,  it's to privide basic parameters and method
+    A base mutilmodal dataset,  it's to provide basic parameters and method
 
     Args: some basic parameters from dataset_param_dict in config.
         data_path(str):  csv/json/parquat file path

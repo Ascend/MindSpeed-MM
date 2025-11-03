@@ -65,7 +65,7 @@ class LLaMaEmbedding(nn.Module):
     def forward(self, input_ids):
         # Embeddings.
         embeddings = self.word_embeddings(input_ids)
-        # Data format change to avoid explicit tranposes : [b s h] --> [s b h].
+        # Data format change to avoid explicit transposes : [b s h] --> [s b h].
         embeddings = embeddings.transpose(0, 1).contiguous()
         # Dropout.
         embeddings = self.embedding_dropout(embeddings)
@@ -149,7 +149,7 @@ class MultiQueryAttention(nn.Module):
 
         if self.use_flash_attention:
             output = self.core_attention(xq, xk, xv, cu_seqlens=cu_seqlens)
-            # reduce-scatter only support first dimention now
+            # reduce-scatter only support first dimension now
             output = rearrange(output, "b s h d -> s b (h d)").contiguous()
         else:
             xq, xk, xv = [

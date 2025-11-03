@@ -202,7 +202,7 @@ class ImageProcesser:
             image = self.image_to_image(image_path)
         else:
             raise NotImplementedError(
-                f"Unsupported image processer type: {self.image_processer_type}"
+                f"Unsupported image processor type: {self.image_processer_type}"
             )
         return image
 
@@ -418,7 +418,7 @@ class TextProcesser:
         # &amp
         caption = re.sub(r"&amp", "", caption)
 
-        # ip adresses:
+        # ip addresses:
         caption = re.sub(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", " ", caption)
 
         # article ids:

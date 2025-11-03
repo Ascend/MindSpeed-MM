@@ -499,11 +499,11 @@ class DoubleStreamBlock(nn.Module):
         attn1 = rearrange(attn1, "b s n d -> b s (n d)")
         txt_attn, img_attn = attn1[:, : txt_q.shape[2]], attn1[:, txt_q.shape[2]:]
 
-        # calculate the img bloks
+        # calculate the img blocks
         img = img + img_mod1_gate * self.img_attn.function_after_core_attention(img_attn)
         img = img + img_mod2_gate * self.img_mlp((1 + img_mod2_scale) * self.img_norm2(img) + img_mod2_shift)
 
-        # calculate the txt bloks
+        # calculate the txt blocks
         txt = txt + txt_mod1_gate * self.txt_attn.function_after_core_attention(txt_attn)
         txt = txt + txt_mod2_gate * self.txt_mlp((1 + txt_mod2_scale) * self.txt_norm2(txt) + txt_mod2_shift)
         return img, txt

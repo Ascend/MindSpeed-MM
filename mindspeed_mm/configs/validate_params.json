@@ -78,7 +78,7 @@
       "ae.from_pretrained_3dvae_ckpt",
       "as.i2v_processor.processor_path",
       "ae.i2v_processor.image_encoder",
-      "dpo.histgram_path",
+      "dpo.histogram_path",
       "tokenizer.from_pretrained",
       "tokenizer.template_file_path",
       "predictor.from_pretrained",

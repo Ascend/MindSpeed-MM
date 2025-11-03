@@ -173,7 +173,7 @@ class TextEncoder(nn.Module):
         elif text_encoder.output_key in ["pooler_output", "text_embeds"]:
             emb = emb.view(*BN, -1)
         else:
-            raise NotImplementedError(f"Text encoder output_key: {text_encoder.output_key} is not implenmented! ")
+            raise NotImplementedError(f"Text encoder output_key: {text_encoder.output_key} is not implemented! ")
 
         if text_encoder.use_attention_mask:
             attention_mask = model_attention_mask

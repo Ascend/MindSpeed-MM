@@ -46,7 +46,7 @@ DIFFUSERS_SCHEDULE_MAPPINGS = {
 
 class DiffusersScheduler:
     """
-    Wrapper class for diffusers sheduler.
+    Wrapper class for diffusers scheduler.
     Args:
         config:
         {

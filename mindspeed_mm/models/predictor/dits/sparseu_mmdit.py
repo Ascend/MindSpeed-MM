@@ -182,7 +182,7 @@ class SparseUMMDiT(MultiModalModule):
             pooled_projection_dim=pooled_projection_dim
         )
 
-        # 3. anthor text embedding
+        # 3. another text embedding
         self.caption_projection = nn.Linear(caption_channels, hidden_size)
 
         # 4. rope
@@ -905,7 +905,7 @@ class RoPE3D(torch.nn.Module):
             * dim: head_dim
             * positions: batch_size x ntokens x 3 (t, y and x position of each token)
         output:
-            * tokens after appplying RoPE3D (ntokens x batch_size x nheads x dim)
+            * tokens after applying RoPE3D (ntokens x batch_size x nheads x dim)
         """
         if dim % 16 != 0:
             raise Error(f"number of dimensions should be a multiple of 16")

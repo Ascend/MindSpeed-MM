@@ -20,21 +20,21 @@ IGNORE_INDEX = -100
 IMAGE_PLACEHOLDER = "<image>"
 
 
-def find_medias(medias, dataset_dir):
-    if medias is None:
+def find_media_files(media_files, dataset_dir):
+    if media_files is None:
         return None
-    elif not isinstance(medias, list):
-        medias = [medias]
-    elif len(medias) == 0:
+    elif not isinstance(media_files, list):
+        media_files = [media_files]
+    elif len(media_files) == 0:
         return None
     else:
-        medias = medias[:]
-    for i, media in enumerate(medias):
+        media_files = media_files[:]
+    for i, media in enumerate(media_files):
         if os.path.isfile(os.path.join(dataset_dir, media)):
-            medias[i] = os.path.join(dataset_dir, media)
+            media_files[i] = os.path.join(dataset_dir, media)
         else:
             print(f"Media {media} does not exist in `media_dir`. Use original path.")
-    return medias
+    return media_files
 
 
 def infer_seqlen(source_len: int, target_len: int, cutoff_len: int):
@@ -73,7 +73,7 @@ class VLDataset(Dataset):
         return dataset
 
     def process_example(self, example, data_dir, mask_history=True):
-        images = find_medias(example[IMAGES_KEY], data_dir)
+        images = find_media_files(example[IMAGES_KEY], data_dir)
         for i, image in enumerate(images):
             images[i] = fetch_image({"type": "image", "image": image})
         messages = example.get(MESSAGES_TAG, [])

@@ -198,7 +198,7 @@ class ParallelWrapper:
         recv_buffer = _allocate_recv_buffer(micro_batch_size, sequence_length)
 
         for micro_batch_index in range(num_micro_batches):
-            # Slice among the batch dimenion.
+            # Slice among the batch dimension.
             start = micro_batch_index * micro_batch_size
             end = min(start + micro_batch_size, batch_size)
             this_micro_batch_size = end - start

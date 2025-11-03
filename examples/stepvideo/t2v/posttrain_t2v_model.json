@@ -3,7 +3,7 @@
     "load_text_features": false,
     "enable_encoder_dp": false,
     "dpo": {
-      "histgram_path": "/video_path/video_score_histogram.json",
+      "histogram_path": "/video_path/video_score_histogram.json",
       "weight_alpha": 0,
       "weight_beta": null,
       "loss_beta": 2000

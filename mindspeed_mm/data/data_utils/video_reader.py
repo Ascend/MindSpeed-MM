@@ -118,7 +118,7 @@ class DecordVideo(Video):
             cls._decoder = DecordInit()
 
     def _load_data(self):
-        self._init_decoder()  # making sure that decorder has been initialized
+        self._init_decoder()  # making sure that decoder has been initialized
         self.vframes = self.__class__._decoder(str(self.video_path))
 
     def get_batch(self, frame_indices: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:

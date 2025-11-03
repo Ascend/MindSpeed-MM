@@ -644,7 +644,7 @@ class HunyuanVideoDiT(MultiModalModule):
 
 class MMDoubleStreamBlock(nn.Module):
     """
-    A multimodal dit block with seperate modulation for text and image/video
+    A multimodal dit block with separate modulation for text and image/video
     """
     def __init__(
             self, 

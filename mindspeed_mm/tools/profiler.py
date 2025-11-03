@@ -92,15 +92,15 @@ class Profiler:
             skip_first = self.sp_start_step
             active = self.sp_end_step - self.sp_start_step
 
-            activites = [torch_npu.profiler.ProfilerActivity.NPU]
+            activities = [torch_npu.profiler.ProfilerActivity.NPU]
             if self.sp_with_cpu:
-                activites.append(torch_npu.profiler.ProfilerActivity.CPU)
+                activities.append(torch_npu.profiler.ProfilerActivity.CPU)
 
             self.prof = torch_npu.profiler.profile(
                 with_stack=self.sp_with_stack,
                 record_shapes=self.sp_record_shapes,
                 profile_memory=self.sp_with_memory,
-                activities=activites,
+                activities=activities,
                 schedule=torch_npu.profiler.schedule(
                     wait=0, warmup=0, active=active, repeat=1, skip_first=skip_first),
                 on_trace_ready=torch_npu.profiler.tensorboard_trace_handler(self.sp_save_path),

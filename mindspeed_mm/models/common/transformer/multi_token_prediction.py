@@ -424,7 +424,7 @@ class MultiTokenPredictionLayer(MegatronModule):
             decoder_input (Tensor): Input tensor of shape [s, b, h] where s is the
                 sequence length, b is the batch size, and h is the hidden size.
                 At the (k - 1)-th MTP module, the i-th element of decoder input is
-                the embedding of (i + K)-th tocken.
+                the embedding of (i + K)-th token.
             attention_mask (Tensor): Boolean tensor of shape [1, 1, s, s] for masking
                 self-attention.
             context (Tensor, optional): Context tensor for cross-attention.

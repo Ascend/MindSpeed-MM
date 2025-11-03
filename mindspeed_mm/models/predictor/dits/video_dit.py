@@ -200,7 +200,7 @@ class VideoDiT(MultiModalModule):
             prompt_mask: Cross-attention mask applied to prompt.
             added_cond_kwargs: resolution or aspect_ratio.
             class_labels: Used to indicate class labels conditioning.
-            use_image_num: The number of images use for trainning.
+            use_image_num: The number of images use for training.
         """
         batch_size, _, t, _, _ = latents.shape
         frames = t - use_image_num

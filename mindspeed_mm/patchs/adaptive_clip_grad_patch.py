@@ -214,7 +214,7 @@ def adaptive_clip_grad_norm_fp32_with_distributed_optimizer(
     ema_decay = clip_grad_ema_decay
     is_first_step = True if moving_avg_max_grad_norm < 0.0 else False # the value of init is -1e6, before first step
 
-    # initailize
+    # initialize
     grad_norm_after_clip = grad_norm_before_clip
 
     if is_first_step:  

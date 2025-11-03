@@ -25,7 +25,7 @@ def qwen2vl_get_rope_index(
     Explanation:
         Each embedding sequence contains vision embedding and text embedding or just contains text embedding.
 
-        For pure text embedding sequence, the rotary position embedding has no difference with mordern LLMs.
+        For pure text embedding sequence, the rotary position embedding has no difference with modern LLMs.
         Examples:
             input_ids: [T T T T T], here T is for text.
             temporal position_ids: [0, 1, 2, 3, 4]
@@ -33,7 +33,7 @@ def qwen2vl_get_rope_index(
             width position_ids: [0, 1, 2, 3, 4]
 
         For vision and text embedding sequence, we calculate 3D rotary position embedding for vision part
-        and 1D rotary position embeddin for text part.
+        and 1D rotary position embedding for text part.
         Examples:
             Assume we have a video input with 3 temporal patches, 2 height patches and 2 width patches.
             input_ids: [V V V V V V V V V V V V T T T T T], here V is for vision.
@@ -533,7 +533,7 @@ def qwen2_5_vl_get_rope_index(
             width position_ids: [0, 1, 2, 3, 4]
 
         For vision and text embedding sequence, we calculate 3D rotary position embedding for vision part
-        and 1D rotary position embeddin for text part.
+        and 1D rotary position embedding for text part.
         Examples:
             Temporal (Time): 3 patches, representing different segments of the video in time.
             Height: 2 patches, dividing each frame vertically.

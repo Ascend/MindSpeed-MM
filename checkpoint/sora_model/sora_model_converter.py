@@ -48,9 +48,9 @@ class SoraModelConverter(Converter):
     _enable_tp = False
     _enable_pp = False
     _enable_vpp = False
-    convert_mapping = OrderedDict() # origin to mm, mapping mode (recommand)
+    convert_mapping = OrderedDict() # origin to mm, mapping mode (recommend)
     str_replace_mapping = OrderedDict() # origin to mm, str_replace mode
-    hf_to_mm_convert_mapping = OrderedDict() # hf to mm, mapping mode (recommand)
+    hf_to_mm_convert_mapping = OrderedDict() # hf to mm, mapping mode (recommend)
     hf_to_mm_str_replace_mapping = OrderedDict() # hf to mm, str_replace mode
     lora_target_modules = [] # lora modules
 

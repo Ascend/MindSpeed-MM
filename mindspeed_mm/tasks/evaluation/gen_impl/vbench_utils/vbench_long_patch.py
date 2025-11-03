@@ -21,7 +21,7 @@ def evaluate_long(self, videos_path, name, prompt_list=None, dimension_list=None
     else:
         self.preprocess(videos_path, mode, **kwargs)
 
-    # Now, long videos have been splitted into clips
+    # Now, long videos have been split into clips
     results_dict = {}
     if dimension_list is None:
         dimension_list = self.build_full_dimension_list()

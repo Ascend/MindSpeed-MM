@@ -57,9 +57,9 @@ class SoRADPOTrainer(DPOTrainer):
         )
 
         args = get_args()
-        self.histgram = read_json_file(args.mm.model.dpo.histgram_path)
+        self.histogram = read_json_file(args.mm.model.dpo.histogram_path)
         self.alpha = args.mm.model.dpo.weight_alpha
-        self.beta = args.mm.model.dpo.weight_beta if args.mm.model.dpo.weight_beta else self.histgram['max_num'] / self.histgram['total_num']
+        self.beta = args.mm.model.dpo.weight_beta if args.mm.model.dpo.weight_beta else self.histogram['max_num'] / self.histogram['total_num']
         self.dpo_beta = args.mm.model.dpo.loss_beta
         self.disable_dropout()
 
@@ -189,7 +189,7 @@ class SoRADPOTrainer(DPOTrainer):
             refer_chosen_loss,
             refer_rejected_loss,
         )
-        pair_prob = math.sqrt(find_probability(kwargs['score_win'], self.histgram) * find_probability(kwargs['score_lose'], self.histgram))
+        pair_prob = math.sqrt(find_probability(kwargs['score_win'], self.histogram) * find_probability(kwargs['score_lose'], self.histogram))
         weight_pair = math.pow((self.beta / max(pair_prob, 1e-3)), self.alpha)
         losses = losses * weight_pair
 

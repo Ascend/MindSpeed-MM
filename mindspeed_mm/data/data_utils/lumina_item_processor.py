@@ -131,7 +131,7 @@ class TokenizerItemProcessor(ItemProcessorBase):
         self.tokenizer = Tokenizer(tokenizer_config).get_tokenizer()
         self.vqgan = AEModel(args.mm.model.ae).get_model().to(device).eval()
 
-        # meida
+        # media
         self.media_symbols = ["<|image|>"]
         self.tokenizer.tokenizer.add_tokens(self.media_symbols)
         self.d_media_symbol2token = {}

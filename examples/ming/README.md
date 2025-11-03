@@ -72,7 +72,7 @@ pip install torch-2.7.1-cp310-cp310-*.whl
 pip install torch_npu-2.7.1*.manylinux2014_aarch64.whl
 
 # 安装MindSPeed MM依赖
-pip install -r MindSpeed-MM/examples/ming/requiremnts.txt
+pip install -r MindSpeed-MM/examples/ming/requirements.txt
 
 ```
 

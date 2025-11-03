@@ -21,7 +21,7 @@ class DiffusersAEModel(nn.Module):
         self.do_sample = config.get("do_sample", True)
 
         # tiling
-        self._tiling = False  # True: use costum tiling method; False: disable tiling or use diffusers' tiling function
+        self._tiling = False  # True: use custom tiling method; False: disable tiling or use diffusers' tiling function
         use_tiling = config.pop("enable_tiling", False)
         self.tiling_param = None
         if use_tiling:

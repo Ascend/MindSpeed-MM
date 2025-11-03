@@ -874,7 +874,7 @@ class MaskGenerator:
             "image_tail",
             "image_head_tail",
             "random",
-            "intepolate",
+            "interpolate",
         ]
         if not all(
                 mask_name in valid_mask_names for mask_name in mask_ratios.keys()
@@ -947,7 +947,7 @@ class MaskGenerator:
             random_size = 1
             mask[:random_size] = 0
             mask[-random_size:] = 0
-        elif mask_name == "intepolate":
+        elif mask_name == "interpolate":
             random_start = random.randint(0, 1)
             mask[random_start::2] = 0
         elif mask_name == "random":

@@ -119,8 +119,8 @@ class LlavaImageVideoPreprocess(MultiModalImageVideoPreprocessBase):
         processor_kwargs = copy.deepcopy(self.train_pipeline)
         processor_kwargs.pop("pad2square", None)
 
-        processer = CLIPImageProcessor(**self.train_pipeline)
-        pixel_values = processer.preprocess(image, return_tensors="pt", **processor_kwargs)["pixel_values"][0]
+        processor = CLIPImageProcessor(**self.train_pipeline)
+        pixel_values = processor.preprocess(image, return_tensors="pt", **processor_kwargs)["pixel_values"][0]
         return {"pixel_values": pixel_values}
 
 

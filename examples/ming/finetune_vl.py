@@ -29,7 +29,7 @@ class MingTrainer:
         gbs = self.config.global_batch_size
         mbs = self.config.micro_batch_size
         if gbs % mbs != 0 or gbs % (mbs * dp_size) != 0:
-            raise ValueError(f"Gobal batch size {gbs} must be multiple of micro batch size {mbs} times data parallel suze {dp_size}")
+            raise ValueError(f"Global batch size {gbs} must be multiple of micro batch size {mbs} times data parallel suze {dp_size}")
         gradient_accumulation_steps = gbs // mbs // dp_size
         setattr(self.config, "gradient_accumulation_steps", gradient_accumulation_steps)
 

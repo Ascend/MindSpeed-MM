@@ -79,7 +79,7 @@ class SoRAModel(nn.Module):
         if self.enable_encoder_dp and mpu.get_pipeline_model_parallel_world_size() > 1:
             raise AssertionError("Encoder DP cannot be used with PP")
 
-        # build inner moudule
+        # build inner module
         if args.dist_train:
             from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
         self.pre_process = mpu.is_pipeline_first_stage() if not args.dist_train else is_in_subworld(

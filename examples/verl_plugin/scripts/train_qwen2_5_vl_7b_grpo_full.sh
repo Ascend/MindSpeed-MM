@@ -14,11 +14,11 @@ done
 
 #校验是否传入data_path和model_path,不需要修改
 if [[ $data_path == "" ]];then
-    echo "[Error] para \"data_path\" must be confing"
+    echo "[Error] para \"data_path\" must be config"
     exit 1
 fi
 if [[ $model_path == "" ]];then
-    echo "[Error] para \"model_path\" must be confing"
+    echo "[Error] para \"model_path\" must be config"
     exit 1
 fi
 

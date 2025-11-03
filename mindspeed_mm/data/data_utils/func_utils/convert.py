@@ -57,22 +57,22 @@ class DatasetConverter:
     dataset_attr: "DatasetAttr"
     data_args: "DataArguments"
 
-    def _find_medias(self, medias: Union["MediaType", List["MediaType"], None]) -> Optional[List["MediaType"]]:
+    def _find_media_files(self, media_files: Union["MediaType", List["MediaType"], None]) -> Optional[List["MediaType"]]:
         r"""Optionally concatenate media path to media dir when loading from local disk."""
-        if medias is None:
+        if media_files is None:
             return None
-        elif not isinstance(medias, list):
-            medias = [medias]
-        elif len(medias) == 0:
+        elif not isinstance(media_files, list):
+            media_files = [media_files]
+        elif len(media_files) == 0:
             return None
         else:
-            medias = medias[:]
-        for i, media in enumerate(medias):
+            media_files = media_files[:]
+        for i, media in enumerate(media_files):
             if os.path.isfile(os.path.join(self.data_args.dataset_dir, media)):
-                medias[i] = os.path.join(self.data_args.dataset_dir, media)
+                media_files[i] = os.path.join(self.data_args.dataset_dir, media)
             else:
                 logger.warning(f"Media {media} does not exist in `media_dir`. Use original path.")
-        return medias
+        return media_files
 
     @abstractmethod
     def __call__(self, example: Dict[str, Any]) -> Dict[str, Any]:
@@ -116,9 +116,9 @@ class AlpacaDatasetConverter(DatasetConverter):
             "_prompt": prompt,
             "_response": response,
             "_system": example[self.dataset_attr.system] if self.dataset_attr.system else "",
-            "_images": self._find_medias(example[self.dataset_attr.images]) if self.dataset_attr.images else None,
-            "_videos": self._find_medias(example[self.dataset_attr.videos]) if self.dataset_attr.videos else None,
-            "_audios": self._find_medias(example[self.dataset_attr.audios]) if self.dataset_attr.audios else None,
+            "_images": self._find_media_files(example[self.dataset_attr.images]) if self.dataset_attr.images else None,
+            "_videos": self._find_media_files(example[self.dataset_attr.videos]) if self.dataset_attr.videos else None,
+            "_audios": self._find_media_files(example[self.dataset_attr.audios]) if self.dataset_attr.audios else None,
         }
         return output
 
@@ -204,9 +204,9 @@ class SharegptDatasetConverter(DatasetConverter):
             "_prompt": prompt,
             "_response": response,
             "_system": system,
-            "_images": self._find_medias(example[self.dataset_attr.images]) if self.dataset_attr.images else None,
-            "_videos": self._find_medias(example[self.dataset_attr.videos]) if self.dataset_attr.videos else None,
-            "_audios": self._find_medias(example[self.dataset_attr.audios]) if self.dataset_attr.audios else None,
+            "_images": self._find_media_files(example[self.dataset_attr.images]) if self.dataset_attr.images else None,
+            "_videos": self._find_media_files(example[self.dataset_attr.videos]) if self.dataset_attr.videos else None,
+            "_audios": self._find_media_files(example[self.dataset_attr.audios]) if self.dataset_attr.audios else None,
         }
         return output
 

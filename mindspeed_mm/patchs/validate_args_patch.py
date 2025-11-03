@@ -463,7 +463,7 @@ def validate_args(args, defaults=None):
     if args.ffn_hidden_size is None:
         if args.swiglu:
             # reduce the dimnesion for MLP since projections happens on
-            # two linear layers. this keeps the number of paramters in
+            # two linear layers. this keeps the number of parameters in
             # the same ballpark as the counterpart with 4*h size
             # we keep it a multiple of 64, which means the actual tensor size
             # will be a multiple of 64 / tp_size

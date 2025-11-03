@@ -132,7 +132,7 @@ class VLModel(MultiModalModule):
             image_sizes=None
     ):
         if self.IGNORE_INDEX is None or self.IMAGE_TOKEN_INDEX is None:
-            raise AssertionError("IGNORE_INDEX and IMAGE_TOKEN_INDEX shoule be provided for this model.")
+            raise AssertionError("IGNORE_INDEX and IMAGE_TOKEN_INDEX should be provided for this model.")
         if not self.add_image_encoder or images is None or input_ids.shape[1] == 1:
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 

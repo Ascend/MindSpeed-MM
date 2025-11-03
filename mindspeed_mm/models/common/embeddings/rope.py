@@ -82,7 +82,7 @@ class RoPE3D(nn.Module):
             tokens: batch_size x nheads x ntokens x dim
             positions: batch_size x ntokens x 3 (t, y and x position of each token)
         output:
-            tokens after appplying RoPE3D (batch_size x nheads x ntokens x x dim)
+            tokens after applying RoPE3D (batch_size x nheads x ntokens x x dim)
         """
         if tokens.size(3) % 3 != 0:
             raise AssertionError("number of dimensions should be a multiple of three")
@@ -166,7 +166,7 @@ class DynamicRotaryEmbedding(RotaryEmbedding):
         # emb [seq_length, .., dim]
         emb = emb[:, None, None, :]
         if parallel_state.get_context_parallel_world_size() > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
-            # slice rotary_pos_emb along sequence dimension and select the parition of the current CP rank
+            # slice rotary_pos_emb along sequence dimension and select the partition of the current CP rank
             emb = get_pos_emb_on_this_cp_rank(emb, 0)
         return emb
     

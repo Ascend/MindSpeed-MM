@@ -88,11 +88,11 @@ def pretrain(
     """
     Main training program.
 
-    This function will run the followings in the order provided:
+    This function will run the following in the order provided:
         1) initialize Megatron.
         2) setup model, optimizer and lr schedule using the model_provider.
         3) call train_val_test_data_provider to get train/val/test datasets.
-        4) train the modle using the forward_step_func.
+        4) train the model using the forward_step_func.
 
     Args:
         train_valid_test_dataset_provider: a function that takes the size of
@@ -125,7 +125,7 @@ def pretrain(
         auto_parallel_mm_search_optimal_config(argument)
         return
 
-    # Initalize and get arguments, timers, and Tensorboard writer.
+    # Initialize and get arguments, timers, and Tensorboard writer.
     initialize_megatron(
         extra_args_provider=extra_args_provider, args_defaults=args_defaults
     )

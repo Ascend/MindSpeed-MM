@@ -35,7 +35,7 @@ def pretrain_ae(
     """
     Main AE training program.
 
-    This function will run the followings in the order provided:
+    This function will run the following in the order provided:
         1) initialize DDP.
         2) setup model, optimizer and AMP scaler.
         3) call train_val_test_data_provider to get train/val/test datasets.

@@ -584,7 +584,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             return True
         else:
             raise NameError(
-                f"Unknown file extention {path.split('.')[-1]}"
+                f"Unknown file extension {path.split('.')[-1]}"
             )
         
     def _process_video_temporal(self, sample, stats):
