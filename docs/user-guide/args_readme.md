@@ -8,6 +8,7 @@
       - [FSDP2](#fsdp2)
     - [加速特性](#加速特性)
   - [MOE\_ARGS下参数解释](#moe_args下参数解释)
+  - [OUTPUT\_ARGS下参数解释说明](#output_args下参数解释说明)
   - [环境变量参数解释](#环境变量参数解释)
 
 ## GPT_ARGS下参数注释
@@ -36,6 +37,10 @@
 --load: str,模型权重路径，根据各example中指导填写
 
 --variable-seq-lengths: store_true,启用可变序列长度
+
+--ckpt-format torch_dcp: 保存时使用dcp格式。(详细介绍)[https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md]
+
+--init-model-with-meta-device: 使用fsdp2的meta初始化模型，目前仅qwen3vl模型支持，详细使用请参考examples下具体模型readme.md界面。
 
 ---
 ### 显存优化
@@ -83,6 +88,16 @@
 --moe-token-dispatcher-type: moe网络中分发token到通信方式选择，默认为allgather,如果开启了专家并行，推荐使用alltoall
 
 --moe-permute-fusion: 使能permute和unpermute融合算子，加速计算。
+
+---
+## OUTPUT_ARGS下参数解释说明
+--save : 取值来自SAVE_PATH,权重保存路径。
+注：仅有该值配置时才会进行权重保存
+
+--ckpt-format: 支持配置列表[torch，torch_dcp],权重保存方式。推荐优先使用torch_dcp[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md)。
+
+注:1、当在使用fsdp2进行模型训练时，仅支持使用torch_dcp配置。
+2、OUTPUT_ARGS下设置--ckpt-format为torch_dcp与GPT_ARGS下使能--ckpt-format torch_dcp二者作用相同，择一即可。
 
 ---
 ## 环境变量参数解释
