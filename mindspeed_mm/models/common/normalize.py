@@ -197,7 +197,7 @@ class SpatialNorm3D(nn.Module):
 
         self.norm_layer = torch.nn.GroupNorm(num_channels=f_channels, **norm_layer_params)
         if freeze_norm_layer:
-            for p in self.norm_layer.parameters:
+            for p in self.norm_layer.parameters():
                 p.requires_grad = False
 
         self.add_conv = add_conv

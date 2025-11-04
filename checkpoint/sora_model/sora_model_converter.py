@@ -31,7 +31,7 @@ class DefaultLayerIndexConverter:
         if len(parts) > 1 and parts[1].isdigit():
             return int(parts[1])
         return None
-        
+
     @staticmethod
     def convert_layer_index(name, new_layer_index):
         parts = name.split(".")
@@ -72,13 +72,13 @@ class SoraModelConverter(Converter):
     def hf_to_mm(self, cfg: ConvertConfig):
         state_dict = load_from_hf(cfg.source_path)
         state_dict = self._replace_state_dict(
-            state_dict, 
-            self.hf_to_mm_convert_mapping, 
+            state_dict,
+            self.hf_to_mm_convert_mapping,
             self.hf_to_mm_str_replace_mapping
         )
         state_dicts = self._mm_split(state_dict, cfg.target_parallel_config)
         save_as_mm(cfg.target_path, state_dicts)
-    
+
     @check_method_support
     def mm_to_hf(self, cfg: ConvertConfig):
         state_dicts = load_from_mm(cfg.source_path)
@@ -96,7 +96,7 @@ class SoraModelConverter(Converter):
         state_dict = self._mm_merge(state_dicts)
         state_dicts = self._mm_split(state_dict, cfg.target_parallel_config)
         save_as_mm(cfg.target_path, state_dicts)
-    
+
     @check_method_support
     def layerzero_to_mm(
         self,
@@ -106,15 +106,15 @@ class SoraModelConverter(Converter):
         ema_model: bool = False
     ):
         state_dict = load_from_layerzero(
-            cfg.source_path, 
-            iteration=iteration, 
-            prefix=prefix, 
-            ema_model=ema_model, 
+            cfg.source_path,
+            iteration=iteration,
+            prefix=prefix,
+            ema_model=ema_model,
             for_release=True
         )
         state_dicts = self._mm_split(state_dict, cfg.target_parallel_config)
         save_as_mm(cfg.target_path, state_dicts)
-    
+
     @check_method_support
     def merge_lora_to_base(
         self,
@@ -181,7 +181,7 @@ class SoraModelConverter(Converter):
                 if old_key not in state_dict.keys():
                     continue
                 state_dict[new_key] = state_dict.pop(old_key)
-        
+
         names = list(state_dict.keys())
         for name in names:
             if "_extra_state" in name:
@@ -191,9 +191,9 @@ class SoraModelConverter(Converter):
                 weight = state_dict.pop(name)
                 name = replace_name(name, str_replace_mapping)
                 state_dict[name] = weight
-        
+
         return state_dict
-    
+
     def _tp_split(
         self,
         state_dict: dict,
@@ -216,19 +216,19 @@ class SoraModelConverter(Converter):
                 _split(layer_names, tp_pattern_class, cfg.tp_size)
             else:
                 raise NotImplementedError(f"TP pattern {tp_pattern} is not found in common tp_pattern, only support: {TP_PARTTERN_MAPPING.keys()}")
-        
+
         for spec_tp_pattern, layer_names in self.spec_tp_split_mapping.items():
             _split(layer_names, spec_tp_pattern, cfg.tp_size)
-        
+
         return tp_state_dicts
-    
+
     def _tp_merge(
         self,
         state_dicts: list
     ):
         if len(state_dicts) == 1:
             return state_dicts[0]
-        
+
         tp_size = len(state_dicts)
 
         merged_state_dict = copy.deepcopy(state_dicts[0])
@@ -249,7 +249,7 @@ class SoraModelConverter(Converter):
 
         for spec_tp_parttern, layer_names in self.spec_tp_split_mapping.items():
             _merge(layer_names, spec_tp_parttern, tp_size)
-        
+
         return merged_state_dict
 
     def _pp_vpp_split(
@@ -266,8 +266,8 @@ class SoraModelConverter(Converter):
 
         if enable_vpp:
             pp_sizes_flat = [
-                layers 
-                for vpp_layer in cfg.pp_layers 
+                layers
+                for vpp_layer in cfg.pp_layers
                 for layers in vpp_layer
             ]
         else:
@@ -293,14 +293,14 @@ class SoraModelConverter(Converter):
                         new_k = self.layer_index_converter.convert_layer_index(k, layer_idx - start_layer)
                         pp_tp_param[new_k] = state_dict[k]
                 vpp_tp_state_dicts[vpp_rank][tp_rank] = pp_tp_param
-        
+
         if enable_vpp:
             # rearrange state_dict list by pp_rank
             vpp_size = len(cfg.pp_layers)
             pp_size = len(cfg.pp_layers[0])
             tp_size = len(state_dicts)
             pp_tp_state_dicts = [[None for _ in range(tp_size)] for _ in range(pp_size)]
-            
+
             for pp_rank in range(pp_size):
                 for tp_rank in range(tp_size):
                     pp_tp_state_dicts[pp_rank][tp_rank] = [
@@ -346,12 +346,12 @@ class SoraModelConverter(Converter):
         for tp_rank in range(tp_size):
             layer_start = 0
             tp_state_dict = {}
-            for vpp_rank in range(vpp_size):  
-                for pp_rank in range(pp_size):                              
+            for vpp_rank in range(vpp_size):
+                for pp_rank in range(pp_size):
                     if enable_vpp:
                         state_dict = state_dicts[pp_rank][tp_rank][vpp_rank]
                     else:
-                        state_dict = state_dicts[pp_size][tp_rank] 
+                        state_dict = state_dicts[pp_rank][tp_rank]
                     tp_state_dict, max_layer_index = _process_state_dict(state_dict, tp_state_dict, layer_start, self.layer_index_converter)
                     layer_start = max_layer_index + 1
                     tp_state_dicts.append(tp_state_dict)

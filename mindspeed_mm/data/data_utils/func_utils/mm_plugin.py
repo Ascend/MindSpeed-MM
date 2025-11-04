@@ -165,6 +165,25 @@ class MMPluginMixin:
         if image.mode != "RGB":
             image = image.convert("RGB")
 
+        # Using the `with` statement ensures that the image file is automatically closed after the
+        # code block is executed, effectively preventing resource leaks.
+        # However, this introduces a problem: the `image` object directly obtained from
+        # `Image.open()` is a `PIL.xxxImagePlugin` instance, which maintains an
+        # association with the file on disk.
+
+        # Once the `with` context is exited, the file handle is closed, and the `PIL.xxxImagePlugin`
+        # object becomes invalid. At this point, any operation that requires re-reading the
+        # file's content (such as an `np.array()` conversion or a `.save()` call) will fail
+        # because the file is closed.
+
+        # To solve this problem, we use the `.copy()` method.
+        # `.copy()` loads all pixel data of the image completely into memory and creates a new,
+        # independent image object. This new object is an instance of the `PIL.Image.Image`
+        # class. It no longer depends on the original file and can therefore be safely
+        # accessed and manipulated outside the `with` context.
+        if image.__class__ != ImageObject:
+            image = image.copy()
+
         return image
 
     @staticmethod
@@ -184,20 +203,26 @@ class MMPluginMixin:
         r"""Regularize images to avoid error. Including reading and pre-processing."""
         results = []
         for image in images:
+            processed_image = None
+
             if isinstance(image, (str, BinaryIO)):
-                image = Image.open(image)
+                with Image.open(image) as image_obj:
+                    processed_image = self._preprocess_image(image_obj, **kwargs)
             elif isinstance(image, bytes):
-                image = Image.open(BytesIO(image))
+                with Image.open(BytesIO(image)) as image_obj:
+                    processed_image = self._preprocess_image(image_obj, **kwargs)
             elif isinstance(image, dict):
                 if image["bytes"] is not None:
-                    image = Image.open(BytesIO(image["bytes"]))
+                    with Image.open(BytesIO(image["bytes"])) as image_obj:
+                        processed_image = self._preprocess_image(image_obj, **kwargs)
                 else:
-                    image = Image.open(image["path"])
+                    with Image.open(image["path"]) as image_obj:
+                        processed_image = self._preprocess_image(image_obj, **kwargs)
 
-            if not isinstance(image, ImageObject):
+            if not isinstance(processed_image, ImageObject):
                 raise ValueError(f"Expect input is a list of images, but got {type(image)}.")
 
-            results.append(self._preprocess_image(image, **kwargs))
+            results.append(processed_image)
 
         return {"images": results}
 

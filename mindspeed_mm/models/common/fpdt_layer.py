@@ -13,39 +13,6 @@ from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mappi
 from mindspeed_mm.models.common.attention import FlashAttention
 
 
-def split_FPDT_tensors(inputs, cp_size, cp_rank):
-    args = get_args()
-    global_seq_len = inputs.shape[0]
-    FPDT_chunk_number = args.mm.model.to_dict().get('predictor', {}).get('FPDT_chunk_number', None)
-    if global_seq_len % cp_size != 0:
-        raise ValueError()
-    if global_seq_len % FPDT_chunk_number != 0:
-        raise ValueError()
-    device = inputs.device
-    totalChunks = global_seq_len // chunk_size
-
-    num_chunk_per_npu = global_seq_len // FPDT_chunk_number
-    local_seq_len = global_seq_len // cp_size
-    chunk_size = local_seq_len // chunk_size
-
-    token_chunk_idx = torch.arange(global_seq_len, device=device, dtype=torch.int) // chunk_size
-    chunk_to_gpu = torch.arange(totalChunks, device=device, dtype=torch.int)
-    chunk_to_gpu = chunk_to_gpu.reshape(num_chunk_per_npu, -1).t().contiguous()
-
-    gather_chunk = chunk_to_gpu.reshape(num_chunk_per_npu, -1).t().contiguous()
-    mask = gather_chunk == token_chunk_idx
-
-    indices = mask.nonzero(as_tuple=False)
-    gather_indices = indices[:, 0]
-    token_chunk_indices = indices[:, 1]
-    indices = torch.cat([token_chunk_indices[gather_indices == i] for i in range(gather_chunk.shape[0])])
-
-    indices = indices.reshape(-1, chunk_size)[num_chunk_per_npu * cp_rank:num_chunk_per_npu * (cp_rank + 1)].flatten().contiguous()
-
-    local_balanced_inputs = inputs[indices, :]
-    return local_balanced_inputs
-
-
 def forward_update(prev_data, cur_data):
     
     prev_attn_out, prev_softmax_max, prev_softmax_sum = prev_data[0], prev_data[1], prev_data[2]

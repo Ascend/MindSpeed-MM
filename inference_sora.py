@@ -85,7 +85,7 @@ def main():
             ]
 
     if hasattr(args, "video"):
-        if args.start_frame or args.num_frames is None:
+        if args.start_frame is None or args.num_frames is None:
             raise ValueError("Please select both starting frame index and total number of frames")
         input_videos = load_videos(args.video, args.start_frame, args.num_frames) if hasattr(args, "video") else None
     else:

@@ -55,7 +55,7 @@ class LuminaConversationDataset(Dataset):
         elif meta_ext == ".jsonl":
             annotations = []
             with open(meta_path) as f:
-                for line in f:
+                for i, line in enumerate(f):
                     try:
                         annotations.append(json.loads(line))
                     except json.decoder.JSONDecodeError as e:

@@ -19,10 +19,10 @@ from abc import abstractmethod, ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, unique
-from typing import TYPE_CHECKING, Any, Optional, Union, Tuple, Literal, List, Dict, Type
+from typing import TYPE_CHECKING, Any, Optional, Union, Tuple, Literal, List, Dict, Type, TypedDict
 
 import torch
-from transformers import PreTrainedTokenizer, ProcessorMixin, AutoProcessor, AutoConfig, AutoTokenizer
+from transformers import PreTrainedTokenizer, ProcessorMixin, AutoProcessor, AutoConfig, AutoTokenizer, PretrainedConfig
 
 from mindspeed_mm.data.data_utils.func_utils.log import get_logger
 from mindspeed_mm.data.data_utils.func_utils.model_args import ProcessorArguments
@@ -50,6 +50,11 @@ if TYPE_CHECKING:
     from .mm_plugin import AudioInput, ImageInput, VideoInput
 
     MediaType = Union[ImageInput, VideoInput, AudioInput]
+
+
+class TokenizerModule(TypedDict):
+    tokenizer: "PreTrainedTokenizer"
+    processor: Optional["ProcessorMixin"]
 
 
 @dataclass
@@ -856,7 +861,7 @@ class VideoRewardProcessor(DatasetProcessor):
 
         return batch
 
-    def preprocess_dataset(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+    def preprocess_dataset(self, examples: List) -> Dict[str, List[Any]]:
         # build input pairs with format
 
         model_inputs = defaultdict(list)
@@ -876,8 +881,8 @@ class VideoRewardProcessor(DatasetProcessor):
 
     def print_data_example(self, example: Dict[str, List[int]]) -> None:
         print("chosen_label:\n{}".format(example["chosen_label"]))
-        print("A_scores:\n{}".format(A_scores))
-        print("B_scores:\n{}".format(B_scores))
+        print("A_scores:\n{}".format(example["A_scores"]))
+        print("B_scores:\n{}".format(example["B_scores"]))
 
 
 def reward_setting_processor(preprocess_args_dict):

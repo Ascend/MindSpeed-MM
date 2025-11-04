@@ -245,7 +245,7 @@ class VideoAlignConverter(Converter):
     @staticmethod
     def mm_to_hf(cfg: ConvertHFConfig):
         """mindspeed mm模型转换huggingface模型权重"""
-        ops = VideoAlignConverter._create_ops(cfg.hf_config.config)
+        ops = VideoAlignConverter._create_ops(cfg.hf_config.config, cfg.common_model_config)
         if not cfg.common_model_config.enable_canonical_hf_struct:
             videoalign_tp_patterns.update(megatron_videoalign_tp_patterns)
         else:
