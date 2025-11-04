@@ -20,7 +20,9 @@ from mindspeed_mm.data.data_utils.data_transform import (
     JpegDegradationSimulator,
     MaxHWResizeVideo,
     CenterCropVideo,
-    AffineVideo
+    AffineVideo,
+    ResizeCropVideo,
+    ResizeToFill
 )
 
 VIDEO_TRANSFORM_MAPPING = {
@@ -40,7 +42,9 @@ VIDEO_TRANSFORM_MAPPING = {
     "MaxHWResizeVideo": MaxHWResizeVideo,
     "Resize": transforms.Resize,
     "CenterCropVideo": CenterCropVideo,
-    "AffineVideo": AffineVideo
+    "AffineVideo": AffineVideo,
+    "ResizeCropVideo": ResizeCropVideo,
+    "ResizeToFill": ResizeToFill
 }
 
 
@@ -57,6 +61,7 @@ IMAGE_TRANSFORM_MAPPING = {
     "DataAugment": JpegDegradationSimulator,
     "Pad2Square": Expand2Square,
     "Resize": transforms.Resize,
+    "ResizeToFill": ResizeToFill,
 }
 
 

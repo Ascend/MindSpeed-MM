@@ -68,6 +68,8 @@ class DataFileReader:
             return self.get_datasamples(data_path, return_type=return_type)
         elif self.data_storage_mode == "combine" or self.data_storage_mode == "sorafeatured":
             return self.get_cap_list(data_path)
+        elif self.data_storage_mode == "vace":
+            return self.get_vace_datasamples(data_path)
         else:
             raise NotImplementedError("Not support now.")
 
@@ -109,6 +111,34 @@ class DataFileReader:
             print(f"Building {anno}...")
             for sub in sub_list:
                 sub["path"] = os.path.join(folder, sub["path"])
+            cap_lists += sub_list
+        return cap_lists
+
+    def get_vace_datasamples(self, data_path):
+        data_file_keys = ["video", "src_video", "src_video_mask", "src_ref_images"]
+        cap_lists = []
+        with open(data_path, "r") as f:
+            folder_anno = [
+                i.strip().split(",")
+                for i in f.readlines()
+                if len(i.strip()) > 0
+            ]
+        for folder, anno in folder_anno:
+            sub_list = self.get_datasamples(anno)
+            print(f"Building {anno}...")
+            for sub in sub_list:
+                for key in data_file_keys:
+                    if pd.isna(sub[key]):
+                        sub[key] = None
+                    if sub[key]:
+                        if isinstance(sub[key], list):
+                            new_sub = []
+                            for file in sub[key]:
+                                new_sub.append(os.path.join(folder, file))
+                            sub[key] = new_sub
+                        else:
+                            sub[key] = os.path.join(folder, sub[key])
+
             cap_lists += sub_list
         return cap_lists
 
@@ -194,6 +224,7 @@ class ImageProcesser:
         self.min_dynamic_patch = min_dynamic_patch
         self.max_dynamic_patch = max_dynamic_patch
         self.use_thumbnail = use_thumbnail
+        self.is_image = False
 
     def __call__(self, image_path, mode="", num_image=1):
         if self.image_processer_type == "image2video":
@@ -220,7 +251,7 @@ class ImageProcesser:
         image = torch.from_numpy(np.array(image))  # [h, w, c]
         image = rearrange(image, "h w c -> c h w").unsqueeze(0)  # [1 c h w]
         # [1 C H W] -> num_img [1 C H W]
-        if "human_images" in image_path:
+        if "human_images" in image_path or self.is_image:
             image = self.image_transforms(image)
         else:
             image = self.video_transforms(image)

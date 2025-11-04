@@ -813,6 +813,7 @@ class RoPE3DWan(nn.Module):
         self.max_seq_len = max_seq_len
 
         self.freqs = self.get_freq(head_dim)
+        self.freqs = [x.npu() for x in self.freqs]
 
     def get_freq(self, head_dim):
         if head_dim <= 0:
@@ -836,7 +837,7 @@ class RoPE3DWan(nn.Module):
         freqs = torch.outer(torch.arange(max_seq_len, device=freqs.device), freqs)
 
         # convert to complex numbers
-        freqs = torch.polar(torch.ones_like(freqs), freqs)
+        freqs = torch.polar(torch.ones_like(freqs), freqs).to(torch.complex64)
         return freqs
 
     def apply_rotary_pos_emb(self, tokens, freqs):

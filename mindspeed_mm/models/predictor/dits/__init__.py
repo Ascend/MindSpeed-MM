@@ -11,7 +11,8 @@ __all__ = [
     "WanDiT",
     "StepVideoDiT",
     "SparseUMMDiT",
-    "MMDiT"
+    "MMDiT",
+    "VACEModel"
 ]
 
 from .video_dit import VideoDiT
@@ -26,3 +27,4 @@ from .wan_dit import WanDiT
 from .step_video_dit import StepVideoDiT
 from .sparseu_mmdit import SparseUMMDiT
 from .mmdit import MMDiT
+from .vace import VACEModel

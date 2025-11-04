@@ -168,20 +168,24 @@ def center_crop_th_tw(clip, th, tw, top_crop):
     return crop(clip, i, j, new_h, new_w)
 
 
-def resize_crop_to_fill(clip, target_size):
+def resize_crop_to_fill(clip, target_size, interpolate_parameters: dict = None):
     if not _is_tensor_video_clip(clip):
         raise ValueError("clip should be a 4D torch.tensor")
+    if interpolate_parameters is None:
+        interpolate_parameters = {}
+    if "interpolation_mode" not in interpolate_parameters:
+        interpolate_parameters["interpolation_mode"] = "bilinear"
     h, w = clip.size(-2), clip.size(-1)
     th, tw = target_size[0], target_size[1]
     rh, rw = th / h, tw / w
     if rh > rw:
         sh, sw = th, round(w * rh)
-        clip = resize(clip, (sh, sw), "bilinear")
+        clip = resize(clip, (sh, sw), **interpolate_parameters)
         i = 0
         j = int(round(sw - tw) / 2.0)
     else:
         sh, sw = round(h * rw), tw
-        clip = resize(clip, (sh, sw), "bilinear")
+        clip = resize(clip, (sh, sw), **interpolate_parameters)
         i = int(round(sh - th) / 2.0)
         j = 0
     if i + th > clip.size(-2) or j + tw > clip.size(-1):
@@ -846,6 +850,60 @@ class CenterCropVideo:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(size={self.size}, interpolation_mode={self.interpolation_mode}"
+
+
+class ResizeCropVideo:
+    def __init__(self, size, interpolation_mode="bilinear", antialias=False, align_corners=False):
+        if isinstance(size, numbers.Number):
+            self.size = (int(size), int(size))
+        else:
+            self.size = size
+        self.interpolation_mode = interpolation_mode
+        self.antialias = antialias
+        self.align_corners = align_corners
+        self.interpolate_parameters = {
+            "interpolation_mode": self.interpolation_mode,
+            "antialias": self.antialias,
+            "align_corners": self.align_corners,
+        }
+
+    def __call__(self, clip):
+        clip = resize_crop_to_fill(clip, self.size, self.interpolate_parameters)
+        return clip
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(size={self.size})"
+
+
+class ResizeToFill:
+    def __init__(self, size, interpolation_mode="bilinear", antialias=False, align_corners=False):
+        if isinstance(size, numbers.Number):
+            self.size = (int(size), int(size))
+        else:
+            self.size = size
+        self.interpolation_mode = interpolation_mode
+        self.antialias = antialias
+        self.align_corners = align_corners
+        self.interpolate_parameters = {
+            "interpolation_mode": self.interpolation_mode,
+            "antialias": self.antialias,
+            "align_corners": self.align_corners,
+        }
+
+    def __call__(self, clip):
+        if clip.shape[-2:] != self.size:
+            canvas_height, canvas_width = self.size
+            ref_height, ref_width = clip.shape[-2:]
+            white_canvas = torch.ones((1, 3, canvas_height, canvas_width))  # [-1, 1]
+            scale = min(canvas_height / ref_height, canvas_width / ref_width)
+            new_height = int(ref_height * scale)
+            new_width = int(ref_width * scale)
+            clip = resize(clip, (new_height, new_width), **self.interpolate_parameters)
+            top = (canvas_height - new_height) // 2
+            left = (canvas_width - new_width) // 2
+            white_canvas[:, :, top:top + new_height, left:left + new_width] = clip
+            clip = white_canvas
+        return clip
 
 
 class AffineVideo:

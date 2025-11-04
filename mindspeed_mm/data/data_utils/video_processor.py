@@ -806,3 +806,164 @@ class RewardVideoProcessor(AbstractVideoProcessor):
     def select_valid_data(self, data_samples):
         return super().select_valid_data(data_samples)
 
+
+@Registry.register
+class VACEVideoProcessor(AbstractVideoProcessor):
+    def __init__(self, num_frames, auto_interval, max_height, max_width, max_hxw, train_fps, speed_factor, force_resolution,
+                  vae_stride=None, vae_patch_size=None, zero_start=True, keep_last=True, **kwargs):
+        super().__init__(**kwargs)
+        if (num_frames - 1) % 4 != 0:
+            raise AssertionError("The length of the frame must be the 4x+1")
+        if vae_patch_size is None:
+            vae_patch_size = [1, 2, 2]
+        if vae_stride is None:
+            vae_stride = [4, 8, 8]
+        self.downsample = tuple([x * y for x, y in zip(vae_stride, vae_patch_size)])
+        self.auto_interval = auto_interval
+        self.max_height = max_height
+        self.max_width = max_width
+        self.speed_factor = speed_factor
+        self.force_resolution = force_resolution
+        self.max_hxw = max_hxw
+        self.min_hxw = max_hxw
+        self.train_fps = train_fps
+        self.zero_start = zero_start
+        self.keep_last = keep_last
+        if self.max_hxw == 480 * 832:
+            self.seq_len = (480 * 832 / (self.downsample[1] * self.downsample[2])) * (1 + (num_frames - 1) / 4)
+        elif self.max_hxw == 720 * 1280:
+            self.seq_len = (720 * 1280 / (self.downsample[1] * self.downsample[2])) * (1 + (num_frames - 1) / 4)
+        else:
+            raise NotImplementedError(f'image_size {self.max_hxw} is not supported')
+        if self.seq_len < self.min_hxw / (self.downsample[1] * self.downsample[2]):
+            raise AssertionError("seq_len is too short")
+        self.rng = np.random.default_rng()
+
+
+    def __call__(
+            self,
+            *vframes,
+            crop_box=None,
+            **kwargs
+    ):
+        fps = vframes[0].get_video_fps()
+        length = min([r.get_len() for r in vframes])
+        frame_timestamps = [vframes[0].get_frame_timestamp(i) for i in range(length)]
+        frame_timestamps = np.array(frame_timestamps, dtype=np.float32)
+        h, w = list(vframes[0].get_batch((0,)).shape[2:])
+        # If a crop_box exists, x1, x2, y1, y2 are set to the crop_box values; otherwise, they are set to (0, w, 0, h).
+        frame_ids, (x1, x2, y1, y2), (target_height, target_weight), fps = self._get_frameid_bbox(fps, frame_timestamps, h, w, crop_box)
+
+        # preprocess video
+        videos = [reader.get_batch(frame_ids)[:, y1:y2, x1:x2, :] for reader in vframes]
+
+        self.image_size = (target_height, target_weight)
+        video_transforms = get_transforms(is_video=True, train_pipeline=self.train_pipeline,
+                            image_size=self.image_size)
+        videos = [video_transforms(video) for video in videos]
+        return *videos, frame_ids, (target_height, target_weight), fps
+
+    def _get_frameid_bbox(self, fps, frame_timestamps, h, w, crop_box):
+        if self.keep_last:
+            return self._get_frameid_bbox_adjust_last(fps, frame_timestamps, h, w, crop_box)
+        else:
+            return self._get_frameid_bbox_default(fps, frame_timestamps, h, w, crop_box)
+
+    # return the x previous frames
+    def _get_frameid_bbox_fixed(self, fps, frame_timestamps, h, w, crop_box):
+        target_fps = min(fps, self.train_fps)
+        duration = frame_timestamps[-1].mean()
+        x1, x2, y1, y2 = [0, w, 0, h] if crop_box is None else crop_box
+        h, w = y2 - y1, x2 - x1
+        ratio = h / w
+        downsample_frame, downsample_height, downsample_weight = self.downsample
+
+        area_z = min(self.seq_len, self.max_hxw / (downsample_height * downsample_weight), (h // downsample_height) * (w // downsample_weight))
+        target_frame = min(
+            (int(duration * target_fps) - 1) // downsample_frame + 1,
+            int(self.seq_len / area_z)
+        )
+
+        # deduce target shape of the [latent video]
+        target_area_z = min(area_z, int(self.seq_len / target_frame))
+        target_height = round(np.sqrt(target_area_z * ratio))
+        target_weight = int(target_area_z / target_height)
+        target_frame = (target_frame - 1) * downsample_frame + 1
+        target_height *= downsample_height
+        target_weight *= downsample_weight
+
+        # sample frame ids
+        target_duration = target_frame / target_fps
+        begin = 0. if self.zero_start else random.randint(0, duration - target_duration)
+        timestamps = np.linspace(begin, begin + target_duration, target_frame)
+        frame_ids = list(range(0, target_frame))
+        return frame_ids, (x1, x2, y1, y2), (target_height, target_weight), target_fps
+
+    # extrace a video from the target_duration and evenly capture the target_frame form it
+    def _get_frameid_bbox_default(self, fps, frame_timestamps, h, w, crop_box):
+        # Extract a number of frames from a specific segment of the video.
+        target_fps = min(fps, self.train_fps)
+        duration = frame_timestamps[-1].mean()
+        x1, x2, y1, y2 = [0, w, 0, h] if crop_box is None else crop_box
+        h, w = y2 - y1, x2 - x1
+        ratio = h / w
+        downsample_frame, downsample_height, downsample_weight = self.downsample
+
+        area_z = min(self.seq_len, self.max_hxw / (downsample_height * downsample_weight), (h // downsample_height) * (w // downsample_weight))
+        target_frame = min(
+            (int(duration * target_fps) - 1) // downsample_frame + 1,
+            int(self.seq_len / area_z)
+        )
+
+        # deduce target shape of the [latent video]
+        target_area_z = min(area_z, int(self.seq_len / target_frame))
+        target_height = round(np.sqrt(target_area_z * ratio))
+        target_weight = int(target_area_z / target_height)
+        target_frame = (target_frame - 1) * downsample_frame + 1
+        target_height *= downsample_height
+        target_weight *= downsample_weight
+
+        # sample frame ids
+        target_duration = target_frame / target_fps
+        begin = 0. if self.zero_start else random.randint(0, duration - target_duration)
+        timestamps = np.linspace(begin, begin + target_duration, target_frame)
+        frame_ids = np.argmax(np.logical_and(
+            timestamps[:, None] >= frame_timestamps[None, :, 0],
+            timestamps[:, None] < frame_timestamps[None, :, 1]
+        ), axis=1).tolist()
+        return frame_ids, (x1, x2, y1, y2), (target_height, target_weight), target_fps
+
+    # evenly capture the target_frame form the video
+    def _get_frameid_bbox_adjust_last(self, fps, frame_timestamps, h, w, crop_box):
+        duration = frame_timestamps[-1].mean()
+        x1, x2, y1, y2 = [0, w, 0, h] if crop_box is None else crop_box
+        h, w = y2 - y1, x2 - x1
+        ratio = h / w
+        downsample_frame, downsample_height, downsample_weight = self.downsample
+
+        area_z = min(self.seq_len, self.max_hxw / (downsample_height * downsample_weight), (h // downsample_height) * (w // downsample_weight))
+        target_frame = min(
+            (len(frame_timestamps) - 1) // downsample_frame + 1,
+            int(self.seq_len / area_z)
+        )
+
+        # deduce target shape of the [latent video]
+        target_area_z = min(area_z, int(self.seq_len / target_frame))
+        target_height = round(np.sqrt(target_area_z * ratio))
+        target_weight = int(target_area_z / target_height)
+        target_frame = (target_frame - 1) * downsample_frame + 1
+        target_height *= downsample_height
+        target_weight *= downsample_weight
+
+        # sample frame ids
+        target_duration = duration
+        target_fps = target_frame / target_duration
+        timestamps = np.linspace(0., target_duration, target_frame)
+        frame_ids = np.argmax(np.logical_and(
+            timestamps[:, None] >= frame_timestamps[None, :, 0],
+            timestamps[:, None] <= frame_timestamps[None, :, 1]
+        ), axis=1).tolist()
+        return frame_ids, (x1, x2, y1, y2), (target_height, target_weight), target_fps
+
+    def select_valid_data(self, data_samples):
+        return super().select_valid_data(data_samples)

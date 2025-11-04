@@ -29,7 +29,7 @@ def auto_grad_checkpoint(module, *args, **kwargs):
     return module(*args, **kwargs)
 
 
-def load_checkpoint(model, ckpt_path):
+def load_checkpoint(model, ckpt_path, strict=False, assign=False):
     if not os.path.isfile(ckpt_path):
         raise FileNotFoundError(f"Could not find checkpoint at {ckpt_path}")
 
@@ -45,6 +45,6 @@ def load_checkpoint(model, ckpt_path):
     elif "state_dict" in ckpt_dict.keys():
         ckpt_dict = ckpt_dict["state_dict"]
 
-    missing_keys, unexpected_keys = model.load_state_dict(ckpt_dict, strict=False)
+    missing_keys, unexpected_keys = model.load_state_dict(ckpt_dict, strict=strict, assign=assign)
     print(f"Missing keys: {missing_keys}")
     print(f"Unexpected keys: {unexpected_keys}")

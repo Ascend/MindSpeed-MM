@@ -138,6 +138,12 @@ class DecordVideo(Video):
     def get_len(self) -> int:
         return len(self.vframes)
 
+    def get_frame_timestamp(self, frame_index: int) -> float:
+        return self.vframes.get_frame_timestamp(frame_index)
+
+    def next(self):
+        return self.vframes.next()
+
 
 @Registry.register
 class TorchvisionVideo(Video):

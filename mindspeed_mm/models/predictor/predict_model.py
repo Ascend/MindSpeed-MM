@@ -16,7 +16,8 @@ from .dits import (
     WanDiT,
     StepVideoDiT,
     SparseUMMDiT,
-    MMDiT
+    MMDiT,
+    VACEModel
 )
 
 
@@ -33,7 +34,8 @@ PREDICTOR_MODEL_MAPPINGS = {
     "wandit": WanDiT,
     "stepvideodit": StepVideoDiT,
     "SparseUMMDiT": SparseUMMDiT,
-    "mmdit": MMDiT
+    "mmdit": MMDiT,
+    "vace": VACEModel
 }
 
 
@@ -52,8 +54,13 @@ class PredictModel(nn.Module):
         config = self._build_predictor_layers_config(config)
         self.predictor = model_cls(**config.to_dict())
         if hasattr(config, "from_pretrained") and config.from_pretrained is not None:
-            load_checkpoint(self.predictor, config.from_pretrained)
-            print_rank_0("load predictor's checkpoint successfully")
+            assign = False
+            if hasattr(self.predictor, "device") and self.predictor.device.type == "meta":
+                assign = True
+            load_checkpoint(self.predictor, config.from_pretrained, assign=assign)
+            print_rank_0("load predictor's checkpoint sucessfully")
+        if hasattr(self.predictor, "post_init"):
+            self.predictor.post_init()
 
     def get_model(self):
         return self.predictor
