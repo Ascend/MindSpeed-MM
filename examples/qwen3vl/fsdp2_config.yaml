@@ -1,4 +1,4 @@
-sharding_size: null
+sharding_size: auto
 sub_modules_to_wrap:
   - transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLVisionBlock
   - transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLTextDecoderLayer

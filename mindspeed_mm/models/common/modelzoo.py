@@ -2,7 +2,7 @@ import importlib
 
 from transformers import AutoModel
 
-from mindspeed_mm.models.hf_src.qwen3vl import (
+from mindspeed_mm.models.hf_src.qwen3vl.qwen3vl import (
     Qwen3VLForConditionalGeneration,
     Qwen3VLMoeForConditionalGeneration
 )

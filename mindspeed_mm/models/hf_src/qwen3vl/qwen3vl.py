@@ -7,6 +7,9 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 from megatron.training import print_rank_0
 from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin
 
+from mindspeed_mm.models.hf_src.qwen3vl.modeling_qwen3_vl import Qwen3VLForConditionalGeneration as HFQwen3VLForConditionalGeneration
+from mindspeed_mm.models.hf_src.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeForConditionalGeneration as HFQwen3VLMoeForConditionalGeneration
+
 
 class Qwen3VLFSDP2Mixin(FSDP2Mixin):
     """
@@ -68,9 +71,9 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
                 param.requires_grad_(False)
 
 
-class Qwen3VLForConditionalGeneration(transformers.Qwen3VLForConditionalGeneration, Qwen3VLFSDP2Mixin):
+class Qwen3VLForConditionalGeneration(HFQwen3VLForConditionalGeneration, Qwen3VLFSDP2Mixin):
     pass
 
 
-class Qwen3VLMoeForConditionalGeneration(transformers.Qwen3VLMoeForConditionalGeneration, Qwen3VLFSDP2Mixin):
+class Qwen3VLMoeForConditionalGeneration(HFQwen3VLMoeForConditionalGeneration, Qwen3VLFSDP2Mixin):
     pass
