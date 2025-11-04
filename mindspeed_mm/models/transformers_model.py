@@ -49,7 +49,7 @@ class TransformersModel(MultiModalModule):
         loss = None
         labels = F.pad(labels, (0, 1), value=ignore_index)
         shift_labels = labels[..., 1:].contiguous()
-        loss_mask = shift_labels > 1
+        loss_mask = shift_labels > -1
 
         # The three loss calculation modes are mutually exclusive:
         # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
