@@ -68,6 +68,43 @@ class TransformersModel(MultiModalModule):
             # Flatten the tokens
             logits = logits.view(-1, logits.shape[-1])
             loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
+        elif args.calculate_token_loss:
+            shift_labels = shift_labels.view(-1)
+            # Flatten the tokens
+            logits = logits.view(-1, logits.shape[-1])
+            loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
+
+            loss_weight = (labels != -100).float()
+
+            shift_weights = loss_weight[..., 1:].contiguous()
+            shift_weights = shift_weights.view(-1)
+            shift_weights = shift_weights.to(logits.device)
+            shift_weights_sum = shift_weights.sum()
+
+            torch.distributed.all_reduce(shift_weights_sum, op=torch.distributed.ReduceOp.AVG)
+
+            loss = loss * shift_weights
+            loss = loss.sum() / shift_weights_sum
+
+        elif args.calculate_square_loss:
+            shift_labels = shift_labels.view(-1)
+            # Flatten the tokens
+            logits = logits.view(-1, logits.shape[-1])
+            loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
+
+            loss_weight = (labels != -100).sum(dim=-1).float()
+            loss_weight = 1 / loss_weight.sqrt()
+            loss_weight = torch.where(labels != -100, loss_weight.unsqueeze(1), 0.0)
+
+            shift_weights = loss_weight[..., 1:].contiguous()
+            shift_weights = shift_weights.view(-1)
+            shift_weights = shift_weights.to(logits.device)
+            shift_weights_sum = shift_weights.sum()
+
+            torch.distributed.all_reduce(shift_weights_sum, op=torch.distributed.ReduceOp.AVG)
+
+            loss = loss * shift_weights
+            loss = loss.sum() / shift_weights_sum
         else:
             shift_labels = shift_labels.view(-1)
             # Flatten the tokens

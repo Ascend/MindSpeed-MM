@@ -110,6 +110,14 @@ def _add_training_args(parser):
                        default=False,
                        help=('Calculate the loss at the sample level: perform token-level mean '
                        'within each sample, and sequence-level mean across samples.'))
+    group.add_argument('--calculate-square-loss',
+                       action='store_true',
+                       default=False,
+                       help=('Calculate the loss.'))
+    group.add_argument('--calculate-token-loss',
+                       action='store_true',
+                       default=False,
+                       help=('Calculate the loss.'))
     return parser
 
 
