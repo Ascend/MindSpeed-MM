@@ -317,8 +317,8 @@ InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，�
 
 #### 3. 启动微调
 
-以InternVL3-8B为例，启动微调训练任务。
-
+以InternVL3-8B为例，启动微调训练任务。  
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.2.0/docs/features/vlm_model_loss_calculate_type.md)
 ```shell
 bash examples/internvl3/finetune_internvl3_8B.sh
 ```
