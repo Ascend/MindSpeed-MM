@@ -16,7 +16,7 @@
 --micro-batch-size：
 取值来自\${MBS},单个GPU在一次前向/反向传播中直接处理的样本数量，适应单个NPU内的内存限制。直接影响GPU显存容量。
 
---global-batch-size：取值来自\${GBS}，模型进行一次参数更新所使用的所有设备上的总样本数
+--global-batch-size：取值来自\${GBS}，模型进行一次参数更新所使用的所有设备上的总样本数。
 
 --num-workers: 取值为非负整数，pytorch中数据加载处理部分会启动的子进程数。设置过大会占用CPU资源，设置过小会导致模型等待数据加载过慢。
 
@@ -34,9 +34,13 @@
 
 --bf16: store_true,使用torch.bfloat16格式训练，极大降低显存消耗。
 
---load: str,模型权重路径，根据各example中指导填写
+--load: str,模型权重路径，根据各example中指导填写。
 
---variable-seq-lengths: store_true,启用可变序列长度
+--variable-seq-lengths: store_true,启用可变序列长度。
+
+--calculate-per-sample-loss：按样本粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+
+--calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 
 --ckpt-format torch_dcp: 保存时使用dcp格式。(详细介绍)[https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md]
 
@@ -59,9 +63,9 @@
 ---
 
 #### 重计算
-[详细介绍](https://gitcode.com/Ascend/MindSpeed-LLM/blob/2.1.0/docs/pytorch/features/recompute_relative.md)
+[详细介绍](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/pytorch/features/recompute_relative.md)
 
---recompute-granularity: 目前仅支持配置full。开启重计算
+--recompute-granularity: 目前仅支持配置full用于开启全量重计算。
 
 --recompute-method: [block, uniform]。重计算模式配置。uniform:将transformer层均匀划分组，每组大小（--recompute-num-layers）,按组存入输入和激活值。block: 前--recompute-num-layers个transformer层使用重计算，剩余层跳过。
 
@@ -69,9 +73,9 @@
 
 ---
 #### FSDP2
-注:启用FSDP2时，megatron各种切分策略及重计算配置均需关闭
+注:启用FSDP2时，megatron各种切分策略及重计算配置均需关闭。
 
---fsdp2-config-path: fsdp2相关配置文件路径
+--fsdp2-config-path: fsdp2相关配置文件路径。
 
 --use-cpu-initialization: 使用CPU初始化权重，需开启。
 
@@ -85,7 +89,7 @@
 
 ---
 ## MOE_ARGS下参数解释
---moe-token-dispatcher-type: moe网络中分发token到通信方式选择，默认为allgather,如果开启了专家并行，推荐使用alltoall
+--moe-token-dispatcher-type: moe网络中分发token到通信方式选择，默认为allgather,如果开启了专家并行，推荐使用alltoall。
 
 --moe-permute-fusion: 使能permute和unpermute融合算子，加速计算。
 
@@ -114,7 +118,7 @@ ASCEND_GLOBAL_LOG_LEVEL: 整形，[0, 4]可选。设置日志级别，仅支持�
 * 2: WARNING
 * 3: ERROR,默认
 * 4: NULL
-注意设置为DEBUG级别后，可能会因为日志流量过大影响业务性能
+注意设置为DEBUG级别后，可能会因为日志流量过大影响业务性能。
 
 TASK_QUEUE_ENABLE: 整形，[0, 2]可选，配置task_queue算子下发队列是否开启及优化等级，推荐配置为2。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_007.html)
 

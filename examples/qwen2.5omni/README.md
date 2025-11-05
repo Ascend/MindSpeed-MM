@@ -387,8 +387,8 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 <a id="jump4.3"></a>
 #### 3. 启动微调
 
-以Qwen2.5Omni-7B为例，启动微调训练任务。
-
+以Qwen2.5Omni-7B为例，启动微调训练任务。  
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 ```shell
 bash examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh
 ```
