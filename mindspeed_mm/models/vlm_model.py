@@ -32,9 +32,10 @@ from mindspeed_mm.models.common.mm_gpt_model import MMGPTModel
 from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positionsids_mask_for_llm
 from mindspeed_mm.utils.hetero_parallel import change_parallel_state
 from mindspeed_mm.utils.utils import EncoderBalanceComm
+from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin, WeightInitMixin
 
 
-class VLMModel(MultiModalModule):
+class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
     """
     Vision-Language multi-modal model.
     VLMModel is an assembled model, which include image_encoder, text_decoder model.
@@ -98,16 +99,7 @@ class VLMModel(MultiModalModule):
         if self.add_text_decoder:
             self.position_embedding_type = config.text_decoder.position_embedding_type
             self.vocab_size = config.text_decoder.vocab_size
-            if args.init_model_with_meta_device:
-                # Create model on meta device
-                if torch.distributed.get_rank() == 0:
-                    self.text_decoder = self._build_text_decoder_model(config.text_decoder)
-                else:
-                    with torch.device('meta'):
-                        self.text_decoder = self._build_text_decoder_model(config.text_decoder)
-            else:
-                # Create model normally (default device)
-                self.text_decoder = self._build_text_decoder_model(config.text_decoder)
+            self.text_decoder = self._build_text_decoder_model(config.text_decoder)
         if self.add_audio_encoder:
             self.audio_encoder = self._build_audio_encoder_model(config.audio_encoder)
 

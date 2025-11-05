@@ -367,7 +367,8 @@ def get_ignored_params(module, device_mesh, ignored_modules_config):
     if ignored_modules:
         for sub_module in module.modules():
             if any(sub_module is target_module for target_module in ignored_modules):
-                sub_module.to(_get_device_from_mesh(device_mesh))
+                if not get_args().init_model_with_meta_device:
+                    sub_module.to(_get_device_from_mesh(device_mesh))
                 
                 ignored_params.update(sub_module.parameters())
 

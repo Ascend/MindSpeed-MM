@@ -1,15 +1,8 @@
 sharding_size: auto
-sub_modules_to_wrap:
-  - transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLVisionBlock
-  - transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLTextDecoderLayer
-  - transformers.models.qwen3_vl_moe.modeling_qwen3_vl_moe.Qwen3VLMoeVisionBlock
-  - transformers.models.qwen3_vl_moe.modeling_qwen3_vl_moe.Qwen3VLMoeTextDecoderLayer
-recompute_modules:
-  - transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLVisionBlock
-  - transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLTextDecoderLayer
-  - transformers.models.qwen3_vl_moe.modeling_qwen3_vl_moe.Qwen3VLMoeVisionBlock
-  - transformers.models.qwen3_vl_moe.modeling_qwen3_vl_moe.Qwen3VLMoeTextDecoderLayer
 reshard_after_forward: True
 param_dtype: "bf16"
 reduce_dtype: "fp32"
 cast_forward_inputs: True
+num_to_forward_prefetch: 0
+num_to_backward_prefetch: 0
+offload_to_cpu: False

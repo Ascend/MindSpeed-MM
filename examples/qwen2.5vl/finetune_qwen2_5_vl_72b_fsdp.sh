@@ -92,6 +92,7 @@ GPT_ARGS="
     --fsdp2-config-path ./examples/qwen2.5vl/fsdp2_config.yaml \
     --use-cpu-initialization \
     --init-model-with-meta-device \
+    --no-initialization \
     --distributed-timeout-minutes 60 \
 "
 

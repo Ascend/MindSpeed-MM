@@ -1,11 +1,16 @@
+sharding_size: auto
 sub_modules_to_wrap:
-  - megatron.core.transformer.transformer_layer.TransformerLayer
-  - megatron.core.models.common.embeddings.language_model_embedding.LanguageModelEmbedding
-  - megatron.core.models.common.embeddings.rotary_pos_embedding.RotaryEmbedding
-param_dtype: "bf16"
-reduce_dtype: "fp32"
+  - text_decoder.output_layer
+  - text_decoder.embedding
+  - text_decoder.rotary_pos_emb
+  - text_decoder.decoder.layers.{*}
+param_dtype: bf16
+reduce_dtype: fp32
 cast_forward_inputs: True
 ignored_modules:
-  - mindspeed_mm.models.vision.vision_model.VisionModel
+  - image_encoder
 recompute_modules:
-  - megatron.core.transformer.transformer_layer.TransformerLayer
+  - text_decoder.decoder.layers.{*}
+num_to_forward_prefetch: 0
+num_to_backward_prefetch: 0
+offload_to_cpu: False

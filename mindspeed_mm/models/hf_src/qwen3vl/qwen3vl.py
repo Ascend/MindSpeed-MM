@@ -1,3 +1,5 @@
+# Copyright 2025 HuggingFace Inc. and the LlamaFactory team.
+
 import transformers
 from torch.distributed.fsdp import fully_shard
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
@@ -36,18 +38,6 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
             fully_shard(layer, **fsdp2_kwargs)
         fully_shard(self.lm_head, **fsdp2_kwargs)
         fully_shard(self, **fsdp2_kwargs)
-
-    def post_meta_init(self):
-        """
-        Moves the model from meta device to NPU and reinitializes buffers
-        (e.g., rotary position embeddings) after FSDP sharding.
-        """
-        # reset buffer
-        self.visual.rotary_pos_emb.__init__(dim=self.config.vision_config.hidden_size // self.config.vision_config.num_heads // 2)
-        self.language_model.rotary_emb.__init__(self.config.text_config)
-
-        self.visual.rotary_pos_emb.to(device="cuda")
-        self.language_model.rotary_emb.to(device="cuda")
 
     def freeze(self, config):
         forbidden_modules = set()

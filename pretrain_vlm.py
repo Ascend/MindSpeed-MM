@@ -237,7 +237,7 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
 
 
 if __name__ == "__main__":
-    from mindspeed_mm.patchs import ring_attn_patch, ulysses_patches, meta_device_patches, torch_dcp_patch
+    from mindspeed_mm.patchs import ring_attn_patch, ulysses_patches, torch_dcp_patch
     train_valid_test_datasets_provider.is_distributed = True
     pretrain(
         train_valid_test_datasets_provider,

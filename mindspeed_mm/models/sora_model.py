@@ -40,11 +40,12 @@ from mindspeed_mm.models.diffusion import DiffusionModel
 from mindspeed_mm.models.predictor import PredictModel
 from mindspeed_mm.models.text_encoder import TextEncoder
 from mindspeed_mm.utils.utils import unwrap_single
+from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin, WeightInitMixin
 
 logger = getLogger(__name__)
 
 
-class SoRAModel(nn.Module):
+class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
     """
     Instantiate a video generation model from config.
     SoRAModel is an assembled model, which may include text_encoder, video_encoder, predictor, and diffusion model

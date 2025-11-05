@@ -5,6 +5,7 @@ import os
 import dataclasses
 
 import torch
+from accelerate import init_empty_weights
 from megatron.core.enums import ModelType
 from megatron.training.utils import print_rank_0
 from megatron.training.global_vars import get_args
@@ -116,7 +117,7 @@ def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encode
 
         return model
     if args.init_model_with_meta_device:
-        with torch.device('meta'):
+        with init_empty_weights():
             model = build_model()
     else:
         model = build_model()

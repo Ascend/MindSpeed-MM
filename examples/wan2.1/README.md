@@ -101,7 +101,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
-git checkout 6aff65eba929b4f39848a5153ac455467d0b0f9e
+git checkout 93c45456c7044bacddebc5072316c01006c938f9
 pip install -r requirements.txt 
 pip install -e .
 cd ..

@@ -66,12 +66,9 @@ GPT_ARGS="
     --no-load-rng \
     --no-save-optim \
     --no-save-rng \
-    --recompute-granularity full \
-    --recompute-method block \
-    --recompute-num-layers 40 \
     --use-torch-fsdp2 \
     --untie-embeddings-and-output-weights \
-    --ckpt-format torch_dist \
+    --ckpt-format torch_dcp \
     --fsdp2-config-path examples/wan2.1/fsdp2_config.yaml \
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
