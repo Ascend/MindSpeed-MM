@@ -23,7 +23,7 @@
 
 ## 模型介绍
 
-Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多模态图像生成模型，其核心结构创新在于采用 MSRoPE 多模态位置编码解决文本与图像位置混淆问题；功能上以卓越的多语言文本渲染（尤其中文）和精准图像编辑为特色，同时具备抢的通用图像生成能力。
+Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多模态图像生成模型，其核心结构创新在于采用 MSRoPE 多模态位置编码解决文本与图像位置混淆问题；功能上以卓越的多语言文本渲染（尤其中文）和精准图像编辑为特色，同时具备强大的通用图像生成能力。
 
 ## 版本说明
 
@@ -137,7 +137,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
     model_name="Qwen/Qwen-Image" # 预训练模型路径
     ```
 
-    获取对应的微调模型后，在以下shell启动微调脚本中将`model_name`参数设置为本地预训练模型绝对路径
+    获取对应的微调模型后，在以下shell启动微调脚本中将`model_name`参数设置为本地预训练模型绝对路径。若需要，可根据deepspeed分布式训练配置修改accelerate中的配置，即`bf16_accelerate_config.yaml`。将`config_file`参数设置为该yaml文件的绝对路径。
 
     ```shell
     model_name="Qwen/Qwen-Image"
@@ -229,7 +229,13 @@ vim ./examples/dreambooth/infer_qwen_image_text2img_bf16.py # 进入运行推理
       output_path = "./infer_result"  # Inference result output folder
       ```
 
-  2. 运行代码
+  2. 按需修改prompt
+
+      ```shell
+      prompt = "一片森林中，一只可爱的小鹿在俯身喝水，小鹿旁边有一块木板，写着'MindSpeed-MM'的字"
+      ```
+
+  3. 运行代码
 
       ```shell
       python examples/dreambooth/infer_qwen_image_text2img_bf16.py
@@ -249,7 +255,13 @@ vim ./examples/dreambooth/infer_qwen_image_text2img_bf16.py # 进入运行推理
       output_path = "./infer_result"  # Inference result output folder
       ```
 
-  2. 运行代码
+  2. 按需修改prompt
+
+      ```shell
+      prompt = "一片森林中，一只可爱的小鹿在俯身喝水，小鹿旁边有一块木板，写着'MindSpeed-MM'的字"
+      ```
+
+  3. 运行代码
 
       ```shell
       python examples/dreambooth/infer_qwen_image_text2img_lora_bf16.py

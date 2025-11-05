@@ -25,7 +25,7 @@ positive_magic = {
 }
 
 pipe = QwenImagePipeline.from_pretrained(model_name, torch_dtype=torch_dtype)
-pipe.load_lora_weight(lora_path)
+pipe.load_lora_weights(lora_path)
 pipe.enable_model_cpu_offload(device=device)
 
 # Generate with different aspect ratios
