@@ -218,6 +218,8 @@ class MMPluginMixin:
                 else:
                     with Image.open(image["path"]) as image_obj:
                         processed_image = self._preprocess_image(image_obj, **kwargs)
+            elif isinstance(image, ImageObject):
+                processed_image = self._preprocess_image(image, **kwargs)
 
             if not isinstance(processed_image, ImageObject):
                 raise ValueError(f"Expect input is a list of images, but got {type(image)}.")
