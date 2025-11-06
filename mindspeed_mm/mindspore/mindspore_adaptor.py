@@ -4,6 +4,7 @@ from mindspeed_mm.mindspore.data.datasets.utils import process_in_cpu_wrapper
 from mindspeed_mm.mindspore.data.data_utils.func_utils.convert import preprocess_dataset
 from mindspeed_mm.mindspore.models.vision.vision_encoders.qwen2vl_vit_model import get_window_index, qwen2vlvit_selfattention_forward
 from mindspeed_mm.mindspore.utils.transformer_model_config import get_model_config
+from mindspeed_mm.mindspore.models.predictor.dits.sparseu_mmdit import block_forward, sparsemmditblock_forward
 
 
 def masked_scatter_(self, mask, updates):
@@ -27,5 +28,9 @@ def apply_mindspore_patch():
     aspm.register_patch('mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model.Qwen2vlVitSelfAttention.forward', qwen2vlvit_selfattention_forward)
     aspm.register_patch('mindspeed_mm.utils.transformer_model_config.get_model_config', get_model_config)
     aspm.apply_patches()
+    #patch opensoraplan1.5t2v
+    aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseUMMDiT.block_forward', block_forward)
+    aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseMMDiTBlock.forward',
+                        sparsemmditblock_forward)
 
 apply_mindspore_patch()
