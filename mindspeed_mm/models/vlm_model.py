@@ -116,8 +116,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         return None
 
     def _build_image_encoder_model(self, config):
-        vit_layer_spec = get_vit_layer_spec(config.vision_encoder)
-        proj_layer_spec = get_projector_layer_spec(config.vision_projector)
         self.encoder_dp_enable = config.vision_encoder.model_id == "InternViT"
 
         if get_args().hetero_parallel:
@@ -133,6 +131,9 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             print_rank_0(f'initial: image_encoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
             print_rank_0(f'initial: image_encoder cp size is {mpu.get_context_parallel_world_size()}')
             print_rank_0(f'initial: image_encoder dp size is {mpu.get_data_parallel_world_size()}')
+        
+        vit_layer_spec = get_vit_layer_spec(config.vision_encoder)
+        proj_layer_spec = get_projector_layer_spec(config.vision_projector)
 
         if self.pp_size <= 1:
             return VisionModel(
@@ -197,8 +198,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
 
 
     def _build_audio_encoder_model(self, config):
-        audio_layer_spec = get_audio_layer_spec(config.audio_encoder)
-
         if get_args().hetero_parallel:
             change_parallel_state('audio_encoder')
             self.pp_size = mpu.get_pipeline_model_parallel_world_size()
@@ -211,6 +210,8 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             print_rank_0(f'initial: audio_encoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
             print_rank_0(f'initial: audio_encoder cp size is {mpu.get_context_parallel_world_size()}')
             print_rank_0(f'initial: audio_encoder dp size is {mpu.get_data_parallel_world_size()}')
+        
+        audio_layer_spec = get_audio_layer_spec(config.audio_encoder)
 
         if self.pp_size <= 1:
             return AudioModel(
