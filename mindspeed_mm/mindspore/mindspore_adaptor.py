@@ -1,5 +1,10 @@
+from packaging import version
+
 import mindspore
+import transformers
 from mindspeed.patch_utils import MindSpeedPatchesManager as aspm
+from mindspeed.mindspore.ops.npu_rotary_position_embedding import npu_rotary_position_embedding
+
 from mindspeed_mm.mindspore.data.datasets.utils import process_in_cpu_wrapper
 from mindspeed_mm.mindspore.data.data_utils.func_utils.convert import preprocess_dataset
 from mindspeed_mm.mindspore.models.vision.vision_encoders.qwen2vl_vit_model import get_window_index, qwen2vlvit_selfattention_forward
@@ -27,6 +32,19 @@ def apply_mindspore_patch():
     aspm.register_patch('mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model.Qwen2VLViT.get_window_index', get_window_index)
     aspm.register_patch('mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model.Qwen2vlVitSelfAttention.forward', qwen2vlvit_selfattention_forward)
     aspm.register_patch('mindspeed_mm.utils.transformer_model_config.get_model_config', get_model_config)
+
+    # patch llava
+    aspm.register_patch(
+        'mindspeed.ops.npu_rotary_position_embedding.npu_rotary_position_embedding',
+        npu_rotary_position_embedding
+    )
+
+    # patch glm
+    if version.parse(transformers.__version__) >= version.parse('4.54.0.dev0'):
+        from mindspeed_mm.mindspore.third_party.transformers.masking_utils import sdpa_mask_older_torch
+        from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
+        ALL_MASK_ATTENTION_FUNCTIONS._global_mapping['sdpa'] = sdpa_mask_older_torch
+
     aspm.apply_patches()
     #patch opensoraplan1.5t2v
     aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseUMMDiT.block_forward', block_forward)

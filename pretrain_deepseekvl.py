@@ -18,6 +18,9 @@ from mindspeed_mm.models.deepseekvl_model import VLMModel
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.utils.transformer_model_config import get_model_config
 from mindspeed_mm.patchs import dummy_optimizer_patch
+mindspeed_args = mindspeed.megatron_adaptor.get_mindspeed_args()
+if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
+    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def model_provider(pre_process=True, post_process=True):

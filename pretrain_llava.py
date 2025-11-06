@@ -20,6 +20,9 @@ from mindspeed_mm.configs.config import MMConfig
 from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.utils.transformer_model_config import get_model_config
 from mindspeed_mm.models.common.module_spec.llava_layer_spec import get_layer_spec, get_mlp_module_spec
+mindspeed_args = mindspeed.megatron_adaptor.get_mindspeed_args()
+if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
+    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def model_provider(pre_process=True, post_process=True):
