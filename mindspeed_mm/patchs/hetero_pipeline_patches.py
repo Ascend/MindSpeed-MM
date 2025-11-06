@@ -656,9 +656,7 @@ def forward_backward_pipelining_without_interleaving_patch(
         # Finalize model grads (perform full grad all-reduce / reduce-scatter for
         # data parallelism, layernorm all-reduce for sequence parallelism, and
         # embedding all-reduce for pipeline parallelism).
-        if (not hasattr(parallel_state, "_IS_FIRST_PIPELINE") or (
-        getattr(parallel_state, "_IS_FIRST_PIPELINE", False))):
-            config.finalize_model_grads_func(
+        config.finalize_model_grads_func(
                 [model], total_num_tokens if config.calculate_per_token_loss else None
             )
 
