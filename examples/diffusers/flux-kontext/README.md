@@ -22,7 +22,7 @@
 
 ## 模型介绍
 
-[FLUX.1 Kontext dev](https://bfl.ai/models/flux-kontext) 是基于FLUX，当前先进的上下文图像生成与编辑技术的生成模型，它可以结合文本与图像，实现精确、连贯的生成效果。
+[FLUX.1-Kontext-dev](https://bfl.ai/models/flux-kontext) 是基于FLUX，当前先进的上下文图像生成与编辑技术的生成模型，它可以结合文本与图像，实现精确、连贯的生成效果。
 
 ## 版本说明
 
@@ -94,7 +94,7 @@
     - 用户需自行获取并解压[kontext-community/relighting](https://huggingface.co/datasets/kontext-community/relighting)数据集，并在以下启动shell脚本中将`dataset_name`参数设置为本地数据集的绝对路径
 
     ```shell
-    dataset_name="kontext-community/relighting" # 数据集 路径
+    dataset_name="kontext-community/relighting" # 数据集路径
     ```
 
    - kontext-community/relighting数据集格式如下:
@@ -197,7 +197,7 @@
     启动微调脚本
 
     ```shell
-    bash finetune_kontext_dreambooth_deepspeed_bf16.sh 
+    bash finetune_kontext_dreambooth_lora_deepspeed_bf16.sh 
     ```
 
 ### 性能
@@ -224,7 +224,7 @@ cd examples/dreambooth/ # 从diffusers目录进入dreambooth目录
 【FLUX模型推理】
 
 ```shell
-vim infer_flux_text2img_bf16.py # 进入运行推理的Python文件
+vim infer_kontext_text2img_bf16.py # 进入运行推理的Python文件
 ```
 
   1. 修改路径
@@ -255,7 +255,7 @@ vim infer_flux_text2img_bf16.py # 进入运行推理的Python文件
   2. 运行代码
 
       ```shell
-      python infer_flux_text2img_lora_bf16.py
+      python infer_kontext_text2img_lora_bf16.py
       ```
 
 <a id="jump3"></a>
@@ -282,7 +282,6 @@ vim infer_flux_text2img_bf16.py # 进入运行推理的Python文件
 | `ACLNN_CACHE_LIMIT`           | 配置单算子执行API在Host侧缓存的算子信息条目个数                                  | 需要配置为整数，取值范围`[1, 10,000,000]`，默认值为`10000`                                                     |
 | `TOKENIZERS_PARALLELISM`      | 用于控制Hugging Face的transformers库中的分词器（tokenizer）在多线程环境下的行为    | `False`: 禁用并行分词<br>`True`: 开启并行分词                                                        |
 | `OMP_NUM_THREADS`             | 设置执行期间使用的线程数    |      需要配置为整数                                                  |
-
 
 ## 引用
 
