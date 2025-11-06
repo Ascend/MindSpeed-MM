@@ -10,7 +10,6 @@ from mindspeed.patch_utils import MindSpeedPatchesManager as mspm
 from megatron.training import get_args, print_rank_0
 from megatron.core.parallel_state import initialize_model_parallel, is_initialized
 import megatron.core.parallel_state as mpu
-from mindspeed_mm import training
 from mindspeed_mm.models.common.communications import gather_forward_split_backward
 
 
