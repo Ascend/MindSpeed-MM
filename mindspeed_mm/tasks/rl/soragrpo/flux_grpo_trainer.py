@@ -172,7 +172,7 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
 
         sigma_schedule = self.sd3_time_shift(args.shift, sigma_schedule)
 
-        self.assert_eq(
+        FluxGRPOTrainer.assert_eq(
             len(sigma_schedule),
             sample_steps + 1,
             "sigma_schedule must have length sample_steps + 1",

@@ -134,7 +134,7 @@ cd ..
 
 ## 数据集准备及处理
 
-下载FLUX DanceGRPO使用的[提示词数据集](https://github.com/XueZeyue/DanceGRPO/blob/main/prompts.txt)。在文件页面点击download
+下载FLUX DanceGRPO使用的[提示词数据集](https://github.com/XueZeyue/DanceGRPO/blob/main/assets/prompts.txt)。在文件页面点击download
 raw file下载文件至MindSpeed MM工程根目录的data目录下。
 
 数据集下载完成后要对数据进行预处理，在启动预处理之前，可以根据自身训练配置需要修改[ 数据预处理脚本 ](./preprocess_flux_rl_embeddings.sh)的配置，以FLUX模型为例：

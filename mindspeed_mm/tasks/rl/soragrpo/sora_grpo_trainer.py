@@ -91,7 +91,7 @@ class SoraGRPOTrainer(ABC):
                 transformer = self.hyper_model.diffuser
                 fsdp_kwargs, split_modules = get_dit_fsdp_kwargs(
                     self.hyper_model,
-                    args.fsdp_sharding_startegy,
+                    args.fsdp_sharding_strategy,
                     False,
                     args.use_cpu_offload,
                     args.master_weight_type,
@@ -106,7 +106,7 @@ class SoraGRPOTrainer(ABC):
             dist.barrier()
 
         self.main_print(
-            f"--> Initializing FSDP with sharding strategy: {args.fsdp_sharding_startegy}"
+            f"--> Initializing FSDP with sharding strategy: {args.fsdp_sharding_strategy}"
         )
 
         # Set model as trainable.
@@ -202,7 +202,7 @@ class SoraGRPOTrainer(ABC):
             for step in range(init_steps + 1, args.train_iters + 1):
                 start_time = time.time()
                 if args.save is not None and step % args.save_interval == 0:
-                    save_checkpoint(transformer, rank, args.save, step, epoch)
+                    self.save_checkpoint(transformer, rank, args.save, step, epoch)
                     dist.barrier()
                 loss, grad_norm = self.train_one_step(loader)
 
@@ -393,7 +393,7 @@ class SoraGRPOTrainer(ABC):
             default=1,
             help="Batch size for sequence parallel training",
         )
-        parser.add_argument("--fsdp_sharding_startegy", default="hybrid_full")
+        parser.add_argument("--fsdp_sharding_strategy", default="hybrid_full")
         parser.add_argument(
             "--lr_scheduler",
             type=str,
@@ -602,7 +602,8 @@ class SoraGRPOTrainer(ABC):
         dist.all_gather(gathered_tensors, tensor)
         return torch.cat(gathered_tensors, dim=0)
 
-    def assert_eq(self, x, y, msg=None):
+    @staticmethod
+    def assert_eq(x, y, msg=None):
         if not x == y:
             raise AssertionError(f"{msg} not equal")
 

@@ -43,3 +43,10 @@ def initialize_model_parallel(
         pipeline_model_parallel_split_rank=pipeline_model_parallel_split_rank,
         context_parallel_size=context_parallel_size,
     )
+
+
+def clear_module(module_name):
+    import sys
+    modules_to_delete = [key for key in sys.modules.keys() if key.startswith(module_name)]
+    for key in modules_to_delete:
+        del sys.modules[key]
