@@ -83,8 +83,6 @@ accelerate launch --config_file ${config_file} \
   --lr_scheduler="constant" \
   --lr_warmup_steps=0 \
   --max_train_steps=$max_train_steps \
-  --validation_prompt="A photo of sks dog in a bucket" \
-  --validation_epochs=200 \
   --checkpointing_steps=50000 \
   --seed="0" \
   --output_dir=${output_path} \
