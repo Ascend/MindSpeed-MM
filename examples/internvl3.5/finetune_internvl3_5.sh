@@ -94,6 +94,7 @@ GPT_ARGS="
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
     --calculate-per-sample-loss \
+    --log-tps
 "
 
 MM_ARGS="
@@ -120,3 +121,13 @@ torchrun $DISTRIBUTED_ARGS pretrain_transformers.py \
 chmod 440 logs/train_${logfile}.log
 find $SAVE_PATH -type d -exec chmod 750 {} \;
 find $SAVE_PATH -type f -exec chmod 640 {} \;
+STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F ':' '{print$5}' | awk -F '|' '{print$1}' | head -n 150 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
+SAMPLES_PER_SECOND=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
+echo "Elapsed Time Per iteration: $STEP_TIME"
+echo "Average Samples per Second: $SAMPLES_PER_SECOND"
+LOG_TOKENS_PER_SECOND=`grep "tokens per sample" logs/train_${logfile}.log`
+if [ "$LOG_TOKENS_PER_SECOND" ]; then
+    AVERAGE_TOKENS=`grep "tokens per sample" logs/train_${logfile}.log | awk -F 'tokens per sample:' '{print$2}' | awk -F '|' '{print$1}' | head -n 150 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
+    TOKENS_PER_SECOND=`awk 'BEGIN{printf "%.3f\n", '${SAMPLES_PER_SECOND}'*'${AVERAGE_TOKENS}'}'`
+    echo "Consumed Tokens per Second: $TOKENS_PER_SECOND"
+fi

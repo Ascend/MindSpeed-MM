@@ -56,6 +56,14 @@ def loss_func(output_tensor):
     args = get_args()
     loss_dir = {}
 
+    if args.log_tps:
+        loss_mask = output_tensor['loss_mask'].view(-1).float()
+        total_tokens = loss_mask.sum()
+        dp_size = torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
+        tokens_per_sample = torch.tensor(total_tokens, device=output_tensor['loss_mask'].device) / dp_size
+        torch.distributed.all_reduce(tokens_per_sample, group=mpu.get_data_parallel_group())
+        loss_dir["tokens per sample"] = tokens_per_sample
+
     if args.calculate_per_token_loss:
         loss, local_num_tokens, reporting_loss = compute_token_level_loss(output_tensor)
         loss_dir["loss"] = (reporting_loss[0], reporting_loss[1])
