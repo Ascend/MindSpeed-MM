@@ -345,10 +345,12 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
 
         # Training configuration
         self.ae_stride_t = vae_scale_factor[0]
-        self.sp_size = mpu.get_context_parallel_world_size() if truncate_t_by_sp else 1 # For sequence parallel
+        from mindspeed_mm.utils.dpcp_utils import get_max_cp_size
+        self.sp_size = get_max_cp_size() if truncate_t_by_sp else 1 # For sequence parallel
         self.train_sp_batch_size = train_sp_batch_size
         self.gradient_accumulation_size = cal_gradient_accumulation_size()
         self.batch_size = get_value_from_args("micro_batch_size")
+        self.global_batch_size = get_value_from_args("global_batch_size")
         self.min_num_frames = min_num_frames
 
         # Randomness control
@@ -649,9 +651,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
     def _apply_final_filters(self, data_samples, sample_sizes, stats):
         """Apply final filters"""
         counter = Counter(sample_sizes)
-        total_batch_size = self.batch_size * torch.distributed.get_world_size() * self.gradient_accumulation_size
-        total_batch_size = total_batch_size // self.sp_size * self.train_sp_batch_size
-        filter_major_num = 4 * total_batch_size
+        filter_major_num = 4 * self.global_batch_size
         data_samples, sample_sizes = zip(*[[i, j] for i, j in zip(data_samples, sample_sizes) if counter[j] >= filter_major_num])
         stats.print_report()
         print(f"{'After filter':<25}: {len(data_samples)}")

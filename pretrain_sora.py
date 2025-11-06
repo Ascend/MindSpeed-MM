@@ -27,6 +27,7 @@ from mindspeed_mm.data.data_utils.constants import (
 from mindspeed_mm.data.data_utils.utils import build_iterations
 from mindspeed_mm.models.sora_model import SoRAModel
 from mindspeed_mm.patchs import dummy_optimizer_patch
+import mindspeed_mm.utils.dpcp_utils as dpcp 
 mindspeed_args = get_mindspeed_args()
 
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
@@ -115,7 +116,11 @@ def forward_step(data_iterator, model):
     batch, video, prompt_ids, video_mask, prompt_mask = {}, None, None, None, None
     skip_encode = False
     if mpu.is_pipeline_first_stage():
-        batches, get_batch_interval = get_batch_for_step(data_iterator)
+        if dpcp.is_use_dynamic_dpcp():
+            batches = [dpcp.get_dpcp_batch_for_step(data_iterator)]
+            get_batch_interval = 0
+        else:
+            batches, get_batch_interval = get_batch_for_step(data_iterator)
         skip_encode = not batches
         i2v_params = defaultdict(list)
         # while encoder dp or encoder interleave offload is enabled. reconstruct data as list: [step_1, ... step_n]

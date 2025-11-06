@@ -25,6 +25,7 @@ from megatron.training.global_vars import (
     get_one_logger,
 )
 from megatron.core.num_microbatches_calculator import (
+    get_current_global_batch_size,
     get_num_microbatches,
     update_num_microbatches,
 )
@@ -63,6 +64,11 @@ from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.patchs.patch_manager import PatchesManager
 from mindspeed_mm.utils.data_balance.data_balance import DataBalance
 from mindspeed_mm.utils.random import seed_all
+from mindspeed_mm.utils.dpcp_utils import (
+    data_aware_parallel_optimize,
+    is_use_dynamic_dpcp,
+    initialize_parall_switch_list
+)
 from mindspeed_mm.utils.auto_setting import (
     auto_settings_fun,
     auto_settings_parse_args,
@@ -144,6 +150,11 @@ def pretrain(
         init_func()
 
     args = get_args()
+    if is_use_dynamic_dpcp():
+        from datetime import timedelta
+        timeout = timedelta(minutes=10)
+        initialize_parall_switch_list(timeout)
+        print_rank_0("dynamic dpcp is enabled")
     merge_mm_args(args)
     
     if args.log_throughput:
@@ -489,12 +500,16 @@ def train(
 
     while iteration < args.train_iters:
         memory_profiler.step()
+
+        # dynamic dp/cp
+        data_aware_parallel_optimize(train_data_iterator)
+
         # Update number of microbatches first without consistency check to decide if a
         # checkpoint should be saved. If the number of microbatches is different
         # from the previous iteration, save a checkpoint. Then run consistency check
         # to make sure training configuration is still valid.
         update_num_microbatches(args.consumed_train_samples, consistency_check=False)
-        if get_num_microbatches() != num_microbatches and iteration != 0:
+        if get_num_microbatches() != num_microbatches and iteration != 0 and not is_use_dynamic_dpcp():
             if get_num_microbatches() <= num_microbatches:
                 raise AssertionError(
                     "number of microbatches should be increasing due to batch size rampup"
@@ -886,8 +901,7 @@ def training_log(loss_dict, total_loss_dict, learning_rate, decoupled_learning_r
         'optimizer']
 
     # Calculate batch size.
-    batch_size = args.micro_batch_size * args.data_parallel_size * \
-                 get_num_microbatches()
+    batch_size = get_current_global_batch_size()
 
     # Track app tag & app tag ID
     if one_logger:

@@ -372,7 +372,7 @@ class ParallelAttention(nn.Module):
             fa_layout=self.fa_layout,
             softmax_scale=1 / math.sqrt(self.head_dim)
         )
-        if self.cp_size > 1 and args.context_parallel_algo in ["ulysses_cp_algo", "hybrid_cp_algo"]:
+        if mpu.get_context_parallel_world_size() > 1 and args.context_parallel_algo in ["ulysses_cp_algo", "hybrid_cp_algo"]:
             ulysses_group = mpu.get_context_parallel_group()
             if args.context_parallel_algo == "hybrid_cp_algo":
                 ulysses_group = get_context_parallel_group_for_hybrid_ulysses()
@@ -549,7 +549,7 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
         self.sparse_group = sparse_group
 
         if args.context_parallel_algo == 'ulysses_cp_algo':
-            self.num_attention_heads_per_partition_per_cp = core.utils.divide(self.num_attention_heads_per_partition, self.cp_size)
+            self.num_attention_heads_per_partition_per_cp = core.utils.divide(self.num_attention_heads_per_partition, mpu.get_context_parallel_world_size())
         elif args.context_parallel_algo == 'hybrid_cp_algo':
             self.num_attention_heads_per_partition_per_cp = core.utils.divide(self.num_attention_heads_per_partition, args.ulysses_degree_in_cp)
         else:
@@ -640,11 +640,11 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
         q, k, v = super().function_before_core_attention(query, key, input_layout, rotary_pos_emb=rotary_pos_emb)
 
         total_frames = frames
-        if self.cp_size > 1:
+        if mpu.get_context_parallel_world_size() > 1:
 
             if args.context_parallel_algo == 'ulysses_cp_algo':
                 cp_group = mpu.get_context_parallel_group()
-                total_frames = frames * self.cp_size
+                total_frames = frames * mpu.get_context_parallel_world_size()
                 # apply all_to_all to gather sequence and split attention heads [s // sp, b, h, d] -> [s, b, h // sp, d]
                 q = mapping.all_to_all(q, cp_group, scatter_dim=2, gather_dim=0)
                 k = mapping.all_to_all(k, cp_group, scatter_dim=2, gather_dim=0)
@@ -658,6 +658,7 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
                 v = mapping.all_to_all(v, cp_group, scatter_dim=2, gather_dim=0)
 
         batch_size = q.shape[1]
+        self.num_attention_heads_per_partition_per_cp = core.utils.divide(self.num_attention_heads_per_partition, mpu.get_context_parallel_world_size())
         q = q.view(-1, batch_size, self.num_attention_heads_per_partition_per_cp * self.head_dim)
         k = k.view(-1, batch_size, self.num_attention_heads_per_partition_per_cp * self.head_dim)
         v = v.view(-1, batch_size, self.num_attention_heads_per_partition_per_cp * self.head_dim)
@@ -691,20 +692,20 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
     ):
         args = get_args()
         total_frames = frames
-        if self.cp_size > 1:
+        if mpu.get_context_parallel_world_size() > 1:
 
             if args.context_parallel_algo == 'ulysses_cp_algo':
                 cp_group = mpu.get_context_parallel_group()
-                total_frames = frames * self.cp_size
-
+                total_frames = frames * mpu.get_context_parallel_world_size()
+                
             if args.context_parallel_algo == 'hybrid_cp_algo':
                 cp_group = get_context_parallel_group_for_hybrid_ulysses()
                 total_frames = frames * args.ulysses_degree_in_cp
 
         if self.sparse1d:
             out = self._reverse_sparse_1d(out, total_frames, height, width)
-
-        if self.cp_size > 1:
+            
+        if mpu.get_context_parallel_world_size() > 1:
             if args.context_parallel_algo == 'ulysses_cp_algo':
                 cp_group = mpu.get_context_parallel_group()
                 out = mapping.all_to_all(out, cp_group, scatter_dim=0, gather_dim=2)
@@ -729,7 +730,7 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
         if mask is not None and args.context_parallel_algo not in ['megatron_cp_algo', 'hybrid_cp_algo']:
             mask = mask.view(batch_size, 1, -1, mask.shape[-1])
 
-        if self.cp_size > 1 and args.context_parallel_algo in ['megatron_cp_algo', 'hybrid_cp_algo']:
+        if mpu.get_context_parallel_world_size() > 1 and args.context_parallel_algo in ['megatron_cp_algo', 'hybrid_cp_algo']:
             scale = 1.0 / math.sqrt(self.head_dim)
             head_num = self.num_attention_heads_per_partition_per_cp
             cp_para = self.cp_para
