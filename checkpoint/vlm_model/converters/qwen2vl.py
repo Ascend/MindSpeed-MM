@@ -143,6 +143,12 @@ class ModelConfigQwen2(CommonModelConfig):
     enable_canonical_hf_struct: Optional[bool] = False
     """是否使用标准huggingface模型结构"""
 
+    new_transformers_weight_key: Optional[bool] = False
+    """是否使用新transformers版本下的模型权重名"""
+
+    model_prefix: Optional[str] = None
+    """模型权重名包含额外前缀"""
+
 
 class ConvertVppMMConfigQwen2(ConvertVppMMConfig):
     common_model_config: ModelConfigQwen2 = ModelConfigQwen2()

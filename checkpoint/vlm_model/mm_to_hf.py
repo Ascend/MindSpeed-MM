@@ -8,7 +8,8 @@ from typing import List
 import torch
 from safetensors.torch import save_file
 
-from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME, IMAGE_ENCODER, AUDIO_ENCODER, TEXT_DECODER
+from checkpoint.common.constant import LATEST_TXT, MEGATRON_CKPT_NAME, IMAGE_ENCODER, AUDIO_ENCODER, TEXT_DECODER, \
+    LORA_CKPT_NAME
 from checkpoint.common.mm_types import STATE_DICT_T, PP_LAYER_NUM_T
 from checkpoint.vlm_model.config import ConvertHFConfig
 from checkpoint.vlm_model.hf_to_mm import load_from_hf
@@ -22,6 +23,15 @@ def save_by_index_json(_state_dicts, _save_dir):
     for index, state_dict in enumerate(_state_dicts, start=1):
         name = f'model-{index:05}-of-{len(_state_dicts):05}.safetensors'
         save_file(state_dict, Path(_save_dir).joinpath(name), metadata=metadata)
+
+
+def save_safetensors(_state_dicts, _save_dir):
+    Path(_save_dir).mkdir(parents=True, exist_ok=True)
+
+    metadata = {
+        'format': 'pt'
+    }
+    save_file(_state_dicts, Path(_save_dir).joinpath(LORA_CKPT_NAME), metadata=metadata)
 
 
 def split_by_index_json(state_dict: STATE_DICT_T, hf_dir: Path) -> List[STATE_DICT_T]:
@@ -170,3 +180,18 @@ def convert_mm_to_hf(convert_config: ConvertHFConfig,
     state_dicts = split_by_index_json(state_dict, convert_config.hf_config.hf_dir)
     copy_files_except_suffix(convert_config.hf_config.hf_dir, convert_config.save_hf_dir)
     save_by_index_json(state_dicts, convert_config.save_hf_dir)
+
+
+def convert_lora_mm_to_hf(convert_config: ConvertHFConfig,
+                          ops: List[Operator],
+                          tp_patterns: TP_PATTERN_T):
+    parallel_config = convert_config.parallel_config
+    # 找到最大的tp
+    max_tp_size = max(parallel_config.tp_size, parallel_config.vit_tp_size, parallel_config.audio_tp_size)
+    # 加载权重字典
+    state_dicts = load_from_mm(convert_config.mm_dir, parallel_config.vit_pp_layers, parallel_config.llm_pp_layers,
+                               max_tp_size, parallel_config.audio_pp_layers)
+    state_dict = merge_by_tp(state_dicts, tp_patterns)
+    for op in ops:
+        op.revert(state_dict)  # 执行逆操作
+    save_safetensors(state_dict, convert_config.save_hf_dir)

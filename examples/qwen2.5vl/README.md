@@ -225,6 +225,58 @@ mm-convert  Qwen2_5_VLConverter resplit \
 # target_parallel_config.tp_size: 期望的tp并行配置（tp_size不能超过原仓config.json中的num_key_value_heads）
 ```
 
+<a id="jump2.5"></a>
+#### 5. LoRA权重转换(LoRA-hf2mm)
+MindSpeed-MM修改了LoRA网络的结构名称，使用`mm-convert`工具对LoRA预训练权重进行转换。该工具实现了huggingface的LoRA权重和MindSpeed-MM的LoRA权重的互相转换以及PP（Pipeline Parallel）权重的重切分。
+```bash
+# 7b 采用huggingface一致的模型结构的LoRA权重转换
+mm-convert  Qwen2_5_VLConverter lora_hf_to_mm \
+	--cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct-lora" \
+	--cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-7B-Instruct-lora" \
+	--cfg.parallel_config.llm_pp_layers [[12,16]] \
+	--cfg.parallel_config.vit_pp_layers [[32,0]] \
+	--cfg.parallel_config.tp_size 1 \
+	--cfg.common_model_config.enable_canonical_hf_struct true \
+	--cfg.common_model_config.model_prefix "base_model.model." \
+    --cfg.common_model_config.new_transformers_weight_key true
+# 其中：
+# mm_dir: 转换后LoRA权重保存目录
+# hf_dir: huggingface的LoRA权重保存目录
+# llm_pp_layers: llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
+# vit_pp_layers: vit在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
+# tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
+# enable_canonical_hf_struct: 是否采用和huggingface一致的模型结构（llm无qkv融合、mlp融合），lora权重转换场景需开启
+# model_prefix: 消除huggingface权重里因peft包裹产生的前缀（"base_model.model."）
+# new_transformers_weight_key: 是否使用新Qwen2.5VL权重名的huggingface权重
+```
+注：LoRA权重转换需将`enable_canonical_hf_struct`置为true。
+
+<a id="jump2.6"></a>
+#### 6. LoRA权重转换(LoRA-mm2hf)
+MindSpeed-MM修改了LoRA网络的结构名称，在微调后，如果需要将LoRA权重转回huggingface格式，可使用`mm-convert`权重转换工具对微调后的LoRA权重进行转换，将权重名称修改为与原始网络一致。
+```bash
+# 7b 采用huggingface一致的模型结构的LoRA权重转换
+m-convert  Qwen2_5_VLConverter lora_mm_to_hf \
+  --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-VL-7B-Instruct-lora/" \
+  --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct-lora/" \
+  --cfg.parallel_config.llm_pp_layers [1,10,10,7] \
+  --cfg.parallel_config.vit_pp_layers [32,0,0,0] \
+  --cfg.parallel_config.tp_size 1 \
+  --cfg.common_model_config.enable_canonical_hf_struct true \
+  --cfg.common_model_config.model_prefix "base_model.model." \
+  --cfg.common_model_config.new_transformers_weight_key true
+# 其中：
+# save_hf_dir: LoRA权重微调后转换回hf模型格式的目录
+# mm_dir: 微调后保存的LoRA权重目录
+# llm_pp_layers: llm在每个卡上切分的层数，注意要和微调时model.json中配置的pipeline_num_layers一致
+# vit_pp_layers: vit在每个卡上切分的层数，注意要和微调时model.json中配置的pipeline_num_layers一致
+# tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
+# enable_canonical_hf_struct: 是否采用和huggingface一致的模型结构（llm无qkv融合、mlp融合），lora权重转换场景需开启
+# model_prefix: 消除huggingface权重里因peft包裹产生的前缀（"base_model.model."）
+# new_transformers_weight_key: 是否使用新Qwen2.5VL权重名的huggingface权重
+```
+注：LoRA权重转换需将`enable_canonical_hf_struct`置为true。
+
 ---
 <a id="jump3"></a>
 ## 数据集准备及处理
@@ -481,19 +533,67 @@ Megatron框架下的qwen2.5VL模型结构相比于huggingface的模型结构实�
 }
 ```
 
-若开启lora微调，`examples/qwen2.5vl/finetune_qwen2_5_vl_xxb.sh`中的`lora-target-modules`需要做如下替换：
+【LoRA微调（可选）】
 
+LoRA为框架通用能力，当前功能已支持，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/lora_finetune.md)。
 
-| 参数         | 替换参数                  |
-|------------|-----------------------|
-| `linear_fc1` | `gate_proj` `up_proj`     |
-| `linear_qkv` | `q_proj` `k_proj` `v_proj`  |
+开启LoRA微调需在启动脚本`examples/qwen2.5vl/finetune_qwen2_5_vl_xxb.sh`中添加LoRA参数，相关配置修改如下：
+
+```shell
+LORA_ARGS="
+    --lora-r 8 \
+    --lora-alpha 16 \
+    --lora-dropout 0 \
+    --lora-target-modules linear_proj linear_fc2 linear_qkv q_proj k_proj v_proj gate_proj up_proj \
+"
+
+torchrun $DISTRIBUTED_ARGS pretrain_vlm.py \
+    ...
+    $LORA_ARGS \
+    ...
+```
+
+其中，`lora-target-modules`参数需根据模型结构进行选择，在未开启huggingface等价模型结构配置功能的情况下，该参数示例配置如下：
+
+`--lora-target-modules linear_proj linear_fc2 linear_qkv linear_fc1 \`
+
+若开启huggingface等价模型结构配置功能，则`lora-target-modules`参数需依据微调模块做如下替换：
+
+|模块| 原始参数         | 替换参数                  |
+|------------|------------|-----------------------|
+| `ViT/LLM` | `linear_fc1` | `gate_proj` `up_proj`     |
+|`LLM`| `linear_qkv` | `q_proj` `k_proj` `v_proj`  |
 
 示例配置为：
 
+（1）仅对ViT模块进行LoRA微调：
+
+`--lora-target-modules linear_proj linear_fc2 linear_qkv gate_proj up_proj \`
+
+（2）仅对LLM模块进行LoRA微调：
+
 `--lora-target-modules linear_proj linear_fc2 q_proj k_proj v_proj gate_proj up_proj \`
 
-注：开启该功能需在权重转换中将`enable_canonical_hf_struct`置为true
+（3）同时对ViT模块和LLM模块进行LoRA微调：
+
+`--lora-target-modules linear_proj linear_fc2 linear_qkv q_proj k_proj v_proj gate_proj up_proj \`
+
+**注：开启huggingface等价模型结构配置功能需在权重转换中将`enable_canonical_hf_struct`参数置为true**
+
+若需加载LoRA预训练权重，需在启动脚本`examples/qwen2.5vl/finetune_qwen2_5_vl_xxb.sh`中添加LoRA预训练权重路径并修改`GPT_ARGS`，相关配置修改如下：
+
+```shell
+LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-32B-Instruct"
+LORA_PATH="ckpt/mm_path/Qwen2.5-VL-32B-Instruct-lora"
+
+# 原始的 --load $LOAD_PATH \ 需替换为 --load-base-model $LOAD_PATH \
+GPT_ARGS="
+	...
+    --load-base-model $LOAD_PATH \
+    --load $LORA_PATH \
+	...
+"
+```
 
 <a id="jump4.3"></a>
 #### 3. 启动微调

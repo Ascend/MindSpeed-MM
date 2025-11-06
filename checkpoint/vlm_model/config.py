@@ -133,6 +133,19 @@ class HfConfig(BaseModel):
         return self
 
 
+class HFLoRAConfig(BaseModel):
+    """huggingface的LoRA权重的配置, 包括路径校验"""
+    hf_dir: DirectoryPath
+    """huggingface的LoRA权重路径"""
+
+    @model_validator(mode='after')
+    def validate_hf_dir(self) -> "HFLoRAConfig":
+        safetensors_files = list(self.hf_dir.glob("*.safetensors"))
+        if not safetensors_files:
+            raise FileNotFoundError(f"No *.safetensors files found in {self.hf_dir}")
+        return self
+
+
 # BaseModel/dataclasses注意要在field的下一行添加描述说明
 class ConvertMMConfig(BaseModel):
     """huggingface权重转换为mindspeed-mm权重配置"""
@@ -285,7 +298,21 @@ class ConvertVppMMConfig(BaseModel):
                 raise AssertionError(f'Sum of audio_pipeline_num_layers_flat must be equal to audio_num_layers, '
                                      f'but got {sum(audio_pipeline_num_layers_flat)} and {self.common_model_config.audio_num_layers}.')
         return self
-    
+
+
+class ConvertHFLoRAConfig(BaseModel):
+    mm_dir: Path
+    """mm的LoRA权重保存路径"""
+
+    parallel_config: VppParallelConfig
+    """并行配置"""
+
+    hf_config: HFLoRAConfig
+    """hf的LoRA权重路径配置"""
+
+    save_vit_only: Optional[bool] = False
+    """是否只保存vit部分(包含projector)的权重, 默认为False, 同时保存llm和vit的权重"""
+
 
 class ConvertTorchDCPConfig(BaseModel):
     """Config for convert huggingface ckpt to mindspeed-mm torch dcp ckpt"""
