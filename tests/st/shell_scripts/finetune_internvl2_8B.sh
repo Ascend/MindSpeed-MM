@@ -88,6 +88,7 @@ OUTPUT_ARGS="
     --save-interval 5000 \
     --eval-interval 5000 \
     --eval-iters 5000 \
+    --log-tps \
 "
 
 

@@ -89,6 +89,7 @@ GPT_ARGS="
     --num-workers 8 \
     --use-flash-attn \
     --swap-attention \
+    --distributed-timeout-minutes 20 \
 "
 
 MM_ARGS="
@@ -104,6 +105,7 @@ OUTPUT_ARGS="
     --eval-iters 5000 \
     --save $SAVE_PATH \
     --ckpt-format torch \
+    --log-tps \
 "
 logfile=train_$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs

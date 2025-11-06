@@ -81,6 +81,7 @@ GPT_ARGS="
     --no-save-optim \
     --no-save-rng \
     --num-workers 8 \
+    --distributed-timeout-minutes 20 \
 "
 
 MM_ARGS="
@@ -96,6 +97,7 @@ OUTPUT_ARGS="
     --eval-iters 5000 \
     --save $SAVE_PATH \
     --ckpt-format torch \
+    --log-tps \
 "
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs

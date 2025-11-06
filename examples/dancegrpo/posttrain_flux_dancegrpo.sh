@@ -109,3 +109,8 @@ torchrun $DISTRIBUTED_ARGS posttrain_flux_dancegrpo.py \
 chmod 440 logs/train_${logfile}.log
 find $SAVE_PATH -type d -exec chmod 750 {} \;
 find $SAVE_PATH -type f -exec chmod 640 {} \;
+STEP_TIME=`grep "step_time=" logs/train_${logfile}.log | awk -F '=' '{print$3}' | awk -F 's,' '{print$1}' | head -n 300 | tail -n 150 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
+GBS=`grep "Total train batch size" logs/train_${logfile}.log | awk -F '=' '{print$2}'`
+SAMPLES_PER_SECOND=$(awk -v gbs="${GBS}" -v step="${STEP_TIME}" 'BEGIN{printf "%.3f\n", gbs/step}')
+echo "Elapsed Time Per iteration: $STEP_TIME"
+echo "Average Samples per Second: $SAMPLES_PER_SECOND"
