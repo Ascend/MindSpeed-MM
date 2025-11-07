@@ -16,3 +16,4 @@ from checkpoint.sora_model.opensoraplan_converter import OpenSoraPlanConverter
 from checkpoint.sora_model.wan_converter import WanConverter
 from checkpoint.sora_model.cogvideo_converter import CogVideoConverter
 from checkpoint.sora_model.lumina_converter import LuminaConverter
+from checkpoint.sora_model.vace_converter import VACEConverter

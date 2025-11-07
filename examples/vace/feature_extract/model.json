@@ -12,7 +12,7 @@
         "norm_mode": "channel_specified_shift_scale",
         "do_sample": false
     },
-    "text_decoder": {
+    "text_encoder": {
         "model_id": "UMT5",
         "dtype": "bf16",
         "hub_backend": "hf",

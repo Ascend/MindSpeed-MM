@@ -7,7 +7,7 @@ from checkpoint.sora_model.convert_utils.utils import check_method_support, flip
 from checkpoint.sora_model.convert_utils.save_load_utils import save_as_mm, load_from_hf, load_from_mm, save_as_hf
 
 
-class VACEConvertor(SoraModelConverter):
+class VACEConverter(SoraModelConverter):
     """Converter for VACE"""
 
     _supported_methods = ["hf_to_mm", "mm_to_hf"]
@@ -66,7 +66,7 @@ class VACEConvertor(SoraModelConverter):
 
         self.hf_to_mm_str_replace_mapping_vace = {
             ".proj_in.": ".before_proj.",
-            ".proj_out.": "after_proj.",
+            ".proj_out.": ".after_proj.",
             "attn1.norm_q": "wan_dit_block.self_attn.q_norm",
             "attn1.norm_k": "wan_dit_block.self_attn.k_norm",
             "attn2.norm_q": "wan_dit_block.cross_attn.q_norm",

@@ -181,9 +181,7 @@ class VaceDit(nn.Module):
             return buffers[0].device
 
     def forward(
-            self, embs, vace_context, prompt_emb, time_emb, rotary_pos_emb,
-            use_gradient_checkpointing: bool = True,
-            use_gradient_checkpointing_offload: bool = False,
+            self, embs, vace_context, prompt_emb, time_emb, rotary_pos_emb
     ):
         # Embed each context sequence and add batch dimension
         vace_context_embed = [self.vace_patch_embedding(u.unsqueeze(0)) for u in vace_context]
@@ -195,28 +193,8 @@ class VaceDit(nn.Module):
                       dim=1) for u in vace_context_reshape
         ])
 
-        def create_custom_forward(module):
-            def custom_forward(*inputs):
-                return module(*inputs)
-
-            return custom_forward
-
         for block in self.vace_blocks:
-            if use_gradient_checkpointing_offload:
-                with torch.autograd.graph.save_on_cpu():
-                    c = torch.utils.checkpoint.checkpoint(
-                        create_custom_forward(block),
-                        c, embs, prompt_emb, time_emb, rotary_pos_emb,
-                        use_reentrant=True
-                    )
-            elif use_gradient_checkpointing:
-                c = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block),
-                    c, embs, prompt_emb, time_emb, rotary_pos_emb,
-                    use_reentrant=True
-                )
-            else:
-                block(c, embs, prompt_emb, time_emb, rotary_pos_emb)
+            c = block(c, embs, prompt_emb, time_emb, rotary_pos_emb)
         hints = torch.unbind(c)[:-1]
         return hints
 
@@ -263,8 +241,6 @@ class VACEModel(MultiModalModule):
             vace_context=None,
             vace_scale=1.0,
             use_unified_sequence_parallel: bool = False,
-            use_gradient_checkpointing: bool = True,
-            use_gradient_checkpointing_offload: bool = False,
             **kwargs
     ):
         timestep = timestep.to(latents[0].device)
@@ -299,29 +275,8 @@ class VACEModel(MultiModalModule):
         rotary_pos_emb = self.wan_dit.rope(batch_size, frames, height, width)
         vace_hints = self.vace_dit(embs, vace_context, prompt_emb, time_emb, rotary_pos_emb)
 
-        def create_custom_forward(module):
-            def custom_forward(*inputs):
-                return module(*inputs)
-
-            return custom_forward
-
         for block_id, block in enumerate(self.wan_dit.blocks):
-            if use_gradient_checkpointing_offload:
-                with torch.autograd.graph.save_on_cpu():
-                    c = torch.utils.checkpoint.checkpoint(
-                        create_custom_forward(block),
-                        embs, prompt_emb, time_emb, rotary_pos_emb,
-                        use_reentrant=True
-                    )
-            elif use_gradient_checkpointing:
-                c = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block),
-                    embs, prompt_emb, time_emb, rotary_pos_emb,
-                    use_reentrant=True
-                )
-            else:
-                block(c, embs, prompt_emb, time_emb, rotary_pos_emb)
-
+            embs = block(embs, prompt_emb, time_emb, rotary_pos_emb)
             if vace_context is not None and block_id in self.vace_dit.vace_to_wan:
                 current_vace_hint = vace_hints[self.vace_dit.vace_to_wan[block_id]]
                 embs = embs + current_vace_hint * vace_scale
@@ -354,7 +309,7 @@ class VACEModel(MultiModalModule):
             if param is not None:
                 param_cls = type(module._parameters[name])
                 kwargs = module._parameters[name].__dict__
-                kwargs["require_grad"] = param.requires_grad
+                kwargs["requires_grad"] = param.requires_grad
                 module._parameters[name] = param_cls(module._parameters[name].to(device), **kwargs)
 
         def register_empty_buffer(module, name, buffer, persistent=True):
@@ -367,7 +322,7 @@ class VACEModel(MultiModalModule):
                 kwargs['device'] = device
                 return fn(*args, **kwargs)
 
-            return wrapper()
+            return wrapper
 
         if include_buffers:
             tensor_constructors_to_patch = {

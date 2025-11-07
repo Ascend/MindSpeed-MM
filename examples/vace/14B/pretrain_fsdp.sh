@@ -11,6 +11,7 @@ export HCCL_CONNECT_TIMEOUT=1200
 export NPU_ASD_ENABLE=0
 export ASCEND_LAUNCH_BLOCKING=0
 export ACLNN_CACHE_LIMIT=100000
+export MULTI_STREAM_MEMORY_REUSE=2
 
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
@@ -28,8 +29,8 @@ GRAD_ACC_STEP=1
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
-MM_DATA="./examples/vace/14b/feature_data.json"
-MM_MODEL="./examples/vace/14b/pretrain_model.json"
+MM_DATA="./examples/vace/14B/feature_data.json"
+MM_MODEL="./examples/vace/14B/pretrain_model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="path to load your vace weight"
 SAVE_PATH="path to save your vace weight"
@@ -55,8 +56,8 @@ GPT_ARGS="
     --lr 5e-5 \
     --min-lr 5e-5 \
     --adam-beta1 0.9 \
-    --adam-beta2 0.999 \
-    --adam-eps 1e-8 \
+    --adam-beta2 0.95 \
+    --adam-eps 1e-5 \
     --lr-decay-style constant \
     --weight-decay 0.1 \
     --lr-warmup-init 0 \
@@ -68,10 +69,10 @@ GPT_ARGS="
     --no-load-rng \
     --no-save-optim \
     --no-save-rng \
-    --bf16
+    --bf16 \
     --use-torch-fsdp2 \
     --untie-embeddings-and-output-weights \
-    --ckpt-format torch_dist \
+    --ckpt-format torch_dcp \
     --fsdp2-config-path examples/vace/fsdp2_config.yaml \
     --use-cpu-initialization \
 "
