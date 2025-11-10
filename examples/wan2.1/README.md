@@ -282,13 +282,13 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
   
   - 限制条件：head 数量需要能够被CP整除（在`examples/wan2.1/{model_size}/{task}/pretrain_model.json`中配置，参数为`num_heads`）
 
-  - 默认使能方式为Ulysess序列并行。
+  - 默认使能方式为Ulysses序列并行。
 
   - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
 
   - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
 
-  - FPDT(Fully Pipelined Distributed Transformer): Ulysess Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/fpdt.md)
+  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/fpdt.md)
 
 - layer_zero
 
@@ -310,7 +310,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   目前支持将predictor模型切分流水线。
 
-  - 使用场景：模型参数较大时候，通过流线线方式切分并行，降低训练内存占用
+  - 使用场景：模型参数较大时候，通过流水线方式切分并行，降低训练内存占用
 
   - 使能方式：
     - 修改在 pretrain_model.json 文件中的"pipeline_num_layers", 类型为list。该list的长度即为 pipeline rank的数量，每一个数值代表rank_i中的层数。例如，[7, 8, 8, 7]代表有4个pipeline stage， 每个容纳7/8个dit layers。注意list中 所有的数值的和应该和总num_layers字段相等。此外，pp_rank==0的stage中除了包含dit层数以外，还会容纳text_encoder和ae，因此可以酌情减少第0个stage的dit层数。注意保证PP模型参数配置和模型转换时的参数配置一致。
@@ -431,7 +431,7 @@ mm-convert WanConverter merge_lora_to_base \
 
 | 配置文件                                                     | 修改字段  |  修改说明 |
 |----------------------------------------------------------|:------:|:-----|
-| examples/wan2.1/{model_size}/{task}/inference_model.json | from_pretrained |  修改为下载的权重所对应路径（包括vae、tokenizer、text_encoder   |
+| examples/wan2.1/{model_size}/{task}/inference_model.json | from_pretrained |  修改为下载的权重所对应路径（包括vae、tokenizer、text_encoder）   |
 | examples/wan2.1/samples_t2v_prompts.txt                  |    文件内容 |  T2V推理任务的prompt，可自定义，一行为一个prompt   |
 | examples/wan2.1/samples_i2v_prompts.txt                  |    文件内容 |  I2V推理任务的prompt，可自定义，一行为一个prompt   |
 | examples/wan2.1/samples_i2v_images.txt                   |    文件内容 |  I2V推理任务的首帧图片路径，可自定义，一行为一个图片路径   |
@@ -442,7 +442,7 @@ mm-convert WanConverter merge_lora_to_base \
 | examples/wan2.1/{model_size}/{task}/inference_model.json |  save_path |  生成视频的保存路径 |
 | examples/wan2.1/{model_size}/{task}/inference_model.json |  dual_image |  双帧推理输入，仅在FLF2V任务中设置为true，其他任务可不配置 |
 | examples/wan2.1/{model_size}/{task}/inference_model.json |  input_size |  生成视频的分辨率，格式为 [t, h, w] |
-| examples/wan2.1/{model_size}/{task}/inference_model.json |  flow_shift |  sheduler参数，480P推荐shift=3.0，720P推荐shift=5.0，FLF2V任务推荐shift=16.0 |
+| examples/wan2.1/{model_size}/{task}/inference_model.json |  flow_shift |  scheduler参数，480P推荐shift=3.0，720P推荐shift=5.0，FLF2V任务推荐shift=16.0 |
 | examples/wan2.1/{model_size}/{task}/inference.sh         |   LOAD_PATH | 转换之后的transformer部分权重路径 |
 
 ### 启动推理

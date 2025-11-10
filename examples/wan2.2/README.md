@@ -242,7 +242,7 @@ mm-convert WanConverter mm_to_hf \
   
   - 限制条件：head 数量需要能够被CP整除（在`examples/wan2.2/{model_size}/{task}/pretrain_model*.json`中配置，参数为`num_heads`）
 
-  - 默认使能方式为Ulysess序列并行。
+  - 默认使能方式为Ulysses序列并行。
 
   - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
 

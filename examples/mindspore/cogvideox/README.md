@@ -248,7 +248,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：`
 
   根据实际情况修改模型参数配置文件（如`model_cogvideox_i2v.json`）以及`data.json`文件中VAE及T5模型文件的实际路径。其中，T5文件的路径字段为`"from_pretrained": "5b-cogvideo/tokenizer"`及`"from_pretrained": "5b-cogvideo"`，替换`5b-cogvideo`为实际的路径；VAE模型文件的路径字段为`"from_pretrained": "3d-vae.pt"`，替换`3d-vae.pt`为实际的路径。
 
-  当需要卸载VAE跟T5时，将模型参数配置文件中的`"load_video_features": false`及`"load_text_features": false`字段中的值分别改为`true`。将`data.json`中的`"use_feature_data"`字段的值改为`true`。
+  当需要卸载VAE和T5时，将模型参数配置文件中的`"load_video_features": false`及`"load_text_features": false`字段中的值分别改为`true`。将`data.json`中的`"use_feature_data"`字段的值改为`true`。
 
 4. 切分策略配置
 

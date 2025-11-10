@@ -231,7 +231,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
     ```shell
     nnodes=1 # 节点数
-    n_gpus_per_node=16 # NPU卡数
+    n_npus_per_node=16 # NPU卡数
     ```
 
     规模增加，可修改以下配置，将推理部分减少FSDP切分参数，减少冗余通讯：
@@ -299,7 +299,6 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 | `actor/pg_clipfrac`                     | GRPO中裁剪机制生效的比例，反映了策略更新幅度的稳定性         |
 | `actor/ppo_kl`                          | PPO算法的实际 KL 散度                                        |
 | `actor/grad_norm`                             | 梯度范数，表示当前反向传播中参数梯度的整体幅度               |
-| `critic/rewards/mean`                     | 规则奖励打分的平均总奖励值                                   |
 | `actor/lr`                               | 学习率，优化器当前使用的学习率                               |
 | `critic/score/mean`                       | 开启奖励模型时的reward均值                                   |
 | `critic/score/max`                        | 奖励模型及规则奖励对同一个样本的reward最大值                 |

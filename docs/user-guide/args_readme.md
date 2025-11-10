@@ -30,7 +30,7 @@
 
 --clip-grad: 浮点数，默认为1，非0时启用该功能。在优化器中对权重做限制，防止loss波动过大。
 
---seed: 整形，随机种子。
+--seed: 整型，随机种子。
 
 --bf16: store_true,使用torch.bfloat16格式训练，极大降低显存消耗。
 
@@ -52,7 +52,7 @@
 
 --pipeline-model-parallel-size: 非0整数，默认为1。取值来自\${PP}。流水线并行参数设置，把整个模型按阶段分到多张卡上去计算，减少单卡内存占用，但会增加通信时间，同时会引起部分卡闲时等待现象。
 
---context_parallel-size: 非0整数，默认为1。取值来自\${CP}。序列并行数量设置，沿着序列维度进行数据切分。主要用于长序列任务，减少单卡内存占用，会引入额外通信时间影响性能。
+--context-parallel-size: 非0整数，默认为1。取值来自\${CP}。序列并行数量设置，沿着序列维度进行数据切分。主要用于长序列任务，减少单卡内存占用，会引入额外通信时间影响性能。
 
 --context-parallel-algo: string, CP算法选择，可选范围[ulysses_cp_algo, hybrid_cp_algo, megatron_cp_algo],[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/ulysses-context-parallel.md)
 
@@ -69,7 +69,7 @@
 
 --recompute-method: [block, uniform]。重计算模式配置。uniform:将transformer层均匀划分组，每组大小（--recompute-num-layers）,按组存入输入和激活值。block: 前--recompute-num-layers个transformer层使用重计算，剩余层跳过。
 
---recompute-num-layers: 整形，使用影响如上。
+--recompute-num-layers: 整型，使用影响如上。
 
 ---
 #### FSDP2
@@ -108,11 +108,11 @@
 所有环境变量具体解释均可在[Ascend官网](https://www.hiascend.com/)搜索查询到详细信息，以下仅展示MM套件中常用的。
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh: cann安装路径，必须配置。
-export CUDA_DEVICE_MAX_CONNECTIONS: 整形，[1, 32]可选。在多GPU系统下，可以使用该变量来控制主机端并行连接多设备数量。注意当开启了序列并行时，需要置为1。
+export CUDA_DEVICE_MAX_CONNECTIONS: 整型，[1, 32]可选。在多GPU系统下，可以使用该变量来控制主机端并行连接多设备数量。注意当开启了序列并行时，需要置为1。
 
-ASCEND_SLOG_PRING_TO_STDOUT: 0 or 1,是否开启日志打印。开启后日志不会保存在log文件中，而是将产生的日志直接打印显示，默认置为0。
+ASCEND_SLOG_PRINT_TO_STDOUT: 0 or 1,是否开启日志打印。开启后日志不会保存在log文件中，而是将产生的日志直接打印显示，默认置为0。
 
-ASCEND_GLOBAL_LOG_LEVEL: 整形，[0, 4]可选。设置日志级别，仅支持调试日志。
+ASCEND_GLOBAL_LOG_LEVEL: 整型，[0, 4]可选。设置日志级别，仅支持调试日志。
 * 0: DEBUG
 * 1: INFO
 * 2: WARNING
@@ -120,18 +120,18 @@ ASCEND_GLOBAL_LOG_LEVEL: 整形，[0, 4]可选。设置日志级别，仅支持�
 * 4: NULL
 注意设置为DEBUG级别后，可能会因为日志流量过大影响业务性能。
 
-TASK_QUEUE_ENABLE: 整形，[0, 2]可选，配置task_queue算子下发队列是否开启及优化等级，推荐配置为2。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_007.html)
+TASK_QUEUE_ENABLE: 整型，[0, 2]可选，配置task_queue算子下发队列是否开启及优化等级，推荐配置为2。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_007.html)
 
 COMBINED_ENABLE: 0 or 1,设置combined标志，用于优化非连续两个算子组合类场景，推荐配置为1。
 
 CPU_AFFINITY_CONF: 粗\细粒度绑核功能设置，推荐配置为1。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_033.html)
 
-HCCL_CONNECT_TIMEOUT: 整形，[120, 7200]可选，分布式场景下用于限制不同设备间socket建链过程的超时等待时间，单位为秒。[详细介绍](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/maintenref/envvar/envref_07_0077.html)
+HCCL_CONNECT_TIMEOUT: 整型，[120, 7200]可选，分布式场景下用于限制不同设备间socket建链过程的超时等待时间，单位为秒。[详细介绍](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/maintenref/envvar/envref_07_0077.html)
 
 NPU_ASD_ENABLE: 0 or 1,是否开启Ascend EXTENSION FOR PyTorch的特征值检测功能，推荐置为0。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_029.html)
 
 ASCEND_LAUNCH_BLOCKING: 0 or 1,置为1时使能。控制算子执行时是否启动同步模式，主要用于定位代码实际出错位置，开启时会导致性能下降，仅在debug时使用。
 
-ACLNN_CACHE_LIMIT: 整形，[1, 10000000], 默认值为10000，用于配置单算子执行API在Host侧缓存的算子信息条目个数。
+ACLNN_CACHE_LIMIT: 整型，[1, 10000000], 默认值为10000，用于配置单算子执行API在Host侧缓存的算子信息条目个数。
 
 PYTORCH_NPU_ALLOC_CONF=“expandable_segments:True”: [详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_012.html)

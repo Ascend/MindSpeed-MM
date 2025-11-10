@@ -4,7 +4,7 @@
 
 视觉语言模型（Vision-Language Model, VLM）通常采用交叉熵损失（Cross-Entropy Loss）作为训练目标。然而，**当前主流模型仓库（如 Hugging Face Transformers）的实现中存在一个问题：当全局批次大小（global batch size）固定时，通过调整微批次大小（micro_batch_size）和梯度累积步数（grad_acc_steps）的不同组合（例如 `micro_batch_size=32, grad_acc_steps=2` vs `micro_batch_size=16, grad_acc_steps=4`），在相同超参数和训练数据下，模型收敛过程中的损失曲线和最终数值会出现较大差异**。相关讨论可参考：[gradient](https://unsloth.ai/blog/gradient)
 
-> 注：Transformers 已在部分模型中修复该问题，但在 Qwen2.5-VL、Qwen3-VL 等模型中因为相关代码传参错误，或显示地不计算num_token_in_batch，导致问题依然存在。
+> 注：Transformers 已在部分模型中修复该问题，但在 Qwen2.5-VL、Qwen3-VL 等模型中因为相关代码传参错误，或显式地不计算num_token_in_batch，导致问题依然存在。
 
 ## 解决方案
 

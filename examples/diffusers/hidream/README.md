@@ -151,7 +151,7 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
 
     ```shell
     model_name="HiDream-ai/HiDream-I1-Dev" # 预训练模型路径
-    pretrained4_path="meta-llama/Meta-Llama-3.1-8B-Instruct" # Forth pretrained path
+    pretrained4_path="meta-llama/Meta-Llama-3.1-8B-Instruct" # Fourth pretrained path
     ```
 
     获取对应的微调模型后，在以下shell启动微调脚本中将`model_name`参数设置为本地预训练模型绝对路径

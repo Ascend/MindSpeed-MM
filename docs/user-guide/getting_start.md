@@ -394,7 +394,7 @@ python examples/wan2.1/convert_ckpt.py --source_path <path for your saved weight
 | mindspeed_mm/tools/tools.json                 |    save_path          | 提取后的特征保存路径                               |
 
 #### 4.4 启动特征提取
-* 修改`examples/wan2.1/feature_extract/data.txt`文件，其中每一行表示个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔。
+* 修改`examples/wan2.1/feature_extract/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔。
 
 * 修改`examples/wan2.1/feature_extract/model.json`修改为下载的权重所对应路径（包括vae, tokenizer, text_encoder）
 

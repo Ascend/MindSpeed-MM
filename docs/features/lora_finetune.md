@@ -21,8 +21,8 @@ $
 
 MindSpeed-MM LoRA微调使能方法：
 
-在模型shell脚本中增加 LORA 微调参数。
-例如，可在`Qwen2-VL`的微调任务脚本中增加`--lora-target-modules`参数，使能 LoRA 。
+在模型shell脚本中增加 LoRA 微调参数。
+例如，可在`Qwen2-VL`的微调任务脚本中增加`--lora-target-modules`参数，使能 LoRA。
 ```
 --lora-target-modules linear_qkv linear_proj linear_fc1 linear_fc2
 ```

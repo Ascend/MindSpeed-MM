@@ -28,7 +28,7 @@
 
   ```shell
   url=https://github.com/huggingface/diffusers
-  commit_id= a98a839de75f1ad82d8d200c3bc2e4ff89929081
+  commit_id=a98a839de75f1ad82d8d200c3bc2e4ff89929081
   ```
 
 ## 微调
@@ -223,7 +223,7 @@
         vim ../advanced_diffusion_training/train_dreambooth_lora_flux_advanced.py #（2322行附近）
         ```
 
-        - 在文件上方的import栏增加`DistributedType`在`from accelerate import Acceleratore`后 （30行附近）
+        - 在文件上方的import栏增加`DistributedType`在`from accelerate import Accelerator`后 （30行附近）
         - 在`if accelerator.is_main_process`后增加 `or accelerator.distributed_type == DistributedType.DEEPSPEED` (1669/2322行附近)，并在`if args.checkpoints_total_limit is not None`后增加`and accelerator.is_main_process`
 
         ```python

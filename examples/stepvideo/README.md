@@ -170,7 +170,7 @@ StepVideo-Converted
 ├── release
 │   └──mp_rank_00
 │      └──model_optim_rng.pt
-└──latest_ckeckpointed_iterations.txt
+└──latest_checkpointed_iterations.txt
 ```
 TP=2,PP=1, TP>2的情况依此类推：
 ```
@@ -180,7 +180,7 @@ StepVideo-Converted
 │   │    └──model_optim_rng.pt
 │   └──mp_rank_01
 │      └──model_optim_rng.pt
-└──latest_ckeckpointed_iterations.txt
+└──latest_checkpointed_iterations.txt
 ```
 
 ---
@@ -285,7 +285,7 @@ stepvideo训练阶段的启动文件为shell脚本，主要分为如下2个：
 
 当调整模型参数或者视频序列长度时，需要根据实际情况启用以下并行策略，并通过调试确定最优并行策略。
 
-+ CP: 序列并行，当前支持Ulysess序列并行。
++ CP: 序列并行，当前支持Ulysses序列并行。
 
   - 使用场景：在视频序列（分辨率X帧数）较大时，可以开启来降低内存占用。
   

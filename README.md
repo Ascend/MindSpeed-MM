@@ -977,7 +977,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 * 【模型特性】 OpensoraPlan1.3: CP (Ring Attention)
 * 【模型特性】 Qwen2VL: VPP, CP (Ulysses & Ring Attention)
 * 【模型特性】 InternVL2: TP, CP (Ulysses & Ring Attention)
-* 【基础特性】 Distrain
+* 【基础特性】 Dist-train
 
 <a id="jump2"></a>
 

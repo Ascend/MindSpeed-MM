@@ -6,7 +6,7 @@ SP（Sequence Parallel）并行算法是一种针对长序列数据处理的并�
 
 ## 解决方案
 
-Sequence Parallel主要作用与TransformerLayer中的Dropout和LayerNorm模块，在序列维度对数据进行非均匀切分。
+Sequence Parallel主要作用于TransformerLayer中的Dropout和LayerNorm模块，在序列维度对数据进行非均匀切分。
 ![alt text](../../sources/images/sp.png)
 
 

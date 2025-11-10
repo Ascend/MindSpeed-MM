@@ -79,14 +79,14 @@ cd ..
 #### 3. 启动脚本
 
 ```bash
-  cd /examples/JanusPro/
+  cd ./examples/JanusPro/
   bash multimodal_understanding.sh
 ```
 
 即可得到推理结果。
 
 推理结果示例：
-以examples/qwen2vl/demo.jpg为输入图片，question为“Describle this image”，得到的推理结果为：
+以examples/qwen2vl/demo.jpg为输入图片，question为“Describe this image”，得到的推理结果为：
 
 ```shell
   The image shows a person sitting on a sandy beach, interacting with a dog. 

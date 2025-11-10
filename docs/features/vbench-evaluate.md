@@ -70,7 +70,6 @@ t2v/long场景需要准备prompts、json文件。
     │   ├── appearance_style.txt
     │   └── ...
     ├── all_dimension.txt
-    ├── all_dimension.txt
     ├── all_dimension_cn.txt
     └── ...
     ```

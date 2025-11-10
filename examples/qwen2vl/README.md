@@ -540,7 +540,7 @@ https://github.com/hiyouga/LLaMA-Factory/blob/main/data/mllm_demo_data/1.mp4
 
   根据实际情况修改`data.json`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段。
 
-  例如：将下载好的权重放在`./ckpt/hf_path/Qwen2-VL-72B-Instruct `, 处理好的数据集放在` ./data/rlhf-v.json ` 。
+  例如：将下载好的权重放在`./ckpt/hf_path/Qwen2-VL-72B-Instruct`, 处理好的数据集放在`./data/rlhf-v.json` 。
 
   则data_72b_dpo.json里的参数设置如下：
 
@@ -566,7 +566,7 @@ https://github.com/hiyouga/LLaMA-Factory/blob/main/data/mllm_demo_data/1.mp4
 
   参数含义同微调章节。
 
-  以单机8卡为例，需要将model_72b.json里面的`vision_encoder`和`text_decoder`的`pipeline_num_layer`参数调整为：
+  以单机8卡为例，需要将model_72b.json里面的`vision_encoder`和`text_decoder`的`pipeline_num_layers`参数调整为：
 
   ```json
   {

@@ -102,7 +102,7 @@
     ```shell
     relighting
     ├── .gitattributes
-    ├── README.MD
+    ├── README.md
     └── data
           └── train-00000-of-00001.parquet
     ```

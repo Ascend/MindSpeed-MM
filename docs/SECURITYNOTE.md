@@ -81,7 +81,7 @@
 
 ## 公开接口声明
 
-MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。16个入口脚本分别为:
+MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。22个入口脚本分别为:
 
 - [evaluate_gen](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/evaluate_gen.py)
 - [evaluate_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/evaluate_vlm.py)

@@ -167,7 +167,7 @@ export LD_PRELOAD="$LD_PRELOAD:/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"
 yum install jemalloc
 ```
 如果上述方法无法正常安装，可以通过源码编译安装
-前往jamalloc官网下载最新稳定版本，官网地址:https://github.com/jemalloc/jemalloc/releases/
+前往jemalloc官网下载最新稳定版本，官网地址:https://github.com/jemalloc/jemalloc/releases/
 ```shell
 tar -xvf jemalloc-{version}.tar.bz2
 cd jemalloc-{version}
@@ -295,11 +295,10 @@ bash examples/rl/scripts/grpo_trainer_qwen25vl_3b.sh
 | `actor/pg_clipfrac`                     | GRPO中裁剪机制生效的比例，反映了策略更新幅度的稳定性         |
 | `actor/ppo_kl`                          | PPO算法的实际 KL 散度                                        |
 | `grad_norm`                             | 梯度范数，表示当前反向传播中参数梯度的整体幅度               |
-| `grpo/rewards/mean`                     | 规则奖励打分的平均总奖励值                                   |
 | `grpo/lr`                               | 学习率，优化器当前使用的学习率                               |
 | `grpo/score/mean`                       | 开启奖励模型时的reward均值                                   |
 | `grpo/score/max`                        | 奖励模型及规则奖励对同一个样本的reward最大值                 |
-| `grpo/score/min `                       | 奖励模型及规则奖励对同一个样本的reward最小值                 |
+| `grpo/score/min`                       | 奖励模型及规则奖励对同一个样本的reward最小值                 |
 | `grpo/rewards/mean`                     | 规则奖励的reward均值；奖励模型对样本的reward经过归一化后的均值 |
 | `grpo/rewards/max`                      | 规则奖励的reward最大值；奖励模型对样本的reward经过归一化后的最大值 |
 | `grpo/rewards/min`                      | 规则奖励的reward最小值；奖励模型对样本的reward经过归一化后的最小值 |
@@ -308,7 +307,7 @@ bash examples/rl/scripts/grpo_trainer_qwen25vl_3b.sh
 | `response_length/max`                   | 最长生成长度，当前 batch 中生成最长的 response 长度          |
 | `prompt_length/mean`                    | 平均输入长度，输入 prompt 的平均长度                         |
 | `prompt_length/max`                     | 最长输入长度，当前 batch 中最长的 prompt长度                 |
-| `prompt_length/min`                     | 最短输入长度，当前 batch 中最长的 prompt长度                 |
+| `prompt_length/min`                     | 最短输入长度，当前 batch 中最短的 prompt长度                 |
 | `e2e_tps`                               | 端到端的tokens/p/s指标                                       |
 | `update_tps`                            | 训练的tokens/p/s指标                                         |
 | `vllm_tps`                              | 推理的tokens/p/s指标                                         |

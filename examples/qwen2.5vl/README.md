@@ -349,7 +349,7 @@ dataset_param->basic_parameters->dataset
 
 将`data_72b.json`中的`"video_max_pixels": 16384`改为`"video_max_pixels": 262144`、`"video_fps": 2.0`改为`"video_fps": 60.0`、`"video_maxlen": 64`改为`"video_maxlen": 768`、`"images": "images"`改为`"images": null`、`"videos": null`改为`"videos": "videos"`；
 
-将`model_72b.json`中的`"pipeline_num_layers": [32, 0, 0, 0, 0, 0, 0, 0]`改为`"pipeline_num_layers": [32, 0, 0, 0]`、`"pipeline_num_layers": [6, 11, 11, 11, 11, 11, 11, 8]`改为`"pipeline_num_layers": [6, 25, 25, 24]`、`"max_position_embeddings": 128000`改为`max_position_embeddings": 131072`并在下方加入`"recompute_granularity": "full",`、`"recompute_method": "uniform",`、`"recompute_num_layers": 1,`。
+将`model_72b.json`中的`"pipeline_num_layers": [32, 0, 0, 0, 0, 0, 0, 0]`改为`"pipeline_num_layers": [32, 0, 0, 0]`、`"pipeline_num_layers": [6, 11, 11, 11, 11, 11, 11, 8]`改为`"pipeline_num_layers": [6, 25, 25, 24]`、`"max_position_embeddings": 128000`改为`"max_position_embeddings": 131072`并在下方加入`"recompute_granularity": "full",`、`"recompute_method": "uniform",`、`"recompute_num_layers": 1,`。
 
 | **训练数据配置** | **模型规模** | **集群规模** | **模型及切分配置** | **性能数据** |
 | --------------- | ----------- | ----------- | ----------- | ------------ |

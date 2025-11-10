@@ -371,7 +371,7 @@ bash examples/llava1.5/inference_llava1_5.sh
 - `dataset_path`为上述评测数据集的本地路径
 - `evaluation_dataset`为评测数据集的名称可选的名称有(`ai2d_test`、`mmmu_dev_val`、`docvqa_val`、`chartqa_test`)， **注意**：需要与上面的数据集路径相对应。
 - `result_output_path`为评测结果的输出路径，**注意**：每次评测前需要将之前保存在该路径下评测文件删除。
-- `image_processer_path`下载链接为[clip-vit-large-patch14-336](https://huggingface.co/openai/clip-vit-large-patch14-336)，自行下载传入
+- `image_processor_path`下载链接为[clip-vit-large-patch14-336](https://huggingface.co/openai/clip-vit-large-patch14-336)，自行下载传入
 
 ```json
   "text_decoder": {
@@ -391,7 +391,7 @@ bash examples/llava1.5/inference_llava1_5.sh
   "evaluation_dataset": "ai2d_test",
   "evaluation_model": "llava_v1.5_7b",
   "result_output_path": "./evaluation_outputs/",
-  "image_processer_path": "./llava_weights_mm/clip-vit-large-patch14-336"
+  "image_processor_path": "./llava_weights_mm/clip-vit-large-patch14-336"
 
 ```
 

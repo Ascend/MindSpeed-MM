@@ -225,7 +225,7 @@ class NpuFusedRMSNorm(torch.nn.Module):
    配置为相同端口号；从IP为MASTER_ADDR的节点开始，将各节点的`NODE_RANK`配置为从0开始依次递增的整数；
 3. 数据集配置信息路径为`MM_DATA`，默认路径为./examples/dancegrpo/data_dancegrpo.json；
 4. 模型配置信息路径为`MM_MODEL`，默认路径为./examples/dancegrpo/model_dancegrpo.json；
-5. DiT模型预训练权重加载路径为`LOAD_PATH`，默认路径为data/flux，用户也可以根据自身权重存放位置进行调整；
+5. DiT模型预训练权重加载路径为`LOAD_PATH`，默认路径为ckpt/flux，用户也可以根据自身权重存放位置进行调整；
 6. 训练权重的保存路径为`SAVE_PATH`，默认为save_dir；
 7. 模型训练过程的reward值保存文件的路径为`HPS_REWARD_SAVE_PATH`，默认为./hps_reward.txt。
 

@@ -51,7 +51,7 @@ commit_id=2766232ceaafeb680ca32fe0a7e9735c04b561d4
 
 ### 变更记录
 
-2025.06.07：T2V任务同步FastVideo原仓关键参数修改，将`embeded_guidance_scale`参数默认值设置为1
+2025.06.07：T2V任务同步FastVideo原仓关键参数修改，将`embedded_guidance_scale`参数默认值设置为1
 
 2025.04.27：首次发布HunyuanVideo I2V任务及I2V LoRA微调任务
 
@@ -326,7 +326,7 @@ bash examples/hunyuanvideo/feature_extract/feature_extraction.sh
   - 训练权重后处理：使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
     ```bash
     source /usr/local/Ascend/ascend-toolkit/set_env.sh
-    mm-converter HunyuanVideoConverter --version t2v --layerzero_to_mm \
+    mm-converte HunyuanVideoConverter --version t2v --layerzero_to_mm \
     	--cfg.source_path <./save_ckpt/hunyuanvideo/>
     	--cfg.target_path <./save_ckpt/hunyuanvideo_megatron_ckpt/>
     ```
