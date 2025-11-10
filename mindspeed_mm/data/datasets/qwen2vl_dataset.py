@@ -8,6 +8,7 @@ from torch.utils.data import IterableDataset
 from transformers.training_args import TrainingArguments
 
 from megatron.training import get_args
+from megatron.training.utils import is_rank0
 from mindspeed_mm.data.data_utils.func_utils.convert import (
     DataArguments,
     DataArgumentsForRewardVideo,
@@ -97,8 +98,9 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
             dataset_processor_cls = PairwiseDatasetProcessor
         else:
             dataset_processor_cls = SupervisedDatasetProcessor
-        preprocess_func = dataset_processor_cls(template=template, tokenizer=tokenizer, processor=processor,
-                                                data_args=data_args).preprocess_dataset
+        dataset_processor = dataset_processor_cls(template=template, tokenizer=tokenizer, processor=processor,
+                                                data_args=data_args)
+        preprocess_func = dataset_processor.preprocess_dataset
         if data_args.streaming:
             train_dataset = train_dataset.map(
                 preprocess_func,
@@ -137,6 +139,9 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                     **kwargs,
                 )
                 return train_dataset, val_dataset
+        if is_rank0():
+            print("training example:")
+            dataset_processor.print_data_example(next(iter(train_dataset)))
         return train_dataset
 
 
