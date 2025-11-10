@@ -998,7 +998,7 @@ MindSpeed MM集成了昇腾profiling采集工具，以提供对模型运行情�
 针对大模型集群场景的性能调优，这里推荐一款优秀的可视化调优工具MindStudio Insight。
 MindStudio Insight提供了包括Timeline视图、通信分析、计算耗时等的可视化呈现，以便用户分析潜在的性能瓶颈，并指导如何采取措施消除或减少这些瓶颈。
 
-  具体使用方法见[《MindStudio Insight操作指南》](https://www.hiAscend.com/document/detail/zh/mindstudio/80RC1/GUI_baseddevelopmenttool/msAscendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/Ascend-computing/mindstudio-pid-251913966/software/264465341?idAbsPath=fixnode01|23710424|251366513|254884019|261408772|251913966)
+  具体使用方法见[《MindStudio Insight操作指南》](https://www.hiAscend.com/document/detail/zh/mindstudio/82RC1/GUI_baseddevelopmenttool/msAscendinsightug/Insight_userguide_0002.html)，下载地址[《MindStudio Insight》](https://support.huawei.com/enterprise/zh/Ascend-computing/mindstudio-pid-251913966/software/264465341?idAbsPath=fixnode01|23710424|251366513|254884019|261408772|251913966)
 
 ## Sora类模型特征提取
 
