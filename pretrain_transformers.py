@@ -8,6 +8,7 @@ from datasets import Dataset
 import torch
 
 import mindspeed.megatron_adaptor
+from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.core import mpu
 from megatron.core.enums import ModelType
 from megatron.training import get_args, print_rank_0
@@ -18,6 +19,9 @@ from mindspeed_mm.data.data_utils.utils import build_iterations
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.models.transformers_model import TransformersModel
 from mindspeed_mm.utils.utils import compute_token_level_loss
+mindspeed_args = get_mindspeed_args()
+if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
+    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def model_provider(*args, **kwargs):

@@ -53,4 +53,16 @@ def apply_mindspore_patch():
     aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseMMDiTBlock.forward',
                         sparsemmditblock_forward)
 
+    # qwen25 omni hang issue
+    from mindspeed_mm.mindspore.data.data_utils.func_utils.mm_plugin import process_messages
+    aspm.register_patch('mindspeed_mm.data.data_utils.func_utils.mm_plugin.Qwen2OmniPlugin.process_messages', process_messages)
+    from mindspeed_mm.mindspore.third_party.accelerate.state import PartialState_prepare_backend_wrapper, PartialState_set_device 
+    # Assign a value to os.environ["LOCAL_RANK"] to obtain the rank ID.
+    aspm.register_patch('accelerate.state.PartialState._prepare_backend', PartialState_prepare_backend_wrapper)
+    # Avoid the "set_device" error.
+    aspm.register_patch('accelerate.state.PartialState.set_device', PartialState_set_device)
+    # torch.stft not support, use _np_extract_fbank_features
+    from mindspeed_mm.mindspore.third_party.transformers.models.whisper.feature_extraction_whisper import _torch_extract_fbank_features_wrapper
+    aspm.register_patch('transformers.models.whisper.feature_extraction_whisper.WhisperFeatureExtractor._torch_extract_fbank_features', _torch_extract_fbank_features_wrapper)
+
 apply_mindspore_patch()
