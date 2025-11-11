@@ -3,6 +3,7 @@
 from typing import Optional, Union
 
 import torch
+import torch_npu
 import torch.nn as nn
 
 from transformers.activations import ACT2FN
@@ -13,7 +14,11 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs, auto_docstring
 from transformers.utils.generic import OutputRecorder, check_model_inputs
-from transformers.models.qwen3_vl_moe.configuration_qwen3_vl_moe import Qwen3VLMoeConfig, Qwen3VLMoeTextConfig, Qwen3VLMoeVisionConfig
+from transformers.models.qwen3_vl_moe.configuration_qwen3_vl_moe import Qwen3VLMoeConfig, Qwen3VLMoeTextConfig
+
+from megatron.training import get_args
+from mindspeed_mm.models.common.gmm import npu_group_gemm
+
 
 from .output import Qwen3VLMoeCausalLMOutputWithPast
 
@@ -32,6 +37,27 @@ from .modeling_qwen3_vl import (
 )
 
 
+def npu_fused_moe(
+    hidden_states: torch.Tensor, 
+    routing_weights: torch.Tensor, 
+    router_indices: torch.Tensor,
+    gate_up_proj: torch.Tensor,
+    down_proj: torch.Tensor,
+    hidden_size: int,
+    num_experts: int
+):
+    batch_size = hidden_states.shape[0]
+    hidden_states = hidden_states.reshape(-1, hidden_size)  # (num_tokens, hidden_size)
+    permuted_hidden_states, row_ids_map = torch_npu.npu_moe_token_permute(hidden_states, router_indices.to(torch.int32))
+    tokens_per_expert = torch.histc(router_indices, bins=num_experts, min=0, max=num_experts)
+    intermediate_hidden_states = npu_group_gemm(permuted_hidden_states, gate_up_proj, tokens_per_expert)
+    intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
+    output = npu_group_gemm(intermediate_activations, down_proj, tokens_per_expert)
+    next_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=routing_weights)
+    next_states = next_states.view(batch_size, -1, hidden_size)
+    return next_states
+
+
 class Qwen3VLMoeTextExperts(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -44,7 +70,7 @@ class Qwen3VLMoeTextExperts(nn.Module):
         self.act_fn = ACT2FN[config.hidden_act]
 
     def forward(
-        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor
+        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor, use_npu_fused_moe: bool = True
     ) -> torch.Tensor:
         """
         When training it is more efficient to just loop over the experts and compute the output for each expert
@@ -59,6 +85,17 @@ class Qwen3VLMoeTextExperts(nn.Module):
         Returns:
             torch.Tensor
         """
+        if use_npu_fused_moe:
+            return npu_fused_moe(
+                hidden_states=hidden_states,
+                routing_weights=routing_weights,
+                router_indices=router_indices,
+                gate_up_proj=self.gate_up_proj,
+                down_proj=self.down_proj,
+                hidden_size=self.hidden_size,
+                num_experts=self.num_experts
+            )
+            
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
         if self.training:
@@ -102,6 +139,8 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         self.top_k = config.num_experts_per_tok
         self.gate = nn.Linear(config.hidden_size, config.num_experts, bias=False)
         self.experts = Qwen3VLMoeTextExperts(config)
+        
+        self.use_npu_fued_moe = getattr(get_args().mm.model.text_decoder, "use_npu_fused_moe", True)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         batch_size = hidden_states.shape[0]
@@ -111,9 +150,13 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         routing_weights, router_indices = torch.topk(routing_weights, self.top_k, dim=-1)
         routing_weights = routing_weights / routing_weights.sum(dim=-1, keepdim=True)
         routing_weights = routing_weights.to(hidden_states.dtype)
-        router_weights = torch.zeros_like(router_logits).scatter_(1, router_indices, routing_weights)
         hidden_states = hidden_states.reshape(batch_size, -1, self.hidden_size)
-        routed_out = self.experts(hidden_states, router_weights, router_indices)
+        
+        if self.use_npu_fued_moe:
+            routed_out = self.experts(hidden_states, routing_weights, router_indices)
+        else:
+            router_weights = torch.zeros_like(router_logits).scatter_(1, router_indices, routing_weights)
+            routed_out = self.experts(hidden_states, router_weights, router_indices, use_npu_fused_moe=False)
         return routed_out
 
 

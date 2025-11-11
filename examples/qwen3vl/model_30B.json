@@ -21,7 +21,8 @@
         "hidden_size": 999999,
         "num_attention_heads": 999999,
         "max_position_embeddings": 999999,
-        "freeze": false
+        "freeze": false,
+        "use_npu_fused_moe": false
     },
     "patch": {
         "clip_grad_async": true,
