@@ -271,8 +271,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 预训练 </td>
       <td> 1x8</td>
       <td> BF16 </td>
-      <td> 5.16 (SPS)(A3) </td>
-      <td> 3.81 (SPS) </td>
+      <td> 3.18 (SPS)(A3) </td>
+      <td> 2.93 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>
@@ -292,8 +292,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 预训练 </td>
       <td> 1x8</td>
       <td> BF16 </td>
-      <td> 5.16 (SPS)(A3) </td>
-      <td> 3.81 (SPS) </td>
+      <td> 3.18 (SPS)(A3) </td>
+      <td> 2.93 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>

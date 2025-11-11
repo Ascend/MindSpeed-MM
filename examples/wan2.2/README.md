@@ -136,8 +136,8 @@ pip install decord==0.6.0
 
 ```shell
 mm-convert WanConverter hf_to_mm \
- --cfg.source_path <./weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer/> \
- --cfg.target_path <./weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer/>
+ --cfg.source_path ./weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer* \
+ --cfg.target_path ./weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer*
 ```
 
 权重转换脚本的参数说明如下：
@@ -153,9 +153,9 @@ mm-convert WanConverter hf_to_mm \
 
 ```shell
 mm-convert WanConverter mm_to_hf \
- --cfg.source_path <path for your saved weight/> \
- --cfg.target_path <./converted_weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer/>
- --cfg.hf_path <weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer/>
+ --cfg.source_path path_for_your_saved_weight \
+ --cfg.target_path ./converted_weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer* \
+ --cfg.hf_path weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer*
 ```
 
 权重转换脚本的参数说明如下：
