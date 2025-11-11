@@ -260,7 +260,7 @@ bash examples/vace/feature_extract/feature_extraction.sh
     # 训练结束后保存的权重路径
     save_path="./vace_weight_save"
     iter_dir="$save_path/iter_$(printf "%07d" $(cat $save_path/latest_checkpointed_iteration.txt))"
-    # 权重换转的目标路径
+    # 权重转换的目标路径
     convert_dir="./dcp_to_torch"
     mkdir -p $convert_dir/release/mp_rank_00
     cp $save_path/latest_checkpointed_iteration.txt $convert_dir/

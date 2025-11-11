@@ -154,7 +154,7 @@ mm-convert OpenSoraPlanConverter --version v1.5 source_to_mm \
 ]
 ```
 
-修改 `examples/opensoraplan1.5/data.txt`文件，其中每一行表示个数据集，第一个参数表示数据文件夹的路径，第二个参数表示 `data.json`文件的路径，用 `,`分隔
+修改 `examples/opensoraplan1.5/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示 `data.json`文件的路径，用 `,`分隔
 
 ### 训练
 

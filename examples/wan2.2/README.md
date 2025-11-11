@@ -210,7 +210,7 @@ mm-convert WanConverter mm_to_hf \
 ]
 ```
 
-修改`examples/wan2.2/data.txt`文件，其中每一行表示个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
+修改`examples/wan2.2/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
 
 ### 训练
 
@@ -260,7 +260,7 @@ mm-convert WanConverter mm_to_hf \
     # 训练结束后保存的权重路径
     save_path="./wandit_weight_save"
     iter_dir="$save_path/iter_$(printf "%07d" $(cat $save_path/latest_checkpointed_iteration.txt))"
-    # 权重换转的目标路径
+    # 权重转换的目标路径
     convert_dir="./dcp_to_torch"
     mkdir -p $convert_dir/release/mp_rank_00
     cp $save_path/latest_checkpointed_iteration.txt $convert_dir/
