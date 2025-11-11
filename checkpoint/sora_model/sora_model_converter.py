@@ -4,7 +4,6 @@ import os
 import copy
 
 import torch
-import mindspeed.megatron_adaptor # noqa
 
 from checkpoint.common.converter import Converter
 from checkpoint.sora_model.convert_utils.cfg import ConvertConfig, ParallelConfig
@@ -81,6 +80,7 @@ class SoraModelConverter(Converter):
 
     @check_method_support
     def mm_to_hf(self, cfg: ConvertConfig):
+        import mindspeed.megatron_adaptor  # noqa
         state_dicts = load_from_mm(cfg.source_path)
         state_dict = self._mm_merge(state_dicts)
         state_dict = self._replace_state_dict(
