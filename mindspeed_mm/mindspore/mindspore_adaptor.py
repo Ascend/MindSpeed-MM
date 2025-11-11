@@ -1,3 +1,4 @@
+from functools import wraps
 from packaging import version
 
 import mindspore
@@ -11,6 +12,24 @@ from mindspeed_mm.mindspore.models.vision.vision_encoders.qwen2vl_vit_model impo
 from mindspeed_mm.mindspore.models.common.communications import _gather
 from mindspeed_mm.mindspore.utils.transformer_model_config import get_model_config
 from mindspeed_mm.mindspore.models.predictor.dits.sparseu_mmdit import block_forward, sparsemmditblock_forward
+
+
+def ms_linear_wrapper(fn):
+    @wraps(fn)
+    def linear_wrapper(inp, weight, bias=None):
+        if {inp.dtype, weight.dtype} == {mindspore.float32, mindspore.bfloat16}:
+            return fn(inp.to(mindspore.float32), weight.to(mindspore.float32), bias.to(mindspore.float32)).to(weight.dtype)
+        return fn(inp, weight, bias)
+    return linear_wrapper
+
+
+def ms_matmul_wrapper(fn):
+    @wraps(fn)
+    def matmul_wrapper(inp, other, *args, **kwargs):
+        if {inp.dtype, other.dtype} == {mindspore.float32, mindspore.bfloat16}:
+            return fn(inp.to(mindspore.float32), other.to(mindspore.float32), *args, **kwargs).to(mindspore.bfloat16)
+        return fn(inp, other, *args, **kwargs)
+    return matmul_wrapper
 
 
 def masked_scatter_(self, mask, updates):
@@ -47,11 +66,15 @@ def apply_mindspore_patch():
         from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
         ALL_MASK_ATTENTION_FUNCTIONS._global_mapping['sdpa'] = sdpa_mask_older_torch
 
-    aspm.apply_patches()
     #patch opensoraplan1.5t2v
     aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseUMMDiT.block_forward', block_forward)
     aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseMMDiTBlock.forward',
                         sparsemmditblock_forward)
+    #patch matmul&&linear input requir same stype
+    aspm.register_patch('mindspore.mint.nn.functional.linear', ms_linear_wrapper)
+    aspm.register_patch('mindspore.mint.matmul', ms_matmul_wrapper)
+
+    aspm.apply_patches()
 
     # qwen25 omni hang issue
     from mindspeed_mm.mindspore.data.data_utils.func_utils.mm_plugin import process_messages
