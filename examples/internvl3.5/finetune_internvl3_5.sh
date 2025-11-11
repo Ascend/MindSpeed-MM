@@ -19,18 +19,23 @@ export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 # export GLOO_SOCKET_IFNAME=
 # export ASCEND_RT_VISIBLE_DEVICES=
 
-NPUS_PER_NODE=8
+NPUS_PER_NODE=16
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
+HF_PATH="ckpt/hf_path/InternVL3_5-30B-A3B-Instruct"
+if [ ! -L "./internvl" ]; then
+    ln -s $HF_PATH ./internvl
+    echo "Create a soft link: internvl -> $HF_PATH"
+fi
 
 MM_DATA="./examples/internvl3.5/data.json"
 MM_MODEL="./examples/internvl3.5/model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-LOAD_PATH="ckpt/hf_path/InternVL3_5-30B-A3B-Instruct"
+LOAD_PATH="ckpt/convert_path/InternVL3_5-30B-A3B-Instruct"
 SAVE_PATH="save_dir"
 FSDP2_PATH="./examples/internvl3.5/fsdp2_config.yaml"
 
@@ -52,7 +57,7 @@ DISTRIBUTED_ARGS="
     --master_port $MASTER_PORT
 "
 
-# GPT_ARGS中模型相关参数具体配置在example/qwen2vl/model_xb.json中，训练相关参数配置在这里
+# GPT_ARGS中模型相关参数具体配置在examples/internvl3.5/model.json中，训练相关参数配置在这里
 GPT_ARGS="
     --use-mcore-models \
     --tensor-model-parallel-size ${TP} \
@@ -94,7 +99,8 @@ GPT_ARGS="
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
     --calculate-per-sample-loss \
-    --log-tps
+    --log-tps \
+    --init-model-with-meta-device
 "
 
 MM_ARGS="
@@ -103,11 +109,15 @@ MM_ARGS="
     --mm-tool $MM_TOOL
 "
 
+# To ensure code security, configure trust_remote_code to default to False.
+# Users need to add the following parameter and ensure the security of the models and data they download.
+# --trust-remote-code \
 OUTPUT_ARGS="
     --log-interval 1 \
     --save-interval 10000 \
     --eval-interval 10000 \
     --eval-iters 5000 \
+    --save $SAVE_PATH \
     --ckpt-format torch_dcp \
 "
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)

@@ -19,8 +19,9 @@ class TransformersModel(MultiModalModule):
         args = get_args()
 
         hf_path = args.mm.model.init_from_hf_path
+        trust_remote_code = args.trust_remote_code
         self.config = core_transformer_config_from_args(args)
-        self.transformer_config = AutoConfig.from_pretrained(hf_path)
+        self.transformer_config = AutoConfig.from_pretrained(hf_path, trust_remote_code=trust_remote_code)
 
         model_cls = ModelZoo.build(config, self.transformer_config)
 
@@ -35,7 +36,8 @@ class TransformersModel(MultiModalModule):
                 config=self.transformer_config,
                 dtype=torch.float32,
                 low_cpu_mem_usage=True,
-                device_map="cpu"
+                device_map="cpu",
+                trust_remote_code=trust_remote_code
             )
         print_rank_0("> load model successfully")
 

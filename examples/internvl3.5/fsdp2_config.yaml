@@ -1,9 +1,12 @@
-sharding_size: null
+sharding_size: auto
 sub_modules_to_wrap:
-  - transformers.models.qwen3_moe.modeling_qwen3_moe.Qwen3MoeDecoderLayer
-  - transformers_modules.InternVL3_5-30B-A3B-Instruct.modeling_intern_vit.InternVisionEncoderLayer
+  - "vision_model.embeddings"
+  - "vision_model.encoder.layers.{*}"
+  - "language_model.model.layers.{*}"
 recompute_modules:
-
+  - "vision_model.embeddings"
+  - "vision_model.encoder.layers.{*}"
+  - "language_model.model.layers.{*}"
 reshard_after_forward: True
 param_dtype: "bf16"
 reduce_dtype: "fp32"

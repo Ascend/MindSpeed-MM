@@ -1,11 +1,10 @@
 import importlib
 
-from transformers import AutoModel
-
 from mindspeed_mm.models.hf_src.qwen3vl.qwen3vl import (
     Qwen3VLForConditionalGeneration,
     Qwen3VLMoeForConditionalGeneration
 )
+from mindspeed_mm.models.hf_src.internvl3_5 import InternVLChatModelGeneration
 
 
 class ModelZoo:
@@ -13,7 +12,7 @@ class ModelZoo:
     MODEL_MAPPINGS = {
         "qwen3_vl": Qwen3VLForConditionalGeneration,
         "qwen3_vl_moe": Qwen3VLMoeForConditionalGeneration,
-        'internvl': AutoModel,
+        'internvl': InternVLChatModelGeneration,
     }
 
     @staticmethod

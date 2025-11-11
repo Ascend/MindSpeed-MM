@@ -11,7 +11,9 @@
 - [环境安装](#jump1)
   - [仓库拉取](#jump1.1)
   - [环境搭建](#jump1.2)
-- [权重下载](#jump2)
+- [权重下载及转换](#jump2)
+  - [权重下载](#jump2.1)
+  - [权重转换](#jump2.2)
 - [数据集准备及处理](#jump3)
   - [数据集下载](#jump3.1)
 - [微调](#jump4)
@@ -63,7 +65,7 @@ mkdir logs dataset ckpt
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
-git checkout 3cd3ebb2f02e0ea991a73e2115bc3d01ee14f5b3
+git checkout 93c45456c7044bacddebc5072316c01006c938f9
 
 # 安装mindspeed及依赖
 pip install -e .
@@ -81,7 +83,11 @@ pip install -e .
 
 <a id="jump2"></a>
 
-## 权重下载
+## 权重下载及转换
+
+<a id="jump2.1"></a>
+
+### 权重下载
 
 从Huggingface等网站下载开源模型权重
 
@@ -89,7 +95,7 @@ pip install -e .
 
 将模型权重保存在`ckpt/hf_path/`目录下，例如`ckpt/hf_path/InternVL3_5-30B-A3B-Instruct`。
 
-### 特别说明
+#### 特别说明
 
 权重下载后，需修改权重路径下的`ckpt/hf_path/modeling_internvl_chat.py`代码文件，96行将None修改为151671，112行为forward函数增加**kwargs参数
 
@@ -103,6 +109,18 @@ pip install -e .
         return_dict: Optional[bool] = None,
         **kwargs
     )
+```
+
+<a id="jump2.2"></a>
+
+### 权重转换
+MindSpeed-MM修改了moe部分原始网络的结构名称，需对原始预训练权重进行转换：
+
+```shell
+# 对修改了网络结构的部分进行权重转换
+mm-convert moe_expert --style merge --hf_dir ckpt/hf_path/InternVL3_5-30B-A3B-Instruct --save_dir ckpt/tmp_path/InternVL3_5-30B-A3B-Instruct
+# 将权重转换为dcp格式
+mm-convert Qwen3VLConverter hf_to_dcp  --hf_dir ckpt/tmp_path/InternVL3_5-30B-A3B-Instruct --dcp_dir ckpt/convert_path/InternVL3_5-30B-A3B-Instruct
 ```
 
 ---
@@ -195,14 +213,30 @@ pip install decord==0.6.0
 }
 ```
 
+【模型路径配置】
+
+根据实际情况修改`model.json`中的权重路径，包括`from_pretrained`、`data_path`、`data_folder`等字段。
+
+以InternVL3_5-30B-A3B-Instruct为例，`model.json`进行以下修改，`init_from_hf_path`的权重路径为原始权重路径。
+
+```json
+{
+    ...
+    "init_from_hf_path": "./ckpt/hf_path/InternVL3_5-30B-A3B-Instruct",
+    ...
+}
+```
+
 【模型保存加载及日志信息配置】
 
 根据实际情况配置`examples/internvl3.5/finetune_internvl3_5.sh`的参数，包括加载、保存路径以及保存间隔`--save-interval`（注意：分布式优化器保存文件较大耗时较长，请谨慎设置保存间隔）, 以InternVL3_5-30B-A3B-Instruct为例：
 
 ```shell
 ...
-# 加载路径
-LOAD_PATH="ckpt/hf_path/InternVL3_5-30B-A3B-Instruct"
+# 加载路径：原始权重路径
+HF_PATH="ckpt/hf_path/InternVL3_5-30B-A3B-Instruct"
+# 加载路径：权重转换后路径
+LOAD_PATH="ckpt/convert_path/InternVL3_5-30B-A3B-Instruct"
 # 保存路径
 SAVE_PATH="save_dir"
 ...

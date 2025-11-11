@@ -1,0 +1,35 @@
+# Copyright 2025 The Qwen team, Alibaba Group and the HuggingFace Inc. team. All rights reserved.
+from transformers.models.qwen3_moe.modeling_qwen3_moe import (
+    Qwen3MoeDecoderLayer, 
+    Qwen3MoeAttention, 
+    Qwen3MoeMLP, 
+    Qwen3MoeRMSNorm
+)
+
+from internvl.modeling_internvl_chat import InternVLChatModel
+
+from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin
+from mindspeed_mm.models.hf_src.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeTextSparseMoeBlock
+
+
+def internvl_moe_decoder_layer_init(self, config, layer_idx: int):
+    super(Qwen3MoeDecoderLayer, self).__init__()
+    self.hidden_size = config.hidden_size
+
+    self.self_attn = Qwen3MoeAttention(config, layer_idx)
+
+    if (layer_idx not in config.mlp_only_layers) and (
+        config.num_experts > 0 and (layer_idx + 1) % config.decoder_sparse_step == 0
+    ):
+        self.mlp = Qwen3VLMoeTextSparseMoeBlock(config)
+    else:
+        self.mlp = Qwen3MoeMLP(config, intermediate_size=config.intermediate_size)
+
+    self.input_layernorm = Qwen3MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+    self.post_attention_layernorm = Qwen3MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+
+
+class InternVLChatModelGeneration(InternVLChatModel, FSDP2Mixin):
+    def __init__(self, config, vision_model=None, language_model=None, use_flash_attn=True):
+        Qwen3MoeDecoderLayer.__init__ = internvl_moe_decoder_layer_init
+        super().__init__(config)
