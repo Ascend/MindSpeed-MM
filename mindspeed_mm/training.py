@@ -526,12 +526,19 @@ def train(
         update_num_microbatches(args.consumed_train_samples, consistency_check=True)
 
         if args.use_data_balance:
+            micro_batch_size = args.micro_batch_size
+            encoder_num_microbatches = num_microbatches
+            if args.hetero_parallel and args.hetero_encoder_mbs_scale > 1:
+                micro_batch_size = args.micro_batch_size * args.hetero_encoder_mbs_scale
+                encoder_num_microbatches = num_microbatches // args.hetero_encoder_mbs_scale
+            is_vit_last_stage = False
+            if model[0].module.module.add_image_encoder:
+                is_vit_last_stage = model[0].module.module.image_encoder.post_process
             train_data_iterator = data_balance_algo.build_balanced_train_data_iterator(
-                model_add_image_encoder=model[0].module.module.add_image_encoder,
-                model_post_process=model[0].module.module.image_encoder.post_process,
-                max_batch_capacity=args.micro_batch_size,
-                micro_batch_size=args.micro_batch_size,
-                num_microbatches=num_microbatches,
+                is_vit_last_stage=is_vit_last_stage,
+                max_batch_capacity=micro_batch_size,
+                micro_batch_size=micro_batch_size,
+                num_microbatches=encoder_num_microbatches,
                 data_type='image',
             )
 

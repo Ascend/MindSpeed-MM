@@ -14,9 +14,10 @@ from megatron.core.tensor_parallel.mappings import gather_from_sequence_parallel
 from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
 
-from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import gather_forward_split_backward, cal_split_sizes, split_forward_gather_backward
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import gather_forward_split_backward, \
+    cal_split_sizes, split_forward_gather_backward
 from mindspeed.core.context_parallel.model_parallel_utils import (
-    get_context_parallel_group_for_hybrid_ulysses, 
+    get_context_parallel_group_for_hybrid_ulysses,
     get_context_parallel_group_for_hybrid_ring,
     get_context_parallel_for_hybrid_ulysses_world_size
 )
@@ -78,9 +79,9 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         self.video_encoder = None
         self.text_decoder = None
 
-        self.share_embeddings_and_output_weights = not getattr(config.text_decoder, 'untie_embeddings_and_output_weights', True)
+        self.share_embeddings_and_output_weights = not getattr(config.text_decoder,
+                                                               'untie_embeddings_and_output_weights', True)
         self.img_context_token_id = config.img_context_token_id
-
 
         # initialize pipeline parallel configs
         self.pp_size = mpu.get_pipeline_model_parallel_world_size()
@@ -131,7 +132,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             print_rank_0(f'initial: image_encoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
             print_rank_0(f'initial: image_encoder cp size is {mpu.get_context_parallel_world_size()}')
             print_rank_0(f'initial: image_encoder dp size is {mpu.get_data_parallel_world_size()}')
-        
+
         vit_layer_spec = get_vit_layer_spec(config.vision_encoder)
         proj_layer_spec = get_projector_layer_spec(config.vision_projector)
 
@@ -196,7 +197,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             post_process=post_process,
         )
 
-
     def _build_audio_encoder_model(self, config):
         if get_args().hetero_parallel:
             change_parallel_state('audio_encoder')
@@ -210,7 +210,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             print_rank_0(f'initial: audio_encoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
             print_rank_0(f'initial: audio_encoder cp size is {mpu.get_context_parallel_world_size()}')
             print_rank_0(f'initial: audio_encoder dp size is {mpu.get_data_parallel_world_size()}')
-        
+
         audio_layer_spec = get_audio_layer_spec(config.audio_encoder)
 
         if self.pp_size <= 1:
@@ -271,7 +271,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             pre_process=pre_process,
             post_process=post_process,
         )
-
 
     def _build_text_decoder_model(self, config):
         if get_args().hetero_parallel:
@@ -348,19 +347,18 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         if self.enable_vp:
             config.num_layers *= self.vp_size
         return MMGPTModel(
-                config=config,
-                transformer_layer_spec=get_llm_layer_spec(config),
-                vocab_size=config.vocab_size,
-                max_sequence_length=config.max_position_embeddings,
-                parallel_output=config.parallel_output,
-                position_embedding_type=config.position_embedding_type,
-                share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
-                rotary_base=config.rope_theta if getattr(config, 'rope_theta', None) else config.rotary_base,
-                pre_process=pre_process,
-                post_process=post_process,
-                reward_process=self.reward_process
-            )
-
+            config=config,
+            transformer_layer_spec=get_llm_layer_spec(config),
+            vocab_size=config.vocab_size,
+            max_sequence_length=config.max_position_embeddings,
+            parallel_output=config.parallel_output,
+            position_embedding_type=config.position_embedding_type,
+            share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
+            rotary_base=config.rope_theta if getattr(config, 'rope_theta', None) else config.rotary_base,
+            pre_process=pre_process,
+            post_process=post_process,
+            reward_process=self.reward_process
+        )
 
     def set_input_tensor(self, input_tensor):
         if not isinstance(input_tensor, list):
@@ -374,7 +372,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                 self.input_tensor = input_tensor[0]
             else:
                 self.text_decoder.set_input_tensor(input_tensor[0])
-
 
     def freeze(
             self,
@@ -402,7 +399,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             for param in self.text_decoder.parameters():
                 param.requires_grad = False
 
-
     def compute_loss_with_tensor_parallel(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         args = get_args()
         # 如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
@@ -427,7 +423,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
 
         return loss
 
-
     def compute_loss_with_context_parallel(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         args = get_args()
         token_nums = None
@@ -449,7 +444,8 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             split_gather_sizes = cal_split_sizes(labels.shape[-1], mpu.get_context_parallel_world_size())
             # Reduce the last device's split size by 1 to handle the shifted labels
             split_gather_sizes[-1] = split_gather_sizes[-1] - 1
-            labels = split_forward_gather_backward(shift_labels, mpu.get_context_parallel_group(), -1, split_gather_sizes, "down")
+            labels = split_forward_gather_backward(shift_labels, mpu.get_context_parallel_group(), -1,
+                                                   split_gather_sizes, "down")
             if mpu.get_context_parallel_rank() == mpu.get_context_parallel_world_size() - 1:
                 logits = logits[..., :-1, :].contiguous()
         elif args.context_parallel_algo == "hybrid_cp_algo":
@@ -459,10 +455,13 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             token_nums = (shift_labels > -1).sum(dim=1)
 
             # split shift_labels
-            split_gather_sizes = cal_split_sizes(shift_labels.shape[-1], get_context_parallel_for_hybrid_ulysses_world_size())
+            split_gather_sizes = cal_split_sizes(shift_labels.shape[-1],
+                                                 get_context_parallel_for_hybrid_ulysses_world_size())
 
-            shift_labels = split_forward_gather_backward(shift_labels, get_context_parallel_group_for_hybrid_ulysses(), 1, split_gather_sizes, "down")
-            labels = split_forward_gather_backward_with_megatron_cp(shift_labels, get_context_parallel_group_for_hybrid_ring(), dim=1)
+            shift_labels = split_forward_gather_backward(shift_labels, get_context_parallel_group_for_hybrid_ulysses(),
+                                                         1, split_gather_sizes, "down")
+            labels = split_forward_gather_backward_with_megatron_cp(shift_labels,
+                                                                    get_context_parallel_group_for_hybrid_ring(), dim=1)
 
         loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), labels)
         loss = loss * (labels > -1)
@@ -601,29 +600,35 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             return {"vit_embeds": vit_embeds}
 
         if self.add_text_decoder:
-            if kwargs.get('vit_embeds') is not None:
-                input_embeds = kwargs.get('vit_embeds')
-            elif get_args().hetero_parallel and mpu.get_pipeline_model_parallel_world_size() > 1:
-                device = torch.device(f'npu:{dist.get_rank()}')
-                pp_group = mpu.get_pipeline_model_parallel_group()
-                src_global_rank = dist.get_global_rank(pp_group, group_rank=0)
-                if dist.get_rank() == src_global_rank:
+            if kwargs.get('vit_embeds') is not None and kwargs.get('audio_features') is not None:
+                if self.text_decoder.pre_process:
+                    vit_embeds = kwargs.get('vit_embeds')
+                    audio_features = kwargs.get('audio_features')
                     input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
-                    ndim = torch.tensor([len(input_embeds.shape)], device=device, dtype=torch.int8)
-                    dist.broadcast(ndim, src=src_global_rank, group=pp_group)
-                    shape_tensor = torch.tensor(input_embeds.shape, device=device, dtype=torch.long)
-                    dist.broadcast(shape_tensor, src=src_global_rank, group=pp_group)
-                    input_embeds = torch.empty(tuple(shape_tensor.tolist()), device=device, dtype=torch.bfloat16)
+                    if vit_embeds is not None:
+                        if self.config.sequence_parallel:
+                            input_embeds = gather_from_sequence_parallel_region(input_embeds)
+                        input_embeds = input_embeds.transpose(0, 1)  # bsh -> sbh
+
+                        image_mask = torch.eq(input_ids, self.img_context_token_id)
+                        vit_embeds = vit_embeds[:, 0, :]
+                        indices_tuple = torch.nonzero(image_mask, as_tuple=True)
+                        input_embeds[indices_tuple] = vit_embeds
+
+                        if 'input_features' in kwargs:
+                            audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds)
+                            audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
+                            input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
+
+                        input_embeds = input_embeds.transpose(0, 1)
                 else:
-                    ndim = torch.empty(1, device=device, dtype=torch.int8)
-                    dist.broadcast(ndim, src=src_global_rank, group=pp_group)
-                    shape_tensor = torch.empty(ndim.item(), device=device, dtype=torch.long)
-                    dist.broadcast(shape_tensor, src=src_global_rank, group=pp_group)
-                    input_embeds = torch.empty(tuple(shape_tensor.tolist()), device=device, dtype=torch.bfloat16)
-                dist.broadcast(input_embeds, src=src_global_rank, group=pp_group)
-                input_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, vit_embeds, **kwargs)
+                    input_embeds = None
+            elif get_args().hetero_parallel and mpu.get_pipeline_model_parallel_world_size() > 1:
+                audio_features = None
+                if 'input_features' in kwargs:
+                    audio_features = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
                 change_parallel_state('image_encoder')
-                return input_embeds
+                return [vit_embeds, audio_features]
             elif self.text_decoder.pre_process:
                 input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
                 input_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, vit_embeds, **kwargs)
@@ -681,10 +686,10 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                             "loss_dict": loss_dict,
                             "logits": output
                         }
-                
+
                 return {
                     "loss": None,
                     "logits": output
                 }
-            
+
         return output

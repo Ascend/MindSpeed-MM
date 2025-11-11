@@ -105,6 +105,10 @@ def _add_training_args(parser):
                        action='store_true',
                        default=False,
                        help='apply different parallelism to different models')
+    group.add_argument('--hetero-encoder-mbs-scale',
+                       type=int,
+                       default=1,
+                       help='Adjust ViT/audio encoder MBS to x-times LLM decoder MBS (x = this param)')
     group.add_argument('--calculate-per-sample-loss',
                        action='store_true',
                        default=False,

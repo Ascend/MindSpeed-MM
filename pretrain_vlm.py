@@ -197,6 +197,10 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
         print_rank_0("change parallel state for data loader ...")
         change_parallel_state("text_decoder")
 
+        if args.hetero_encoder_mbs_scale > 1:
+            pp_mbs = args.micro_batch_size
+            args.micro_batch_size = pp_mbs * args.hetero_encoder_mbs_scale
+
     datasets = build_mm_dataset(data_config.dataset_param)
     build_dataloader = partial(
         build_mm_dataloader,
@@ -209,6 +213,8 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
     micro_batch_size = args.micro_batch_size
     if args.use_data_balance:
         global_batch_size = args.micro_batch_size * get_num_microbatches()
+        if args.hetero_encoder_mbs_scale > 1:
+            global_batch_size = global_batch_size // args.hetero_encoder_mbs_scale
         args.micro_batch_size = global_batch_size
 
     if isinstance(datasets, tuple) and len(datasets) == 2:
@@ -233,6 +239,10 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
             train_dataloader = build_dataloader(train_dataset)
             args.micro_batch_size = micro_batch_size
             train_dataloader, valid_dataloader, test_dataloader = build_iterations(train_dataloader)
+
+    if args.hetero_parallel and args.hetero_encoder_mbs_scale > 1:
+        args.micro_batch_size = pp_mbs
+
     return train_dataloader, valid_dataloader, test_dataloader
 
 

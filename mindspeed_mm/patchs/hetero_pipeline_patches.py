@@ -2,6 +2,7 @@
 # Copyright (c) 2025, Huawei Technologies Co., Ltd. All rights reserved.
 import contextlib
 import inspect
+import gc
 from functools import wraps, partial
 from collections import deque
 import torch
@@ -10,6 +11,8 @@ import megatron.core.parallel_state as mpu
 from megatron.training import get_args, print_rank_0
 from megatron.core import parallel_state
 from megatron.core.transformer.cuda_graphs import create_cudagraphs
+from megatron.core.rerun_state_machine import RerunDataIterator
+from megatron.core.num_microbatches_calculator import get_num_microbatches
 from megatron.core.utils import (
     get_model_config,
     get_model_type,
@@ -47,32 +50,87 @@ class PipelineMeta:
 class ReplayIterator:
     def __init__(self, data_iterator):
         self.real_iter = data_iterator
-        self.cached_batch = None
-        self.has_cached = False
+        self._current_batch = None
+        self._has_data = False
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if not self.has_cached:
-            try:
-                self.cached_batch = next(self.real_iter)
-                self.has_cached = True
-                return self.cached_batch
-            except StopIteration as e:
-                raise RuntimeError(f"Can not next, because of {e}") from e
-        else:
-            return self.cached_batch
+        self._current_batch = next(self.real_iter)
+        self._has_data = True
+        return self._current_batch
 
     @property
     def current_batch(self):
-        if not self.has_cached:
-            raise RuntimeError("Try to get current_batch, but no batch cached.")
-        return self.cached_batch
+        if not self._has_data:
+            raise RuntimeError("No current batch available. Call next() first.")
+        return self._current_batch
 
-    def consume_and_reset(self):
-        self.cached_batch = None
-        self.has_cached = False
+    @property
+    def has_current_batch(self):
+        return self._has_data
+
+
+class DecoderRerunDataIterator(RerunDataIterator):
+    def __init__(self, batch_dict, outputs, mbs_scale):
+        self.mbs_scale = mbs_scale
+        super().__init__(self._create_base_iterator(batch_dict, outputs))
+
+    def _create_base_iterator(self, batch_dict, outputs):
+        AUDIO_TOKEN_ID = 151646
+        VIT_SCALE_FACTOR = 4
+        gc.collect()
+
+        for dict_item, embed_tensor in zip(batch_dict, outputs):
+            vit_embeds, audio_features = embed_tensor
+
+            cur_dict = {
+                k: v
+                for k, v in dict_item.items()
+                if isinstance(v, torch.Tensor)
+            }
+
+            cur_image_grid_thw = cur_dict['image_grid_thw']
+            cur_input_ids = cur_dict['input_ids']
+            total_pp_embeds = cur_image_grid_thw.shape[0]
+
+            if total_pp_embeds < self.mbs_scale:
+                raise ValueError(f"total_pp_embeds ({total_pp_embeds}) must be >= mbs_scale ({self.mbs_scale})")
+
+            embeds_per_mbs = total_pp_embeds // self.mbs_scale
+
+            vit_prod = cur_image_grid_thw.prod(dim=-1).cumsum(dim=0)
+            vit_cumulative = [0] + (vit_prod // VIT_SCALE_FACTOR).tolist()
+
+            audio_mask = (cur_input_ids == AUDIO_TOKEN_ID).sum(dim=-1).cumsum(dim=0)
+            audio_cumulative = [0] + audio_mask.tolist()
+
+            for i in range(self.mbs_scale):
+                chunk = {}
+                start_idx = i * embeds_per_mbs
+                if i < self.mbs_scale - 1:
+                    end_idx = start_idx + embeds_per_mbs
+                else:
+                    end_idx = total_pp_embeds
+
+                vit_start_pos = vit_cumulative[start_idx]
+                vit_s_len = vit_cumulative[end_idx] - vit_cumulative[start_idx]
+
+                audio_start_pos = audio_cumulative[start_idx]
+                audio_s_len = audio_cumulative[end_idx] - audio_cumulative[start_idx]
+
+                chunk['vit_embeds'] = vit_embeds[vit_start_pos: vit_start_pos + vit_s_len, :]
+                chunk['audio_features'] = audio_features[audio_start_pos: audio_start_pos + audio_s_len, :]
+
+                for key, tensor in cur_dict.items():
+                    chunk[key] = tensor[start_idx:end_idx]
+
+                yield chunk
+                del chunk
+
+            del cur_dict, cur_image_grid_thw, cur_input_ids
+            del vit_embeds, audio_features
 
 
 def recovery_parallel_state(source_globals):
@@ -92,45 +150,8 @@ def store_state_snapshot():
     return state_snapshot
 
 
-def get_update_data_iterator_func(module_meta_pre, module_meta):
-    return '_'.join(['update_data_iterator', 'from', module_meta_pre.module_name, 'to', module_meta.module_name])
-
-
 def get_backward_func(forward_backward_pipeline):
     return forward_backward_pipeline + '_backward'
-
-
-def update_data_iterator_from_image_encoder_to_text_decoder(outputs, data_batchs, pp_batch):
-    if not outputs:
-        raise ValueError('Image encoder outputs is empty.')
-    if not data_batchs:
-        raise ValueError('GBS data_batchs is empty.')
-
-    if data_batchs:
-        keys = [k
-                for k in data_batchs[0].keys()
-                if k != 'pixel_values' and isinstance(data_batchs[0][k], torch.Tensor)]
-    else:
-        keys = []
-    all_keys = ['vit_embeds'] + [k for k in keys if k != 'vit_embeds']
-
-    split_tensors_queues = deque()
-    for key in all_keys:
-        if key == 'vit_embeds':
-            local_tensors = outputs
-        else:
-            local_tensors = []
-            for i in range(len(outputs)):
-                t = data_batchs[i].get(key)
-                if isinstance(t, torch.Tensor):
-                    local_tensors.append(t)
-                else:
-                    raise ValueError(f"Key '{key}' missing in micro-batch {i} in in dp rank: {dist.get_rank()}")
-        if not local_tensors:
-            continue
-        split_tensors_queues.append((key, deque(local_tensors)))
-
-    pp_batch['pp_batchs_queues'] = split_tensors_queues
 
 
 def mpu_wrapper():
@@ -218,16 +239,16 @@ def hetero_pipeline(
     backward_func_list, backward_pipeline_meta_list, output_tensors_list, num_microbatches_list = [], [], [], []
     total_num_tokens, forward_data_store = None, None
     module_meta_pre = None
-    update_data_iterator_func = None
+    current_batchs, output_tensors = [], []
 
     for module_meta, forward_backward_func in zip(pipeline_meta_list, forward_backward_func_list):
-
         if module_meta_pre is not None:
-            update_data_iterator_func = get_update_data_iterator_func(module_meta_pre, module_meta)
-        if update_data_iterator_func is not None:
-            globals()[update_data_iterator_func](output_tensors, current_batchs, data_iterator.current_batch)
+            mbs_scale = get_args().hetero_encoder_mbs_scale
+            data_iterator = DecoderRerunDataIterator(current_batchs, output_tensors, mbs_scale)
+            num_microbatches = get_num_microbatches()
         else:
             data_iterator = ReplayIterator(data_iterator)
+            num_microbatches = num_microbatches // get_args().hetero_encoder_mbs_scale
 
         change_parallel_state(module_meta.module_name)
         forward_only_for_global = (not mpu._IS_LAST_PIPELINE) or forward_only
@@ -238,17 +259,9 @@ def hetero_pipeline(
                                        decoder_seq_length=decoder_seq_length, forward_only=forward_only_for_global,
                                        collect_non_loss_data=collect_non_loss_data, first_val_step=first_val_step)
 
-        if module_meta_pre:
-            data_iterator.consume_and_reset()
-
         forward_data_store, output_tensors, total_num_tokens, current_batchs = output
         output_tensors_list.append(output_tensors)
         module_meta_pre = module_meta
-
-        if forward_only_for_global and (not forward_only):
-            backward_func_list.append(get_backward_func(forward_backward_func.__name__))
-            backward_pipeline_meta_list.append(module_meta)
-            num_microbatches_list.append(num_microbatches)
 
     return forward_data_store
 
@@ -320,7 +333,6 @@ def forward_backward_no_pipelining_patch(
             elif mpu._HETERO_PIPELINE and not mpu._IS_LAST_PIPELINE:
                 output_tensors.append(output_tensor)
                 current_batch.append(data_iterator.current_batch)
-                data_iterator.consume_and_reset()
 
     # Run computation for last microbatch out of context handler (want to
     # synchronize gradients).
@@ -429,12 +441,6 @@ def forward_backward_pipelining_without_interleaving_patch(
             model = model.module
         return model
 
-    def split_batch(split_tensors_queues, current_batch):
-        for key, q in split_tensors_queues:
-            if len(q) == 0:
-                raise RuntimeError(f"Queue for key '{key}' is empty, cannot pop.")
-            current_split_tensor = q.popleft()
-            current_batch[key] = current_split_tensor
 
     def set_decoder_input_tensor(model, input_tensor):
         if not mpu.is_pipeline_first_stage():
@@ -498,8 +504,6 @@ def forward_backward_pipelining_without_interleaving_patch(
         output_tensors = []
     forward_data_store = []
 
-    split_tensors_queues = data_iterator.current_batch['pp_batchs_queues']
-
     # Run warmup forward passes.
     for i in range(num_warmup_microbatches):
         # Decide to checkpoint all layers' activations of the current micro-batch
@@ -514,7 +518,6 @@ def forward_backward_pipelining_without_interleaving_patch(
         input_tensor = recv_forward(recv_tensor_shapes, config)
         set_decoder_input_tensor(model, input_tensor)
 
-        split_batch(split_tensors_queues, data_iterator.current_batch)
         output_tensor, num_tokens = forward_step(
             forward_step_func,
             data_iterator,
@@ -557,7 +560,6 @@ def forward_backward_pipelining_without_interleaving_patch(
             checkpoint_activations_microbatch = None
 
         set_decoder_input_tensor(model, input_tensor)
-        split_batch(split_tensors_queues, data_iterator.current_batch)
         output_tensor, num_tokens = forward_step(
             forward_step_func,
             data_iterator,
