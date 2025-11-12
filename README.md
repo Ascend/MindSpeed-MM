@@ -59,6 +59,17 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 
+## 文生视频： Wan 2.2 T2V
+
+<table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
+  <tr>
+      <td>
+          <img src="sources/videos/video_wan_T2V.gif" width="80%" controls autoplay loop></video>
+          <p>Prompt: Ultra HD, 4K, cinematic composition, low contrast ratio, low saturation, cool tone; The queen wears an iron crown and rides on the dragon over the city. She holds a big flag that shows:" MindSpeed MM".</p>
+      </td>
+  </tr>
+</table>
+
 ## 文生视频： OpensoraPlan 1.5 T2V
 
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
@@ -74,32 +85,17 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
   </tr>
 </table>
 
-## 图生视频： Wan 2.1 I2V
+## 文生图：Qwen-Image -> 图片编辑 Flux.1-Kontext
 
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
   <tr>
       <td>
-          <p>输入图片：</p>
-          <img src="examples/wan2.1/i2v_input.jpg" width="800" height="100%"></img>
+          <img src="sources/images/qwen_image.png" width="800"></img>
+          <p>Prompt for generation: A coffee shop entrance features a chalkboard sign reading "MindSpeed Coffee 😊 $2 per cup," with a neon light displaying "MindSpeed MM". Next to it hangs a poster showing a beautiful Chinese woman, and beneath the poster is written "Welcome to use MindSpeed MM". Ultra HD, 4K, cinematic composition. (Qwen-Image)</p>
       </td>
       <td>
-          <img src="sources/videos/video_wan_I2V.gif" width="100%" controls autoplay loop></video>
-          <p>Prompt: An astronaut hatching from an egg, on the surface of the moon, the darkness and depth of space realised in the background. High quality, ultrarealistic detail and breath-taking movie-like camera shot.</p>
-      </td>
-  </tr>
-</table>
-
-## 文生图：Flux T2I
-
-<table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
-  <tr>
-      <td>
-          <img src="sources/images/flux_cat.png" width="800"></img>
-          <p>Prompt: A cat holding a sign that says hello world</p>
-      </td>
-      <td>
-          <img src="sources/images/flux_cat_MM.png" width="800"></img>
-          <p>Prompt: A cat holding a sign that says MindSpeed</p>
+          <img src="sources/images/flux_kontext.png" width="1500"></img>
+          <p>Prompt for edition: Change the decoration of the coffee shop to a modern style with white painting. (Flux.1-Kontext)</p>
       </td>
   </tr>
 </table>
