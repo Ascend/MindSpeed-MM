@@ -26,7 +26,8 @@ from .modules import (
     Qwen3VLTextAttention,
     Qwen3VLTextRMSNorm,
     Qwen3VLTextMLP,
-    Qwen3VLTextRotaryEmbedding
+    Qwen3VLTextRotaryEmbedding,
+    Qwen3VLLMHead
 )
 
 from .modeling_qwen3_vl import (
@@ -373,8 +374,7 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, Qwen3VLForCo
         Qwen3VLMoePreTrainedModel.__init__(self, config)
         GenerationMixin.__init__(self)
         self.model = Qwen3VLMoeModel(config)
-        self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
-
+        self.lm_head = Qwen3VLLMHead(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
         self.post_init()
 
     @check_model_inputs
@@ -392,6 +392,7 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, Qwen3VLForCo
         video_grid_thw: Optional[torch.LongTensor] = None,
         cache_position: Optional[torch.LongTensor] = None,
         logits_to_keep: Union[int, torch.Tensor] = 0,
+        loss_ctx: Optional[callable] = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> Union[tuple, Qwen3VLMoeCausalLMOutputWithPast]:
 
@@ -413,12 +414,14 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, Qwen3VLForCo
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        logits = self.lm_head(hidden_states[:, slice_indices, :])
-
-        loss = None
-        if labels is not None:
-            loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
-
+        
+        if loss_ctx:
+            logits, loss = self.lm_head(hidden_states[:, slice_indices, :], loss_ctx=loss_ctx)
+        else:
+            logits, loss = self.lm_head(hidden_states[:, slice_indices, :])
+            if labels is not None:
+                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
+        
         aux_loss = None
         if kwargs.get("output_router_logits", False):
             aux_loss = load_balancing_loss_func(

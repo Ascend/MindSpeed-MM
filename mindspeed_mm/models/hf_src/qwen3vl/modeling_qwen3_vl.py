@@ -33,7 +33,8 @@ from .modules import (
     Qwen3VLVisionRotaryEmbedding,
     Qwen3VLVisionBlock,
     Qwen3VLVisionPatchMerger,
-    Qwen3VLTextRotaryEmbedding
+    Qwen3VLTextRotaryEmbedding,
+    Qwen3VLLMHead
 )
 
 
@@ -787,8 +788,8 @@ class Qwen3VLForConditionalGeneration(Qwen3VLPreTrainedModel, GenerationMixin):
     def __init__(self, config):
         super().__init__(config)
         self.model = Qwen3VLModel(config)
-        self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
-
+        self.lm_head = Qwen3VLLMHead(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
+        
         self.post_init()
 
     def get_input_embeddings(self):
@@ -835,6 +836,7 @@ class Qwen3VLForConditionalGeneration(Qwen3VLPreTrainedModel, GenerationMixin):
         video_grid_thw: Optional[torch.LongTensor] = None,
         cache_position: Optional[torch.LongTensor] = None,
         logits_to_keep: Union[int, torch.Tensor] = 0,
+        loss_ctx: Optional[callable] = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> Union[tuple, Qwen3VLCausalLMOutputWithPast]:
         r"""
@@ -865,12 +867,14 @@ class Qwen3VLForConditionalGeneration(Qwen3VLPreTrainedModel, GenerationMixin):
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        logits = self.lm_head(hidden_states[:, slice_indices, :])
 
-        loss = None
-        if labels is not None:
-            loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
-
+        if loss_ctx:
+            logits, loss = self.lm_head(hidden_states[:, slice_indices, :], loss_ctx=loss_ctx)
+        else:
+            logits, loss = self.lm_head(hidden_states[:, slice_indices, :])
+            if labels is not None:
+                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
+        
         return Qwen3VLCausalLMOutputWithPast(
             loss=loss,
             logits=logits,
