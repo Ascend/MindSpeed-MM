@@ -6,10 +6,15 @@ from transformers.models.qwen3_moe.modeling_qwen3_moe import (
     Qwen3MoeRMSNorm
 )
 
-from internvl.modeling_internvl_chat import InternVLChatModel
-
 from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin
 from mindspeed_mm.models.hf_src.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeTextSparseMoeBlock
+
+try:
+    from internvl.modeling_internvl_chat import InternVLChatModel
+except ModuleNotFoundError:
+    class InternVLChatModel:
+        def __init__(self, config):
+            raise Exception("Cannot read modeling_internvl_chat.py")
 
 
 def internvl_moe_decoder_layer_init(self, config, layer_idx: int):
