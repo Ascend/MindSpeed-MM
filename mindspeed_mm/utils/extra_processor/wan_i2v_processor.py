@@ -15,7 +15,7 @@ class WanVideoI2VProcessor(torch.nn.Module):
             "max_hxw": args.mm.data.dataset_param.preprocess_parameters.max_hxw,
         }
 
-        if hasattr(config, "image_encoder"):
+        if "image_encoder" in config:
             self.image_encoder = CLIPVisionModel.from_pretrained(config["image_encoder"]).eval()
 
             first_frame_clip_preprocess = {
