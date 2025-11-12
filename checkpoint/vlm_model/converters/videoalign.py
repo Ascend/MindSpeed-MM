@@ -110,7 +110,7 @@ def create_videoalign_ops(new_transformers_weight_key: bool, enable_canonical_hf
                        v_size=llm_kv_size,
                        ),
         ]
-        rename_ops = RenameOp(
+        rename_op = RenameOp(
             (
                 (fr'{model_prefix_name}{transformers_text_model_name}layers.(\d+).self_attn.linear_qkv',
                  fr'text_decoder.decoder.layers.(\d+).self_attention.linear_qkv'),
@@ -120,7 +120,7 @@ def create_videoalign_ops(new_transformers_weight_key: bool, enable_canonical_hf
         )
         ops.extend(relocate_ops)
         ops.extend(merge_ops)
-        ops.extend(rename_ops)
+        ops.append(rename_op)
 
     else:
         rename_ops = RenameOp(

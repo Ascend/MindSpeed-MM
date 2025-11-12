@@ -165,9 +165,6 @@ def get_reward_video_dataset(basic_param, preprocess_param, dataset_param):
         raise ValueError("`cutoff_len` is deprecated, please use `seq_length` instead.")
 
     data_args = DataArgumentsForRewardVideo(**basic_param)
-        
-    if data_args.max_samples and not data_args.streaming:
-        train_dataset = train_dataset.select(range(data_args.max_samples))
 
     # 确保主进程进行数据处理，其他进程复用缓存避免重复计算，该策略和llamafactory对数据处理策略一致
     with TrainingArguments(output_dir='./').main_process_first(desc="pre-process dataset"):

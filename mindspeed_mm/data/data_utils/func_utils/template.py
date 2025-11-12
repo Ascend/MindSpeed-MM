@@ -381,11 +381,6 @@ _register_template(
 )
 
 
-def _add_or_replace_eos_token(tokenizer: "PreTrainedTokenizer", eos_token: str) -> None:
-    if tokenizer.eos_token == eos_token:
-        return
-
-
 def get_template_and_fix_tokenizer(tokenizer: "PreTrainedTokenizer", template: str) -> "Template":
     r"""
     Gets chat template and fixes the tokenizer.
