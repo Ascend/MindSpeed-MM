@@ -1,11 +1,11 @@
   <p align="center"> <img src="sources/images/mm_logo.png" height="103px" width="700px"> </p>
 
 <p align="center">
-    <a href="https://gitcode.com/Ascend/MindSpeed/blob/master/LICENSE">
-    <a href="https://gitcode.com/Ascend/MindSpeed/blob/master/LICENSE">
+    <a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/LICENSE">
+    <a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/LICENSE">
         <img alt="Badge" src="https://img.shields.io/badge/License-MIT-blue.svg">
     </a>
-    <a href="https://gitcode.com/Ascend/MindSpeed">
+    <a href="https://gitcode.com/Ascend/MindSpeed-MM">
         <img alt="Documentation" src="https://img.shields.io/website/http/huggingface.co/docs/transformers/index.svg?down_color=red&down_message=offline&up_message=online">
     </a>
     <a>
@@ -18,6 +18,17 @@
 ---
 
 MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件，支持业界主流多模态大模型训练，旨在为华为 [昇腾芯片](https://www.hiAscend.com/) 提供端到端的多模态训练解决方案, 包含预置业界主流模型，数据工程，分布式训练及加速，预训练、微调、后训练、在线推理任务等特性。
+
+# 加入我们
+
+---
+
+为了交流开发经验、分享使用心得、及时获取项目更新，我们创建了MindSpeed MM官方微信群。
+
+无论你是正在使用这个项目，还是有奇思妙想，都欢迎加入👋
+
+<p align="center"> <img src="./sources/images/MM_wechat_qrcode.jpg" width=150> </p>
+
 
 # 最新消息
 
