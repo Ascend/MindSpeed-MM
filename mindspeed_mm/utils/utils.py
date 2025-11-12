@@ -550,7 +550,10 @@ def compute_token_level_loss(loss_dict):
         loss_mask = loss_dict['loss_mask']
         loss_mask = loss_mask.view(-1).float()
         total_tokens = loss_mask.sum()
-        loss = torch.cat([loss.view(1), total_tokens.view(1)])
+        if loss.view(-1).shape == loss_mask.shape:
+            loss = torch.cat([torch.sum(loss.view(-1) * loss_mask).view(1), total_tokens.view(1)])
+        else:
+            loss = torch.cat([loss.view(1), total_tokens.view(1)])
 
     # Reduce loss for logging.
     reporting_loss = loss.clone().detach()

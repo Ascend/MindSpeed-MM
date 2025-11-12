@@ -87,7 +87,7 @@ class TransformersModel(MultiModalModule):
             # Flatten the tokens
             logits = logits.view(-1, logits.shape[-1])
             loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
-            loss = torch.sum(loss.view(-1) * loss_mask).view(1)
+            loss = torch.sum(loss.view(-1) * loss_mask)
         elif args.calculate_token_loss:
             shift_labels = shift_labels.view(-1)
             # Flatten the tokens
