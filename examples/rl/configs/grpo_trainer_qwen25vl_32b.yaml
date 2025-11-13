@@ -103,6 +103,7 @@ rl_config:
   use_tensorboard: false
   reuse_image_embeds: false
   colocate_actor_and_vit: false
+  log_max_throughput: false
   actor_resource:
     num_npus: 16
   vit_resource:
