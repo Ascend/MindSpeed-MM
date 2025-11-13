@@ -1,0 +1,94 @@
+{
+    "pipeline_class": "WanPipeline",
+    "prompt": "/home/ci_resource/models/wan2.2/samples_t2v_prompts.txt",
+    "save_path": "examples/wan2.2/samples/A14B/t2v/",
+    "use_prompt_preprocess": false,
+    "dtype": "bf16",
+    "device": "npu",
+    "frame_interval": 1,
+    "fps": 16,
+    "pipeline_config": {
+        "input_size": [
+            13,
+            128,
+            128
+        ],
+        "cpu_offload": true
+    },
+    "boundary_ratio": 0.875,
+    "ae": {
+        "model_id": "wan_video_vae",
+        "from_pretrained": "/home/ci_resource/models/wan2.2/vae/",
+        "dtype": "float32"
+    },
+    "tokenizer": {
+        "autotokenizer_name": "AutoTokenizer",
+        "hub_backend": "hf",
+        "from_pretrained": "/home/ci_resource/models/wan2.2/tokenizer/"
+    },
+    "text_encoder": {
+        "model_id": "UMT5",
+        "hub_backend": "hf",
+        "from_pretrained": "/home/ci_resource/models/wan2.2/text_encoder/",
+        "dtype": "bf16"
+    },
+    "predictor": {
+        "model_id": "wandit",
+        "dtype": "bf16",
+        "model_type": "wan2.2-t2v",
+        "patch_size": [
+            1,
+            2,
+            2
+        ],
+        "text_len": 512,
+        "in_dim": 16,
+        "hidden_size": 5120,
+        "ffn_dim": 13824,
+        "freq_dim": 256,
+        "text_dim": 4096,
+        "img_dim": 1280,
+        "out_dim": 16,
+        "num_heads": 40,
+        "num_layers": 3,
+        "qk_norm": true,
+        "qk_norm_type": "rmsnorm",
+        "cross_attn_norm": true,
+        "eps": 1e-6,
+        "max_seq_len": 1024,
+        "use_fused_rmsnorm": true
+    },
+    "low_noise_predictor": "/weights/Wan-AI/Wan2.2-T2V-A14B-Diffusers/transformer_2",
+    "diffusion": {
+        "guidance_scale": [
+            4.0,
+            3.0
+        ],
+        "model_id": "UniPCMultistepScheduler",
+        "num_train_steps": 1000,
+        "num_inference_steps": 3,
+        "beta_end": 0.02,
+        "beta_schedule": "linear",
+        "beta_start": 0.0001,
+        "disable_corrector": [],
+        "dynamic_thresholding_ratio": 0.995,
+        "final_sigmas_type": "zero",
+        "flow_shift": 3.0,
+        "lower_order_final": true,
+        "predict_x0": true,
+        "prediction_type": "flow_prediction",
+        "rescale_betas_zero_snr": false,
+        "sample_max_value": 1.0,
+        "solver_order": 2,
+        "solver_p": null,
+        "solver_type": "bh2",
+        "steps_offset": 0,
+        "thresholding": false,
+        "timestep_spacing": "linspace",
+        "trained_betas": null,
+        "use_beta_sigmas": false,
+        "use_exponential_sigmas": false,
+        "use_flow_sigmas": true,
+        "use_karras_sigmas": false
+    }
+}
