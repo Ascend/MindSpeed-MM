@@ -2,6 +2,7 @@ from functools import wraps
 from packaging import version
 
 import mindspore
+import torch
 import transformers
 from mindspeed.patch_utils import MindSpeedPatchesManager as aspm
 from mindspeed.mindspore.ops.npu_rotary_position_embedding import npu_rotary_position_embedding
@@ -71,10 +72,8 @@ def apply_mindspore_patch():
     aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseMMDiTBlock.forward',
                         sparsemmditblock_forward)
     #patch matmul&&linear input requir same stype
-    aspm.register_patch('mindspore.mint.nn.functional.linear', ms_linear_wrapper)
-    aspm.register_patch('mindspore.mint.matmul', ms_matmul_wrapper)
-
-    aspm.apply_patches()
+    aspm.register_patch('torch.nn.functional.linear', ms_linear_wrapper)
+    aspm.register_patch('torch.matmul', ms_matmul_wrapper)
 
     # qwen25 omni hang issue
     from mindspeed_mm.mindspore.data.data_utils.func_utils.mm_plugin import process_messages
@@ -87,5 +86,7 @@ def apply_mindspore_patch():
     # torch.stft not support, use _np_extract_fbank_features
     from mindspeed_mm.mindspore.third_party.transformers.models.whisper.feature_extraction_whisper import _torch_extract_fbank_features_wrapper
     aspm.register_patch('transformers.models.whisper.feature_extraction_whisper.WhisperFeatureExtractor._torch_extract_fbank_features', _torch_extract_fbank_features_wrapper)
+
+    aspm.apply_patches()
 
 apply_mindspore_patch()
