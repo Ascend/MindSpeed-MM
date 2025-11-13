@@ -657,6 +657,10 @@ class WanDiTBlock(nn.Module):
         rotary_pos_emb,
         recompute_skip_core_attention=False
     ):
+        # Fixes the memory reorganization problem triggered when fast host dispatch
+        # and tensor multi-stream reuse occur simultaneously.
+        torch.npu.synchronize()
+
         # before self attention process
         if recompute_skip_core_attention:
             query, key, value, gate_msa, shift_mlp, scale_mlp, gate_mlp = tensor_parallel.checkpoint(
