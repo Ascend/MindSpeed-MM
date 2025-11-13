@@ -91,6 +91,7 @@ rl_config:
   verifier_weight: [1.0]
   num_cpus_for_local_task: 1.0
   use_tensorboard: false
+  log_max_throughput: false
   actor_resource:
     num_npus: 8
 

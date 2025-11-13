@@ -18,7 +18,6 @@
   - [日志打点指标说明](#jump4.3)
 - [断点续训](#jump5)
 - [注意事项](#jump6)
-- [性能数据](#jump7)
 
 <a id="jump0"></a>
 ## 简介
@@ -355,15 +354,3 @@ sudo apt-get install iproute2
 ```shell
 pip install "ray[default]" debugpy
 ```
-
----
-<a id="jump7"></a>
-## 性能数据
-
-| 模型                  | 机器型号     | GBS | n_samples | max_prompt_length | max_tokens | 端到端 tps |
-|---------------------|----------|-----|-----------|-------------------|------------|---------|
-| Qwen25VL-3B           | Atlas A3 | 256  | 5         | 1024              | 2048       | 6302     |
-| Qwen25VL-7B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 2761     |
-| Qwen25VL-32B          | Atlas A3 | 512  | 5        | 1024              | 2048       | 626     |
-
-注：模型 token/p/s 性能数据会打印在日志中, 当前计算公式下，A3单卡性能需要将日志打印的token/p/s性能指数*2。
