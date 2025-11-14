@@ -38,12 +38,16 @@ MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础
 |mindspore_op_plugin | [master](https://gitee.com/mindspore/mindspore_op_plugin) |
 
 <a id="jump1.1"></a>
-### 1. 仓库拉取
+### 1. 仓库拉取及环境搭建
 
-针对MindSpeed MindSpore后端，昇腾社区提供了模型一键拉起部署MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在华为MindSpore+CANN环境下一键拉起模型训练。在进行一键拉起前，用户需要拉取相关的代码仓：
+针对MindSpeed MindSpore后端，昇腾社区提供了模型一键拉起部署MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在华为MindSpore+CANN环境下一键拉起模型训练。在进行一键拉起前，用户需要拉取相关的代码仓以及进行环境搭建：
 
 
-```
+```shell
+# 创建conda环境
+conda create -n test python=3.10
+conda activate test
+
 # 使用环境变量
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
@@ -53,7 +57,11 @@ git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b master
 
 # 使用MindSpeed-Core-MS内部脚本自动拉取相关代码仓并一键适配
 cd MindSpeed-Core-MS
+pip install -r requirements.txt 
 source auto_convert.sh mm
+pip install transformers==4.53.0
+# 安装librosa，用于音频解析
+pip install librosa
 
 # 拉取并安装mindspore_op_plugin
 git clone https://gitee.com/mindspore/mindspore_op_plugin.git
@@ -66,7 +74,7 @@ mkdir ckpt
 mkdir data
 mkdir logs
 ```
---
+---
 <a id="jump2"></a>
 ## 权重下载及转换
 

@@ -225,6 +225,17 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 563 </td>
       <td>✅</td>
     </tr>
+    <tr>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/qwen2.5omni">Qwen25Omni</a></td>
+      <td><a href="https://huggingface.co/Qwen/Qwen2.5-Omni-7B/tree/main">7B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td>  </td>
+      <td> / </td>
+      <td> / </td>
+      <td>✅</td>
+    </tr>
     </tbody>
 </table>
 
