@@ -128,7 +128,7 @@ class DataFileReader:
             print(f"Building {anno}...")
             for sub in sub_list:
                 for key in data_file_keys:
-                    if pd.isna(sub[key]):
+                    if check_none(sub[key]):
                         sub[key] = None
                     if sub[key]:
                         if isinstance(sub[key], list):
@@ -1093,4 +1093,12 @@ def map_target_fps(
     sampling_interval = math.ceil(fps / max_fps)
     new_fps = math.floor(fps / sampling_interval)
     return new_fps, sampling_interval
+
+
+def check_none(value):
+    if value is None:
+        return True
+    if isinstance(value, (float, np.floating)):
+        return math.isnan(value) or np.isnan(value)
+    return False
 

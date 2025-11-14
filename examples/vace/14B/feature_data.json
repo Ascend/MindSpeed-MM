@@ -29,7 +29,7 @@
             {
                 "autotokenizer_name": "AutoTokenizer",
                 "hub_backend": "hf",
-                "from_pretrained": "Wan2.1-T2V-1.3B-Diffusers/tokenizer",
+                "from_pretrained": "Wan2.1-VACE-14B/tokenizer",
                 "model_max_length": 256
             }
         ]

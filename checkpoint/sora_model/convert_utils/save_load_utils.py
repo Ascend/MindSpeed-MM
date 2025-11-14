@@ -33,7 +33,7 @@ def load_from_mm(load_dir):
 
     for sub_dir in sub_dirs:
         state_dict_path = os.path.join(load_dir, directory, sub_dir, MEGATRON_CKPT_NAME)
-        state_dict = torch.load(state_dict_path, map_location='cpu')
+        state_dict = torch.load(state_dict_path, map_location='cpu', weights_only=False)
         if enable_pp:
             tp_rank, pp_rank = map(int, (sub_dir.split('_')[2:4]))
             vpp_state_dicts = []

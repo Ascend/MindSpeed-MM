@@ -11,7 +11,6 @@ export HCCL_CONNECT_TIMEOUT=1200
 export NPU_ASD_ENABLE=0
 export ASCEND_LAUNCH_BLOCKING=0
 export ACLNN_CACHE_LIMIT=100000
-export MULTI_STREAM_MEMORY_REUSE=2
 
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
@@ -32,7 +31,6 @@ GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 MM_DATA="./examples/vace/14B/feature_data.json"
 MM_MODEL="./examples/vace/14B/pretrain_model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-LOAD_PATH="path to load your vace weight"
 SAVE_PATH="path to save your vace weight"
 
 
@@ -88,7 +86,6 @@ OUTPUT_ARGS="
     --save-interval 10000 \
     --eval-interval 10000 \
     --eval-iters 10 \
-    --load $LOAD_PATH \
     --save $SAVE_PATH \
 "
 

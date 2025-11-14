@@ -10,7 +10,7 @@
             "video_reader_type": "DecordVideo",
             "image_reader_type": "Image",
             "image_processer_type": "image2image",
-            "num_frames": 81,
+            "num_frames": 17,
             "frame_interval": 1,
             "auto_interval": false,
             "max_height": 480,
@@ -29,7 +29,7 @@
             {
                 "autotokenizer_name": "AutoTokenizer",
                 "hub_backend": "hf",
-                "from_pretrained": "Wan2.1-VACE-1.3B/tokenizer",
+                "from_pretrained": "Wan2.2-VACE-Fun-A14B/tokenizer",
                 "model_max_length": 256
             }
         ]

@@ -1,0 +1,13 @@
+{
+  "model": {
+    "transformer": [
+      "./Wan2.1-VACE-1.3B/diffusion_pytorch_model.safetensors"
+    ],
+    "vae": "./Wan2.1-VACE-1.3B/Wan2.1_VAE.pth",
+    "text_encoder": "./Wan2.1-VACE-1.3B/models_t5_umt5-xxl-enc-bf16.pth",
+    "tokenizer": "./Wan2.1-VACE-1.3B/google/umt5-xxl"
+  },
+  "image_path": "../cat_fighting.jpg",
+  "video_path": "../depth_video.mp4",
+  "output_path": "../inference_output"
+}

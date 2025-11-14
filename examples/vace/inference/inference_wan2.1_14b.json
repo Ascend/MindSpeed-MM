@@ -1,0 +1,21 @@
+{
+  "model": {
+    "transformer": [
+      [
+        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00001-of-00007.safetensors",
+        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00002-of-00007.safetensors",
+        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00003-of-00007.safetensors",
+        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00004-of-00007.safetensors",
+        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00005-of-00007.safetensors",
+        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00006-of-00007.safetensors",
+        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00007-of-00007.safetensors",
+      ]
+    ],
+    "vae": "./Wan2.1-VACE-14B/Wan2.1_VAE.pth",
+    "text_encoder": "./Wan2.1-VACE-14B/models_t5_umt5-xxl-enc-bf16.pth",
+    "tokenizer": "./Wan2.1-VACE-14B/google/umt5-xxl"
+  },
+  "image_path": "../cat_fighting.jpg",
+  "video_path": "../depth_video.mp4",
+  "output_path": "../inference_output"
+}

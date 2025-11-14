@@ -28,10 +28,10 @@ GRAD_ACC_STEP=1
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
-MM_DATA="./examples/vace/1.3B/feature_data.json"
-MM_MODEL="./examples/vace/1.3B/pretrain_model.json"
+MM_DATA="./examples/vace/A14B_wan2.2/feature_data.json"
+MM_MODEL="./examples/vace/A14B_wan2.2/pretrain_model_high.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-SAVE_PATH="path to save your vace weight"
+SAVE_PATH="path to save your high noise vace weight"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $NPUS_PER_NODE \
@@ -88,7 +88,7 @@ OUTPUT_ARGS="
     --save $SAVE_PATH \
 "
 
-logfile=$(date +%Y%m%d)_$(date +%H%M%S)
+logfile=wan_high_$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
 torchrun $DISTRIBUTED_ARGS pretrain_sora.py \
     $GPT_ARGS \
