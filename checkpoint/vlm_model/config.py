@@ -363,3 +363,13 @@ class ConvertVppHFConfig(ConvertVppMMConfig):
     """mindspeed-mm训练出来的权重转换为huggingface格式权重的配置"""
     save_hf_dir: Path
     """mm转回hf格式时保存的路径"""
+
+
+class ConvertHeteroMMConfig(BaseModel):
+    """mindspeed-mm的权重转换为适配hetero的mindspeed-mm的权重的配置"""
+
+    mm_dir: Path
+    """原mm权重的路径"""
+
+    mm_hetero_dir: Path
+    """mm_hetero权重的路径"""
