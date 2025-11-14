@@ -75,7 +75,7 @@
 
     ```shell
     pip install -e .
-    vim examples/dreambooth/requirements_flux.txt #修改版本： torch==2.7.1, accelerate==1.7.0, transformers==4.47.1, 添加deepspeed==0.17.2
+    vim examples/dreambooth/requirements_flux.txt #修改版本： torch==2.7.1, accelerate==1.7.0, transformers==4.47.1, 添加deepspeed==0.17.2, peft==0.7.1
     pip install -r examples/dreambooth/requirements_flux.txt # 安装对应依赖
     ```
 
