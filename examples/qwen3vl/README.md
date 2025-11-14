@@ -106,7 +106,7 @@ mm-convert Qwen3VLConverter hf_to_dcp \
 ```
 并在examples/qwen3vl/finetune_qwen3vl.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数
 
- ---
+---
 <a id="jump3"></a>
 ## 数据集准备及处理
 
@@ -286,12 +286,18 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 以Qwen3VL-xxB为例，启动微调训练任务。  
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+
 ```shell
 bash examples/qwen3vl/finetune_qwen3vl_xxB.sh
 ```
+**优化特性：**
+
+- ChunkLoss：可以参考文档[ChunkLoss](docs/features/chunkloss.md)开启该特性优化长序列时的显存占用。
+
 ---
 
 <a id="jump4.4"></a>
+
 #### 4. 启动推理
 训练完成之后，以Qwen3VL-xxB为例，将保存在`save_dir`目录下的权重转换成huggingface格式
 ```shell
