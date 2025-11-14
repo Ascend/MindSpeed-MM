@@ -205,8 +205,8 @@ class TransformersModel(MultiModalModule):
         # Shift labels to match the input sequence for next-token prediction.
         shift_labels = labels[..., 1:].contiguous()
         
-        # Create a mask to identify valid tokens (typically > 1 means non-special tokens)
-        loss_mask = shift_labels > 1
+        # Create a mask to identify valid tokens (typically > -1 means non-special tokens)
+        loss_mask = shift_labels > -1
         
         # Retrieve global arguments to determine loss reduction behavior.
         args = get_args()

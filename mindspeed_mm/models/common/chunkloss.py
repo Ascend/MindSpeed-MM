@@ -206,10 +206,10 @@ def calculate_lm_loss(
         >>> loss, logits = calculate_lm_loss(hidden, weight, shift_labels=labels, reduction="sum")
     """
     # Flatten labels to 1D: (batch_size * seq_len,)
-    shift_labels = shift_labels.view(-1)
+    shift_labels = shift_labels.reshape(-1)
     
     # Flatten hidden states to (batch_size * seq_len, hidden_dim)
-    hidden_states = hidden_states.view(-1, hidden_states.size(-1))
+    hidden_states = hidden_states.reshape(-1, hidden_states.size(-1))
     
     # Project to logits using only the weight (bias is intentionally omitted here)
     # Cast to float to ensure numerical stability in loss computation
