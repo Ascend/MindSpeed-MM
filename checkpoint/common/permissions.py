@@ -3,7 +3,7 @@ from pathlib import Path
 from checkpoint.common.constant import DIR_MODE, FILE_MODE
 
 
-def set_directory_permissions(target_dir: Path) -> None:
+def set_directory_permissions(target_dir: str | Path) -> None:
     # Set root directory permissions
     target_dir.chmod(DIR_MODE)
 

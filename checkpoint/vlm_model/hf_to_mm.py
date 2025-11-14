@@ -175,15 +175,15 @@ def save_by_vpp(state_dicts: List[Dict[str, torch.Tensor]],
     save_root_dir.joinpath(LATEST_TXT).write_text(str(iteration))
 
 
-def save_by_dcp(state_dicts: List[Dict[str, torch.Tensor]],
+def save_by_dcp(state_dict: STATE_DICT_T,
                 save_root_dir: Path,
-                iteration: Optional[Union[str, int]] = 'release'):
+                iteration: Union[str, int] = 'release'):
 
     iter_name = iteration if isinstance(iteration, str) else f"iter_{iteration:07d}"
     save_path = save_root_dir.joinpath(iter_name)
     save_path.mkdir(exist_ok=True, parents=True)
     save_dict = {
-        'model': state_dicts,
+        'model': state_dict,
         'checkpoint_version': CHECKPOINT_VERSION_VALUE
     }
     _save_state_dict(

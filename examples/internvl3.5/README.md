@@ -118,9 +118,7 @@ MindSpeed-MM修改了moe部分原始网络的结构名称，需对原始预训�
 
 ```shell
 # 对修改了网络结构的部分进行权重转换
-mm-convert moe_expert --style merge --hf_dir ckpt/hf_path/InternVL3_5-30B-A3B-Instruct --save_dir ckpt/tmp_path/InternVL3_5-30B-A3B-Instruct
-# 将权重转换为dcp格式
-mm-convert Qwen3VLConverter hf_to_dcp  --hf_dir ckpt/tmp_path/InternVL3_5-30B-A3B-Instruct --dcp_dir ckpt/convert_path/InternVL3_5-30B-A3B-Instruct
+mm-convert ExpertMergeDcpConverter hf_to_dcp --hf_dir "ckpt/hf_path/InternVL3_5-30B-A3B-Instruct" --save_dir "ckpt/convert_path/InternVL3_5-30B-A3B-Instruct"
 ```
 
 ---

@@ -9,7 +9,7 @@ from checkpoint.vlm_model.converters.videoalign import VideoAlignConverter
 from checkpoint.vlm_model.converters.glm import GlmConverter
 from checkpoint.vlm_model.converters.deepseekvl2 import DeepSeekVLConverter
 from checkpoint.vlm_model.converters.internvl import InternVLConverter
-from checkpoint.vlm_model.converters.moe_expert import moe_expert
+import checkpoint.vlm_model.converters.moe_expert
 
 # sora model converter
 from checkpoint.sora_model.hunyuanvideo_converter import HunyuanVideoConverter

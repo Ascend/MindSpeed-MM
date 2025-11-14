@@ -80,7 +80,7 @@ def save_hf_weights(
 @validate_arguments
 def merge_dcp_to_hf(
     load_dir: DirectoryPath,
-    save_dir: str,
+    save_dir: str | Path,
     model_assets_dir: DirectoryPath,
     prefix: str = "",
 ):

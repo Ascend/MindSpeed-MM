@@ -24,9 +24,11 @@ from tqdm import tqdm, trange
 from transformers import AutoConfig
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 
-from checkpoint.common.converter import Converter
+from checkpoint.common.converter import Commandable, DcpConverter
+from checkpoint.common.merge_dcp_to_hf import load_dcp_state_dict
 from checkpoint.common.mm_types import STATE_DICT_T
-from checkpoint.vlm_model.hf_to_mm import load_from_hf
+from checkpoint.common.permissions import set_directory_permissions
+from checkpoint.vlm_model.hf_to_mm import load_from_hf, save_by_dcp
 from checkpoint.vlm_model.mm_to_hf import copy_files_except_suffix
 
 
@@ -107,6 +109,22 @@ def save_sharded_state_dict(state_dict: STATE_DICT_T, save_dir: Path, max_shard_
         save_file(shard, save_dir / shard_file, metadata=metadata)
 
 
+def get_expert_config_from_pretrained(save_dir: Path) -> tuple[int, int, str]:
+    config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
+    if config.__class__.__name__ == "InternVLChatConfig":
+        num_hidden_layers = config.llm_config.num_hidden_layers
+        num_experts = config.llm_config.num_experts
+        weight_path = "language_model.model.layers.{layer}.mlp.experts.{expert}"
+    elif config.__class__.__name__ == "Qwen3OmniMoeConfig":
+        num_hidden_layers = config.thinker_config.text_config.num_hidden_layers
+        num_experts = config.thinker_config.text_config.num_experts
+        weight_path = "thinker.model.layers.{layer}.mlp.experts.{expert}"
+    else:
+        # new model such as qwen3omni moe/qwen3 moe only need define num_hidden_layers/num_experts/weight_path here.
+        raise ValueError(f"Not supported model config: {config}")
+    return num_experts, num_hidden_layers, weight_path
+
+
 def moe_expert(style: Literal["merge", "split"], hf_dir: DirectoryPath, save_dir: Path, max_shard_size: str = "4GB"):
     """merge Mixtral style moe (one parameter per expert) all experts parameter to one parameter, or vice versa
     usage:
@@ -121,18 +139,7 @@ def moe_expert(style: Literal["merge", "split"], hf_dir: DirectoryPath, save_dir
     """
     copy_files_except_suffix(hf_dir, save_dir, except_suffix='.safetensors')
 
-    config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
-    if config.__class__.__name__ == "InternVLChatConfig":
-        num_hidden_layers = config.llm_config.num_hidden_layers
-        num_experts = config.llm_config.num_experts
-        weight_path = "language_model.model.layers.{layer}.mlp.experts.{expert}"
-    elif config.__class__.__name__ == "Qwen3OmniMoeConfig":
-        num_hidden_layers = config.thinker_config.text_config.num_hidden_layers
-        num_experts = config.thinker_config.text_config.num_experts
-        weight_path = "thinker.model.layers.{layer}.mlp.experts.{expert}"
-    else:
-        # new model such as qwen3omni moe/qwen3 moe only need define num_hidden_layers/num_experts/weight_path here.
-        raise ValueError(f"Not supported model config: {config}")
+    num_experts, num_hidden_layers, weight_path = get_expert_config_from_pretrained(save_dir)
     state_dict = load_from_hf(hf_dir)
     if style == "merge":
         merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, weight_path=weight_path)
@@ -143,5 +150,30 @@ def moe_expert(style: Literal["merge", "split"], hf_dir: DirectoryPath, save_dir
     save_sharded_state_dict(state_dict, save_dir, max_shard_size, metadata={"format": "pt"})
 
 
-# register to Converter command line interface
-Converter.subclasses.append(moe_expert)
+class ExpertMergeDcpConverter(DcpConverter):
+    @staticmethod
+    def hf_to_dcp(hf_dir: DirectoryPath, save_dir: Path):
+        num_experts, num_hidden_layers, weight_path = get_expert_config_from_pretrained(hf_dir)
+        state_dict = load_from_hf(hf_dir)
+        merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, weight_path=weight_path)
+        weight_names = list(state_dict.keys())
+        for weight_name in weight_names:
+            state_dict[f"model.{weight_name}"] = state_dict.pop(weight_name)
+        save_by_dcp(state_dict, save_dir)
+        set_directory_permissions(save_dir)
+
+    @staticmethod
+    def dcp_to_hf(hf_dir: DirectoryPath, dcp_dir: DirectoryPath, save_dir: Path):
+        copy_files_except_suffix(hf_dir, save_dir, except_suffix='.safetensors')
+        state_dict = load_dcp_state_dict(dcp_dir)
+        weight_names = list(state_dict.keys())
+        for weight_name in weight_names:
+            state_dict[weight_name.removeprefix("model.")] = state_dict.pop(weight_name)
+        num_experts, num_hidden_layers, weight_path = get_expert_config_from_pretrained(save_dir)
+        split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, weight_path=weight_path)
+        save_sharded_state_dict(state_dict, save_dir, max_shard_size="4GB", metadata={"format": "pt"})
+        set_directory_permissions(save_dir)
+
+
+# register to command line interface
+Commandable.add_command(moe_expert)
