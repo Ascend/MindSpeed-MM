@@ -76,7 +76,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
   </thead>
   <tbody>
     <tr>
-      <td rowspan="7"> 多模态生成 </td>
+      <td rowspan="10"> 多模态生成 </td>
     </tr>
     <tr>
       <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-T2V</a></td>
@@ -139,6 +139,38 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> BF16 </td>
       <td>  </td>
       <td> 3.92 (SPS) </td>
+      <td> / </td>
+      <td>支持中</td>
+    </tr>
+    <tr>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/mindspore/wan2.1">Wan2.1-I2V</a></td>
+      <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers"> 1.3B </a></td>
+      <td> 预训练 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td>  </td>
+      <td> 0.61 (SPS) </td>
+      <td> / </td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/mindspore/wan2.1">Wan2.1-T2V</a></td>
+      <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers"> 1.3B </a></td>
+      <td> 预训练 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td>  </td>
+      <td> 0.73 (SPS) </td>
+      <td> / </td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers"> 1.3B </a></td>
+      <td> Lora微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td>  </td>
+      <td> / </td>
       <td> / </td>
       <td>支持中</td>
     </tr>

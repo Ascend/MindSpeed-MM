@@ -77,6 +77,16 @@ cd MindSpeed-Core-MS
 pip install -r requirements.txt
 source auto_convert.sh mm
 
+pip install transformers==4.51.0
+pip install diffusers==0.30.3
+
+# 拉取并安装mindspore_op_plugin
+git clone https://gitee.com/mindspore/mindspore_op_plugin.git
+cd mindspore_op_plugin
+bash build.sh
+source env.source
+cd ..
+
 mkdir ckpt
 mkdir data
 mkdir logs
