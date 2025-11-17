@@ -6,6 +6,10 @@ from mindspeed_mm.models.hf_src.qwen3vl.qwen3vl import (
 )
 from mindspeed_mm.models.hf_src.internvl3_5 import InternVLChatModelGeneration
 
+from mindspeed_mm.models.hf_src.qwen3omni import (
+    Qwen3OmniMoeThinkerForConditionalGeneration
+)
+
 
 class ModelZoo:
 
@@ -13,6 +17,7 @@ class ModelZoo:
         "qwen3_vl": Qwen3VLForConditionalGeneration,
         "qwen3_vl_moe": Qwen3VLMoeForConditionalGeneration,
         'internvl': InternVLChatModelGeneration,
+        "qwen3_omni_moe": Qwen3OmniMoeThinkerForConditionalGeneration,
     }
 
     @staticmethod

@@ -365,6 +365,41 @@ _register_template(
 
 
 _register_template(
+    name="qwen3_omni",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n"]),
+        format_assistant=StringFormatter(slots=["{{content}}<|im_end|>\n"]),
+        format_system=StringFormatter(slots=["<|im_start|>system\n{{content}}<|im_end|>\n"]),
+        format_observation=StringFormatter(
+            slots=[
+                "<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
+        ),
+        stop_words=["<|im_end|>"],
+        replace_eos=True),
+    mm_plugin=get_mm_plugin(
+        name="qwen3_omni", audio_token="<|audio_pad|>", image_token="<|image_pad|>", video_token="<|video_pad|>"),
+    template_class=ReasoningTemplate
+)
+
+
+_register_template(
+    name="qwen3_omni_nothink",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n"]),
+        format_assistant=StringFormatter(slots=["{{content}}<|im_end|>\n"]),
+        format_system=StringFormatter(slots=["<|im_start|>system\n{{content}}<|im_end|>\n"]),
+        format_observation=StringFormatter(
+            slots=[
+                "<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
+        ),
+        stop_words=["<|im_end|>"],
+        replace_eos=True),
+    mm_plugin=get_mm_plugin(
+        name="qwen3_omni", audio_token="<|audio_pad|>", image_token="<|image_pad|>", video_token="<|video_pad|>"),
+)
+
+
+_register_template(
     name="glm4.1v",
     params=RegisterParams(
         format_user=StringFormatter(slots=["<|user|>\n{{content}}<|assistant|>"]),

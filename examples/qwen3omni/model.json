@@ -1,0 +1,39 @@
+{
+    "model_id": "qwen3_omni_moe",
+    "init_from_hf_path": "./ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct",
+    "image_encoder": {
+        "vision_encoder": {
+            "model_id": "qwen2vit",
+            "num_layers": 32,
+            "hidden_size": 1280,
+            "num_attention_heads": 16,
+            "freeze": true
+        },
+        "vision_projector": {
+            "model_id": "lnmlp",
+            "num_layers": 1,
+            "freeze": true
+        }
+    },
+    "audio_encoder": {
+        "audio_encoder": {
+            "model_id": "qwen_omni",
+            "num_layers": 32,
+            "hidden_size": 1280,
+            "num_attention_heads": 20,
+            "freeze": true
+        }
+    },
+    "text_decoder": {
+        "model_id": "qwen2_5_omni_thinker",
+        "num_layers": 28,
+        "hidden_size": 3584,
+        "num_attention_heads": 28,
+        "max_position_embeddings": 128000,
+        "freeze": false
+    },
+    "patch": {
+        "hetero_parallel_cp": false,
+        "moe_full": true
+    }
+}

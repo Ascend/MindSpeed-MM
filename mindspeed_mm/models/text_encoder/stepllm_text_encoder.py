@@ -20,9 +20,15 @@ import torch.nn.functional as F
 import torch_npu
 import numpy as np
 
-from transformers.modeling_utils import PretrainedConfig, PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel
 
 from mindspeed_mm.models.common.normalize import normalize
+
+try:
+    from transformers.modeling_utils import PretrainedConfig
+except ImportError:
+    # support newer transformers for qwen3omni
+    from transformers.modeling_utils import PreTrainedConfig as PretrainedConfig
 
 DTYPE_FP16_MIN = float(np.finfo(np.float16).min)
 
