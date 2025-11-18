@@ -669,7 +669,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td rowspan="19"> 多模态理解 </td>
+      <td rowspan="20"> 多模态理解 </td>
       <tr>
       <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen3vl">Qwen3-VL</a></td>
       <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 8B </a></td>
@@ -754,7 +754,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan=""><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/internvl2.5">InternVL 2.5</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/internvl2.5">InternVL 2.5</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2_5-78B">78B</a></td>
       <td> 微调 </td>
       <td> 8x8 </td>
@@ -858,7 +858,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5omni">Qwen2.5-Omni</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5omni">Qwen2.5-Omni</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-Omni-7B">7B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
