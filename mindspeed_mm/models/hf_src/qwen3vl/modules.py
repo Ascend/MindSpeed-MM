@@ -19,6 +19,10 @@ from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs
 from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLTextConfig, Qwen3VLVisionConfig
 
+from megatron.core import mpu
+from mindspeed_mm.models.common.communications import cal_split_sizes, gather_forward_split_backward, split_forward_gather_backward
+from .utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq
+
 
 class Qwen3VLVisionMLP(nn.Module):
     def __init__(self, config):
@@ -71,6 +75,7 @@ class Qwen3VLVisionPatchMerger(nn.Module):
     def __init__(self, config: Qwen3VLVisionConfig, use_postshuffle_norm=False) -> None:
         super().__init__()
         self.hidden_size = config.hidden_size * (config.spatial_merge_size**2)
+        self.spatial_merge_size = config.spatial_merge_size
         self.use_postshuffle_norm = use_postshuffle_norm
         self.norm = nn.LayerNorm(self.hidden_size if use_postshuffle_norm else config.hidden_size, eps=1e-6)
         self.linear_fc1 = nn.Linear(self.hidden_size, self.hidden_size)
@@ -78,8 +83,30 @@ class Qwen3VLVisionPatchMerger(nn.Module):
         self.linear_fc2 = nn.Linear(self.hidden_size, config.out_hidden_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.norm(x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x).view(-1, self.hidden_size)
-        x = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
+        if mpu.get_context_parallel_world_size() > 1:
+            actual_seq_len = get_seq_len("visual") * self.spatial_merge_size ** 2
+            gather_sizes = cal_split_sizes(actual_seq_len, mpu.get_context_parallel_world_size())
+            x = gather_forward_split_backward(
+                x,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes
+            )
+            x = x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x
+            x = self.norm(x).view(-1, self.hidden_size)
+            split_sizes = cal_split_sizes(x.shape[0], mpu.get_context_parallel_world_size())
+            x = split_forward_gather_backward(
+                    x, 
+                    mpu.get_context_parallel_group(),
+                    dim=0,
+                    grad_scale="down",
+                    split_sizes=split_sizes
+                )
+            x = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
+        else:
+            x = self.norm(x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x).view(-1, self.hidden_size)
+            x = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
         return x
 
 
@@ -174,6 +201,17 @@ class Qwen3VLVisionAttention(nn.Module):
         key_states = key_states.transpose(0, 1).unsqueeze(0)
         value_states = value_states.transpose(0, 1).unsqueeze(0)
 
+        if mpu.get_context_parallel_world_size() > 1:
+            total_visual_seqlen = int(cu_seqlens[-1])
+            query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
+                query_states,
+                key_states,
+                value_states,
+                seq_dim=2,
+                head_dim=1,
+                gather_size=total_visual_seqlen
+            )
+
         attention_interface: Callable = eager_attention_forward
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
@@ -220,11 +258,18 @@ class Qwen3VLVisionAttention(nn.Module):
             ]
             attn_output = torch.cat(attn_outputs, dim=1)
 
+        if mpu.get_context_parallel_world_size() > 1:
+            attn_output = gather_heads_scatter_seq(
+                attn_output,
+                seq_dim=1,
+                head_dim=2,
+                gather_size=self.num_heads
+            )
+
         attn_output = attn_output.reshape(seq_length, -1).contiguous()
         attn_output = self.proj(attn_output)
         return attn_output
-    
-    
+
 
 class Qwen3VLVisionBlock(nn.Module):
     def __init__(self, config, attn_implementation: str = "sdpa") -> None:
@@ -362,6 +407,7 @@ class Qwen3VLTextAttention(nn.Module):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
+        self.num_heads = config.num_attention_heads
         self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
         self.scaling = self.head_dim**-0.5
@@ -414,6 +460,21 @@ class Qwen3VLTextAttention(nn.Module):
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
+        total_seq_len = get_seq_len("total")
+        if mpu.get_context_parallel_world_size() > 1:
+            if mpu.get_context_parallel_world_size() > key_states.shape[1]:
+                key_states = repeat_kv(key_states, self.num_key_value_groups)
+                value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+            query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
+                query_states,
+                key_states,
+                value_states,
+                seq_dim=2,
+                head_dim=1,
+                gather_size=total_seq_len
+            )
+
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -423,6 +484,13 @@ class Qwen3VLTextAttention(nn.Module):
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
             **kwargs,
+        )
+
+        attn_output = gather_heads_scatter_seq(
+            attn_output,
+            seq_dim=1,
+            head_dim=2,
+            gather_size=self.num_heads
         )
 
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()

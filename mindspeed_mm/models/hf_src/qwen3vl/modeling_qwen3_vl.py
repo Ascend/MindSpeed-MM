@@ -2,7 +2,6 @@
 # Copyright 2025 The Qwen Team and The HuggingFace Inc. team. All rights reserved.
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any, Optional, Union
 
 import torch
@@ -19,6 +18,11 @@ from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs, auto_docstring, is_torchdynamo_compiling
 from transformers.utils.generic import check_model_inputs
 from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLConfig, Qwen3VLTextConfig, Qwen3VLVisionConfig
+
+from megatron.core import mpu
+from megatron.training import get_args
+from mindspeed_mm.models.common.communications import cal_split_sizes, gather_forward_split_backward, split_forward_gather_backward
+from .utils import get_seq_len, set_seq_len
 
 from .output import (
     Qwen3VLCausalLMOutputWithPast, 
@@ -172,7 +176,7 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
                 coords = coords.repeat(num_frames, 1)
 
             num_tokens = coords.shape[0]
-            pos_ids[offset:offset + num_tokens] = coords
+            pos_ids[offset: offset + num_tokens] = coords
             offset += num_tokens
 
         embeddings = freq_table[pos_ids]  # lookup rotary embeddings
@@ -259,10 +263,10 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         rotary_pos_emb = self.rot_pos_emb(grid_thw)
 
         seq_len, _ = hidden_states.size()
+        seq_len_down = seq_len // self.spatial_merge_size ** 2
+        set_seq_len("visual", seq_len_down)
         hidden_states = hidden_states.reshape(seq_len, -1)
         rotary_pos_emb = rotary_pos_emb.reshape(seq_len, -1)
-        emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
-        position_embeddings = (emb.cos(), emb.sin())
 
         cu_seqlens = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cumsum(
             dim=0,
@@ -272,6 +276,25 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
             dtype=grid_thw.dtype if torch.jit.is_tracing() else torch.int32,
         )
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
+
+        split_gather_sizes = None
+        if mpu.get_context_parallel_world_size() > 1:
+            split_gather_sizes = cal_split_sizes(seq_len, mpu.get_context_parallel_world_size())
+            rotary_pos_emb = split_forward_gather_backward(
+                rotary_pos_emb,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                split_sizes=split_gather_sizes
+            )
+            hidden_states = split_forward_gather_backward(
+                hidden_states,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                split_sizes=split_gather_sizes,
+            )
+
+        emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
+        position_embeddings = (emb.cos(), emb.sin())
 
         deepstack_feature_lists = []
         for layer_num, blk in enumerate(self.blocks):
@@ -370,6 +393,9 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         else:
             text_position_ids = position_ids[0]
 
+        total_seq_len = inputs_embeds.shape[1]
+        set_seq_len("total", total_seq_len)
+
         attention_mask = create_causal_mask(
             config=self.config,
             input_embeds=inputs_embeds,
@@ -378,6 +404,30 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
             past_key_values=past_key_values,
             position_ids=text_position_ids,
         )
+
+        if mpu.get_context_parallel_world_size() > 1:
+            split_gather_sizes = cal_split_sizes(total_seq_len, mpu.get_context_parallel_world_size())
+            position_ids = split_forward_gather_backward(
+                position_ids, 
+                mpu.get_context_parallel_group(),
+                dim=2,
+                grad_scale="down",
+                split_sizes=split_gather_sizes
+            )
+            text_position_ids = split_forward_gather_backward(
+                text_position_ids, 
+                mpu.get_context_parallel_group(),
+                dim=1,
+                grad_scale="down",
+                split_sizes=split_gather_sizes
+            )
+            inputs_embeds = split_forward_gather_backward(
+                inputs_embeds, 
+                mpu.get_context_parallel_group(), 
+                dim=1,
+                grad_scale="down",
+                split_sizes=split_gather_sizes, 
+            )
 
         hidden_states = inputs_embeds
 
@@ -415,10 +465,39 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
     def _deepstack_process(
         self, hidden_states: torch.Tensor, visual_pos_masks: torch.Tensor, visual_embeds: torch.Tensor
     ):
+        if mpu.get_context_parallel_world_size() > 1:
+            total_seq_len = get_seq_len("total")
+            visual_seq_len = get_seq_len("visual")
+            split_gather_sizes = cal_split_sizes(total_seq_len, mpu.get_context_parallel_world_size())
+            visual_gather_sizes = cal_split_sizes(visual_seq_len, mpu.get_context_parallel_world_size())
+            hidden_states = gather_forward_split_backward(
+                hidden_states,
+                mpu.get_context_parallel_group(),
+                dim=1,
+                grad_scale="up",
+                gather_sizes=split_gather_sizes
+            )
+            visual_embeds = gather_forward_split_backward(
+                visual_embeds,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=visual_gather_sizes
+            )
+
         visual_pos_masks = visual_pos_masks.to(hidden_states.device)
         visual_embeds = visual_embeds.to(hidden_states.device, hidden_states.dtype)
         local_this = hidden_states[visual_pos_masks, :].clone() + visual_embeds
         hidden_states[visual_pos_masks, :] = local_this
+
+        if mpu.get_context_parallel_world_size() > 1:
+            hidden_states = split_forward_gather_backward(
+                hidden_states, 
+                mpu.get_context_parallel_group(), 
+                dim=1,
+                grad_scale="down",
+                split_sizes=split_gather_sizes, 
+            )
         return hidden_states
 
 
@@ -598,6 +677,18 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
         """
         pixel_values = pixel_values.type(self.visual.dtype)
         image_embeds, deepstack_image_embeds = self.visual(pixel_values, grid_thw=image_grid_thw)
+        if mpu.get_context_parallel_world_size() > 1:
+            visual_seqlen = get_seq_len("visual")
+            gather_sizes = cal_split_sizes(visual_seqlen, mpu.get_context_parallel_world_size())
+
+            image_embeds = gather_forward_split_backward(
+                image_embeds,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes,
+            )
+
         split_sizes = (image_grid_thw.prod(-1) // self.visual.spatial_merge_size**2).tolist()
         image_embeds = torch.split(image_embeds, split_sizes)
         return image_embeds, deepstack_image_embeds

@@ -7,10 +7,12 @@ from transformers import AutoConfig
 
 from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
+from megatron.core import tensor_parallel, mpu
 
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.modelzoo import ModelZoo
 from mindspeed_mm.models.common.chunkloss import chunk_loss, calculate_lm_loss
+from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward, gather_forward_split_backward
 
 
 class TransformersModel(MultiModalModule):
@@ -25,6 +27,11 @@ class TransformersModel(MultiModalModule):
         self.transformer_config = AutoConfig.from_pretrained(hf_path, trust_remote_code=trust_remote_code)
 
         model_cls = ModelZoo.build(config, self.transformer_config)
+
+        self._set_loss_cfg()
+        
+        if callable(getattr(model_cls, 'overwrite_transformer_config', None)):
+            self.transformer_config = model_cls.overwrite_transformer_config(self.transformer_config)
 
         if args.init_model_with_meta_device:
             self.model = model_cls._from_config(self.transformer_config).float()
@@ -43,25 +50,49 @@ class TransformersModel(MultiModalModule):
         print_rank_0("> load model successfully")
 
         self.model.train()
-        if hasattr(self.model, 'freeze') and callable(getattr(self.model, 'freeze')):
+
+        if callable(getattr(self.model, 'freeze', None)):
             self.model.freeze(config)
-        
-        # Retrieve loss configuration from args if available; otherwise, set to None.
-        loss_cfg = getattr(args.mm.model, "loss_cfg", None)
 
-        # Default loss mode is "default". It can be overridden by loss_cfg.mode if provided.
-        self.loss_compute_mode = "default"
-        self.loss_chunk_size = None  # Initialize chunk size as None; only used in "chunk" mode.
-
-        if loss_cfg is not None:
-            # Override loss mode based on configuration (supports "default" or "chunk").
-            self.loss_compute_mode = getattr(loss_cfg, "compute_mode", "default")
-            
-            # If using "chunk" mode, retrieve the chunk size (default: 1024).
-            if self.loss_compute_mode == "chunk":
-                self.loss_chunk_size = getattr(loss_cfg, "chunk_size", 1024)
-            
         self.model.use_cache = False
+
+    def compute_language_model_loss_cp(self, logits: Tensor, labels: Tensor, ignore_index: int = -100) -> Tensor:
+        args = get_args()
+        token_nums = None
+        logits = logits.permute(0, 2, 1).contiguous()
+
+        if args.context_parallel_algo == "ulysses_cp_algo":
+            # pad and shift labels
+            labels = F.pad(labels, (0, 1), value=ignore_index)
+            shift_labels = labels[..., 1:].contiguous()
+            token_nums = (shift_labels > -1).sum(dim=1)
+            # shape: [bs, s] --> [b, s / cp]
+            split_sizes = cal_split_sizes(shift_labels.shape[-1], mpu.get_context_parallel_world_size())
+            shift_labels = split_forward_gather_backward(
+                shift_labels,
+                mpu.get_context_parallel_group(),
+                dim=1,
+                grad_scale="down",
+                split_sizes=split_sizes
+            )
+        else:
+            raise NotImplementedError("Only support ulysses_cp_algo now")
+
+        loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
+        loss = loss * (shift_labels > -1)
+
+        if args.calculate_per_token_loss:
+            return loss.sum(), token_nums.sum()
+        elif args.calculate_per_sample_loss:
+            batch_mean_loss = loss.sum(dim=1) / token_nums
+            loss = batch_mean_loss.mean()
+            token_nums = token_nums.mean()
+        elif args.calculate_token_loss:
+            token_nums = torch.sum(token_nums)
+            loss = loss.sum() / token_nums
+        else:
+            raise NotImplementedError("Unsupported loss type now")
+        return loss, token_nums
 
     def compute_language_model_loss(self, logits: Tensor, labels: Tensor, ignore_index: int = -100, **kwargs) -> Tensor:
         args = get_args()
@@ -87,7 +118,7 @@ class TransformersModel(MultiModalModule):
             # Flatten the tokens
             logits = logits.view(-1, logits.shape[-1])
             loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
-            loss = torch.sum(loss.view(-1) * loss_mask)
+            loss = torch.sum(loss.view(-1) * loss_mask.view(-1))
         elif args.calculate_token_loss:
             shift_labels = shift_labels.view(-1)
             # Flatten the tokens
@@ -175,9 +206,14 @@ class TransformersModel(MultiModalModule):
             )
             logits = outputs.logits.contiguous().float()
 
-            loss, loss_mask = self.compute_language_model_loss(logits, labels, **kwargs)
-            loss_dict["loss"] = loss
-            loss_dict["loss_mask"] = loss_mask
+            if mpu.get_context_parallel_world_size() > 1:
+                loss, token_nums = self.compute_language_model_loss_cp(logits, labels)
+                loss_dict["loss"] = loss
+                loss_dict["token_nums"] = token_nums
+            else:
+                loss, loss_mask = self.compute_language_model_loss(logits, labels, **kwargs)
+                loss_dict["loss"] = loss
+                loss_dict["loss_mask"] = loss_mask
         return loss_dict
 
     def fully_shard(
@@ -228,6 +264,19 @@ class TransformersModel(MultiModalModule):
             alpha = loss_mask.sum()  # scalar
             reduction = "sum"
 
+        if mpu.get_context_parallel_world_size() > 1:
+            if args.context_parallel_algo == "ulysses_cp_algo":
+                split_gather_sizes = cal_split_sizes(shift_labels.shape[1], mpu.get_context_parallel_world_size())
+                shift_labels = split_forward_gather_backward(
+                    shift_labels,
+                    mpu.get_context_parallel_group(),
+                    dim=-1,
+                    grad_scale="down",
+                    split_sizes=split_gather_sizes
+                    )
+            else:
+                raise NotImplementedError("Only support ulysses_cp_algo now")
+
         # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
         chunk_labels = torch.split(shift_labels, chunk_size, dim=1)
         
@@ -254,3 +303,20 @@ class TransformersModel(MultiModalModule):
             )
         
         return loss_ctx, loss_mask
+
+    def _set_loss_cfg(self):
+        # Retrieve loss configuration from model.json if available
+        loss_cfg = getattr(self.config, "loss_cfg", None)
+        # loss_cfg param: compute_mode, chunk_size
+        # compute_mode: default, chunk(use chunk loss)
+        # chunk_size: valid when compute mode is set to chunk (default 1024)
+        self.loss_compute_mode = "default"
+        self.loss_chunk_size = 1024
+        if loss_cfg is not None:
+            self.loss_compute_mode = getattr(loss_cfg, "compute_mode", "default")
+            if self.loss_compute_mode == "default":
+                pass
+            elif self.loss_compute_mode == "chunk":
+                self.loss_chunk_size = getattr(loss_cfg, "chunk_size", 1024)
+            else:
+                raise NotImplementedError(f"Unrecognized loss_compute_mode: {self.loss_compute_mode}.")

@@ -4,9 +4,9 @@
     "image_encoder": {
         "vision_encoder": {
             "model_id": "qwen3vit",
-            "num_layers": 999999,
-            "hidden_size": 999999,
-            "num_attention_heads": 999999,
+            "num_layers": 27,
+            "hidden_size": 1152,
+            "num_attention_heads": 16,
             "freeze": true
         },
         "vision_projector": {
@@ -17,10 +17,10 @@
     },
     "text_decoder": {
         "model_id": "qwen3lm",
-        "num_layers": 999999,
-        "hidden_size": 999999,
-        "num_attention_heads": 999999,
-        "max_position_embeddings": 999999,
+        "num_layers": 48,
+        "hidden_size": 2048,
+        "num_attention_heads": 32,
+        "max_position_embeddings": 262144,
         "freeze": false,
         "use_npu_fused_moe": false
     },

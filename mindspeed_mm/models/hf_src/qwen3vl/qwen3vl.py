@@ -6,7 +6,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
     CheckpointImpl
 )
-from megatron.training import print_rank_0
+from megatron.training import print_rank_0, get_args
 from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin
 
 from mindspeed_mm.models.hf_src.qwen3vl.modeling_qwen3_vl import Qwen3VLForConditionalGeneration as HFQwen3VLForConditionalGeneration
@@ -59,6 +59,20 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         for name, param in self.model.named_parameters():
             if any(forbidden_module in name for forbidden_module in forbidden_modules):
                 param.requires_grad_(False)
+
+    @staticmethod
+    def overwrite_transformer_config(transformer_config):
+        args = get_args()
+        model_cfg = args.mm.model
+
+        # attn_implementation support eager, sdpa(layout BNSD), flash_attention_2(layout BNSD), var_len_fa(layout TND), default flash_attention_2
+        vit_attn_implementation = getattr(model_cfg.image_encoder, "attn_implementation", "flash_attention_2")
+        llm_attn_implementation = getattr(model_cfg.text_decoder, "attn_implementation", "flash_attention_2")
+        # set attn type configuration
+        transformer_config.vision_config._attn_implementation = vit_attn_implementation
+        transformer_config.text_config._attn_implementation = llm_attn_implementation
+
+        return transformer_config
 
 
 class Qwen3VLForConditionalGeneration(HFQwen3VLForConditionalGeneration, Qwen3VLFSDP2Mixin):

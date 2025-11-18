@@ -18,7 +18,6 @@ from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.data.data_utils.utils import build_iterations
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.models.transformers_model import TransformersModel
-from mindspeed_mm.utils.utils import compute_token_level_loss
 mindspeed_args = get_mindspeed_args()
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
     import mindspeed_mm.mindspore.mindspore_adaptor
@@ -60,28 +59,35 @@ def loss_func(output_tensor):
     args = get_args()
     loss_dir = {}
 
-    if args.log_tps:
+    loss = output_tensor['loss']    
+    if output_tensor.get('token_nums', None) is not None:
+        total_tokens = output_tensor['token_nums']
+    else:
         loss_mask = output_tensor['loss_mask'].view(-1).float()
         total_tokens = loss_mask.sum()
+    
+    if args.log_tps:
         dp_size = torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
-        tokens_per_sample = torch.tensor(total_tokens, device=output_tensor['loss_mask'].device) / dp_size
+        tokens_per_sample = torch.tensor(total_tokens, device=output_tensor['loss'].device) / dp_size
         torch.distributed.all_reduce(tokens_per_sample, group=mpu.get_data_parallel_group())
         loss_dir["tokens per sample"] = tokens_per_sample
 
     if args.calculate_per_token_loss:
-        loss, local_num_tokens, reporting_loss = compute_token_level_loss(output_tensor)
+        loss = output_tensor['loss']
+        # for report
+        reporting_loss = torch.cat([loss.view(1), total_tokens.view(1)]).detach()
+        torch.distributed.all_reduce(reporting_loss[0], group=mpu.get_data_parallel_group(with_context_parallel=True))
         loss_dir["loss"] = (reporting_loss[0], reporting_loss[1])
-        return (
-            loss[0].clone(),
-            local_num_tokens,
-            loss_dir
-        )
+        # prepare per token loss
+        loss *= mpu.get_context_parallel_world_size()
+        num_tokens = total_tokens.clone().detach().to(torch.int)
 
-    loss = output_tensor['loss']
+        return loss.clone(), num_tokens, loss_dir
+
     averaged_loss = average_losses_across_data_parallel_group([loss])
     loss_dir["loss"] = averaged_loss[0]
     loss = loss.unsqueeze(0).clone()
-    return loss / mpu.get_context_parallel_world_size(), loss_dir
+    return loss, loss_dir
 
 
 def forward_step(data_iterator, model):
