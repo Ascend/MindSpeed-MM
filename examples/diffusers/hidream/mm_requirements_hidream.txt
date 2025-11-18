@@ -5,7 +5,7 @@ transformers==4.47.1
 ftfy
 tensorboard
 Jinja2
-peft>=0.14.0
+peft==0.17.1
 sentencepiece
 scipy
 decorator
