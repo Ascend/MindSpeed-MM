@@ -83,7 +83,7 @@
 
     ```shell
     pip install -e .
-    vim examples/dreambooth/requirements_sd3.txt #修改版本：torch==2.7.1, accelerate==1.10.0, 添加deepspeed==0.17.2
+    vim examples/dreambooth/requirements_sd3.txt #修改版本：torch==2.7.1, accelerate==1.10.0, 添加deepspeed==0.17.2, peft==0.7.1
     pip install -r examples/dreambooth/requirements_sd3.txt # 安装对应依赖
     ```
 
@@ -370,7 +370,6 @@ vim infer_sd3_img2img.py # 进入运行I2I推理的Python文件
 | `ACLNN_CACHE_LIMIT`           | 配置单算子执行API在Host侧缓存的算子信息条目个数                                  | 需要配置为整数，取值范围`[1, 10,000,000]`，默认值为`10000`                                                     |
 | `TOKENIZERS_PARALLELISM`      | 用于控制Hugging Face的transformers库中的分词器（tokenizer）在多线程环境下的行为    | `False`: 禁用并行分词<br>`True`: 开启并行分词                                                        |
 | `OMP_NUM_THREADS`             | 设置执行期间使用的线程数    |      需要配置为整数                                                  |
-
 
 ## 引用
 
