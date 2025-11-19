@@ -33,6 +33,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 # 最新消息
 
 ---
+* [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型
 * [Nov. 06, 2025]: 🚀 MindSpeed MM基于FSDP2支持DeepseekOCR模型训练demo【Prototype】
 * [Oct. 31, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-8B/30B模型 【Prototype】
 * [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型 【Prototype】
@@ -248,7 +249,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </thead>
   <tbody>
     <tr>
-      <td rowspan="40"> 多模态生成 </td>
+      <td rowspan="42"> 多模态生成 </td>
       </tr>
       <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/lumina">Lumina-mGPT 2.0</a></td>
@@ -667,6 +668,28 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> / </td>
       <td> / </td>
       <td>【Test】</td>
+    </tr>
+    <tr>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/qwen_image">Qwen-Image</a></td>
+      <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">27B</a></td>
+      <td> Lora微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td> 23.02 (FPS) </td>
+      <td> 21.54 (FPS) </td>
+      <td> / </td>
+      <td>【Pass】</td>
+    </tr>
+    <tr>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffsynth/qwen_image_edit">Qwen-Image</a></td>
+      <td><a href="https://github.com/modelscope/Diffsynth-Studio/tree/main/examples/qwen_image">27B</a></td>
+      <td> Lora微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td> 20.59 (FPS) </td>
+      <td> 17.47 (FPS) </td>
+      <td> / </td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td rowspan="20"> 多模态理解 </td>
