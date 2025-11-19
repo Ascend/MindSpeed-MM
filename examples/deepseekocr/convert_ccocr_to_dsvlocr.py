@@ -23,36 +23,39 @@ def trans_base64_to_pil(base64_str: str):
 
 
 def transform_jsonl(input_path, output_path):
-    orig_datas = load_dataset(path=input_path)['train']
-
+    name_list = ["multi_scene_ocr", "multi_lan_ocr", "kie", "doc_parsing"]
     with open(output_path, 'w', encoding='utf-8') as outfile:
-        for i, ori_data in enumerate(tqdm(orig_datas)):
-            img_data = ori_data['image']
-            answer = ori_data['answer']
-            img_name = ori_data['image_name']
-            img = trans_base64_to_pil(img_data)
+        i = 0
+        for name in name_list:
+            orig_datas = load_dataset(path=input_path, name=name)['test']
+            for ori_data in tqdm(orig_datas):
+                img_data = ori_data['image']
+                answer = ori_data['answer']
+                img_name = ori_data['image_name']
+                img = trans_base64_to_pil(img_data)
 
-            save_path = os.path.join(os.path.dirname(input_path), 'convert')
-            if not os.path.exists(save_path):
-                os.mkdir(save_path)
-            save_file = f"{save_path}/{img_name}.jpg"
-            img.save(save_file)
+                save_path = os.path.join(os.path.dirname(input_path), 'convert')
+                if not os.path.exists(save_path):
+                    os.mkdir(save_path)
+                save_file = f"{save_path}/{img_name}.jpg"
+                img.save(save_file)
 
-            transformed = {
-                'id': i,
-                'conversations': [
-                    {
-                        "role": "<|User|>",
-                        "content": "Free OCR.",
-                        "images": [f"{save_file}"]
-                    },
-                    {
-                        "role": "<|Assistant|>",
-                        "content": answer
-                    }
-                ]
-            }
-            outfile.write(json.dumps(transformed, ensure_ascii=False) + '\n')
+                transformed = {
+                    'id': i,
+                    'conversations': [
+                        {
+                            "role": "<|User|>",
+                            "content": "Free OCR.",
+                            "images": [f"{save_file}"]
+                        },
+                        {
+                            "role": "<|Assistant|>",
+                            "content": answer
+                        }
+                    ]
+                }
+                i += 1
+                outfile.write(json.dumps(transformed, ensure_ascii=False) + '\n')
 
 
 if __name__ == "__main__":
