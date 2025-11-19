@@ -310,7 +310,18 @@ mm-convert Qwen3VLConverter dcp_to_hf \
 
 完成权重转换之后，即可使用transformers库进行推理。
 
+【多机运行配置】
+
+如需拉起多机训练，修改启动脚本下 MASTER_ADDR、NODE_ADDR、NODES以及NODE_RANK变量
+``` shell
+MASTER_ADDR: 主节点IP地址
+NODE_ADDR: 本机IP地址
+NODE_RANK: 第几个节点
+NODES: 一共几个节点
+```
+
 ---
+
 
 
 <a id="jump10"></a>

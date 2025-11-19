@@ -1,0 +1,30 @@
+{
+    "model_id": "qwen3_vl_moe",
+    "init_from_hf_path": "./ckpt/hf_path/Qwen3-VL-235B-Instruct",
+    "image_encoder": {
+        "vision_encoder": {
+            "model_id": "qwen3vit",
+            "num_layers": 999999,
+            "hidden_size": 999999,
+            "num_attention_heads": 999999,
+            "freeze": true
+        },
+        "vision_projector": {
+            "model_id": "lnmlp",
+            "num_layers": 999999,
+            "freeze": true
+        }
+    },
+    "text_decoder": {
+        "model_id": "qwen3lm",
+        "num_layers": 999999,
+        "hidden_size": 999999,
+        "num_attention_heads": 999999,
+        "max_position_embeddings": 999999,
+        "freeze": false
+    },
+    "patch": {
+        "clip_grad_async": true,
+        "scale_grad": true
+    }
+}
