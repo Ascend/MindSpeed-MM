@@ -40,12 +40,11 @@ def find_safetensors_index(directory: Path) -> Optional[FilePath]:
 
 @validate_arguments
 def save_hf_weights(
-    save_dir: str,  # Allow creation, so not DirectoryPath
+    save_path: Path,
     model_assets_dir: DirectoryPath,
     state_dict: Dict,
     prefix: str = "",
 ):
-    save_path = Path(save_dir)
     save_path.mkdir(parents=True, exist_ok=True)
 
     index_file: Optional[FilePath] = find_safetensors_index(Path(model_assets_dir))
@@ -97,7 +96,7 @@ def merge_dcp_to_hf(
     processor.save_pretrained(save_path)
 
     save_hf_weights(
-        save_dir=save_dir,
+        save_path=save_path,
         model_assets_dir=str(model_assets_dir),
         state_dict=state_dict,
         prefix=prefix,

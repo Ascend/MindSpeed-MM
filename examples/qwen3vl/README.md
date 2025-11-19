@@ -302,9 +302,9 @@ bash examples/qwen3vl/finetune_qwen3vl_xxB.sh
 训练完成之后，以Qwen3VL-xxB为例，将保存在`save_dir`目录下的权重转换成huggingface格式
 ```shell
 mm-convert Qwen3VLConverter dcp_to_hf \
-  --load-dir save_dir/iter_000xx/ \
-  --save-dir save_dir/iter_000xx_hf/ \
-  --model-assets-dir ./ckpt/Qwen3-VL-xxB-Instruct \
+  --load_dir save_dir/iter_000xx/ \
+  --save_dir save_dir/iter_000xx_hf/ \
+  --model_assets_dir ./ckpt/Qwen3-VL-xxB-Instruct \
 ```
 其中，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径，`--model_assets_dir`原始huggingface权重的路径。
 

@@ -55,7 +55,7 @@ class Qwen3VLConverter(Converter):
     def dcp_to_hf(
         self, 
         load_dir: str = "mm_save_dir/release",     # Input: Directory containing DCP shards
-        save_dir: str = "Qwen3-VL-xxB-hf",         # Output: Directory to save merged HF model
+        save_dir: Path = "Qwen3-VL-xxB-hf",         # Output: Directory to save merged HF model
         model_assets_dir: str = "Qwen3-VL-xxB"     # Reference: Original HF model dir (for config/tokenizer)
     ):
         """
