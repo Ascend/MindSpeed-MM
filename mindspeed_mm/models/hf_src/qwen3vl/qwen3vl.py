@@ -24,6 +24,9 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
 
         for i, layer in enumerate(self.model.language_model.layers):
             self.model.language_model.layers[i] = checkpoint_wrapper(layer, CheckpointImpl.REENTRANT)
+            
+        last_module_kwargs = fsdp2_kwargs.copy()
+        last_module_kwargs["reshard_after_forward"] = False
 
         # fully_shard
         for block in self.model.visual.blocks:
@@ -31,13 +34,35 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         fully_shard(self.model.visual.merger, **fsdp2_kwargs)
         for merger in self.model.visual.deepstack_merger_list:
             fully_shard(merger, **fsdp2_kwargs)
-        fully_shard(self.model.visual, **fsdp2_kwargs)
+        fully_shard(self.model.visual, **fsdp2_kwargs)            
 
+        llm_num_layers = len(self.model.language_model.layers)
         fully_shard(self.model.language_model.embed_tokens, **fsdp2_kwargs)
-        for layer in self.model.language_model.layers:
-            fully_shard(layer, **fsdp2_kwargs)
-        fully_shard(self.lm_head, **fsdp2_kwargs)
+        for idx, layer in enumerate(self.model.language_model.layers):
+            if idx == (llm_num_layers - 1) and fsdp2_config.num_to_forward_prefetch > 0:
+                # Skip resharding after forward for the last layer if prefetching is enabled
+                fully_shard(layer, **last_module_kwargs)
+            else:
+                fully_shard(layer, **fsdp2_kwargs)
+        fully_shard(self.lm_head, **last_module_kwargs)
         fully_shard(self, **fsdp2_kwargs)
+        
+        # prefetch
+        if fsdp2_config.num_to_forward_prefetch > 0:
+            for i, (curr_block, next_block) in enumerate(zip(self.model.visual.blocks[:-1], self.model.visual.blocks[1:])):
+                prefetch_modules = []
+                if i in self.model.visual.deepstack_visual_indexes:
+                    prefetch_modules.append(self.model.visual.deepstack_merger_list[self.model.visual.deepstack_visual_indexes.index(i)])
+                prefetch_modules.append(next_block)
+                curr_block.set_modules_to_forward_prefetch(prefetch_modules)
+                
+            self.model.visual.blocks[-1].set_modules_to_forward_prefetch([self.model.visual.merger])
+            self.model.visual.merger.set_modules_to_forward_prefetch([self.model.language_model.embed_tokens])
+            self.model.language_model.embed_tokens.set_modules_to_forward_prefetch([self.model.language_model.layers[0]])
+            
+            for curr_layer, next_layer in zip(self.model.language_model.layers[:-1], self.model.language_model.layers[1:]):
+                curr_layer.set_modules_to_forward_prefetch([next_layer])
+            self.model.language_model.layers[-1].set_modules_to_forward_prefetch([self.lm_head])
 
     def freeze(self, config):
         forbidden_modules = set()
