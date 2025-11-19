@@ -33,7 +33,15 @@ from mindspeed_mm.models.common.mm_gpt_model import MMGPTModel
 from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positionsids_mask_for_llm
 from mindspeed_mm.utils.hetero_parallel import change_parallel_state
 from mindspeed_mm.utils.utils import EncoderBalanceComm
-from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin, WeightInitMixin
+try:
+    from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin, WeightInitMixin
+except Exception as e:
+    print(
+        "⚠️ FSDP2Mixin and WeightInitMixin are not available\n"
+        "If you want to use them, please ensure torch version >= 2.7.1"
+    )
+    class FSDP2Mixin: pass
+    class WeightInitMixin: pass
 
 
 class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
