@@ -51,7 +51,7 @@ log_prob_micro_batch_size_per_gpu=4
 use_remove_padding=True
 ignore_eos=False
 actor_reshard=True
-ref_reshared=True
+ref_reshard=True
 
 # training params
 enable_gradient_checkpointing=True

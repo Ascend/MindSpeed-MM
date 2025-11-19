@@ -124,3 +124,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.enable_activation_offload=True \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=$sp_size \
     actor_rollout_ref.ref.ulysses_sequence_parallel_size=$sp_size | tee train_qwen3_vl_30b_grpo_full.log 2>&1 &
+wait
+
+TPS=`grep 'perf/throughput:' train_qwen3_vl_30b_grpo_full.log | awk -F 'perf/throughput:' '{print$2}' | awk -F ' ' '{print$1}' | tail -n 5 | awk '{sum+=$1} END {print sum/NR}'`
+echo "Final Performance TPS : $TPS"
