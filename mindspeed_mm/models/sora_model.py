@@ -40,7 +40,7 @@ from mindspeed_mm.models.diffusion import DiffusionModel
 from mindspeed_mm.models.predictor import PredictModel
 from mindspeed_mm.models.text_encoder import TextEncoder
 from mindspeed_mm.utils.utils import unwrap_single
-from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin, WeightInitMixin
+from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 
 logger = getLogger(__name__)
 
@@ -148,7 +148,7 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
                             latents, i2v_results = self.ae.encode(video, **kwargs)
                         else:
                             raise NotImplementedError(f"Task {self.task} is not Implemented!")
-                    
+
                     # Text Encode
                     if self.load_text_features:
                         prompt = prompt_ids
@@ -343,7 +343,7 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
 
         self.index += 1
         return latents, prompt, video_mask, prompt_mask, i2v_results
-    
+
     def sharded_state_dict(
         self,
         prefix: str = '',
@@ -367,9 +367,9 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
         """
         sharded_state_dict = {}
         # Save parameters
-        
+
         self._save_to_state_dict(sharded_state_dict, '', keep_vars=True)
-        
+
         sharded_state_dict = make_sharded_tensors_for_checkpoint(
             sharded_state_dict, prefix, sharded_offsets=sharded_offsets, extra_state_suffix=""
         )

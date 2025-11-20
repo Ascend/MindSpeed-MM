@@ -7,12 +7,12 @@ from transformers import AutoConfig
 
 from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
-from megatron.core import tensor_parallel, mpu
+from megatron.core import mpu
 
 from mindspeed_mm.models.common.module import MultiModalModule
-from mindspeed_mm.models.common.modelzoo import ModelZoo
 from mindspeed_mm.models.common.chunkloss import chunk_loss, calculate_lm_loss
-from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward, gather_forward_split_backward
+from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward
+from mindspeed_mm.models.transformers.modelhub import ModelHub
 
 
 class TransformersModel(MultiModalModule):
@@ -26,7 +26,7 @@ class TransformersModel(MultiModalModule):
         self.config = core_transformer_config_from_args(args)
         self.transformer_config = AutoConfig.from_pretrained(hf_path, trust_remote_code=trust_remote_code)
 
-        model_cls = ModelZoo.build(config, self.transformer_config)
+        model_cls = ModelHub.build(config, self.transformer_config)
 
         self._set_loss_cfg(args)
         
@@ -230,7 +230,7 @@ class TransformersModel(MultiModalModule):
                 **kwargs
             )
         return False
-    
+
     def build_loss_ctx(
         self,
         labels,
@@ -240,10 +240,10 @@ class TransformersModel(MultiModalModule):
         labels = F.pad(labels, (0, 1), value=ignore_index)
         # Shift labels to match the input sequence for next-token prediction.
         shift_labels = labels[..., 1:].contiguous()
-        
+
         # Create a mask to identify valid tokens (typically > -1 means non-special tokens)
         loss_mask = shift_labels > -1
-        
+
         # Retrieve global arguments to determine loss reduction behavior.
         args = get_args()
         if args.calculate_per_sample_loss:
@@ -251,7 +251,7 @@ class TransformersModel(MultiModalModule):
             alpha = loss_mask.sum(1) * loss_mask.shape[0]  # shape: [batch_size]
             reduction = "none"  # Keep per-token losses for sample-wise aggregation.
         elif args.calculate_per_token_loss:
-            # Use raw sum loss without normalization here; 
+            # Use raw sum loss without normalization here;
             # token-level loss equivalence will be achieved later by scaling the gradient norm.
             alpha = torch.tensor(1)
             reduction = "sum"
@@ -279,7 +279,7 @@ class TransformersModel(MultiModalModule):
 
         # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
         chunk_labels = torch.split(shift_labels, chunk_size, dim=1)
-        
+
         # Prepare keyword arguments for each chunk to be passed to the chunked loss function.
         loss_ctx_kwargs = [
             {
@@ -290,7 +290,7 @@ class TransformersModel(MultiModalModule):
             }
             for i in range(len(chunk_labels))
         ]
-        
+
         # Return a closure that computes the chunked language modeling loss using the prepared config.
         def loss_ctx(hidden_states, head_weight, head_bias):
             return chunk_loss(
@@ -301,7 +301,7 @@ class TransformersModel(MultiModalModule):
                 loss_kwargs_chunks=loss_ctx_kwargs,
                 chunk_size=chunk_size
             )
-        
+
         return loss_ctx, loss_mask
 
     def _set_loss_cfg(self, args):

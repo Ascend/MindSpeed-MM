@@ -7,10 +7,10 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     CheckpointImpl
 )
 from megatron.training import print_rank_0, get_args
-from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin
+from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
 
-from mindspeed_mm.models.hf_src.qwen3vl.modeling_qwen3_vl import Qwen3VLForConditionalGeneration as HFQwen3VLForConditionalGeneration
-from mindspeed_mm.models.hf_src.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeForConditionalGeneration as HFQwen3VLMoeForConditionalGeneration
+from mindspeed_mm.models.transformers.qwen3vl.modeling_qwen3_vl import Qwen3VLForConditionalGeneration as HFQwen3VLForConditionalGeneration
+from mindspeed_mm.models.transformers.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeForConditionalGeneration as HFQwen3VLMoeForConditionalGeneration
 
 
 class Qwen3VLFSDP2Mixin(FSDP2Mixin):
@@ -24,7 +24,7 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
 
         for i, layer in enumerate(self.model.language_model.layers):
             self.model.language_model.layers[i] = checkpoint_wrapper(layer, CheckpointImpl.REENTRANT)
-            
+
         last_module_kwargs = fsdp2_kwargs.copy()
         last_module_kwargs["reshard_after_forward"] = False
 
@@ -34,7 +34,7 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         fully_shard(self.model.visual.merger, **fsdp2_kwargs)
         for merger in self.model.visual.deepstack_merger_list:
             fully_shard(merger, **fsdp2_kwargs)
-        fully_shard(self.model.visual, **fsdp2_kwargs)            
+        fully_shard(self.model.visual, **fsdp2_kwargs)
 
         llm_num_layers = len(self.model.language_model.layers)
         fully_shard(self.model.language_model.embed_tokens, **fsdp2_kwargs)
@@ -46,7 +46,7 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
                 fully_shard(layer, **fsdp2_kwargs)
         fully_shard(self.lm_head, **last_module_kwargs)
         fully_shard(self, **fsdp2_kwargs)
-        
+
         # prefetch
         if fsdp2_config.num_to_forward_prefetch > 0:
             for i, (curr_block, next_block) in enumerate(zip(self.model.visual.blocks[:-1], self.model.visual.blocks[1:])):
@@ -55,11 +55,11 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
                     prefetch_modules.append(self.model.visual.deepstack_merger_list[self.model.visual.deepstack_visual_indexes.index(i)])
                 prefetch_modules.append(next_block)
                 curr_block.set_modules_to_forward_prefetch(prefetch_modules)
-                
+
             self.model.visual.blocks[-1].set_modules_to_forward_prefetch([self.model.visual.merger])
             self.model.visual.merger.set_modules_to_forward_prefetch([self.model.language_model.embed_tokens])
             self.model.language_model.embed_tokens.set_modules_to_forward_prefetch([self.model.language_model.layers[0]])
-            
+
             for curr_layer, next_layer in zip(self.model.language_model.layers[:-1], self.model.language_model.layers[1:]):
                 curr_layer.set_modules_to_forward_prefetch([next_layer])
             self.model.language_model.layers[-1].set_modules_to_forward_prefetch([self.lm_head])

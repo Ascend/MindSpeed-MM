@@ -1,13 +1,13 @@
 import importlib
 
-from mindspeed_mm.models.hf_src.qwen3vl.qwen3vl import (
+from mindspeed_mm.models.transformers.qwen3vl.qwen3vl import (
     Qwen3VLForConditionalGeneration,
     Qwen3VLMoeForConditionalGeneration
 )
-from mindspeed_mm.models.hf_src.internvl3_5 import InternVLChatModelGeneration
+from mindspeed_mm.models.transformers.internvl3_5 import InternVLChatModelGeneration
 
 
-class ModelZoo:
+class ModelHub:
 
     MODEL_MAPPINGS = {
         "qwen3_vl": Qwen3VLForConditionalGeneration,
@@ -17,7 +17,7 @@ class ModelZoo:
 
     try:
         # support newer transformers for qwen3omni
-        from mindspeed_mm.models.hf_src.qwen3omni import Qwen3OmniMoeThinkerForConditionalGeneration
+        from mindspeed_mm.models.transformers.qwen3omni import Qwen3OmniMoeThinkerForConditionalGeneration
         MODEL_MAPPINGS["qwen3_omni_moe"] = Qwen3OmniMoeThinkerForConditionalGeneration
     except AttributeError:
         pass
@@ -30,13 +30,13 @@ class ModelZoo:
         This method determines the model class in the following priority order:
         1. First checks the `model_id` field in the `config` object (typically from the "model_id"
         field in model.json). If present, it looks up the corresponding model class in
-        ModelZoo.MODEL_MAPPINGS.
+        ModelHub.MODEL_MAPPINGS.
         2. If `model_id` is not available, it attempts to use the `architectures` field from
         `transformer_config` (usually from the config.json file in the Hugging Face model
         directory) to dynamically load the model class from the transformers library.
         3. If `architectures` is not available, it falls back to the `model_type` field in
         `transformer_config`, and looks up the corresponding model class in
-        ModelZoo.MODEL_MAPPINGS.
+        ModelHub.MODEL_MAPPINGS.
 
         Args:
             config (object): Configuration object expected to contain a `model_id` attribute.
@@ -61,7 +61,7 @@ class ModelZoo:
 
         model_id = getattr(config, "model_id", None)
         if model_id:
-            model_cls = ModelZoo.MODEL_MAPPINGS.get(model_id, None)
+            model_cls = ModelHub.MODEL_MAPPINGS.get(model_id, None)
             return model_cls
 
         if architectures:
@@ -71,7 +71,7 @@ class ModelZoo:
                 return model_cls
 
         if model_type:
-            model_cls = ModelZoo.MODEL_MAPPINGS.get(model_type, None)
+            model_cls = ModelHub.MODEL_MAPPINGS.get(model_type, None)
             if model_cls is not None:
                 return model_cls
 

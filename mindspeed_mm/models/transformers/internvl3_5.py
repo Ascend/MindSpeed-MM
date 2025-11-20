@@ -1,13 +1,13 @@
 # Copyright 2025 The Qwen team, Alibaba Group and the HuggingFace Inc. team. All rights reserved.
 from transformers.models.qwen3_moe.modeling_qwen3_moe import (
-    Qwen3MoeDecoderLayer, 
-    Qwen3MoeAttention, 
-    Qwen3MoeMLP, 
+    Qwen3MoeDecoderLayer,
+    Qwen3MoeAttention,
+    Qwen3MoeMLP,
     Qwen3MoeRMSNorm
 )
 
-from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin
-from mindspeed_mm.models.hf_src.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeTextSparseMoeBlock
+from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
+from mindspeed_mm.models.transformers.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeTextSparseMoeBlock
 
 try:
     from internvl.modeling_internvl_chat import InternVLChatModel

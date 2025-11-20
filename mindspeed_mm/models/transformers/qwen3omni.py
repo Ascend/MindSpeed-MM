@@ -6,7 +6,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 )
 
 from megatron.training import print_rank_0
-from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin
+from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
 
 
 class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
@@ -18,7 +18,7 @@ class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
         # recompute
         for i, layer in enumerate(self.audio_tower.layers):
             self.audio_tower.layers[i] = checkpoint_wrapper(layer, CheckpointImpl.REENTRANT)
-    
+
         for i, layer in enumerate(self.model.layers):
             self.model.layers[i] = checkpoint_wrapper(layer, CheckpointImpl.REENTRANT)
 
@@ -26,7 +26,7 @@ class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
         fully_shard(self.audio_tower.positional_embedding, **fsdp2_kwargs)
         for layer in self.audio_tower.layers:
             fully_shard(layer, **fsdp2_kwargs)
-        
+
         fully_shard(self.visual.merger, **fsdp2_kwargs)
         for merger in self.visual.merger_list:
             fully_shard(merger, **fsdp2_kwargs)
@@ -72,10 +72,10 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(transformers.Qwen3OmniMoeThink
         config = kwargs.get("config")
         if config is not None:
             kwargs["config"] = config.thinker_config
-        
+
         load_kwargs = {
             "trust_remote_code": False,
-            "_from_auto": True, 
+            "_from_auto": True,
             "device_map": None,
             "dtype": None,
             "attn_implementation": "eager",

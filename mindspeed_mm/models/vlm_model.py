@@ -34,7 +34,7 @@ from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positio
 from mindspeed_mm.utils.hetero_parallel import change_parallel_state
 from mindspeed_mm.utils.utils import EncoderBalanceComm
 try:
-    from mindspeed_mm.models.hf_src.base_model import FSDP2Mixin, WeightInitMixin
+    from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 except Exception as e:
     print(
         "⚠️ FSDP2Mixin and WeightInitMixin are not available\n"
