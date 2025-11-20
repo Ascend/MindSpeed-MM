@@ -1,13 +1,13 @@
 sharding_size: auto
 sub_modules_to_wrap:
-  - "vision_model.embeddings"
-  - "vision_model.encoder.layers.{*}"
-  - "language_model.model.layers.{*}"
+  - vision_model.embeddings
+  - vision_model.encoder.layers.{*}
+  - language_model.model.layers.{*}
 recompute_modules:
-  - "vision_model.embeddings"
-  - "vision_model.encoder.layers.{*}"
-  - "language_model.model.layers.{*}"
+  - vision_model.embeddings
+  - vision_model.encoder.layers.{*}
+  - language_model.model.layers.{*}
 reshard_after_forward: True
-param_dtype: "bf16"
-reduce_dtype: "fp32"
+param_dtype: bf16
+reduce_dtype: fp32
 cast_forward_inputs: True

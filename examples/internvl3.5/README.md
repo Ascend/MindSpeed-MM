@@ -17,6 +17,10 @@
 - [数据集准备及处理](#jump3)
   - [数据集下载](#jump3.1)
 - [微调](#jump4)
+  - [准备工作](#jump4.1)
+  - [配置参数](#jump4.2)
+  - [启动微调](#jump4.3)
+  - [启动推理](#jump4.4)
 - [环境变量声明](#jump6)
 
 ## 版本说明
@@ -177,6 +181,8 @@ pip install decord==0.6.0
 
 ## 微调
 
+<a id="jump4.1"></a>
+
 #### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载** 、**数据集准备及处理**，详情可查看对应章节。
@@ -236,7 +242,7 @@ HF_PATH="ckpt/hf_path/InternVL3_5-30B-A3B-Instruct"
 # 加载路径：权重转换后路径
 LOAD_PATH="ckpt/convert_path/InternVL3_5-30B-A3B-Instruct"
 # 保存路径
-SAVE_PATH="save_dir"
+SAVE_PATH="internvl35_finetune_result"
 ...
 GPT_ARGS="
     ...
@@ -301,6 +307,18 @@ $save_dir
 ```shell
 bash examples/internvl3.5/finetune_internvl3_5.sh
 ```
+
+<a id="jump4.4"></a>
+
+#### 4. 启动推理
+训练完成之后，将保存在`SAVE_PATH`目录下的权重转换成huggingface格式
+```shell
+mm-convert ExpertMergeDcpConverter dcp_to_hf --hf_dir "ckpt/hf_path/InternVL3_5-30B-A3B-Instruct" --dcp_dir "internvl35_finetune_result/iter_000xx" --save_dir "ckpt/dcp_to_hf/InternVL3_5-30B-A3B-Instruct"
+```
+
+其中，`--hf_dir`表示原始huggingface权重的路径，`--dcp_dir`表示微调后的权重保存路径，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径。
+
+完成权重转换之后，即可使用transformers库进行推理。
 
 
 <a id="jump6"></a>

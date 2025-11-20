@@ -29,16 +29,23 @@ NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 HF_PATH="ckpt/hf_path/InternVL3_5-30B-A3B-Instruct"
-if [ ! -L "./internvl" ]; then
-    ln -s $HF_PATH ./internvl
-    echo "Create a soft link: internvl -> $HF_PATH"
+
+if [ ! -f "$HF_PATH/modeling_internvl_chat.py" ]; then
+    echo "The HF_PATH is configured incorrectly. Please check."
+    exit 1
 fi
+
+if [ -L "./internvl" ]; then
+    unlink internvl
+fi
+ln -s $HF_PATH ./internvl
+echo "Create a soft link: internvl -> $HF_PATH"
 
 MM_DATA="./examples/internvl3.5/data.json"
 MM_MODEL="./examples/internvl3.5/model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="ckpt/convert_path/InternVL3_5-30B-A3B-Instruct"
-SAVE_PATH="save_dir"
+SAVE_PATH="internvl35_finetune_result"
 FSDP2_PATH="./examples/internvl3.5/fsdp2_config.yaml"
 
 TP=1

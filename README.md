@@ -166,6 +166,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 
 |       模型 \ 特性       | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) | RL | [FSDP2](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/fsdp2.md) |
 |:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|:------:|:------:|
+|   InternVL3.5-30B   |  |  |  |  |  |  | ✔ |  |  | ✔ |
 |       Qwen3-VL-8B        |  |  |  |  |  |  | ✔ |  |  | ✔ |
 |       Qwen3-VL-30B        |  |  |  |  |  |  | ✔ |  |  | ✔ |
 |       Wan2.2        |  |  |  |  | CP (Ulysses) | ✔ | ✔ |  |  | ✔ |
@@ -807,6 +808,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 4.69 (SPS) </td>
       <td> / </td>
       <td>【Pass】</td>
+    </tr>
+    <tr>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/internvl3.5">InternVL 3.5</a></td>
+      <td><a href="https://huggingface.co/OpenGVLab/InternVL3_5-30B-A3B-Instruct">30B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 (A3)  </td>
+      <td> BF16 </td>
+      <td> 2.1 (SPS) </td>
+      <td> 1.9 (SPS) </td>
+      <td> / </td>
+      <td>【Test】</td>
     </tr>
     <tr>
       <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2vl">Qwen2-VL</a></td>
