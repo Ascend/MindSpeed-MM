@@ -19,8 +19,8 @@
 
 ## 支持模型
 
-- [Qwen2.5VL](./verl_examples/qwen2.5vl/README.md)
-- [Qwen3VL](./verl_examples/qwen3vl/README.md)
+- [Qwen2.5VL](../examples/verl_examples/qwen2.5vl/README.md)
+- [Qwen3VL](../examples/verl_examples/qwen3vl/README.md)
 
 <a id="jump2"></a>
 

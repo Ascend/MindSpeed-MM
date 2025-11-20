@@ -136,13 +136,13 @@ pip install torch_npu-2.7.1*.manylinux_*.whl
 ```bash
 # 请确保 vllm 已正确安装并且之后不会做覆盖
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
-cd MindSpeed-MM/examples/verl_plugin
+cd MindSpeed-MM/verl_plugin
 export MODEL_SELECT="Qwen3vl"
 # 指定verl源码路径 例如：/home/code/verl
 export VERL_PATH=path_to_verl
 pip install -v -e .
-scp -r verl_examples/qwen3vl/* ../../../verl/examples/grpo_trainer/
-cd ../../../verl/
+scp -r ../examples/verl_examples/qwen3vl/* ../../verl/examples/grpo_trainer/
+cd ../../verl/
 ```
 
 <a id="jump2"></a>
@@ -190,7 +190,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 #### 2. 启动训练
 
-以 Qwen3VL 8B 模型为例,在启动训练之前，需要修改[启动脚本](../../../../examples/verl_plugin/verl_examples/qwen3vl/train_qwen3_vl_8b_grpo_full.sh)的配置：
+以 Qwen3VL 8B 模型为例,在启动训练之前，需要修改[启动脚本](train_qwen3_vl_8b_grpo_full.sh)的配置：
 
 1. 根据使用机器的情况，修改`NNODES`、`NPUS_PER_NODE`配置， 例如单机 A2 可设置`NNODES`为 1 、`NPUS_PER_NODE`为8；
 
@@ -214,7 +214,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 3. 实际运行场景与默认配置脚本不一致时，需要根据实际场景调整`micro_batch_size`、`dispatch_size`等相关配置参数。
 
-4. 以 Qwen3VL 30B 模型为例,若增加机器规模的情况下，可通过修改[启动脚本](../../../../examples/verl_plugin/verl_examples/qwen3vl/train_qwen3_vl_30b_grpo_full.sh)的配置：
+4. 以 Qwen3VL 30B 模型为例,若增加机器规模的情况下，可通过修改[启动脚本](train_qwen3_vl_30b_grpo_full.sh)的配置：
 
     ```shell
     vim examples/grpo_trainer/train_qwen3_vl_30b_grpo_full.sh
@@ -249,7 +249,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
     ```
 
 6. 对于 Qwen3VL 30B 模型，不更换数据集，将prompt_length改为16k，response_length改为1k，可使用以下脚本：
-    [examples/verl_plugin/verl_examples/qwen3vl/train_qwen3_vl_30b_16k_grpo_full.sh](../../../../examples/verl_plugin/verl_examples/qwen3vl/train_qwen3_vl_30b_16k_grpo_full.sh)
+    [train_qwen3_vl_30b_16k_grpo_full.sh](train_qwen3_vl_30b_16k_grpo_full.sh)
     其中padding_mode=1为padding为上述输入输出的模式，对应以下两个配置：
     
    ```shell

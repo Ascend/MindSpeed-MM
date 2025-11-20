@@ -125,10 +125,10 @@ pip install torch_npu-2.5.1*.manylinux2014_*.whl
 ```bash
 # 请确保 vllm 已正确安装并且之后不会做覆盖
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
-cd MindSpeed-MM/examples/verl_plugin
+cd MindSpeed-MM/verl_plugin
 pip install -v -e .
-scp -r verl_examples/qwen2.5vl/* ../../../verl/examples/grpo_trainer/
-cd ../../../verl/
+scp -r ../examples/verl_examples/qwen2.5vl/* ../../verl/examples/grpo_trainer/
+cd ../../verl/
 ```
 
 **注意**：安装插件前需要保证verl源码安装，否则插件不能生效。如果无法源码安装verl，需要指定verl源码路径：
@@ -182,7 +182,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 #### 2. 启动训练
 
-以 Qwen2.5VL 7B 模型为例,在启动训练之前，需要修改[启动脚本](../../examples/verl_plugin/verl_examples/qwen2.5vl/train_qwen2_5_vl_7b_grpo_full.sh)的配置：
+以 Qwen2.5VL 7B 模型为例,在启动训练之前，需要修改[启动脚本](train_qwen2_5_vl_7b_grpo_full.sh)的配置：
 
 1. 根据使用机器的情况，修改`NNODES`、`NPUS_PER_NODE`配置， 例如单机 A2 可设置`NNODES`为 1 、`NPUS_PER_NODE`为8；
 2. 如果是单机，需要保证`MASTER_ADDR`与`CURRENT_IP`一致，如果为多机，需要保证各个机器的`MASTER_ADDR`一致，`CURRENT_IP`为各个节点的 IP (需要注意的是`MASTER_ADDR`与`CURRENT_IP`不能设置为`localhost`)；
@@ -221,7 +221,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 4. 实际运行场景与默认配置脚本不一致时，需要根据实际场景调整`micro_batch_size`、`dispatch_size`等相关配置参数。
 
-5. 以 Qwen2.5VL 32B 模型为例,若增加机器规模的情况下，可通过修改[启动脚本](../../examples/verl_plugin/verl_examples/qwen2.5vl/train_qwen2_5_vl_32b_grpo_full.sh)的配置：
+5. 以 Qwen2.5VL 32B 模型为例,若增加机器规模的情况下，可通过修改[启动脚本](train_qwen2_5_vl_32b_grpo_full.sh)的配置：
 
     ```shell
     vim examples/grpo_trainer/train_qwen2_5_vl_32b_grpo_full.sh
