@@ -56,9 +56,9 @@ commit_id=97b65c63c729c61ca607315cf7084012aabc6bba
 
 #### 1. 环境依赖
 
-| MindSpeed RL版本 | PyTorch版本 | torch_npu版本 | CANN版本  | Python版本 |
-| ---------------- | ------------ |-----------| ---------- | ---------- |
-| master（主线）   | 2.5.1     | 2.5.1       | 8.3.RC1 | Python3.11 |
+| PyTorch版本 | torch_npu版本 | Python版本 |
+|-----------|-------------| ---------- |
+| 2.5.1     | 2.5.1       | Python3.11 |
 
 <a id="jump1.2"></a>
 
