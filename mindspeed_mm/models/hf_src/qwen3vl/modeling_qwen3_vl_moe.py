@@ -262,6 +262,10 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel, Qwen3VLTextModel):
         self.norm = Qwen3VLTextRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen3VLTextRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
+        self.is_causal = True
+        self.activation_offload = config.activation_offload
+        if self.activation_offload:
+            self.swap_stream = torch.npu.Stream()
 
         # Initialize weights and apply final processing
         self.post_init()

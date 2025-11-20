@@ -7,11 +7,12 @@
             "num_layers": 27,
             "hidden_size": 1152,
             "num_attention_heads": 16,
-            "freeze": true
+            "freeze": true,
+            "attn_implementation": "sdpa"
         },
         "vision_projector": {
             "model_id": "lnmlp",
-            "num_layers": 999999,
+            "num_layers": 1,
             "freeze": true
         }
     },
@@ -22,7 +23,9 @@
         "num_attention_heads": 32,
         "max_position_embeddings": 262144,
         "freeze": false,
-        "use_npu_fused_moe": false
+        "use_npu_fused_moe": false,
+        "attn_implementation": "sdpa",
+        "activation_offload": false
     },
     "loss_cfg": {
         "compute_mode": "default",

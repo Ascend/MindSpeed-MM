@@ -28,7 +28,7 @@ class TransformersModel(MultiModalModule):
 
         model_cls = ModelZoo.build(config, self.transformer_config)
 
-        self._set_loss_cfg()
+        self._set_loss_cfg(args)
         
         if callable(getattr(model_cls, 'overwrite_transformer_config', None)):
             self.transformer_config = model_cls.overwrite_transformer_config(self.transformer_config)
@@ -304,9 +304,9 @@ class TransformersModel(MultiModalModule):
         
         return loss_ctx, loss_mask
 
-    def _set_loss_cfg(self):
+    def _set_loss_cfg(self, args):
         # Retrieve loss configuration from model.json if available
-        loss_cfg = getattr(self.config, "loss_cfg", None)
+        loss_cfg = getattr(args.mm.model, "loss_cfg", None)
         # loss_cfg param: compute_mode, chunk_size
         # compute_mode: default, chunk(use chunk loss)
         # chunk_size: valid when compute mode is set to chunk (default 1024)

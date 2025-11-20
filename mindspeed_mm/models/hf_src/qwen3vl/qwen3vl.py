@@ -97,6 +97,10 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         transformer_config.vision_config._attn_implementation = vit_attn_implementation
         transformer_config.text_config._attn_implementation = llm_attn_implementation
 
+        # set activation offload, only suppport offload text activations now
+        llm_activation_offload = getattr(model_cfg.text_decoder, "activation_offload", False)
+        setattr(transformer_config.text_config, "activation_offload", llm_activation_offload)
+
         return transformer_config
 
 

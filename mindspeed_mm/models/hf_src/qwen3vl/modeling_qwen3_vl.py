@@ -3,6 +3,7 @@
 
 from collections.abc import Callable
 from typing import Any, Optional, Union
+from contextlib import nullcontext
 
 import torch
 import torch.nn as nn
@@ -22,7 +23,9 @@ from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLConfig, Q
 from megatron.core import mpu
 from megatron.training import get_args
 from mindspeed_mm.models.common.communications import cal_split_sizes, gather_forward_split_backward, split_forward_gather_backward
+from mindspeed_mm.utils.async_offload import async_save_on_cpu
 from .utils import get_seq_len, set_seq_len
+
 
 from .output import (
     Qwen3VLCausalLMOutputWithPast, 
@@ -256,9 +259,7 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
             `torch.Tensor`: hidden_states.
         """
         hidden_states = self.patch_embed(hidden_states)
-
-        pos_embeds = self.fast_pos_embed_interpolate(grid_thw)
-        hidden_states = hidden_states + pos_embeds
+        hidden_states = hidden_states + self.fast_pos_embed_interpolate(grid_thw)
 
         rotary_pos_emb = self.rot_pos_emb(grid_thw)
 
@@ -337,6 +338,10 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         self.norm = Qwen3VLTextRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen3VLTextRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
+        self.is_causal = True
+        self.activation_offload = config.activation_offload
+        if self.activation_offload:
+            self.swap_stream = torch.npu.Stream()
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -396,14 +401,16 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         total_seq_len = inputs_embeds.shape[1]
         set_seq_len("total", total_seq_len)
 
-        attention_mask = create_causal_mask(
-            config=self.config,
-            input_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            cache_position=cache_position,
-            past_key_values=past_key_values,
-            position_ids=text_position_ids,
-        )
+        attention_mask = None
+        if not self.is_causal:
+            attention_mask = create_causal_mask(
+                config=self.config,
+                input_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+                position_ids=text_position_ids,
+            )
 
         if mpu.get_context_parallel_world_size() > 1:
             split_gather_sizes = cal_split_sizes(total_seq_len, mpu.get_context_parallel_world_size())
@@ -436,15 +443,34 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         
         # decoder layers
         for layer_idx, decoder_layer in enumerate(self.layers):
-            layer_outputs = decoder_layer(
-                hidden_states,
-                attention_mask=attention_mask,
-                position_ids=text_position_ids,
-                past_key_values=past_key_values,
-                cache_position=cache_position,
-                position_embeddings=position_embeddings,
-                **kwargs,
-            )
+            if self.activation_offload:
+                with async_save_on_cpu(
+                    h2d_stream=self.swap_stream,
+                    d2h_stream=self.swap_stream,
+                    block_idx=layer_idx,
+                    depth=len(self.layers),
+                    custom_check_fn=lambda x: x.data_ptr() == hidden_states.data_ptr(),
+                    prefetch=True,
+                ):
+                    layer_outputs = decoder_layer(
+                    hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=text_position_ids,
+                    past_key_values=past_key_values,
+                    cache_position=cache_position,
+                    position_embeddings=position_embeddings,
+                    **kwargs,
+                    )
+            else:
+                layer_outputs = decoder_layer(
+                    hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=text_position_ids,
+                    past_key_values=past_key_values,
+                    cache_position=cache_position,
+                    position_embeddings=position_embeddings,
+                    **kwargs,
+                )
             hidden_states = layer_outputs
 
             # add visual features to the hidden states of first several layers
@@ -764,8 +790,13 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
         image_mask = None
         video_mask = None
 
+        vit_config = get_args().mm.model.image_encoder
+        context = nullcontext()
+        if vit_config.vision_encoder.freeze and vit_config.vision_projector.freeze:
+            context = torch.no_grad()
         if pixel_values is not None:
-            image_embeds, deepstack_image_embeds = self.get_image_features(pixel_values, image_grid_thw)
+            with context:
+                image_embeds, deepstack_image_embeds = self.get_image_features(pixel_values, image_grid_thw)
             image_embeds = torch.cat(image_embeds, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
             image_mask, _ = self.get_placeholder_mask(
                 input_ids, inputs_embeds=inputs_embeds, image_features=image_embeds
@@ -773,7 +804,8 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
             inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
 
         if pixel_values_videos is not None:
-            video_embeds, deepstack_video_embeds = self.get_video_features(pixel_values_videos, video_grid_thw)
+            with context:
+                video_embeds, deepstack_video_embeds = self.get_video_features(pixel_values_videos, video_grid_thw)
             video_embeds = torch.cat(video_embeds, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
             _, video_mask = self.get_placeholder_mask(
                 input_ids, inputs_embeds=inputs_embeds, video_features=video_embeds
