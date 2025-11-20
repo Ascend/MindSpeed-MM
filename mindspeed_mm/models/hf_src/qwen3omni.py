@@ -19,9 +19,6 @@ class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
         for i, layer in enumerate(self.audio_tower.layers):
             self.audio_tower.layers[i] = checkpoint_wrapper(layer, CheckpointImpl.REENTRANT)
     
-        for i, block in enumerate(self.visual.blocks):
-            self.visual.blocks[i] = checkpoint_wrapper(block, CheckpointImpl.REENTRANT)
-
         for i, layer in enumerate(self.model.layers):
             self.model.layers[i] = checkpoint_wrapper(layer, CheckpointImpl.REENTRANT)
 
@@ -30,8 +27,6 @@ class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
         for layer in self.audio_tower.layers:
             fully_shard(layer, **fsdp2_kwargs)
         
-        for block in self.visual.blocks:
-            fully_shard(block, **fsdp2_kwargs)
         fully_shard(self.visual.merger, **fsdp2_kwargs)
         for merger in self.visual.merger_list:
             fully_shard(merger, **fsdp2_kwargs)

@@ -60,6 +60,10 @@ class PatchesManager:
             ("mindspeed_mm.models.vlm_model.get_audio_layer_spec", \
                 hetero_patches.hetero_spec_wrapper),
         ],
+        "moe_full": [
+            ("transformers.models.qwen3_omni_moe.modeling_qwen3_omni_moe.Qwen3OmniMoeThinkerTextSparseMoeBlock", \
+                models_patches.Qwen3OmniMoeThinkerTextSparseMoeBlock)
+        ],
         "scale_grad": [
             ("megatron.core.distributed.TorchFullyShardedDataParallel.scale_gradients", fsdp2_patches.scale_gradients)
         ]
