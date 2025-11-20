@@ -170,7 +170,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 |   InternVL3.5-30B   |  |  |  |  |  |  | ✔ |  |  | ✔ |
 |       Qwen3-VL-8B        |  |  |  |  |  |  | ✔ |  |  | ✔ |
 |       Qwen3-VL-30B        |  |  |  |  |  |  | ✔ |  |  | ✔ |
-|       Wan2.2        |  |  |  |  | CP (Ulysses) | ✔ | ✔ |  |  | ✔ |
+|       Wan2.2        |  |  |  |  | CP (Ulysses) |  | ✔ |  |  | ✔ |
 | OpenSoraPlan1.5-T2V | ✔ | ✔ |  |  |  |  | ✔ |  |  |  |
 |       Wan2.1        |  |  |  |  | CP (Ulysses) | ✔ | ✔ | ✔ |  | ✔ |
 |    HunyuanVideo     | ✔ | ✔ |  |  | CP (Ulysses) | ✔ | ✔ | ✔ |  |  |
@@ -279,9 +279,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.2">Wan2.2-T2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">5B</a></td>
       <td> 预训练 </td>
-      <td> 1x8</td>
+      <td> 1x8 (A3) </td>
       <td> BF16 </td>
-      <td> 3.18 (SPS)(A3) </td>
+      <td> 3.18 (SPS) </td>
       <td> 2.93 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
@@ -289,10 +289,10 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers">A14B</a></td>
       <td> 预训练 </td>
-      <td> 1x8</td>
+      <td> 1x8 (A3) </td>
       <td> BF16 </td>
-      <td> 0.727 (SPS)(A3) </td>
-      <td> / </td>
+      <td> 0.710 (SPS) </td>
+      <td> 0.292 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>
@@ -300,9 +300,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.2">Wan2.2-TI2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">5B</a></td>
       <td> 预训练 </td>
-      <td> 1x8</td>
+      <td> 1x8 (A3) </td>
       <td> BF16 </td>
-      <td> 3.18 (SPS)(A3) </td>
+      <td> 3.18 (SPS) </td>
       <td> 2.93 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
@@ -311,10 +311,10 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.2">Wan2.2-I2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers">A14B</a></td>
       <td> 预训练 </td>
-      <td> 1x8</td>
+      <td> 1x8 (A3) </td>
       <td> BF16 </td>
-      <td> 0.670 (SPS)(A3) </td>
-      <td> 0.571 (SPS) </td>
+      <td> 0.671 (SPS) </td>
+      <td> 0.294 (SPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>

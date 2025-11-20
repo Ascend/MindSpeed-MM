@@ -166,7 +166,6 @@ pip install decord==0.6.0
 #### 权重转换
 权重转换source_path参数请配置transformer权重文件的路径：
 ```bash
-python examples/cogvideox/cogvideox_sat_convert_to_mm_ckpt.py --source_path <your source path> --target_path <target path> --task t2v --tp_size 1 --pp_size 10 11 11 10 --num_layers 42 --mode split
 mm-convert CogVideoConverter --version <t2v or i2v> source_to_mm \
   --cfg.source_path <your source path> \
   --cfg.target_path <your target path> \
@@ -394,9 +393,13 @@ CogvideoX推理启动文件为shell脚本，主要分为如下4个：
 | examples/cogvideox/samples_i2v_prompts.txt |               文件内容               |    自定义prompt     |
 
 
-如果使用训练后保存的权重进行推理，需要使用脚本进行转换，权重转换source_path参数请配置训练时的保存路径
+如果使用训练后保存的权重改变模型切分策略进行推理，需要使用命令进行转换，权重转换source_path参数请配置训练时的保存路径
 ```bash
-python examples/cogvideox/cogvideox_sat_convert_to_mm_ckpt.py --source_path <your source path> --target_path <target path> --task t2v --tp_size 1 --pp_size 42  --num_layers 42 --mode merge
+mm-convert CogVideoConverter --version <t2v or i2v> resplit \
+  --cfg.source_path <your source path> \
+  --cfg.target_path <your target path> \
+  --cfg.target_parallel_config.tp_size <tp_size> \
+  --cfg.target_parallel_config.pp_layers <pp_layers> \
 ```
 
 #### 启动推理
@@ -434,7 +437,7 @@ bash examples/cogvideox/i2v_1.5/inference_cogvideox_i2v_1.5.sh
  + [t2v下载链接](https://huggingface.co/THUDM/CogVideoX1.5-5B/tree/main)
  + [i2v下载链接](https://huggingface.co/THUDM/CogVideoX1.5-5B-I2V/tree/main)
   
-  lora微调功能的权重转换使用`cogvideox_hf_convert_to_mm_ckpt.py`脚本，注意`source_path`为权重所在目录的目录名，非权重本身。
+  lora微调功能的权重转换使用`mm-convert`命令。
 ```bash
 mm-convert CogVideoConverter --version <t2v or i2v> hf_to_mm \
   --cfg.source_path <your source path> \
