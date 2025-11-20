@@ -160,11 +160,14 @@ mm-convert WanConverter mm_to_hf \
 
 权重转换脚本的参数说明如下：
 
-|参数| 含义 |
-|:------------|:----|
-| --cfg.source_path | MindSpeed MM保存的权重路径                                   |
-| --cfg.target_path | 转换后的Hugging Face权重路径                                 |
+| 参数                | 含义                                            |
+|:------------------|:----------------------------------------------|
+| --cfg.source_path | MindSpeed MM保存的权重路径                           |
+| --cfg.target_path | 转换后的Hugging Face权重路径                          |
 | --cfg.hf_path     | 原始Hugging Face权重路径，需要从该目录下获取原始huggingface配置文件 |
+
+**注**： 对A14B模型，hugging face diffusers权重中包含两个transformer权重，
+后缀中transformer对应高噪声（high）模型，transformer_2对应低噪声（low）模型。
 
 ---
 
@@ -232,6 +235,8 @@ mm-convert WanConverter mm_to_hf \
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |      SAVE_PATH    | 训练过程中保存的权重路径                            |
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |        CP         | 训练时的CP size（建议根据训练时设定的分辨率调整）   |
 
+**注**： 当前LOAD_PATH路径无效时，MindSpeed会对模型随机初始化从头训练。为防止加载失败，请留意日志中的warning信息，或者自行确认路径合法。
+
 【并行化配置参数说明】：
 
 - CP: 序列并行。
@@ -293,15 +298,16 @@ bash examples/wan2.2/{model_size}/{task}/pretrain_{type}.sh
 
 检查模型权重路径、并行参数等配置是否完成
 
-| 配置文件                                                     | 修改字段  |  修改说明 |
-|----------------------------------------------------------|:------:|:-----|
-| examples/wan2.2/{model_size}/{task}/inference_model.json | from_pretrained |  修改为下载的权重所对应路径（包括vae、tokenizer、text_encoder）   |
-| examples/wan2.2/samples_t2v_prompts.txt                  |    文件内容 |  T2V推理任务的prompt，可自定义，一行为一个prompt   |
-| examples/wan2.2/samples_i2v_prompts.txt                  |    文件内容 |  I2V推理任务的prompt，可自定义，一行为一个prompt   |
-| examples/wan2.2/samples_i2v_images.txt                   |    文件内容 |  I2V推理任务的首帧图片路径，可自定义，一行为一个图片路径   |
-| examples/wan2.2/{model_size}/{task}/inference_model.json |  save_path |  生成视频的保存路径 |
-| examples/wan2.2/{model_size}/{task}/inference_model.json |  input_size |  生成视频的分辨率，格式为 [t, h, w] |
-| examples/wan2.2/{model_size}/{task}/inference.sh         |   LOAD_PATH | 转换之后的transformer部分权重路径 |
+| 配置文件                                                     |        修改字段         | 修改说明                                        |
+|----------------------------------------------------------|:-------------------:|:--------------------------------------------|
+| examples/wan2.2/{model_size}/{task}/inference_model.json |   from_pretrained   | 修改为下载的权重所对应路径（包括vae、tokenizer、text_encoder） |
+| examples/wan2.2/samples_t2v_prompts.txt                  |        文件内容         | T2V推理任务的prompt，可自定义，一行为一个prompt             |
+| examples/wan2.2/samples_i2v_prompts.txt                  |        文件内容         | I2V推理任务的prompt，可自定义，一行为一个prompt             |
+| examples/wan2.2/samples_i2v_images.txt                   |        文件内容         | I2V推理任务的首帧图片路径，可自定义，一行为一个图片路径               |
+| examples/wan2.2/{model_size}/{task}/inference_model.json |      save_path      | 生成视频的保存路径                                   |
+| examples/wan2.2/{model_size}/{task}/inference_model.json |     input_size      | 生成视频的分辨率，格式为 [t, h, w]                      |
+| examples/wan2.2/{model_size}/{task}/inference_model.json | low_noise_predictor | 转换之后的transformer_2（低噪声）部分权重路径，仅A14B模型涉及     |
+| examples/wan2.2/{model_size}/{task}/inference.sh         |      LOAD_PATH      | 转换之后的transformer部分权重路径，对A14B模型对应高噪声模型       |
 
 ### 启动推理
 

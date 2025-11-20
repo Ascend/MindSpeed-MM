@@ -9,7 +9,7 @@
             "video_processor_type": "OpensoraplanVideoProcessor",
             "video_reader_type": "DecordVideo",
             "image_reader_type": "Image",
-            "num_frames": 81,
+            "num_frames": 49,
             "min_num_frames": 1,
             "frame_interval": 1,
             "auto_interval": false,
