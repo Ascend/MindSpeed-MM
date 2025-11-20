@@ -71,6 +71,7 @@ GPT_ARGS="
     --use-fused-rmsnorm \
     --swiglu \
     --use-fused-swiglu \
+    --no-masked-softmax-fusion \
     --lr 1.0e-5 \
     --lr-decay-style cosine \
     --weight-decay 0 \
@@ -91,6 +92,8 @@ GPT_ARGS="
     --no-save-rng \
     --num-workers 8 \
     --use-flash-attn \
+    --swap-attention \
+    --distributed-timeout-minutes 20 \
 "
 
 MM_ARGS="

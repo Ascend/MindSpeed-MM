@@ -40,12 +40,12 @@
 
 MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/mindspore/install_guide.md)。
 
-| 依赖软件         |                                                              |
-| ---------------- | ------------------------------------------------------------ |
+| 依赖软件         |                                                                                                                               |
+| ---------------- |-------------------------------------------------------------------------------------------------------------------------------|
 | 昇腾NPU驱动固件  | [在研版本](https://www.hiascend.com/hardware/firmware-drivers/community?product=1&model=30&cann=8.0.RC3.alpha002&driver=1.0.26.alpha) |
-| 昇腾 CANN        | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann) |
-| MindSpore        | [2.7.0](https://www.mindspore.cn/install/)         |
-| Python           | >=3.9                                                        |                                          |
+| 昇腾 CANN        | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann)                                           |
+| MindSpore        | 2.7.2                                                    |
+| Python           | >=3.10                                                                                                                        |                                          |
 
 <a id="jump1.1"></a>
 ### 1. 仓库拉取及环境搭建
@@ -547,6 +547,9 @@ bash examples/mindspore/qwen2.5vl/evaluate_qwen2_5_vl_7b.sh
 <a id="jump8.1"></a>
 ### lora微调
 LoRA为框架通用能力，当前功能已支持，可参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/lora_finetune.md)。
+
+### swap attention
+对于不需要重计算的场景，只开启--swap-attention，可以在几乎不损耗性能的情况下，节省内存，以支持更大的模型的配置，可参考[swap attention特性文档](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swap_attention.md)中内存节省部分。
 
 <a id="jump9"></a>
 ## 环境变量声明
