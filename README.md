@@ -33,6 +33,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 # 最新消息
 
 ---
+* [Nov. 20, 2025]: 🚀 MindSpeed MM基于FSDP2支持InternVL3.5-30B模型【Prototype】
 * [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型
 * [Nov. 06, 2025]: 🚀 MindSpeed MM基于FSDP2支持DeepseekOCR模型训练demo【Prototype】
 * [Oct. 31, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-8B/30B模型 【Prototype】
@@ -693,7 +694,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td rowspan="20"> 多模态理解 </td>
+      <td rowspan="21"> 多模态理解 </td>
       <tr>
       <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen3vl">Qwen3-VL</a></td>
       <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 8B </a></td>
