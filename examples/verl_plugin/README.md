@@ -32,7 +32,7 @@
 | Qwen2.5VL-32B | geo3k    | Atlas 200T A2 Box16 | 256 | 5        | 1024              | 2048                | 8192                   | 103.50  |
 | Qwen2.5VL-7B  | 非公开数据集   | Atlas 200T A2 Box16 | 16  | 4        | 18,000            | 512                 | 19,000                 | 428.38  |
 | Qwen2.5VL-32B | 非公开数据集   | Atlas 200T A2 Box16 | 32  | 8        | 18,000            | 512                 | 20,000                 | 99.65   |
-| Qwen3VL-8B    | geo3k    | Atlas 200T A2 Box16 | 512 | 5        | 1024              | 2048                | 8192                   | 527.35  |
+| Qwen3VL-8B    | geo3k    | Atlas 200T A2 Box16 | 512 | 5        | 1024              | 2048                | 8192                   | 429     |
 | Qwen3VL-8B    | geo3k    | Atlas 200T A3 Box8  | 512 | 5        | 1024              | 2048                | 8192                   | 364*2   |
 | Qwen3VL-30B   | geo3k    | Atlas 200T A2 Box16 | 64  | 5        | 1024              | 2048                | 8192                   | 21.76   |
 | Qwen3VL-30B   | geo3k    | Atlas 200T A3 Box8  | 64  | 5        | 1024             | 2048                | 8192                  | 19.1*2  |

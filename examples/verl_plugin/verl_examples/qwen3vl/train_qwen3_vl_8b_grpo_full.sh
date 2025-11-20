@@ -46,7 +46,7 @@ enforce_eager=False
 train_batch_size=512
 ppo_mini_batch_size=32
 ppo_micro_batch_size_per_gpu=4
-log_prob_micro_batch_size_per_gpu=5
+log_prob_micro_batch_size_per_gpu=4
 use_remove_padding=True
 ignore_eos=False
 
