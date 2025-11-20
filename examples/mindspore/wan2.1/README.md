@@ -84,6 +84,7 @@ pip install diffusers==0.30.3
 git clone https://gitee.com/mindspore/mindspore_op_plugin.git
 cd mindspore_op_plugin
 bash build.sh
+pip install output/xxx.whl
 source env.source
 cd ..
 
@@ -91,6 +92,8 @@ mkdir ckpt
 mkdir data
 mkdir logs
 ```
+
+> 注：op_plugin使用教程请参考[op_plugin CPU 算子开发指南](https://gitee.com/mindspore/mindspore_op_plugin/wikis/op_plugin%20CPU%E7%AE%97%E5%AD%90%E5%BC%80%E5%8F%91%E6%8C%87%E5%8D%97)
 
 
 ### Decord搭建
@@ -124,7 +127,7 @@ pip install decord==0.6.0
 ```shell
 mm-convert WanConverter hf_to_mm \
  --cfg.source_path <./weights/Wan-AI/Wan2.1-{T2V/I2V}-1.3B-Diffusers/transformer/> \
- --cfg.target_path <./weights/Wan-AI/Wan2.1-{T2V/I2V}-1.3B-Diffusers/transformer/>
+ --cfg.target_path <./weights/Wan-AI/Wan2.1-{T2V/I2V}-1.3B-Diffusers/transformer/> \
  --cfg.target_parallel_config.pp_layers <pp_layers>
 ```
 
@@ -143,17 +146,17 @@ mm-convert WanConverter hf_to_mm \
 ```shell
 mm-convert WanConverter mm_to_hf \
  --cfg.source_path <path for your saved weight/> \
- --cfg.target_path <./converted_weights/Wan-AI/Wan2.1-{T2V/I2V}-1.3B-Diffusers/transformer/>
- --cfg.hf_path <weights/Wan-AI/Wan2.1-{T2V/I2V}-1.3B-Diffusers/transformer/>
+ --cfg.target_path <./converted_weights/Wan-AI/Wan2.1-{T2V/I2V}-1.3B-Diffusers/transformer/> \
+ --cfg.hf_dir <weights/Wan-AI/Wan2.1-{T2V/I2V}-1.3B-Diffusers/transformer/>
 ```
 
 权重转换脚本的参数说明如下：
 
-|参数| 含义 | 默认值 |
-|:------------|:----|:----|
+| 参数                | 含义 | 默认值 |
+|:------------------|:----|:----|
 | --cfg.source_path | MindSpeed MM保存的权重路径                                   | /      |
 | --cfg.target_path | 转换后的Hugging Face权重路径                                 | /      |
-| --cfg.hf_path     | 原始Hugging Face权重路径，需要从该目录下获取原始huggingface配置文件 |    /   |
+| --cfg.hf_dir      | 原始Hugging Face权重路径，需要从该目录下获取原始huggingface配置文件 |    /   |
 
 ---
 
