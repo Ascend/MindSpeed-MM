@@ -26,6 +26,8 @@ for para in $*; do
   fi
 done
 
+export COMBINED_ENABLE=1
+export HCCL_WHITELIST_DISABLE=1
 export TASK_QUEUE_ENABLE=2
 export HCCL_CONNECT_TIMEOUT=1200
 export ACLNN_CACHE_LIMIT=100000
