@@ -683,7 +683,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffsynth/qwen_image_edit">Qwen-Image</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffsynth/qwen_image_edit">Qwen-Image-Edit</a></td>
       <td><a href="https://github.com/modelscope/Diffsynth-Studio/tree/main/examples/qwen_image">27B</a></td>
       <td> Lora微调 </td>
       <td> 1x8 </td>
