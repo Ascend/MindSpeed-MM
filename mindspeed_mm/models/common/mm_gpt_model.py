@@ -18,7 +18,7 @@ from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.training import get_args
 
-from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, gather_forward_split_backward
 from mindspeed.core.context_parallel.model_parallel_utils import (
     get_context_parallel_group_for_hybrid_ulysses, 
     get_context_parallel_group_for_hybrid_ring, 
@@ -27,6 +27,8 @@ from mindspeed.core.context_parallel.model_parallel_utils import (
 from mindspeed.utils import set_actual_seq_len
 from mindspeed_mm.models.common.embeddings.rope import DynamicRotaryEmbedding
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2VLRotaryEmbedding_llm
+from mindspeed_mm.models.vision.vision_encoders.qwen3vl_vit_model import Qwen3VLTextRotaryEmbedding_llm
+from mindspeed_mm.models.text_decoder.qwen3vl_transformer_block import Qwen3vlTransformerBlock
 from mindspeed_mm.utils.utils import ensure_valid, split_forward_gather_backward_with_megatron_cp
 from mindspeed_mm.models.vision.vision_encoders.glm4v_vl_vit_model import GlmTransformerBlock, Glm4vRotaryEmbedding_llm
 
@@ -97,10 +99,12 @@ class MMGPTModel(LanguageModule):
             )
 
         if self.position_embedding_type == 'mrope':
-            if getattr(config, 'mrope_section', None) is None:
+            if getattr(config, 'mrope_section', None) is None and getattr(config, 'rope_scaling', None) is None:
                 raise AssertionError('mrope section should be provided for mrope!')
             if getattr(config, 'model_id', None) == "glm4v_lm":
                 self.rotary_pos_emb = Glm4vRotaryEmbedding_llm(config=config)
+            elif getattr(config, 'model_id', None) == "qwen3_lm":
+                self.rotary_pos_emb = Qwen3VLTextRotaryEmbedding_llm(config=config)
             else:
                 self.rotary_pos_emb = Qwen2VLRotaryEmbedding_llm(config=config)
         elif self.position_embedding_type == 'rope':
@@ -126,6 +130,13 @@ class MMGPTModel(LanguageModule):
         # Transformer.
         if getattr(config, 'model_id', None) == "glm4v_lm":
             self.decoder = GlmTransformerBlock(
+                config=self.config,
+                spec=transformer_layer_spec,
+                pre_process=self.pre_process,
+                post_process=self.post_process,
+            )
+        elif getattr(config, 'model_id', None) == "qwen3_lm":
+            self.decoder = Qwen3vlTransformerBlock(
                 config=self.config,
                 spec=transformer_layer_spec,
                 pre_process=self.pre_process,
@@ -278,6 +289,11 @@ class MMGPTModel(LanguageModule):
                 raise AssertionError('mrope only support bf16 now!')
             if getattr(self.config, 'model_id', None) == "glm4v_lm":
                 rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids, self.config.mrope_section)
+            elif getattr(self.config, 'model_id', None) == "qwen3_lm":
+                rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids)
+                half_dim = rotary_pos_emb.shape[-1] // 2
+                cos, sin = rotary_pos_emb[..., :half_dim], rotary_pos_emb[..., half_dim:]
+                rotary_pos_emb = torch.cat([cos, sin], dim=0)
             else:
                 rotary_pos_emb = self.rotary_pos_emb(input_ids.device, param_dtype, position_ids)
                 half_dim = rotary_pos_emb.shape[-1] // 2

@@ -1,5 +1,6 @@
 from mindspeed_mm.models.common.module_spec.qwen2vl_layer_spec import get_qwen2vl_layer_spec, get_mlp_module_spec, \
     get_qwen2vl_llm_layer_spec, get_qwen2_5_vit_layer_spec
+from mindspeed_mm.models.common.module_spec.qwen3vl_layer_spec import get_qwen3vl_layer_spec
 from mindspeed_mm.models.common.module_spec.qwen2_5omni_layer_spec import get_qwen_omni_audio_layer_spec
 from mindspeed_mm.models.common.module_spec.internvl_layer_spec import get_language_layer_spec, get_vit_layer_spec
 from mindspeed_mm.models.common.module_spec.llava_layer_spec import get_layer_spec
@@ -11,6 +12,7 @@ from mindspeed_mm.models.common.module_spec.videoalign_layer_spec import get_vid
 audio_layer_specs = {'qwen_omni': get_qwen_omni_audio_layer_spec}
 
 vit_layer_specs = {'qwen2vit': get_qwen2vl_layer_spec,
+                  'qwen3vit': get_qwen3vl_layer_spec,
                    'qwen2_5_vit': get_qwen2_5_vit_layer_spec,
                    'InternViT': get_vit_layer_spec,
                    'clip': get_layer_spec,

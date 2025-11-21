@@ -33,6 +33,15 @@ def ms_matmul_wrapper(fn):
     return matmul_wrapper
 
 
+def ms_scatter_add_wrapper(fn):
+    @wraps(fn)
+    def scatter_add_wrapper(self, dim, index, src):
+        if not index.is_contiguous():
+            index = index.contiguous()
+        return fn(self, dim, index, src)
+    return scatter_add_wrapper
+
+
 def masked_scatter_(self, mask, updates):
     origin_dtype = None
     if self.dtype in (mindspore.float16, mindspore.bfloat16):
@@ -86,6 +95,11 @@ def apply_mindspore_patch():
     # torch.stft not support, use _np_extract_fbank_features
     from mindspeed_mm.mindspore.third_party.transformers.models.whisper.feature_extraction_whisper import _torch_extract_fbank_features_wrapper
     aspm.register_patch('transformers.models.whisper.feature_extraction_whisper.WhisperFeatureExtractor._torch_extract_fbank_features', _torch_extract_fbank_features_wrapper)
+
+    # fix qwen3vl data process issue
+    aspm.register_patch('datasets.arrow_dataset.Pool', mindspore.multiprocessing.Pool)
+    # fix scatter_add_ contiguous issue for CANN8.5
+    aspm.register_patch('mindspore.common.Tensor.scatter_add_', ms_scatter_add_wrapper)
 
     aspm.apply_patches()
 

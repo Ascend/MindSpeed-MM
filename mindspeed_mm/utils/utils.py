@@ -169,6 +169,10 @@ def quick_gelu(x: torch.Tensor) -> torch.Tensor:
     return x * torch.sigmoid(1.702 * x)
 
 
+def gelu_tanh(inp: torch.Tensor) -> torch.Tensor:
+    return torch.nn.functional.gelu(inp, approximate="tanh")
+
+
 def set_modules_requires_grad(modules, requires_grad):
     for module in modules:
         module.requires_grad_(requires_grad)

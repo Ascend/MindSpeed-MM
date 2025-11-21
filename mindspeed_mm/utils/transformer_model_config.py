@@ -9,7 +9,7 @@ from megatron.training import get_args
 from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 
 from mindspeed_mm.configs.config import ConfigReader
-from .utils import get_dtype, quick_gelu
+from .utils import get_dtype, quick_gelu, gelu_tanh
 
 
 def get_class_variables(cls):
@@ -46,6 +46,8 @@ def get_model_config(config):
         t_config["activation_func"] = F.silu
     elif t_config.get("activation_func") == "quick_gelu":
         t_config["activation_func"] = quick_gelu
+    elif t_config.get("activation_func") == "gelu_pytorch_tanh":
+        t_config["activation_func"] = gelu_tanh
     else:
         t_config["activation_func"] = F.gelu
 

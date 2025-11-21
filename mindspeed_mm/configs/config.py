@@ -45,6 +45,9 @@ class ConfigReader:
         except Exception as e:
             print(f"An error occurred: {e}")
         return ""
+    
+    def get(self, key, default):
+        return self.__dict__.get(key, default)
 
     def update_unuse(self, **kwargs):
 
