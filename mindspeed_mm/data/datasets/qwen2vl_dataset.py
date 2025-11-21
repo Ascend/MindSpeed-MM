@@ -102,13 +102,19 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                                                 data_args=data_args)
         preprocess_func = dataset_processor.preprocess_dataset
         if data_args.streaming:
-            train_dataset = train_dataset.map(
-                preprocess_func,
-                batched=True,
-                batch_size=data_args.preprocessing_batch_size,
-                remove_columns=(list(next(iter(train_dataset)).keys())),
-                **kwargs,
-            )
+            if data_args.preprocess_on_fly:
+                train_dataset.set_transform(
+                    preprocess_func,
+                    output_all_columns=True,
+                )
+            else:
+                train_dataset = train_dataset.map(
+                    preprocess_func,
+                    batched=True,
+                    batch_size=data_args.preprocessing_batch_size,
+                    remove_columns=(list(next(iter(train_dataset)).keys())),
+                    **kwargs,
+                )
             train_dataset = DistributedIterableDataset(train_dataset)
             if val_dataset:
                 val_dataset = val_dataset.map(
@@ -121,14 +127,20 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                 val_dataset = DistributedIterableDataset(val_dataset)
                 return train_dataset, val_dataset
         else:
-            train_dataset = train_dataset.map(
-                preprocess_func,
-                batched=True,
-                batch_size=data_args.preprocessing_batch_size,
-                remove_columns=(list(next(iter(train_dataset)).keys())),
-                desc=f"Rank {local_process_index}, running tokenizer on train_dataset",
-                **kwargs,
-            )
+            if data_args.preprocess_on_fly:
+                train_dataset.set_transform(
+                    preprocess_func,
+                    output_all_columns=True,
+                )
+            else:
+                train_dataset = train_dataset.map(
+                    preprocess_func,
+                    batched=True,
+                    batch_size=data_args.preprocessing_batch_size,
+                    remove_columns=(list(next(iter(train_dataset)).keys())),
+                    desc=f"Rank {local_process_index}, running tokenizer on train_dataset",
+                    **kwargs,
+                )
             if val_dataset:
                 val_dataset = val_dataset.map(
                     preprocess_func,

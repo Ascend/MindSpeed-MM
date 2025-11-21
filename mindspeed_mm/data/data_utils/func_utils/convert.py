@@ -390,6 +390,10 @@ class DataArguments:
         default=False,
         metadata={"help": "Enable sequence packing without cross-attention."},
     )
+    preprocess_on_fly: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to perform preprocess during training."},
+    )
 
     def __post_init__(self):
         self.dataset = self.dataset.split(",")

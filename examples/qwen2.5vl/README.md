@@ -399,6 +399,8 @@ dataset_param->basic_parameters->dataset
 }
 ```
 
+如加载大量数据遇到通信TIMEOUT，可以在`data_xxb.json`中添加`dataset_param.basic_parameters.preprocess_on_fly`字段并置为true。详情可参考[相关issue](https://gitcode.com/Ascend/MindSpeed-MM/issues/152)。
+
 【模型保存加载及日志信息配置】
 
 根据实际情况配置`examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh`的参数，包括加载、保存路径以及保存间隔`--save-interval`（注意：分布式优化器保存文件较大耗时较长，请谨慎设置保存间隔）
