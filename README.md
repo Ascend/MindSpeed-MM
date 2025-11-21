@@ -29,16 +29,16 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 <p align="center"> <img src="./sources/images/MM_wechat_qrcode.jpg" width=150> </p>
 
-
 # 最新消息
 
 ---
-* [Nov. 20, 2025]: 🚀 MindSpeed MM基于FSDP2支持InternVL3.5-30B模型【Prototype】
-* [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型
+
+* [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型 【Prototype】
+* [Nov. 13, 2025]: 🚀 MindSpeed MM基于FSDP2支持InternVL3.5-30B模型
 * [Nov. 06, 2025]: 🚀 MindSpeed MM基于FSDP2支持DeepseekOCR模型训练demo【Prototype】
 * [Oct. 31, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-8B/30B模型 【Prototype】
-* [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型 【Prototype】
-* [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型 【Prototype】
+* [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型
+* [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型
 * [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
 * [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
 * [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型
@@ -636,7 +636,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 1.97 (FPS) </td>
       <td> 2.00 (FPS) </td>
       <td> / </td>
-      <td>【Test】</td>
+      <td>【Pass】</td>
     </tr>
     <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/diffusers/sana">Sana</a></td>
@@ -691,7 +691,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 20.59 (FPS) </td>
       <td> 17.47 (FPS) </td>
       <td> / </td>
-      <td>【Pass】</td>
+      <td>【Test】</td>
     </tr>
     <tr>
       <td rowspan="21"> 多模态理解 </td>
@@ -709,9 +709,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 30B </a></td>
       <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> FP16 </td>
-      <td> / </td>
+      <td> 1x8 (A3) </td>
+      <td> BF16 </td>
+      <td> 4.74 (SPS) </td>
       <td> / </td>
       <td> / </td>
       <td>【Test】</td>
@@ -920,92 +920,6 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 </table>
 
 ---
-
-<table>
-  <caption><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm">其他已适配昇腾的多模态大模型</a></caption>
-  <thead>
-    <tr>
-      <th>模型</th>
-      <th>参数量</th>
-      <th>任务</th>
-      <th>集群</th>
-      <th>精度格式</th>
-      <th>NPU性能</th>
-      <th>参考性能</th>
-      <th>认证</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/CogVLM2">CogVLM-2</a></td>
-      <td><a href="https://github.com/THUDM/CogVLM2">8B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td> 3.9 (s/it) </td>
-      <td> 3.3 (s/it) </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td rowspan="2"><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/PLLaVA">PLLaVA</a></td>
-      <td><a href="https://github.com/magic-research/PLLaVA">7B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-      <td> 0.841 (s/step) </td>
-      <td> 0.935 (s/step) </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td><a href="https://github.com/magic-research/PLLaVA">7B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> FP32 </td>
-      <td> 0.935 (s/step) </td>
-      <td> 1.08 (s/step) </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td rowspan="2"><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/MiniCPM-V">miniCPM-V 2.5</a></td>
-      <td><a href="https://github.com/OpenBMB/MiniCPM-V">8B</a></td>
-      <td> 全参微调 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-      <td> 1046 (s)/50-200steps </td>
-      <td> 847 (s)/50-200steps </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td><a href="https://github.com/OpenBMB/MiniCPM-V">8B</a></td>
-      <td> Lora微调 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-      <td> 603 (s)/50-200steps </td>
-      <td> 490 (s)/50-200steps </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/HunyuanDiT">HunYuanDiT</a></td>
-      <td><a href="https://github.com/Tencent/HunyuanDiT">1.5B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-      <td> 1099.5 (ms/step) </td>
-      <td> 1059.3 (ms/step) </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td><a href="https://gitee.com/Ascend/ModelZoo-PyTorch/tree/master/PyTorch/built-in/mm/InternVL1.5">InternVL 1.5</a></td>
-      <td><a href="https://github.com/OpenGVLab/InternVL/tree/v1.5.0">26B</a></td>
-      <td> 微调训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-      <td> 4.952 (FPS) </td>
-      <td> 5.151 (FPS) </td>
-      <td>【Pass】</td>
-    </tr>
-  </tbody>
-</table>
 
 # 常用参数解释说明
 
