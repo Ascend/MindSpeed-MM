@@ -1,5 +1,8 @@
 # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 import torch
+
+from megatron.training import get_args
+from megatron.core.tensor_parallel.mappings import gather_from_sequence_parallel_region
 from megatron.core.transformer.mlp import MLP, MLPSubmodules
 from megatron.core.transformer.spec_utils import build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
@@ -25,9 +28,11 @@ class MultimodalProjector(MultiModalModule):
         self,
         config: TransformerConfig,
         submodules: MLPSubmodules,
+        use_postshuffle_norm: bool = False,
     ):
         super().__init__(config=config)
         self.projector_type = config.model_id
+        self.use_postshuffle_norm = use_postshuffle_norm
         if submodules is None:
             raise AssertionError("MLPSubmodules must be provided")
         if self.projector_type == "mlp":
@@ -51,7 +56,11 @@ class MultimodalProjector(MultiModalModule):
             )
         elif self.projector_type == "lnmlp":
             self.ffn_hidden_size = config.ffn_hidden_size
-            self.layernorm = TENorm(config=config, hidden_size=config.input_size, eps=config.layernorm_epsilon)
+            self.layernorm = TENorm(
+                config=config, 
+                hidden_size=self.ffn_hidden_size if use_postshuffle_norm else config.input_size, 
+                eps=config.layernorm_epsilon)
+            
             self.encoder = MLP(
                 config=config,
                 submodules=submodules,
@@ -62,6 +71,8 @@ class MultimodalProjector(MultiModalModule):
 
     def forward(self, hidden_states):
         if self.projector_type == "lnmlp":
+            if self.use_postshuffle_norm:
+                hidden_states = hidden_states.view(-1, self.ffn_hidden_size)
             hidden_states = self.layernorm(hidden_states).view(-1, self.ffn_hidden_size)
            
         encoder_output, encoder_output_bias = self.encoder(hidden_states)
