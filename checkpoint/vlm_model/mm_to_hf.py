@@ -64,7 +64,9 @@ def load_from_mm(load_dir: Path,
                  vit_pp_list: PP_LAYER_NUM_T,
                  llm_pp_list: PP_LAYER_NUM_T,
                  tp_size: int = 1,
-                 audio_pp_list: PP_LAYER_NUM_T = None) -> List[STATE_DICT_T]:
+                 audio_pp_list: PP_LAYER_NUM_T = None,
+                 ep_size: int = 1,
+                 num_experts: int = 1) -> List[STATE_DICT_T]:
     import mindspeed.megatron_adaptor  # noqa
     save_iteration = load_dir.joinpath(LATEST_TXT).read_text()
     save_dir = load_dir.joinpath(f"iter_{int(save_iteration):07}" if save_iteration != "release" else save_iteration)
@@ -72,17 +74,31 @@ def load_from_mm(load_dir: Path,
     for tp_rank in range(tp_size):
         pp_state_dict = {}
         for pp_rank in range(len(vit_pp_list)):
-            if len(vit_pp_list) > 1:
-                current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(pp_rank):03}")
+            if ep_size > 1:
+                for ep_rank in range(ep_size):
+                    if len(vit_pp_list) > 1:
+                        current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(pp_rank):03}_{int(ep_rank):03}")
+                    else:
+                        current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(ep_size):03}")
+                    pt_path = current_path.joinpath(MEGATRON_CKPT_NAME)
+                    dict_ep = {}
+                    for param, tensor in torch.load(pt_path, map_location='cpu', weights_only=False)['model'].items():
+                        if tensor is not None:
+                            new_key = rename_pp_ep_parameter(param, vit_pp_list, llm_pp_list, audio_pp_list, pp_rank, ep_rank, ep_size, num_experts)
+                            dict_ep.update({new_key: tensor})
+                    pp_state_dict.update(dict_ep)
             else:
-                current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}")
-            pt_path = current_path.joinpath(MEGATRON_CKPT_NAME)
-            print(str(pt_path).center(100, '_'))
-            # 注意output_layer存在_extra_state其值为None
-            pp_state_dict.update(
-                {rename_pp_parameter(param, vit_pp_list, llm_pp_list, audio_pp_list, pp_rank): tensor
-                 for param, tensor in torch.load(pt_path, map_location='cpu', weights_only=False)['model'].items()
-                 if tensor is not None})
+                if len(vit_pp_list) > 1:
+                    current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(pp_rank):03}")
+                else:
+                    current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}")
+                pt_path = current_path.joinpath(MEGATRON_CKPT_NAME)
+                print(str(pt_path).center(100, '_'))
+                # 注意output_layer存在_extra_state其值为None
+                pp_state_dict.update(
+                    {rename_pp_parameter(param, vit_pp_list, llm_pp_list, audio_pp_list, pp_rank): tensor
+                    for param, tensor in torch.load(pt_path, map_location='cpu', weights_only=False)['model'].items()
+                    if tensor is not None})
         state_dicts.append(pp_state_dict)
     return state_dicts
 
@@ -122,6 +138,35 @@ def merge_by_tp(tp_state_dicts: List[STATE_DICT_T], patterns: TP_PATTERN_T, tp_s
         else:
             merged_dict[key] = tp_values[0]
     return merged_dict
+
+
+def rename_pp_ep_parameter(param_name: str,
+                        vit_pp_list: List[int],
+                        llm_pp_list: List[int],
+                        audio_pp_list: List[int] = None,
+                        pp_index: int = 0,
+                        ep_rank: int = 0,
+                        ep_size: int = 1,
+                        num_experts: int = 16) -> str:
+    pp_key = rename_pp_parameter(param_name, vit_pp_list, llm_pp_list, audio_pp_list, pp_index)
+    per_ep_rank_experts = num_experts // ep_size
+    offset = ep_rank * per_ep_rank_experts  # 原始专家索引的起始位置
+    if "local_experts" in pp_key:
+        # 解析原始 key 的结构
+        parts = pp_key.split(".")
+        if len(parts) < 8:
+            raise ValueError(f"Invalid key format: {pp_key}")
+        # 获取 local_expert_idx（即内部编号）
+        local_expert_idx = int(parts[7])
+        # 恢复为原始专家索引
+        original_expert_idx = offset + local_expert_idx
+        # 替换 parts[7] 为原始索引
+        parts[7] = str(original_expert_idx)
+        # 重构 key
+        new_key = ".".join(parts)
+    else:
+        new_key = pp_key
+    return new_key
 
 
 def rename_pp_parameter(param_name: str,
@@ -167,11 +212,14 @@ def convert_mm_to_hf(convert_config: ConvertHFConfig,
                      tp_patterns: TP_PATTERN_T,
                      merge_source: bool = False):
     parallel_config = convert_config.parallel_config
+    config = convert_config.hf_config.config
     # 找到最大的tp
     max_tp_size = max(parallel_config.tp_size, parallel_config.vit_tp_size, parallel_config.audio_tp_size)
+    ep_size = parallel_config.ep_size if hasattr(parallel_config, 'ep_size') else 1
+    num_experts = config.text_config.num_experts if hasattr(config.text_config, 'num_experts') else 1
     # 加载权重字典
     state_dicts = load_from_mm(convert_config.mm_dir, parallel_config.vit_pp_layers, parallel_config.llm_pp_layers,
-                               max_tp_size, parallel_config.audio_pp_layers)
+                               max_tp_size, parallel_config.audio_pp_layers, ep_size, num_experts)
     state_dict = merge_by_tp(state_dicts, tp_patterns, parallel_config.tp_size, parallel_config.vit_tp_size, parallel_config.audio_tp_size)
     for op in ops:
         op.revert(state_dict)  # 执行逆操作

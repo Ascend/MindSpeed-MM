@@ -577,6 +577,38 @@ class GLUSplit(BaseSplit):
             torch.cat(all_gates, dim=0),
             torch.cat(all_ups, dim=0)
         ], dim=0)
+    
+
+class ExpertSplitOp(Operator):
+    """moe experts split op"""
+    def __init__(self, raw_name: Any, new_name: str, num_experts: int):
+        self.raw_name = raw_name
+        self.new_name = new_name
+        self.num_experts = num_experts
+
+    def apply(self, weights: STATE_DICT_T):
+        if self.num_experts > 0:
+            experts_tensor = weights.pop(self.raw_name)
+            for num in range(self.num_experts):
+                # 拆分专家weight
+                split_tensors = experts_tensor[num]
+                weights[self.new_name.replace(DIGIT_FMT, str(num))] = split_tensors.T
+
+    def revert(self, weights: STATE_DICT_T):
+        if self.num_experts > 0:
+            split_tensors_list = []
+            for num in range(self.num_experts):
+                split_tensors = weights.pop(self.new_name.replace(DIGIT_FMT, str(num))).T
+                split_tensors_list.append(split_tensors)
+
+            ori_dtype = split_tensors_list[0].dtype
+            need_trans_dtype = ori_dtype == torch.bfloat16
+            if need_trans_dtype:
+                split_tensors_list = [x.to(torch.float32) for x in split_tensors_list]
+            merged_tensor = torch.stack(split_tensors_list, dim=0)
+            if need_trans_dtype:
+                merged_tensor = merged_tensor.to(ori_dtype)
+            weights[self.raw_name] = merged_tensor
 
 
 TP_PATTERN_T = Dict[str, BaseSplit]
