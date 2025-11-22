@@ -141,7 +141,7 @@ export MODEL_SELECT="Qwen3vl"
 # 指定verl源码路径 例如：/home/code/verl
 export VERL_PATH=path_to_verl
 pip install -v -e .
-scp -r ../examples/verl_examples/qwen3vl/* ../../verl/examples/grpo_trainer/
+cp -r ../examples/verl_examples/qwen3vl/* ../../verl/examples/grpo_trainer/
 cd ../../verl/
 ```
 

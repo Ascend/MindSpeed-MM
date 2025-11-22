@@ -127,7 +127,7 @@ pip install torch_npu-2.5.1*.manylinux2014_*.whl
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM/verl_plugin
 pip install -v -e .
-scp -r ../examples/verl_examples/qwen2.5vl/* ../../verl/examples/grpo_trainer/
+cp -r ../examples/verl_examples/qwen2.5vl/* ../../verl/examples/grpo_trainer/
 cd ../../verl/
 ```
 
