@@ -15,7 +15,7 @@
     - [准备工作](#jump4.1)
     - [启动训练](#jump4.2)
 - [性能数据](#性能数据)
-- [备注](#jump5)
+- [FAQ](#jump5)
 
 <a id="jump0"></a>
 
@@ -70,7 +70,7 @@ cd ..
 conda create -n test python=3.10
 conda activate test
 
-# for torch-npu dev version or x86 machine [Optional]
+# 对于x86的设备，若遇到有关torchvision的导包问题，建议优先检查环境中的torchvision版本是否为`+cpu`版本，建议使用以下源配置解决此类问题
 # pip config set global.extra-index-url "https://download.pytorch.org/whl/cpu/ https://mirrors.huaweicloud.com/ascend/repos/pypi"
 # 安装torch和torch_npu
 pip install torch-2.7.1+cpu-cp310-cp310-*.whl
@@ -258,5 +258,5 @@ bash examples/dancegrpo/posttrain_flux_dancegrpo.sh
 
 <a id="jump5"></a>
 
-## 备注
-对于CPU型号为x86的设备，建议使用torchvision版本为`0.22.1+cpu`
+## FAQ
+1. 对于CPU型号为x86的设备，建议使用torchvision版本为`0.22.1+cpu`，若遇到有关torchvision的导包问题，建议优先检查环境中的torchvision版本是否为`+cpu`版本。
