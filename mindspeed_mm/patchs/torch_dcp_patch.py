@@ -1,4 +1,4 @@
-# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION.  All rights reserved.
 import os
 import sys
 import torch
@@ -157,11 +157,22 @@ def _load_base_checkpoint(
 
             fs_storage_reader = torch.distributed.checkpoint.FileSystemReader(checkpoint_name)
 
+            load_planner = DefaultLoadPlanner(allow_partial_load=True)
             torch.distributed.checkpoint.load_state_dict(
                 state_dict=state_dict,
                 storage_reader=fs_storage_reader,
-                planner=DefaultLoadPlanner(allow_partial_load=True)
+                planner=load_planner
             )
+            
+            curr_keys = load_planner.state_dict.keys()
+            load_keys = load_planner.metadata.state_dict_metadata.keys()
+            unexpected_keys = set(load_keys) - set(curr_keys)
+            missing_keys = set(curr_keys) - set(load_keys)
+            model_unexpected_keys = [item[len("model."):] for item in unexpected_keys if item.startswith("model.")]
+            model_missing_keys = [item[len("model."):] for item in missing_keys if item.startswith("model.")]
+            
+            print_rank_0(f"Missing keys: {model_missing_keys}")
+            print_rank_0(f"Unexpected keys: {model_unexpected_keys}")
     else:
         raise NotImplementedError(f"checkpoint format {ckpt_format} not supported")
 
