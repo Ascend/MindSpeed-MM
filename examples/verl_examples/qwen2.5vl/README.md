@@ -119,7 +119,7 @@ git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM/verl_plugin
 export MODEL_SELECT="Qwen2_5vl"
 pip install -v -e .
-scp -r ../examples/verl_examples/qwen2.5vl/* ../../verl/examples/grpo_trainer/
+cp -r ../examples/verl_examples/qwen2.5vl/* ../../verl/examples/grpo_trainer/
 cd ../../verl/
 ```
 

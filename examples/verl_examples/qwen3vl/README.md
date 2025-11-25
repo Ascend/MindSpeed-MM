@@ -130,7 +130,7 @@ export MODEL_SELECT="Qwen3vl"
 export VERL_PATH=path_to_verl
 pip install -v -e .
 # 需要确认插件是否安装完成，请参考下面“注意事项”第4点
-scp -r ../examples/verl_examples/qwen3vl/* ../../verl/examples/grpo_trainer/
+cp -r ../examples/verl_examples/qwen3vl/* ../../verl/examples/grpo_trainer/
 cd ../../verl/
 ```
 
