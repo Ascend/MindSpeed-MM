@@ -27,7 +27,8 @@ from .modules import (
     Qwen3VLTextRMSNorm,
     Qwen3VLTextMLP,
     Qwen3VLTextRotaryEmbedding,
-    Qwen3VLLMHead
+    Qwen3VLLMHead,
+    Qwen3VLEmptyModule
 )
 
 from .modeling_qwen3_vl import (
@@ -255,6 +256,9 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel, Qwen3VLTextModel):
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        
+        # Placeholder for FSDP2 hook registration on norm/gate params when align_fsdp_param_groups is enabled.
+        self.norm_hook_module = Qwen3VLEmptyModule()
         
         self.layers = nn.ModuleList(
             [Qwen3VLMoeTextDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]

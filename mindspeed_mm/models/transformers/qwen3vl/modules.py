@@ -24,6 +24,23 @@ from mindspeed_mm.models.common.communications import cal_split_sizes, gather_fo
 from .utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq
 
 
+class Qwen3VLEmptyModule(nn.Module):
+    """
+    This class does not implement any functionality. It serves solely as a placeholder
+    to provide a registration point for attaching FSDP2 hooks to all normalization (e.g., LayerNorm, RMSNorm)
+    and gate-related parameters when the `align_fsdp_param_groups` feature is enabled.
+
+    Its purpose is structural: to ensure these specific parameters are correctly identified
+    and included in FSDP2's parameter grouping and communication logic, without participating
+    in forward/backward computation or maintaining any internal state.
+    """
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, hidden_state: torch.Tensor) -> torch.Tensor:
+        return hidden_state
+    
+
 class Qwen3VLVisionMLP(nn.Module):
     def __init__(self, config):
         super().__init__()

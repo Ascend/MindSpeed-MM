@@ -225,6 +225,10 @@ class Fsdp2Config:
 
     recompute_modules: Optional[Iterable[torch.nn.Module]] = None
     use_reentrant: bool = True
+    
+    # If True, each FSDP parameter group within a block contains only Linear layer parameters,
+    # enabling aligned sharding for improved communication efficiency. Set to False to disable this optimization.
+    align_fsdp_param_groups: bool = False
 
     def to_dict(self):
         mp_policy = self._mp_policy()
