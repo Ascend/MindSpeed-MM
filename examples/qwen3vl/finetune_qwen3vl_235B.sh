@@ -89,6 +89,7 @@ GPT_ARGS="
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
     --calculate-per-token-loss \
+    --init-model-with-meta-device \
     --log-tps
 "
 
