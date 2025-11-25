@@ -85,8 +85,6 @@ git clone https://github.com/vllm-project/vllm.git
 cd vllm
 git checkout v0.9.1
 VLLM_TARGET_DEVICE=empty pip install -v -e .
-# for x86 machine [Optional]
-# VLLM_TARGET_DEVICE=empty pip install -v -e . --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 cd ..
 
 # vllm-ascend
@@ -94,8 +92,6 @@ git clone https://github.com/vllm-project/vllm-ascend.git
 cd vllm-ascend
 git checkout 2961f2f
 pip install -v -e .
-# for x86 machine [Optional]
-# pip install -v -e . --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 cd ..
 
 # verl
@@ -104,15 +100,10 @@ cd verl
 git checkout 97b65c63c729c61ca607315cf7084012aabc6bba
 pip install -r requirements-npu.txt
 pip install -v -e .
-# for x86 machine [Optional]
-# pip install -r requirements-npu.txt --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
-# pip install -v -e . --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 cd ..
 
 # 安装三方库
-pip install transformers==4.52.4 mathruler==0.1.0 decorator qwen-vl-utils==0.0.11 viztracer cloudpickle==2.1.0
-# for x86 machine [Optional]
-# pip install transformers==4.52.4 mathruler==0.1.0 decorator qwen-vl-utils==0.0.11 viztracer cloudpickle==2.1.0 --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
+pip install transformers==4.52.4 mathruler==0.1.0 decorator qwen-vl-utils==0.0.11 viztracer cloudpickle==2.1.0 setuptools==80.9.0
 
 # 因安装环境可能导致覆盖，需重新安装torch_npu
 pip install torch_npu-2.5.1*.manylinux2014_*.whl
@@ -126,6 +117,7 @@ pip install torch_npu-2.5.1*.manylinux2014_*.whl
 # 请确保 vllm 已正确安装并且之后不会做覆盖
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM/verl_plugin
+export MODEL_SELECT="Qwen2_5vl"
 pip install -v -e .
 scp -r ../examples/verl_examples/qwen2.5vl/* ../../verl/examples/grpo_trainer/
 cd ../../verl/

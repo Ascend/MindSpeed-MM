@@ -54,8 +54,8 @@ ignore_eos=False
 
 # training params
 enable_gradient_checkpointing=True
-nnodes=2
-n_gpus_per_node=8
+nnodes=1
+n_gpus_per_node=16
 sp_size=8
 rollout_n=8
 padding_mode=1
