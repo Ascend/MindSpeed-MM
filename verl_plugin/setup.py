@@ -6,7 +6,6 @@ import sysconfig
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
-QWEN_VL = "Qwen3vl"
 MODEL_SELECT = "MODEL_SELECT"
 
 
@@ -67,7 +66,7 @@ def inject_verl_plugin(custom_path=None):
 
     qwen3vl_modify_success = True
     model_select = os.environ.get(MODEL_SELECT, None)
-    if model_select and model_select == QWEN_VL:
+    if model_select and model_select == "Qwen3vl":
         qwen3vl_modify_success = qwen3vl_fun_modify(verl_path)
 
     return init_modify_success and qwen3vl_modify_success
@@ -222,11 +221,7 @@ def inject_vllm_plugin():
 
     # 需要修改的行
     line_to_change = "query, key = torch_npu.npu_mrope(positions,"
-    model_select = os.environ.get(MODEL_SELECT, None)
-    if model_select and model_select == QWEN_VL:
-        line_change_to = "        query, key = torch_npu.npu_mrope(positions.contiguous(),\n"
-    else:
-        line_change_to = "    query, key = torch_npu.npu_mrope(positions.contiguous(),\n"
+    line_change_to = "    query, key = torch_npu.npu_mrope(positions.contiguous(),\n"
 
     try:
         with open(rotary_embedding_file, "r") as f:
@@ -302,10 +297,13 @@ def get_vllm_path():
 class CustomBuildPy(build_py):
     def run(self):
         super().run()
+        model_select = os.environ.get(MODEL_SELECT, None)
+        if model_select is None:
+            print("Error: Environment variable 'MODEL_SELECT' is required. Please set MODEL_SELECT to specify the model.")
         custom_path = os.environ.get('VERL_PATH', None)
         if not inject_verl_plugin(custom_path):
             print("Error: verl injection failed. Please check installation.")
-        if not inject_vllm_plugin():
+        if model_select == "Qwen2_5vl" and not inject_vllm_plugin():
             print("Error: vllm injection failed. Please check installation.")
 
 

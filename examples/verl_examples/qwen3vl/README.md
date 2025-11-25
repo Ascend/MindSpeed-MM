@@ -67,8 +67,9 @@ conda create -n test python=3.11
 conda activate test
 
 # for torch-npu dev version or x86 machine [Optional]
-# pip config set global.extra-index-url "https://download.pytorch.org/whl/cpu/ https://mirrors.huaweicloud.com/ascend/repos/pypi"
 # pip install 后缀需加上 --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
+pip config set global.extra-index-url "https://download.pytorch.org/whl/cpu/ https://mirrors.huaweicloud.com/ascend/repos/pypi"
+
 # 安装torch和torch_npu
 pip install torch-2.7.1-cp311-cp311-*.whl
 pip install torch_npu-2.7.1*.manylinux_*.whl
@@ -83,9 +84,6 @@ cd vllm
 git checkout v0.11.0
 pip install -r requirements/build.txt
 VLLM_TARGET_DEVICE=empty pip install -v -e .
-# for x86 machine [Optional]
-# pip install -r requirements/build.txt --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
-# VLLM_TARGET_DEVICE=empty pip install -v -e . --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 cd ..
 
 # vllm-ascend
@@ -95,9 +93,6 @@ git checkout fed8145
 pip install -r requirements.txt
 pip install -v -e .
 # 如果遇到编译失败问题，请检查下方“注意事项”章节第2点
-# for x86 machine [Optional]
-# pip install -r requirements.txt --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
-# pip install -v -e . --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 cd ..
 
 # verl
@@ -106,9 +101,6 @@ cd verl
 git checkout 7df2afb
 pip install -r requirements.txt
 pip install -v -e .
-# for x86 machine [Optional]
-# pip install -r requirements.txt --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
-# pip install -v -e . --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 cd ..
 
 # transformers
@@ -116,14 +108,10 @@ git clone https://github.com/huggingface/transformers.git
 cd transformers
 git checkout 7a833d1ccd41673030c85107f65f454c0c3222f5
 pip install '.[torch]'
-# for x86 machine [Optional]
-# pip install '.[torch]' --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 cd ..
 
 # 安装三方库
-pip install qwen-vl-utils==0.0.11 mathruler viztracer uvloop==0.21.0
-# for x86 machine [Optional]
-# pip install qwen-vl-utils==0.0.11 mathruler viztracer uvloop==0.21.0 --trusted-host mirrors.aliyun.com --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
+pip install qwen-vl-utils==0.0.11 mathruler viztracer uvloop==0.21.0 setuptools==80.9.0
 
 # 因安装环境可能导致覆盖，需重新安装torch_npu
 pip install torch_npu-2.7.1*.manylinux_*.whl
@@ -141,6 +129,7 @@ export MODEL_SELECT="Qwen3vl"
 # 指定verl源码路径 例如：/home/code/verl
 export VERL_PATH=path_to_verl
 pip install -v -e .
+# 需要确认插件是否安装完成，请参考下面“注意事项”第4点
 cp -r ../examples/verl_examples/qwen3vl/* ../../verl/examples/grpo_trainer/
 cd ../../verl/
 ```
@@ -335,6 +324,12 @@ sudo apt-get install iproute2
 
 ```shell
 pip install "ray[default]" debugpy
+```
+
+4. 确认插件安装完成，可通过检查文件是否修改成功（`vi ../../verl/verl/__init__.py` 确认文件末尾是否有`import verl_npu`等代码追加），如果没有修改成功，推荐修改安装插件命令为：
+
+```shell
+pip install -v .
 ```
 
 ---
