@@ -15,17 +15,16 @@ export ACLNN_CACHE_LIMIT=100000
 export TOKENIZERS_PARALLELISM=false
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-# export HCCL_SOCKET_IFNAME=
-# export GLOO_SOCKET_IFNAME=
-# export ASCEND_RT_VISIBLE_DEVICES=
-
-NPUS_PER_NODE=16
-MASTER_ADDR=localhost
+# 当前脚本双机拉起配置仅作参考，请根据实际情况修改
+export GLOO_SOCKET_IFNAME="Your SOCKET IFNAME"
+# 根据实际情况，指定设备
+export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+NPUS_PER_NODE=8
+MASTER_ADDR=<master_ip_address>
 MASTER_PORT=6000
-NNODES=1
-NODE_RANK=0
+NNODES=2
+NODE_RANK=0 # 主节点为0，从节点为1，除了该参数，其他配置都要保持一致
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
-
 
 MM_DATA="./examples/qwen3omni/data.json"
 MM_MODEL="./examples/qwen3omni/model.json"
@@ -73,7 +72,7 @@ GPT_ARGS="
     --lr 1.0e-5 \
     --lr-decay-style cosine \
     --weight-decay 0 \
-    --train-iters 5000 \
+    --train-iters 200 \
     --lr-warmup-fraction 0.1 \
     --clip-grad 0.0 \
     --adam-beta1 0.9 \
@@ -107,6 +106,7 @@ OUTPUT_ARGS="
     --eval-interval 10000 \
     --eval-iters 5000 \
     --save $SAVE_PATH \
+    --log-tps \
 "
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs

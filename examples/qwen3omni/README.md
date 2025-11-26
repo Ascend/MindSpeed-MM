@@ -11,7 +11,7 @@
 - [环境安装](#jump1)
   - [环境准备](#jump1.1)
   - [环境搭建](#jump1.2)
-- [权重下载及转换](#jump2)
+- [权重下载](#jump2)
   - [权重下载](#jump2.1)
 - [数据集准备及处理](#jump3)
   - [数据集下载](#jump3.1)
@@ -87,7 +87,7 @@ pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
 <a id="jump2"></a>
 
-## 权重下载及转换
+## 权重下载
 
 <a id="jump2.1"></a>
 
@@ -105,7 +105,6 @@ pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
 <a id="jump3.1"></a>
 #### 1. 数据集下载(以coco2017数据集为例)
-M
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
@@ -258,7 +257,7 @@ OUTPUT_ARGS="
 
 根据实际情况配置`examples/qwen3omni/model.json`中的`init_from_hf_path`参数，该参数表示初始权重的加载路径。
 根据实际情况配置`examples/qwen3omni/model.json`中的`image_encoder.vision_encoder.freeze`、`image_encoder.vision_projector.freeze`、`audio_encoder.audio_encoder.freeze`、`text_decoder.freeze`参数，该参数分别代表是否冻结vision model模块、multi model projector模块、audio model模块、及language model模块。
-注：当前`examples/qwen3omni/model.json`中点各网络层数均为未过校验的无效配置，如需减层请修改原始hf路径下相关配置文件config.json。
+注：当前`examples/qwen3omni/model.json`中的各网络层数均为未过校验的无效配置，如需减层请修改原始hf路径下相关配置文件config.json。
 
 【单机运行配置】
 
@@ -268,16 +267,38 @@ OUTPUT_ARGS="
 # 根据实际情况修改 ascend-toolkit 和 nnal 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/asdsip/set_env.sh
-NPUS_PER_NODE=16
+NPUS_PER_NODE=8
 # 如果想要指定单卡0，则增加export ASCEND_RT_VISIBLE_DEVICES=0
 # 并修改NPUS_PER_NODE=1
 MASTER_ADDR=localhost
-MASTER_PORT=29501
+MASTER_PORT=6000
 NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 # 可以修改步数为5000步
 --train-iters 5000
+```
+
+【多机运行配置】
+
+配置`examples/qwen3omni/finetune_qwen3omni.sh`参数如下（性能场景默认双机运行配置）
+
+```shell
+# 根据实际情况修改 ascend-toolkit 和 nnal 路径
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/asdsip/set_env.sh
+# 根据分布式集群实际情况配置分布式参数
+export GLOO_SOCKET_IFNAME="Your SOCKET IFNAME" # 通过ifconfig获取
+# 如果节点的卡数大于8，需要指定设备
+export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+NPUS_PER_NODE=8 # 每个节点的卡数，根据实际情况填写
+MASTER_ADDR=<master_ip_address> # 都要修改为主节点的IP地址（不能为localhost)
+MASTER_PORT=6000 # 各个节点保持一致
+NNODES=2 # 集群里的节点数，根据实际情况填写
+NODE_RANK=0 # 当前节点的RANK，多个节点不能重复，主节点为0，其他节点可以是1,2..
+WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
+# 可以修改步数为200步
+--train-iters 200
 ```
 
 <a id="jump4.3"></a>
