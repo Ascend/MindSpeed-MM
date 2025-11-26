@@ -912,7 +912,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 2x8 (A3) </td>
       <td> BF16 </td>
       <td> 28.1 (TPS) </td>
-      <td> 16.4 </td>
+      <td> 16.4 (TPS) </td>
       <td> / </td>
       <td>【Test】</td>
     </tr>
