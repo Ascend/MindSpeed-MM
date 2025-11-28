@@ -338,6 +338,11 @@ vim diffsynth/vram_management/layers.py
 将16行的`torch.cuda.mem_get_info(self.computation_device)`
 改为`torch.npu.mem_get_info()`
 
+```shell
+vim diffsynth/models/wan_video_dit.py
+  ```
+将96行的`freqs`
+改为`freqs.to(torch.complex64)`
 
 ### 启动推理
 

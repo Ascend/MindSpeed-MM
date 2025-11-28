@@ -286,7 +286,12 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
           ]
     ```
 
-  2. 运行代码
+  2. 创建推理结果路径
+      ```shell
+      mkdir -p inference
+      ```
+
+  3. 运行代码
 
       ```shell
       source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -319,7 +324,12 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
     `lora_path`是存放 lora 权重的绝对路径，其他权重同上
 
-  2. 运行代码
+  2. 创建推理结果路径
+      ```shell
+      mkdir -p inference
+      ```
+
+  3. 运行代码
 
       ```shell
       source /usr/local/Ascend/ascend-toolkit/set_env.sh

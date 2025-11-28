@@ -384,5 +384,5 @@ def apply_patches():
     dit_module.QwenDoubleStreamAttention = PatchedQwenDoubleStreamAttention
     dit_module.QwenImageDiT = PatchedQwenImageDiT
 
-    trainer_module = sys.modules["diffsynth.trainer.utils"]
+    trainer_module = sys.modules["diffsynth.trainers.utils"]
     trainer_module.launch_training_task = Patched_launch_training_task
