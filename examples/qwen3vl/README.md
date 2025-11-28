@@ -237,6 +237,27 @@ dataset_param->basic_parameters->dataset
 
 ```
 
+【序列并行配置】
+
+当前已支持Ulysses序列并行，当使用长序列训练时，需要开启CP特性，开启方式为在训练bash脚本设置CP > 1，例如
+```bash
+CP=4
+GPT_ARGS="
+    ...
+    --context-parallel-size ${CP} \
+    ...
+"
+```
+
+【Attention配置】
+当前支持vision和text模块选择不同的Attntion实现方式，具体为在`model.json`文件中修改`attn_implementation`字段，当前支持`eager`、`flash_attention_2`、`sdpa`三种配置，开启`flash_attention_2`默认会走TND layout模式，cu_seqlens 转list操作会产生同步，可以缓解多流复用带来显存未及时释放问题，降低部分显存使用。
+
+【activation_offload配置】
+使用activation_offload可以将重计算过程中产生的checkpoint点的激活值移动到host，反向异步从host传输到device，降低device激活显存占用，配置方式为在`model.json`中将`activation_offload`字段设置为True。
+
+【chunkloss 配置】
+参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/chunkloss.md)
+
 【模型保存加载及日志信息配置】
 
 根据实际情况配置`examples/qwen3vl/finetune_qwen3vl_xxB.sh`的参数，包括加载、保存路径以及保存间隔`--save-interval`（注意：分布式优化器保存文件较大耗时较长，请谨慎设置保存间隔）
