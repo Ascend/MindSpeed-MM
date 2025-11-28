@@ -6,7 +6,7 @@ MindSpeed-MM已支持接入华为自研AI框架MindSpore，旨在提供华为全
 
 ## 🔥🔥🔥Latest News
 
-🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../examples/mindspore/cogvideox/)、[InternVL2](../../examples/mindspore/internvl2)、[Qwen2.5VL](../../examples/mindspore/qwen2.5vl/README.md)模型。
+🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../examples/mindspore/cogvideox/)、[InternVL2](../../examples/mindspore/internvl2)、[Qwen2.5VL](../../examples/mindspore/qwen2.5vl/README.md)、[Qwen25Omni](../../examples/mindspore/qwen2.5omni/README.md)、[Qwen3VL](../../examples/mindspore/qwen3vl/README.md)模型。
 
 ## 版本配套
 
@@ -14,9 +14,9 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 | 依赖软件        |                                                                                                                                    |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 昇腾NPU驱动固件 | [在研版本](https://www.hiascend.com/hardware/firmware-drivers/community?product=1&model=30&cann=8.0.RC3.alpha002&driver=1.0.26.alpha) |
-| 昇腾 CANN       | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann)                                               |
-| MindSpore       | [2.7.0](https://www.mindspore.cn/install/)                                                                                        |
+| 昇腾NPU驱动固件 | 在研版本 |
+| 昇腾 CANN       | 在研版本                                               |
+| MindSpore       | [2.7.2](https://www.mindspore.cn/install/)                                                                                        |
 | Python          | >=3.9  
 
 ## 环境部署
@@ -33,14 +33,17 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 ### 已支持特性概览
 
-|       模型 \ 特性       | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) |
-|:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|
-|   CogVideoX系列-T2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ |  |
-|   CogVideoX系列-I2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) | ✔ | ✔ |  |
-|    InternVL2-2B     |  |  |  |                                            ✔                                            |  | ✔ | ✔ |  |
-|    InternVL2-8B     |  |  | ✔ |                                            ✔                                            |  | ✔ | ✔ |  |
-|    Qwen2.5VL-7B     | ✔ |  |  |                                            ✔                                            |  | ✔ |  |  |
-|    Qwen2.5VL-72B    | ✔ |  |  |                                            ✔                                            |  | ✔ |  |  |
+|       模型 \ 特性       | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | EP |  [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) |
+|:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:-------:|:------:|:------:|:------:|
+|   CogVideoX系列-T2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
+|   CogVideoX系列-I2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
+|    InternVL2-2B     |  |  |  |                                            ✔                                            |  |   | ✔ | ✔ |  |
+|    InternVL2-8B     |  |  | ✔ |                                            ✔                                            |  |   | ✔ | ✔ |  |
+|    Qwen2.5VL-7B     | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
+|    Qwen2.5VL-72B    | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
+|    Qwen25Omni-7B    |  |  |  |                                            ✔                                            |  |   | ✔ |  |  |
+|    Qwen3vl-8B    |  | ✔ |  |                                            ✔                                            |  |   | ✔ |  |  |
+|    Qwen3vl-30B    |  | ✔ |  |                                            ✔                                            |  | ✔ | ✔ |  |
 
 备注：
 
@@ -175,7 +178,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>支持中</td>
     </tr>
     <tr>
-      <td rowspan="9"> 多模态理解 </td>
+      <td rowspan="20"> 多模态理解 </td>
       <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2-2B">2B</a></td>
       <td> 微调 </td>
@@ -262,6 +265,27 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-Omni-7B/tree/main">7B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
+      <td> BF16 </td>
+      <td>  </td>
+      <td> / </td>
+      <td> / </td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/qwen3vl">Qwen3VL</a></td>
+      <td><a href="https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct/tree/main"> 8B </a></td>
+      <td> 微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td>  </td>
+      <td> / </td>
+      <td> / </td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td><a href="https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Instruct/tree/main"> 30B </a></td>
+      <td> 微调 </td>
+      <td> 1x16 </td>
       <td> BF16 </td>
       <td>  </td>
       <td> / </td>

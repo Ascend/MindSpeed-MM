@@ -79,7 +79,7 @@ def load_from_mm(load_dir: Path,
                     if len(vit_pp_list) > 1:
                         current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(pp_rank):03}_{int(ep_rank):03}")
                     else:
-                        current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(ep_size):03}")
+                        current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(ep_rank):03}")
                     pt_path = current_path.joinpath(MEGATRON_CKPT_NAME)
                     dict_ep = {}
                     for param, tensor in torch.load(pt_path, map_location='cpu', weights_only=False)['model'].items():
