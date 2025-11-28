@@ -1,4 +1,6 @@
 # Copyright 2025 The Qwen team, Alibaba Group and the HuggingFace Inc. team. All rights reserved.
+import torch
+
 from transformers.models.qwen3_moe.modeling_qwen3_moe import (
     Qwen3MoeDecoderLayer,
     Qwen3MoeAttention,
@@ -34,7 +36,16 @@ def internvl_moe_decoder_layer_init(self, config, layer_idx: int):
     self.post_attention_layernorm = Qwen3MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
 
+def internvl_moe_decoder_layer_forward(self, hidden_states, **kwargs):
+    # Memory bloat exists, synchronization can be used to avoid it.
+    torch.npu.synchronize()
+    outputs = self.forward_before_patch(hidden_states, **kwargs)
+    return outputs
+
+
 class InternVLChatModelGeneration(InternVLChatModel, FSDP2Mixin):
     def __init__(self, config, vision_model=None, language_model=None, use_flash_attn=True):
         Qwen3MoeDecoderLayer.__init__ = internvl_moe_decoder_layer_init
+        Qwen3MoeDecoderLayer.forward_before_patch = Qwen3MoeDecoderLayer.forward
+        Qwen3MoeDecoderLayer.forward = internvl_moe_decoder_layer_forward
         super().__init__(config)

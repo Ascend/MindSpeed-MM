@@ -53,15 +53,15 @@ def test_merge_moe_expert_weights():
     merged_gate_up_proj = state_dict.get("layer.0.experts.gate_up_proj")
     merged_down_proj = state_dict.get("layer.0.experts.down_proj")
 
-    assert merged_gate_up_proj.shape == (2, 3, 4)
-    assert merged_down_proj.shape == (2, 3, 2)
+    assert merged_gate_up_proj.shape == (6, 4)
+    assert merged_down_proj.shape == (6, 2)
 
 
 def test_split_moe_expert_weights():
     # Create test state_dict
     state_dict = {
-        "layer.0.experts.gate_up_proj": torch.randn(2, 3, 4),
-        "layer.0.experts.down_proj": torch.randn(2, 3, 2),
+        "layer.0.experts.gate_up_proj": torch.randn(6, 4),
+        "layer.0.experts.down_proj": torch.randn(6, 2),
     }
     num_hidden_layers = 1
     num_experts = 2

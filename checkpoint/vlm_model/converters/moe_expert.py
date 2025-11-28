@@ -52,6 +52,11 @@ def merge_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, n
             down_proj_weights.append(down_proj_weight.T)
         new_gate_up_proj_weight = torch.stack(gate_up_proj_weights)
         new_down_proj_weight = torch.stack(down_proj_weights)
+        
+        # view experts weight: (expert_num, input_dim, output_dim) -> (expert_num * input_dim, output_dim)
+        new_gate_up_proj_weight = new_gate_up_proj_weight.view(-1, new_gate_up_proj_weight.shape[-1])
+        new_down_proj_weight = new_down_proj_weight.view(-1, new_down_proj_weight.shape[-1])
+
         new_gate_up_proj = (weight_path.replace('.{expert}', '') + ".gate_up_proj").format(layer=layer)
         new_down_proj = (weight_path.replace('.{expert}', '') + ".down_proj").format(layer=layer)
         state_dict[new_gate_up_proj] = new_gate_up_proj_weight
@@ -71,6 +76,9 @@ def split_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, n
 
         merged_gate_up_proj = state_dict.pop(gate_up_proj)
         merged_down_proj = state_dict.pop(down_proj)
+        # view experts weight: (expert_num * input_dim, output_dim) -> (expert_num, input_dim, output_dim)
+        merged_gate_up_proj = merged_gate_up_proj.view(num_experts, -1, merged_gate_up_proj.shape[-1])
+        merged_down_proj = merged_down_proj.view(num_experts, -1, merged_down_proj.shape[-1])
 
         # Split merged_gate_up_proj into individual gate_proj and up_proj for each expert
         gate_up_experts = merged_gate_up_proj.unbind()
