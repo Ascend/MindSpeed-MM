@@ -28,7 +28,7 @@ def ms_matmul_wrapper(fn):
     @wraps(fn)
     def matmul_wrapper(inp, other, *args, **kwargs):
         if {inp.dtype, other.dtype} == {mindspore.float32, mindspore.bfloat16}:
-            return fn(inp.to(mindspore.float32), other.to(mindspore.float32), *args, **kwargs).to(mindspore.bfloat16)
+            return fn(inp.to(mindspore.float32), other.to(mindspore.float32), *args, **kwargs).to(inp.dtype)
         return fn(inp, other, *args, **kwargs)
     return matmul_wrapper
 
@@ -82,7 +82,7 @@ def apply_mindspore_patch():
                         sparsemmditblock_forward)
     #patch matmul&&linear input requir same stype
     aspm.register_patch('torch.nn.functional.linear', ms_linear_wrapper)
-    aspm.register_patch('torch.matmul', ms_matmul_wrapper)
+    aspm.register_patch('mindspore.mint.matmul', ms_matmul_wrapper)
 
     # qwen25 omni hang issue
     from mindspeed_mm.mindspore.data.data_utils.func_utils.mm_plugin import process_messages
