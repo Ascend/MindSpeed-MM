@@ -174,30 +174,6 @@ register_conv_template(
 
 register_conv_template(
     Conversation(
-        name="llava-v1",
-        system_message="A chat between a curious user and an artificial intelligence assistant. "
-               "The assistant gives helpful, detailed, and polite answers to the user's questions.",
-        roles=("USER", "ASSISTANT"),
-        offset=0,
-        sep_style=SeparatorStyle.TWO,
-        sep=" ",
-        sep2="</s>"
-    )
-)
-
-register_conv_template(
-    Conversation(
-        name="llava-plain",
-        system_message="",
-        roles=(),
-        offset=0,
-        sep_style=SeparatorStyle.PLAIN,
-        sep="\n"
-    )
-)
-
-register_conv_template(
-    Conversation(
         name='internvl2_5',
         system_template='<|im_start|>system\n{system_message}',
         system_message='你是书生·万象，英文名是InternVL，是由上海人工智能实验室、清华大学及多家合作单位联合开发的多模态大语言模型。',

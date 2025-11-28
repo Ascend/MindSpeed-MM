@@ -30,43 +30,6 @@ from mindspeed_mm.data.data_utils.constants import (
 )
 
 
-@dataclass
-class DataCollatorForLlava(object):
-    """Collate examples for supervised fine-tuning."""
-
-    def __init__(self, pad_token_id, **kwargs):
-        self.pad_token_id = pad_token_id
-        self.model_max_length = get_args().seq_length
-        self.ignore_index = MODEL_CONSTANTS['llava']['IGNORE_INDEX']
-
-    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
-        input_ids, labels = tuple([instance[key] for instance in instances]
-                                  for key in ("input_ids", "labels"))
-        input_ids = torch.nn.utils.rnn.pad_sequence(
-            input_ids,
-            batch_first=True,
-            padding_value=self.pad_token_id)
-        labels = torch.nn.utils.rnn.pad_sequence(labels,
-                                                 batch_first=True,
-                                                 padding_value=self.ignore_index)
-        input_ids = input_ids[:, :self.model_max_length]
-        labels = labels[:, :self.model_max_length]
-        batch = dict(
-            input_ids=input_ids,
-            labels=labels,
-            attention_mask=input_ids.ne(self.pad_token_id),
-        )
-
-        if "pixel_values" in instances[0]:
-            images = [instance["pixel_values"] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch["pixel_values"] = torch.stack(images)
-            else:
-                batch["pixel_values"] = images
-
-        return batch
-
-
 class DataCollatorForInternvl(object):
     def __init__(self, pad_id, **kwargs):
         self.pad_id = pad_id
@@ -592,7 +555,6 @@ class DataCollatorForVideoAlign:
         return model_inputs
 
 DATA_COLLATOR = {
-    "llava": DataCollatorForLlava,
     "internvl": DataCollatorForInternvl,
     "whisper": DataCollatorSpeechSeq2SeqWithPadding,
     "qwen2vl": DataCollatorForQwen2vl,

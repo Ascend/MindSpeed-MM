@@ -107,28 +107,9 @@ class InternvlImageVideoPreprocess(MultiModalImageVideoPreprocessBase):
         return {"pixel_values": pixel_values, "image_list": image_list}
 
 
-class LlavaImageVideoPreprocess(MultiModalImageVideoPreprocessBase):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def __call__(self, image_path, **kwargs):
-        image = self.image_reader(image_path)
-        expand2square = Expand2Square(mean=self.train_pipeline["image_mean"])
-        image = expand2square(image)
-
-        processor_kwargs = copy.deepcopy(self.train_pipeline)
-        processor_kwargs.pop("pad2square", None)
-
-        processor = CLIPImageProcessor(**self.train_pipeline)
-        pixel_values = processor.preprocess(image, return_tensors="pt", **processor_kwargs)["pixel_values"][0]
-        return {"pixel_values": pixel_values}
-
-
 def get_multimodal_image_video_preprocessor(template_name, **kwargs):
     if template_name in ("internlm2-chat", "internvl2_5", "internvit_qwen3"):
         return InternvlImageVideoPreprocess(**kwargs)
-    elif template_name in ("llava-plain"):
-        return LlavaImageVideoPreprocess(**kwargs)
     else:
         raise ValueError(f"Unsupported template_name: {template_name}")
 

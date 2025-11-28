@@ -4,7 +4,6 @@ from mindspeed_mm.tasks.inference.pipeline.opensora_pipeline import OpenSoraPipe
 from mindspeed_mm.tasks.inference.pipeline.opensoraplan_pipeline import OpenSoraPlanPipeline
 from mindspeed_mm.tasks.inference.pipeline.cogvideox_pipeline import CogVideoXPipeline
 from mindspeed_mm.tasks.inference.pipeline.internvl_pipeline import InternVLPipeline
-from mindspeed_mm.tasks.inference.pipeline.llava_pipeline import LlavaPipeline
 from mindspeed_mm.tasks.inference.pipeline.qihoo_pipeline import QihooPipeline
 from mindspeed_mm.tasks.inference.pipeline.qwen2vl_pipeline import Qwen2VlPipeline
 from mindspeed_mm.tasks.inference.pipeline.hunyuanvideo_pipeline import HunyuanVideoPipeline
@@ -24,7 +23,6 @@ sora_pipeline_dict = {"OpenSoraPlanPipeline": OpenSoraPlanPipeline,
 
 vlm_pipeline_dict = {
     "InternVLPipeline": InternVLPipeline,
-    "LlavaPipeline": LlavaPipeline,
     "Qwen2VlPipeline": Qwen2VlPipeline,
     "GlmPipeline": GlmPipeline
 }
