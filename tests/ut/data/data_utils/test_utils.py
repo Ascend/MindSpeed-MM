@@ -27,7 +27,7 @@ class TestDataFileReader:
         }
         get_data = DataFileReader(data_storage_mode=data_config["data_storage_mode"])
         cap_list = get_data(data_config["data_path"])
-        judge_expression(isinstance(cap_list, list)) 
+        judge_expression(isinstance(cap_list, list))
 
 
 class TestTextProcesser:
@@ -44,4 +44,3 @@ class TestTextProcesser:
             judge_expression(isinstance(result, str))
 
 
-       
