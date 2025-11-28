@@ -118,15 +118,11 @@ pip install torch_npu-2.5.1*.manylinux2014_*.whl
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM/verl_plugin
 export MODEL_SELECT="Qwen2_5vl"
+# path_to_verl替换为verl源码路径 例如：/home/code/verl
+export VERL_PATH=path_to_verl
 pip install -v -e .
 cp -r ../examples/verl_examples/qwen2.5vl/* ../../verl/examples/grpo_trainer/
 cd ../../verl/
-```
-
-**注意**：安装插件前需要保证verl源码安装，否则插件不能生效。如果无法源码安装verl，需要指定verl源码路径：
-
-```bash
-VERL_PATH=path_to_verl pip install -e .
 ```
 
 <a id="jump2"></a>
