@@ -60,7 +60,7 @@ Sana是由NVIDIA、麻省理工学院和清华大学共同推出的文生图模�
 2. 克隆仓库到本地服务器
 
     ```shell
-    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+    git clone --branch 2.3.0 https://gitcode.com/Ascend/MindSpeed-MM.git
     ```
 
 3. 模型搭建

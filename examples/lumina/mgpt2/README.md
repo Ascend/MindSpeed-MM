@@ -46,7 +46,7 @@ commit_id=978feb32473b57b79ea6a709687d01107e630478
 ### 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+git clone --branch 2.3.0 https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1

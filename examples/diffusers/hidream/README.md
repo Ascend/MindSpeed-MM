@@ -69,7 +69,7 @@ HiDream-I1是一个开源的图像生成模型，它使用了动态MoE架构的�
 2. 克隆仓库到本地服务器
 
     ```shell
-    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+    git clone --branch 2.3.0 https://gitcode.com/Ascend/MindSpeed-MM.git
     ```
 
 3. 模型搭建

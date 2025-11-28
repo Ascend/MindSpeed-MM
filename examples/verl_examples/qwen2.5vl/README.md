@@ -115,7 +115,7 @@ pip install torch_npu-2.5.1*.manylinux2014_*.whl
 
 ```bash
 # 请确保 vllm 已正确安装并且之后不会做覆盖
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 2.3.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM/verl_plugin
 export MODEL_SELECT="Qwen2_5vl"
 # path_to_verl替换为verl源码路径 例如：/home/code/verl
