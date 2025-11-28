@@ -1,4 +1,10 @@
 # Copyright (c) 2025, HUAWEI CORPORATION.  All rights reserved.
+# Copyright 2025 Bytedance Ltd. and/or its affiliates
+#
+# Copyright 2025 The Qwen Team and The HuggingFace Inc. team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
 
 from importlib.metadata import version as get_version
 
@@ -6,11 +12,6 @@ import torch
 import torch_npu
 from torch_npu import npu_rotary_mul as apply_rotary_emb
 from transformers.models.qwen2_5_vl import modeling_qwen2_5_vl
-from transformers.models.qwen3 import modeling_qwen3
-from transformers.models.qwen3_moe import modeling_qwen3_moe
-from transformers.models.qwen3_vl import modeling_qwen3_vl
-from transformers.models.qwen3_vl_moe import modeling_qwen3_vl_moe
-from transformers.models.qwen3_vl_moe.modeling_qwen3_vl_moe import Qwen3VLMoeTextExperts, Qwen3VLMoeTextSparseMoeBlock
 from transformers.utils import logging
 from transformers.activations import ACT2FN
 import verl.third_party.vllm as vllm_sleep_level
@@ -19,6 +20,12 @@ from torch import nn
 if get_version("transformers") > "4.57.1":
     from transformers.configuration_utils import PretrainedConfig
     from transformers.modeling_utils import PreTrainedModel
+    from transformers.models.qwen3 import modeling_qwen3
+    from transformers.models.qwen3_moe import modeling_qwen3_moe
+    from transformers.models.qwen3_vl import modeling_qwen3_vl
+    from transformers.models.qwen3_vl_moe import modeling_qwen3_vl_moe
+    from transformers.models.qwen3_vl_moe.modeling_qwen3_vl_moe import Qwen3VLMoeTextExperts, \
+        Qwen3VLMoeTextSparseMoeBlock
 else:
     from transformers.modeling_utils import PretrainedConfig, PreTrainedModel
 
@@ -195,8 +202,9 @@ def apply_npu_plugin():
 
     TensorDictBase._sync_all = _sync_all_patch
 
-    modeling_qwen3_vl_moe.Qwen3VLMoeTextSparseMoeBlock = Qwen3VLMoeTextSparseMoeBlock
-    modeling_qwen3_vl_moe.Qwen3VLMoeTextRMSNorm.forward = rms_norm_forward
-    modeling_qwen3_vl_moe.apply_rotary_pos_emb = apply_rotary_pos_emb_qwen3_npu
-    modeling_qwen3_vl.Qwen3VLTextRMSNorm.forward = rms_norm_forward
-    modeling_qwen3_vl.Qwen3VLTextMLP.forward = silu_forward
+    if get_version("transformers") > "4.57.1":
+        modeling_qwen3_vl_moe.Qwen3VLMoeTextSparseMoeBlock = Qwen3VLMoeTextSparseMoeBlock
+        modeling_qwen3_vl_moe.Qwen3VLMoeTextRMSNorm.forward = rms_norm_forward
+        modeling_qwen3_vl_moe.apply_rotary_pos_emb = apply_rotary_pos_emb_qwen3_npu
+        modeling_qwen3_vl.Qwen3VLTextRMSNorm.forward = rms_norm_forward
+        modeling_qwen3_vl.Qwen3VLTextMLP.forward = silu_forward

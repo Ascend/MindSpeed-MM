@@ -66,14 +66,21 @@ commit_id=7df2afb936cd37b7b3a262edc119b2a57f070e3b
 conda create -n test python=3.11
 conda activate test
 
-# for torch-npu dev version or x86 machine [Optional]
-# pip install 后缀需加上 --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
+# for x86 machine
 pip config set global.extra-index-url "https://download.pytorch.org/whl/cpu/ https://mirrors.huaweicloud.com/ascend/repos/pypi"
+# pip install 后缀需加上 --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
 
-# 安装torch和torch_npu
+# for arm64 machine
+pip config set global.extra-index-url "https://mirrors.huaweicloud.com/ascend/repos/pypi"
+# pip install 后缀仅需加上 --trusted-host mirrors.huaweicloud.com
+
+# 安装cmake，如果cmake版本过低，需要升级版本，推荐3.26.4
+conda install -c conda-forge cmake=3.26.4
+
+# 安装torch，torch_npu和pybind11==3.0.1
 pip install torch-2.7.1-cp311-cp311-*.whl
 pip install torch_npu-2.7.1*.manylinux_*.whl
-
+pip install pybind11==3.0.1
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh
@@ -111,7 +118,7 @@ pip install '.[torch]'
 cd ..
 
 # 安装三方库
-pip install qwen-vl-utils==0.0.11 mathruler viztracer uvloop==0.21.0 setuptools==80.9.0
+pip install qwen-vl-utils==0.0.11 mathruler viztracer uvloop==0.21.0 setuptools==80.9.0 cloudpickle==3.1.2
 
 # 因安装环境可能导致覆盖，需重新安装torch_npu
 pip install torch_npu-2.7.1*.manylinux_*.whl
@@ -126,7 +133,7 @@ pip install torch_npu-2.7.1*.manylinux_*.whl
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM/verl_plugin
 export MODEL_SELECT="Qwen3vl"
-# 指定verl源码路径 例如：/home/code/verl
+# path_to_verl替换为verl源码路径 例如：/home/code/verl
 export VERL_PATH=path_to_verl
 pip install -v -e .
 # 需要确认插件是否安装完成，请参考下面“注意事项”第4点
