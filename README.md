@@ -192,6 +192,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 |    Qwen2.5VL-32B    | ✔ | ✔ |  | ✔ |  | ✔ | ✔ |  | GRPO |  |
 |    Qwen2.5VL-72B    | ✔ | ✔ |  | ✔ |  | ✔ | ✔ | ✔ |  |  |
 |   Qwen2.5Omni-7B    | ✔ |  |  | ✔ |  | ✔ |  | ✔ |  |  |
+|     Qwen3-Omni      |  |  |  |  |  |  | ✔ |  |  | ✔ |
 |    InternVL3-8B     | ✔ | ✔ | ✔ | ✔ | CP (Ring) | ✔ | ✔ |  |  |
 |    InternVL3-78B    | ✔ | ✔ | ✔ | ✔ | CP (Ring) | ✔ | ✔ |  |  |
 
@@ -694,7 +695,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td rowspan="21"> 多模态理解 </td>
+      <td rowspan="22"> 多模态理解 </td>
       <tr>
       <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen3vl">Qwen3-VL</a></td>
       <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 8B </a></td>
@@ -903,6 +904,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 14.44 (SPS) </td>
       <td> 296 </td>
       <td>【Pass】</td>
+    </tr>
+    <tr>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen3omni">Qwen3-Omni</a></td>
+      <td><a href="https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct">30B</a></td>
+      <td> 微调 </td>
+      <td> 2x8 (A3) </td>
+      <td> BF16 </td>
+      <td> 28.1 (TPS) </td>
+      <td> 16.4 (TPS) </td>
+      <td> / </td>
+      <td>【Test】</td>
     </tr>
     <tr>
       <td> 语音识别 </td>
