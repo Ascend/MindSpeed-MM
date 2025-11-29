@@ -17,8 +17,7 @@ export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
 # 当前脚本双机拉起配置仅作参考，请根据实际情况修改
 export GLOO_SOCKET_IFNAME="Your SOCKET IFNAME"
-# 根据实际情况，指定设备
-export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+# 当前脚本双机8卡，请根据实际情况指定设备
 NPUS_PER_NODE=8
 MASTER_ADDR=<master_ip_address>
 MASTER_PORT=6000

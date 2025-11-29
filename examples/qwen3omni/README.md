@@ -267,7 +267,8 @@ OUTPUT_ARGS="
 # 根据实际情况修改 ascend-toolkit 和 nnal 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/asdsip/set_env.sh
-NPUS_PER_NODE=8
+# 单机16卡可以跑满层
+NPUS_PER_NODE=16
 # 如果想要指定单卡0，则增加export ASCEND_RT_VISIBLE_DEVICES=0
 # 并修改NPUS_PER_NODE=1
 MASTER_ADDR=localhost
@@ -289,9 +290,9 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/asdsip/set_env.sh
 # 根据分布式集群实际情况配置分布式参数
 export GLOO_SOCKET_IFNAME="Your SOCKET IFNAME" # 通过ifconfig获取
-# 如果节点的卡数大于8，需要指定设备
+# 如果节点的卡数大于8，需要指定设备，如果指定前8卡，则可以按如下设置
 export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-NPUS_PER_NODE=8 # 每个节点的卡数，根据实际情况填写
+NPUS_PER_NODE=8 # 每个节点的卡数，根据实际情况填写，性能场景每个节点8卡
 MASTER_ADDR=<master_ip_address> # 都要修改为主节点的IP地址（不能为localhost)
 MASTER_PORT=6000 # 各个节点保持一致
 NNODES=2 # 集群里的节点数，根据实际情况填写
