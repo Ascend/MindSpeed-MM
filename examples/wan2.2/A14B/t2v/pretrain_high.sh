@@ -67,6 +67,7 @@ GPT_ARGS="
     --no-save-optim \
     --no-save-rng \
     --bf16 \
+    --distributed-timeout-minutes 20 \
     --use-fused-rmsnorm \
     --use-torch-fsdp2 \
     --untie-embeddings-and-output-weights \
