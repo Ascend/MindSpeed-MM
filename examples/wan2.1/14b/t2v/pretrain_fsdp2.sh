@@ -66,6 +66,7 @@ GPT_ARGS="
     --no-load-rng \
     --no-save-optim \
     --no-save-rng \
+    --distributed-timeout-minutes 20 \
     --use-torch-fsdp2 \
     --untie-embeddings-and-output-weights \
     --ckpt-format torch_dcp \
