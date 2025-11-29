@@ -562,5 +562,6 @@ DATA_COLLATOR = {
     "qwen3vl": DataCollatorForQwen2vl,
     "open_sora_plan": DataCollatorForOpenSoraPlan,
     "deepseekvl2": DataCollatorForDeepSeekVL,
-    "videoalign": DataCollatorForVideoAlign
+    "videoalign": DataCollatorForVideoAlign,
+    "glm4v_moe": DataCollatorForQwen2vl
 }

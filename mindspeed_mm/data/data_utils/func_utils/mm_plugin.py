@@ -699,6 +699,7 @@ class GLM4VPlugin(Qwen2VLPlugin):
                 images,
                 image_max_pixels=getattr(processor, "image_max_pixels", 768 * 768),
                 image_min_pixels=getattr(processor, "image_min_pixels", 32 * 32),
+                resample=False,
             )["images"]
             mm_inputs.update(image_processor(images, return_tensors="pt"))
 
@@ -787,6 +788,9 @@ class GLM4VPlugin(Qwen2VLPlugin):
                         f"<|begin_of_image|>{self.image_token * video_seqlen}<|end_of_image|>{timestamp_sec}"
                     )
                     video_structure += frame_structure
+
+                if not self.expand_mm_tokens:
+                    video_structure = self.video_token
 
                 content = content.replace(VIDEO_PLACEHOLDER, f"<|begin_of_video|>{video_structure}<|end_of_video|>", 1)
                 num_video_tokens += 1

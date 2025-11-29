@@ -1,0 +1,38 @@
+{
+    "model_id": "glm4v_moe",
+    "init_from_hf_path": "./ckpt/hf_path/GLM4.5V",
+    "image_encoder": {
+        "vision_encoder": {
+            "model_id": "glm4v_moe",
+            "num_layers": 24,
+            "hidden_size": 1536,
+            "num_attention_heads": 12,
+            "freeze": true,
+            "attn_implementation": "sdpa"
+        },
+        "vision_projector": {
+            "model_id": "lnmlp",
+            "num_layers": 1,
+            "freeze": true
+        }
+    },
+    "text_decoder": {
+        "model_id": "glm_4v_moe_text",
+        "num_layers": 46,
+        "hidden_size": 12288,
+        "num_attention_heads": 96,
+        "max_position_embeddings": 65536,
+        "freeze": false,
+        "use_npu_fused_moe": false,
+        "attn_implementation": "sdpa",
+        "activation_offload": false
+    },
+    "loss_cfg": {
+        "compute_mode": "default",
+        "chunk_size": 1024
+    },
+    "patch": {
+        "clip_grad_async": true,
+        "scale_grad": true
+    }
+}

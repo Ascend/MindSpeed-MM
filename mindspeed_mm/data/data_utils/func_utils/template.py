@@ -416,6 +416,23 @@ _register_template(
 )
 
 
+_register_template(
+    name="glm4v_moe",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["<|user|>\n{{content}}<|assistant|>"]),
+        format_assistant=StringFormatter(slots=["\n{{content}}"]),
+        format_system=StringFormatter(slots=["<|system|>\n{{content}}"]),
+        format_observation=StringFormatter(slots=["<|observation|>\n{{content}}<|assistant|>"]),
+
+        format_prefix=EmptyFormatter(slots=["[gMASK]<sop>"]),
+        stop_words=["<|user|>", "<|observation|>", "</answer>"],
+        efficient_eos=True
+    ),
+    mm_plugin=get_mm_plugin(name="glm4.1v", image_token="<|image|>", video_token="<|video|>"),
+    template_class=ReasoningTemplate
+)
+
+
 def get_template_and_fix_tokenizer(tokenizer: "PreTrainedTokenizer", template: str) -> "Template":
     r"""
     Gets chat template and fixes the tokenizer.

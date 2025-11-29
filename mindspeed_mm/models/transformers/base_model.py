@@ -629,10 +629,8 @@ class WeightInitMixin:
             module.weight.data.normal_(mean=0.0, std=std)
             if module.bias is not None:
                 module.bias.data.zero_()
-        elif isinstance(module, nn.Embedding):
+        elif isinstance(module, nn.Embedding) and module.padding_idx is None:
             module.weight.data.normal_(mean=0.0, std=std)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
         elif isinstance(module, nn.MultiheadAttention):
             # This uses torch's original init
             module._reset_parameters()
@@ -675,22 +673,15 @@ class WeightInitMixin:
         `torch.nn.init` functions (which are all no_grad by default), but simply do in-place ops such as
         `module.weight.data.zero_()`.
         """
-        if not hasattr(torch.nn.Module, "smart_apply"):
-            # This function is equivalent to `torch.nn.Module.apply`, except that it dynamically adjust the function
-            # to apply as we go down the graph
-            def smart_apply(self, fn):
-                for module in self.children():
-                    # We found a sub-model: recursively dispatch its own init function now!
-                    if hasattr(module, "_init_weights"):
-                        module.smart_apply(module._init_weights)
-                    elif hasattr(module, "reset_parameters"):
-                        module.reset_parameters()
-                    else:
-                        module.smart_apply(fn)
-                fn(self)
-                return self
+        # This function is equivalent to `torch.nn.Module.apply`, except that it dynamically adjust the function
+        # to apply as we go down the graph
+        def smart_apply(self, fn):
+            for module in self.children():
+                module.smart_apply(fn)
+            fn(self)
+            return self
 
-            torch.nn.Module.smart_apply = smart_apply
+        torch.nn.Module.smart_apply = smart_apply
 
         # Let the magic happen with this simple call
         self.smart_apply(self._init_weights)

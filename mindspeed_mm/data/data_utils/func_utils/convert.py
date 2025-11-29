@@ -972,7 +972,10 @@ def load_tokenizer(model_args: "ProcessorArguments") -> "TokenizerModule":
     )
 
     try:
-        processor = AutoProcessor.from_pretrained(model_args.model_name_or_path, local_files_only=True)
+        processor = AutoProcessor.from_pretrained(
+            model_args.model_name_or_path,
+            use_fast=model_args.use_fast_tokenizer,
+            local_files_only=True)
         setattr(processor, "tokenizer", tokenizer)
         setattr(processor, "image_max_pixels", model_args.image_max_pixels)
         setattr(processor, "image_min_pixels", model_args.image_min_pixels)

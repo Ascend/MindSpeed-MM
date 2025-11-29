@@ -33,11 +33,12 @@ def test_merge_moe_expert_weights():
         "layer.0.experts.1.up_proj.weight": torch.randn(2, 3),
         "layer.0.experts.1.down_proj.weight": torch.randn(2, 3),
     }
+    expert_start_layer = 0
     num_hidden_layers = 1
     num_experts = 2
     weight_path = "layer.{layer}.experts.{expert}"
 
-    merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, weight_path)
+    merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, weight_path)
 
     # Check merged weights
     assert "layer.0.experts.0.gate_proj.weight" not in state_dict
@@ -63,11 +64,12 @@ def test_split_moe_expert_weights():
         "layer.0.experts.gate_up_proj": torch.randn(6, 4),
         "layer.0.experts.down_proj": torch.randn(6, 2),
     }
+    expert_start_layer = 0
     num_hidden_layers = 1
     num_experts = 2
     weight_path = "layer.{layer}.experts.{expert}"
 
-    split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, weight_path)
+    split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, weight_path)
     assert "layer.0.experts.gate_up_proj" not in state_dict
     assert "layer.0.experts.down_proj" not in state_dict
 
