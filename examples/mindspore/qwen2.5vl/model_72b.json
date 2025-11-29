@@ -1,11 +1,10 @@
 {
     "model_id": "qwen2_5vl",
     "img_context_token_id": 151655,
-    "video_token_id": 151656,
     "vision_start_token_id": 151652,
     "image_encoder": {
         "vision_encoder": {
-            "model_id": "qwen2vit",
+            "model_id": "qwen2_5_vit",
             "num_layers": 32,
             "pipeline_num_layers": [32, 0, 0, 0, 0, 0, 0, 0],
             "hidden_size": 1280,
@@ -36,11 +35,13 @@
             "use_fused_rotary_pos_emb": true,
             "post_layer_norm": false,
             "attention_mask_type": "general",
-            "freeze": true
+            "freeze": true,
+            "use_vit_dp": false
         },
         "vision_projector": {
             "model_id": "lnmlp",
             "num_layers": 1,
+            "context_parallel_size": 1,
             "gated_linear_unit": false,
             "bias_activation_fusion": false,
             "add_bias_linear": true,
@@ -86,10 +87,7 @@
         "rope_theta": 1000000.0,
         "params_dtype": "bf16",
         "bf16": true,
-        "parallel_output": true,
-        "recompute_granularity": "full",
-        "recompute_method": "uniform",
-        "recompute_num_layers": 1
+        "parallel_output": true
     },
     "text_encoder": null,
     "video_encoder": null
