@@ -1,5 +1,6 @@
 import torch
 import torch_npu
+import torch.nn as nn
 from wan.modules import causal_model, model
 
 
@@ -71,3 +72,33 @@ def npu_rope_apply(x, grid_sizes, freqs):
         # append to collection
         output.append(x_i)
     return torch.stack(output).type_as(x)
+
+
+@global_function_replacement(model, 'rope_params')
+def npu_rope_params(max_seq_len, dim, theta=10000):
+    freqs = torch.outer(
+        torch.arange(max_seq_len),
+        1.0 / torch.pow(theta,
+                        torch.arange(0, dim, 2).to(torch.float32).div(dim)))
+    freqs = torch.polar(torch.ones_like(freqs), freqs)
+    return freqs
+
+
+@global_function_replacement(model, 'WanRMSNorm')
+class WanRMSNorm(nn.Module):
+
+    def __init__(self, dim, eps=1e-5):
+        super().__init__()
+        self.dim = dim
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(dim))
+
+    def forward(self, x):
+        r"""
+        Args:
+            x(Tensor): Shape [B, L, C]
+        """
+        return torch_npu.npu_rms_norm(x, self.weight, epsilon=self.eps)[0]
+
+    def _norm(self, x):
+        return x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + self.eps)
