@@ -1,4 +1,4 @@
-sharding_size: auto
+sharding_size: 16
 sub_modules_to_wrap:
   - predictor.blocks.{*}
   - predictor.head

@@ -31,7 +31,7 @@ MM_MODEL="./examples/wan2.2/5B/ti2v/pretrain_model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="Wan2.2-TI2V-5B-Diffusers/mm_convert"  # ensure the wandit weight be converted
 SAVE_PATH="wandit_weight_save"
-fsdp2_config="./examples/wan2.2/fsdp2_config.yaml"
+fsdp2_config="./examples/wan2.2/5B/fsdp2_config.yaml"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $NPUS_PER_NODE \
