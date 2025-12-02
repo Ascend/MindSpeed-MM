@@ -16,26 +16,26 @@ Pipedream流水线并行切分粒度过大，运行过程中仍然有许多空�
 
 [原文链接](https://people.eecs.berkeley.edu/~matei/papers/2021/sc_megatron_lm.pdf)
 
-为了方便理解，举一个例子：Internvl2-8B的视觉模块层数是24，语言模块层数是32。设置张量并行大小为1，流水线并行大小为4，虚拟流水线并行大小为3。模型会被分为 4 * 3 = 12 个阶段，其中每个阶段的层数可自定义，支持非均匀切分。
+为了方便理解，举一个例子：Qwen2vl-7B的视觉模块层数是32，语言模块层数是28。设置张量并行大小为1，流水线并行大小为4，虚拟流水线并行大小为3。模型会被分为 4 * 3 = 12 个阶段，其中每个阶段的层数可自定义，支持非均匀切分。
 
-视觉模块的切分方式：`[[6, 7, 7, 4],[0, 0, 0, 0],[0, 0, 0, 0]]`，
+视觉模块的切分方式：`[[10, 10, 10, 2],[0, 0, 0, 0],[0, 0, 0, 0]]`，
 
-语言模块的切分方式：`[[0, 0, 0, 1],[4, 4, 4, 4],[4, 4, 4, 3]]`
+语言模块的切分方式：`[[0, 0, 0, 1],[4, 4, 4, 4],[4, 3, 2, 2]]`
 
 下面为每个device和每层vpp的模型层数分布，D表示Device，V表示vpp
 
-    D0V0: 6层vit + 0层llm
+    D0V0: 10层vit + 0层llm
     D0V1: 0层vit + 4层llm
     D0V2: 0层vit + 4层llm
-    D1V0: 7层vit + 0层llm
+    D1V0: 10层vit + 0层llm
     D1V1: 0层vit + 4层llm
-    D1V2: 0层vit + 4层llm
-    D2V0: 7层vit + 0层llm
+    D1V2: 0层vit + 3层llm
+    D2V0: 10层vit + 0层llm
     D2V1: 0层vit + 4层llm
-    D2V2: 0层vit + 4层llm
-    D3V0: 4层vit + 1层llm
+    D2V2: 0层vit + 2层llm
+    D3V0: 2层vit + 1层llm
     D3V1: 0层vit + 4层llm
-    D3V2: 0层vit + 3层llm
+    D3V2: 0层vit + 2层llm
 
 前向的顺序为 D0V0 -> D1V0 -> D2V0 -> D3V0 -> D0V1 -> D1V1 -> D2V1 -> D3V1 -> D0V2 -> D1V2 -> D2V2 -> D3V2
 
@@ -45,30 +45,30 @@ Pipedream流水线并行切分粒度过大，运行过程中仍然有许多空�
 
 ## 使用方法
 
-以Internvl2-8B为例
+以Qwen2vl-7B为例
 
 1.配置vpp切分规则，运行权重转换工具
 
 ```shell
-mm-convert  InternVLConverter hf_to_mm \
-  --cfg.mm_dir "pretrained/InternVL2-8B-vpp" \
-  --cfg.hf_config.hf_dir "raw_ckpt/InternVL2-8B" \
-  --cfg.parallel_config.llm_pp_layers [[0,0,0,1],[4,4,4,4],[4,4,4,3]] \
-  --cfg.parallel_config.vit_pp_layers [[6,7,7,4],[0,0,0,0],[0,0,0,0]] \
-  --cfg.trust_remote_code True
+mm-convert  Qwen2VLConverter hf_to_mm \
+  --cfg.mm_dir "ckpt/mm_path/Qwen2-VL-7B-Instruct-vpp" \
+  --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2-VL-7B-Instruct" \
+  --cfg.parallel_config.llm_pp_layers [[0,0,0,1],[4,4,4,4],[4,3,2,2]] \
+  --cfg.parallel_config.vit_pp_layers [[10,10,10,2],[0,0,0,0],[0,0,0,0]] \
+  --cfg.parallel_config.tp_size 1
 ```
 
-2.修改model.json中的pipeline_num_layers，需要和权重转换时的layers一致。可参考examples/internvl2/model_8B_vpp.json
+2.修改model.json中的pipeline_num_layers，需要和权重转换时的layers一致。以Qwen2vl-7B为例
 
 ```
 # text_decoder
-"pipeline_num_layers": [[0, 0, 0, 1],[4, 4, 4, 4],[4, 4, 4, 3]]
+"pipeline_num_layers": [[0, 0, 0, 1],[4, 4, 4, 4],[4, 3, 2, 2]]
 
 # vision_encoder
-"pipeline_num_layers": [[6, 7, 7, 4],[0, 0, 0, 0],[0, 0, 0, 0]]
+"pipeline_num_layers": [[10, 10, 10, 2],[0, 0, 0, 0],[0, 0, 0, 0]]
 ```
 
-3.shell添加vpp参数，可参考examples/internvl2/finetune_internvl2_8B_vpp.sh。因为megatron原生只支持vpp均匀切分，为了支持vpp非均匀切分，需要在shell中导入VP_SIZE变量，VP_SIZE等于pipeline_num_layers的长度；`--virtual-pipeline-model-parallel-size 3`该参数同样用于开启vpp功能，取值与VP_SIZE相同
+3.shell添加vpp参数，因为megatron原生只支持vpp均匀切分，为了支持vpp非均匀切分，需要在shell中导入VP_SIZE变量，VP_SIZE等于pipeline_num_layers的长度；`--virtual-pipeline-model-parallel-size 3`该参数同样用于开启vpp功能，取值与VP_SIZE相同
 
 ```shell
 export VP_SIZE=3

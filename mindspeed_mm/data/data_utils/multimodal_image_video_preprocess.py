@@ -108,7 +108,7 @@ class InternvlImageVideoPreprocess(MultiModalImageVideoPreprocessBase):
 
 
 def get_multimodal_image_video_preprocessor(template_name, **kwargs):
-    if template_name in ("internlm2-chat", "internvl2_5", "internvit_qwen3"):
+    if template_name in ("internvl2_5", "internvit_qwen3"):
         return InternvlImageVideoPreprocess(**kwargs)
     else:
         raise ValueError(f"Unsupported template_name: {template_name}")

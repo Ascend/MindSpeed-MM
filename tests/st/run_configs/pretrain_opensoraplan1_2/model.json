@@ -35,7 +35,7 @@
     "text_encoder": {
         "model_id": "UMT5",
         "hub_backend": "hf",
-        "from_pretrained":"/mnt/disk0/ci_resource/models/text_encoder_mini/umt5_mini/",
+        "from_pretrained":"/home/ci_resource/models/text_encoder_mini/umt5_mini/",
         "dtype": "bf16",
         "load_in_8bit": false,
         "low_cpu_mem_usage": true

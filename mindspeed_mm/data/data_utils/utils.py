@@ -580,81 +580,6 @@ def collate_fn_default(batch):
     return ret
 
 
-def preprocess_internlm(
-        template_name,
-        sources,
-        tokenizer: transformers.PreTrainedTokenizer,
-        num_image_token_list: list,
-        text_only: bool = False,
-        group_by_length: bool = False,
-        use_packed_ds: bool = False,
-        num_image: int = 1
-) -> Dict:
-    """
-    Process sources for internvl model preprocessing.
-    """
-    conv = get_conv_template(template_name)
-    roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
-    conversations = get_formatted_conversations(sources, roles, conv)
-
-    im_start_token = MODEL_CONSTANTS['internvl']["IMG_START_TOKEN"]
-    im_context_token = MODEL_CONSTANTS['internvl']["IMG_CONTEXT_TOKEN"]
-    im_end_token = MODEL_CONSTANTS['internvl']["IMG_END_TOKEN"]
-
-    if not text_only:
-        new_conversations = []
-        for conversation in conversations:
-            for i in range(num_image):
-                image_tokens = f"{im_start_token}{im_context_token * num_image_token_list[i]}{im_end_token}"
-                conversation = conversation.replace("<image>", image_tokens, 1)
-            new_conversations.append(conversation)
-        conversations = new_conversations
-
-    # Tokenize conversations
-    input_ids = tokenizer(
-        conversations,
-        return_tensors="pt",
-        padding=False if group_by_length or use_packed_ds else "max_length",
-        max_length=tokenizer.model_max_length,
-        truncation=True,
-    ).input_ids
-    targets = input_ids.clone()
-
-    for conversation, target in zip(conversations, targets):
-        total_len = int(target.ne(tokenizer.pad_token_id).sum())  # 浦语里面 pad_token_id = eos_token_id
-        cur_len = 1
-        target[:cur_len] = IGNORE_TOKEN_ID  # <s>
-        parts = conversation.split(conv.roles[1])  # [UNUSED_TOKEN_146]assistant\n
-        info = parts[0] + conv.roles[1]
-        temp_len = len(tokenizer(info).input_ids) - 1  # 去除tokenizer的<s>
-        target[cur_len: cur_len + temp_len] = IGNORE_TOKEN_ID
-        cur_len = cur_len + temp_len
-
-        for index in range(1, len(parts) - 1):
-            info = parts[index]
-            part1, part2 = info.split(conv.roles[0])
-            temp_len = len(tokenizer(part1).input_ids) - 1
-            cur_len = cur_len + temp_len
-            part = conv.roles[0] + part2 + conv.roles[1]
-            temp_len = len(tokenizer(part).input_ids) - 1
-            target[cur_len: cur_len + temp_len] = IGNORE_TOKEN_ID
-            cur_len = cur_len + temp_len
-        last_info = parts[-1]
-        temp_len = len(tokenizer(last_info).input_ids) - 1
-        cur_len = cur_len + temp_len
-
-        target[cur_len:] = IGNORE_TOKEN_ID
-        if cur_len < tokenizer.model_max_length:
-            if cur_len != total_len:
-                target[:] = IGNORE_TOKEN_ID
-                print(f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}.", flush=True)
-
-    return dict(
-        input_ids=input_ids[0],
-        labels=targets[0],
-        attention_mask=input_ids.ne(tokenizer.pad_token_id)[0],
-    )
-
 
 def pad_to_multiple(sequence, multiple=1, pad_value=0):
     current_length = sequence.size(0)
@@ -775,54 +700,6 @@ def preprocess_internvl2_5(
     )
 
 
-def tokenizer_image_token(prompt, tokenizer, image_token_index, return_tensors=None):
-    """
-    Tokenize prompts with image tokens.
-    """
-    prompt_chunks = [tokenizer(chunk).input_ids for chunk in prompt.split("<image>")]
-
-    def insert_separator(X, sep):
-        return [ele for sublist in zip(X, [sep] * len(X)) for ele in sublist][:-1]
-
-    input_ids = []
-    offset = 0
-    if len(prompt_chunks) > 0 and len(prompt_chunks[0]) > 0 and prompt_chunks[0][0] == tokenizer.bos_token_id:
-        offset = 1
-        input_ids.append(prompt_chunks[0][0])
-
-    for x in insert_separator(prompt_chunks, [image_token_index] * (offset + 1)):
-        input_ids.extend(x[offset:])
-
-    if return_tensors is not None:
-        if return_tensors == "pt":
-            return torch.tensor(input_ids, dtype=torch.long)
-        raise ValueError(f"Unsupported tensor type: {return_tensors}")
-    return input_ids
-
-
-def get_formatted_conversations(sources, roles, conv):
-    """
-    Format conversations based on provided roles and conversation template.
-    """
-    # Apply prompt templates
-    conversations = []
-    for source in sources:
-        if roles[source[0]["from"]] != conv.roles[0]:
-            # Skip the first one if it is not from human
-            source = source[1:]
-
-        conv.messages = []
-        for j, sentence in enumerate(source):
-            role = roles[sentence["from"]]
-            if role != conv.roles[j % 2]:
-                raise ValueError(
-                    f"Role mismatch at {sentence}, expected {conv.roles[j % 2]}, got {role}")
-            sentence["value"] = sentence["value"].strip()
-            conv.append_message(role, sentence["value"])
-        conversations.append(conv.get_prompt())
-    return conversations
-
-
 def preprocess(
         template_name,
         sources,
@@ -836,12 +713,7 @@ def preprocess(
     """
     Select and run the appropriate preprocessing function based on template name.
     """
-    if template_name == "internlm2-chat":
-        ret = preprocess_internlm(template_name, sources,
-                                  tokenizer, num_image_token_list,
-                                  group_by_length=group_by_length,
-                                  num_image=num_image)
-    elif template_name in ("internvl2_5", "internvit_qwen3"):
+    if template_name in ("internvl2_5", "internvit_qwen3"):
         ret = preprocess_internvl2_5(template_name, sources,
                                      tokenizer, num_image_token_list,
                                      group_by_length=group_by_length,

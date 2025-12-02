@@ -2,7 +2,7 @@
     "dataset_param": {
         "dataset_type": "huggingface",
         "preprocess_parameters": {
-            "model_name_or_path": "/mnt/disk0/ci_resource/models/Qwen2-VL-72B-Instruct",
+            "model_name_or_path": "/home/ci_resource/models/Qwen2-VL-72B-Instruct",
             "use_fast_tokenizer": true,
             "split_special_tokens": false,
             "image_max_pixels": 262144,
@@ -15,7 +15,7 @@
         "basic_parameters": {
             "template": "qwen2vl",
             "dataset_dir": "./data",
-            "dataset": "/mnt/disk0/ci_resource/data/qwen2vl/dpo/rlhf-v.json",
+            "dataset": "/home/ci_resource/data/qwen2vl/dpo/rlhf-v.json",
             "cache_dir": "./data/cache_dir",
             "train_on_prompt": false,
             "mask_history": false,

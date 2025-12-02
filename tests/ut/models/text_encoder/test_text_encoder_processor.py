@@ -166,7 +166,7 @@ class TestTestEncoder:
         text_encoder_dict = {
             "model_id": "HunyuanMLLmModel",
             "dtype": "fp16",
-            "from_pretrained": "/mnt/disk0/ci_resource/models/text_encoder_mini/llava-llama-3-8b-text-encoder-tokenizer_mini_trans_453",
+            "from_pretrained": "/home/ci_resource/models/text_encoder_mini/llava-llama-3-8b-text-encoder-tokenizer_mini_trans_453",
             "hub_backend": "hf",
             "use_attention_mask": True,
             "hidden_state_skip_layer": 2,
@@ -178,7 +178,7 @@ class TestTestEncoder:
         tokenizer_dict = {
             "autotokenizer_name": "hunyuanMLLmTokenizer",
             "hub_backend": "hf",
-            "from_pretrained": "/mnt/disk0/ci_resource/models/text_encoder_mini/llava-llama-3-8b-text-encoder-tokenizer_mini_trans_453",
+            "from_pretrained": "/home/ci_resource/models/text_encoder_mini/llava-llama-3-8b-text-encoder-tokenizer_mini_trans_453",
             "model_max_length": 256,
             "template_id": "hyv-llm-encode-video",
             "template_file_path": "/home/ci_resource/models/hunyuanvideo_t2v/template.json"
