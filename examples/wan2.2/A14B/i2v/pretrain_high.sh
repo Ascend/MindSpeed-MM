@@ -31,7 +31,7 @@ MM_MODEL="./examples/wan2.2/A14B/i2v/pretrain_model_high.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="./weights/Wan-AI/Wan2.2-I2V-A14B-Diffusers/transformer/"  # ensure the wandit weight be converted
 SAVE_PATH="path to save your high noise expert wandit weight"
-FSDP_CONFIG="./examples/wan2.2/fsdp2_config.yaml"
+FSDP_CONFIG="./examples/wan2.2/A14B/fsdp2_config.yaml"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $NPUS_PER_NODE \
