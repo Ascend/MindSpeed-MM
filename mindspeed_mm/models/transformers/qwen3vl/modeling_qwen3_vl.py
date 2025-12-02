@@ -708,7 +708,9 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
             image_grid_thw (`torch.LongTensor` of shape `(num_images, 3)`, *optional*):
                 The temporal, height and width of feature shape of each image in LLM.
         """
-        pixel_values = pixel_values.type(self.visual.dtype)
+        if hasattr(self.visual, "_get_fsdp_state") and self.visual._get_fsdp_state()._mp_policy.param_dtype != pixel_values.dtype:
+            param_dtype = self.visual._get_fsdp_state()._mp_policy.param_dtype
+            pixel_values = pixel_values.type(param_dtype) if param_dtype is not None else pixel_values
         image_embeds, deepstack_image_embeds = self.visual(pixel_values, grid_thw=image_grid_thw)
         if mpu.get_context_parallel_world_size() > 1:
             visual_seqlen = get_seq_len("visual")

@@ -541,6 +541,61 @@ def split_forward_gather_backward_with_megatron_cp(
     return _SplitForwardGatherBackWardWithMegatronCP.apply(input_, cp_rank, cp_size, dim, process_group)
 
 
+class _GatherForwardSplitBackWardWithMegatronCP(torch.autograd.Function):
+    '''
+    Split the input tensor in the forward pass and gather the gradients in the backward pass with megatron cp(Ring Attention)
+    It will be implemented in Mindspeed in the future.
+    '''
+    @staticmethod
+    def forward(ctx, val, cp_rank, cp_size, seq_dim, cp_group=None):
+        # Step 1: All-gather shards from all CP ranks along the sequence dimension
+        val = _gather(val, cp_group, dim=seq_dim)
+        # Step 2: Reorder the gathered tensor
+        val = reorder_output(val, cp_rank, cp_size, cp_group, dim=seq_dim)
+
+        ctx.cp_group = cp_group
+        ctx.cp_rank = cp_rank
+        ctx.cp_size = cp_size
+        ctx.seq_dim = seq_dim
+
+        return val
+        
+    @staticmethod
+    def backward(ctx, grad_output):
+        cp_group = ctx.cp_group
+        cp_rank = ctx.cp_rank
+        cp_size = ctx.cp_size
+        seq_dim = ctx.seq_dim
+
+        grad_output = grad_output.view(
+            *grad_output.shape[0:seq_dim],
+            2 * cp_size,
+            grad_output.shape[seq_dim] // (2 * cp_size),
+            *grad_output.shape[(seq_dim + 1):],
+        ) * cp_size  # Scale gradients up by cp_size
+        # Select the two chunks that belong to the current rank:
+        # - One from the forward direction (index = cp_rank)
+        # - One from the backward direction (index = 2*cp_size - cp_rank - 1)
+        index = torch.tensor([cp_rank, (2 * cp_size - cp_rank - 1)], device=grad_output.device)
+        grad_output = grad_output.index_select(seq_dim, index)
+
+        # Collapse the two selected chunks back into a single contiguous local sequence
+        grad_input = grad_output.view(*grad_output.shape[0:seq_dim], -1, *grad_output.shape[(seq_dim + 2):])
+        
+        return grad_input, None, None, None, None
+
+
+def gather_forward_split_backward_with_megatron_cp(
+    input_: torch.Tensor,
+    process_group: torch.distributed.ProcessGroup,
+    dim: int = 0
+) -> torch.Tensor:
+    cp_size = torch.distributed.get_world_size(group=process_group)
+    cp_rank = torch.distributed.get_rank(group=process_group)
+
+    return _GatherForwardSplitBackWardWithMegatronCP.apply(input_, cp_rank, cp_size, dim, process_group)
+
+
 def compute_token_level_loss(loss_dict):
     """Token level loss function"""
     args = get_args()

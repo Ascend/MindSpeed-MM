@@ -1,9 +1,26 @@
-from typing import List, Optional
+from typing import List, Optional, Union, Tuple
 
 import torch
 import torch.distributed as dist
 
-from mindspeed_mm.utils.utils import get_context_parallel_world_size, get_context_parallel_rank, get_context_parallel_group
+from megatron.training import get_args
+from megatron.core import mpu
+from mindspeed.core.context_parallel.model_parallel_utils import (
+    get_context_parallel_group_for_hybrid_ulysses,
+    get_context_parallel_group_for_hybrid_ring,
+    get_context_parallel_for_hybrid_ring_world_size,
+    get_context_parallel_for_hybrid_ulysses_world_size,
+    get_context_parallel_for_hybrid_ring_global_ranks,
+    get_context_parallel_for_hybrid_ring_rank
+)
+
+from mindspeed_mm.utils.utils import (
+    get_context_parallel_world_size,
+    get_context_parallel_rank,
+    get_context_parallel_group,
+    split_forward_gather_backward_with_megatron_cp,
+    gather_forward_split_backward_with_megatron_cp
+)
 
 
 def _adjust_tensor_dimensions(tensor, scatter_idx, gather_idx):
@@ -57,6 +74,31 @@ def cal_split_sizes(dim_size: int, world_size: int):
     remainder = dim_size % world_size
     sizes = [split_size + (1 if i < remainder else 0) for i in range(world_size)]
     return sizes
+
+
+def cal_split_sizes_multi(sizes: Union[List[int], Tuple[int, ...], torch.Tensor], world_size: int):
+    """
+    Calculate split sizes for multiple sizes across distributed ranks.
+    
+    Returns:
+        torch.Tensor: A tensor of shape [world_size, num_sizes] where each row 
+                     represents the split sizes for one rank across all input sizes.
+        
+    Example:
+        >>> cal_split_sizes_multi([10, 15], 3)
+        tensor([[4, 5],  # Rank 0: 4 from first size, 5 from second size
+                [3, 5],  # Rank 1: 3 from first size, 5 from second size
+                [3, 5]]) # Rank 2: 3 from first size, 5 from second size
+    """
+    # Process each size independently
+    splits_per_size = []
+    for size in sizes:
+        split_size = size // world_size
+        remainder = size % world_size
+        size_splits = [split_size + (1 if i < remainder else 0) for i in range(world_size)]
+        splits_per_size.append(size_splits)
+    
+    return torch.tensor(splits_per_size).T
 
 
 # ====================
@@ -354,6 +396,168 @@ def split_forward_gather_backward(
 
 def gather_forward_split_backward(input_, process_group, dim, grad_scale=None, gather_sizes=None):
     return _GatherForwardSplitBackward.apply(input_, process_group, dim, grad_scale, gather_sizes)
+
+
+def split_each_sequence_in_packed_tensor(
+    hidden_states: torch.Tensor,  # Concatenated sequences: s1+s2+s3+...
+    process_group: torch.distributed.ProcessGroup,
+    sequence_lengths: List[int],  # List of individual sequence lengths: [s1_len, s2_len, s3_len, ...]
+    dim: int = 0
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Split packed hidden states for sequence parallelism, handling multiple variable-length sequences.
+    
+    This function:
+    1. Splits each sequence across all processes in the process group
+    2. Returns the local chunks for the current rank
+    
+    Args:
+        hidden_states: Concatenated hidden states of all sequences [total_seq_len, hidden_dim]
+        process_group: Distributed process group for parallelism
+        sequence_lengths: List of lengths for each individual sequence
+        dim: Dimension along which to split (default: 0 - sequence dimension)
+        
+    Returns:
+        local_hidden_states: Local chunks of hidden states for current rank
+    """
+    
+    world_size = torch.distributed.get_world_size(process_group)
+    local_sequence_chunks = []     # Local chunks for current rank
+    
+    current_position = 0
+    
+    # Process each sequence individually
+    for _, seq_len in enumerate(sequence_lengths):
+        # Extract the current sequence from packed hidden states
+        sequence_end = current_position + seq_len
+        current_sequence = hidden_states.narrow(dim=dim, start=current_position, length=seq_len)
+        current_position = sequence_end
+        
+        # Calculate how to split this sequence across all ranks
+        sequence_split_sizes = cal_split_sizes(seq_len, world_size)
+
+        # Split sequence and get local chunk for current rank
+        local_chunk = split_forward_gather_backward(
+            current_sequence,
+            process_group=process_group,
+            dim=dim,
+            grad_scale="down",  # Scale gradients during backward
+            split_sizes=sequence_split_sizes
+        )
+        local_sequence_chunks.append(local_chunk)
+    
+    # Concatenate all local chunks along sequence dimension
+    local_hidden_states = torch.cat(local_sequence_chunks, dim=dim)
+    
+    return local_hidden_states
+
+
+def gather_sequence_chunks_to_packed_tensor(
+    local_hidden_states: torch.Tensor,
+    all_split_sizes: torch.Tensor,  # [world_size, num_sequences]
+    process_group: torch.distributed.ProcessGroup,
+    dim: int = 0
+) -> torch.Tensor:
+    """
+    Gather distributed sequence chunks and reconstruct original packed sequences.
+    
+    Reconstruction process:
+    1. For each sequence: gather chunks from all ranks and concatenate
+    2. Concatenate all reconstructed sequences along sequence dimension
+    
+    Args:
+        local_hidden_states: Local hidden states [local_seq_len, hidden_dim]
+        all_split_sizes: Split sizes tensor [world_size, num_sequences] showing how each sequence 
+                        was distributed across ranks
+        process_group: Distributed process group for communication
+        dim: Dimension along which sequences were split (default: 0 - sequence dimension)
+        
+    Returns:
+        reconstructed_sequences: Reconstructed packed sequences [total_seq_len, hidden_dim]
+    """
+    world_size, num_sequences = all_split_sizes.shape
+    rank = torch.distributed.get_rank(process_group)
+
+    # Calculate total sequence length handled by each rank
+    # This sums up all sequence chunks that belong to each rank
+    rank_total_sizes = []
+    for r in range(world_size):
+        total_size_this_rank = all_split_sizes[r].sum().item()  # Sum across all sequences
+        rank_total_sizes.append(total_size_this_rank)
+
+    # Step 1: Gather all local chunks from all ranks into a single tensor
+    all_gathered_tensor = gather_forward_split_backward(
+        local_hidden_states,
+        process_group=process_group,
+        dim=dim,
+        grad_scale="up",  # Scale gradients during backward
+        gather_sizes=rank_total_sizes
+    )
+
+    # Step 2: Split the gathered tensor into chunks corresponding to each rank's contribution
+    # This separates the gathered data back into per-rank chunks for processing
+    rank_chunks = torch.split(all_gathered_tensor, rank_total_sizes, dim=dim)
+
+    # Step 3: Reconstruct each original sequence by collecting chunks from all ranks
+    reconstructed_sequences = []
+
+    for seq_idx in range(num_sequences):
+        sequence_chunks = []
+        
+        # For current sequence, collect chunks from all ranks
+        for rank_idx in range(world_size):
+            chunk_size = all_split_sizes[rank_idx, seq_idx]
+            # Find the position of this sequence's chunk within the rank's data
+            chunk_start = all_split_sizes[rank_idx, :seq_idx].sum()
+            chunk_end = chunk_start + chunk_size
+            
+            # Extract the chunk
+            chunk = rank_chunks[rank_idx].narrow(dim, chunk_start, chunk_size)
+            sequence_chunks.append(chunk)
+        
+        # Concatenate all chunks for this sequence
+        full_sequence = torch.cat(sequence_chunks, dim=dim)
+        reconstructed_sequences.append(full_sequence)
+    
+    # Step 4: Concatenate all reconstructed sequences along sequence dimension
+    final_output = torch.cat(reconstructed_sequences, dim=dim)
+
+    return final_output
+
+
+def split_forward_gather_backward_with_cp(
+    input_: torch.Tensor,
+    dim: int
+) -> torch.Tensor:
+    """
+    Perform a context-parallel-aware tensor split during forward pass and gather during backward pass.
+    
+    This function supports multiple context parallel (CP) algorithms:
+      - Ulysses-style CP: uniform or non-uniform split across CP ranks.
+      - Megatron-style CP: typically used with sequence parallelism and ring-based communication.
+      - Hybrid CP: combines ring-based (Megatron) and Ulysses-style splitting in nested groups.
+    """
+    args = get_args()
+    seq_len = input_.shape[dim]
+    if args.context_parallel_algo == "ulysses_cp_algo":
+        split_gather_sizes = cal_split_sizes(seq_len, mpu.get_context_parallel_world_size())
+
+        input_ = split_forward_gather_backward(input_, mpu.get_context_parallel_group(), dim=dim, split_sizes=split_gather_sizes)
+    elif args.context_parallel_algo == "megatron_cp_algo":
+        input_ = split_forward_gather_backward_with_megatron_cp(input_, mpu.get_context_parallel_group(), dim=dim)
+
+    elif args.context_parallel_algo == "hybrid_cp_algo":
+        # ring split
+        input_ = split_forward_gather_backward_with_megatron_cp(input_, get_context_parallel_group_for_hybrid_ring(), dim=dim)
+
+        # ulysses split in ring
+        split_gather_sizes = cal_split_sizes(input_.shape[dim], get_context_parallel_for_hybrid_ulysses_world_size())
+        input_ = split_forward_gather_backward(input_, get_context_parallel_group_for_hybrid_ulysses(), dim=dim, split_sizes=split_gather_sizes)
+
+    else:
+        raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {args.context_parallel_algo}")
+    
+    return input_
 
 
 def _conv_split(input_, dim, kernel_size):
