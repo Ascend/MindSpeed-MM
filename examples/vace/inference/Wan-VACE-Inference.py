@@ -31,7 +31,7 @@ if not os.path.exists(output_path):
     os.mkdir(output_path)
 
 model_config = []
-for model_path in model_config:
+for model_path in transformer_paths:
     model_config.append(ModelConfig(path=model_path))
 model_config.append(ModelConfig(path=vae_path))
 model_config.append(ModelConfig(path=text_encoder_path))
