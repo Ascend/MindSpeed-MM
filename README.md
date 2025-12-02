@@ -33,6 +33,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 
+* [Dec. 02, 2025]: 🚀 MindSpeed MM支持Self-Forcing基于Wan2.1-1.3B的DMD蒸馏 【Prototype】
 * [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型 【Prototype】
 * [Nov. 13, 2025]: 🚀 MindSpeed MM基于FSDP2支持InternVL3.5-30B模型
 * [Nov. 06, 2025]: 🚀 MindSpeed MM基于FSDP2支持DeepseekOCR模型训练demo【Prototype】
@@ -252,7 +253,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </thead>
   <tbody>
     <tr>
-      <td rowspan="42"> 多模态生成 </td>
+      <td rowspan="43"> 多模态生成 </td>
       </tr>
       <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/lumina">Lumina-mGPT 2.0</a></td>
@@ -389,6 +390,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 0.173 (SPS) </td>
       <td> / </td>
       <td>【Pass】</td>
+    </tr>
+    </tr>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/self_forcing">Self-Forcing</a></td>
+      <td><a href="https://huggingface.co/gdhe17/Self-Forcing">1.3B</a></td>
+      <td> DMD蒸馏 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 0.225 (FPS) </td>
+      <td> 0.282 (FPS) </td>
+      <td> / </td>
+      <td>【Test】</td>
     </tr>
     </tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/hunyuanvideo">HunyuanVideo-T2V</a></td>
