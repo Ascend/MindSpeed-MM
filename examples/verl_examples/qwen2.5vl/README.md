@@ -243,13 +243,25 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
     trainer.total_training_steps='null' \
     ```
 
-7. 启动ray, 若多机运行，需主节点到副节点依次运行此脚本：
+7. 如需使用确定性计算，在[安装插件](#jump1.3)步骤中需添加`export DETERMINISTIC=True`：
+    
+```bash
+# 添加：
+export DETERMINISTIC=True 
+# 添加后在进行如下操作：
+export MODEL_SELECT="Qwen2_5vl"
+# path_to_verl替换为verl源码路径 例如：/home/code/verl
+export VERL_PATH=path_to_verl
+pip install -v -e .
+```
+
+8. 启动ray, 若多机运行，需主节点到副节点依次运行此脚本：
 
     ```bash
     bash examples/grpo_trainer/ray_start.sh
     ```
 
-8. 启动训练脚本：
+9. 启动训练脚本：
     - `model_path`为模型权重路径，`data_path`为数据集路径
     - 若多机运行，*仅需主节点*需运行此脚本
 

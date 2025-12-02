@@ -2,18 +2,77 @@ import os
 import subprocess
 import sys
 import sysconfig
+from logging import raiseExceptions
 
 from setuptools import setup, find_packages
 from setuptools.command.build_py import build_py
 
 MODEL_SELECT = "MODEL_SELECT"
+DETERMINISTIC = "DETERMINISTIC"
+
+
+# Use Deterministic in Verl
+def inject_seed_code_to_fsdp_workers(verl_path):
+    target_file = os.path.join(verl_path, "verl", "workers", "fsdp_workers.py")
+    if not os.path.exists(target_file):
+        print(f"Error: fsdp_workers.py not found at {target_file}")
+        return False
+
+    seed_code = '''import random
+import numpy as np
+import torch
+import torch_npu
+
+def seed_all(seed=1234):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ['HCCL_DETERMINISTIC'] = str(True)
+    os.environ['LCCL_DETERMINISTIC'] = str(1)
+    os.environ['CLOSE_MATMUL_K_SHIFT'] = str(1)
+    os.environ['ATB_LLM_LCOC_ENABLE'] = "0"
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
+    torch_npu.npu.manual_seed_all(seed)
+    torch_npu.npu.manual_seed(seed)
+seed_all()
+'''
+
+    try:
+        with open(target_file, 'r') as f:
+            lines = f.readlines()
+    except Exception as e:
+        print(f"Error reading {target_file}: {e}")
+        return False
+
+    # Insert at line 98 (note: Python list is 0-indexed, so line 98 = index 97)
+    insert_index = 97  # because line numbers start at 1
+
+    # Ensure the file has at least 98 lines; if not, append
+    if len(lines) < insert_index + 1:
+        # Pad with empty lines if needed
+        while len(lines) < insert_index:
+            lines.append('\n')
+        lines.append(seed_code)
+    else:
+        # Insert before line 98
+        lines.insert(insert_index, seed_code)
+
+    try:
+        with open(target_file, 'w') as f:
+            f.writelines(lines)
+        print(f"Successfully injected seed_all code at line 98 of {target_file}")
+        return True
+    except Exception as e:
+        print(f"Error writing to {target_file}: {e}")
+        return False
 
 
 # 插件注入逻辑
 def inject_verl_plugin(custom_path=None):
     """将NPU加速支持注入到verl包中"""
     print("Starting verl plugin injection...")
-    
+
     # 优先级：环境变量 > 自定义路径 > 自动查找
     if 'VERL_PATH' in os.environ:
         verl_path = os.path.join(os.environ['VERL_PATH'], "verl")
@@ -25,20 +84,20 @@ def inject_verl_plugin(custom_path=None):
         print("Searching for verl package automatically...")
         # 尝试多种方式查找verl安装路径
         paths_to_try = [
-            sysconfig.get_paths()["purelib"],
-            sysconfig.get_paths()["platlib"],
-        ] + sys.path  # 搜索所有Python路径
-        
+                           sysconfig.get_paths()["purelib"],
+                           sysconfig.get_paths()["platlib"],
+                       ] + sys.path  # 搜索所有Python路径
+
         verl_path = None
         for path in paths_to_try:
             if not path:
                 continue
-                
+
             candidate = os.path.join(path, "verl")
             if os.path.exists(candidate) and os.path.isdir(candidate):
                 verl_path = candidate
                 break
-        
+
         # 使用pip show作为备用方案
         if not verl_path:
             try:
@@ -54,11 +113,11 @@ def inject_verl_plugin(custom_path=None):
                         break
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 print(f"pip show failed: {e}")
-    
+
     if not verl_path:
         print("Error: verl package not found. Please specify with VERL_PATH environment variable.")
         return False
-    
+
     print(f"Found verl at: {verl_path}")
 
     # 修改 __init__.py 文件
@@ -167,7 +226,7 @@ def modify_init_fun(verl_path):
     if not os.path.exists(init_file):
         print(f"Error: verl initialization file not found: {init_file}")
         return False
-    
+
     # 检查是否已经注入过
     import_content = """
 # NPU acceleration support added by mindspeed-mm plugin
@@ -177,7 +236,7 @@ if is_npu_available:
     import verl_npu
     print("NPU acceleration enabled for verl")
 """
-    
+
     # 读取当前内容
     try:
         with open(init_file, "r") as f:
@@ -185,7 +244,7 @@ if is_npu_available:
     except Exception as e:
         print(f"Error reading {init_file}: {e}")
         return False
-    
+
     if import_content in content:
         print(f"Info: {init_file} already contains NPU acceleration import")
     else:
@@ -213,7 +272,7 @@ def inject_vllm_plugin():
 
     print(f"Found vllm_ascend at: {vllm_path}")
 
-     # 2. 修改 rotary_embedding.py 文件
+    # 2. 修改 rotary_embedding.py 文件
     rotary_embedding_file = os.path.join(vllm_path, "ops", "rotary_embedding.py")
     if not os.path.exists(rotary_embedding_file):
         print(f"Warning: rotary_embedding file not found: {rotary_embedding_file}")
@@ -298,6 +357,7 @@ class CustomBuildPy(build_py):
     def run(self):
         super().run()
         model_select = os.environ.get(MODEL_SELECT, None)
+        deterministic_select = os.environ.get(DETERMINISTIC, None)
         if model_select is None:
             print("Error: Environment variable 'MODEL_SELECT' is required. Please set MODEL_SELECT to specify the model.")
         custom_path = os.environ.get('VERL_PATH', None)
@@ -305,6 +365,14 @@ class CustomBuildPy(build_py):
             print("Error: verl injection failed. Please check installation.")
         if model_select == "Qwen2_5vl" and not inject_vllm_plugin():
             print("Error: vllm injection failed. Please check installation.")
+        if deterministic_select is not None:
+            success = inject_seed_code_to_fsdp_workers(custom_path)
+            if success:
+                print("Deteministic is enabled")
+            else:
+                print("Failed to enable the deterministic")
+        else:
+            print("Deteministic is not enabled")
 
 
 setup(
