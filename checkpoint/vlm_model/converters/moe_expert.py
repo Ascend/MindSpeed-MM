@@ -15,6 +15,7 @@ mm-convert moe_expert --style split --hf_dir "merged_weight" --save_dir "splited
 import json
 from pathlib import Path
 from typing import Dict, Literal
+from enum import Enum
 
 import torch
 from huggingface_hub import split_torch_state_dict_into_shards
@@ -32,8 +33,26 @@ from checkpoint.vlm_model.hf_to_mm import load_from_hf, save_by_dcp
 from checkpoint.vlm_model.mm_to_hf import copy_files_except_suffix
 
 
+class ConfigType(Enum):
+    DEFAULT = 0
+    QWEN3_OMNI = 1
+
+    
+def get_config_type_from_class_name(save_dir: Path) -> ConfigType:
+    """
+    Note: Since qwen3omni only the thinker model is fine-tuned, the configuration will include 
+    the thinker, which needs to be handled separately.
+    """
+    config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
+    class_name = config.__class__.__name__
+    if class_name == "Qwen3OmniMoeConfig":
+        return ConfigType.QWEN3_OMNI
+    else:
+        return ConfigType.DEFAULT
+
+
 def merge_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, num_experts: int,
-                             expert_start_layer: int, weight_path: str) -> None:
+                             expert_start_layer: int, config_type: ConfigType, weight_path: str) -> None:
     """Process weights for each layer and expert. state_dict will be modified in place"""
     for layer in trange(expert_start_layer, num_hidden_layers, desc="merge moe experts weight"):
         gate_up_proj_weights = []
@@ -54,8 +73,9 @@ def merge_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, n
         new_down_proj_weight = torch.stack(down_proj_weights)
         
         # view experts weight: (expert_num, input_dim, output_dim) -> (expert_num * input_dim, output_dim)
-        new_gate_up_proj_weight = new_gate_up_proj_weight.view(-1, new_gate_up_proj_weight.shape[-1])
-        new_down_proj_weight = new_down_proj_weight.view(-1, new_down_proj_weight.shape[-1])
+        if config_type != ConfigType.QWEN3_OMNI: # Exclude QWEN3_OMNI config type
+            new_gate_up_proj_weight = new_gate_up_proj_weight.view(-1, new_gate_up_proj_weight.shape[-1])
+            new_down_proj_weight = new_down_proj_weight.view(-1, new_down_proj_weight.shape[-1])
 
         new_gate_up_proj = (weight_path.replace('.{expert}', '') + ".gate_up_proj").format(layer=layer)
         new_down_proj = (weight_path.replace('.{expert}', '') + ".down_proj").format(layer=layer)
@@ -64,7 +84,7 @@ def merge_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, n
 
 
 def split_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, num_experts: int,
-                             expert_start_layer: int, weight_path: str) -> None:
+                             expert_start_layer: int, config_type: ConfigType, weight_path: str) -> None:
     """Split merged expert weights back into individual expert weights. state_dict will be modified in place."""
     for layer in trange(expert_start_layer, num_hidden_layers, desc="split moe experts weight"):
         # Get merged gate_up_proj and down_proj weights
@@ -77,8 +97,9 @@ def split_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, n
         merged_gate_up_proj = state_dict.pop(gate_up_proj)
         merged_down_proj = state_dict.pop(down_proj)
         # view experts weight: (expert_num * input_dim, output_dim) -> (expert_num, input_dim, output_dim)
-        merged_gate_up_proj = merged_gate_up_proj.view(num_experts, -1, merged_gate_up_proj.shape[-1])
-        merged_down_proj = merged_down_proj.view(num_experts, -1, merged_down_proj.shape[-1])
+        if config_type != ConfigType.QWEN3_OMNI: # Exclude QWEN3_OMNI config type
+            merged_gate_up_proj = merged_gate_up_proj.view(num_experts, -1, merged_gate_up_proj.shape[-1])
+            merged_down_proj = merged_down_proj.view(num_experts, -1, merged_down_proj.shape[-1])
 
         # Split merged_gate_up_proj into individual gate_proj and up_proj for each expert
         gate_up_experts = merged_gate_up_proj.unbind()
@@ -155,10 +176,19 @@ def moe_expert(style: Literal["merge", "split"], hf_dir: DirectoryPath, save_dir
 
     num_experts, num_hidden_layers, weight_path, expert_start_layer = get_expert_config_from_pretrained(save_dir)
     state_dict = load_from_hf(hf_dir)
+    config_type = get_config_type_from_class_name(hf_dir)
     if style == "merge":
-        merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, weight_path=weight_path)
+        merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path=weight_path)
+        if config_type == ConfigType.QWEN3_OMNI: # support qwen3-omni
+            weight_names = list(state_dict.keys())
+            for weight_name in weight_names:
+                state_dict[weight_name.removeprefix("thinker.")] = state_dict.pop(weight_name)
     elif style == "split":
-        split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, weight_path=weight_path)
+        if config_type == ConfigType.QWEN3_OMNI: # support qwen3-omni
+            weight_names = list(state_dict.keys())
+            for weight_name in weight_names:
+                state_dict[f"thinker.{weight_name}"] = state_dict.pop(weight_name)
+        split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path=weight_path)
     else:
         raise ValueError(f"Only support style `merge` or `split`, given: {style}")
     save_sharded_state_dict(state_dict, save_dir, max_shard_size, metadata={"format": "pt"})
@@ -169,7 +199,13 @@ class ExpertMergeDcpConverter(DcpConverter):
     def hf_to_dcp(hf_dir: DirectoryPath, save_dir: Path):
         num_experts, num_hidden_layers, weight_path, expert_start_layer = get_expert_config_from_pretrained(hf_dir)
         state_dict = load_from_hf(hf_dir)
-        merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, weight_path=weight_path)
+        config_type = get_config_type_from_class_name(hf_dir)
+        merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path=weight_path)
+        
+        if config_type == ConfigType.QWEN3_OMNI: # support qwen3-omni
+            weight_names = list(state_dict.keys())
+            for weight_name in weight_names:
+                state_dict[weight_name.removeprefix("thinker.")] = state_dict.pop(weight_name)
         weight_names = list(state_dict.keys())
         for weight_name in weight_names:
             state_dict[f"model.{weight_name}"] = state_dict.pop(weight_name)
@@ -183,8 +219,13 @@ class ExpertMergeDcpConverter(DcpConverter):
         weight_names = list(state_dict.keys())
         for weight_name in weight_names:
             state_dict[weight_name.removeprefix("model.")] = state_dict.pop(weight_name)
+        config_type = get_config_type_from_class_name(hf_dir)
+        if config_type == ConfigType.QWEN3_OMNI: # support qwen3-omni
+            weight_names = list(state_dict.keys())
+            for weight_name in weight_names:
+                state_dict[f"thinker.{weight_name}"] = state_dict.pop(weight_name)
         num_experts, num_hidden_layers, weight_path, expert_start_layer = get_expert_config_from_pretrained(save_dir)
-        split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, weight_path=weight_path)
+        split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path=weight_path)
         save_sharded_state_dict(state_dict, save_dir, max_shard_size="4GB", metadata={"format": "pt"})
         set_directory_permissions(save_dir)
 

@@ -77,7 +77,7 @@ GPT_ARGS="
     --adam-beta1 0.9 \
     --adam-beta2 0.999 \
     --no-gradient-accumulation-fusion \
-    --seed 1234 \
+    --seed 42 \
     --load $LOAD_PATH \
     --no-load-optim \
     --no-load-rng \
@@ -91,6 +91,7 @@ GPT_ARGS="
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
     --distributed-timeout-minutes 60 \
+    --init-model-with-meta-device \
 "
 
 MM_ARGS="

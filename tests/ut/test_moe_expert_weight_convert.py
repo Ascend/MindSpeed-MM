@@ -1,6 +1,7 @@
 import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+from enum import Enum
 
 import pytest
 import torch
@@ -12,6 +13,11 @@ from checkpoint.vlm_model.converters.moe_expert import (
     save_sharded_state_dict,
     moe_expert
 )
+
+
+class ConfigType(Enum):
+    DEFAULT = 0
+    QWEN3_OMNI = 1
 
 
 @pytest.fixture
@@ -37,8 +43,9 @@ def test_merge_moe_expert_weights():
     num_hidden_layers = 1
     num_experts = 2
     weight_path = "layer.{layer}.experts.{expert}"
+    config_type = ConfigType.DEFAULT
 
-    merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, weight_path)
+    merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path)
 
     # Check merged weights
     assert "layer.0.experts.0.gate_proj.weight" not in state_dict
@@ -68,8 +75,9 @@ def test_split_moe_expert_weights():
     num_hidden_layers = 1
     num_experts = 2
     weight_path = "layer.{layer}.experts.{expert}"
+    config_type = ConfigType.DEFAULT
 
-    split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, weight_path)
+    split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path)
     assert "layer.0.experts.gate_up_proj" not in state_dict
     assert "layer.0.experts.down_proj" not in state_dict
 
