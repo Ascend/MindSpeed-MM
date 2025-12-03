@@ -30,9 +30,7 @@ class SoRADPOModel(nn.Module):
         args = get_args()
         self.config = core_transformer_config_from_args(args)
         self.task = getattr(config, "task", "t2v")
-        if args.dist_train:
-            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
-        self.pre_process = mpu.is_pipeline_first_stage() if not args.dist_train else is_in_subworld('vae')  # vae subworld
+        self.pre_process = mpu.is_pipeline_first_stage()
         self.post_process = mpu.is_pipeline_last_stage()
         self.input_tensor = None
         # to avoid grad all-reduce and reduce-scatter in megatron, since SoRAModel has no embedding layer.
@@ -59,27 +57,16 @@ class SoRADPOModel(nn.Module):
         # copy config
         predictor_config_ref = copy.deepcopy(config.predictor)
         predictor_config = copy.deepcopy(config.predictor)
-
-        if args.dist_train:
-            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
-            if is_in_subworld('dit'):
-                self.reference = PredictModel(predictor_config_ref).get_model().eval()
-                self.reference.requires_grad_(False)
-                self.actor = PredictModel(predictor_config).get_model()
-        else:
-            self.reference = PredictModel(predictor_config_ref).get_model().eval()
-            self.reference.requires_grad_(False)
-            self.actor = PredictModel(predictor_config).get_model()
+        self.reference = PredictModel(predictor_config_ref).get_model().eval()
+        self.reference.requires_grad_(False)
+        self.actor = PredictModel(predictor_config).get_model()
 
         print_rank_0("finish building SoRADPOModel related modules ...")
         return None
 
     def set_input_tensor(self, input_tensor):
         self.input_tensor = input_tensor
-        if get_args().dist_train and mpu.is_pipeline_first_stage(is_global=False):  # enable dist_train will apply Patch
-            self.input_tensor = input_tensor
-        else:
-            self.actor.set_input_tensor(input_tensor)
+        self.actor.set_input_tensor(input_tensor)
 
     def forward(self, video, video_lose, prompt_ids, video_mask=None, prompt_mask=None, **kwargs):
         """
@@ -208,20 +195,11 @@ class SoRADPOModel(nn.Module):
     
     def state_dict_for_save_checkpoint(self, prefix="", keep_vars=False):
         """Customized state_dict"""
-        if not get_args().dist_train:
-            state_dict = self.actor.state_dict(prefix=prefix, keep_vars=keep_vars)
-            return state_dict
-        from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
-        if is_in_subworld('dit'):
-            return self.actor.state_dict(prefix=prefix, keep_vars=keep_vars)
-        return None
+        state_dict = self.actor.state_dict(prefix=prefix, keep_vars=keep_vars)
+        return state_dict
     
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         """Customized load."""
-        if get_args().dist_train:
-            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
-            if is_in_subworld('vae'):
-                return None
         if not isinstance(state_dict, Mapping):
             raise TypeError(f"Expected state_dict to be dict-like, got {type(state_dict)}.")
 

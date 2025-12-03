@@ -219,22 +219,9 @@ def pretrain(
 
     # Model, optimizer, and learning rate.
     timers("model-and-optimizer-setup", log_level=0).start(barrier=True)
-    if args.dist_train and is_forward_only_model():
-        model = get_model(model_provider, model_type)
-        optimizer, opt_param_scheduler = None, None
-        if args.load is not None or args.pretrained_checkpoint is not None:
-            timers('load-checkpoint', log_level=0).start(barrier=True)
-            args.iteration, args.num_floating_point_operations_so_far = load_checkpoint(
-                model, optimizer, opt_param_scheduler)
-            timers('load-checkpoint').stop(barrier=True)
-            timers.log(['load-checkpoint'])
-        else:
-            args.iteration = 0
-            args.num_floating_point_operations_so_far = 0
-    else:
-        model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
-            model_provider, model_type
-    )
+    model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
+        model_provider, model_type
+)
 
     if getattr(args, "auto_parallel_profile", False):
         from mindspeed.core.auto_parallel.mm_search.memory_modeling import count_module_param

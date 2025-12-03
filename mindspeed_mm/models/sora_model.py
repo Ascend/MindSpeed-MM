@@ -81,18 +81,13 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
             raise AssertionError("Encoder DP cannot be used with PP")
 
         # build inner module
-        if args.dist_train:
-            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
-        self.pre_process = mpu.is_pipeline_first_stage() if not args.dist_train else is_in_subworld(
-            'vae')  # vae subworld
+        self.pre_process = mpu.is_pipeline_first_stage()
         self.post_process = mpu.is_pipeline_last_stage()
         self.input_tensor = None
 
         if mpu.get_pipeline_model_parallel_rank() == 0:
             self.load_video_features = config.load_video_features
             self.load_text_features = config.load_text_features
-            if args.dist_train and not is_in_subworld('vae'):
-                self.load_video_features = self.load_text_features = False
             if not self.load_video_features:
                 print_rank_0(f"init AEModel....")
                 self.ae = AEModel(config.ae).eval()
@@ -106,22 +101,14 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
                 self.offload_cpu = self.interleaved_steps > 1
 
         self.diffusion = DiffusionModel(config.diffusion).get_model()
-        if args.dist_train:
-            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
-            if is_in_subworld('dit'):
-                self.predictor = PredictModel(config.predictor).get_model()
-        else:
-            self.predictor = PredictModel(config.predictor).get_model()
+        self.predictor = PredictModel(config.predictor).get_model()
 
         # to avoid grad all-reduce and reduce-scatter in megatron, since SoRAModel has no embedding layer.
         self.share_embeddings_and_output_weights = False
 
     def set_input_tensor(self, input_tensor):
         self.input_tensor = input_tensor
-        if get_args().dist_train and mpu.is_pipeline_first_stage(is_global=False):  # enable dist_train will apply Patch
-            self.input_tensor = input_tensor
-        else:
-            self.predictor.set_input_tensor(input_tensor)
+        self.predictor.set_input_tensor(input_tensor)
 
     def forward(self, video, prompt_ids, video_mask=None, prompt_mask=None, skip_encode=False, **kwargs):
         """
@@ -172,23 +159,14 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
             predictor_input_latent, predictor_timesteps, predictor_prompt = noised_latents, timesteps, prompt
             predictor_video_mask, predictor_prompt_mask = video_mask, prompt_mask
 
-            if args.dist_train:
-                return [predictor_input_latent, predictor_timesteps, predictor_prompt, predictor_video_mask,
-                        predictor_prompt_mask,
-                        latents, noised_latents, timesteps, noise, video_mask]
         else:
-            if args.dist_train and mpu.is_pipeline_first_stage(is_global=False):
-                [predictor_input_latent, predictor_timesteps, predictor_prompt, predictor_video_mask,
-                 predictor_prompt_mask,
-                 latents, noised_latents, timesteps, noise, video_mask] = self.input_tensor
-            else:
-                if not hasattr(self.predictor, "pipeline_set_prev_stage_tensor"):
-                    raise ValueError(f"PP has not been implemented for {self.predictor_cls} yet. ")
-                predictor_input_list, training_loss_input_list = self.predictor.pipeline_set_prev_stage_tensor(
-                    self.input_tensor, extra_kwargs=kwargs)
-                predictor_input_latent, predictor_timesteps, predictor_prompt, predictor_video_mask, predictor_prompt_mask \
-                    = predictor_input_list
-                latents, noised_latents, timesteps, noise, video_mask = training_loss_input_list
+            if not hasattr(self.predictor, "pipeline_set_prev_stage_tensor"):
+                raise ValueError(f"PP has not been implemented for {self.predictor_cls} yet. ")
+            predictor_input_list, training_loss_input_list = self.predictor.pipeline_set_prev_stage_tensor(
+                self.input_tensor, extra_kwargs=kwargs)
+            predictor_input_latent, predictor_timesteps, predictor_prompt, predictor_video_mask, predictor_prompt_mask \
+                = predictor_input_list
+            latents, noised_latents, timesteps, noise, video_mask = training_loss_input_list
 
         output = self.predictor(
             predictor_input_latent,
@@ -232,8 +210,7 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
         return loss_dict
 
     def train(self, mode=True):
-        if hasattr(self, "predictor"):
-            self.predictor.train()
+        self.predictor.train()
 
     def state_dict_for_save_lora_checkpoint(self, state_dict):
         state_dict_ = dict()
@@ -244,15 +221,10 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
 
     def state_dict_for_save_checkpoint(self, prefix="", keep_vars=False):
         """Customized state_dict"""
-        if not get_args().dist_train:
-            state_dict = self.predictor.state_dict(prefix=prefix, keep_vars=keep_vars)
-            if self.is_enable_lora:
-                state_dict = self.state_dict_for_save_lora_checkpoint(state_dict)
-            return state_dict
-        from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
-        if is_in_subworld('dit'):
-            return self.predictor.state_dict(prefix=prefix, keep_vars=keep_vars)
-        return None
+        state_dict = self.predictor.state_dict(prefix=prefix, keep_vars=keep_vars)
+        if self.is_enable_lora:
+            state_dict = self.state_dict_for_save_lora_checkpoint(state_dict)
+        return state_dict
 
     def state_dict(self):
         """Customized state_dict for fsdp2"""
@@ -260,10 +232,6 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
 
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         """Customized load."""
-        if get_args().dist_train:
-            from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
-            if is_in_subworld('vae'):
-                return None
         if not isinstance(state_dict, Mapping):
             raise TypeError(f"Expected state_dict to be dict-like, got {type(state_dict)}.")
 

@@ -26,7 +26,6 @@ from mindspeed_mm.data.data_utils.constants import (
 )
 from mindspeed_mm.data.data_utils.utils import build_iterations
 from mindspeed_mm.models.sora_model import SoRAModel
-from mindspeed_mm.patchs import dummy_optimizer_patch
 import mindspeed_mm.utils.dpcp_utils as dpcp 
 mindspeed_args = get_mindspeed_args()
 
