@@ -5,7 +5,7 @@ from mindspeed_mm.models.transformers.qwen3vl.qwen3vl import (
     Qwen3VLMoeForConditionalGeneration
 )
 from mindspeed_mm.models.transformers.internvl3_5 import InternVLChatModelGeneration
-from mindspeed_mm.models.transformers.glm4_5v import Glm4vMoeForConditionalGeneration
+from mindspeed_mm.models.transformers.glm4v_moe.glm4_5v import Glm4vMoeForConditionalGeneration
 
 
 class ModelHub:

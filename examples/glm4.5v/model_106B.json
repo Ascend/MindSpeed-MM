@@ -1,6 +1,6 @@
 {
     "model_id": "glm4v_moe",
-    "init_from_hf_path": "./ckpt/hf_path/GLM4.5V",
+    "init_from_hf_path": "./ckpt/hf_path/GLM-4.5V",
     "image_encoder": {
         "vision_encoder": {
             "model_id": "glm4v_moe",
@@ -23,7 +23,7 @@
         "num_attention_heads": 96,
         "max_position_embeddings": 65536,
         "freeze": false,
-        "use_npu_fused_moe": false,
+        "use_npu_fused_moe": true,
         "attn_implementation": "sdpa",
         "activation_offload": false
     },

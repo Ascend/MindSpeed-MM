@@ -1,7 +1,6 @@
 # Copyright 2025 HuggingFace Inc. and the LlamaFactory team.
 
 
-from transformers.models.glm4v_moe.modeling_glm4v_moe import Glm4vMoeForConditionalGeneration as HFGlm4vMoeForConditionalGeneration
 import torch.nn as nn
 from torch.distributed.fsdp import fully_shard
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
@@ -9,6 +8,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     CheckpointImpl
 )
 from megatron.training import print_rank_0, get_args
+from mindspeed_mm.models.transformers.glm4v_moe.modeling_glm4v_moe import Glm4vFusedMoeForConditionalGeneration
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 
 
@@ -65,6 +65,6 @@ class Glm4VFSDP2Minxin(FSDP2Mixin):
                 param.requires_grad_(False)
 
 
-class Glm4vMoeForConditionalGeneration(WeightInitMixin, HFGlm4vMoeForConditionalGeneration, Glm4VFSDP2Minxin):
+class Glm4vMoeForConditionalGeneration(WeightInitMixin, Glm4vFusedMoeForConditionalGeneration, Glm4VFSDP2Minxin):
     pass
 

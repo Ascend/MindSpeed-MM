@@ -31,7 +31,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 MM_DATA="./examples/glm4.5v/data_106B.json"
 MM_MODEL="./examples/glm4.5v/model_106B.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-LOAD_PATH="ckpt/mm_path/GLM4.5V"
+LOAD_PATH="ckpt/mm_path/GLM-4.5V"
 SAVE_PATH="save_dir"
 FSDP2_PATH="./examples/glm4.5v/fsdp2_config.yaml"
 
