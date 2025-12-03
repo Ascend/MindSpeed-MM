@@ -8,7 +8,6 @@ from megatron.core import mpu
 from megatron.training import get_args
 from megatron.core.packed_seq_params import PackedSeqParams
 from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import all_to_all
-from mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel import ringattn_context_parallel_tnd_general, ringattn_context_parallel
 from mindspeed.core.context_parallel.model_parallel_utils import (
     get_context_parallel_group_for_hybrid_ulysses,
     get_context_parallel_group_for_hybrid_ring,

@@ -11,6 +11,7 @@ from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
 
 from mindspeed_mm.models.transformers.qwen3vl.modeling_qwen3_vl import Qwen3VLForConditionalGeneration as HFQwen3VLForConditionalGeneration
 from mindspeed_mm.models.transformers.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeForConditionalGeneration as HFQwen3VLMoeForConditionalGeneration
+from .attention_utils import verify_attn_layout
 
 
 class Qwen3VLFSDP2Mixin(FSDP2Mixin):
@@ -109,11 +110,21 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         model_cfg = args.mm.model
 
         # attn_implementation support eager, sdpa(layout BNSD), flash_attention_2(layout BNSD), var_len_fa(layout TND), default flash_attention_2
-        vit_attn_implementation = getattr(model_cfg.image_encoder, "attn_implementation", "flash_attention_2")
+        vit_attn_implementation = getattr(model_cfg.image_encoder.vision_encoder, "attn_implementation", "flash_attention_2")
         llm_attn_implementation = getattr(model_cfg.text_decoder, "attn_implementation", "flash_attention_2")
         # set attn type configuration
         transformer_config.vision_config._attn_implementation = vit_attn_implementation
         transformer_config.text_config._attn_implementation = llm_attn_implementation
+        # set attn layout configuration
+        vit_attn_layout = getattr(model_cfg.image_encoder.vision_encoder, "attn_layout", "TND")
+        llm_attn_layout = getattr(model_cfg.text_decoder, "attn_layout", "BNSD")
+        verify_attn_layout(vit_attn_implementation, vit_attn_layout)
+        verify_attn_layout(llm_attn_implementation, llm_attn_layout)
+        setattr(transformer_config.vision_config, "attn_layout", vit_attn_layout)
+        setattr(transformer_config.text_config, "attn_layout", llm_attn_layout)
+        # set attn mask type
+        llm_is_causal = getattr(model_cfg.text_decoder, "is_causal", False)
+        setattr(transformer_config.text_config, "is_causal", llm_is_causal)
 
         # set activation offload, only suppport offload text activations now
         llm_activation_offload = getattr(model_cfg.text_decoder, "activation_offload", False)

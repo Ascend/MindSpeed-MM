@@ -71,7 +71,7 @@ class Qwen3VLTextDecoderLayer(nn.Module):
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         # Self Attention
-        hidden_states, _ = self.self_attn(
+        hidden_states = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -278,6 +278,8 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
             dtype=grid_thw.dtype if torch.jit.is_tracing() else torch.int32,
         )
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
+        cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
+        cu_seqlens = tuple(cu_seqlens.cpu().numpy().tolist())
 
         split_gather_sizes = None
         if mpu.get_context_parallel_world_size() > 1:
@@ -329,6 +331,7 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
 
     def __init__(self, config: Qwen3VLTextConfig):
         super().__init__(config)
+        self.config = config
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
@@ -343,9 +346,8 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         self.norm = Qwen3VLTextRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen3VLTextRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
-        self.is_causal = True
-        self.activation_offload = config.activation_offload
-        if self.activation_offload:
+
+        if config.activation_offload:
             self.swap_stream = torch.npu.Stream()
 
         # Initialize weights and apply final processing
@@ -406,16 +408,25 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         total_seq_len = inputs_embeds.shape[1]
         set_seq_len("total", total_seq_len)
 
-        attention_mask = None
-        if not self.is_causal:
-            attention_mask = create_causal_mask(
-                config=self.config,
-                input_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                cache_position=cache_position,
-                past_key_values=past_key_values,
-                position_ids=text_position_ids,
-            )
+        if self.config.attn_layout == "TND":
+            seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
+            cu_seqlens = F.pad(torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0))
+            cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
+            indices = torch.nonzero(attention_mask.flatten(), as_tuple=False).flatten()
+            kwargs["cu_seqlens"] = tuple(cu_seqlens.cpu().numpy().tolist())
+            kwargs["indices"] = indices
+        else:
+            if not self.config.is_causal:
+                attention_mask = create_causal_mask(
+                    config=self.config,
+                    input_embeds=inputs_embeds,
+                    attention_mask=attention_mask,
+                    cache_position=cache_position,
+                    past_key_values=past_key_values,
+                    position_ids=text_position_ids,
+                )
+            else:
+                attention_mask = None
 
         if mpu.get_context_parallel_world_size() > 1:
             split_gather_sizes = cal_split_sizes(total_seq_len, mpu.get_context_parallel_world_size())
@@ -450,7 +461,7 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         
         # decoder layers
         for layer_idx, decoder_layer in enumerate(self.layers):
-            if self.activation_offload:
+            if self.config.activation_offload:
                 with async_save_on_cpu(
                     h2d_stream=self.swap_stream,
                     d2h_stream=self.swap_stream,

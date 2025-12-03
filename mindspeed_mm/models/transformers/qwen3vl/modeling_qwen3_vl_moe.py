@@ -191,7 +191,7 @@ class Qwen3VLMoeTextDecoderLayer(nn.Module):
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         # Self Attention
-        hidden_states, _ = self.self_attn(
+        hidden_states = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -253,6 +253,7 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel, Qwen3VLTextModel):
 
     def __init__(self, config: Qwen3VLMoeTextConfig):
         Qwen3VLMoePreTrainedModel.__init__(self, config)
+        self.config = config
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
@@ -267,9 +268,8 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel, Qwen3VLTextModel):
         self.norm = Qwen3VLTextRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen3VLTextRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
-        self.is_causal = True
-        self.activation_offload = config.activation_offload
-        if self.activation_offload:
+
+        if config.activation_offload:
             self.swap_stream = torch.npu.Stream()
 
         # Initialize weights and apply final processing

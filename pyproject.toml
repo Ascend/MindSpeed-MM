@@ -20,7 +20,7 @@ dependencies = [
     "torch==2.7.1",
     "torchvision",
     "diffusers==0.30.3",
-    "transformers==4.53.0",
+    "transformers==4.57.0",
     "accelerate==0.32.1",
     "pandarallel",
     "datasets",

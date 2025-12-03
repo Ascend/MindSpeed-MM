@@ -8,7 +8,8 @@
             "hidden_size": 1152,
             "num_attention_heads": 16,
             "freeze": true,
-            "attn_implementation": "sdpa"
+            "attn_implementation": "flash_attention_2",
+            "attn_layout": "TND"
         },
         "vision_projector": {
             "model_id": "lnmlp",
@@ -24,7 +25,9 @@
         "max_position_embeddings": 262144,
         "freeze": false,
         "use_npu_fused_moe": false,
-        "attn_implementation": "sdpa",
+        "attn_implementation": "flash_attention_2",
+        "attn_layout": "TND",
+        "is_causal": false,
         "activation_offload": false
     },
     "loss_cfg": {

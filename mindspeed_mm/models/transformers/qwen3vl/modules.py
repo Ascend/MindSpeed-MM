@@ -14,14 +14,14 @@ from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache
 from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
 from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
-from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs
 from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLTextConfig, Qwen3VLVisionConfig
-
 from megatron.core import mpu
+
 from mindspeed_mm.models.common.communications import cal_split_sizes, gather_forward_split_backward, split_forward_gather_backward
 from .utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq
+from .attention_utils import ALL_ATTENTION_FUNCTIONS, pad_out
 
 
 class Qwen3VLEmptyModule(nn.Module):
@@ -212,11 +212,29 @@ class Qwen3VLVisionAttention(nn.Module):
             self.qkv(hidden_states).reshape(seq_length, 3, self.num_heads, -1).permute(1, 0, 2, 3).unbind(0)
         )
         cos, sin = position_embeddings
-        query_states, key_states = apply_rotary_pos_emb_vision(query_states, key_states, cos, sin)
+        query_states, key_states = apply_rotary_pos_emb_vision(query_states, key_states, cos, sin)  # TND
 
-        query_states = query_states.transpose(0, 1).unsqueeze(0)
-        key_states = key_states.transpose(0, 1).unsqueeze(0)
-        value_states = value_states.transpose(0, 1).unsqueeze(0)
+        attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
+        seq_dim, head_dim = None, None
+        attention_kwargs = {"scale": self.scaling, "dropout": self.attention_dropout, "is_causal": self.is_causal, "attention_mask": None}
+
+        if self.config._attn_implementation == "flash_attention_2" and self.config.attn_layout == "TND":
+            seq_dim, head_dim = 0, 1
+            attention_kwargs["actual_seq_qlen"] = cu_seqlens
+            attention_kwargs["actual_seq_kvlen"] = cu_seqlens
+            attention_kwargs["layout"] = "TND"
+
+        elif self.config._attn_implementation in ["eager", "sdpa", "flash_attention_2"] and self.config.attn_layout == "BNSD":
+            # layout, TND --> BNSD
+            query_states = query_states.transpose(0, 1).unsqueeze(0)  # [1, N, T(B*S), D]
+            key_states = key_states.transpose(0, 1).unsqueeze(0)
+            value_states = value_states.transpose(0, 1).unsqueeze(0)
+            seq_dim, head_dim = 2, 1
+            attention_kwargs["layout"] = "BNSD"
+        else:
+            raise NotImplementedError(
+                f"Unsupported Attention: {self.config._attn_implementation}, or layout: {self.config.attn_layout}"
+                "Qwen3VLTextAttention only support ['eager', 'sdpa', 'flash_attention_2'], layout TND and BNSD")
 
         if mpu.get_context_parallel_world_size() > 1:
             total_visual_seqlen = int(cu_seqlens[-1])
@@ -224,53 +242,34 @@ class Qwen3VLVisionAttention(nn.Module):
                 query_states,
                 key_states,
                 value_states,
-                seq_dim=2,
-                head_dim=1,
+                seq_dim=seq_dim,
+                head_dim=head_dim,
                 gather_size=total_visual_seqlen
             )
 
-        attention_interface: Callable = eager_attention_forward
-        if self.config._attn_implementation != "eager":
-            attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-
-        if self.config._attn_implementation == "flash_attention_2":
-            # Flash Attention 2: Use cu_seqlens for variable length attention
-            max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
-            attn_output, _ = attention_interface(
-                self,
+        if self.config.attn_layout == "TND":
+            
+            attn_output = attention_interface(
                 query_states,
                 key_states,
                 value_states,
-                attention_mask=None,
-                scaling=self.scaling,
-                dropout=0.0 if not self.training else self.attention_dropout,
-                cu_seq_lens_q=cu_seqlens,
-                cu_seq_lens_k=cu_seqlens,
-                max_length_q=max_seqlen,
-                max_length_k=max_seqlen,
-                is_causal=False,
-                **kwargs,
+                **attention_kwargs
             )
         else:
-            # Other implementations: Process each chunk separately
-            lengths = cu_seqlens[1:] - cu_seqlens[:-1]
+            # Other FA implementations: Process each chunk separately
+            lengths = [cu_seqlens[0]] + [post_len - seqlen for seqlen, post_len in zip(cu_seqlens, cu_seqlens[1:])]
             splits = [
-                torch.split(tensor, lengths.tolist(), dim=2)
+                torch.split(tensor, lengths, dim=seq_dim)
                 for tensor in (query_states, key_states, value_states)
             ]
 
             attn_outputs = [
                 attention_interface(
-                    self,
                     q,
                     k,
                     v,
-                    attention_mask=None,
-                    scaling=self.scaling,
-                    dropout=0.0 if not self.training else self.attention_dropout,
-                    is_causal=False,
-                    **kwargs,
-                )[0]
+                    **attention_kwargs,
+                )
                 for q, k, v in zip(*splits)
             ]
             attn_output = torch.cat(attn_outputs, dim=1)
@@ -278,13 +277,14 @@ class Qwen3VLVisionAttention(nn.Module):
         if mpu.get_context_parallel_world_size() > 1:
             attn_output = gather_heads_scatter_seq(
                 attn_output,
-                seq_dim=1,
-                head_dim=2,
+                seq_dim=seq_dim,
+                head_dim=head_dim,
                 gather_size=self.num_heads
             )
 
         attn_output = attn_output.reshape(seq_length, -1).contiguous()
         attn_output = self.proj(attn_output)
+
         return attn_output
 
 
@@ -450,69 +450,104 @@ class Qwen3VLTextAttention(nn.Module):
 
     def forward(
         self,
-        hidden_states: torch.Tensor,
+        hidden_states: torch.Tensor, # [B, S, H]
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
         attention_mask: Optional[torch.Tensor],
         past_key_values: Optional[Cache] = None,
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
-        input_shape = hidden_states.shape[:-1]
-        hidden_shape = (*input_shape, -1, self.head_dim)
 
-        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+        batch_size, seqlen = hidden_states.shape[:-1]
+        hidden_shape = (batch_size, seqlen, -1, self.head_dim)  # BSND
+
+        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape))  # BSND
+        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape))
+        value_states = self.v_proj(hidden_states).view(hidden_shape)
 
         cos, sin = position_embeddings # b s d
-        
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, unsqueeze_dim=2)
+
+        attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
+        dropout = 0.0 if not self.training else self.attention_dropout
+        attention_kwargs = {
+            "scale": self.scaling,
+            "dropout": dropout,
+            "is_causal": self.is_causal,
+            "layout": self.config.attn_layout,
+        }
+
+        seq_dim, head_dim = None, None
+        if self.config.attn_layout == "BNSD":
+            query_states = query_states.transpose(1, 2)  # BNSD
+            key_states = key_states.transpose(1, 2)
+            value_states = value_states.transpose(1, 2)
+            attention_kwargs["attention_mask"] = attention_mask[:, :, :, : key_states.shape[-2]] if attention_mask is not None else None
+            attention_kwargs["enable_gqa"] = True
+            seq_dim, head_dim = 2, 1
+        elif self.config.attn_layout == "BSND":
+            attention_kwargs["attention_mask"] = attention_mask[:, :, :, : key_states.shape[1]] if attention_mask is not None else None
+            attention_kwargs["enable_gqa"] = True
+        elif self.config.attn_layout == "TND":
+            attention_kwargs["actual_seq_qlen"] = kwargs["cu_seqlens"]
+            attention_kwargs["actual_seq_kvlen"] = kwargs["cu_seqlens"]
+
+            indices = kwargs["indices"]
+            # reshape: BSND -> TND, and upad_input
+            query_states = query_states.view(-1, *query_states.shape[2:])[indices]
+            key_states = key_states.view(-1, *key_states.shape[2:])[indices]
+            value_states = value_states.view(-1, *value_states.shape[2:])[indices]
+            
+            seq_dim, head_dim = 0, 1
+        else:
+            raise NotImplementedError(
+                f"Unsupported Attention layout: {self.config.attn_layout}, "
+                "Qwen3VLTextAttention only support ['BNSD', 'BSND', 'TND'] now.")
 
         if past_key_values is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
             key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
-        attention_interface: Callable = eager_attention_forward
-        if self.config._attn_implementation != "eager":
-            attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-
-        total_seq_len = get_seq_len("total")
         if mpu.get_context_parallel_world_size() > 1:
-            if mpu.get_context_parallel_world_size() > key_states.shape[1]:
+            total_seq_len = get_seq_len("total")
+            if mpu.get_context_parallel_world_size() > self.config.num_key_value_heads:
                 key_states = repeat_kv(key_states, self.num_key_value_groups)
                 value_states = repeat_kv(value_states, self.num_key_value_groups)
+                attention_kwargs["enable_gqa"] = False
 
             query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
                 query_states,
                 key_states,
                 value_states,
-                seq_dim=2,
-                head_dim=1,
+                seq_dim=seq_dim,
+                head_dim=head_dim,
                 gather_size=total_seq_len
             )
 
-        attn_output, attn_weights = attention_interface(
-            self,
+        attn_output = attention_interface(
             query_states,
             key_states,
             value_states,
-            attention_mask,
-            dropout=0.0 if not self.training else self.attention_dropout,
-            scaling=self.scaling,
-            **kwargs,
+            **attention_kwargs,
         )
 
-        attn_output = gather_heads_scatter_seq(
-            attn_output,
-            seq_dim=1,
-            head_dim=2,
-            gather_size=self.num_heads
-        )
 
-        attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+        if self.config.attn_layout == "TND":
+            # pad output
+            attn_output = pad_out(attn_output, indices, batch_size, seqlen)
+
+        if mpu.get_context_parallel_world_size() > 1:
+            attn_output = gather_heads_scatter_seq(
+                attn_output,
+                seq_dim=seq_dim,
+                head_dim=head_dim,
+                gather_size=self.num_heads
+            )
+
+        attn_output = attn_output.reshape(batch_size, seqlen, -1).contiguous()  # TND -> BSH
         attn_output = self.o_proj(attn_output)
-        return attn_output, attn_weights
+        return attn_output
 
 
 class Qwen3VLTextMLP(nn.Module):
