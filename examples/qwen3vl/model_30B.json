@@ -9,7 +9,8 @@
             "num_attention_heads": 16,
             "freeze": true,
             "attn_implementation": "flash_attention_2",
-            "attn_layout": "TND"
+            "attn_layout": "TND",
+            "synchronize_per_layer": true
         },
         "vision_projector": {
             "model_id": "lnmlp",
@@ -28,7 +29,8 @@
         "attn_implementation": "flash_attention_2",
         "attn_layout": "TND",
         "is_causal": false,
-        "activation_offload": false
+        "activation_offload": false,
+        "synchronize_per_layer": true
     },
     "loss_cfg": {
         "compute_mode": "default",

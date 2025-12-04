@@ -126,6 +126,12 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         llm_is_causal = getattr(model_cfg.text_decoder, "is_causal", False)
         setattr(transformer_config.text_config, "is_causal", llm_is_causal)
 
+        # set synchronize per layer, for memory reuse between streams when using FSDP2
+        vit_synchronize_per_layer = getattr(model_cfg.image_encoder.vision_encoder, "synchronize_per_layer", False)
+        llm_synchronize_per_layer = getattr(model_cfg.text_decoder, "synchronize_per_layer", False)
+        setattr(transformer_config.vision_config, "synchronize_per_layer", vit_synchronize_per_layer)
+        setattr(transformer_config.text_config, "synchronize_per_layer", llm_synchronize_per_layer)
+
         # set activation offload, only suppport offload text activations now
         llm_activation_offload = getattr(model_cfg.text_decoder, "activation_offload", False)
         setattr(transformer_config.text_config, "activation_offload", llm_activation_offload)

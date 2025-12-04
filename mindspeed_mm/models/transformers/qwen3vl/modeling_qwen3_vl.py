@@ -302,6 +302,9 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
 
         deepstack_feature_lists = []
         for layer_num, blk in enumerate(self.blocks):
+            if self.config.synchronize_per_layer:
+                torch.npu.synchronize()
+
             hidden_states = blk(
                 hidden_states,
                 cu_seqlens=cu_seqlens,
@@ -461,6 +464,9 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         
         # decoder layers
         for layer_idx, decoder_layer in enumerate(self.layers):
+            if self.config.synchronize_per_layer:
+                torch.npu.synchronize()
+
             if self.config.activation_offload:
                 with async_save_on_cpu(
                     h2d_stream=self.swap_stream,
