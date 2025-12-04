@@ -35,19 +35,12 @@ conda activate test
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_v0.12.1
-git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
-pip install -r requirements.txt
-pip3 install -e .
+git checkout 93c45456c7044bacddebc5072316c01006c938f9
+# 安装mindspeed及依赖
+pip install -e .
 cd ..
-# 安装其余依赖库
+# 安装mindspeed mm及依赖
 pip install -e .
-
-# 安装transformers指定版本
-git clone https://github.com/huggingface/transformers.git
-cd transformers
-git checkout fa56dcc2a
-pip install -e .
-
 ```
 
 ### 2. 权重下载及转换
@@ -261,7 +254,7 @@ conda activate test
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_v0.12.1
-git checkout 6aff65eba929b4f39848a5153ac455467d0b0f9e
+git checkout 93c45456c7044bacddebc5072316c01006c938f9
 pip install -r requirements.txt 
 pip install -e .
 cd ..
