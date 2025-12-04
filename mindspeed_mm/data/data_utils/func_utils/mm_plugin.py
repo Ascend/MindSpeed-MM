@@ -506,7 +506,7 @@ class Qwen2VLPlugin(BasePlugin):
                 video_maxlen=getattr(processor, "video_maxlen", 128),
             )
             video_processor = get_video_processor(processor, False)
-            mm_inputs.update(video_processor(images=None, videos=video_data["videos"], return_tensors="pt"))
+            mm_inputs.update(video_processor(videos=video_data["videos"], return_tensors="pt"))
             temporal_patch_size: int = getattr(image_processor, "temporal_patch_size", 2)
             if "second_per_grid_ts" in processor.model_input_names:
                 mm_inputs["second_per_grid_ts"] = [temporal_patch_size / fps for fps in video_data["fps_per_video"]]
@@ -846,7 +846,8 @@ class Qwen2OmniPlugin(Qwen2VLPlugin):
                 video_fps=getattr(processor, "video_fps", 2.0),
                 video_maxlen=getattr(processor, "video_maxlen", 128),
             )
-            mm_inputs.update(image_processor(images=None, videos=video_dict["videos"], return_tensors="pt"))
+            video_processor = get_video_processor(processor)
+            mm_inputs.update(video_processor(videos=video_dict["videos"], return_tensors="pt"))
             temporal_patch_size: int = getattr(image_processor, "temporal_patch_size", 2)
             mm_inputs["video_second_per_grid"] = torch.tensor(
                 [temporal_patch_size / fps for fps in video_dict["fps_per_video"]]
