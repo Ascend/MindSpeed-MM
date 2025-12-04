@@ -175,11 +175,11 @@ pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_v0.12.1
-git checkout 6aff65eba929b4f39848a5153ac455467d0b0f9e
-pip install -r requirements.txt
-pip3 install -e .
+git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
+# 安装mindspeed及依赖
+pip install -e .
 cd ..
-# 安装其余依赖库
+# 安装mindspeed mm及依赖
 pip install -e .
 ```
 ### 权重下载及转换
