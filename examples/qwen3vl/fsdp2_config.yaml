@@ -6,3 +6,7 @@ cast_forward_inputs: True
 num_to_forward_prefetch: 1
 num_to_backward_prefetch: 1
 offload_to_cpu: False
+
+# If True, each FSDP parameter group within a block contains only Linear layer parameters,
+# enabling aligned sharding for improved communication efficiency. Set to False to disable this optimization.
+align_fsdp_param_groups: True

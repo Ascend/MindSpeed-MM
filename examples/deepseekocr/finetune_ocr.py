@@ -1,6 +1,7 @@
 import argparse
 import math
 import itertools
+import time
 
 import torch
 import torch_npu
@@ -20,6 +21,7 @@ class OCRTrainer:
         self.validate_args()
         self.build_dataloader()
         self.build_model_and_optimizer()
+        self.total_tokens = 0
 
     def validate_args(self):
         dp_size = torch.distributed.get_world_size()
@@ -78,7 +80,7 @@ class OCRTrainer:
         fully_shard(self.model.lm_head, **fsdp_kwargs)
         fully_shard(self.model, **fsdp_kwargs)
 
-        if torch.distributed.get_rank == 0:
+        if torch.distributed.get_rank() == 0:
             print(self.model)
 
         self.optimizer = AdamW(self.model.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
@@ -88,11 +90,17 @@ class OCRTrainer:
         )
 
     def train_step(self):
+        total_loss = 0
+        self.optimizer.zero_grad()
+
+        batch_data = next(self.data_iter)
+        input_ids = batch_data.get('input_ids', None)
+        if input_ids is not None:
+            batch_tokens = input_ids.numel()
+            self.total_tokens += batch_tokens
+
         for _ in range(self.config.gradient_accumulation_steps):
-            total_loss = 0
-            self.optimizer.zero_grad()
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                batch_data = next(self.data_iter)
                 inputs = {k: v.to(torch.cuda.current_device()) for k, v in batch_data.items()}
                 outputs = self.model(**inputs)
                 loss = outputs.loss / self.config.gradient_accumulation_steps
@@ -103,6 +111,8 @@ class OCRTrainer:
     def train(self):
         self.model.train()
         iteration = 0
+
+        start_time = time.time()
 
         experimental_config = torch_npu.profiler._ExperimentalConfig(
             aic_metrics=torch_npu.profiler.AiCMetrics.PipeUtilization,
@@ -133,6 +143,14 @@ class OCRTrainer:
             self.scheduler.step()
 
             iteration += 1
+            elapsed_time = time.time() - start_time
+
+            if self.config.log_tps:
+                total_tokens_tensor = torch.tensor(self.total_tokens, device='cuda', dtype=torch.int32)
+                torch.distributed.all_reduce(total_tokens_tensor, op=torch.distributed.ReduceOp.SUM)
+                total_tokens = total_tokens_tensor.item()
+                tps = total_tokens / elapsed_time
+
             if self.config.profiling:
                 prof.step()
             log_string = "iteration {:8d}/{:8d}".format(iteration, self.config.train_iters)
@@ -141,6 +159,9 @@ class OCRTrainer:
             log_string += f" | loss: {loss:.6E}"
             if self.config.clip_grad > 0:
                 log_string += f" | grad norm: {gnorm.item():.6E}"
+            log_string += f" | elapsed time per iteration: {elapsed_time / iteration * 1000:.2f}"
+            if self.config.tps:
+                log_string += f" | tokens per sample: {tps}"
             if torch.distributed.get_rank() == 0:
                 print(log_string)
         if self.config.profiling:
@@ -305,6 +326,13 @@ def get_parser():
         action='store_true',
         default=False,
         help="Whether or not to start profiling"
+    )
+
+    parser.add_argument(
+        '--log_tps',
+        action='store_true',
+        default=False,
+        help="Whether or not to print tps"
     )
     return parser
 

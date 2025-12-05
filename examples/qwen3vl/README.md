@@ -104,7 +104,9 @@ mm-convert Qwen3VLConverter hf_to_dcp \
   --hf_dir Qwen3-VL-xxB \
   --dcp_dir Qwen3-VL-xxB-dcp \
 ```
-并在examples/qwen3vl/finetune_qwen3vl.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数
+并在examples/qwen3vl/finetune_qwen3vl.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数。
+
+注意，针对Qwen3VL-30B和Qwen3VL-235B模型，必须使用meta init初始化加载权重。
 
 ---
 <a id="jump3"></a>

@@ -5,6 +5,7 @@ from typing import Optional, Union
 import torch
 import torch_npu
 import torch.nn as nn
+from torch.distributed.tensor import DTensor
 
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache
@@ -27,7 +28,8 @@ from .modules import (
     Qwen3VLTextRMSNorm,
     Qwen3VLTextMLP,
     Qwen3VLTextRotaryEmbedding,
-    Qwen3VLLMHead
+    Qwen3VLLMHead,
+    Qwen3VLEmptyModule
 )
 
 from .modeling_qwen3_vl import (
@@ -38,27 +40,6 @@ from .modeling_qwen3_vl import (
 )
 
 
-def npu_fused_moe(
-    hidden_states: torch.Tensor, 
-    routing_weights: torch.Tensor, 
-    router_indices: torch.Tensor,
-    gate_up_proj: torch.Tensor,
-    down_proj: torch.Tensor,
-    hidden_size: int,
-    num_experts: int
-):
-    batch_size = hidden_states.shape[0]
-    hidden_states = hidden_states.reshape(-1, hidden_size)  # (num_tokens, hidden_size)
-    permuted_hidden_states, row_ids_map = torch_npu.npu_moe_token_permute(hidden_states, router_indices.to(torch.int32))
-    tokens_per_expert = torch.histc(router_indices, bins=num_experts, min=0, max=num_experts)
-    intermediate_hidden_states = npu_group_gemm(permuted_hidden_states, gate_up_proj, tokens_per_expert)
-    intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
-    output = npu_group_gemm(intermediate_activations, down_proj, tokens_per_expert)
-    next_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=routing_weights)
-    next_states = next_states.view(batch_size, -1, hidden_size)
-    return next_states
-
-
 class Qwen3VLMoeTextExperts(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -66,12 +47,20 @@ class Qwen3VLMoeTextExperts(nn.Module):
         self.intermediate_size = config.moe_intermediate_size
         self.hidden_size = config.hidden_size
         self.expert_dim = self.intermediate_size
-        self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts, self.hidden_size, 2 * self.expert_dim))
-        self.down_proj = nn.Parameter(torch.empty((self.num_experts, self.expert_dim, self.hidden_size)))
+        self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts * self.hidden_size, 2 * self.expert_dim))
+        self.down_proj = nn.Parameter(torch.empty((self.num_experts * self.expert_dim, self.hidden_size)))
         self.act_fn = ACT2FN[config.hidden_act]
+        
+    def _view_experts_weight(self):
+        gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
+        gate_up_proj = gate_up_proj.view(self.num_experts, self.hidden_size, -1)
+        
+        down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
+        down_proj = down_proj.view(self.num_experts, self.expert_dim, -1)
+        return gate_up_proj, down_proj
 
     def forward(
-        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor, use_npu_fused_moe: bool = True
+        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor
     ) -> torch.Tensor:
         """
         When training it is more efficient to just loop over the experts and compute the output for each expert
@@ -86,16 +75,7 @@ class Qwen3VLMoeTextExperts(nn.Module):
         Returns:
             torch.Tensor
         """
-        if use_npu_fused_moe:
-            return npu_fused_moe(
-                hidden_states=hidden_states,
-                routing_weights=routing_weights,
-                router_indices=router_indices,
-                gate_up_proj=self.gate_up_proj,
-                down_proj=self.down_proj,
-                hidden_size=self.hidden_size,
-                num_experts=self.num_experts
-            )
+        gate_up_proj, down_proj = self._view_experts_weight()
             
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
@@ -111,24 +91,43 @@ class Qwen3VLMoeTextExperts(nn.Module):
                 with torch.no_grad():
                     _, token_idx = torch.where(expert_mask[expert_idx[0]])
                 current_state = hidden_states[token_idx]
-                gate_up = current_state @ self.gate_up_proj[expert_idx]
+                gate_up = current_state @ gate_up_proj[expert_idx]
                 gate, up = gate_up.chunk(2, dim=-1)
                 gated_output = up * self.act_fn(gate)
-                out = gated_output @ self.down_proj[expert_idx]
+                out = gated_output @ down_proj[expert_idx]
                 weighted_output = out[0] * routing_weights[token_idx, expert_idx, None]
                 next_states.index_add_(0, token_idx, weighted_output.to(hidden_states.dtype))
             next_states = next_states.view(batch_size, -1, self.hidden_size)
         else:
             hidden_states = hidden_states.repeat(self.num_experts, 1)
             hidden_states = hidden_states.view(self.num_experts, -1, self.hidden_size)
-            gate_up = torch.bmm(hidden_states, self.gate_up_proj)
+            gate_up = torch.bmm(hidden_states, gate_up_proj)
             gate, up = gate_up.chunk(2, dim=-1)  # not supported for DTensors
-            next_states = torch.bmm((up * self.act_fn(gate)), self.down_proj)
+            next_states = torch.bmm((up * self.act_fn(gate)), down_proj)
             next_states = next_states.reshape(self.num_experts, batch_size, -1, self.hidden_size)
             next_states = (
                 next_states * routing_weights.transpose(0, 1).view(self.num_experts, batch_size, -1)[..., None]
             )
             next_states = next_states.sum(dim=0)
+        return next_states
+    
+    
+class Qwen3VLNpuFusedMoETextExperts(Qwen3VLMoeTextExperts):
+    """NPU fusd Moe"""
+    def forward(
+        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor
+    ) -> torch.Tensor:
+        gate_up_proj, down_proj = self._view_experts_weight()
+        
+        batch_size = hidden_states.shape[0]
+        hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
+        permuted_hidden_states, row_ids_map = torch_npu.npu_moe_token_permute(hidden_states, router_indices.to(torch.int32))
+        tokens_per_expert = torch.histc(router_indices, bins=self.num_experts, min=0, max=self.num_experts)
+        intermediate_hidden_states = npu_group_gemm(permuted_hidden_states, gate_up_proj, tokens_per_expert)
+        intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
+        output = npu_group_gemm(intermediate_activations, down_proj, tokens_per_expert)
+        next_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=routing_weights)
+        next_states = next_states.view(batch_size, -1, self.hidden_size)
         return next_states
 
 
@@ -139,9 +138,12 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.gate = nn.Linear(config.hidden_size, config.num_experts, bias=False)
-        self.experts = Qwen3VLMoeTextExperts(config)
         
-        self.use_npu_fued_moe = getattr(get_args().mm.model.text_decoder, "use_npu_fused_moe", True)
+        self.use_npu_fused_moe = getattr(get_args().mm.model.text_decoder, "use_npu_fused_moe", True)
+        if self.use_npu_fused_moe:
+            self.experts = Qwen3VLNpuFusedMoETextExperts(config)
+        else:
+            self.experts = Qwen3VLMoeTextExperts(config)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         batch_size = hidden_states.shape[0]
@@ -153,11 +155,11 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         routing_weights = routing_weights.to(hidden_states.dtype)
         hidden_states = hidden_states.reshape(batch_size, -1, self.hidden_size)
         
-        if self.use_npu_fued_moe:
+        if self.use_npu_fused_moe:
             routed_out = self.experts(hidden_states, routing_weights, router_indices)
         else:
             router_weights = torch.zeros_like(router_logits).scatter_(1, router_indices, routing_weights)
-            routed_out = self.experts(hidden_states, router_weights, router_indices, use_npu_fused_moe=False)
+            routed_out = self.experts(hidden_states, router_weights, router_indices)
         return routed_out
 
 
@@ -255,6 +257,9 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel, Qwen3VLTextModel):
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        
+        # Placeholder for FSDP2 hook registration on norm/gate params when align_fsdp_param_groups is enabled.
+        self.norm_hook_module = Qwen3VLEmptyModule()
         
         self.layers = nn.ModuleList(
             [Qwen3VLMoeTextDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]

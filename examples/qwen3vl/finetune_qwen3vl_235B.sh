@@ -5,7 +5,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export CUDA_DEVICE_MAX_CONNECTIONS=2 # 开启FSDP2时，不能置为1
 export ASCEND_SLOG_PRINT_TO_STDOUT=0
 export ASCEND_GLOBAL_LOG_LEVEL=3
-export TASK_QUEUE_ENABLE=2
+export TASK_QUEUE_ENABLE=1
 export COMBINED_ENABLE=1
 export CPU_AFFINITY_CONF=1
 export HCCL_CONNECT_TIMEOUT=1200
@@ -14,6 +14,7 @@ export ASCEND_LAUNCH_BLOCKING=0
 export ACLNN_CACHE_LIMIT=100000
 export TOKENIZERS_PARALLELISM=false
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+export MULTI_STREAM_MEMORY_REUSE=2
 
 NPUS_PER_NODE=16
 MASTER_ADDR=localhost
@@ -34,7 +35,7 @@ PP=1
 CP=1
 MBS=1
 GRAD_ACC_STEP=1
-SEQ_LEN=1024
+SEQ_LEN=16384
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
@@ -89,6 +90,7 @@ GPT_ARGS="
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
     --calculate-per-token-loss \
+    --init-model-with-meta-device \
     --log-tps
 "
 
