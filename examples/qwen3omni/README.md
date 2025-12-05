@@ -11,8 +11,9 @@
 - [环境安装](#jump1)
   - [环境准备](#jump1.1)
   - [环境搭建](#jump1.2)
-- [权重下载](#jump2)
+- [权重下载及转换](#jump2)
   - [权重下载](#jump2.1)
+  - [权重转换](#jump2.2)
 - [数据集准备及处理](#jump3)
   - [数据集下载](#jump3.1)
   - [混合数据集处理](#jump3.2)
@@ -87,7 +88,7 @@ pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
 <a id="jump2"></a>
 
-## 权重下载
+## 权重下载及转换
 
 <a id="jump2.1"></a>
 
@@ -98,6 +99,33 @@ pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 - 模型地址: [Qwen3-Omni-30B-A3B-Instruct](https://huggingface.co/collections/Qwen/qwen3-omni)；
 
 将下载的模型权重保存到本地的`ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct`目录下。
+
+#### 特别说明
+
+权重下载后，需修改权重路径下的`ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct/config.json`代码文件，将`enable_audio_output`的true修改为false
+
+<a id="jump2.2"></a>
+
+#### 2. 权重转换
+
+当前用多卡微调时，会遇到梯度通信问题，MindSpeed-MM修改了transformers中MOE实现方式，需对原始预训练权重进行转换：
+
+```shell
+mm-convert ExpertMergeDcpConverter hf_to_dcp \
+  --hf_dir "ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct" \
+  --save_dir "ckpt/convert_path/Qwen3-Omni-30B-A3B-Instruct"
+```
+并在examples/qwen3omni/finetune_qwen3omni.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数。
+
+训练完成之后，支持将保存在`SAVE_PATH`目录下的权重转换成huggingface格式：
+```shell
+mm-convert ExpertMergeDcpConverter dcp_to_hf \
+  --hf_dir "ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct" \
+  --dcp_dir "save_dir/iter_000xx" \
+  --save_dir "ckpt/dcp_to_hf/Qwen3-Omni-30B-A3B-Instruct"
+```
+
+其中，`--hf_dir`表示原始huggingface权重的路径，`--dcp_dir`表示微调后的权重保存路径，路径中的`iter_000xx`表示保存的第xx步权重，`--save_dir`表示转换后的huggingface格式权重保存路径。
 
  ---
 <a id="jump3"></a>
@@ -131,7 +159,7 @@ dataset_param->basic_parameters->dataset
 同时注意`data.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
 
 <a id="jump3.2"></a>
-#### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
+#### 2.混合数据集处理(以LLaVA-Instruct-150K为例)
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
 
@@ -234,8 +262,8 @@ dataset_param->basic_parameters->dataset
 
 ```shell
 ...
-# 断点续训权重加载路径
-LOAD_PATH="./ckpt/save_dir/Qwen3-Omni-30B-A3B-Instruct"
+# 权重加载路径：转换后的权重
+LOAD_PATH="./ckpt/convert_path/Qwen3-Omni-30B-A3B-Instruct"
 # 保存路径
 SAVE_PATH="save_dir"
 ...
@@ -313,6 +341,7 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
 ```
 
 ---
+
 <a id="jump10"></a>
 ## 环境变量声明
 
@@ -334,7 +363,8 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
 ---
+
 <a id="jump11"></a>
+
 ## 注意事项
-‼️当前用多卡微调时，会遇到梯度通信问题，需要在transformers中对MOE实现方式改写，让所有专家参与前向运算，进行规避，规避方法如下：
-在`examples/qwen3omni/model.json`中的`moe_full`参数，此参数若为true，则使用改写后的Qwen3OmniMoeThinkerTextSparseMoeBlock类；若为false，则使用transformers中的原始实现
+‼️当前用多卡微调时，会遇到梯度通信问题，需要在transformers中对MOE实现方式改写，需要转换权重的改写方式可以有更好的性能，其他改写方式（比如，让所有专家参与前向运算）的性能较差

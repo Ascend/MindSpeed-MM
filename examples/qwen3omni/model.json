@@ -33,7 +33,6 @@
         "freeze": false
     },
     "patch": {
-        "hetero_parallel_cp": false,
-        "moe_full": true
+        "hetero_parallel_cp": false
     }
 }

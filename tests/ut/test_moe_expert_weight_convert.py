@@ -1,6 +1,7 @@
 import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+from enum import Enum
 
 import pytest
 import torch
@@ -12,6 +13,11 @@ from checkpoint.vlm_model.converters.moe_expert import (
     save_sharded_state_dict,
     moe_expert
 )
+
+
+class ConfigType(Enum):
+    DEFAULT = 0
+    QWEN3_OMNI = 1
 
 
 @pytest.fixture
@@ -33,11 +39,13 @@ def test_merge_moe_expert_weights():
         "layer.0.experts.1.up_proj.weight": torch.randn(2, 3),
         "layer.0.experts.1.down_proj.weight": torch.randn(2, 3),
     }
+    expert_start_layer = 0
     num_hidden_layers = 1
     num_experts = 2
     weight_path = "layer.{layer}.experts.{expert}"
+    config_type = ConfigType.DEFAULT
 
-    merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, weight_path)
+    merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path)
 
     # Check merged weights
     assert "layer.0.experts.0.gate_proj.weight" not in state_dict
@@ -53,21 +61,23 @@ def test_merge_moe_expert_weights():
     merged_gate_up_proj = state_dict.get("layer.0.experts.gate_up_proj")
     merged_down_proj = state_dict.get("layer.0.experts.down_proj")
 
-    assert merged_gate_up_proj.shape == (2, 3, 4)
-    assert merged_down_proj.shape == (2, 3, 2)
+    assert merged_gate_up_proj.shape == (6, 4)
+    assert merged_down_proj.shape == (6, 2)
 
 
 def test_split_moe_expert_weights():
     # Create test state_dict
     state_dict = {
-        "layer.0.experts.gate_up_proj": torch.randn(2, 3, 4),
-        "layer.0.experts.down_proj": torch.randn(2, 3, 2),
+        "layer.0.experts.gate_up_proj": torch.randn(6, 4),
+        "layer.0.experts.down_proj": torch.randn(6, 2),
     }
+    expert_start_layer = 0
     num_hidden_layers = 1
     num_experts = 2
     weight_path = "layer.{layer}.experts.{expert}"
+    config_type = ConfigType.DEFAULT
 
-    split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, weight_path)
+    split_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path)
     assert "layer.0.experts.gate_up_proj" not in state_dict
     assert "layer.0.experts.down_proj" not in state_dict
 
