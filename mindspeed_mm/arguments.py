@@ -41,6 +41,7 @@ def process_args(parser):
     parser = _add_network_args(parser)
     parser = _add_data_balance_args(parser)
     parser = _add_auto_settings_args(parser)
+    parser = _add_optim_arguments(parser)
     return parser
 
 
@@ -239,5 +240,32 @@ def _add_data_balance_args(parser):
     group.add_argument("--data_balance_sorting_algo", type=str, default="post_global_balancing_greedy_without_pad",
                        help="data balance sorting algorithm:"
                             "post_global_balancing_greedy_without_pad: a greedy post global balancing algorithm without padding")
+
+    return parser
+
+
+def _add_optim_arguments(parser):
+    group = parser.add_argument_group(title='optimization_filter')
+
+    group.add_argument(
+        '--weight-decay-exclude-modules',
+        nargs='+',
+        type=str,
+        default=[],
+        help='Keywords in parameter names to exclude from weight decay. Empty list disables this feature.'
+    )
+    group.add_argument(
+        '--lr-scale-modules',
+        nargs='+',
+        type=str,
+        default=[],
+        help='Keywords in parameter names to apply learning rate scaling. Empty list disables this feature.'
+    )
+    group.add_argument(
+        '--lr-mult',
+        type=float,
+        default=1.0,
+        help='Learning rate multiplier for parameters matching scale-lr-keywords. '
+    )
 
     return parser

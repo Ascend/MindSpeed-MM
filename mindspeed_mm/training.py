@@ -219,9 +219,9 @@ def pretrain(
 
     # Model, optimizer, and learning rate.
     timers("model-and-optimizer-setup", log_level=0).start(barrier=True)
+    lr_mult = args.lr_mult
     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
-        model_provider, model_type
-)
+        model_provider, model_type, no_wd_decay_cond=no_wd_decay_cond, scale_lr_cond=scale_lr_cond, lr_mult=lr_mult)
 
     if getattr(args, "auto_parallel_profile", False):
         from mindspeed.core.auto_parallel.mm_search.memory_modeling import count_module_param
@@ -1075,3 +1075,45 @@ def judge_forward_pre_hook(args, model, optimizer):
     if optimizer:
         return False
     return True
+
+
+def no_wd_decay_cond(name: str, param) -> bool:
+    """
+    Condition function to determine if a parameter should be excluded from weight decay.
+
+    Args:
+        name: str - Parameter name string (e.g., model layer parameter name)
+        param - Model parameter object
+
+    Returns:
+        bool - True means the parameter should be excluded from weight decay; False means weight decay is applied normally
+    """
+    args = get_args()
+    no_wd_module_keywords = args.weight_decay_exclude_modules
+
+    if not no_wd_module_keywords:
+        return False
+
+    # Case-insensitive matching: check if parameter name contains any exclusion keyword
+    return any(keyword.lower() in name.lower() for keyword in no_wd_module_keywords)
+
+
+def scale_lr_cond(name: str, param) -> bool:
+    """
+    Condition function to determine if a parameter should apply learning rate scaling (with --lr-mult).
+
+    Args:
+        name: str - Parameter name string (e.g., model layer parameter name)
+        param - Model parameter object (not directly used here but retained for filter function interface compatibility)
+
+    Returns:
+        bool - True means the parameter should apply learning rate scaling; False means use the default learning rate
+    """
+    args = get_args()
+    scale_lr_module_keywords = args.lr_scale_modules
+
+    if not scale_lr_module_keywords:
+        return False
+
+    # Case-insensitive matching: check if parameter name contains any scaling keyword
+    return any(keyword.lower() in name.lower() for keyword in scale_lr_module_keywords)

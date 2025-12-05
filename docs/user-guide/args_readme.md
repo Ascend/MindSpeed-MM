@@ -28,6 +28,10 @@
 
 --lr-warmup-fraction: 0~1之间浮点数，用于学习率“预热”阶段占总步长的比例。
 
+--weight-decay-exclude-modules: 参数级的权重衰减排除，通过配置参数名关键词（可多个）排除特定参数的权重衰减。 [详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/parameter_lr_wd_tuning.md)
+
+--lr-scale-modules：参数级学习率缩放，通过配置参数名关键词（可多个）来对特定参数的学习率进行缩放。 [详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/parameter_lr_wd_tuning.md)
+
 --clip-grad: 浮点数，默认为1，非0时启用该功能。在优化器中对权重做限制，防止loss波动过大。
 
 --seed: 整型，随机种子。
@@ -40,7 +44,7 @@
 
 --calculate-per-sample-loss：按样本粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 
---calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+--calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](  https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 
 --ckpt-format torch_dcp: 保存时使用dcp格式。(详细介绍)[https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md]
 
