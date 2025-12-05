@@ -291,6 +291,7 @@ class Qwen3VLVisionAttention(nn.Module):
 class Qwen3VLVisionBlock(nn.Module):
     def __init__(self, config, attn_implementation: str = "sdpa") -> None:
         super().__init__()
+        self.config = config
         self.norm1 = nn.LayerNorm(config.hidden_size, eps=1e-6)
         self.norm2 = nn.LayerNorm(config.hidden_size, eps=1e-6)
         self.attn = Qwen3VLVisionAttention(config=config)
@@ -304,6 +305,9 @@ class Qwen3VLVisionBlock(nn.Module):
         position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,
         **kwargs,
     ) -> torch.Tensor:
+        if self.config.synchronize_per_layer:
+            torch.npu.synchronize()
+
         hidden_states = hidden_states + self.attn(
             self.norm1(hidden_states),
             cu_seqlens=cu_seqlens,

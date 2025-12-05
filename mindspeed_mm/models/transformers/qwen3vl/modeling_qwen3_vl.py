@@ -49,6 +49,7 @@ from .modules import (
 class Qwen3VLTextDecoderLayer(nn.Module):
     def __init__(self, config: Qwen3VLTextConfig, layer_idx: int):
         super().__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
 
         self.self_attn = Qwen3VLTextAttention(config=config, layer_idx=layer_idx)
@@ -68,6 +69,9 @@ class Qwen3VLTextDecoderLayer(nn.Module):
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> torch.Tensor:
+        if self.config.synchronize_per_layer:
+            torch.npu.synchronize()
+
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         # Self Attention
@@ -302,9 +306,6 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
 
         deepstack_feature_lists = []
         for layer_num, blk in enumerate(self.blocks):
-            if self.config.synchronize_per_layer:
-                torch.npu.synchronize()
-
             hidden_states = blk(
                 hidden_states,
                 cu_seqlens=cu_seqlens,
@@ -464,9 +465,6 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         
         # decoder layers
         for layer_idx, decoder_layer in enumerate(self.layers):
-            if self.config.synchronize_per_layer:
-                torch.npu.synchronize()
-
             if self.config.activation_offload:
                 with async_save_on_cpu(
                     h2d_stream=self.swap_stream,

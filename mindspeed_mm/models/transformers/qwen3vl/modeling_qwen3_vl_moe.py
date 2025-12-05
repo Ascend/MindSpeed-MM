@@ -166,6 +166,7 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
 class Qwen3VLMoeTextDecoderLayer(nn.Module):
     def __init__(self, config: Qwen3VLMoeTextConfig, layer_idx: int):
         super().__init__()
+        self.config = config
         self.self_attn = Qwen3VLTextAttention(config, layer_idx)
         if (layer_idx not in config.mlp_only_layers) and (
             config.num_experts > 0 and (layer_idx + 1) % config.decoder_sparse_step == 0
@@ -188,6 +189,9 @@ class Qwen3VLMoeTextDecoderLayer(nn.Module):
         position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
         **kwargs: Unpack[TransformersKwargs],
     ) -> torch.Tensor:
+        if self.config.synchronize_per_layer:
+            torch.npu.synchronize()
+
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         # Self Attention

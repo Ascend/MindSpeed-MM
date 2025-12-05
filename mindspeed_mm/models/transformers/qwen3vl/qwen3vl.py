@@ -117,7 +117,7 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         transformer_config.text_config._attn_implementation = llm_attn_implementation
         # set attn layout configuration
         vit_attn_layout = getattr(model_cfg.image_encoder.vision_encoder, "attn_layout", "TND")
-        llm_attn_layout = getattr(model_cfg.text_decoder, "attn_layout", "BNSD")
+        llm_attn_layout = getattr(model_cfg.text_decoder, "attn_layout", "TND")
         verify_attn_layout(vit_attn_implementation, vit_attn_layout)
         verify_attn_layout(llm_attn_implementation, llm_attn_layout)
         setattr(transformer_config.vision_config, "attn_layout", vit_attn_layout)
