@@ -245,15 +245,17 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 7. 如需使用确定性计算，在[安装插件](#jump1.3)步骤中需添加`export DETERMINISTIC=True`：
     
-```bash
-# 添加：
-export DETERMINISTIC=True 
-# 添加后在进行如下操作：
-export MODEL_SELECT="Qwen2_5vl"
-# path_to_verl替换为verl源码路径 例如：/home/code/verl
-export VERL_PATH=path_to_verl
-pip install -v -e .
-```
+    ```bash
+    # 添加：
+    export DETERMINISTIC=True 
+    # 添加后在进行如下操作：
+    export MODEL_SELECT="Qwen2_5vl"
+    # path_to_verl替换为verl源码路径 例如：/home/code/verl
+    export VERL_PATH=path_to_verl
+    pip install -v -e .
+    ```
+
+    后续可通过在verl/workers/fsdp_workers.py文件中114行附近注释掉`seed_all()`来关闭确定性计算
 
 8. 启动ray, 若多机运行，需主节点到副节点依次运行此脚本：
 
