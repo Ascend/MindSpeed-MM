@@ -4,10 +4,7 @@ from megatron.core import mpu
 
 from mindspeed_mm.models.common.checkpoint import load_checkpoint
 from .dits import (
-    VideoDiT, 
     Latte, 
-    STDiT, 
-    STDiT3, 
     VideoDitSparse, 
     SatDiT, 
     VideoDitSparseI2V, 
@@ -22,12 +19,9 @@ from .dits import (
 
 
 PREDICTOR_MODEL_MAPPINGS = {
-    "videodit": VideoDiT,
     "videoditsparse": VideoDitSparse,
     "videoditsparsei2v": VideoDitSparseI2V,
     "latte": Latte,
-    "stdit": STDiT,
-    "stdit3": STDiT3,
     "satdit": SatDiT,
     "ptdit": PTDiT,
     "hunyuanvideodit": HunyuanVideoDiT,

@@ -17,7 +17,6 @@ import torch.nn as nn
 
 from mindspeed_mm.utils.extra_processor.i2v_processors import I2VProcessor
 from mindspeed_mm.models.ae.diffusers_ae_model import DiffusersAEModel
-from mindspeed_mm.models.ae.vae import VideoAutoencoderKL, VideoAutoencoder3D
 from mindspeed_mm.models.ae.casualvae import CausalVAE
 from mindspeed_mm.models.ae.wfvae import WFVAE
 from mindspeed_mm.models.ae.contextparallel_causalvae import ContextParallelCasualVAE
@@ -29,8 +28,6 @@ from mindspeed_mm.models.ae.flux_vae import FluxVae
 
 
 AE_MODEL_MAPPINGS = {
-    "vae": VideoAutoencoderKL,
-    "vae3D": VideoAutoencoder3D,
     "casualvae": CausalVAE,
     "wfvae": WFVAE,
     "contextparallelcasualvae": ContextParallelCasualVAE,
