@@ -35,7 +35,7 @@ MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础
 | MindSpore        | [2.7.2](https://www.mindspore.cn/install/)         |
 | Python           | >=3.9                                                        |                                          |
 |transformers     |      [v4.53.0](https://github.com/huggingface/transformers/tree/v4.53.0)    |    |
-|mindspore_op_plugin | [master](https://gitee.com/mindspore/mindspore_op_plugin) |
+|mindspore_op_plugin | [在研版本](https://gitee.com/mindspore/mindspore_op_plugin) |
 
 <a id="jump1.1"></a>
 ### 1. 仓库拉取及环境搭建
@@ -74,6 +74,9 @@ mkdir ckpt
 mkdir data
 mkdir logs
 ```
+
+> 注：[mindspore_op_plugin](https://gitee.com/mindspore/mindspore_op_plugin) 是 MindSpore 的算子插件库，通过直接调用 libtorch 中的 ATen 算子，快速补齐 CPU/GPU 算子功能。目前为 **实验特性**，仅在该模型 **受限使用**
+
 ---
 <a id="jump2"></a>
 ## 权重下载及转换

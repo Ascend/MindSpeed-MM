@@ -2,12 +2,10 @@
 
 - [Wan2.1 使用指南](#wan21-使用指南)
   - [版本说明](#版本说明)
-    - [参考实现](#参考实现)
-    - [变更记录](#变更记录)
+      - [参考实现](#参考实现)
   - [任务支持列表](#任务支持列表)
   - [环境安装](#环境安装)
-    - [仓库拉取](#仓库拉取)
-    - [环境搭建](#环境搭建)
+    - [仓库拉取及环境搭建](#仓库拉取及环境搭建)
     - [Decord搭建](#decord搭建)
   - [权重下载及转换](#权重下载及转换)
     - [Diffusers权重下载](#diffusers权重下载)
@@ -15,12 +13,11 @@
   - [预训练](#预训练)
     - [数据预处理](#数据预处理)
     - [训练](#训练)
-      - [准备工作](#准备工作-1)
-      - [参数配置](#参数配置-1)
-      - [启动训练](#启动训练)
+      - [准备工作](#准备工作)
+      - [参数配置](#参数配置)
   - [lora 微调](#lora-微调)
-    - [准备工作](#准备工作-2)
-    - [参数配置](#参数配置-2)
+    - [准备工作](#准备工作-1)
+    - [参数配置](#参数配置-1)
     - [启动微调](#启动微调)
   - [环境变量声明](#环境变量声明)
 
@@ -29,7 +26,7 @@
 #### 参考实现
 
 T2V I2V LoRA微调任务
-
+ 
 ```
 url=https://github.com/modelscope/DiffSynth-Studio.git
 commit_id=03ea278
@@ -52,10 +49,11 @@ MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础
 | 昇腾NPU驱动固件  | [在研版本](https://www.hiascend.com/hardware/firmware-drivers/community?product=1&model=30&cann=8.0.RC3.alpha002&driver=1.0.26.alpha) |
 | 昇腾 CANN        | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann) |
 | MindSpore        | [2.7.0](https://www.mindspore.cn/install/)         |
-| Python           | >=3.9                                                        |                                          |
+| Python           | >=3.9                                                        |
+|mindspore_op_plugin | [在研版本](https://gitee.com/mindspore/mindspore_op_plugin) |
 
 <a id="jump1.1"></a>
-### 1. 仓库拉取及环境搭建
+### 仓库拉取及环境搭建
 
 针对MindSpeed MindSpore后端，昇腾社区提供了一键拉起工具MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在华为MindSpore+CANN环境下一键拉起模型训练。在进行一键拉起前，用户需要拉取相关的代码仓以及进行环境搭建：
 
@@ -92,6 +90,8 @@ mkdir ckpt
 mkdir data
 mkdir logs
 ```
+
+> 注：[mindspore_op_plugin](https://gitee.com/mindspore/mindspore_op_plugin) 是 MindSpore 的算子插件库，通过直接调用 libtorch 中的 ATen 算子，快速补齐 CPU/GPU 算子功能。目前为 **实验特性**，仅在该模型 **受限使用**
 
 > 注：op_plugin使用教程请参考[op_plugin CPU 算子开发指南](https://gitee.com/mindspore/mindspore_op_plugin/wikis/op_plugin%20CPU%E7%AE%97%E5%AD%90%E5%BC%80%E5%8F%91%E6%8C%87%E5%8D%97)
 
