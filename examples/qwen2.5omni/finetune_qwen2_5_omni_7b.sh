@@ -6,7 +6,7 @@ export ASCEND_SLOG_PRINT_TO_STDOUT=0
 export ASCEND_GLOBAL_LOG_LEVEL=3
 export TASK_QUEUE_ENABLE=2
 export COMBINED_ENABLE=1
-export CPU_AFFINITY_CONF=1
+export CPU_AFFINITY_CONF=2
 export HCCL_CONNECT_TIMEOUT=1200
 export NPU_ASD_ENABLE=0
 export ASCEND_LAUNCH_BLOCKING=0
@@ -77,7 +77,7 @@ GPT_ARGS="
     --no-load-rng \
     --no-save-optim \
     --no-save-rng \
-    --num-workers 8 \
+    --num-workers 2 \
     --distributed-timeout-minutes 600 \
     --use-flash-attn \
 "
