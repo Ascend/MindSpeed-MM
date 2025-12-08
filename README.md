@@ -709,45 +709,15 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td rowspan="23"> 多模态理解 </td>
-      <tr>
-      <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen3vl">Qwen3-VL</a></td>
-      <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 8B </a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td> 1.45 (SPS)</td>
-      <td> 1.38 (SPS)</td>
-      <td> / </td>
-      <td>【Test】</td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 30B </a></td>
-      <td> 微调 </td>
-      <td> 1x8 (A3) </td>
-      <td> BF16 </td>
-      <td> 4.74 (SPS) </td>
-      <td> / </td>
-      <td> / </td>
-      <td>【Test】</td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 235B </a></td>
-      <td> 微调 </td>
-      <td> 16x8 (A3) </td>
-      <td> BF16 </td>
-      <td> 289.9 (TPS) </td>
-      <td> / </td>
-      <td> / </td>
-      <td>【Test】</td>
     </tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/glm4.1v">GLM-4.1V</a></td>
       <td><a href="https://github.com/THUDM/GLM-4.1V-Thinking">9B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 12.16(SPS) </td>
-      <td> 10.28(SPS) </td>
-      <td> / </td>
+      <td> 1074.64(TPS) </td>
+      <td> 908.49(TPS) </td>
+      <td> 707 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -756,9 +726,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 全参微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 48.27 (SPS) </td>
-      <td> 49.94 (SPS) </td>
-      <td> / </td>
+      <td> 3632.31 (TPS) </td>
+      <td> 3757.98 (TPS) </td>
+      <td> 602 </td>
       <td>【Test】</td>
     </tr>
    <tr>
@@ -767,9 +737,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 33.77 (SPS) </td>
-      <td> 22.46 (SPS) </td>
-      <td> / </td>
+      <td> 7653.12 (TPS) </td>
+      <td> 5089.99 (TPS) </td>
+      <td> 1813 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -777,9 +747,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 12.86 (SPS) </td>
-      <td> 11.00 (SPS) </td>
-      <td> / </td>
+      <td> 2914.39 (TPS) </td>
+      <td> 2492.87 (TPS) </td>
+      <td> 1813 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -787,9 +757,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 3.31 (SPS) </td>
-      <td> 3.26 (SPS) </td>
-      <td> / </td>
+      <td> 750.12 (TPS) </td>
+      <td> 738.79 (TPS) </td>
+      <td> 1813 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -799,7 +769,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> BF16 </td>
       <td> 214 (TPS) </td>
       <td> 191 (TPS) </td>
-      <td> / </td>
+      <td> 1813 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -819,9 +789,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 7.07 (SPS) </td>
-      <td> 6.67 (SPS) </td>
-      <td> / </td>
+      <td> 1707.40 (TPS) </td>
+      <td> 1610.80 (TPS) </td>
+      <td> 1932 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -829,9 +799,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 4x8 (A3) </td>
       <td> BF16 </td>
-      <td> 3.79 (SPS) </td>
-      <td> 4.69 (SPS) </td>
-      <td> / </td>
+      <td> 228.82 (TPS) </td>
+      <td> 283.15 (TPS) </td>
+      <td> 1932 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -840,9 +810,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 (A3)  </td>
       <td> BF16 </td>
-      <td> 2.1 (SPS) </td>
-      <td> 1.9 (SPS) </td>
-      <td> / </td>
+      <td> 422.1 (TPS) </td>
+      <td> 381.9 (TPS) </td>
+      <td> 201 </td>
       <td>【Test】</td>
     </tr>
     <tr>
@@ -851,9 +821,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 34.15 (SPS) </td>
-      <td> 34.88 (SPS) </td>
-      <td> 563 </td>
+      <td> 2941.17 (TPS) </td>
+      <td> 3004.04 (TPS) </td>
+      <td> 689 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -861,9 +831,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 13.28 (SPS) </td>
-      <td> 11.66 (SPS) </td>
-      <td> 563 </td>
+      <td> 1143.74 (TPS) </td>
+      <td> 1004.22 (TPS) </td>
+      <td> 689 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -873,7 +843,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> BF16 </td>
       <td> 261.25 (TPS) </td>
       <td> 257.63 (TPS) </td>
-      <td> 563 </td>
+      <td> 689 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -882,9 +852,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 23.77 (SPS) </td>
-      <td> 21.79 (SPS) </td>
-      <td> 563 </td>
+      <td> 2047.19 (TPS) </td>
+      <td> 1876.66 (TPS) </td>
+      <td> 689 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -892,9 +862,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 18.82 (SPS) </td>
-      <td> 12.67 (SPS) </td>
-      <td> 563 </td>
+      <td> 1620.87 (TPS) </td>
+      <td> 1091.20 (TPS) </td>
+      <td> 689 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -904,7 +874,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> BF16 </td>
       <td> 257.50 (TPS) </td>
       <td> / </td>
-      <td> 563 </td>
+      <td> 689 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -914,8 +884,39 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> BF16 </td>
       <td> 322.96 (TPS) </td>
       <td> 256.28 (TPS) </td>
-      <td> 563 </td>
+      <td> 689 </td>
       <td>【Pass】</td>
+    </tr>
+    <tr>
+      <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen3vl">Qwen3-VL</a></td>
+      <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 8B </a></td>
+      <td> 微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td> 146.54 (TPS)</td>
+      <td> 129.71 (TPS)</td>
+      <td> 179 </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 30B </a></td>
+      <td> 微调 </td>
+      <td> 1x8 (A3) </td>
+      <td> BF16 </td>
+      <td> 179.57 (TPS) </td>
+      <td> / </td>
+      <td> 185 </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 235B </a></td>
+      <td> 微调 </td>
+      <td> 16x8 (A3) </td>
+      <td> BF16 </td>
+      <td> 598.05 (TPS) </td>
+      <td> / </td>
+      <td> 16116 </td>
+      <td>【Test】</td>
     </tr>
     <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5omni">Qwen2.5-Omni</a></td>
@@ -923,8 +924,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 12.99 (SPS) </td>
-      <td> 14.44 (SPS) </td>
+      <td> 480.63 (TPS) </td>
+      <td> 534.28 (TPS) </td>
       <td> 296 </td>
       <td>【Pass】</td>
     </tr>
@@ -932,11 +933,11 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen3omni">Qwen3-Omni</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct">30B</a></td>
       <td> 微调 </td>
-      <td> 2x8 (A3) </td>
+      <td> 2x4 (A3) </td>
       <td> BF16 </td>
       <td> 65.6 (TPS) </td>
       <td> 16.4 (TPS) </td>
-      <td> / </td>
+      <td> 288 </td>
       <td>【Test】</td>
     </tr>
     <tr>
