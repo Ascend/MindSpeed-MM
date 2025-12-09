@@ -1,0 +1,1 @@
+-e git+https://github.com/huggingface/transformers.git@c0dbe09#egg=transformers
