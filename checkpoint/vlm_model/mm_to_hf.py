@@ -216,7 +216,10 @@ def convert_mm_to_hf(convert_config: ConvertHFConfig,
     # 找到最大的tp
     max_tp_size = max(parallel_config.tp_size, parallel_config.vit_tp_size, parallel_config.audio_tp_size)
     ep_size = parallel_config.ep_size if hasattr(parallel_config, 'ep_size') else 1
-    num_experts = config.text_config.num_experts if hasattr(config.text_config, 'num_experts') else 1
+    if not hasattr(config, 'text_config'):
+        num_experts = 1
+    else:
+        num_experts = config.text_config.num_experts if hasattr(config.text_config, 'num_experts') else 1
     # 加载权重字典
     state_dicts = load_from_mm(convert_config.mm_dir, parallel_config.vit_pp_layers, parallel_config.llm_pp_layers,
                                max_tp_size, parallel_config.audio_pp_layers, ep_size, num_experts)
