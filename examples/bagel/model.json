@@ -1,0 +1,71 @@
+{
+    "patch": {
+        "get_dist_model_load_from_pt": true
+    },
+    "model_id": "bagel",
+    "mllm":{
+        "architectures": [
+        "Qwen2ForCausalLM"
+        ],
+        "model_id": "qwen2MoT",
+        "attention_dropout": 0.0,
+        "bos_token_id": 151643,
+        "eos_token_id": 151645,
+        "hidden_act": "silu",
+        "hidden_size": 3584,
+        "initializer_range": 0.02,
+        "intermediate_size": 18944,
+        "max_position_embeddings": 32768,
+        "max_window_layers": 28,
+        "model_type": "qwen2",
+        "num_attention_heads": 28,
+        "num_hidden_layers": 28,
+        "num_key_value_heads": 4,
+        "rms_norm_eps": 1e-06,
+        "rope_theta": 1000000.0,
+        "sliding_window": 131072,
+        "tie_word_embeddings": false,
+        "torch_dtype": "bfloat16",
+        "use_cache": true,
+        "use_sliding_window": false,
+        "vocab_size": 152064,
+        "layer_module": "Qwen2MoTDecoderLayer",
+        "freeze_und": false,
+        "qk_norm": true,
+        "is_causal": true,
+        "use_moe": true
+    },
+    "image_encoder": {
+        "vit_max_num_patch_per_side": 70,
+        "vision_encoder": {
+            "model_id": "SigLip",
+            "layers": 26,
+            "params_dtype": "bf16",
+            "model_name": "siglip_so400m_patch14_384",
+            "image_size": 980,
+            "select_layer": -2,
+            "embed_layer": "linear",
+            "attn": "attn_packed",
+            "freeze": false
+        },
+        "vision_projector": {
+            "model_id": "InternVLMLP",
+            "downsample_ratio": 1,
+            "vit_hidden_size": 1152,
+            "llm_hidden_size": 3584,
+            "norm": false
+        }
+    },
+    "ae": {
+        "model_id": "fluxvae",
+        "from_pretrained": "./weight/BAGEL-7B-MoT/ae.safetensors",
+        "downsample": 8,
+        "z_channels": 16,
+        "freeze": true,
+        "max_latent_size": 64,
+        "latent_patch_size": 2,
+        "timestep_shift": 1.0
+    },
+    "visual_und": true,
+    "visual_gen": true
+}
