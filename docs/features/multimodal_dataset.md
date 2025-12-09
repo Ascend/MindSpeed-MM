@@ -1,8 +1,8 @@
 # MultiModal Dataset
 
 ## 多数据集训练
-### 使用方法（InternVL/Llava 已支持）
-以internvl为例，在examples/internvl2/data_2B.json中，修改basic_parameters。
+### 使用方法（InternVL已支持）
+以internvl为例，在examples/internvl2.5/data_4B.json中，修改basic_parameters。
 
 假设要训练dataset1和dataset2两个数据集，修改如下
 ```shell

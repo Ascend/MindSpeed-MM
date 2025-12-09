@@ -52,7 +52,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 * [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
 * [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
 * [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型
-* **[Jul. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/verl_plugin/README.md)**
+* **[Jul. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/verl_examples/qwen2.5vl/README.md)**
 * [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型
 * [Jun. 30, 2025]: 🌴 MindSpeed MM版本2.1.0发布
 * [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型
@@ -970,6 +970,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 * 【模型特性】 OpensoraPlan1.3: CP (Ring Attention)
 * 【模型特性】 Qwen2VL: VPP, CP (Ulysses & Ring Attention)
 * 【模型特性】 InternVL2: TP, CP (Ulysses & Ring Attention)
+* 【基础特性】 Hetero-parallel
 
 <a id="jump2"></a>
 
