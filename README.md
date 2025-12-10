@@ -771,9 +771,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 8x8 </td>
       <td> BF16 </td>
+      <td> 228.33 </td>
       <td> / </td>
-      <td> / </td>
-      <td> / </td>
+      <td> 1896 </td>
       <td>【Test】</td>
     </tr>
     <tr>
@@ -782,9 +782,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 1707.40 (TPS) </td>
-      <td> 1610.80 (TPS) </td>
-      <td> 1932 </td>
+      <td> 2344.58 (TPS) </td>
+      <td> 2211.93 (TPS) </td>
+      <td> 2653 </td>
       <td>【Pass】</td>
     </tr>
     <tr>
@@ -803,8 +803,8 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 (A3)  </td>
       <td> BF16 </td>
-      <td> 422.1 (TPS) </td>
-      <td> 381.9 (TPS) </td>
+      <td> 52.76 (TPS) </td>
+      <td> 47.73 (TPS) </td>
       <td> 201 </td>
       <td>【Test】</td>
     </tr>
@@ -917,7 +917,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
-      <td> 480.63 (TPS) </td>
+      <td> 575.01 (TPS) </td>
       <td> 534.28 (TPS) </td>
       <td> 296 </td>
       <td>【Pass】</td>
@@ -928,7 +928,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 微调 </td>
       <td> 2x4 (A3) </td>
       <td> BF16 </td>
-      <td> 65.6 (TPS) </td>
+      <td> 131.3 (TPS) </td>
       <td> 16.4 (TPS) </td>
       <td> 288 </td>
       <td>【Test】</td>
