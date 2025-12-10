@@ -8,6 +8,7 @@ import math
 import torch
 import numpy as np
 from PIL import Image
+import torch.nn.functional as F
 import torchvision.transforms as T
 
 
@@ -904,6 +905,84 @@ class ResizeToFill:
             white_canvas[:, :, top:top + new_height, left:left + new_width] = clip
             clip = white_canvas
         return clip
+
+
+MAX_PIXELS = 14 * 14 * 9 * 1024
+
+
+class MaxLongEdgeMinShortEdgeResize:
+    """Resize the input image so that its longest side and shortest side are within a specified range,
+    ensuring that both sides are divisible by a specified stride. This class also handles tensor conversion
+    and normalization to provide a complete image transformation pipeline.
+    """
+    def __init__(
+            self,
+            max_size: int,
+            min_size: int,
+            stride: int,
+            max_pixels: int = MAX_PIXELS,
+            interpolation=T.InterpolationMode.BICUBIC,
+            antialias: bool = True
+    ):
+        self.max_size = max_size
+        self.min_size = min_size
+        self.stride = stride
+        self.max_pixels = max_pixels
+        self.interpolation = interpolation
+        self.antialias = antialias
+
+        # Initialize transformation components
+        self.to_tensor_transform = T.ToTensor()
+        self.normalize_transform = T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], inplace=True)
+
+    def _make_divisible(self, value: int, stride: int) -> int:
+        return max(stride, int(round(value / stride) * stride))
+
+    def _apply_scale(self, width: int, height: int, scale: float) -> tuple:
+        """Apply scaling and ensure dimensions are divisible by stride."""
+        new_width = round(width * scale)
+        new_height = round(height * scale)
+        new_width = self._make_divisible(new_width, self.stride)
+        new_height = self._make_divisible(new_height, self.stride)
+        return new_width, new_height
+
+    def __call__(self, img, img_num: int = 1):
+        # Store original type to handle return type appropriately
+        original_is_tensor = isinstance(img, torch.Tensor)
+
+        if original_is_tensor:
+            height, width = img.shape[-2:]
+        else:
+            width, height = img.size
+
+        # Calculate initial scale based on size constraints
+        scale = min(self.max_size / max(width, height), 1.0)
+        scale = max(scale, self.min_size / min(width, height))
+        new_width, new_height = self._apply_scale(width, height, scale)
+
+        # Ensure the number of pixels does not exceed max_pixels
+        if new_width * new_height > self.max_pixels / img_num:
+            scale = self.max_pixels / img_num / (new_width * new_height)
+            new_width, new_height = self._apply_scale(new_width, new_height, scale)
+
+        # Ensure longest edge does not exceed max_size
+        if max(new_width, new_height) > self.max_size:
+            scale = self.max_size / max(new_width, new_height)
+            new_width, new_height = self._apply_scale(new_width, new_height, scale)
+
+        # Apply resize
+        resized_img = F.resize(img, (new_height, new_width), self.interpolation, antialias=self.antialias)
+
+        # Convert to tensor if input was PIL image
+        if not original_is_tensor:
+            tensor_img = self.to_tensor_transform(resized_img)
+        else:
+            tensor_img = resized_img
+
+        # Apply normalization
+        normalized_img = self.normalize_transform(tensor_img)
+
+        return normalized_img
 
 
 class AffineVideo:
