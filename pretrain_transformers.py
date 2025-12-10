@@ -68,8 +68,8 @@ def loss_func(output_tensor):
     
     if args.log_tps:
         dp_size = torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
-        tokens_per_sample = torch.tensor(total_tokens, device=output_tensor['loss'].device) / dp_size
-        torch.distributed.all_reduce(tokens_per_sample, group=mpu.get_data_parallel_group())
+        tokens_per_sample = torch.tensor(total_tokens / args.micro_batch_size, device=output_tensor['loss'].device) / dp_size
+        torch.distributed.all_reduce(tokens_per_sample, group=mpu.get_data_parallel_group(with_context_parallel=True))
         loss_dir["tokens per sample"] = tokens_per_sample
 
     if args.calculate_per_token_loss:
