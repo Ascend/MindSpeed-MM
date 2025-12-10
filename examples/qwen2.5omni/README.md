@@ -511,3 +511,4 @@ LoRA为框架通用能力，当前功能已支持，可参考[LoRA特性文档](
 ## 注意事项
 
 1. 在 `finetune_xx.sh`里，与模型结构相关的参数并不生效，以`examples/qwen2.5omni/model_xb.json`里同名参数配置为准，非模型结构的训练相关参数在 `finetune_xx.sh`修改。
+2. 当更改`finetune_xx.sh`中的训练参数`MBS`时，建议同步调整`--num-workers`参数，以保证数据加载与模型计算的高效匹配，否则可能会导致训练性能波动或下降，通常情况建议将`--num-workers`调整至不小于`MBS`。
