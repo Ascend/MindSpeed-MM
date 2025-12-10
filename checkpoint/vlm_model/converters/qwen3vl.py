@@ -3,7 +3,8 @@ from transformers import AutoConfig, AutoProcessor
 
 from checkpoint.common.converter import Converter
 from checkpoint.common.permissions import set_directory_permissions
-from checkpoint.common.merge_dcp_to_hf import load_dcp_state_dict, save_hf_weights
+from checkpoint.common.merge_dcp_to_hf import load_dcp_state_dict, save_hf_weights, merge_dcp_to_hf_sharded
+from checkpoint.common.hf_to_dcp import hf_to_dcp_sharded
 from checkpoint.vlm_model.hf_to_mm import load_from_hf, save_by_dcp
 
 
@@ -42,24 +43,29 @@ class Qwen3VLConverter(Converter):
         5. Set proper directory permissions.
         """
         
-        state_dict = load_from_hf(Path(hf_dir))
-        
-        if tie_weight:
-            for tgt_weight, src_weight in self.tie_weight_mapping.items():
-                state_dict[tgt_weight] = state_dict[src_weight]
+        def state_dict_convert_func(state_dict):        
+            if tie_weight:
+                for tgt_weight, src_weight in self.tie_weight_mapping.items():
+                    if src_weight in state_dict.keys():
+                        state_dict[tgt_weight] = state_dict[src_weight]
+                    
+            ori_keys = list(state_dict.keys())
+            for ori_key in ori_keys:
+                value = state_dict.pop(ori_key)
                 
-        ori_keys = list(state_dict.keys())
-        for ori_key in ori_keys:
-            value = state_dict.pop(f"{self.hf_prefix}{ori_key}")
-            
-            # view experts weight: (expert_num, input_dim, output_dim) -> (expert_num * input_dim, output_dim)
-            if any(fused_linear_name in ori_key for fused_linear_name in self.fused_linear_names):
-                value = value.view(-1, value.shape[-1])
-            
-            state_dict[f"{self.dcp_prefix}{ori_key}"] = value
+                # view experts weight: (expert_num, input_dim, output_dim) -> (expert_num * input_dim, output_dim)
+                if any(fused_linear_name in ori_key for fused_linear_name in self.fused_linear_names):
+                    value = value.view(-1, value.shape[-1])
+                
+                new_key = ori_key.replace(self.hf_prefix, self.dcp_prefix, 1) if len(self.hf_prefix) > 0 else f"{self.dcp_prefix}{ori_key}"
+                state_dict[new_key] = value
+            return state_dict
         
-        save_by_dcp(state_dict, Path(dcp_dir))
-        set_directory_permissions(Path(dcp_dir))
+        hf_to_dcp_sharded(
+            hf_dir=hf_dir,
+            dcp_dir=dcp_dir,
+            state_dict_convert_func=state_dict_convert_func
+        )
         
     def dcp_to_hf(
         self, 
@@ -73,29 +79,29 @@ class Qwen3VLConverter(Converter):
         This is typically used after training or inference in torch-dcp format to export 
         a model that can be easily loaded with Hugging Face Transformers.
         """
-        state_dict = load_dcp_state_dict(load_dir)
-
         config = AutoConfig.from_pretrained(model_assets_dir)
-        processor = AutoProcessor.from_pretrained(model_assets_dir, trust_remote_code=True)
-        config.save_pretrained(save_dir)
-        processor.save_pretrained(save_dir)
-        
         num_experts = getattr(config.text_config, "num_experts", None)
-        # moe model
-        if num_experts:
+        
+        def state_dict_convert_func(state_dict):
             state_dict_keys = list(state_dict.keys())
+
             for key in state_dict_keys:
                 # view experts weight: (expert_num * input_dim, output_dim) -> (expert_num, input_dim, output_dim)
-                if any(fused_linear_name in key for fused_linear_name in self.fused_linear_names):
+                if num_experts and any(fused_linear_name in key for fused_linear_name in self.fused_linear_names):
                     state_dict[key] = state_dict[key].view(num_experts, -1, state_dict[key].shape[-1])
+                value = state_dict.pop(key)
+                new_key = key.replace(self.dcp_prefix, self.hf_prefix, 1) if key.startswith(self.dcp_prefix) else key
+                state_dict[new_key] = value
+            
+            return state_dict
 
-        save_hf_weights(
-            save_path=save_dir,
-            model_assets_dir=model_assets_dir,
-            state_dict=state_dict,
-            prefix=self.dcp_prefix,
+        merge_dcp_to_hf_sharded(
+            load_dir=Path(load_dir),
+            save_dir=Path(save_dir),
+            model_assets_dir=Path(model_assets_dir),
+            select_key_convert_func=lambda key: f"model.{self.dcp_prefix}" + key,
+            state_dict_convert_func=state_dict_convert_func
         )
-        set_directory_permissions(save_dir)
     
     @staticmethod    
     def hf_to_mm():
