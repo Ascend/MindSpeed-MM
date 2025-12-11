@@ -507,12 +507,11 @@ TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重�
 
 【huggingface等价模型结构配置（可选）】
 
-Megatron框架下的qwen2.5VL模型结构相比于huggingface的模型结构实现有差异：Megatron会对vit模型的qkv权重矩阵进行交织重排、mlp的gate_proj和up_proj权重矩阵进行融合，llm模型的q、k、v权重矩阵、mlp的gate_proj和up_proj权重矩阵进行融合。
+Megatron框架下的qwen2.5VL模型结构相比于Huggingface的模型结构实现有差异，对训练效果造成的影响。  
 
-开启该功能可以使用完全与huggingface一致的模型结构进行训练。Lora微调场景建议开启该功能。
+开启该功能可以使用完全与Huggingface一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/canonical_model.md) 
 
-相关配置修改如下：
-
+开启方式：
 `model_xxb.json`使能`canonical_model`
 ```json
 {
