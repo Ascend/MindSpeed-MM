@@ -1,7 +1,7 @@
 #!/bin/bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 # 该变量只用于规避megatron对其校验，对npu无效
-export CUDA_DEVICE_MAX_CONNECTIONS=1
+export CUDA_DEVICE_MAX_CONNECTIONS=2
 export ASCEND_SLOG_PRINT_TO_STDOUT=0
 export ASCEND_GLOBAL_LOG_LEVEL=3
 export TASK_QUEUE_ENABLE=1
@@ -28,7 +28,7 @@ BASEPATH=$(cd `dirname $0`; cd ../../../; pwd)
 MM_DATA="$BASEPATH/tests/st/run_configs/pretrain_wan2.1_t2v/data.json"
 MM_MODEL="$BASEPATH/tests/st/run_configs/pretrain_wan2.1_t2v/model.json"
 MM_TOOL="$BASEPATH/mindspeed_mm/tools/tools.json"
-layerzero_config="$BASEPATH/examples/wan2.1/zero_config.yaml"
+fsdp2_config="$BASEPATH/examples/wan2.1/fsdp2_config.yaml"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $NPUS_PER_NODE \
@@ -61,14 +61,11 @@ GPT_ARGS="
     --no-save-optim \
     --no-save-rng \
     --bf16 \
-    --recompute-granularity full \
-    --recompute-method block \
-    --recompute-num-layers 40 \
-    --use-distributed-optimizer \
-    --overlap-grad-reduce \
-    --overlap-param-gather \
-    --layerzero \
-    --layerzero-config ${layerzero_config} \
+    --use-torch-fsdp2 \
+    --untie-embeddings-and-output-weights \
+    --ckpt-format torch_dcp \
+    --fsdp2-config-path ${fsdp2_config} \
+    --optimizer-selection fused_torch_adamw \
     --num-workers 4 \
 "
 
