@@ -71,7 +71,6 @@ GPT_ARGS="
     --recompute-num-layers 40 \
     --use-distributed-optimizer \
     --overlap-grad-reduce \
-    --overlap-param-gather \
     --layerzero \
     --layerzero-config ${layerzero_config} \
 "
