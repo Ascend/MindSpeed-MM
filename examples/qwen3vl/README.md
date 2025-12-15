@@ -87,9 +87,14 @@ bash scripts/install.sh --arch arm --msid 93c45456c7044bacddebc5072316c01006c938
 ```bash
 mm-convert Qwen3VLConverter hf_to_dcp \
   --hf_dir Qwen3-VL-xxB \
-  --dcp_dir Qwen3-VL-xxB-dcp \
+  --dcp_dir Qwen3-VL-xxB-dcp
+
+# 转换后的目录结构为：
+# ———— Qwen3-VL-xxB-dcp
+#   |—— release
+#   |—— latest_checkpointed_iteration.txt
 ```
-并在examples/qwen3vl/finetune_qwen3vl.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数。
+并在examples/qwen3vl/finetune_qwen3vl_xxB.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数，同时将该脚本中的`LOAD_PATH`修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录，如`Qwen3-VL-xxB-dcp`）。
 
 注意，针对Qwen3VL-30B和Qwen3VL-235B模型，必须使用meta init初始化加载权重。
 
@@ -258,7 +263,7 @@ GPT_ARGS="
 
 ```shell
 ...
-# 断点续训权重加载路径
+# 转换后的dcp权重或断点续训权重加载路径
 LOAD_PATH="./ckpt/save_dir/Qwen3-VL-xxB-Instruct"
 # 保存路径
 SAVE_PATH="save_dir"
