@@ -1,0 +1,81 @@
+{
+	"dataset_param": {
+		"dataset_type": "i2v",
+		"basic_parameters": {
+			"data_path": "./examples/opensoraplan1.3/data.txt",
+			"data_storage_mode": "combine"
+		},
+		"preprocess_parameters": {
+			"video_processor_type": "OpensoraplanVideoProcessor",
+			"video_reader_type": "DecordVideo",
+			"image_reader_type": "Image",
+			"num_frames": 93,
+			"min_num_frames": 29,
+			"frame_interval": 1,
+			"max_hxw": 236544,
+			"min_hxw": 102400,
+			"train_fps": 18,
+			"speed_factor": 1.0,
+			"drop_short_ratio": 0.0,
+			"cfg": 0.1,
+			"hw_stride": 32,
+			"vae_scale_factor": [4,8,8],
+			"force_resolution": false,
+			"seed": 1234,
+			"hw_aspect_thr": 2.0,
+			"use_aesthetic": true,
+			"train_pipeline": {
+				"video": [
+					{
+						"trans_type": "MaxHWResizeVideo",
+						"param": {
+							"align_corners": true,
+							"antialias": true,
+							"transform_size": "auto"
+						}
+					},
+					{
+						"trans_type": "SpatialStrideCropVideo",
+						"param": {
+							"stride": 32
+						}
+					}
+				]
+			},
+			"train_pipeline_after_resize": {
+				"video": [
+					{
+						"trans_type": "ToTensorAfterResize"
+					},
+					{
+						"trans_type": "ae_norm"
+					}
+				]
+			}
+		},
+		"use_text_processer": true,
+		"tokenizer_config": {
+			"hub_backend": "hf",
+			"autotokenizer_name": "AutoTokenizer",
+			"from_pretrained": "your model path",
+			"model_max_length": 512
+		},
+		"mask_type_ratio_dict_video": {
+			"i2v": 1
+		}
+	},
+	"dataloader_param": {
+		"dataloader_mode": "sampler",
+		"sampler_type": "LengthGroupedSampler",
+		"shuffle": true,
+		"drop_last": true,
+		"pin_memory": false,
+		"group_frame": false,
+		"group_resolution": false,
+		"group_data": true,
+		"initial_global_step_for_sampler": 0,
+		"collate_param": {
+			"model_name": "open_sora_plan"
+		}
+	}
+}

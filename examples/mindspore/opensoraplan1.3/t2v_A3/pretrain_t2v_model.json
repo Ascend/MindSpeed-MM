@@ -1,0 +1,71 @@
+{
+    "load_video_features": true,
+    "load_text_features": true,
+    "enable_encoder_dp": false,
+    "predictor": {
+        "model_id": "videoditsparse",
+        "from_pretrained": null,
+        "dtype": "bf16",
+        "num_layers" : 32,
+        "num_heads": 32,
+        "head_dim":96,
+        "in_channels":8,
+        "out_channels":8,
+        "dropout":0.0,
+        "cross_attention_dim":3072,
+        "attention_q_bias":true,
+        "attention_k_bias":true,
+        "attention_v_bias":true,
+        "fa_layout":"sbh",
+        "patch_size_thw": [1, 2, 2],
+        "activation_fn":"gelu-approximate",
+        "norm_elementwise_affine":false,
+        "norm_eps":1e-06,
+        "caption_channels":4096,
+        "interpolation_scale":[1.0, 1.0, 1.0],
+        "pipeline_num_layers": [8, 8, 8, 8],
+        "sparse1d":true,
+        "sparse_n":4
+    },
+    "diffusion": {
+        "model_id": "DDPM",
+        "num_train_steps":1000,
+        "guidance_scale":7.5,
+        "prediction_type": "v_prediction",
+        "rescale_betas_zero_snr": true,
+        "timestep_spacing": "leading",
+        "device":"npu",
+        "snr_gamma": 5.0,
+        "t_sample_method": "explicit_uniform"
+    },
+    "text_encoder": {
+        "model_id": "MT5",
+        "hub_backend": "hf",
+        "from_pretrained": "./weights/google/mt5-xxl",
+        "low_cpu_mem_usage": false,
+        "dtype": "bf16"
+    },
+    "ae": {
+        "model_id": "wfvae",
+        "from_pretrained": "./weights/vae/wfvae_mm.pt",
+        "dtype": "bf16",
+        "output_dtype": "bf16",
+        "base_channels": 128,
+        "decoder_energy_flow_hidden_size": 128,
+        "decoder_num_resblocks": 2,
+        "dropout": 0.0,
+        "encoder_energy_flow_hidden_size": 64,
+        "encoder_num_resblocks": 2,
+        "latent_dim": 8,
+        "use_attention": true,
+        "norm_type": "aelayernorm",
+        "t_interpolation": "trilinear",
+        "use_tiling": false,
+        "connect_res_layer_num": 2,
+        "vae_cp_size": 1
+    },
+    "patch": {
+        "ae_float32": true
+    }
+}
+
