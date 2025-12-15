@@ -23,7 +23,10 @@ from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.attention import FlashAttention, ParallelAttention
 from mindspeed_mm.models.common.embeddings import TextProjection
 from mindspeed_mm.models.common.normalize import normalize, FP32LayerNorm
-from mindspeed_mm.models.common.fpdt_layer import FPDTFlashAttention
+from mindspeed_mm.models.common.fpdt_layer import (
+    FPDTFlashAttention, 
+    split_forward_gather_backward_FPDT_tensors, 
+    gather_forward_split_backward_FPDT_tensors)
 from mindspeed_mm.utils.utils import change_tensor_layout
 
 
@@ -138,6 +141,9 @@ class WanDiT(MultiModalModule):
             raise NotImplementedError(
                 f"Context_parallel_algo {self.context_parallel_algo} is not implemented"
             )
+        
+        self.FPDT = args.mm.model.to_dict().get('predictor', {}).get('FPDT', False)
+        self.FPDT_chunk_number = args.mm.model.to_dict().get('predictor', {}).get('FPDT_chunk_number', None)
 
         if self.pre_process:
             # time embeddings
@@ -405,20 +411,32 @@ class WanDiT(MultiModalModule):
         # cp split
         if self.context_parallel_algo is not None:
             if self.pre_process:
-                embs = split_forward_gather_backward(
-                    embs, mpu.get_context_parallel_group(), dim=1, grad_scale="down"
-                )  # b s h
-                if time_emb.ndim == 4:
-                    # b s 6 h for adaLN in wan2.2 5b
-                    time_emb = split_forward_gather_backward(
-                        time_emb, mpu.get_context_parallel_group(), dim=1, grad_scale="down"
-                    )
-            rotary_pos_emb = split_forward_gather_backward(
-                rotary_pos_emb,
-                mpu.get_context_parallel_group(),
-                dim=0,
-                grad_scale="down",
-            )
+                if self.FPDT:
+                    embs = split_forward_gather_backward_FPDT_tensors(embs, seq_dim=1, chunk_number=self.FPDT_chunk_number, 
+                                              group=mpu.get_context_parallel_group(), grad_scale="down")
+
+                    if time_emb.ndim == 4:
+                        time_emb = split_forward_gather_backward_FPDT_tensors(time_emb, seq_dim=1, chunk_number=self.FPDT_chunk_number, 
+                                                      group=mpu.get_context_parallel_group(), grad_scale="down")
+                else:
+                    embs = split_forward_gather_backward(
+                        embs, mpu.get_context_parallel_group(), dim=1, grad_scale="down"
+                    )  # b s h
+                    if time_emb.ndim == 4:
+                        # b s 6 h for adaLN in wan2.2 5b
+                        time_emb = split_forward_gather_backward(
+                            time_emb, mpu.get_context_parallel_group(), dim=1, grad_scale="down"
+                        )
+            if self.FPDT:
+                rotary_pos_emb = split_forward_gather_backward_FPDT_tensors(rotary_pos_emb, seq_dim=0, chunk_number=self.FPDT_chunk_number, 
+                                                    group=mpu.get_context_parallel_group(), grad_scale="down")
+            else:
+                rotary_pos_emb = split_forward_gather_backward(
+                    rotary_pos_emb,
+                    mpu.get_context_parallel_group(),
+                    dim=0,
+                    grad_scale="down",
+                )
 
         with rng_context:
             if self.recompute_granularity == "full":
@@ -436,14 +454,21 @@ class WanDiT(MultiModalModule):
         out = embs
         if self.post_process:
             if self.context_parallel_algo is not None:
-                embs = gather_forward_split_backward(
-                    embs, mpu.get_context_parallel_group(), dim=1, grad_scale="up"
-                )
-                if time_emb.ndim == 4:
-                    # b s 6 h for adaLN in wan2.2 5b
-                    time_emb = gather_forward_split_backward(
-                        time_emb, mpu.get_context_parallel_group(), dim=1, grad_scale="up"
+                if self.FPDT:
+                    embs = gather_forward_split_backward_FPDT_tensors(embs, seq_dim=1, chunk_number=self.FPDT_chunk_number, 
+                                                   group=mpu.get_context_parallel_group(), grad_scale="up")
+                    if time_emb.ndim == 4:
+                        time_emb = gather_forward_split_backward_FPDT_tensors(time_emb, seq_dim=1, chunk_number=self.FPDT_chunk_number, 
+                                                           group=mpu.get_context_parallel_group(), grad_scale="up")
+                else:
+                    embs = gather_forward_split_backward(
+                        embs, mpu.get_context_parallel_group(), dim=1, grad_scale="up"
                     )
+                    if time_emb.ndim == 4:
+                        # b s 6 h for adaLN in wan2.2 5b
+                        time_emb = gather_forward_split_backward(
+                            time_emb, mpu.get_context_parallel_group(), dim=1, grad_scale="up"
+                        )
             embs_out = self.head(embs, times)
             out = self.unpatchify(embs_out, frames, height, width)
 
@@ -585,7 +610,6 @@ class WanDiTBlock(nn.Module):
 
         self.FPDT = args.mm.model.to_dict().get('predictor', {}).get('FPDT', False)
         self.FPDT_chunk_number = args.mm.model.to_dict().get('predictor', {}).get('FPDT_chunk_number', None)
-        self.FPDT_with_offload = args.mm.model.to_dict().get('predictor', {}).get('FPDT_with_offload', False)
         self.distribute_saved_activations = args.distribute_saved_activations
 
         self.attention_async_offload_param = {

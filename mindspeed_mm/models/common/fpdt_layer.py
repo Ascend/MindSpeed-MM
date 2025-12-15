@@ -9,8 +9,42 @@ from torch import Tensor
 from megatron.training import get_args
 from megatron.core import mpu
 from einops import rearrange
-from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import all_to_all
+from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import (
+        all_to_all, 
+        split_forward_gather_backward, 
+        gather_forward_split_backward
+)
 from mindspeed_mm.models.common.attention import FlashAttention
+
+
+def split_forward_gather_backward_FPDT_tensors(tensor, seq_dim=0, chunk_number=1, group=None, grad_scale="down"):
+    world_size = torch.distributed.get_world_size(group)
+    global_chunk_number = chunk_number * world_size
+
+    chunks = list(torch.chunk(tensor, global_chunk_number, dim=seq_dim))
+    indices = []
+    for r in range(world_size):
+        indices.extend(range(r, global_chunk_number, world_size))
+    
+    tensor = torch.cat([chunks[i] for i in indices], dim=seq_dim)
+    tensor = split_forward_gather_backward(
+        tensor, group, dim=seq_dim, grad_scale=grad_scale
+    )
+    return tensor
+
+
+def gather_forward_split_backward_FPDT_tensors(tensor, seq_dim=0, chunk_number=1, group=None, grad_scale="up"):
+    world_size = torch.distributed.get_world_size(group)
+    tensor = gather_forward_split_backward(
+        tensor, group, dim=seq_dim, grad_scale=grad_scale
+    )
+    global_chunk_number = chunk_number * world_size
+
+    chunks = list(torch.chunk(tensor, global_chunk_number, dim=seq_dim))
+    indices = [i // world_size + (i % world_size) * chunk_number for i in range(global_chunk_number)]
+
+    tensor = torch.cat([chunks[i] for i in indices], dim=seq_dim)
+    return tensor
 
 
 def forward_update(prev_data, cur_data):
@@ -88,12 +122,12 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
             per_gpu_seq_len = q.shape[0]
             chunk_size = per_gpu_seq_len // num_chunks
             if chunk_size * num_chunks != per_gpu_seq_len:
-                raise ValueError()
+                raise ValueError(f'per_gpu_seq_len {per_gpu_seq_len} should be divided by num_chunks {num_chunks}')
             if attention_mask is not None:
-                raise NotImplementedError()
+                raise NotImplementedError('attention_mask is not supported now')
             ctx.num_chunks = num_chunks
             ctx.cpu_offloading = cpu_offloading
-            ctx.cpg = cpg
+            ctx.cpg = cpg 
             ctx.scatter_idx = scatter_idx
             ctx.gather_idx = gather_idx
             ctx.hidden_size_per_attention_head = hidden_size_per_attention_head
