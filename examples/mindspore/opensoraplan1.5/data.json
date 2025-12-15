@@ -1,0 +1,97 @@
+{
+	"dataset_param": {
+		"dataset_type": "t2v",
+		"basic_parameters": {
+			"data_path": "./examples/opensoraplan1.5/data.txt",
+			"data_storage_mode": "combine"
+		},
+		"preprocess_parameters": {
+			"video_processor_type": "OpensoraplanVideoProcessor",
+			"video_reader_type": "DecordVideo",
+			"image_reader_type": "Image",
+			"num_frames": 57,
+			"min_num_frames": 29,
+			"frame_interval": 1,
+			"max_height": 288,
+			"max_width": 512,
+			"max_hxw": 147456,
+			"min_hxw": 147456,
+			"train_fps": 12,
+			"speed_factor": 1.0,
+			"drop_short_ratio": 0.0,
+			"vae_scale_factor": [8,8,8],
+			"cfg": 0.1,
+			"hw_stride": 32,
+			"force_resolution": false,
+			"seed": 42,
+			"hw_aspect_thr": 2.0,
+			"use_aesthetic": true,
+			"train_pipeline": {
+				"video": [{
+						"trans_type": "ToTensorVideo"
+					},
+					{
+						"trans_type": "CenterCropResizeVideo",
+						"param": {
+							"transform_size": {
+								"max_height": 288,
+								"max_width": 512
+							},
+							"interpolation_mode": "bicubic"
+						}
+					},
+					{
+						"trans_type": "ae_norm"
+					}
+				],
+				"image": [{
+					"trans_type": "ToTensorVideo"
+					},
+					{
+						"trans_type": "CenterCropResizeVideo",
+						"param": {
+							"transform_size": {
+								"max_height": 288,
+								"max_width": 512
+							},
+							"interpolation_mode": "bicubic"
+						}
+					},
+					{
+						"trans_type": "ae_norm"
+					}
+				]
+			}
+		},
+		"use_text_processer": true,
+		"enable_text_preprocess": true,
+		"tokenizer_config":[{
+            "hub_backend": "hf",
+            "autotokenizer_name": "AutoTokenizer",
+            "from_pretrained": "t5/t5-v1_1-xl",
+            "low_cpu_mem_usage": false,
+            "model_max_length": 512
+        },
+        {
+            "hub_backend": "hf",
+            "autotokenizer_name": "AutoTokenizer",
+            "from_pretrained": "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k",
+            "low_cpu_mem_usage": false,
+            "model_max_length": 77
+        }]
+	},
+	"dataloader_param": {
+		"dataloader_mode": "sampler",
+		"sampler_type": "LengthGroupedSampler",
+		"shuffle": true,
+		"drop_last": true,
+		"pin_memory": true,
+		"group_frame": false,
+		"group_resolution": false,
+		"group_data": true,
+		"initial_global_step_for_sampler": 0,
+		"collate_param": {
+			"model_name": "open_sora_plan"
+		}
+	}
+}

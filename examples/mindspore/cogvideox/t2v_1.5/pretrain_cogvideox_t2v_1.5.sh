@@ -16,11 +16,13 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
-TP=1
+TP=4
 PP=1
 CP=1
 MBS=1
-GBS=$(($WORLD_SIZE*$MBS/$CP/$TP))
+GRAD_ACC_STEP=4
+DP=$(($WORLD_SIZE/$TP/$PP/$CP))
+GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
 MM_DATA="./examples/mindspore/cogvideox/t2v_1.5/data.json"
 MM_MODEL="./examples/mindspore/cogvideox/t2v_1.5/model_cogvideox_t2v_1.5.json"
@@ -30,7 +32,7 @@ SAVE_PATH="your_ckpt_path_to_save"
 
 DISTRIBUTED_ARGS="
     --worker_num $WORLD_SIZE \
-    --local_worker_num $NPUS_PER_NODE \
+    --local_worker_num $GPUS_PER_NODE \
     --log_dir="msrun_log" \
     --join=True \
     --cluster_time_out=300 \
@@ -41,6 +43,7 @@ GPT_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
     --context-parallel-size ${CP} \
+    --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --lr 1e-5 \
@@ -55,6 +58,7 @@ GPT_ARGS="
     --clip-grad 1.0 \
     --train-iters 5000 \
     --no-gradient-accumulation-fusion \
+    --qk-layernorm \
     --load $LOAD_PATH \
     --no-load-optim \
     --no-load-rng \
@@ -69,6 +73,7 @@ GPT_ARGS="
     --overlap-param-gather \
     --allow-tf32 \
     --num-workers 8 \
+    --sequence-parallel \
 "
 
 MM_ARGS="

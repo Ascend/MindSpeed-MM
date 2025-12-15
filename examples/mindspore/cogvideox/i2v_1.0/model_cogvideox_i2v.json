@@ -1,15 +1,16 @@
 {
-    "frames": 25,
+    "frames": 17,
     "resolution": [480, 720],
     "allow_internal_format":false,
     "load_video_features": false,
     "load_text_features": false,
     "task": "i2v",
+    "enable_encoder_dp": false,
     "predictor": {
         "model_id": "satdit",
         "from_pretrained": null,
         "dtype": "bf16",
-        "num_layers": 2,
+        "num_layers": 42,
         "pipeline_num_layers":null,
         "num_heads": 48,
         "head_dim": 64,
@@ -31,7 +32,7 @@
         "text_hidden_size": 4096,
         "concat_text_embed": true,
         "interpolation_scale": [1.0, 1.0, 1.0],
-        "learnable_pos_embed": false,
+        "learnable_pos_embed": true,
         "use_rope": true
     },
     "diffusion": {

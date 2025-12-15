@@ -9,18 +9,20 @@ export CPU_AFFINITY_CONF=1
 export HCCL_CONNECT_TIMEOUT=1200
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
-GPUS_PER_NODE=8
+NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=29505
 NNODES=1
 NODE_RANK=0
-WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
+WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
-TP=1
+TP=4
 PP=1
 CP=1
 MBS=1
-GBS=$(($WORLD_SIZE*$MBS/$CP/$TP))
+GRAD_ACC_STEP=4
+DP=$(($WORLD_SIZE/$TP/$PP/$CP))
+GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
 MM_DATA="./examples/mindspore/cogvideox/i2v_1.5/data.json"
 MM_MODEL="./examples/mindspore/cogvideox/i2v_1.5/model_cogvideox_i2v_1.5.json"
@@ -41,6 +43,7 @@ GPT_ARGS="
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
     --context-parallel-size ${CP} \
+    --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --lr 1e-5 \
@@ -69,6 +72,8 @@ GPT_ARGS="
     --overlap-param-gather \
     --allow-tf32 \
     --num-workers 8 \
+    --sequence-parallel \
+    --qk-layernorm \
 "
 
 MM_ARGS="

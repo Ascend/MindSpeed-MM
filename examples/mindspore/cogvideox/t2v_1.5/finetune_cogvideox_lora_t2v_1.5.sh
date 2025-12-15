@@ -1,5 +1,6 @@
 #!/bin/bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
+
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export ASCEND_SLOG_PRINT_TO_STDOUT=0
 export ASCEND_GLOBAL_LOG_LEVEL=3
@@ -8,30 +9,29 @@ export COMBINED_ENABLE=1
 export CPU_AFFINITY_CONF=1
 export HCCL_CONNECT_TIMEOUT=1200
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-NPUS_PER_NODE=8
+
+GPUS_PER_NODE=8
 MASTER_ADDR=localhost
-MASTER_PORT=29505
+MASTER_PORT=6000
 NNODES=1
 NODE_RANK=0
-WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
+WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
-TP=4
+TP=1
 PP=1
 CP=1
 MBS=1
-GRAD_ACC_STEP=4
-DP=$(($WORLD_SIZE/$TP/$PP/$CP))
-GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
+GBS=$(($WORLD_SIZE*$MBS/$CP/$TP))
 
-MM_DATA="./examples/mindspore/cogvideox/i2v_1.0/data.json"
-MM_MODEL="./examples/mindspore/cogvideox/i2v_1.0/model_cogvideox_i2v.json"
+MM_DATA="./examples/mindspore/cogvideox/t2v_1.5/data.json"
+MM_MODEL="./examples/mindspore/cogvideox/t2v_1.5/model_cogvideox_t2v_1.5.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="your_converted_dit_ckpt_dir"
 SAVE_PATH="your_ckpt_path_to_save"
 
 DISTRIBUTED_ARGS="
     --worker_num $WORLD_SIZE \
-    --local_worker_num $NPUS_PER_NODE \
+    --local_worker_num $GPUS_PER_NODE \
     --log_dir="msrun_log" \
     --join=True \
     --cluster_time_out=300 \
@@ -63,17 +63,12 @@ GPT_ARGS="
     --no-save-optim \
     --no-save-rng \
     --bf16 \
-    --recompute-granularity full \
-    --recompute-method block \
-    --recompute-num-layers 42 \
-    --use-distributed-optimizer \
-    --overlap-grad-reduce \
-    --overlap-param-gather \
     --allow-tf32 \
     --num-workers 8 \
-    --seed 42 \
-    --sequence-parallel \
-    --qk-layernorm \
+    --lora-r 128 \
+    --lora-alpha 64 \
+    --lora-dropout 0 \
+    --lora-target-modules proj_qkv proj_out \
 "
 
 MM_ARGS="
