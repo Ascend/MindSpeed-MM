@@ -41,7 +41,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态。软件版本配套�
   </tr>
   <tr>
     <td>Python</td>
-    <td><a href="https://gitcode.com/Ascend/pytorch#pytorch%E4%B8%8Epython%E7%89%88%E6%9C%AC%E9%85%8D%E5%A5%97%E8%A1%A8">配套版本</a></td>
+    <td> 3.10 </td>
   </tr>
   <tr>
     <td>PyTorch</td>
@@ -68,10 +68,10 @@ bash Ascend-hdk-*-npu-firmware_*.run --full
 
 ```shell
 # 因为版本迭代，包名存在出入，根据实际修改
-bash Ascend-cann-toolkit_8.2.RC1_linux-aarch64.run --install
-bash Ascend-cann-kernels-*_8.2.RC1_linux-aarch64.run --install
+bash Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
+bash Ascend-cann-kernels-*_8.3.RC1_linux-aarch64.run --install
 source /usr/local/Ascend/ascend-toolkit/set_env.sh # 安装nnal包需要source环境变量
-bash Ascend-cann-nnal_8.2.RC1_linux-aarch64.run --install
+bash Ascend-cann-nnal_8.3.RC1_linux-aarch64.run --install
 # 设置环境变量
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh
