@@ -37,6 +37,7 @@ class TestParallelAttention(DistributedTest):
         args.sparse_mode = 0
         args.params_dtype = DTYPE
         args.num_layers = 1
+        args.seq_length = SEQUENCE_LENGTH
         set_args(args)
 
         initialize_model_parallel(

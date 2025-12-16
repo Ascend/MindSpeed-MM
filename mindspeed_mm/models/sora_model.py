@@ -254,7 +254,7 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
             return self.predictor.state_dict(prefix=prefix, keep_vars=keep_vars)
         return None
 
-    def state_dict(self):
+    def state_dict(self, **kwargs):
         """Customized state_dict for fsdp2"""
         return self.predictor.state_dict()
 
