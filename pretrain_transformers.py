@@ -75,10 +75,10 @@ def loss_func(output_tensor):
         loss_dir["tokens per sample"] = tokens_per_sample
 
     if args.calculate_per_token_loss:
-        loss = output_tensor['loss']
         # for report
         reporting_loss = torch.cat([loss.view(1), total_tokens.view(1)]).detach()
         torch.distributed.all_reduce(reporting_loss[0], group=mpu.get_data_parallel_group(with_context_parallel=True))
+        torch.distributed.all_reduce(reporting_loss[1], group=mpu.get_data_parallel_group())
         loss_dir["loss"] = (reporting_loss[0], reporting_loss[1])
         # prepare per token loss
         loss *= mpu.get_context_parallel_world_size()
