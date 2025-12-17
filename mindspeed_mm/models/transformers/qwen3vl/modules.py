@@ -9,6 +9,7 @@ import torch_npu
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributed.tensor import DTensor
+from einops import rearrange
 
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache
@@ -19,8 +20,21 @@ from transformers.utils import TransformersKwargs
 from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLTextConfig, Qwen3VLVisionConfig
 from megatron.core import mpu
 
-from mindspeed_mm.models.common.communications import cal_split_sizes, gather_forward_split_backward, split_forward_gather_backward
-from .utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq
+from megatron.training import get_args
+from megatron.core.packed_seq_params import PackedSeqParams
+from mindspeed.core.context_parallel.model_parallel_utils import (
+    get_context_parallel_group_for_hybrid_ulysses,
+    get_context_parallel_group_for_hybrid_ring,
+    get_context_parallel_for_hybrid_ring_world_size,
+    get_context_parallel_for_hybrid_ulysses_world_size,
+    get_context_parallel_for_hybrid_ring_global_ranks,
+    get_context_parallel_for_hybrid_ring_rank
+)
+from mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel import ringattn_context_parallel_tnd_general, ringattn_context_parallel
+from mindspeed.utils import get_actual_seq_len
+
+from mindspeed_mm.models.common.communications import cal_split_sizes, cal_split_sizes_multi, gather_forward_split_backward, split_forward_gather_backward
+from .utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq, gather_visual_seqs_with_cp, set_seq_len
 from .attention_utils import ALL_ATTENTION_FUNCTIONS, pad_out
 
 
@@ -101,25 +115,24 @@ class Qwen3VLVisionPatchMerger(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if mpu.get_context_parallel_world_size() > 1:
-            actual_seq_len = get_seq_len("visual") * self.spatial_merge_size ** 2
-            gather_sizes = cal_split_sizes(actual_seq_len, mpu.get_context_parallel_world_size())
-            x = gather_forward_split_backward(
-                x,
-                mpu.get_context_parallel_group(),
-                dim=0,
-                grad_scale="up",
-                gather_sizes=gather_sizes
-            )
-            x = x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x
-            x = self.norm(x).view(-1, self.hidden_size)
-            split_sizes = cal_split_sizes(x.shape[0], mpu.get_context_parallel_world_size())
-            x = split_forward_gather_backward(
-                    x, 
-                    mpu.get_context_parallel_group(),
-                    dim=0,
-                    grad_scale="down",
-                    split_sizes=split_sizes
-                )
+            if self.use_postshuffle_norm:
+                x = gather_visual_seqs_with_cp(x, dim=0)
+                x = x.view(-1, self.hidden_size)
+                # after down_sample hidden_state, should split it again
+                split_sizes = cal_split_sizes(x.shape[0], mpu.get_context_parallel_world_size())
+                # Split the merged tensor back for distributed processing
+                # Since no attention computation follows, we can use simple splitting
+                x = split_forward_gather_backward(x, mpu.get_context_parallel_group(), dim=0, grad_scale="down", split_sizes=split_sizes)
+                x = self.norm(x)
+            else:
+                x = self.norm(x)
+                x = gather_visual_seqs_with_cp(x, dim=0)
+                x = x.view(-1, self.hidden_size)
+                # after down_sample hidden_state, should split it again
+                split_sizes = cal_split_sizes(x.shape[0], mpu.get_context_parallel_world_size())
+                # Split the merged tensor back for distributed processing
+                # Since no attention computation follows, we can use simple splitting
+                x = split_forward_gather_backward(x, mpu.get_context_parallel_group(), dim=0, grad_scale="down", split_sizes=split_sizes)
             x = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
         else:
             x = self.norm(x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x).view(-1, self.hidden_size)
@@ -185,6 +198,38 @@ def eager_attention_forward(
     return attn_output, attn_weights
 
 
+def do_vit_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask=None, dropout_p=0., pse=None, pse_type=None, shapes=None):
+    args = get_args()
+    in_hybrid_mode = get_context_parallel_group_for_hybrid_ring(check_initialized=False) is not None
+    if in_hybrid_mode:
+        cp_group = get_context_parallel_group_for_hybrid_ring()
+        cp_size = get_context_parallel_for_hybrid_ring_world_size()
+        rank = get_context_parallel_for_hybrid_ring_rank()
+        cp_global_ranks = get_context_parallel_for_hybrid_ring_global_ranks()
+    else:
+        cp_group = mpu.get_context_parallel_group()
+        cp_size = mpu.get_context_parallel_world_size()
+        rank = mpu.get_context_parallel_rank()
+        cp_global_ranks = mpu.get_context_parallel_global_ranks()
+
+    cp_para = dict()
+
+    cp_para['causal'] = False
+    cp_para['cp_group'] = cp_group
+    cp_para['cp_size'] = cp_size
+    cp_para['rank'] = rank
+
+    cp_para['cp_global_ranks'] = cp_global_ranks
+    cp_para['cp_group_for_send_recv_overlap'] = mpu.get_context_parallel_group_for_send_recv_overlap() \
+        if args.use_cp_send_recv_overlap else None
+    cp_para['pse'] = pse
+    cp_para['pse_type'] = pse_type
+    
+    output = ringattn_context_parallel_tnd_general(q, k, v, head_num, cp_para, softmax_scale, attn_mask, dropout_p, shapes=shapes)
+
+    return output
+
+
 class Qwen3VLVisionAttention(nn.Module):
     def __init__(self, config: Qwen3VLVisionConfig) -> None:
         super().__init__()
@@ -208,6 +253,7 @@ class Qwen3VLVisionAttention(nn.Module):
         **kwargs,
     ) -> torch.Tensor:
         seq_length = hidden_states.shape[0]
+        total_visual_seqlen = int(cu_seqlens[-1])
         query_states, key_states, value_states = (
             self.qkv(hidden_states).reshape(seq_length, 3, self.num_heads, -1).permute(1, 0, 2, 3).unbind(0)
         )
@@ -237,15 +283,62 @@ class Qwen3VLVisionAttention(nn.Module):
                 "Qwen3VLTextAttention only support ['eager', 'sdpa', 'flash_attention_2'], layout TND and BNSD")
 
         if mpu.get_context_parallel_world_size() > 1:
-            total_visual_seqlen = int(cu_seqlens[-1])
-            query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
-                query_states,
-                key_states,
-                value_states,
-                seq_dim=seq_dim,
-                head_dim=head_dim,
-                gather_size=total_visual_seqlen
-            )
+            megatron_args = get_args()
+            if megatron_args.context_parallel_algo == "ulysses_cp_algo":
+                query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
+                    query_states,
+                    key_states,
+                    value_states,
+                    seq_dim=seq_dim,
+                    head_dim=head_dim,
+                    gather_size=total_visual_seqlen
+                )
+            elif megatron_args.context_parallel_algo == "megatron_cp_algo":
+                if self.config.attn_layout.upper() != "TND":
+                    raise ValueError(f"Vision Attention only support layout `TND` when using Ring Attention.")
+                all_split_sizes_tensor = cal_split_sizes_multi(get_seq_len("per_visual"), mpu.get_context_parallel_world_size())
+                attn_output = do_vit_ring_context_parallel(
+                    query_states,
+                    key_states,
+                    value_states,
+                    self.num_heads,
+                    self.scaling,
+                    attn_mask=None,
+                    dropout_p=0.,
+                    pse=None,
+                    pse_type=None,
+                    shapes=all_split_sizes_tensor
+                )
+                attn_output = attn_output.reshape(seq_length, -1).contiguous()
+                attn_output = self.proj(attn_output)
+                return attn_output
+            elif megatron_args.context_parallel_algo == "hybrid_cp_algo":
+                if self.config.attn_layout.upper() != "TND":
+                    raise ValueError(f"Vision Attention only support layout `TND` when using Hybrid Attention.")
+                # ulysses a2a
+                ulysses_process_group = get_context_parallel_group_for_hybrid_ulysses()
+                query_states, key_states, value_states = gather_seq_scatter_heads_qkv(query_states, key_states, value_states, seq_dim=0, head_dim=1, gather_size=total_visual_seqlen, group=ulysses_process_group)
+                # ring attention
+                all_split_sizes_tensor = cal_split_sizes_multi(get_seq_len("per_visual"), get_context_parallel_for_hybrid_ring_world_size())
+                attn_output = do_vit_ring_context_parallel(
+                    query_states,
+                    key_states,
+                    value_states,
+                    self.num_heads // get_context_parallel_for_hybrid_ulysses_world_size(),# Num of heads per ring rank
+                    self.scaling,
+                    attn_mask=None,
+                    dropout_p=0.,
+                    pse=None,
+                    pse_type=None,
+                    shapes=all_split_sizes_tensor
+                )
+                attn_output = gather_heads_scatter_seq(attn_output, seq_dim=0, head_dim=1, gather_size=self.num_heads, group=get_context_parallel_group_for_hybrid_ulysses())
+                attn_output = attn_output.reshape(seq_length, -1).contiguous()
+                attn_output = self.proj(attn_output)
+                return attn_output
+            else:
+                raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {megatron_args.context_parallel_algo}")
+
 
         if self.config.attn_layout == "TND":
             
@@ -421,6 +514,40 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
     return q_embed, k_embed
 
 
+def do_llm_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask=None, dropout_p=0., pse=None, pse_type=None, shapes=None):
+    args = get_args()
+    in_hybrid_mode = get_context_parallel_group_for_hybrid_ring(check_initialized=False) is not None
+    if in_hybrid_mode:
+        cp_group = get_context_parallel_group_for_hybrid_ring()
+        cp_size = get_context_parallel_for_hybrid_ring_world_size()
+        rank = get_context_parallel_for_hybrid_ring_rank()
+        cp_global_ranks = get_context_parallel_for_hybrid_ring_global_ranks()
+    else:
+        cp_group = mpu.get_context_parallel_group()
+        cp_size = mpu.get_context_parallel_world_size()
+        rank = mpu.get_context_parallel_rank()
+        cp_global_ranks = mpu.get_context_parallel_global_ranks()
+
+    cp_para = dict()
+
+    cp_para['causal'] = True
+    cp_para['cp_group'] = cp_group
+    cp_para['cp_size'] = cp_size
+    cp_para['rank'] = rank
+
+    cp_para['cp_global_ranks'] = cp_global_ranks
+    cp_para['cp_group_for_send_recv_overlap'] = mpu.get_context_parallel_group_for_send_recv_overlap() \
+        if args.use_cp_send_recv_overlap else None
+    cp_para['pse'] = pse
+    cp_para['pse_type'] = pse_type
+
+    cp_para['megatron_cp_in_bnsd'] = args.megatron_cp_in_bnsd
+
+    output = ringattn_context_parallel(q, k, v, head_num, cp_para, softmax_scale, attn_mask, dropout_p, shapes=shapes)
+
+    return output
+
+
 class Qwen3VLTextAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -514,20 +641,99 @@ class Qwen3VLTextAttention(nn.Module):
             key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
         if mpu.get_context_parallel_world_size() > 1:
+            megatron_args = get_args()
             total_seq_len = get_seq_len("total")
-            if mpu.get_context_parallel_world_size() > self.config.num_key_value_heads:
-                key_states = repeat_kv(key_states, self.num_key_value_groups)
-                value_states = repeat_kv(value_states, self.num_key_value_groups)
-                attention_kwargs["enable_gqa"] = False
 
-            query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
-                query_states,
-                key_states,
-                value_states,
-                seq_dim=seq_dim,
-                head_dim=head_dim,
-                gather_size=total_seq_len
-            )
+            if megatron_args.context_parallel_algo == "ulysses_cp_algo":
+                if mpu.get_context_parallel_world_size() > self.config.num_key_value_heads:
+                    key_states = repeat_kv(key_states, self.num_key_value_groups)
+                    value_states = repeat_kv(value_states, self.num_key_value_groups)
+                    attention_kwargs["enable_gqa"] = False
+                query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
+                    query_states,
+                    key_states,
+                    value_states,
+                    seq_dim=seq_dim,
+                    head_dim=head_dim,
+                    gather_size=total_seq_len
+                )
+            elif megatron_args.context_parallel_algo == "megatron_cp_algo":
+                if self.config.attn_layout.upper() != "BNSD":
+                    raise ValueError(f"TextAttention only support layout `BNSD` when using Ring Attention.")
+
+                # mindspeed core only support SBH as input layout
+                query_states = rearrange(query_states, "b n s d -> s b (n d)").contiguous()
+                key_states = rearrange(key_states, "b n s d -> s b (n d)").contiguous()
+                value_states = rearrange(value_states, "b n s d -> s b (n d)").contiguous()
+                attn_output = do_llm_ring_context_parallel(
+                    query_states,
+                    key_states,
+                    value_states,
+                    self.config.num_attention_heads,
+                    softmax_scale=self.scaling,
+                    attn_mask=None,
+                    dropout_p=0.,
+                    pse=None,
+                    pse_type=None,
+                    shapes=None,# LLM inputs are padded to be divisible by 2*cp_size
+                )
+                # Convert back from SBH to BNSD format
+                attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=self.head_dim).contiguous()
+
+                attn_output = attn_output.reshape(batch_size, seqlen, -1).contiguous()
+                attn_output = self.o_proj(attn_output)
+                return attn_output
+            elif megatron_args.context_parallel_algo == "hybrid_cp_algo":
+                if get_context_parallel_for_hybrid_ulysses_world_size() > self.config.num_key_value_heads:
+                    key_states = repeat_kv(key_states, self.num_key_value_groups)
+                    value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+                if self.config.attn_layout.upper() != "BNSD":
+                    raise ValueError(f"TextAttention only support layout `BNSD` when using Hybrid Attention.")
+                # Calculate sequence length per ring group
+                seq_len_per_ring = total_seq_len // get_context_parallel_for_hybrid_ring_world_size()
+                # Division is exact due to padding in ring groups
+
+                # ulysses a2a
+                query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
+                    query_states,
+                    key_states,
+                    value_states,
+                    seq_dim=2,
+                    head_dim=1,
+                    gather_size=seq_len_per_ring,
+                    group=get_context_parallel_group_for_hybrid_ulysses()
+                )
+                # ring attention
+                # mindspeed core only support SBH as input layout
+                query_states = rearrange(query_states, "b n s d -> s b (n d)").contiguous()
+                key_states = rearrange(key_states, "b n s d -> s b (n d)").contiguous()
+                value_states = rearrange(value_states, "b n s d -> s b (n d)").contiguous()
+                attn_output = do_llm_ring_context_parallel(
+                    query_states,
+                    key_states,
+                    value_states,
+                    self.config.num_attention_heads // get_context_parallel_for_hybrid_ulysses_world_size(),# Num of heads per ring rank
+                    softmax_scale=self.scaling,
+                    attn_mask=None,
+                    dropout_p=0.,
+                    pse=None,
+                    pse_type=None,
+                    shapes=None,# LLM inputs are padded to be divisible by 2*cp_size
+                )
+                attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=self.head_dim).contiguous()
+                attn_output = gather_heads_scatter_seq(
+                    attn_output,
+                    seq_dim=1,
+                    head_dim=2,
+                    gather_size=self.config.num_attention_heads,
+                    group=get_context_parallel_group_for_hybrid_ulysses()
+                )
+                attn_output = attn_output.reshape(batch_size, seqlen, -1).contiguous()
+                attn_output = self.o_proj(attn_output)
+                return attn_output
+            else:
+                raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {megatron_args.context_parallel_algo}")
 
         attn_output = attention_interface(
             query_states,

@@ -7,12 +7,18 @@ from transformers import AutoConfig
 
 from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
-from megatron.core import mpu
+from megatron.core import tensor_parallel, mpu
+from mindspeed.core.context_parallel.model_parallel_utils import (
+    get_context_parallel_group_for_hybrid_ulysses,
+    get_context_parallel_group_for_hybrid_ring,
+    get_context_parallel_for_hybrid_ulysses_world_size
+)
 
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.chunkloss import chunk_loss, calculate_lm_loss
 from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward
 from mindspeed_mm.models.transformers.modelhub import ModelHub
+from mindspeed_mm.utils.utils import split_forward_gather_backward_with_megatron_cp
 
 
 class TransformersModel(MultiModalModule):
@@ -75,8 +81,31 @@ class TransformersModel(MultiModalModule):
                 grad_scale="down",
                 split_sizes=split_sizes
             )
+        elif args.context_parallel_algo == "megatron_cp_algo":
+            shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
+            # split and shift labels
+            # The default value of the ignore index is -100
+            shift_labels[..., -1] = ignore_index
+            # shape [batch size, s / cp size] --> [batch size]
+            token_nums = (shift_labels > -1).sum(dim=1)
+            shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels, mpu.get_context_parallel_group(), 1)
+        elif args.context_parallel_algo == "hybrid_cp_algo":
+            # shift labels,
+            shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
+            shift_labels[..., -1] = ignore_index  # use padding flag
+            token_nums = (shift_labels > -1).sum(dim=1)
+
+            # Split with Ring CP (first level)
+            shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels,
+                                                                    get_context_parallel_group_for_hybrid_ring(), dim=1)
+            # split shift_labels
+            split_gather_sizes = cal_split_sizes(shift_labels.shape[-1],
+                                                 get_context_parallel_for_hybrid_ulysses_world_size())
+            # Further split with Ulysses CP (second level)
+            shift_labels = split_forward_gather_backward(shift_labels, get_context_parallel_group_for_hybrid_ulysses(),
+                                                         1, split_sizes=split_gather_sizes)
         else:
-            raise NotImplementedError("Only support ulysses_cp_algo now")
+            NotImplementedError("Only support ulysses_cp_algo,megatron_cp_algo,hybrid_cp_algo now")
 
         loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
         loss = loss * (shift_labels > -1)
@@ -274,8 +303,16 @@ class TransformersModel(MultiModalModule):
                     grad_scale="down",
                     split_sizes=split_gather_sizes
                     )
+            elif args.context_parallel_algo == "megatron_cp_algo":
+                shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels, mpu.get_context_parallel_group(), dim=1)
+            elif args.context_parallel_algo == "hybrid_cp_algo":
+                # ring split
+                shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels, get_context_parallel_group_for_hybrid_ring(), dim=1)
+                # ulysses split in ring
+                split_gather_sizes = cal_split_sizes(shift_labels.shape[1], get_context_parallel_for_hybrid_ulysses_world_size())
+                shift_labels = split_forward_gather_backward(shift_labels, get_context_parallel_group_for_hybrid_ulysses(), dim=1, split_sizes=split_gather_sizes)
             else:
-                raise NotImplementedError("Only support ulysses_cp_algo now")
+                raise NotImplementedError("Only support ulysses_cp_algo,megatron_cp_algo,hybrid_cp_algo now")
 
         # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
         chunk_labels = torch.split(shift_labels, chunk_size, dim=1)

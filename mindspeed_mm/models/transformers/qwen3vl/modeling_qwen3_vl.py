@@ -22,16 +22,33 @@ from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLConfig, Q
 
 from megatron.core import mpu
 from megatron.training import get_args
-from mindspeed_mm.models.common.communications import cal_split_sizes, gather_forward_split_backward, split_forward_gather_backward
+from mindspeed.core.context_parallel.model_parallel_utils import (
+    get_context_parallel_group_for_hybrid_ulysses,
+    get_context_parallel_group_for_hybrid_ring,
+    get_context_parallel_for_hybrid_ring_world_size,
+    get_context_parallel_for_hybrid_ulysses_world_size,
+    get_context_parallel_for_hybrid_ring_global_ranks,
+    get_context_parallel_for_hybrid_ring_rank
+)
+
+from mindspeed_mm.models.common.communications import (
+    cal_split_sizes,
+    gather_forward_split_backward,
+    split_forward_gather_backward,
+    cal_split_sizes_multi,
+    split_forward_gather_backward_with_cp
+)
 from mindspeed_mm.utils.async_offload import async_save_on_cpu
-from .utils import get_seq_len, set_seq_len
+from mindspeed_mm.utils.utils import (
+    split_forward_gather_backward_with_megatron_cp,
+    gather_forward_split_backward_with_megatron_cp
+)
 
-
+from .utils import get_seq_len, set_seq_len, split_visual_seqs_with_cp
 from .output import (
     Qwen3VLCausalLMOutputWithPast, 
     Qwen3VLModelOutputWithPast
 )
-
 from .modules import (
     Qwen3VLTextAttention,
     Qwen3VLTextMLP,
@@ -198,6 +215,9 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         weight_list = [[] for _ in range(4)]
 
         for _, h, w in zip(grid_ts, grid_hs, grid_ws):
+            # Create coordinate mappings from target resolution to source grid
+            # h_idxs: float indices in [0, num_grid_per_side-1] for each pixel row
+            # for example: N=16, h=24 → h_idxs = [0, 0.652, 1.304, ..., 15]
             h_idxs = torch.linspace(0, self.num_grid_per_side - 1, h)
             w_idxs = torch.linspace(0, self.num_grid_per_side - 1, w)
 
@@ -206,50 +226,74 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
             h_idxs_ceil = (h_idxs.int() + 1).clip(max=self.num_grid_per_side - 1)
             w_idxs_ceil = (w_idxs.int() + 1).clip(max=self.num_grid_per_side - 1)
 
-            dh = h_idxs - h_idxs_floor
+            dh = h_idxs - h_idxs_floor # dh ∈ [0,1)
             dw = w_idxs - w_idxs_floor
 
             base_h = h_idxs_floor * self.num_grid_per_side
             base_h_ceil = h_idxs_ceil * self.num_grid_per_side
 
+            # ========== Compute 4 Corner Indices ==========
+            # For bilinear interpolation, we need 4 surrounding grid points
             indices = [
-                (base_h[None].T + w_idxs_floor[None]).flatten(),
-                (base_h[None].T + w_idxs_ceil[None]).flatten(),
-                (base_h_ceil[None].T + w_idxs_floor[None]).flatten(),
-                (base_h_ceil[None].T + w_idxs_ceil[None]).flatten(),
+                (base_h[None].T + w_idxs_floor[None]).flatten(), # top-left
+                (base_h[None].T + w_idxs_ceil[None]).flatten(), # top-right
+                (base_h_ceil[None].T + w_idxs_floor[None]).flatten(), # bottom-left
+                (base_h_ceil[None].T + w_idxs_ceil[None]).flatten(), # bottom-right
             ]
-
+            # Weights are based on inverse distance from each corner
             weights = [
-                ((1 - dh)[None].T * (1 - dw)[None]).flatten(),
+                ((1 - dh)[None].T * (1 - dw)[None]).flatten(), # top-left weight
                 ((1 - dh)[None].T * dw[None]).flatten(),
                 (dh[None].T * (1 - dw)[None]).flatten(),
                 (dh[None].T * dw[None]).flatten(),
             ]
-
+            # Accumulate indices and weights for this image into global lists
             for i in range(4):
                 idx_list[i].extend(indices[i].tolist())
                 weight_list[i].extend(weights[i].tolist())
 
-        idx_tensor = torch.tensor(idx_list, dtype=torch.long, device=self.pos_embed.weight.device)
-        weight_tensor = torch.tensor(
+        idx_tensors = torch.tensor(idx_list, dtype=torch.long, device=self.pos_embed.weight.device)# [4, hw1+hw2+hw3...]
+        weight_tensors = torch.tensor(
             weight_list, dtype=self.pos_embed.weight.dtype, device=self.pos_embed.weight.device
-        )
-        pos_embeds = self.pos_embed(idx_tensor) * weight_tensor[:, :, None]
+        )# [4, hw1+hw2+hw3...]
+
+        # ========== Per-Sample Processing ==========
+        # Split combined tensors back into per-sample tensors
+        patch_idx_tensors = idx_tensors.split([h * w for h, w in zip(grid_hs, grid_ws)], dim=1)
+        patch_weight_tensors = weight_tensors.split([h * w for h, w in zip(grid_hs, grid_ws)], dim=1)
+
+        # Initialize lists for reordered tensors (after spatial merging)
+        patch_idx_tensors_permute = []
+        patch_weight_tensors_permute = []
+        merge_size = self.config.spatial_merge_size
+        for idx_tensor, weight_tensor, t, h, w in zip(patch_idx_tensors, patch_weight_tensors, grid_ts, grid_hs, grid_ws):
+            idx_tensor = idx_tensor.repeat(1, t)# 4, thw
+            weight_tensor = weight_tensor.repeat(1, t)
+            idx_tensor = (
+                idx_tensor.view(4, t, h // merge_size, merge_size, w // merge_size, merge_size)
+                .permute(0, 1, 2, 4, 3, 5)
+                .flatten(1, 5)
+            )# 4, thw
+            weight_tensor = (
+                weight_tensor.view(4, t, h // merge_size, merge_size, w // merge_size, merge_size)
+                .permute(0, 1, 2, 4, 3, 5)
+                .flatten(1, 5)
+            )# 4, thw
+            patch_idx_tensors_permute.append(idx_tensor)
+            patch_weight_tensors_permute.append(weight_tensor)
+        patch_idx_tensors_permute = torch.cat(patch_idx_tensors_permute, dim=1)# [4, s1+s2+s3...]
+        patch_weight_tensors_permute = torch.cat(patch_weight_tensors_permute, dim=1)
+        
+        # Split tensors across context parallel ranks for distributed processing
+        if mpu.get_context_parallel_world_size() > 1:
+            patch_idx_tensors_permute = split_visual_seqs_with_cp(patch_idx_tensors_permute, dim=1)
+            patch_weight_tensors_permute = split_visual_seqs_with_cp(patch_weight_tensors_permute, dim=1)
+        
+
+        # embedding
+        pos_embeds = self.pos_embed(patch_idx_tensors_permute) * patch_weight_tensors_permute[:, :, None]# 4, total_visual_tokens//cp_size, hidden_size
         patch_pos_embeds = pos_embeds[0] + pos_embeds[1] + pos_embeds[2] + pos_embeds[3]
 
-        patch_pos_embeds = patch_pos_embeds.split([h * w for h, w in zip(grid_hs, grid_ws)])
-
-        patch_pos_embeds_permute = []
-        merge_size = self.config.spatial_merge_size
-        for pos_embed, t, h, w in zip(patch_pos_embeds, grid_ts, grid_hs, grid_ws):
-            pos_embed = pos_embed.repeat(t, 1)
-            pos_embed = (
-                pos_embed.view(t, h // merge_size, merge_size, w // merge_size, merge_size, -1)
-                .permute(0, 1, 3, 2, 4, 5)
-                .flatten(0, 4)
-            )
-            patch_pos_embeds_permute.append(pos_embed)
-        patch_pos_embeds = torch.cat(patch_pos_embeds_permute)
         return patch_pos_embeds
 
     def forward(self, hidden_states: torch.Tensor, grid_thw: torch.Tensor, **kwargs) -> torch.Tensor:
@@ -263,14 +307,17 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         Returns:
             `torch.Tensor`: hidden_states.
         """
-        hidden_states = self.patch_embed(hidden_states)
-        hidden_states = hidden_states + self.fast_pos_embed_interpolate(grid_thw)
+        hidden_states = self.patch_embed(hidden_states)# s1+s2+s3..., h
 
         rotary_pos_emb = self.rot_pos_emb(grid_thw)
 
         seq_len, _ = hidden_states.size()
-        seq_len_down = seq_len // self.spatial_merge_size ** 2
-        set_seq_len("visual", seq_len_down)
+        
+        sequence_lengths = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cpu()
+
+        # Set global sequence length variables for context parallelism
+        set_seq_len("per_visual", sequence_lengths)
+        set_seq_len("visual", seq_len)
         hidden_states = hidden_states.reshape(seq_len, -1)
         rotary_pos_emb = rotary_pos_emb.reshape(seq_len, -1)
 
@@ -285,24 +332,26 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
         cu_seqlens = tuple(cu_seqlens.cpu().numpy().tolist())
 
-        split_gather_sizes = None
+        # Split sequences across context parallel groups for distributed processing
         if mpu.get_context_parallel_world_size() > 1:
-            split_gather_sizes = cal_split_sizes(seq_len, mpu.get_context_parallel_world_size())
-            rotary_pos_emb = split_forward_gather_backward(
-                rotary_pos_emb,
-                mpu.get_context_parallel_group(),
-                dim=0,
-                split_sizes=split_gather_sizes
-            )
-            hidden_states = split_forward_gather_backward(
-                hidden_states,
-                mpu.get_context_parallel_group(),
-                dim=0,
-                split_sizes=split_gather_sizes,
-            )
+            rotary_pos_emb = split_visual_seqs_with_cp(rotary_pos_emb, dim=0)
+            hidden_states = split_visual_seqs_with_cp(hidden_states, dim=0)
+
+            if get_args().context_parallel_algo == "megatron_cp_algo":
+                all_split_sizes_tensor = cal_split_sizes_multi(sequence_lengths, mpu.get_context_parallel_world_size())
+                # Get cumulative split sizes for the current ring cp rank
+                cu_seqlens = all_split_sizes_tensor.cumsum(dim=1)[mpu.get_context_parallel_rank()]
+            elif get_args().context_parallel_algo == "hybrid_cp_algo":
+                # Calculate split sizes for hybrid ring context parallelism
+                all_split_sizes_tensor = cal_split_sizes_multi(sequence_lengths, get_context_parallel_for_hybrid_ring_world_size())
+                # Get cumulative split sizes for the current hybrid ring rank
+                cu_seqlens = all_split_sizes_tensor.cumsum(dim=1)[get_context_parallel_for_hybrid_ring_rank()]
 
         emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
         position_embeddings = (emb.cos(), emb.sin())
+
+        # Add fast position embeddings (interpolated based on grid dimensions)
+        hidden_states = hidden_states + self.fast_pos_embed_interpolate(grid_thw)
 
         deepstack_feature_lists = []
         for layer_num, blk in enumerate(self.blocks):
@@ -319,6 +368,19 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
                 deepstack_feature_lists.append(deepstack_feature)
 
         hidden_states = self.merger(hidden_states)
+
+        # Gather outputs from all context parallel ranks for the final result
+        set_seq_len("visual", seq_len // self.spatial_merge_size ** 2)
+        if mpu.get_context_parallel_world_size() > 1:
+            gather_sizes = cal_split_sizes(get_seq_len("visual"), mpu.get_context_parallel_world_size())
+            hidden_states = gather_forward_split_backward(
+                hidden_states,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes
+            )
+        
 
         return hidden_states, deepstack_feature_lists
 
@@ -433,28 +495,9 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
                 attention_mask = None
 
         if mpu.get_context_parallel_world_size() > 1:
-            split_gather_sizes = cal_split_sizes(total_seq_len, mpu.get_context_parallel_world_size())
-            position_ids = split_forward_gather_backward(
-                position_ids, 
-                mpu.get_context_parallel_group(),
-                dim=2,
-                grad_scale="down",
-                split_sizes=split_gather_sizes
-            )
-            text_position_ids = split_forward_gather_backward(
-                text_position_ids, 
-                mpu.get_context_parallel_group(),
-                dim=1,
-                grad_scale="down",
-                split_sizes=split_gather_sizes
-            )
-            inputs_embeds = split_forward_gather_backward(
-                inputs_embeds, 
-                mpu.get_context_parallel_group(), 
-                dim=1,
-                grad_scale="down",
-                split_sizes=split_gather_sizes, 
-            )
+            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
+            text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
+            inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
 
         hidden_states = inputs_embeds
 
@@ -514,17 +557,8 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         self, hidden_states: torch.Tensor, visual_pos_masks: torch.Tensor, visual_embeds: torch.Tensor
     ):
         if mpu.get_context_parallel_world_size() > 1:
-            total_seq_len = get_seq_len("total")
             visual_seq_len = get_seq_len("visual")
-            split_gather_sizes = cal_split_sizes(total_seq_len, mpu.get_context_parallel_world_size())
             visual_gather_sizes = cal_split_sizes(visual_seq_len, mpu.get_context_parallel_world_size())
-            hidden_states = gather_forward_split_backward(
-                hidden_states,
-                mpu.get_context_parallel_group(),
-                dim=1,
-                grad_scale="up",
-                gather_sizes=split_gather_sizes
-            )
             visual_embeds = gather_forward_split_backward(
                 visual_embeds,
                 mpu.get_context_parallel_group(),
@@ -535,17 +569,31 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
 
         visual_pos_masks = visual_pos_masks.to(hidden_states.device)
         visual_embeds = visual_embeds.to(hidden_states.device, hidden_states.dtype)
+        if mpu.get_context_parallel_world_size() > 1:
+            megatron_args = get_args()
+            if megatron_args.context_parallel_algo == "ulysses_cp_algo":
+                gather_sizes = cal_split_sizes(get_seq_len("total"), mpu.get_context_parallel_world_size())
+                hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), dim=1, grad_scale="up", gather_sizes=gather_sizes)
+            elif megatron_args.context_parallel_algo == "megatron_cp_algo":
+                hidden_states = gather_forward_split_backward_with_megatron_cp(hidden_states, mpu.get_context_parallel_group(), dim=1)
+            elif megatron_args.context_parallel_algo == "hybrid_cp_algo":
+                # Calculate the sequence length per ring CP group for Ulysses processing. 
+                # Since padding is applied in ring groups, the division yields an integer.
+                seq_len_per_ring = get_seq_len("total") // get_context_parallel_for_hybrid_ring_world_size()
+                # ulysses allgather
+                gather_sizes = cal_split_sizes(seq_len_per_ring, get_context_parallel_for_hybrid_ulysses_world_size())
+                hidden_states = gather_forward_split_backward(hidden_states, get_context_parallel_group_for_hybrid_ulysses(), dim=1, grad_scale="up", gather_sizes=gather_sizes)
+                # ring allgather
+                hidden_states = gather_forward_split_backward_with_megatron_cp(hidden_states, get_context_parallel_group_for_hybrid_ring(), dim=1)
+            else:
+                raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {megatron_args.context_parallel_algo}")
         local_this = hidden_states[visual_pos_masks, :].clone() + visual_embeds
         hidden_states[visual_pos_masks, :] = local_this
 
+        # split again
         if mpu.get_context_parallel_world_size() > 1:
-            hidden_states = split_forward_gather_backward(
-                hidden_states, 
-                mpu.get_context_parallel_group(), 
-                dim=1,
-                grad_scale="down",
-                split_sizes=split_gather_sizes, 
-            )
+            hidden_states = split_forward_gather_backward_with_cp(hidden_states, dim=1)
+
         return hidden_states
 
 
@@ -727,17 +775,6 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
             param_dtype = self.visual._get_fsdp_state()._mp_policy.param_dtype
             pixel_values = pixel_values.type(param_dtype) if param_dtype is not None else pixel_values
         image_embeds, deepstack_image_embeds = self.visual(pixel_values, grid_thw=image_grid_thw)
-        if mpu.get_context_parallel_world_size() > 1:
-            visual_seqlen = get_seq_len("visual")
-            gather_sizes = cal_split_sizes(visual_seqlen, mpu.get_context_parallel_world_size())
-
-            image_embeds = gather_forward_split_backward(
-                image_embeds,
-                mpu.get_context_parallel_group(),
-                dim=0,
-                grad_scale="up",
-                gather_sizes=gather_sizes,
-            )
 
         split_sizes = (image_grid_thw.prod(-1) // self.visual.spatial_merge_size**2).tolist()
         image_embeds = torch.split(image_embeds, split_sizes)
@@ -768,15 +805,15 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
             special_video_mask = input_ids == self.config.video_token_id
 
         n_image_tokens = special_image_mask.sum()
-        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)
-        if image_features is not None and inputs_embeds[special_image_mask].numel() != image_features.numel():
+        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)# b s h
+        if image_features is not None and special_image_mask.sum().item() != image_features.numel():
             raise ValueError(
                 f"Image features and image tokens do not match: tokens: {n_image_tokens}, features {image_features.shape[0]}"
             )
 
         n_video_tokens = special_video_mask.sum()
         special_video_mask = special_video_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)
-        if video_features is not None and inputs_embeds[special_video_mask].numel() != video_features.numel():
+        if video_features is not None and special_video_mask.sum().item() != video_features.numel():
             raise ValueError(
                 f"Videos features and video tokens do not match: tokens: {n_video_tokens}, features {video_features.shape[0]}"
             )
@@ -826,6 +863,8 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
                 input_ids, inputs_embeds=inputs_embeds, image_features=image_embeds
             )
             inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
+            # for releasing space
+            del image_embeds
 
         if pixel_values_videos is not None:
             with context:
@@ -835,6 +874,8 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
                 input_ids, inputs_embeds=inputs_embeds, video_features=video_embeds
             )
             inputs_embeds = inputs_embeds.masked_scatter(video_mask, video_embeds)
+            # for releasing space
+            del video_embeds
 
         visual_pos_masks = None
         deepstack_visual_embeds = None

@@ -3,6 +3,7 @@
 from copy import deepcopy
 from functools import partial
 from typing import Dict, Any
+from dataclasses import dataclass
 
 from datasets import Dataset
 import torch
@@ -12,7 +13,7 @@ from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.core import mpu
 from megatron.core.enums import ModelType
 from megatron.training import get_args, print_rank_0
-from megatron.training.utils import average_losses_across_data_parallel_group
+from megatron.training.utils import average_losses_across_data_parallel_group, unwrap_model
 from mindspeed_mm.configs.config import mm_extra_args_provider
 from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.data.data_utils.utils import build_iterations
@@ -34,14 +35,16 @@ def model_provider(*args, **kwargs):
 
 
 def move_to_device(batch: Dict[str, Any], float_dtype: str):
+    new_batch = dict()
     for k, v in batch.items():
         if isinstance(v, torch.Tensor):
             dtype = float_dtype if torch.is_floating_point(v) else None
-            batch[k] = v.to(device=torch.cuda.current_device(), dtype=dtype)
+            new_batch[k] = v.to(device=torch.cuda.current_device(), dtype=dtype)
         elif isinstance(v, list) and all(isinstance(t, torch.Tensor) for t in v):
-            batch[k] = [t.to(device=torch.cuda.current_device(),
+            new_batch[k] = [t.to(device=torch.cuda.current_device(),
                              dtype=float_dtype if torch.is_floating_point(t) else None)
                         for t in v]
+    return new_batch
 
 
 def get_batch(data_iterator):
@@ -50,7 +53,6 @@ def get_batch(data_iterator):
         batch = next(data_iterator)
     else:
         raise ValueError("Data iterator is None. Unable to retrieve batch.")
-    move_to_device(batch, get_args().params_dtype)
     return batch
 
 
@@ -93,6 +95,13 @@ def loss_func(output_tensor):
 def forward_step(data_iterator, model):
     """Forward step."""
     batch_data = get_batch(data_iterator)
+    if get_args().use_torch_fsdp2:
+        dtype = unwrap_model(model).model._get_fsdp_state()._mp_policy.param_dtype
+        dtype = dtype if dtype is not None else torch.bfloat16
+        batch_data = move_to_device(batch_data, dtype)
+    else:
+        batch_data = move_to_device(batch_data, get_args().params_dtype)
+
     output_tensor = model(**batch_data)
     return output_tensor, loss_func
 

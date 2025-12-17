@@ -497,32 +497,19 @@ def gather_sequence_chunks_to_packed_tensor(
     # Step 2: Split the gathered tensor into chunks corresponding to each rank's contribution
     # This separates the gathered data back into per-rank chunks for processing
     rank_chunks = torch.split(all_gathered_tensor, rank_total_sizes, dim=dim)
+    rank_seq_chunks = [list(torch.split(rank_chunks[i], all_split_sizes[i].tolist(), dim=dim)) for i in range(world_size)]
 
     # Step 3: Reconstruct each original sequence by collecting chunks from all ranks
     reconstructed_sequences = []
 
-    for seq_idx in range(num_sequences):
-        sequence_chunks = []
-        
+    for _ in range(num_sequences):
         # For current sequence, collect chunks from all ranks
-        for rank_idx in range(world_size):
-            chunk_size = all_split_sizes[rank_idx, seq_idx]
-            # Find the position of this sequence's chunk within the rank's data
-            chunk_start = all_split_sizes[rank_idx, :seq_idx].sum()
-            chunk_end = chunk_start + chunk_size
-            
-            # Extract the chunk
-            chunk = rank_chunks[rank_idx].narrow(dim, chunk_start, chunk_size)
-            sequence_chunks.append(chunk)
-        
+        sequence_chunks = [rank_seq_chunks[i].pop(0) for i in range(world_size)]
         # Concatenate all chunks for this sequence
-        full_sequence = torch.cat(sequence_chunks, dim=dim)
-        reconstructed_sequences.append(full_sequence)
-    
-    # Step 4: Concatenate all reconstructed sequences along sequence dimension
-    final_output = torch.cat(reconstructed_sequences, dim=dim)
+        reconstructed_sequences.extend(sequence_chunks)
 
-    return final_output
+    # Step 4: Concatenate all reconstructed sequences along sequence dimension
+    return torch.cat(reconstructed_sequences, dim=dim)
 
 
 def split_forward_gather_backward_with_cp(
