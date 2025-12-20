@@ -1,0 +1,102 @@
+{
+    "dataset_param": {
+        "dataset_type": "t2v",
+        "basic_parameters": {
+			"data_path": "/home/ci_resource/data/OpenSoraPlan/v1.2/pixabay_v2/train_data.txt",
+			"data_storage_mode": "combine"
+        },
+        "preprocess_parameters": {
+            "video_processor_type": "OpensoraplanVideoProcessor",
+            "video_reader_type": "DecordVideo",
+            "image_reader_type": "Image",
+            "num_frames": 49,
+            "min_num_frames": 1,
+            "frame_interval": 1,
+            "auto_interval": false,
+            "max_height": 480,
+            "max_width": 832,
+            "max_hxw": 399360,
+            "train_fps": 24,
+            "speed_factor": 1.0,
+            "drop_short_ratio": 0.0,
+            "cfg": 0.0,
+            "hw_stride": 8,
+            "force_resolution": false,
+            "hw_aspect_thr": 5.0,
+            "truncate_t_by_sp": false,
+            "train_pipeline": {
+                "video": [
+                    {
+                        "trans_type": "ResizeVideo",
+                        "param": {
+                            "transform_size": "auto",
+                            "interpolation_mode": "bilinear",
+                            "antialias": true,
+                            "mode": "shortside"
+                        }
+                    },
+                    {
+                        "trans_type": "ToTensorVideo"
+                    },
+                    {
+                        "trans_type": "norm_fun",
+                        "param": {
+                            "mean": 0.5,
+                            "std": 0.5
+                        }
+                    },
+                    {
+                        "trans_type": "CenterCropResizeVideo",
+                        "param": {
+                            "use_short_edge": false,
+                            "top_crop": false,
+                            "align_corners": false,
+                            "antialias": true,
+                            "transform_size": "auto"
+                        }
+                    }
+                ],
+                "first_frame_vae": [
+                    {
+                        "trans_type": "ResizeVideo",
+                        "param": {
+                            "transform_size": "auto",
+                            "mode": "resize",
+                            "interpolation_mode": "bilinear",
+                            "align_corners": false,
+                            "antialias": false
+                        }
+                    }
+                ]
+            }
+        },
+        "use_text_processer": true,
+        "enable_text_preprocessing": true,
+        "text_preprocess_methods":[
+            {
+                "method": "basic_clean"
+            },
+            {
+                "method": "whitespace_clean"
+            }
+        ],
+        "tokenizer_config": 
+        {
+            "autotokenizer_name": "AutoTokenizer",
+            "hub_backend": "hf",
+            "from_pretrained": "/home/ci_resource/models/wan2.2/tokenizer/",
+            "model_max_length": 512
+        }
+    },
+    "dataloader_param": {
+        "dataloader_mode": "sampler",
+        "sampler_type": "LengthGroupedSampler",
+        "shuffle": true,
+        "drop_last": true,
+        "pin_memory": true,
+        "group_frame": false,
+        "group_resolution": false,
+        "group_data": true,
+        "initial_global_step_for_sampler": 0
+    }
+}
