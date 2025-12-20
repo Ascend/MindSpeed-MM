@@ -87,22 +87,24 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         forbidden_modules = set()
         if config.image_encoder.vision_encoder.freeze:
             vision_model_keys = ["visual.patch_embed", "visual.blocks"]
-            print_rank_0(f"Set vision model not trainable: {vision_model_keys}")
             forbidden_modules.update(vision_model_keys)
 
         if config.image_encoder.vision_projector.freeze:
             projector_keys = ["visual.merger"]
-            print_rank_0(f"Set vision model not trainable: {projector_keys}")
             forbidden_modules.update(projector_keys)
 
         if config.text_decoder.freeze:
             language_model_keys = ["language_model", "lm_head"]
-            print_rank_0(f"Set vision model not trainable: {language_model_keys}")
             forbidden_modules.update(language_model_keys)
 
-        for name, param in self.model.named_parameters():
-            if any(forbidden_module in name for forbidden_module in forbidden_modules):
-                param.requires_grad_(False)
+        # modules that are finally frozen
+        final_forbidden_modules = set()
+        for name, param in self.named_parameters():
+            for forbidden_module in forbidden_modules:
+                if forbidden_module in name:
+                    param.requires_grad_(False)
+                    final_forbidden_modules.add(forbidden_module)
+        print_rank_0(f"Set modules not trainable: {final_forbidden_modules}")
 
     @staticmethod
     def overwrite_transformer_config(transformer_config):

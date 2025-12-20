@@ -226,6 +226,11 @@ dataset_param->basic_parameters->dataset
 }
 
 ```
+【模块冻结配置】
+
+当前支持vison encoder、vision projector、text decoder及lm head模块的冻结，其中，vison encoder、vision projector默认训练时为冻结状态，
+
+通过配置`model.json`文件中各个模块的`freeze`字段，来修改各个模块的冻结与否。
 
 【MoE 加速配置】
 
