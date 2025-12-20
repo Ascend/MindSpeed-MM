@@ -17,7 +17,7 @@ class DiffusersAEModel(nn.Module):
         module = importlib.import_module("diffusers")
         automodel = getattr(module, model_name)
         self.model_name = model_name
-        self.model = automodel.from_pretrained(config["from_pretrained"])
+        self.model = automodel.from_pretrained(config["from_pretrained"], torch_dtype=config.pop("dtype", None))
         self.do_sample = config.get("do_sample", True)
 
         # tiling

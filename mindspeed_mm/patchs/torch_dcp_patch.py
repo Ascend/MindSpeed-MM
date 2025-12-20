@@ -175,6 +175,12 @@ def _load_base_checkpoint(
             print_rank_0(f"Unexpected keys: {model_unexpected_keys}")
     else:
         raise NotImplementedError(f"checkpoint format {ckpt_format} not supported")
+    # By default FSDP2 mixed precision keeps the original weight precision.
+    # To match the numerical behavior of  --bf16 , we added the  --downcast-to-bf16  option.
+    if args.downcast_to_bf16 and isinstance(state_dict, dict) and 'model' in state_dict:
+        for k in state_dict['model']:
+            if state_dict['model'][k].dtype == torch.float:
+                state_dict['model'][k] = state_dict['model'][k].bfloat16().float()
 
     return state_dict, checkpoint_name, release, ckpt_type
 

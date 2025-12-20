@@ -127,3 +127,7 @@ offload_to_cpu: False
 4、当设置`offload_to_cpu=True`时，需在入口脚本中设置通信组为双后端，即：`--distributed-backend npu:hccl,cpu:gloo`
 
 5、对于参数量极大的模型训练，推荐启用`--init-model-with-meta-device`和`--no-initialization`参数，有效避免因一次性加载完整模型参数导致的内存溢出，同时显著减少模型初始化阶段的等待时间。
+
+6、fsdp2的混精在yaml中配置生效，`--bf16`不再必要，并且与断点续训存在冲突，如启用需要与`--no-save-optim`和`--no-load-optim`一同启用。
+为了和`--bf16`的计算行为对齐，我们增加了`--downcast-to-bf16`选项，在权重加载阶段增加权重downcast，以保持关闭`--bf16`时的计算一致性。
+此处fsdp2混精默认保持加载权重的精度不变，推荐使用此默认行为，避免精度损失。

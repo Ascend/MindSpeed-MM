@@ -66,7 +66,7 @@ GPT_ARGS="
     --no-load-rng \
     --no-save-optim \
     --no-save-rng \
-    --bf16 \
+    --downcast-to-bf16 \
     --use-torch-fsdp2 \
     --untie-embeddings-and-output-weights \
     --ckpt-format torch_dcp \

@@ -83,6 +83,10 @@ def _add_training_args(parser):
                        action='store_true',
                        default=False,
                        help='Use tf32 to train')
+    group.add_argument('--downcast-to-bf16',
+                       action='store_true',
+                       default=False,
+                       help='whether to downcast model weight from fp32 to bf16 while loading ckpt')
     group.add_argument('--allow-internal-format',
                        action='store_true',
                        default=False,

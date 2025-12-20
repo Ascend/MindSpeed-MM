@@ -66,7 +66,7 @@ GPT_ARGS="
     --no-load-rng \
     --no-save-optim \
     --no-save-rng \
-    --bf16 \
+    --downcast-to-bf16 \
     --use-fused-rmsnorm \
     --use-torch-fsdp2 \
     --fsdp2-config-path ${fsdp2_config} \
