@@ -365,7 +365,7 @@ class Qwen3VLVisionAttention(nn.Module):
                 )
                 for q, k, v in zip(*splits)
             ]
-            attn_output = torch.cat(attn_outputs, dim=1)
+            attn_output = torch.cat(attn_outputs, dim=seq_dim)
 
         if mpu.get_context_parallel_world_size() > 1:
             attn_output = gather_heads_scatter_seq(
@@ -374,6 +374,9 @@ class Qwen3VLVisionAttention(nn.Module):
                 head_dim=head_dim,
                 gather_size=self.num_heads
             )
+
+        if self.config.attn_layout == "BNSD":
+            attn_output = attn_output.transpose(1, 2)
 
         attn_output = attn_output.reshape(seq_length, -1).contiguous()
         attn_output = self.proj(attn_output)
@@ -613,11 +616,11 @@ class Qwen3VLTextAttention(nn.Module):
             query_states = query_states.transpose(1, 2)  # BNSD
             key_states = key_states.transpose(1, 2)
             value_states = value_states.transpose(1, 2)
-            attention_kwargs["attention_mask"] = attention_mask[:, :, :, : key_states.shape[-2]] if attention_mask is not None else None
+            attention_kwargs["attention_mask"] = attention_mask
             attention_kwargs["enable_gqa"] = True
             seq_dim, head_dim = 2, 1
         elif self.config.attn_layout == "BSND":
-            attention_kwargs["attention_mask"] = attention_mask[:, :, :, : key_states.shape[1]] if attention_mask is not None else None
+            attention_kwargs["attention_mask"] = attention_mask
             attention_kwargs["enable_gqa"] = True
         elif self.config.attn_layout == "TND":
             attention_kwargs["actual_seq_qlen"] = kwargs["cu_seqlens"]
@@ -755,6 +758,8 @@ class Qwen3VLTextAttention(nn.Module):
                 gather_size=self.num_heads
             )
 
+        if self.config.attn_layout == "BNSD":
+            attn_output = attn_output.transpose(1, 2)
         attn_output = attn_output.reshape(batch_size, seqlen, -1).contiguous()  # TND -> BSH
         attn_output = self.o_proj(attn_output)
         return attn_output

@@ -252,9 +252,25 @@ GPT_ARGS="
 
 【Attention配置】
 
-当前支持vision和text模块选择不同的Attntion实现方式，具体为在`model.json`文件中修改`attn_implementation`字段，当前支持`eager`、`flash_attention_2`、`sdpa`三种配置。
+- 是否计算AttnMask
+  配置方式为在 `model.json` 文件中修改`is_causal`字段。
+  是否使用casual_mask，设置为 true 时按照casual mask计算，为 false 时会创建完整的attention mask，长序列时推荐使能以节省显存。
 
-注意：当sdpa和FusedMoE一起使用时，可能会存在显存未及时释放导致OOM的问题，可以开启`flash_attention_2`缓解多流复用带来显存未及时释放问题，降低部分显存使用。
+- attn_implementation 和 layout配置
+  当前支持vision和text模块选择不同的Attntion实现方式，具体为在`model.json`文件中修改`attn_implementation`字段，当前支持情况如下表。
+  | 模块| 支持的FA以及layout | 支持的cp类型 |
+  | --- | --- | --- |
+  | ViT | `flash_attention_2`: `TND` | ulysses、ring、usp |
+  | ViT | `flash_attention_2`: ``BNSD`` | ulysses |
+  | ViT | `sdpa`: ``BNSD`` | ulysses |
+  | LLM | `flash_attention_2`: `TND` | / |
+  | LLM | `flash_attention_2`: `BNSD` | ulysses、ring、usp |
+  | LLM | `flash_attention_2`: `BSND` | ulysses |
+  | LLM | `sdpa`: `BNSD` | ulysses |
+
+【synchronize_per_layer配置】
+当使用FSDP2训练时，可能会存在显存未及时释放导致OOM的问题，可以开启`synchronize_per_layer`让每个transformer layer强制同步，缓解多流复用带来显存未及时释放问题，降低部分显存使用。
+开启方式为在 `model.json` 文件中修改`synchronize_per_layer`字段，当前已默认设置为true
 
 【activation_offload配置】
 使用activation_offload可以将重计算过程中产生的checkpoint点的激活值移动到host，反向异步从host传输到device，降低device激活显存占用，配置方式为在`model.json`中将`activation_offload`字段设置为True。

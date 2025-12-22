@@ -196,7 +196,6 @@ def sdpa_attention_forward(
         is_causal=is_causal,
         enable_gqa=enable_gqa,
     )
-    attn_output = attn_output.transpose(1, 2).contiguous()
 
     return attn_output
 
