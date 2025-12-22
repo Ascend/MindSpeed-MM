@@ -37,13 +37,13 @@ def _adjust_tensor_dimensions(tensor, scatter_idx, gather_idx):
         # scatter_idx == 1:
         else:
             dims[scatter_idx], dims[gather_idx] = dims[gather_idx], dims[scatter_idx]
-    
+
     elif gather_idx == 1:
         # scatter idx >= 2
         if scatter_idx != 0:
             # if scatter_idx is not 0, move it to 0
             dims[0], dims[scatter_idx] = dims[gather_idx], dims[0]
-    
+
     # Handle the case when gather_idx >= 2
     else:
         if scatter_idx == 0:
@@ -63,7 +63,7 @@ def _unadjust_tensor_dimensions(tensor, adjusted_dims):
     inverse_dims = [0] * len(adjusted_dims)
     for new_pos, old_pos in enumerate(adjusted_dims):
         inverse_dims[old_pos] = new_pos
-    
+
     # Restore the dimension order
     unadjusted_tensor = tensor.permute(inverse_dims).contiguous()
     return unadjusted_tensor
@@ -79,11 +79,11 @@ def cal_split_sizes(dim_size: int, world_size: int):
 def cal_split_sizes_multi(sizes: Union[List[int], Tuple[int, ...], torch.Tensor], world_size: int):
     """
     Calculate split sizes for multiple sizes across distributed ranks.
-    
+
     Returns:
-        torch.Tensor: A tensor of shape [world_size, num_sizes] where each row 
+        torch.Tensor: A tensor of shape [world_size, num_sizes] where each row
                      represents the split sizes for one rank across all input sizes.
-        
+
     Example:
         >>> cal_split_sizes_multi([10, 15], 3)
         tensor([[4, 5],  # Rank 0: 4 from first size, 5 from second size
@@ -97,7 +97,7 @@ def cal_split_sizes_multi(sizes: Union[List[int], Tuple[int, ...], torch.Tensor]
         remainder = size % world_size
         size_splits = [split_size + (1 if i < remainder else 0) for i in range(world_size)]
         splits_per_size.append(size_splits)
-    
+
     return torch.tensor(splits_per_size).T
 
 
@@ -116,7 +116,7 @@ def _all_to_all(
 
     if world_size == 1:
         return input_
-    
+
     # 非均匀切分
     if scatter_sizes is not None and gather_sizes is not None:
         input_list = [t.contiguous() for t in torch.split(input_, scatter_sizes, scatter_dim)]
@@ -127,7 +127,7 @@ def _all_to_all(
             tensor_shape = list(tensor_shape_base)
             tensor_shape[gather_dim] = gather_sizes[i]
             output_list.append(torch.empty(tensor_shape, dtype=input_.dtype, device=input_.device))
-    
+
     else:
         input_list = [
             t.contiguous()
@@ -162,6 +162,30 @@ def _single_all_to_all(
     if scatter_dim < 1:
         output = output.transpose(0, 1).contiguous()
     return output.reshape(inp_shape[:gather_dim] + [inp_shape[gather_dim] * sp_size, ] + inp_shape[gather_dim + 1:])
+
+
+def _ep_all_to_all(
+    input_: torch.Tensor,
+    group: dist.ProcessGroup,
+    scatter_dim: int,
+    gather_dim: int,
+    scatter_sizes: List = None,
+    gather_sizes: List = None
+):
+    world_size = torch.distributed.get_world_size(group=group)
+    if world_size == 1:
+        return input_
+
+    inputs = input_.contiguous()
+    if gather_sizes is None:
+        output = torch.empty_like(inputs)  # Equal split (all2all)
+    else:
+        # Unequal split (all2all-v)
+        output = inputs.new_empty(size=[sum(gather_sizes)] + list(inputs.size()[1:]),
+                                    dtype=inputs.dtype, device=inputs.device)
+    torch.distributed.all_to_all_single(output, inputs, output_split_sizes=gather_sizes,
+                                        input_split_sizes=scatter_sizes, group=group)
+    return output
 
 
 class _AllToAll(torch.autograd.Function):
@@ -230,6 +254,17 @@ def all_to_all_SBH(
     return _AllToAll.apply(input_, process_group, scatter_dim, gather_dim, scatter_sizes, gather_sizes, _single_all_to_all)
 
 
+def all_to_all_EP(
+    input_: torch.Tensor,
+    process_group: dist.ProcessGroup,
+    scatter_dim: int = 2,
+    gather_dim: int = 1,
+    scatter_sizes: List = None,
+    gather_sizes: List = None
+):
+    return _AllToAll.apply(input_, process_group, scatter_dim, gather_dim, scatter_sizes, gather_sizes, _ep_all_to_all)
+
+
 # ====================
 # Gather-Split
 # ====================
@@ -270,8 +305,8 @@ def _split(
     return output
 
 
-def _gather(input_: torch.Tensor, 
-    pg: dist.ProcessGroup, 
+def _gather(input_: torch.Tensor,
+    pg: dist.ProcessGroup,
     dim: int = -1,
     gather_sizes: List = None
 ):
@@ -294,7 +329,7 @@ def _gather(input_: torch.Tensor,
             tensor_list.append(torch.empty(tensor_shape, dtype=input_.dtype, device=input_.device))
     else:
         tensor_list = [torch.empty_like(input_) for _ in range(world_size)]
-    
+
     torch.distributed.all_gather(tensor_list, input_, group=pg)
 
     # concat
@@ -406,33 +441,33 @@ def split_each_sequence_in_packed_tensor(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Split packed hidden states for sequence parallelism, handling multiple variable-length sequences.
-    
+
     This function:
     1. Splits each sequence across all processes in the process group
     2. Returns the local chunks for the current rank
-    
+
     Args:
         hidden_states: Concatenated hidden states of all sequences [total_seq_len, hidden_dim]
         process_group: Distributed process group for parallelism
         sequence_lengths: List of lengths for each individual sequence
         dim: Dimension along which to split (default: 0 - sequence dimension)
-        
+
     Returns:
         local_hidden_states: Local chunks of hidden states for current rank
     """
-    
+
     world_size = torch.distributed.get_world_size(process_group)
     local_sequence_chunks = []     # Local chunks for current rank
-    
+
     current_position = 0
-    
+
     # Process each sequence individually
     for _, seq_len in enumerate(sequence_lengths):
         # Extract the current sequence from packed hidden states
         sequence_end = current_position + seq_len
         current_sequence = hidden_states.narrow(dim=dim, start=current_position, length=seq_len)
         current_position = sequence_end
-        
+
         # Calculate how to split this sequence across all ranks
         sequence_split_sizes = cal_split_sizes(seq_len, world_size)
 
@@ -445,10 +480,10 @@ def split_each_sequence_in_packed_tensor(
             split_sizes=sequence_split_sizes
         )
         local_sequence_chunks.append(local_chunk)
-    
+
     # Concatenate all local chunks along sequence dimension
     local_hidden_states = torch.cat(local_sequence_chunks, dim=dim)
-    
+
     return local_hidden_states
 
 
@@ -460,18 +495,18 @@ def gather_sequence_chunks_to_packed_tensor(
 ) -> torch.Tensor:
     """
     Gather distributed sequence chunks and reconstruct original packed sequences.
-    
+
     Reconstruction process:
     1. For each sequence: gather chunks from all ranks and concatenate
     2. Concatenate all reconstructed sequences along sequence dimension
-    
+
     Args:
         local_hidden_states: Local hidden states [local_seq_len, hidden_dim]
-        all_split_sizes: Split sizes tensor [world_size, num_sequences] showing how each sequence 
+        all_split_sizes: Split sizes tensor [world_size, num_sequences] showing how each sequence
                         was distributed across ranks
         process_group: Distributed process group for communication
         dim: Dimension along which sequences were split (default: 0 - sequence dimension)
-        
+
     Returns:
         reconstructed_sequences: Reconstructed packed sequences [total_seq_len, hidden_dim]
     """
@@ -518,7 +553,7 @@ def split_forward_gather_backward_with_cp(
 ) -> torch.Tensor:
     """
     Perform a context-parallel-aware tensor split during forward pass and gather during backward pass.
-    
+
     This function supports multiple context parallel (CP) algorithms:
       - Ulysses-style CP: uniform or non-uniform split across CP ranks.
       - Megatron-style CP: typically used with sequence parallelism and ring-based communication.
@@ -543,7 +578,7 @@ def split_forward_gather_backward_with_cp(
 
     else:
         raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {args.context_parallel_algo}")
-    
+
     return input_
 
 
