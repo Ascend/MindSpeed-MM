@@ -2,8 +2,8 @@
     "model_id": "DeepSeek-VL2",
     "text_decoder": {
         "model_id": "deepseek",
-        "num_layers": 5,
-        "pipeline_num_layers": [1, 4],
+        "num_layers": 15,
+        "pipeline_num_layers": [7, 8],
         "hidden_size": 2560,
         "num_attention_heads": 32,
         "num_query_groups": 32,
