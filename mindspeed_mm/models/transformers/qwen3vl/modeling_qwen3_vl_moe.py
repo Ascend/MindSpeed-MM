@@ -281,7 +281,7 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel, Qwen3VLTextModel):
 
 
 @auto_docstring
-class Qwen3VLMoeModel(Qwen3VLModel, Qwen3VLMoePreTrainedModel):
+class Qwen3VLMoeModel(Qwen3VLMoePreTrainedModel, Qwen3VLModel):
     base_model_prefix = ""
     _checkpoint_conversion_mapping = {}
     # Reference: fix gemma3 grad acc #37208

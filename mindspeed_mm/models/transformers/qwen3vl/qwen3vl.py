@@ -137,6 +137,10 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         # set activation offload, only suppport offload text activations now
         llm_activation_offload = getattr(model_cfg.text_decoder, "activation_offload", False)
         setattr(transformer_config.text_config, "activation_offload", llm_activation_offload)
+        
+        # set router_aux_loss_coef, for moe model
+        router_aux_loss_coef = getattr(model_cfg.loss_cfg, "router_aux_loss_coef", 0.0)
+        transformer_config.text_config.router_aux_loss_coef = router_aux_loss_coef
 
         return transformer_config
 

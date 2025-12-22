@@ -206,6 +206,10 @@ class TransformersModel(MultiModalModule):
             *args, **kwargs
     ) -> torch.Tensor:
         loss_dict = {}
+        
+        # aux loss (for moe model)
+        if self.router_aux_loss_coef > 0.0:
+            kwargs["output_router_logits"] = True
 
         if self.loss_compute_mode == "chunk":
             loss_ctx, loss_mask = self.build_loss_ctx(labels, chunk_size=self.loss_chunk_size)
@@ -344,11 +348,13 @@ class TransformersModel(MultiModalModule):
     def _set_loss_cfg(self, args):
         # Retrieve loss configuration from model.json if available
         loss_cfg = getattr(args.mm.model, "loss_cfg", None)
-        # loss_cfg param: compute_mode, chunk_size
+        # loss_cfg param: compute_mode, chunk_size, router_aux_loss_coef
         # compute_mode: default, chunk(use chunk loss)
         # chunk_size: valid when compute mode is set to chunk (default 1024)
+        # router_aux_loss_coef: float (use for moe model, default 0.0)
         self.loss_compute_mode = "default"
         self.loss_chunk_size = 1024
+        self.router_aux_loss_coef = 0.0
         if loss_cfg is not None:
             self.loss_compute_mode = getattr(loss_cfg, "compute_mode", "default")
             if self.loss_compute_mode == "default":
@@ -357,3 +363,10 @@ class TransformersModel(MultiModalModule):
                 self.loss_chunk_size = getattr(loss_cfg, "chunk_size", 1024)
             else:
                 raise NotImplementedError(f"Unrecognized loss_compute_mode: {self.loss_compute_mode}.")
+            
+            self.router_aux_loss_coef = getattr(loss_cfg, "router_aux_loss_coef", 0.0)
+            
+            if self.router_aux_loss_coef > 0.0 and args.calculate_per_token_loss:
+                raise NotImplementedError(
+                    "Auxiliary loss computation and per-token loss calculation are currently not supported simultaneously."
+                )

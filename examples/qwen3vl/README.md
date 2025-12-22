@@ -273,10 +273,13 @@ GPT_ARGS="
 开启方式为在 `model.json` 文件中修改`synchronize_per_layer`字段，当前已默认设置为true
 
 【activation_offload配置】
-使用activation_offload可以将重计算过程中产生的checkpoint点的激活值移动到host，反向异步从host传输到device，降低device激活显存占用，配置方式为在`model.json`中将`activation_offload`字段设置为True。
+使用activation_offload可以将重计算过程中产生的checkpoint点的激活值移动到host，反向异步从host传输到device，降低device激活显存占用，配置方式为在`model_xxB.json`中将`activation_offload`字段设置为True。
 
 【chunkloss 配置】
 参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/chunkloss.md)
+
+【负载均衡损失配置】
+支持自定义moe模型中专家负载均衡的aux_loss的系数，在`model_xxB.json`中的`router_aux_loss_coef`，默认为0.0，即不计算该损失。(注意当前不支持同时开启aux_loss和`--calculate-per-token-loss`)
 
 【模型保存加载及日志信息配置】
 
