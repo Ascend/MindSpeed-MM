@@ -47,6 +47,6 @@
             "ignore_pad_token_for_loss": true
         },
         "pin_memory": true,
-        "shuffle": true
+        "shuffle": false
     }
 }

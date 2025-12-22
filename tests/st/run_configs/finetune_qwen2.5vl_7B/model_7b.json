@@ -5,7 +5,7 @@
     "image_encoder": {
         "vision_encoder": {
             "model_id": "qwen2vit",
-            "num_layers": 2,
+            "num_layers": 32,
             "hidden_size": 1280,
             "ffn_hidden_size": 3420,
             "llm_hidden_size": 3584,
@@ -27,7 +27,7 @@
             "freeze": true,
             "use_fused_rotary_pos_emb": true,
             "post_layer_norm": false,
-            "pipeline_num_layers": [2, 0],
+            "pipeline_num_layers": [32, 0],
             "intermediate_size": 3420,
             "tokens_per_second": 2,
             "window_attn_size": 112,
@@ -58,8 +58,8 @@
     },
     "text_decoder": {
         "model_id": "qwen2_5_lm",
-        "num_layers": 2,
-        "pipeline_num_layers": [1, 1],
+        "num_layers": 28,
+        "pipeline_num_layers": [12, 16],
         "hidden_size": 3584,
         "ffn_hidden_size": 18944,
         "num_attention_heads": 28,

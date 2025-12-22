@@ -1,22 +1,22 @@
 {
     "loss": [
-        1.189751E+01,
-        9.664209E+00
+        1.187568E+01,
+        9.759526E+00
     ],
     "time": [
-        7495.9,
-        2106.7
+        9832.1,
+        3407.1
     ],
     "memo info": [
         {
             "rank": 0,
-            "allocated memory": 8782.43994,
-            "max allocated memory": 24059.55859
+            "allocated memory": 33781.49658203125,
+            "max allocated memory": 33781.4970703125
         },
         {
             "rank": 4,
-            "allocated memory": 20551.69726,
-            "max allocated memory": 20551.69824
+            "allocated memory": 37217.69384765625,
+            "max allocated memory": 37217.6943359375
         }
     ],
     "warm_up": 1
