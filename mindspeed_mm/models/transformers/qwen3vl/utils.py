@@ -99,7 +99,7 @@ def gather_visual_seqs_with_cp(
     """
     megatron_args = get_args()
     if megatron_args.context_parallel_algo == "ulysses_cp_algo":
-        gather_sizes = cal_split_sizes(get_seq_len("visual"), mpu.get_context_parallel_group())
+        gather_sizes = cal_split_sizes(get_seq_len("visual"), mpu.get_context_parallel_world_size())
         x = gather_forward_split_backward(
             x,
             mpu.get_context_parallel_group(),
