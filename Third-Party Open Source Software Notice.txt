@@ -533,6 +533,19 @@ Copyright (c) 2025 inclusionAI
 
 Copyright 2024 Meta Inc.
 
+Software Notice
+Software Moonlight
+License: MIT License
+For the full text of the license, please go to the above.
+
+Copyright (c) 2025 Moonshot AI
+
+Software Notice
+Software Muon
+License: MIT License
+For the full text of the license, please go to the above.
+
+Copyright (c) 2024 Keller Jordan
 
 Software Notice
 Software DanceGRPO

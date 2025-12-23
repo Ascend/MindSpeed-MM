@@ -42,6 +42,7 @@ def process_args(parser):
     parser = _add_data_balance_args(parser)
     parser = _add_auto_settings_args(parser)
     parser = _add_optim_arguments(parser)
+    parser = _add_muon_optim_arguments(parser)
     return parser
 
 
@@ -127,6 +128,9 @@ def _add_training_args(parser):
                        action='store_true',
                        default=False,
                        help=('Calculate the loss.'))
+    group.add_argument('--optimizer', type=str, default='adam',
+                       choices=['adam', 'sgd', 'muon'],
+                       help='Optimizer function')
     return parser
 
 
@@ -270,6 +274,39 @@ def _add_optim_arguments(parser):
         type=float,
         default=1.0,
         help='Learning rate multiplier for parameters matching scale-lr-keywords. '
+    )
+
+    return parser
+
+
+def _add_muon_optim_arguments(parser):
+    group = parser.add_argument_group(title='muon_optimizer')
+
+    group.add_argument(
+        '--matched-adamw-rms',
+        type=float,
+        default=0.2,
+        help='Matched AdamW RMS value for Muon optimizer. '
+                'Controls how closely Muon matches AdamW update magnitude. '
+                'Typical range: 0.1-0.4. Default: 0.2'
+    )
+
+    group.add_argument(
+        '--muon-momentum',
+        type=float,
+        default=0.95,
+        help='Momentum coefficient for Muon internal SGD. '
+                'Higher values give more weight to previous updates. '
+                'Range: 0.0-1.0. Default: 0.95'
+    )
+    
+    group.add_argument(
+        '--ns-steps',
+        type=int,
+        default=5,
+        help='Number of Newton-Schulz iterations for orthogonalization. '
+                'More steps give better orthogonalization but slower training. '
+                'Range: 1-10. Default: 5'
     )
 
     return parser

@@ -22,7 +22,8 @@ from mindspeed_mm.patchs import (
     fsdp1_patches,
     hetero_patches,
     training_patches,
-    fsdp2_patches
+    fsdp2_patches,
+    optimizer_patch
 )
 
 
@@ -62,6 +63,11 @@ class PatchesManager:
         ],
         "scale_grad": [
             ("megatron.core.distributed.TorchFullyShardedDataParallel.scale_gradients", fsdp2_patches.scale_gradients)
+        ],
+        "muon_optimizer": [
+            ("megatron.core.optimizer._get_param_groups", optimizer_patch._get_param_groups),
+            ("megatron.core.optimizer._get_param_groups_and_buffers", optimizer_patch._get_param_groups_and_buffers),
+            ("megatron.core.optimizer._get_megatron_optimizer_based_on_param_groups", optimizer_patch._get_megatron_optimizer_based_on_param_groups)
         ]
     }
 

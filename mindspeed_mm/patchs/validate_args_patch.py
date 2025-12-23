@@ -326,7 +326,10 @@ def validate_args(args, defaults=None):
             '--overlap-param-gather-with-optimizer-step only supported with interleaved pipeline parallelism')
         ensure_valid(not args.use_dist_ckpt, \
             '--overlap-param-gather-with-optimizer-step not supported with distributed checkpointing yet')
-
+    if args.optimizer == "muon":
+        ensure_valid(not args.use_distributed_optimizer, \
+            "--optimizer muon is not supported with MCore's distributed optimizer")
+            
     dtype_map = {
         'fp32': torch.float32, 'bf16': torch.bfloat16, 'fp16': torch.float16, 'fp8': torch.uint8,
     }
