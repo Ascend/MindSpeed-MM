@@ -609,11 +609,8 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh
 <a id="jump4.4"></a>
 #### 4. 支持FSDP2训练
 
-当前Qwen2.5VL-72B使用FSDP2训练，MFU已达到30%以上，使用前需要更新MindSpeed版本：
-```shell
-git clone https://gitcode.com/Ascend/MindSpeed.git
-git checkout cecf0dcc873e026ac5a470d1b8e4f7ba9e739c7e
-```
+当前Qwen2.5VL-72B使用FSDP2训练，MFU已达到30%以上
+
 当进行视频32K长序列训练时，一组参考的配置如下：
   - model_72b.json
     ```json
