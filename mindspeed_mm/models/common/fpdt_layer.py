@@ -313,7 +313,7 @@ class ChunkManager:
         cpu_chunk = torch.empty(chunk.shape, dtype=chunk.dtype, device='cpu', pin_memory=True)
 
         if chunk.is_npu:
-            cpu_chunk.copy_(chunk, non_blocking=False)
+            cpu_chunk.copy_(chunk, non_blocking=True)
         else:
             cpu_chunk = chunk
         
@@ -325,7 +325,7 @@ class ChunkManager:
             pass
         else:
             npu_chunk = torch.empty(self.chunk_shape, device=self.device, dtype=self.chunk_dtype)
-            npu_chunk.copy_(self.cpu_chunk, non_blocking=False)
+            npu_chunk.copy_(self.cpu_chunk, non_blocking=True)
             self.npu_chunk = npu_chunk
 
     def get_npu_chunk(self):
@@ -342,7 +342,7 @@ class ChunkManager:
     def overwrite_to_cpu(self):
         if self.npu_chunk is None or str(self.npu_chunk.device) != str(self.device):
             raise AttributeError()
-        self.cpu_chunk.copy_(self.npu_chunk, non_blocking=False)
+        self.cpu_chunk.copy_(self.npu_chunk, non_blocking=True)
 
         
 class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
@@ -440,9 +440,12 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
             kv_compute_chunk_idx = 0
 
             for i in range(num_chunks):
-                global_q[i].load_to_npu()
-                global_k[0].load_to_npu()
-                global_v[0].load_to_npu()
+                with torch_npu.npu.stream(offload_stream):
+                    global_q[i].load_to_npu()
+                    global_k[0].load_to_npu()
+                    global_v[0].load_to_npu()
+                compute_stream.wait_stream(offload_stream)
+                compute_stream.synchronize()
                 
                 cur_attn_output = None
                 cur_softmax_max = None
@@ -510,6 +513,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                     global_o.append(ChunkManager(cur_attn_output))
                     global_softmax_max.append(ChunkManager(cur_softmax_max.contiguous()))
                     global_softmax_sum.append(ChunkManager(cur_softmax_sum.contiguous()))
+                general_offload_stream.synchronize()
 
             compute_stream.wait_stream(general_offload_stream)
             compute_stream.synchronize()
@@ -571,6 +575,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
         dk_accum = torch.zeros(global_k[0].chunk_shape, dtype=torch.float, device=device)
         dv_accum = torch.zeros(global_v[0].chunk_shape, dtype=torch.float, device=device)
 
+        torch_npu.npu.synchronize()
         dq_final = []
         dk_final = []
         dv_final = []
@@ -676,7 +681,11 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
             global_v[i].offload()
 
         for i in range(num_chunks):
-            dq[i].load_to_npu()
+            with torch_npu.npu.stream(offload_stream):
+                dq[i].load_to_npu()
+            compute_stream.wait_stream(offload_stream)
+            compute_stream.synchronize()
+
             dq_accum = dq[i].get_npu_chunk().to(dtype)
             dq_accum = all_to_all(dq_accum.contiguous(), cpg, gather_idx, scatter_idx)
 
