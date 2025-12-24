@@ -79,7 +79,7 @@ source /usr/local/Ascend/nnal/atb/set_env.sh
 
 ### 4. PTA安装
 
-准备[torch_npu](https://www.hiascend.com/developer/download/community/result?module=pt)和[apex](https://gitcode.com/Ascend/apex)，参考[Ascend Extension for PyTorch 配置与安装](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)或执行以下命令安装：
+准备[torch_npu](https://www.hiascend.com/developer/download/community/result?module=pt)，参考[Ascend Extension for PyTorch 配置与安装](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)或执行以下命令安装：
 
 安装torch和torch_npu，以下以python 3.10 + torch 2.7.1为例：
 
@@ -89,11 +89,4 @@ conda activate test
 # 注：若需安装torch2.6.0版本需要修改列对应whl包，并且修改 MindSpeed-MM/pyproject.toml中的torch版本为2.6.0
 pip install torch-2.7.1-cp310-cp310*.whl 
 pip install torch_npu-2.7.1*-cp310-cp310*.whl
-```
-
-安装apex
-
-```shell
-# apex for Ascend 构建参考 https://gitcode.com/Ascend/apex
-pip3 install --upgrade apex-0.1+ascend-{version}.whl # version为python版本和cpu架构
 ```
