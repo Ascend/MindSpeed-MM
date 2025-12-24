@@ -6,7 +6,7 @@ from megatron.training import get_args
 from megatron.training.arguments import core_transformer_config_from_args
 
 from mindspeed_mm.models.ae.base import AEModel
-from mindspeed_mm.models.transformer.transformer_model import TransformerModel
+from mindspeed_mm.models.omni.mllm_model import MllmModel
 from mindspeed_mm.models.vision.vision_model import VisionModel
 
 
@@ -39,7 +39,7 @@ class OmniModel(nn.Module):
         if self.add_image_encoder:
             self.image_encoder = VisionModel(config.image_encoder)
         if self.add_mllm:
-            self.mllm = TransformerModel(config).get_model()
+            self.mllm = MllmModel(config).get_model()
         if self.add_ae:
             self.ae = AEModel(config.ae).get_model()
 

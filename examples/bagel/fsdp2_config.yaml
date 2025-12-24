@@ -1,11 +1,9 @@
 sharding_size: 8
 sub_modules_to_wrap:
-  - mindspeed_mm.models.transformer.mllms.bagel_qwen2_mot.Qwen2MoTDecoderLayer
-  - mindspeed_mm.models.common.embeddings.time_embeddings.TimeStepEmbedding2
-  - mindspeed_mm.models.common.embeddings.pos_embeddings.PositionEmbedding
+  - mindspeed_mm.models.omni.mllms.bagel_qwen2_mot.Qwen2MoTDecoderLayer
 reshard_after_forward: True
 param_dtype: bf16
 reduce_dtype: bf16
 cast_forward_inputs: True
 recompute_modules:
-  - mindspeed_mm.models.transformer.qwen2MoT.Qwen2DecoderLayer
+  - mindspeed_mm.models.omni.mllms.bagel_qwen2_mot.Qwen2MoTDecoderLayer

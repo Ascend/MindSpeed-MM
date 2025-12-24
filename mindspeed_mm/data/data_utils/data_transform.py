@@ -8,7 +8,7 @@ import math
 import torch
 import numpy as np
 from PIL import Image
-import torch.nn.functional as F
+from torchvision.transforms import functional as F
 import torchvision.transforms as T
 
 
@@ -917,16 +917,16 @@ class MaxLongEdgeMinShortEdgeResize:
     """
     def __init__(
             self,
-            max_size: int,
-            min_size: int,
-            stride: int,
+            max_image_size: int,
+            min_image_size: int,
+            image_stride: int,
             max_pixels: int = MAX_PIXELS,
             interpolation=T.InterpolationMode.BICUBIC,
             antialias: bool = True
     ):
-        self.max_size = max_size
-        self.min_size = min_size
-        self.stride = stride
+        self.max_size = max_image_size
+        self.min_size = min_image_size
+        self.stride = image_stride
         self.max_pixels = max_pixels
         self.interpolation = interpolation
         self.antialias = antialias

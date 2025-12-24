@@ -2,7 +2,7 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from transformers.models.qwen2.configuration_qwen2 import Qwen2Config
 
 from mindspeed_mm.models.common.module import MultiModalModule
-from mindspeed_mm.models.transformer.mllms.bagel_qwen2_mot import Qwen2ForCausalLM
+from mindspeed_mm.models.omni.mllms.bagel_qwen2_mot import Qwen2ForCausalLM
 
 
 class ModelConfigManager:
@@ -48,9 +48,9 @@ class ModelConfigManager:
         return target_config
 
 
-class TransformerModel(MultiModalModule):
+class MllmModel(MultiModalModule):
     """
-    TransformerModel - Main multi-modal transformer model builder.
+    MllmModel - Main multi-modal model builder.
 
     Responsible for constructing multi-modal models by integrating various
     components (vision encoder, autoencoder) with a base language model.

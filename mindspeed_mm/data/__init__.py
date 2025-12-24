@@ -82,6 +82,9 @@ def build_mm_dataset(dataset_param):
     if dataset_type == "lumina":
         from mindspeed_mm.data.datasets.lumina_dataset import LuminaConversationDataset
         return LuminaConversationDataset(basic_param, **dataset_param)
+    elif dataset_type == "bagel":
+        from mindspeed_mm.data.datasets.bagel_dataset import BagelMultiDataset
+        return BagelMultiDataset(basic_param, preprocess_param, **dataset_param)
     else:
         raise NotImplementedError(dataset_type)
 

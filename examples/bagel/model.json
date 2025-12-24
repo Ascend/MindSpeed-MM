@@ -57,7 +57,7 @@
         }
     },
     "ae": {
-        "model_id": "fluxvae",
+        "model_id": "flux_vae",
         "from_pretrained": "./weight/BAGEL-7B-MoT/ae.safetensors",
         "downsample": 8,
         "z_channels": 16,

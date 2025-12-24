@@ -7,6 +7,7 @@ from copy import deepcopy
 import numpy as np
 import torch
 import torch.distributed as dist
+from torch.nn.attention.flex_attention import or_masks, and_masks
 from transformers.models.qwen2.tokenization_qwen2 import Qwen2Tokenizer
 from mindspeed_mm.data.data_utils.data_transform import MaxLongEdgeMinShortEdgeResize
 from mindspeed_mm.data.datasets.bagel_iterable_dataset import T2IIterableDataset, SftJSONLIterableDataset
@@ -15,6 +16,36 @@ DATASET_REGISTRY = {
     't2i_pretrain': T2IIterableDataset,
     'vlm_sft': SftJSONLIterableDataset,
 }
+
+
+def create_sparse_mask(document_lens, split_lens, attn_modes, device):
+    def causal_mask(b, h, q_idx, kv_idx):
+        return q_idx >= kv_idx
+
+    def full_and_noise_mask(b, h, q_idx, kv_idx):
+        return (full_and_noise_seq_id[q_idx] == full_and_noise_seq_id[kv_idx]) & (full_and_noise_seq_id[q_idx] >= 0)
+
+    def remove_noise_mask(b, h, q_idx, kv_idx):
+        return (~((noise_seq_id[kv_idx] >= 0) & (noise_seq_id[q_idx] != noise_seq_id[kv_idx])))
+
+    def sample_mask(b, h, q_idx, kv_idx):
+        return document_id[q_idx] == document_id[kv_idx]
+
+    full_and_noise_tmp = []
+    noise_tmp = []
+
+    for i, (length, model) in enumerate(zip(split_lens, attn_modes)):
+        value = i if model in ['full', 'noise'] else -1
+        full_and_noise_tmp.extend([value] * length)
+        value_noise = i if model == 'noise' else -1
+        noise_tmp.extend([value_noise] * length)
+
+    full_and_noise_seq_id = torch.Tensor(full_and_noise_tmp).to(device)
+    noise_seq_id = torch.Tensor(noise_tmp).to(device)
+
+    document_id = torch.cat([torch.full((doc_len,), i) for i, doc_len in enumerate(document_lens, start=1)]).to(device)
+
+    return and_masks(or_masks(causal_mask, full_and_noise_mask), remove_noise_mask, sample_mask)
 
 
 def add_special_tokens(tokenizer):

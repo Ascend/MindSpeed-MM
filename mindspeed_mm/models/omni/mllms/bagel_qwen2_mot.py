@@ -32,7 +32,7 @@ from transformers.models.qwen2.modeling_qwen2 import (
 )
 from transformers.utils import logging
 
-from mindspeed_mm.data.data_utils.bagel_data_utils import create_sparse_mask
+from mindspeed_mm.data.datasets.bagel_dataset import create_sparse_mask
 from mindspeed_mm.models.common.embeddings.pos_embeddings import PositionEmbedding
 from mindspeed_mm.models.common.embeddings.time_embeddings import timestep_embedding
 from mindspeed_mm.models.common.normalize import LlamaRMSNorm
