@@ -81,7 +81,7 @@
 
 ## 公开接口声明
 
-MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。20个入口脚本分别为:
+MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。19个入口脚本分别为:
 
 - [evaluate_gen](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/evaluate_gen.py)
 - [evaluate_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/evaluate_vlm.py)
@@ -92,7 +92,6 @@ MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功�
 - [posttrain_flux_dancegrpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_flux_dancegrpo.py)
 - [posttrain_qwen2vl_dpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_qwen2vl_dpo.py)
 - [posttrain_sora_dpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_sora_dpo.py)
-- [posttrain_vlm_dapo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_vlm_dapo.py)
 - [pretrain_ae](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_ae.py)
 - [pretrain_deepseekvl](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_deepseekvl.py)
 - [pretrain_internvl](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_internvl.py)
