@@ -68,12 +68,12 @@ def create_qwen2vl_ops(enable_canonical_hf_struct: bool, vit_embed_dim: int, vit
                        k_size=llm_kv_size,
                        v_size=llm_kv_size,
                        ),
-            RelocateOp(name=r"visual.blocks.(\d+).attn.qkv.weight",
+            RelocateOp(name=r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight",
                        new_name=r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.weight",
                        group=vit_num_heads,
                        split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
                        ),
-            RelocateOp(name=r"visual.blocks.(\d+).attn.qkv.bias",
+            RelocateOp(name=r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias",
                        new_name=r"image_encoder.encoder.blocks.layers.(\d+).self_attention.linear_qkv.bias",
                        group=vit_num_heads,
                        split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
