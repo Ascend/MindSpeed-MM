@@ -263,7 +263,7 @@ GPT_ARGS="
   | ViT | `flash_attention_2`: `TND` | ulysses、ring、usp |
   | ViT | `flash_attention_2`: ``BNSD`` | ulysses |
   | ViT | `sdpa`: ``BNSD`` | ulysses |
-  | LLM | `flash_attention_2`: `TND` | / |
+  | LLM | `flash_attention_2`: `TND` | ulysses |
   | LLM | `flash_attention_2`: `BNSD` | ulysses、ring、usp |
   | LLM | `flash_attention_2`: `BSND` | ulysses |
   | LLM | `sdpa`: `BNSD` | ulysses |

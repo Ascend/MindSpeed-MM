@@ -609,43 +609,18 @@ class Qwen3VLTextAttention(nn.Module):
             "dropout": dropout,
             "is_causal": self.is_causal,
             "layout": self.config.attn_layout,
+            "enable_gqa": True
         }
-
-        seq_dim, head_dim = None, None
-        if self.config.attn_layout == "BNSD":
-            query_states = query_states.transpose(1, 2)  # BNSD
-            key_states = key_states.transpose(1, 2)
-            value_states = value_states.transpose(1, 2)
-            attention_kwargs["attention_mask"] = attention_mask
-            attention_kwargs["enable_gqa"] = True
-            seq_dim, head_dim = 2, 1
-        elif self.config.attn_layout == "BSND":
-            attention_kwargs["attention_mask"] = attention_mask
-            attention_kwargs["enable_gqa"] = True
-        elif self.config.attn_layout == "TND":
-            attention_kwargs["actual_seq_qlen"] = kwargs["cu_seqlens"]
-            attention_kwargs["actual_seq_kvlen"] = kwargs["cu_seqlens"]
-
-            indices = kwargs["indices"]
-            # reshape: BSND -> TND, and upad_input
-            query_states = query_states.view(-1, *query_states.shape[2:])[indices]
-            key_states = key_states.view(-1, *key_states.shape[2:])[indices]
-            value_states = value_states.view(-1, *value_states.shape[2:])[indices]
-            
-            seq_dim, head_dim = 0, 1
-        else:
-            raise NotImplementedError(
-                f"Unsupported Attention layout: {self.config.attn_layout}, "
-                "Qwen3VLTextAttention only support ['BNSD', 'BSND', 'TND'] now.")
 
         if past_key_values is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
             key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
+        total_seq_len = get_seq_len("total")
         if mpu.get_context_parallel_world_size() > 1:
             megatron_args = get_args()
-            total_seq_len = get_seq_len("total")
+            seq_dim, head_dim = 1, 2
 
             if megatron_args.context_parallel_algo == "ulysses_cp_algo":
                 if mpu.get_context_parallel_world_size() > self.config.num_key_value_heads:
@@ -738,6 +713,26 @@ class Qwen3VLTextAttention(nn.Module):
             else:
                 raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {megatron_args.context_parallel_algo}")
 
+        if self.config.attn_layout == "BNSD":
+            query_states = query_states.transpose(1, 2)  # BNSD
+            key_states = key_states.transpose(1, 2)
+            value_states = value_states.transpose(1, 2)
+            attention_kwargs["attention_mask"] = attention_mask
+        elif self.config.attn_layout == "BSND":
+            attention_kwargs["attention_mask"] = attention_mask
+        elif self.config.attn_layout == "TND":
+            attention_kwargs["actual_seq_qlen"] = kwargs["cu_seqlens"]
+            attention_kwargs["actual_seq_kvlen"] = kwargs["cu_seqlens"]
+            indices = kwargs["indices"]
+            # reshape BSND -> TND, and upad_input
+            query_states = query_states.view(-1, *query_states.shape[2:])[indices]
+            key_states = key_states.view(-1, *key_states.shape[2:])[indices]
+            value_states = value_states.view(-1, *value_states.shape[2:])[indices]
+        else:
+            raise NotImplementedError(
+                f"Unsupported Attention layout: {self.config.attn_layout}, "
+                "Qwen3VLTextAttention only support ['BNSD', 'BSND', 'TND'] now.")
+
         attn_output = attention_interface(
             query_states,
             key_states,
@@ -745,10 +740,12 @@ class Qwen3VLTextAttention(nn.Module):
             **attention_kwargs,
         )
 
-
+        if self.config.attn_layout == "BNSD":
+            attn_output = attn_output.transpose(1, 2)
         if self.config.attn_layout == "TND":
-            # pad output
-            attn_output = pad_out(attn_output, indices, batch_size, seqlen)
+            # pad output, and reshape to BSND
+            attn_output = pad_out(attn_output, indices, batch_size, total_seq_len)
+            attn_output = attn_output.view(batch_size, total_seq_len, *attn_output.shape[1:])
 
         if mpu.get_context_parallel_world_size() > 1:
             attn_output = gather_heads_scatter_seq(
@@ -758,9 +755,7 @@ class Qwen3VLTextAttention(nn.Module):
                 gather_size=self.num_heads
             )
 
-        if self.config.attn_layout == "BNSD":
-            attn_output = attn_output.transpose(1, 2)
-        attn_output = attn_output.reshape(batch_size, seqlen, -1).contiguous()  # TND -> BSH
+        attn_output = attn_output.reshape(batch_size, seqlen, -1).contiguous()  # reshape to BSH
         attn_output = self.o_proj(attn_output)
         return attn_output
 
