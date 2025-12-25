@@ -168,7 +168,7 @@ mm-convert WanConverter hf_to_mm \
 mm-convert WanConverter mm_to_hf \
  --cfg.source_path <path for your saved weight/> \
  --cfg.target_path <./converted_weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
- --cfg.hf_path <weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
+ --cfg.hf_dir <weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
 ```
 
 权重转换脚本的参数说明如下：
@@ -177,7 +177,7 @@ mm-convert WanConverter mm_to_hf \
 |:------------|:----|:----|
 | --cfg.source_path | MindSpeed MM保存的权重路径                                   | /      |
 | --cfg.target_path | 转换后的Hugging Face权重路径                                 | /      |
-| --cfg.hf_path     | 原始Hugging Face权重路径，需要从该目录下获取原始huggingface配置文件 |    /   |
+| --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始huggingface配置文件 |    /   |
 
 ---
 
