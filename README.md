@@ -708,7 +708,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td rowspan="23"> 多模态理解 </td>
+      <td rowspan="24"> 多模态理解 </td>
     </tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/glm4.1v">GLM-4.1V</a></td>
       <td><a href="https://github.com/THUDM/GLM-4.1V-Thinking">9B</a></td>
@@ -719,6 +719,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 908.49(TPS) </td>
       <td> 707 </td>
       <td>【Pass】</td>
+    </tr>
+      </tr>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/deepseekocr">DeepSeek-OCR</a></td>
+      <td><a href="https://github.com/deepseek-ai/DeepSeek-OCR">3B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td> 1327.694(TPS) </td>
+      <td> / </td>
+      <td> / </td>
+      <td>【Test】</td>
     </tr>
     <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/llava1.5">LLaVA 1.5</a></td>

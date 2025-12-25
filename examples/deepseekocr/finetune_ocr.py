@@ -160,7 +160,7 @@ class OCRTrainer:
             if self.config.clip_grad > 0:
                 log_string += f" | grad norm: {gnorm.item():.6E}"
             log_string += f" | elapsed time per iteration: {elapsed_time / iteration * 1000:.2f}"
-            if self.config.tps:
+            if self.config.log_tps:
                 log_string += f" | tokens per sample: {tps}"
             if torch.distributed.get_rank() == 0:
                 print(log_string)
