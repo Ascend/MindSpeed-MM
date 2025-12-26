@@ -640,9 +640,9 @@ class Qwen3VLTextAttention(nn.Module):
                     raise ValueError(f"TextAttention only support layout `BNSD` when using Ring Attention.")
 
                 # mindspeed core only support SBH as input layout
-                query_states = rearrange(query_states, "b n s d -> s b (n d)").contiguous()
-                key_states = rearrange(key_states, "b n s d -> s b (n d)").contiguous()
-                value_states = rearrange(value_states, "b n s d -> s b (n d)").contiguous()
+                query_states = rearrange(query_states, "b s n d -> s b (n d)").contiguous()
+                key_states = rearrange(key_states, "b s n d -> s b (n d)").contiguous()
+                value_states = rearrange(value_states, "b s n d -> s b (n d)").contiguous()
                 attn_output = do_llm_ring_context_parallel(
                     query_states,
                     key_states,
@@ -677,16 +677,16 @@ class Qwen3VLTextAttention(nn.Module):
                     query_states,
                     key_states,
                     value_states,
-                    seq_dim=2,
-                    head_dim=1,
+                    seq_dim=seq_dim,
+                    head_dim=head_dim,
                     gather_size=seq_len_per_ring,
                     group=get_context_parallel_group_for_hybrid_ulysses()
                 )
                 # ring attention
                 # mindspeed core only support SBH as input layout
-                query_states = rearrange(query_states, "b n s d -> s b (n d)").contiguous()
-                key_states = rearrange(key_states, "b n s d -> s b (n d)").contiguous()
-                value_states = rearrange(value_states, "b n s d -> s b (n d)").contiguous()
+                query_states = rearrange(query_states, "b s n d -> s b (n d)").contiguous()
+                key_states = rearrange(key_states, "b s n d -> s b (n d)").contiguous()
+                value_states = rearrange(value_states, "b s n d -> s b (n d)").contiguous()
                 attn_output = do_llm_ring_context_parallel(
                     query_states,
                     key_states,
@@ -702,8 +702,8 @@ class Qwen3VLTextAttention(nn.Module):
                 attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=self.head_dim).contiguous()
                 attn_output = gather_heads_scatter_seq(
                     attn_output,
-                    seq_dim=1,
-                    head_dim=2,
+                    seq_dim=seq_dim,
+                    head_dim=head_dim,
                     gather_size=self.config.num_attention_heads,
                     group=get_context_parallel_group_for_hybrid_ulysses()
                 )
