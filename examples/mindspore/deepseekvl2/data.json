@@ -1,0 +1,24 @@
+{
+    "dataset_param": {
+        "dataset_type": "deepseekvl2",
+        "basic_parameters": {
+            "data_path": "/path/json_path",
+            "data_folder": "/path/root_path",
+            "repeat_time": 1
+        },
+        "processor_path": "deepseek-ai/deepseek-vl2",
+        "preprocess_parameters": null,
+        "group_by_length": false
+    },
+    "dataloader_param": {
+        "dataloader_mode": "sampler",
+        "shuffle": true,
+        "drop_last": true,
+        "pin_memory": true,
+        "sampler_type": "BaseRandomBatchSampler",
+        "collate_param": {
+            "model_name": "deepseekvl2",
+            "pad_id": 2
+        }
+    }
+}
