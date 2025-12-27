@@ -12,26 +12,7 @@
 
 
 
-### 使用方法（InternVL2/Qwen2VL 已支持）
-
-#### Internvl的数据分桶使用方法：
-
-在examples/internvl2/data_2B.json中，修改dataloader_param下的sampler_type为"BucketBatchSampler"，且"priority_mode"配置为 "data_bucketing_img"，如下：
-
-```
-	"dataloader_param": {
-        "dataloader_mode": "sampler",
-        "shuffle": true,
-        "drop_last": true,
-        "pin_memory": true,
-        "sampler_type": "BucketBatchSampler",
-        "priority_mode": "data_bucketing_img",
-        "collate_param": {
-            "model_name": "internvl",
-            "pad_id": 2
-        }
-    }
-```
+### 使用方法（Qwen2VL 已支持）
 
 #### Qwen2VL的数据分桶使用方法：
 

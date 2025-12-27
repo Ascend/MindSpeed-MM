@@ -45,10 +45,10 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 * [Oct. 31, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-8B/30B模型 【Prototype】
 * [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型
 * [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型
+* **[Sep. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/verl_examples/qwen2.5vl/README.md)**
 * [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
 * [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
 * [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型
-* **[Jul. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/verl_plugin/README.md)**
 * [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型
 * [Jun. 30, 2025]: 🌴 MindSpeed MM版本2.1.0发布
 * [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型
@@ -119,7 +119,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
   </tr>
 </table>
 
-## 理解模型：InternVL2 & Qwen2VL
+## 理解模型：Qwen2VL
 
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
   <tr>
@@ -127,10 +127,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
           <p>Input image for both models:</p>
           <img src="sources/images/view.jpg" width="1000" height="700"></img>
           <p>Input text for both models: Please describe the image shortly</p>
-          <p>InternVL2推理结果: The image depicts a serene lakeside scene with a wooden dock extending into the calm water. The water reflects the surrounding landscape, which includes dense forests and a mountain range in the background. The sky is partly cloudy, adding to the tranquil atmosphere of the scene</p>
           <p>Qwen2VL推理结果: The image depicts a serene lakeside scene with a wooden dock extending into the calm waters. The dock is made of weathered wooden planks and leads to a small platform with a ladder, suggesting it is used for swimming or diving. The lake is surrounded by lush green forests and mountains in the background, creating a picturesque and tranquil setting. The sky is overcast, adding to the calm and peaceful atmosphere of the scene.</p>
-          <p>Input text for InternVL2: 请简短描述这张照片</p>
-          <p>InternVL2推理结果: 这张图片展示了一个宁静的湖泊，湖面平静，反射着天空和周围景物的影像。湖的中央有一个木制码头，延伸到湖中，码头上有几根柱子支撑。 湖的远端是一片茂密的森林，树木高大，覆盖着茂密的绿色植被。森林的尽头是一座高耸的山峰，山峰上覆盖着积雪，显得格外壮丽。 天空中有一些云朵，但整体上是晴朗的，阳光从云层中透出，照亮了整个湖面和周围的景色。 这张图片整体给人一种宁静、祥和的感觉，仿佛是一个远离尘嚣的世外桃源</p>
           <p>Input text for Qwen2VL: 请用中文简短描述这张照片</p>
           <p>Qwen2VL推理结果: 这张图片展示了一座木制码头延伸到平静的湖面上，背景是连绵的山脉和茂密的森林。天空多云，整体色调偏冷，给人一种宁静和自然的感觉。</p>
       </td>
@@ -182,14 +179,9 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 |    HunyuanVideo     | ✔ | ✔ |  |  | CP (Ulysses) | ✔ | ✔ | ✔ |  |  |
 |   CogVideoX系列-T2V   | ✔ | ✔ |  |  | CP (Ulysses) | ✔ | ✔ | ✔ |  |  |
 |   CogVideoX系列-I2V   | ✔ | ✔ |  |  | CP (Ulysses) | ✔ | ✔ | ✔ |  |  |
-|     Opensora1.2     |  |  |  |  | DSP | ✔ | ✔ |  |  |  |
 | OpensoraPlan1.3-T2V | ✔ | ✔ | ✔ | ✔ | CP (Ulysses) | ✔ | ✔ |  |  |  |
 | OpensoraPlan1.3-I2V | ✔ | ✔ | ✔ | ✔ | CP (Ulysses) | ✔ | ✔ |  |  |  |
 |      GLM-4.1V       |  |  |  | ✔ |  | ✔ | ✔ |  |  |  |
-|    InternVL2-2B     |  |  | ✔ | ✔ |  | ✔ | ✔ |  |  |  |
-|    InternVL2-8B     |  |  | ✔ | ✔ |  | ✔ | ✔ |  |  |  |
-|    InternVL2-26B    |  |  | ✔ | ✔ |  | ✔ | ✔ |  |  |  |
-|    InternVL2-76B    |  |  | ✔ | ✔ |  | ✔ | ✔ |  |  |  |
 |     Qwen2VL-2B      | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ |  |  |
 |     Qwen2VL-7B      | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ |  |  |
 |     Qwen2VL-72B     | ✔ | ✔ |  | ✔ | CP (Ulysses) | ✔ | ✔ | ✔ | DPO |  |
@@ -419,7 +411,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensora1.0">OpenSora 1.0</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensora1.0">OpenSora 1.0</a></td>
       <td><a href="https://huggingface.co/hpcai-tech/Open-Sora/tree/main">5.5B</a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -430,7 +422,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensora1.2">OpenSora 1.2</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensora1.2">OpenSora 1.2</a></td>
       <td><a href="https://huggingface.co/hpcai-tech/OpenSora-STDiT-v3">5.2B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -452,7 +444,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/opensoraplan1.2">OpenSoraPlan 1.2</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensoraplan1.2">OpenSoraPlan 1.2</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.2.0">8.7B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -714,7 +706,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/llava1.5">LLaVA 1.5</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/llava1.5">LLaVA 1.5</a></td>
       <td><a href="https://github.com/haotian-liu/LLaVA">7B</a></td>
       <td> 全参微调 </td>
       <td> 1x8 </td>
@@ -725,7 +717,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
    <tr>
-      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/internvl2">InternVL 2.0</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2-2B">2B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -963,7 +955,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 * 【模型特性】 OpensoraPlan1.3: CP (Ring Attention)
 * 【模型特性】 Qwen2VL: VPP, CP (Ulysses & Ring Attention)
 * 【模型特性】 InternVL2: TP, CP (Ulysses & Ring Attention)
-* 【基础特性】 Dist-train
+* 【基础特性】 Hetero-parallel
 
 <a id="jump2"></a>
 
