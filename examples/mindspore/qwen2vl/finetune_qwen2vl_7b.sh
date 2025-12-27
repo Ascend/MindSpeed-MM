@@ -20,17 +20,17 @@ NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 
-MM_DATA="./examples/mindspore/qwen2vl/data_2b.json"
-MM_MODEL="./examples/mindspore/qwen2vl/model_2b.json"
+MM_DATA="./examples/mindspore/qwen2vl/data_7b.json"
+MM_MODEL="./examples/mindspore/qwen2vl/model_7b.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-LOAD_PATH="ckpt/mm_path/Qwen2-VL-2B-Instruct"
+LOAD_PATH="ckpt/mm_path/Qwen2-VL-7B-Instruct"
 SAVE_PATH="save_dir"
 
 TP=1
-PP=1
+PP=4
 CP=1
 MBS=1
-GRAD_ACC_STEP=24
+GRAD_ACC_STEP=96
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
@@ -53,7 +53,7 @@ GPT_ARGS="
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --tokenizer-type NullTokenizer \
-    --vocab-size 151936 \
+    --vocab-size 152064 \
     --seq-length 1024 \
     --make-vocab-size-divisible-by 1 \
     --normalization RMSNorm \
@@ -73,6 +73,7 @@ GPT_ARGS="
     --seed 42 \
     --bf16 \
     --load $LOAD_PATH \
+    --variable-seq-lengths \
     --use-distributed-optimizer \
     --use-flash-attn \
     --no-load-optim \

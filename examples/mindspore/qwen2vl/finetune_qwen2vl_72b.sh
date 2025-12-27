@@ -1,36 +1,47 @@
 #!/bin/bash
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
+# 该变量只用于规避megatron对其校验，对npu无效
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export ASCEND_SLOG_PRINT_TO_STDOUT=0
 export ASCEND_GLOBAL_LOG_LEVEL=3
 export TASK_QUEUE_ENABLE=2
 export COMBINED_ENABLE=1
-export CPU_AFFINITY_CONF=1
+export CPU_AFFINITY_CONF=2
 export HCCL_CONNECT_TIMEOUT=1200
 export NPU_ASD_ENABLE=0
 export ASCEND_LAUNCH_BLOCKING=0
 export ACLNN_CACHE_LIMIT=100000
-
-NPUS_PER_NODE=8
-MASTER_ADDR=localhost
+export MULTI_STREAM_MEMORY_REUSE=2
+export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"
+# 根据机器实际情况填写
+NPUS_PER_NODE=16
+# 注意，当前为多机运行，需要根据实际的机器ip创建examples/mindspore/qwen2vl/hostfile.txt文件，其中每行为一台机器的ip地址
+HOSTFILE="examples/mindspore/qwen2vl/hostfile.txt"
+MASTER_ADDR=$(head -n1 $HOSTFILE | awk '{print $1;}')  # 获取hostfile第一行为masteraddr
 MASTER_PORT=6000
-NNODES=1
-NODE_RANK=0
+NODE_ADDR=`hostname -I | awk '{for(i=1;i<=NF;i++)print $i}' | grep ${MASTER_ADDR%.*}. | awk -F " " '{print$1}'`  # 获取本机IP
+NODE_RANK=$(awk '{ranks[$1]=(FNR-1);}END{print ranks["'$NODE_ADDR'"];}' $HOSTFILE)
+NNODES=$(cat $HOSTFILE | wc -l)
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
+echo $MASTER_ADDR
+echo $NODE_ADDR
+echo $NODE_RANK
+echo $NNODES
 
 
-MM_DATA="./examples/mindspore/qwen2vl/data_2b.json"
-MM_MODEL="./examples/mindspore/qwen2vl/model_2b.json"
+MM_DATA="./examples/qwen2vl/data_72b.json"
+MM_MODEL="./examples/qwen2vl/model_72b.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-LOAD_PATH="ckpt/mm_path/Qwen2-VL-2B-Instruct"
+# 需要先根据readme把huggingface格式模型转换为mm格式
+LOAD_PATH="ckpt/mm_path/Qwen2-VL-72B-Instruct"
 SAVE_PATH="save_dir"
 
-TP=1
-PP=1
+TP=2
+PP=8
 CP=1
 MBS=1
-GRAD_ACC_STEP=24
+GRAD_ACC_STEP=96
 DP=$(($WORLD_SIZE/$TP/$PP/$CP))
 GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 
@@ -53,7 +64,7 @@ GPT_ARGS="
     --micro-batch-size ${MBS} \
     --global-batch-size ${GBS} \
     --tokenizer-type NullTokenizer \
-    --vocab-size 151936 \
+    --vocab-size 152064 \
     --seq-length 1024 \
     --make-vocab-size-divisible-by 1 \
     --normalization RMSNorm \
@@ -73,7 +84,9 @@ GPT_ARGS="
     --seed 42 \
     --bf16 \
     --load $LOAD_PATH \
+    --variable-seq-lengths \
     --use-distributed-optimizer \
+    --reuse-fp32-param \
     --use-flash-attn \
     --no-load-optim \
     --no-load-rng \

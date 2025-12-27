@@ -1,0 +1,52 @@
+{
+    "dataset_param": {
+        "dataset_type": "huggingface",
+        "preprocess_parameters": {
+            "model_name_or_path": "./ckpt/hf_path/Qwen2-VL-72B-Instruct",
+            "use_fast_tokenizer": true,
+            "split_special_tokens": false,
+            "image_max_pixels": 262144,
+            "image_min_pixels": 0,
+            "video_max_pixels": 16384,
+            "video_min_pixels": 0,
+            "video_fps": 2.0,
+            "video_maxlen": 64
+        },
+        "basic_parameters": {
+            "template": "qwen2vl",
+            "dataset_dir": "./data",
+            "dataset": "./data/mllm_video_demo.json",
+            "cache_dir": "./data/cache_dir",
+            "train_on_prompt": false,
+            "mask_history": false,
+            "preprocessing_batch_size": 1000,
+            "preprocessing_num_workers": 16,
+            "max_samples": null,
+            "tool_format": null
+        },
+        "attr": {
+            "system": null,
+            "images": null,
+            "videos": "videos",
+            "messages": "messages",
+            "role_tag": "role",
+            "content_tag": "content",
+            "user_tag": "user",
+            "assistant_tag": "assistant",
+            "observation_tag": null,
+            "function_tag": null,
+            "system_tag": null
+        }
+    },
+    "dataloader_param": {
+        "dataloader_mode": "sampler",
+        "drop_last": true,
+        "sampler_type": "BaseRandomBatchSampler",
+        "collate_param": {
+            "model_name": "qwen2vl",
+            "ignore_pad_token_for_loss": true
+        },
+        "pin_memory": true,
+        "shuffle": true
+    }
+}
