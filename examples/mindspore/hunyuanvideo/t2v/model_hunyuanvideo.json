@@ -1,0 +1,91 @@
+{
+    "load_video_features": true,
+    "load_text_features": true,
+    "task": "t2v",
+    "ae": {
+        "model_id": "autoencoder_kl_hunyuanvideo",
+        "from_pretrained": "hunyuan-video-t2v-720p/vae/pytorch_model.pt",
+        "dtype": "bf16",
+        "latent_channels": 16,
+        "block_out_channels": [128, 256, 512, 512],
+        "layers_per_block": 2,
+        "in_channels": 3,
+        "norm_num_groups": 32,
+        "out_channels": 3,
+        "sample_size": 256,
+        "sample_tsize": 64,
+        "down_block_types": [
+            "DownEncoderBlockCausal3D",
+            "DownEncoderBlockCausal3D",
+            "DownEncoderBlockCausal3D",
+            "DownEncoderBlockCausal3D"
+        ],
+        "up_block_types": [
+            "UpDecoderBlockCausal3D",
+            "UpDecoderBlockCausal3D",
+            "UpDecoderBlockCausal3D",
+            "UpDecoderBlockCausal3D"
+        ],
+        "scaling_factor": 0.476986,
+        "time_compression_ratio": 4,
+        "mid_block_add_attention": true,
+        "act_fn": "silu",
+        "enable_tiling": true
+    },
+    "text_encoder": [
+        {
+            "model_id": "HunyuanMLLmModel",
+            "dtype": "bf16",
+            "from_pretrained": "llava-llama-3-8b-text-encoder-tokenizer",
+            "hub_backend": "hf",
+            "use_attention_mask": true,
+            "hidden_state_skip_layer": 2,
+            "output_key": "hidden_states",
+            "template_id": "hyv-llm-encode-video",
+            "template_file_path": "examples/hunyuanvideo/template.json"
+        },
+        {
+            "model_id": "CLIP",
+            "dtype": "fp16",
+            "from_pretrained": "clip-vit-large-patch14",
+            "hub_backend": "hf",
+            "low_cpu_mem_usage": true,
+            "use_attention_mask": true,
+            "output_key": "pooler_output"
+        }
+    ],
+    "diffusion": {
+        "model_id": "flow_match_discrete_scheduler",
+        "num_train_timesteps": 1000,
+        "shift": 7.0,
+        "reverse": true,
+        "solver": "euler"
+    },
+    "predictor": {
+        "model_id": "hunyuanvideodit",
+        "from_pretrained": null,
+        "dtype": "bf16",
+        "patch_size": [1, 2, 2],
+        "in_channels": 16,
+        "out_channels": 16,
+        "num_heads": 24,
+        "head_dim": 128,
+        "mlp_width_ratio": 4,
+        "mlp_act_type": "gelu_tanh",
+        "mm_double_blocks_depth": 20,
+        "double_stream_full_recompute_layers": 20,
+        "mm_single_blocks_depth": 40,
+        "single_stream_full_recompute_layers": 40,
+        "attention_async_offload": true,
+        "rope_dim_list": [16, 56, 56],
+        "qkv_bias": true,
+        "qk_norm": true,
+        "qk_norm_type": "rmsnorm",
+        "guidance_embed": true,
+        "embeded_guidance_scale": 1.0,
+        "text_projection": "single_refiner",
+        "text_states_dim": [4096, 768],
+        "use_attention_mask": true,
+        "use_fused_rmsnorm": true
+    }
+}
