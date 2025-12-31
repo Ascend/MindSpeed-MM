@@ -68,7 +68,7 @@ mkdir logs data ckpt
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
-git checkout 93c45456c7044bacddebc5072316c01006c938f9
+git checkout d76dbddd
 
 # 安装mindspeed及依赖
 pip install -e .
@@ -294,7 +294,6 @@ OUTPUT_ARGS="
 ```shell
 # 根据实际情况修改 ascend-toolkit 和 nnal 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-source /usr/local/Ascend/nnal/asdsip/set_env.sh
 # 单机16卡可以跑满层
 NPUS_PER_NODE=16
 # 如果想要指定单卡0，则增加export ASCEND_RT_VISIBLE_DEVICES=0
@@ -315,7 +314,6 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```shell
 # 根据实际情况修改 ascend-toolkit 和 nnal 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-source /usr/local/Ascend/nnal/asdsip/set_env.sh
 # 根据分布式集群实际情况配置分布式参数
 export GLOO_SOCKET_IFNAME="Your SOCKET IFNAME" # 通过ifconfig获取
 # 如果节点的卡数大于8，需要指定设备，如果指定前8卡，则可以按如下设置
