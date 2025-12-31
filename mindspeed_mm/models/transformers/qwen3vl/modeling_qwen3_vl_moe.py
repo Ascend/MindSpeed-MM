@@ -19,7 +19,7 @@ from transformers.models.qwen3_vl_moe.configuration_qwen3_vl_moe import Qwen3VLM
 
 from megatron.training import get_args
 from mindspeed_mm.models.common.gmm import npu_group_gemm
-
+from mindspeed_mm.models.common.fused_moe import fused_ep_forward
 
 from .output import Qwen3VLMoeCausalLMOutputWithPast
 
@@ -50,11 +50,11 @@ class Qwen3VLMoeTextExperts(nn.Module):
         self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts * self.hidden_size, 2 * self.expert_dim))
         self.down_proj = nn.Parameter(torch.empty((self.num_experts * self.expert_dim, self.hidden_size)))
         self.act_fn = ACT2FN[config.hidden_act]
-        
+
     def _view_experts_weight(self):
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
         gate_up_proj = gate_up_proj.view(self.num_experts, self.hidden_size, -1)
-        
+
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
         down_proj = down_proj.view(self.num_experts, self.expert_dim, -1)
         return gate_up_proj, down_proj
@@ -76,7 +76,7 @@ class Qwen3VLMoeTextExperts(nn.Module):
             torch.Tensor
         """
         gate_up_proj, down_proj = self._view_experts_weight()
-            
+
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
         if self.training:
@@ -110,15 +110,31 @@ class Qwen3VLMoeTextExperts(nn.Module):
             )
             next_states = next_states.sum(dim=0)
         return next_states
-    
-    
+
+    @staticmethod
+    def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices):
+        batch_size = hidden_states.shape[0]
+        hidden_states = hidden_states.reshape(-1, self.hidden_size)
+        hidden_states = fused_ep_forward(
+            self.num_experts,
+            routing_weights,
+            router_indices,
+            hidden_states,
+            fc1_weight=self.gate_up_proj,
+            fc2_weight=self.down_proj,
+            ep_group=ep_group
+        )
+        hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
+        return hidden_states
+
+
 class Qwen3VLNpuFusedMoETextExperts(Qwen3VLMoeTextExperts):
     """NPU fusd Moe"""
     def forward(
         self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor
     ) -> torch.Tensor:
         gate_up_proj, down_proj = self._view_experts_weight()
-        
+
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
         permuted_hidden_states, row_ids_map = torch_npu.npu_moe_token_permute(hidden_states, router_indices.to(torch.int32))
@@ -138,7 +154,7 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.gate = nn.Linear(config.hidden_size, config.num_experts, bias=False)
-        
+
         self.use_npu_fused_moe = getattr(get_args().mm.model.text_decoder, "use_npu_fused_moe", True)
         if self.use_npu_fused_moe:
             self.experts = Qwen3VLNpuFusedMoETextExperts(config)
@@ -154,7 +170,7 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         routing_weights = routing_weights / routing_weights.sum(dim=-1, keepdim=True)
         routing_weights = routing_weights.to(hidden_states.dtype)
         hidden_states = hidden_states.reshape(batch_size, -1, self.hidden_size)
-        
+
         if self.use_npu_fused_moe:
             routed_out = self.experts(hidden_states, routing_weights, router_indices)
         else:
@@ -243,7 +259,7 @@ class Qwen3VLMoePreTrainedModel(PreTrainedModel):
         if isinstance(module, Qwen3VLMoeTextExperts):
             module.gate_up_proj.data.normal_(mean=0.0, std=std)
             module.down_proj.data.normal_(mean=0.0, std=std)
-            
+
 
 @auto_docstring(
     custom_intro=(
@@ -262,10 +278,10 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel, Qwen3VLTextModel):
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-        
+
         # Placeholder for FSDP2 hook registration on norm/gate params when align_fsdp_param_groups is enabled.
         self.norm_hook_module = Qwen3VLEmptyModule()
-        
+
         self.layers = nn.ModuleList(
             [Qwen3VLMoeTextDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
@@ -428,14 +444,14 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, Qwen3VLForCo
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        
+
         if loss_ctx:
             logits, loss = self.lm_head(hidden_states[:, slice_indices, :], loss_ctx=loss_ctx)
         else:
             logits, loss = self.lm_head(hidden_states[:, slice_indices, :])
             if labels is not None:
                 loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
-        
+
         aux_loss = None
         if kwargs.get("output_router_logits", False):
             aux_loss = load_balancing_loss_func(
