@@ -116,7 +116,7 @@ pip install decord==0.6.0
 
 ### Diffusers权重下载
 
-|   模型   |   Huggingface下载链接   |
+|   模型   |   Hugging Face下载链接   |
 | ---- | ---- |
 |   T2V-1.3B   |   <https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers>   |
 

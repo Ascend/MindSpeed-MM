@@ -133,7 +133,7 @@ pip install decord==0.6.0
 
 ### Diffusers权重下载
 
-|   模型   |   Huggingface下载链接   |
+|   模型   |   Hugging Face下载链接   |
 | ---- | ---- |
 |   T2V-1.3B   |   <https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers>   |
 |  T2V-14B    |  <https://huggingface.co/Wan-AI/Wan2.1-T2V-14B-Diffusers>    |
@@ -177,7 +177,7 @@ mm-convert WanConverter mm_to_hf \
 |:------------|:----|:----|
 | --cfg.source_path | MindSpeed MM保存的权重路径                                   | /      |
 | --cfg.target_path | 转换后的Hugging Face权重路径                                 | /      |
-| --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始huggingface配置文件 |    /   |
+| --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始Hugging Face配置文件 |    /   |
 
 ---
 

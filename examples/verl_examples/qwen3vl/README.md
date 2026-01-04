@@ -145,7 +145,7 @@ cd ../../verl/
 
 ## 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [Qwen3-VL-8B](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct/tree/main)；
 - 模型地址: [Qwen3-VL-30B](https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Instruct/tree/main)；

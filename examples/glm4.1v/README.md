@@ -89,7 +89,7 @@ pip install -e .
 <a id="jump2.1"></a>
 #### 1. 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [GLM4.1V-9B](https://huggingface.co/THUDM/GLM-4.1V-9B-Thinking)；
 
@@ -135,7 +135,7 @@ mm-convert GlmConverter hf_to_mm \
 
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载(以coco2017数据集为例)
+#### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
 

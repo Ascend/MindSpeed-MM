@@ -84,7 +84,7 @@
 
 #### 3. 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [Qihoo-t2i-1B](https://huggingface.co/qihoo360/Qihoo-T2X/tree/main)；
 

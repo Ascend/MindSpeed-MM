@@ -1,5 +1,5 @@
 # 快速上手（MindSpore后端）
-以MindSpore AI框架为后端的MindSpeed MM同时支持了部分多模态生成和多模态理解模型。下面介绍典型模型Qwen2.5VL在MindSpore后端下的使用方法，引导开发者快速上手预置模型在MindSpore + 昇腾NPU上的高效运行。
+以MindSpore AI套件为后端的MindSpeed MM同时支持了部分多模态生成和多模态理解模型。下面介绍典型模型Qwen2.5VL在MindSpore后端下的使用方法，引导开发者快速上手预置模型在MindSpore + 昇腾NPU上的高效运行。
 
 ## Qwen2.5-VL-7B MindSpore后端快速上手指南
 更多细节请参考[qwen2.5vl](../../examples/mindspore/qwen2.5vl/README.md)。
@@ -38,12 +38,12 @@ mkdir logs
 ### 2. 权重下载及转换
 #### 2.1 权重下载
 
-从Huggingface库下载[Qwen2.5-VL-7B](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)的模型权重, 并将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-7B-Instruct`目录下。
+从Hugging Face库下载[Qwen2.5-VL-7B](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)的模型权重, 并将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-7B-Instruct`目录下。
 
 #### 2.2 权重转换
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。更多细节请参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.2.0/docs/features/权重转换工具.md)。
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。更多细节请参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.2.0/docs/features/权重转换工具.md)。
 
-以下是将huggingface权重转为MindSpeed-MM权重的转换示例：
+以下是将Hugging Face权重转为MindSpeed MM权重的转换示例：
 ```bash
 # 7b
 mm-convert  Qwen2_5_VLConverter hf_to_mm \
@@ -56,12 +56,12 @@ mm-convert  Qwen2_5_VLConverter hf_to_mm \
 
 其中参数含义如下：
 - mm_dir: 转换后保存目录
-- hf_dir: huggingface权重目录
+- hf_dir: Hugging Face权重目录
 - llm_pp_layers: llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 - vit_pp_layers: vit在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 - tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
 
-MindSpeed-MM修改了部分原始网络的结构名称，在微调后，如果需要将权重转回huggingface格式，可使用`mm-convert`权重转换工具对微调后的权重进行转换，将权重名称修改为与原始网络一致。
+MindSpeed-MM修改了部分原始网络的结构名称，在微调后，如果需要将权重转回Hugging Face格式，可使用`mm-convert`权重转换工具对微调后的权重进行转换，将权重名称修改为与原始网络一致。
 
 以下是mm2hf的转换示例：
 ```bash
@@ -77,7 +77,7 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
 其中参数含义如下：
 - save_hf_dir: mm微调后转换回hf模型格式的目录
 - mm_dir: 微调后保存的权重目录
-- hf_dir: huggingface权重目录
+- hf_dir: Hugging Face权重目录
 - llm_pp_layers: llm在每个卡上切分的层数，注意要和微调时model.json中配置的pipeline_num_layers一致
 - vit_pp_layers: vit在每个卡上切分的层数，注意要和微调时model.json中配置的pipeline_num_layers一致
 - tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
@@ -89,7 +89,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-7B-Instruct"
 ```
 
 ### 3. 数据集准备及处理
-#### 3.1 数据集下载(以COCO2017数据集为例)
+#### 3.1 数据集下载（以COCO2017数据集为例）
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
 (2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。

@@ -95,7 +95,7 @@ pip install -e .
 <a id="jump2.1"></a>
 #### 1. 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [Qwen2.5-VL-3B](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct/tree/main)；
 - 模型地址: [Qwen2.5-VL-7B](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)；
@@ -282,7 +282,7 @@ m-convert  Qwen2_5_VLConverter lora_mm_to_hf \
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载(以coco2017数据集为例)
+#### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
@@ -507,9 +507,9 @@ TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重�
 
 【huggingface等价模型结构配置（可选）】
 
-Megatron框架下的qwen2.5VL模型结构相比于Huggingface的模型结构实现有差异，对训练效果造成的影响。  
+Megatron框架下的qwen2.5VL模型结构相比于Hugging Face的模型结构实现有差异，对训练效果造成的影响。  
 
-开启该功能可以使用完全与Huggingface一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/canonical_model.md) 
+开启该功能可以使用完全与Hugging Face一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/canonical_model.md) 
 
 开启方式：
 `model_xxb.json`使能`canonical_model`
@@ -646,7 +646,7 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_72b_fsdp.sh
 
 （1）tokenizer/from_pretrained配置的路径为从huggingface下载的原始Qwen2.5-VL-7B-Instruct路径。
 
-（2）shell文件中的LOAD_PATH的路径为经过权重转换后的模型路径(可PP切分)。
+（2）shell文件中的LOAD_PATH的路径为经过权重转换后的模型路径（可PP切分）。
 
 <a id="jump5.2"></a>
 #### 2、启动推理

@@ -80,7 +80,7 @@ pip install -r MindSpeed-MM/examples/ming/requirements.txt
 
 ## 权重下载
 
-从Huggingface等网站下载开源模型权重
+从Hugging Face等网站下载开源模型权重
 
 - [Ming-Lite-Omni-1.5](https://huggingface.co/inclusionAI/Ming-Lite-Omni-1.5)
 

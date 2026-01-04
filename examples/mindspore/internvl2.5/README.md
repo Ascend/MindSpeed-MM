@@ -64,7 +64,7 @@ mkdir logs
 
 #### 1. 权重下载
 
-从Huggingface等网站下载开源模型权重
+从Hugging Face等网站下载开源模型权重
 
 - [
 InternVL2_5-4B](https://huggingface.co/OpenGVLab/InternVL2_5-4B)；

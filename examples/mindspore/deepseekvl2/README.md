@@ -54,7 +54,7 @@ mkdir ckpt
 
 #### 1. 权重下载
 
-从Huggingface等网站下载开源模型权重
+从Hugging Face等网站下载开源模型权重
 
 - [DeepSeekVL2](https://huggingface.co/deepseek-ai/deepseek-vl2)；
 

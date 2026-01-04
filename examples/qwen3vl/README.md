@@ -77,7 +77,7 @@ bash scripts/install.sh --arch arm --msid d76dbddd4517d48a2fc1cd494de8b9a6cfdbfb
 
 #### 1. 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [Qwen3-VL-*B](https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe)；
 
@@ -103,7 +103,7 @@ mm-convert Qwen3VLConverter hf_to_dcp \
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载(以coco2017数据集为例)
+#### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 

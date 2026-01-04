@@ -3,9 +3,9 @@
 
 ## 概述
 
-当前大模型相关业务发展迅速，AI框架PyTorch因其编程友好受到业界大多数大模型训练、推理软件的青睐，华为昇腾也提供了基于PyTorch的[昇腾MindSpeed + 昇腾NPU训练解决方案](https://www.hiascend.com/software/mindspeed)。为此，MindSpore推出了动态图方案以及[动态图API接口](https://www.mindspore.cn/docs/zh-CN/master/api_python/mindspore.mint.html)，使用户也可以像使用PyTorch一样使用MindSpore AI框架。当前华为昇腾MindSpeed也已支持接入MindSpore AI框架作为后端引擎，打造华为全栈解决方案，使用户在友好编程的同时，也享受到华为全栈软硬结合带来的极致性能体验。
+当前大模型相关业务发展迅速，AI套件PyTorch因其编程友好受到业界大多数大模型训练、推理软件的青睐，华为昇腾也提供了基于PyTorch的[昇腾MindSpeed + 昇腾NPU训练解决方案](https://www.hiascend.com/software/mindspeed)。为此，MindSpore推出了动态图方案以及[动态图API接口](https://www.mindspore.cn/docs/zh-CN/master/api_python/mindspore.mint.html)，使用户也可以像使用PyTorch一样使用MindSpore AI套件。当前华为昇腾MindSpeed也已支持接入MindSpore AI套件作为后端引擎，打造华为全栈解决方案，使用户在友好编程的同时，也享受到华为全栈软硬结合带来的极致性能体验。
 
-**建议用户先参照《[MindSpeed MM迁移调优指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/docs/user-guide/model-migration.md)》进行基于torch生态的代码开发，之后根据本指南迁移至Mindspore后端运行来获取更优的模型训练推理性能。**
+**建议用户先参照《[MindSpeed MM迁移调优指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/docs/user-guide/model-migration.md)》进行基于torch生态的代码开发，之后根据本指南迁移至MindSpore后端运行来获取更优的模型训练推理性能。**
 
 本指南侧重提供MindSpeed-MM MindSpore后端的迁移开发指导，帮助用户快速地将大模型训练从PyTorch后端迁移至MindSpore后端。在介绍迁移开发前，先简要介绍MindSpore动态图和API适配工具MSAdapter，供用户了解MindSpore后端和PyTorch后端的差异，以启发用户在模型迁移开发遇到问题时进行问题排查。
 
@@ -15,7 +15,7 @@
 
 #### 自动微分机制差异
 
-神经网络的训练主要使用反向传播算法，自动微分是各个AI框架实现反向传播的核心机制。PyTorch使用动态计算图，在代码执行时立即运算，正反向计算图在每次前向传播时动态构建；PyTorch反向微分是命令式反向微分，符合面向对象编程的使用习惯。
+神经网络的训练主要使用反向传播算法，自动微分是各个AI套件实现反向传播的核心机制。PyTorch使用动态计算图，在代码执行时立即运算，正反向计算图在每次前向传播时动态构建；PyTorch反向微分是命令式反向微分，符合面向对象编程的使用习惯。
 
 MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/r2.7.0/beginner/autograd.html?highlight=%E4%BC%A0%E6%92%AD)的设计理念，提供了更接近数学语义的自动微分接口`grad`和`value_and_grad`与PyTorch的自动微分`Tensor.backward`机制不同，MindSpore需要针对需要自动微分的函数对象调用`grad`接口获取函数微分，并指定需要求导的输入的位置索引。`grad`和`value_and_grad`接口的使用详见 [mindspore.grad](https://www.mindspore.cn/docs/zh-CN/master/api_python/mindspore/mindspore.grad.html?highlight=grad#mindspore.grad) 和 [mindspore.value_and_grad](https://www.mindspore.cn/docs/zh-CN/master/api_python/mindspore/mindspore.value_and_grad.html)。
 

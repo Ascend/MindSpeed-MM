@@ -100,7 +100,7 @@ pip install -e .
 
 #### 1. 权重下载
 
-从Huggingface网站下载开源模型权重
+从Hugging Face网站下载开源模型权重
 
 - [OpenSoraV2模型](https://huggingface.co/hpcai-tech/Open-Sora-v2/blob/main/Open_Sora_v2.safetensors)
 - [vae模型](https://huggingface.co/hpcai-tech/Open-Sora-v2/blob/main/hunyuan_vae.safetensors)

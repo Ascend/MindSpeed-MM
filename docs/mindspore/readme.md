@@ -1,6 +1,6 @@
 ## MindSpore后端支持说明
 
-MindSpeed-MM已支持接入华为自研AI框架MindSpore，旨在提供华为全栈易用的端到端的多模态模型训练解决方案，以此获得更极致的性能体验。MindSpore后端提供了一套对标PyTorch的API，用户无需进行额外代码适配即可无缝切换。
+MindSpeed-MM已支持接入华为自研AI套件MindSpore，旨在提供华为全栈易用的端到端的多模态模型训练解决方案，以此获得更极致的性能体验。MindSpore后端提供了一套对标PyTorch的API，用户无需进行额外代码适配即可无缝切换。
 
 ---
 
