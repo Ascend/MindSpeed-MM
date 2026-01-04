@@ -36,8 +36,9 @@ LOAD_PATH=""
 SAVE_PATH=""
 LOG_PATH="msrun_log"
 
-TP=4
+TP=2
 PP=4
+EP=2
 CP=1
 MBS=1
 GRAD_ACC_STEP=1
@@ -61,6 +62,7 @@ GPT_ARGS="
     --use-mcore-models \
     --tensor-model-parallel-size ${TP} \
     --pipeline-model-parallel-size ${PP} \
+    --expert-model-parallel-size ${EP} \
     --context-parallel-size ${CP} \
     --context-parallel-algo ulysses_cp_algo \
     --micro-batch-size ${MBS} \
@@ -92,6 +94,7 @@ GPT_ARGS="
     --num-workers 8 \
     --use-distributed-optimizer \
     --bf16 \
+    --sequence-parallel \
     --load $LOAD_PATH \
 "
 
@@ -120,9 +123,9 @@ OUTPUT_ARGS="
     --ckpt-format torch \
 "
 
-logfile=qwen3vl_$(date +%Y%m%d)_$(date +%H%M%S)
+logfile=qwen3vl_30B_$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
-msrun $DISTRIBUTED_ARGS mindspeed_mm/mindspore/pretrain_qwen3vl.py \
+msrun $DISTRIBUTED_ARGS pretrain_vlm.py \
     $GPT_ARGS \
     $MM_ARGS \
     $OUTPUT_ARGS \

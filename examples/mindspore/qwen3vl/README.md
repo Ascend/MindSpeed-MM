@@ -50,12 +50,16 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 # 安装MindSpeed-Core-MS一键拉起部署
-git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b master
+git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b r0.5.0
 
 # 使用MindSpeed-Core-MS内部脚本自动拉取相关代码仓并一键适配
 cd MindSpeed-Core-MS
 pip install -r requirements.txt 
 source auto_convert.sh mm
+# 使用master分支的MindSpeed-MM
+cd MindSpeed-MM
+git switch master
+cd ..
 
 # 安装新版transformers（支持qwen3vl模型）
 git clone https://github.com/huggingface/transformers.git

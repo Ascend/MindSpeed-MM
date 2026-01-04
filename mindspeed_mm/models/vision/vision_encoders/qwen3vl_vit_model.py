@@ -21,7 +21,7 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core import mpu
 from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.transformer_config import TransformerConfig
-from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_region
+from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_region, gather_from_sequence_parallel_region
 from megatron.training import get_args
 
 from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, gather_forward_split_backward
@@ -123,6 +123,7 @@ class Qwen3VLViT(MultiModalModule):
             self.num_grid_per_side = int(config.max_position_embeddings**0.5)
         self.deepstack_visual_indexes = config.deepstack_visual_indexes
 
+        self.unfreeze_param_names = ['pos_embed', 'deepstack_layer']
 
     def rot_pos_emb(self, grid_thw: torch.Tensor) -> torch.Tensor:
         merge_size = self.spatial_merge_size
@@ -224,16 +225,50 @@ class Qwen3VLViT(MultiModalModule):
         patch_pos_embeds = torch.cat(patch_pos_embeds_permute)
         return patch_pos_embeds
 
+    def pad_to_sequence_parallel(self, images, image_grid_thw):
+        """
+        Adjust image patches for tensor parallelism (TP) by padding to match effective TP size.
+
+        Args:
+            images (torch.Tensor): [num_patches, patch_dim] input patch tensor
+            image_grid_thw (torch.Tensor): [num_patches, 3] patch grid info (T,H,W)
+
+        Notes:
+            - Effective TP size = tensor_model_parallel_size * (spatial_merge_size²)
+            - No op if TP size ≤ 1
+        """
+        all_patch_num = images.shape[0]
+        res_dim = 0
+        if get_args().tensor_model_parallel_size <= 1:
+            return images, image_grid_thw, all_patch_num, res_dim
+
+        tp_size = get_args().tensor_model_parallel_size
+        effective_tp_size = tp_size * (self.spatial_merge_size ** 2)
+
+        res_dim = all_patch_num % effective_tp_size
+        pad_size = 0
+        if res_dim != 0:
+            pad_size = effective_tp_size - res_dim  # patch to lcm of tp size and all_patch_num
+            zero_tensor = torch.zeros(pad_size, images.shape[1], dtype=images.dtype, device='npu')
+            images = torch.cat((images, zero_tensor), dim=0)
+            pad_thw = torch.tensor([[1, 2, pad_size // 2]], dtype=image_grid_thw.dtype, device='npu')  # s, t
+            image_grid_thw = torch.cat((image_grid_thw, pad_thw), dim=0)
+
+        return images, image_grid_thw, all_patch_num, res_dim
+
     def forward(self, pixel_values: torch.Tensor, grid_thw: torch.Tensor, *args, **kwargs) -> torch.Tensor:
         """
         Forward function of the Qwen2VL ViT Model. This function passes the input tensors
         through the embedding layer and then the transformer.
 
         """
+        all_patch_num, res_dim = None, None
         if self.pre_process:
             if pixel_values is None or grid_thw is None:
                 raise ValueError('You have to specify pixel_values and grid_thw')
             else:
+                pixel_values, grid_thw, all_patch_num, res_dim = self.pad_to_sequence_parallel(pixel_values,
+                                                                                               grid_thw)
                 hidden_states = self.patch_embed(pixel_values)
 
         else:
@@ -306,6 +341,10 @@ class Qwen3VLViT(MultiModalModule):
                 split_gather_sizes,
                 "up"
             )
+        if get_args().sequence_parallel:
+            hidden_states = gather_from_sequence_parallel_region(hidden_states, tensor_parallel_output_grad=False)
+            if res_dim != 0:
+                hidden_states = hidden_states[: all_patch_num]  # s*t
 
         # should not gather here when sequence parallel otherwise grad norm will be doubled
         return hidden_states, window_index, deepstack_feature_lists

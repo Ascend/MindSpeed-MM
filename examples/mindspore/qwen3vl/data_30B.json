@@ -23,7 +23,7 @@
             "mask_history": false,
             "preprocessing_batch_size": 16,
             "preprocessing_num_workers": 16,
-            "max_samples": 100,
+            "max_samples": null,
             "tool_format": null
         },
         "attr": {

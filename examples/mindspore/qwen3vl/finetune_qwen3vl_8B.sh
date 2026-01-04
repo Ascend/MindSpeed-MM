@@ -114,9 +114,9 @@ OUTPUT_ARGS="
     --ckpt-format torch \
 "
 
-logfile=qwen3vl_8B_pt_$(date +%Y%m%d)_$(date +%H%M%S)
+logfile=qwen3vl_8B_$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
-msrun $DISTRIBUTED_ARGS mindspeed_mm/mindspore/pretrain_qwen3vl.py \
+msrun $DISTRIBUTED_ARGS pretrain_vlm.py \
     $GPT_ARGS \
     $MM_ARGS \
     $OUTPUT_ARGS \

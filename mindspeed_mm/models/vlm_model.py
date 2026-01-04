@@ -537,6 +537,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         return loss
 
     def process_multimodal_embeddings(self, input_embeds, input_ids, vit_embeds, **kwargs):
+        deepstack_visual_embeds = []
         if vit_embeds is not None:
             if self.config.sequence_parallel:
                 input_embeds = gather_from_sequence_parallel_region(input_embeds)
@@ -547,6 +548,22 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             indices_tuple = torch.nonzero(image_mask, as_tuple=True)
             input_embeds[indices_tuple] = vit_embeds
 
+            deepstack_image_embeds = kwargs.pop("deepstack_image_embeds", None)
+            if deepstack_image_embeds is not None:
+                for deepstack_image in deepstack_image_embeds:
+                    if self.config.sequence_parallel:
+                        deepstack_image = gather_from_sequence_parallel_region(deepstack_image,
+                                                                               tensor_parallel_output_grad=False)
+                        deepstack_image = deepstack_image[: vit_embeds.shape[0], :]
+
+                    deepstack_emb = deepstack_image.new_zeros(input_embeds.shape)
+                    deepstack_emb[indices_tuple] = deepstack_image
+
+                    deepstack_emb = deepstack_emb.transpose(0, 1)
+                    if self.config.sequence_parallel:
+                        deepstack_emb = tensor_parallel.scatter_to_sequence_parallel_region(deepstack_emb)
+                    deepstack_visual_embeds.append(deepstack_emb)
+
             if 'input_features' in kwargs:
                 audio_features = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
                 audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds)
@@ -554,7 +571,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                 input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
 
             input_embeds = input_embeds.transpose(0, 1)  # sbh -> bsh
-        return input_embeds
+        return input_embeds, deepstack_visual_embeds
 
     def forward(
             self,
@@ -581,10 +598,16 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
             hetero_pp = True
 
         # MM_GRPO use, if llm_only is True, directly get vit_embeds
+        deepstack_visual_embeds = None
         if self.add_image_encoder and self.image_encoder.pre_process and kwargs.get('llm_only', False):
             vit_embeds = kwargs.get('vit_embeds').unsqueeze(1)
         elif self.add_image_encoder and pixel_values is not None and not hetero_pp:
-            vit_embeds = self.image_encoder(pixel_values, image_grid_thw)
+            encoder_out = self.image_encoder(pixel_values, image_grid_thw)
+            if isinstance(encoder_out, tuple) and len(encoder_out) == 2:
+                vit_embeds, deepstack_image_embeds = encoder_out
+                kwargs["deepstack_image_embeds"] = deepstack_image_embeds
+            else:
+                vit_embeds = encoder_out
             if get_args().encoder_dp_balance and self.encoder_dp_enable:
                 vit_embeds = EncoderBalanceComm.apply(
                     vit_embeds,
@@ -639,7 +662,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                 return [vit_embeds, audio_features]
             elif self.text_decoder.pre_process:
                 input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
-                input_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, vit_embeds, **kwargs)
+                input_embeds, deepstack_visual_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, vit_embeds, **kwargs)
             else:
                 input_embeds = None
 
@@ -652,6 +675,9 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                                                                              inputs_embeds=input_embeds,
                                                                              cache_position=cache_position,
                                                                              **kwargs)
+            extra_block_kwargs = {}
+            if deepstack_visual_embeds is not None and len(deepstack_visual_embeds) > 0:
+                extra_block_kwargs['deepstack_visual_embeds'] = deepstack_visual_embeds
 
             output = self.text_decoder(
                 input_ids=input_ids,
@@ -660,6 +686,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                 decoder_input=input_embeds,
                 labels=None,
                 inference_params=inference_params,
+                extra_block_kwargs=extra_block_kwargs,
             )
 
             if self.text_decoder.post_process:

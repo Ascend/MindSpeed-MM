@@ -52,7 +52,7 @@
         "use_remove_padding": false,
         "use_qk_norm": true,
         "qk_layernorm": true,
-        "sequence_parallel": false,
+        "sequence_parallel": true,
         "recompute_granularity": "full",
         "recompute_method": "block",
         "recompute_num_layers": 4
