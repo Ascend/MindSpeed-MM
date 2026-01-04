@@ -100,7 +100,7 @@ pip install peft==0.10.0
 <a id="jump2.1"></a>
 #### 1. 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [Qwen2-VL-2B](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/tree/main)；
 

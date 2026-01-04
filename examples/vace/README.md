@@ -129,7 +129,7 @@ pip install decord==0.6.0
 
 ### 权重下载
 
-| 模型               | Huggingface下载链接                                            |
+| 模型               | Hugging Face下载链接                                            |
 |------------------|------------------------------------------------------------|
 | Wan2.1-VACE-1.3B | <https://huggingface.co/Wan-AI/Wan2.1-VACE-1.3B> |
 | Wan2.1-VACE-14B  | <https://huggingface.co/Wan-AI/Wan2.1-VACE-14B>  |
@@ -313,7 +313,7 @@ bash examples/vace/{model_type}/pretrain_fsdp.sh
 | examples/vace/inference/inference_wan{2.1/2.2}_{model_type}.json | output_path |  生成视频的保存路径  |
 
  1. model_paths中的vae和text_encoder需要使用[非diffusers版](https://huggingface.co/Wan-AI/Wan2.1-VACE-1.3B)的huggingface权重
- 2. model_paths中的transformer如果想使用训练中保存的权重，需要提前运行权重转换脚本`mm-convert VACEConverter mm_to_hf`将MM格式权重转换为Huggingface格式
+ 2. model_paths中的transformer如果想使用训练中保存的权重，需要提前运行权重转换脚本`mm-convert VACEConverter mm_to_hf`将MM格式权重转换为Hugging Face格式
 
 
 

@@ -89,7 +89,7 @@ pip install -e .
 <a id="jump2.1"></a>
 #### 1. 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [GLM4.1V-9B](https://huggingface.co/THUDM/GLM-4.1V-9B-Thinking)；
 
@@ -100,7 +100,7 @@ pip install -e .
 <a id="jump2.2"></a>
 #### 2. 权重转换(hf2mm)
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
 
 ```bash
 # 9B PP1
@@ -122,7 +122,7 @@ mm-convert GlmConverter hf_to_mm \
 
 # 其中：
 # mm_dir: 转换后保存目录
-# hf_dir: huggingface权重目录
+# hf_dir: Hugging Face权重目录
 # llm_pp_layers: llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 # vit_pp_layers: vit在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 # tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
@@ -135,7 +135,7 @@ mm-convert GlmConverter hf_to_mm \
 
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载(以coco2017数据集为例)
+#### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
 

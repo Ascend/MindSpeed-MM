@@ -84,7 +84,7 @@ mkdir logs
 <a id="jump2.1"></a>
 ### 1. 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [Qwen2.5-Omni-7B](https://huggingface.co/Qwen/Qwen2.5-Omni-7B/tree/main)；
 
@@ -154,7 +154,7 @@ mm-convert  Qwen2_5_OmniConverter mm_to_hf \
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载(以coco2017数据集为例)
+#### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
 

@@ -93,7 +93,7 @@ pip install -e .
 
 ### 权重下载
 
-从Huggingface等网站下载开源模型权重
+从Hugging Face等网站下载开源模型权重
 
 - [InternVL3_5-30B-A3B-Instruct](https://huggingface.co/OpenGVLab/InternVL3_5-30B-A3B-Instruct)
 

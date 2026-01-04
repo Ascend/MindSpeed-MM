@@ -124,7 +124,7 @@ pip install decord==0.6.0
 
 ### Diffusers权重下载
 
-|   模型   |   Huggingface下载链接   |
+|   模型   |   下载链接   |
 | ---- | ---- |
 |   5B   |   <https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers>   |
 |  T2V-14B    |  <https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers>    |
@@ -164,7 +164,7 @@ mm-convert WanConverter mm_to_hf \
 |:------------------|:----------------------------------------------|
 | --cfg.source_path | MindSpeed MM保存的权重路径                           |
 | --cfg.target_path | 转换后的Hugging Face权重路径                          |
-| --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始huggingface配置文件 |
+| --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始配置文件 |
 
 **注**： 对A14B模型，hugging face diffusers权重中包含两个transformer权重，
 后缀中transformer对应高噪声（high）模型，transformer_2对应低噪声（low）模型。

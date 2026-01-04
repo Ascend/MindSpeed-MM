@@ -46,14 +46,14 @@ pip install -e .
 ### 2. 权重下载及转换
 #### 2.1 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 模型地址: [Qwen2.5-VL-3B](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct/tree/main)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-3B-Instruct`目录下。
 
 #### 2.2 权重转换
-MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分，详情参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
+MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分，详情参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
 
 以下是hf2mm的转换示例：
 ```bash
@@ -67,13 +67,13 @@ mm-convert  Qwen2_5_VLConverter hf_to_mm \
 
 # 其中：
 # mm_dir: 转换后保存目录
-# hf_dir: huggingface权重目录
+# hf_dir: Hugging Face权重目录
 # llm_pp_layers: llm在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 # vit_pp_layers: vit在每个卡上切分的层数，注意要和model.json中配置的pipeline_num_layers一致
 # tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
 ```
 
-MindSpeed-MM修改了部分原始网络的结构名称，在微调后，如果需要将权重转回huggingface格式，可使用`mm-convert`权重转换工具对微调后的权重进行转换，将权重名称修改为与原始网络一致。
+MindSpeed-MM修改了部分原始网络的结构名称，在微调后，如果需要将权重转回Hugging Face格式，可使用`mm-convert`权重转换工具对微调后的权重进行转换，将权重名称修改为与原始网络一致。
 
 以下是mm2hf的转换示例：
 ```bash
@@ -87,7 +87,7 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
 # 其中：
 # save_hf_dir: mm微调后转换回hf模型格式的目录
 # mm_dir: 微调后保存的权重目录
-# hf_dir: huggingface权重目录
+# hf_dir: Hugging Face权重目录
 # llm_pp_layers: llm在每个卡上切分的层数，注意要和微调时model.json中配置的pipeline_num_layers一致
 # vit_pp_layers: vit在每个卡上切分的层数，注意要和微调时model.json中配置的pipeline_num_layers一致
 # tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
@@ -285,7 +285,7 @@ pip install decord==0.6.0
 
 #### 2.1 Diffusers权重下载
 
-|   模型   |   Huggingface下载链接   |
+|   模型   |   Hugging Face下载链接   |
 | ---- | ---- |
 |   T2V-1.3B   |   <https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers>   |
 

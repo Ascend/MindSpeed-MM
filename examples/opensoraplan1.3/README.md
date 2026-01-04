@@ -120,7 +120,7 @@ pip install decord==0.6.0
 
 #### 1. 权重下载
 
-从Huggingface等网站下载开源模型权重
+从Hugging Face等网站下载开源模型权重
 
 - [LanguageBind/Open-Sora-Plan-v1.3.1](https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.3.0/tree/main)：WFVAE模型和SparseVideoDiT模型；
 

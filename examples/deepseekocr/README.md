@@ -74,7 +74,7 @@ pip install -r examples/deepseekocr/requirements.txt
 
 ## 权重下载
 
-从Huggingface等网站下载开源模型权重
+从Hugging Face等网站下载开源模型权重
 
 - [Deepseek-OCR](https://huggingface.co/deepseek-ai/DeepSeek-OCR)
 

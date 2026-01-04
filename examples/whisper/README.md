@@ -86,7 +86,7 @@
 
 #### 1. 权重下载
 
-从Huggingface等网站下载开源模型权重
+从Hugging Face等网站下载开源模型权重
 
 - [openai/whisper-large-v3](https://huggingface.co/openai/whisper-large-v3/tree/main)：Whisper large-v3模型；
 

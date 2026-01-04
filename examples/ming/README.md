@@ -80,7 +80,7 @@ pip install -r MindSpeed-MM/examples/ming/requirements.txt
 
 ## 权重下载
 
-从Huggingface等网站下载开源模型权重
+从Hugging Face等网站下载开源模型权重
 
 - [Ming-Lite-Omni-1.5](https://huggingface.co/inclusionAI/Ming-Lite-Omni-1.5)
 
@@ -131,7 +131,7 @@ pip install -r MindSpeed-MM/examples/ming/requirements.txt
 DATA_PATH="./data/mllm_format_llava_instruct_data.json" # 数据集的文件
 DATA_DIR="./data" # 数据集依赖图文等文件的目录
 PROCESSOR_PATH="." # Ming代码仓路径，默认是当前目录（即 Ming 目录）
-LOAD_PATH="./ckpt/Ming-Lite-Omni-1.5" # huggingface下载的权重路径
+LOAD_PATH="./ckpt/Ming-Lite-Omni-1.5" # Hugging Face下载的权重路径
 ```
 
 2. 根据使用机器的情况，修改`NNODES`、`NPUS_PER_NODE`配置， 例如单机 A2 可设置`NNODES`为 1 、`NPUS_PER_NODE`为8；

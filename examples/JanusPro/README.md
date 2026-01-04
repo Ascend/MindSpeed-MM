@@ -52,7 +52,7 @@ cd ..
 
 #### 1. 权重下载
 
-从Huggingface库下载对应的模型权重:
+从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [JanusPro-7B](https://huggingface.co/deepseek-ai/Janus-Pro-7B/tree/main)；
 
