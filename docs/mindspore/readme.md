@@ -17,7 +17,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 | 昇腾NPU驱动固件 | 在研版本 |
 | 昇腾 CANN       | 在研版本                                               |
 | MindSpore       | [2.7.2](https://www.mindspore.cn/install/)                                                                                        |
-| Python          | >=3.9  
+| Python          | >=3.10  
 
 ## 环境部署
 
