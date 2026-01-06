@@ -344,7 +344,7 @@ class Qwen2VlPipeline(GenerationMixin):
         # clear cache memory
         self.model.inference_params = None
         if generated_ids is not None:
-            #  把input_ids 截取掉
+            # Truncate input_ids
             generated_ids = [
                 output_ids[len(input_ids):]
                 for input_ids, output_ids in zip(inputs.input_ids, generated_ids)

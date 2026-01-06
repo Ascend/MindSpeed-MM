@@ -7,12 +7,12 @@ from functools import lru_cache
 
 def get_logger(name):
     _logger = logging.getLogger(name)
-    # 设置日志level
+    # Set the log level
     _logger.setLevel("INFO")
-    # 设置日志格式
+    # Set the log format
     formatter = logging.Formatter(
         '%(asctime)s - %(module)s - %(lineno)d - %(levelname)s - %(message)s')
-    # 控制台打印
+    # Console print
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     _logger.addHandler(console_handler)

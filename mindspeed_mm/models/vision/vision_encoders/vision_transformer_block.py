@@ -564,7 +564,7 @@ class Qwen3VLVisionTransformerBlock(TransformerBlock):
                 if self.config.context_parallel_size == 1:
                     cu_full_seqlens = cu_full_seqlens.tolist()
                 full_packed_seq_params = PackedSeqParams(cu_seqlens_q=cu_full_seqlens, cu_seqlens_kv=cu_full_seqlens)
-        deepstack_feature_lists = [] # NOTE: htwang 当前不考虑重计算
+        deepstack_feature_lists = [] # NOTE: No recompute for now
         with rng_context:
             # Forward pass.
             if self.config.recompute_granularity == 'full' and self.training:

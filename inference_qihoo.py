@@ -55,11 +55,11 @@ def main():
     # prepare pipeline
     sora_pipeline = prepare_pipeline(args, device)
 
-    # == Iter over all samples ==
+    # Iter over all samples
     video_grids = []
     save_iter = 1
     for i in range(0, len(prompts), args.micro_batch_size):
-        # == prepare batch prompts ==
+        # prepare batch prompts
         batch_prompts = prompts[i: i + args.micro_batch_size]
         batch_negative_prompts = [negative_prompt] * args.micro_batch_size
         videos = sora_pipeline(prompt=batch_prompts, negative_prompt=batch_negative_prompts, fps=save_fps, device=device, dtype=dtype)

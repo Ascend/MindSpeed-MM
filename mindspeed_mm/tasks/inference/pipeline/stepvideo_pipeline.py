@@ -60,11 +60,11 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         return num_frames, width, height
 
     def resize_to_desired_aspect_ratio(self, video, aspect_size):
-        ## video is in shape [f, c, h, w]
+        # video is in shape [f, c, h, w]
         height, width = video.shape[-2:]
 
         aspect_ratio = [w / h for h, w in aspect_size]
-        # # resize
+        # resize
         aspect_ratio_fact = width / height
         bucket_idx = np.argmin(np.abs(aspect_ratio_fact - np.array(aspect_ratio)))
         aspect_ratio = aspect_ratio[bucket_idx]
@@ -78,7 +78,7 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         width_scale = int(round(width * scale))
         height_scale = int(round(height * scale))
 
-        # # crop
+        # crop
         delta_h = height_scale - target_size_height
         delta_w = width_scale - target_size_width
         if delta_w < 0 or delta_h < 0:
@@ -87,7 +87,7 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         top = delta_h // 2
         left = delta_w // 2
 
-        ## resize image and crop
+        # resize image and crop
         resize_crop_transform = transforms.Compose([
             transforms.Resize((height_scale, width_scale)),
             lambda x: transforms.functional.crop(x, top, left, target_size_height, target_size_width),
@@ -262,8 +262,8 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         )
 
         # 5. Denoising
-        prompt_embeds = prompt_embeds.unsqueeze(1)# b s d -> b 1 s d
-        clip_embedding = clip_embedding.unsqueeze(1)# b s d -> b 1 s d
+        prompt_embeds = prompt_embeds.unsqueeze(1)  # b s d -> b 1 s d
+        clip_embedding = clip_embedding.unsqueeze(1)  # b s d -> b 1 s d
         self.predict_model.to(device)
         latents = self.scheduler.sample(
             model=self.predict_model,
@@ -279,6 +279,6 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         torch.cuda.empty_cache()
 
         # 6. Decode
-        video = self.decode_latents(latents.to(self.vae.dtype))# b t c h w
+        video = self.decode_latents(latents.to(self.vae.dtype))  # b t c h w
         
         return video

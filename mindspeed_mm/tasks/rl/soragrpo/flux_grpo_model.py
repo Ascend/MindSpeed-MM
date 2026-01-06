@@ -11,7 +11,7 @@ class FluxGRPOModel(SoraGRPOModel):
         self.ae = self._init_ae(args, device)
         self.reward = self.initialize_reward_model(args, device)
         self.text_encoder = None
-        # diffuser模型较大，且需要加载入host内存后续再使用FSDP分片，所以统一最后加载
+        # Diffuser model is large, load to host memory first then FSDP shard, so load it last uniformly
         self.diffuser = self._init_diffuser(args)
 
     def _init_diffuser(self, args):

@@ -35,7 +35,7 @@ def zeropower_via_newtonschulz5(G, steps):
     # Perform the NS iterations
     for _ in range(steps):
         A = X @ X.T
-        B = b * A + c * A @ A # adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng
+        B = b * A + c * A @ A  # adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng
         X = a * X + B @ X
 
     if G.size(0) > G.size(1):

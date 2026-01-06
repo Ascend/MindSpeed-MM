@@ -340,7 +340,7 @@ class OpenSoraPlanScheduler:
             raise ValueError("The shape of noise and x_start must be equal.")
         if sigmas is None:
             sigmas = self.compute_density_for_sigma_sampling(b).to(x_start.device)
-            image_seq_len = (noise.shape[-1] * noise.shape[-2]) // 4 if self.use_dynamic_shifting else None # divided by patch embedding size
+            image_seq_len = (noise.shape[-1] * noise.shape[-2]) // 4 if self.use_dynamic_shifting else None  # divided by patch embedding size
             sigmas = self.sigma_shift_opensoraplan(sigmas, image_seq_len=image_seq_len)
             timesteps = sigmas * 1000
             while sigmas.ndim < x_start.ndim:
@@ -370,7 +370,7 @@ class OpenSoraPlanScheduler:
         if added_cond_kwargs:
             model_kwargs.update(added_cond_kwargs)
 
-        image_seq_len = (shape[-1] * shape[-2]) // 4 if self.use_dynamic_shifting else None # patch embedding size
+        image_seq_len = (shape[-1] * shape[-2]) // 4 if self.use_dynamic_shifting else None  # patch embedding size
         sigmas = self.set_sigmas(device=self.device, sigmas=None, image_seq_len=image_seq_len)
         timesteps = sigmas.clone() * 1000
         timesteps = timesteps[:-1]

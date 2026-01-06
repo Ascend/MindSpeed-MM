@@ -47,7 +47,8 @@ class AudioModel(MultiModalModule):
         self.pre_process = pre_process
         self.post_process = post_process
         self.add_encoder = config.audio_encoder is not None
-        self.projector = None  # 开pp时projector只在最后一张卡有projector，这里默认要设为None不然影响freeze
+        # When enabling PP, projector exists only on the last rank, set to None by default (otherwise freeze is affected).
+        self.projector = None
         self.encoder = None
         if self.add_encoder:
             self.encoder = AUDIO_ENCODER_MAPPINGS[config.audio_encoder.model_id](

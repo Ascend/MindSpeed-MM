@@ -172,8 +172,8 @@ def get_meshgrid_nd(rope_sizes, dim=2, dtype=torch.float32):
     Get n-D meshgrid
     """
     axis_grid = [torch.linspace(0, rope_sizes[i], rope_sizes[i] + 1, dtype=dtype)[:rope_sizes[i]] for i in range(dim)]
-    grid = torch.meshgrid(*axis_grid, indexing="ij") # dim x [W, H, D]
-    grid = torch.stack(grid, dim=0) # [dim, W, H, D]
+    grid = torch.meshgrid(*axis_grid, indexing="ij")  # dim x [W, H, D]
+    grid = torch.stack(grid, dim=0)  # [dim, W, H, D]
 
     return grid
 
@@ -753,10 +753,10 @@ class RoPE3DSORA(nn.Module):
             inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float().to(device) / self.dim))
             t = torch.arange(seq_len, device=device, dtype=inv_freq.dtype) / interpolation_scale
             freqs = torch.einsum("i,j->ij", t, inv_freq)
-            freqs = torch.cat((freqs, freqs), dim=-1) # (Seq, Dim)
+            freqs = torch.cat((freqs, freqs), dim=-1)  # (Seq, Dim)
             self.cache[self.dim, seq_len, device] = freqs
         freqs = self.cache[self.dim, seq_len, device]
-        return F.embedding(pos1d, freqs)[:, :, None, :] # s, b, 1, d
+        return F.embedding(pos1d, freqs)[:, :, None, :]  # s, b, 1, d
 
     @staticmethod
     def rotate_half(x):
@@ -785,7 +785,7 @@ class RoPE3DSORA(nn.Module):
         return tokens
 
     def forward(self, b, t, h, w, device):
-        poses, max_poses = self.get_position(b, t, h, w, device) # [3, seq, batch]
+        poses, max_poses = self.get_position(b, t, h, w, device)  # [3, seq, batch]
         freq_t = self.get_freq(max_poses[0] + 1, poses[0], device, self.interpolation_scale_t)
         freq_y = self.get_freq(max_poses[1] + 1, poses[1], device, self.interpolation_scale_h)
         freq_x = self.get_freq(max_poses[2] + 1, poses[2], device, self.interpolation_scale_w)
@@ -819,13 +819,13 @@ class RoPE3DStepVideo(RoPE3DSORA):
             inv_freq = 1.0 / (self.base ** (torch.arange(0, dim, 2).float().to(device) / dim))
             t = torch.arange(seq_len, device=device, dtype=inv_freq.dtype)
             freqs = torch.einsum("i,j->ij", t, inv_freq)
-            freqs = torch.cat((freqs, freqs), dim=-1) # (Seq, Dim)
+            freqs = torch.cat((freqs, freqs), dim=-1)  # (Seq, Dim)
             self.cache[dim, seq_len, device] = freqs
         freqs = self.cache[dim, seq_len, device]
-        return F.embedding(pos1d, freqs)[:, :, None, :] # s, b, 1, d
+        return F.embedding(pos1d, freqs)[:, :, None, :]  # s, b, 1, d
 
     def forward(self, b, t, h, w, device):
-        poses, max_poses = self.get_position(b, t, h, w, device) # [3, seq, batch]
+        poses, max_poses = self.get_position(b, t, h, w, device)  # [3, seq, batch]
 
         out = []
         for i, dim in enumerate(self.ch_split):

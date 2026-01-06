@@ -27,8 +27,8 @@ class DiffusersAEModel(nn.Module):
         if use_tiling:
             self.enable_tiling(tiling_param=config.get("tiling_param", None))
 
-        # diffusers中，model.encode最后不会对latent进行norm，而是放在其他模块中
-        # MindSpeedMM中将该步骤合并至AE.encode中
+        # In diffusers, model.encode does not normalize latent at last, the normalization is performed in other modules.
+        # MindSpeed-MM merges this step into AE.encode.
         # Mode:
         # 1. value_shift_scale: (output - shift_factor) * scaling_factor
         # 2. channel_specified_shift_scale: (output - latents_mean) / latents_std

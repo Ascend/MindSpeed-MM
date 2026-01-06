@@ -218,7 +218,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         num_inference_steps = self.scheduler.num_inference_steps
         timesteps = self.scheduler.timesteps
 
-        ## v2v task has to add noise
+        # v2v task has to add noise
         if video is not None:
             timesteps, _ = self.get_timesteps(num_inference_steps, timesteps, self.strength)
             latent_timestep = timesteps[:1].repeat(batch_size)
@@ -468,7 +468,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
     def prepare_video_latents(self, batch_size, video, device, dtype):
         # process video data
         video = torch.stack(video, dim=0)
-        video = video.to(torch.float32) / 255.0 # normalize to [0, 1]
+        video = video.to(torch.float32) / 255.0  # normalize to [0, 1]
         video = video.permute(0, 2, 1, 3, 4)
 
         h, w = video.shape[-2:]
@@ -500,7 +500,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         vae_transform = v2.Compose([v2.Resize(size=[h, w])])
         video = vae_transform(video).to(device)
 
-        ## normalize to [-1, 1]
+        # normalize to [-1, 1]
         video = 2.0 * video - 1.0
         vae_feature = self.vae.encode(video).to(dtype)
 

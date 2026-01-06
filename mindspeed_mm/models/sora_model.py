@@ -48,21 +48,46 @@ logger = getLogger(__name__)
 class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
     """
     Instantiate a video generation model from config.
-    SoRAModel is an assembled model, which may include text_encoder, video_encoder, predictor, and diffusion model
+    SoRAModel is an assembled model, which may include text_encoder, video_encoder, predictor, and diffusion model.
+    The model supports distributed training with pipeline parallelism and tensor parallelism,
+    also supports encoder offload and feature cache mechanism for training efficiency optimization.
 
-    Args:
-        config (dict): the general config for Multi-Modal Model
-        {
-            "ae": {...},
-            "text_encoder": {...},
-            "predictor": {...},
-            "diffusion": {...},
-            "load_video_features":False,
-            ...
-        }
+    Attributes:
+        config: Core configuration for Multi-Modal Model with sub-configs for inner modules.
+        task: Training task type of the model, default is `t2v`, optional: `t2v`, `i2v`.
+        is_enable_lora: Flag to enable LoRA fine-tuning for target modules.
+        interleaved_steps: Encoder offload interval step.
+        enable_encoder_dp: Flag to enable data parallelism for encoder module.
+        cache: Feature cache for encoder offload and DP scenario, store latent/prompt/mask features.
+        index: Step index counter for feature cache access in interleaved training.
+        i2v_keys: Cache keys for image-to-video task extra features.
+        pre_process: Flag to mark current rank as pipeline first stage for feature encoding.
+        post_process: Flag to mark current rank as pipeline last stage for loss computation.
+        input_tensor: Input tensor passed from previous pipeline stage.
+        load_video_features: Flag to load pre-encoded video latent features instead of raw video tensor.
+        load_text_features: Flag to load pre-encoded text hidden states instead of token ids.
+        ae: AutoEncoder model for video encode/decode, eval mode with no grad.
+        text_encoder: Text encoder model for text feature extraction, eval mode with no grad.
+        text_encoder_num: Number of text encoder branches in the multi-text encoder setup.
+        offload_cpu: Flag to enable CPU offload for text encoder to save GPU memory.
+        diffusion: Diffusion core model for video latent space generation.
+        predictor: Predictor model for noise prediction in diffusion process.
+        share_embeddings_and_output_weights: Flag to disable embedding weight sharing for megatron compatibility.
     """
-
     def __init__(self, config):
+        """Initialize the assembled multi-modal video generation SoRAModel from config.
+
+        Args:
+            config (dict): the general config for Multi-Modal Model derived from model.json
+            {
+                "ae": {...},
+                "text_encoder": {...},
+                "predictor": {...},
+                "diffusion": {...},
+                "load_video_features":False,
+                ...
+            }
+        """
         super().__init__()
         args = get_args()
         self.config = core_transformer_config_from_args(args)

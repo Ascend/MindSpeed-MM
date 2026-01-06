@@ -51,6 +51,7 @@ def model_provider(pre_process=True, post_process=True):
 
 
 def get_batch_on_this_tp_rank(data_iterator):
+    """Get a batch from the data iterator on the current TP rank."""
     args = get_args()
     interleaved = args.mm.model.interleaved \
         if hasattr(args.mm.model, "interleaved") else False
@@ -91,6 +92,7 @@ def loss_func(output_tensor):
 
 
 def get_batch_for_step(data_iterator):
+    """Get batches by step interval from data iterator."""
     args = get_args()
     enable_encoder_dp = getattr(args.mm.model, "enable_encoder_dp", False)
     encoder_offload_interval = getattr(args.mm.model, "encoder_offload_interval", 1)

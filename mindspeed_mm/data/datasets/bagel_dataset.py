@@ -419,7 +419,7 @@ class BagelMultiDataset(torch.utils.data.IterableDataset):
                 # add a <|im_end|> token
                 sequence_status['packed_text_ids'].append(self.eos_token_id)
                 sequence_status['packed_text_indexes'].append(curr)
-                if item['special_token_loss'] == 1: # <|im_end|> may have loss
+                if item['special_token_loss'] == 1:  # <|im_end|> may have loss
                     sequence_status['ce_loss_indexes'].append(curr)
                     sequence_status['ce_loss_weights'].append(1.0)
                     sequence_status['packed_label_ids'].append(item['special_token_label'])
@@ -463,7 +463,7 @@ class BagelMultiDataset(torch.utils.data.IterableDataset):
                 # add a <|endofimage|> token
                 sequence_status['packed_text_ids'].append(self.end_of_image)
                 sequence_status['packed_text_indexes'].append(curr)
-                if item['special_token_loss'] == 1: # <|endofimage|> may have loss
+                if item['special_token_loss'] == 1:  # <|endofimage|> may have loss
                     sequence_status['ce_loss_indexes'].append(curr)
                     sequence_status['ce_loss_weights'].append(1.0)
                     sequence_status['packed_label_ids'].append(item['special_token_label'])

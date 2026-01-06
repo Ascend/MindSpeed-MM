@@ -118,10 +118,10 @@ class DataBalance(object):
             [
                 torch.arange(
                     num_replicas, dtype=gathered_lengths.dtype, device=gathered_lengths.device
-                ).view(-1, 1).expand(num_replicas, gathered_lengths.shape[1]).unsqueeze(-1),   # group id
+                ).view(-1, 1).expand(num_replicas, gathered_lengths.shape[1]).unsqueeze(-1),  # group id
                 torch.arange(
                     gathered_lengths.shape[1], dtype=gathered_lengths.dtype, device=gathered_lengths.device
-                ).view(1, -1).expand(num_replicas, gathered_lengths.shape[1]).unsqueeze(-1),   # batch id
+                ).view(1, -1).expand(num_replicas, gathered_lengths.shape[1]).unsqueeze(-1),  # batch id
                 gathered_lengths
             ], dim=-1
         ).flatten(0, 1)

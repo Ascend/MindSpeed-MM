@@ -646,7 +646,7 @@ class ResizeVideo:
         skip_low_resolution=False,
         align_corners=False, 
         antialias=False,
-        mode="resize" # resize / longside / shortside / hxw
+        mode="resize"  # resize / longside / shortside / hxw
     ):  
         self.mode = mode
         if mode == 'hxw':

@@ -126,7 +126,7 @@ class IndividualTokenRefinerBlock(nn.Module):
             scale=1 / math.sqrt(self.head_dim)
         )[0]
         
-        attn = attn.view(attn.shape[0], attn.shape[1], -1) # bsnd -> bsh
+        attn = attn.view(attn.shape[0], attn.shape[1], -1)  # bsnd -> bsh
         x = x + self.self_attn_proj(attn) * gate_msa
 
         # FFN Layer

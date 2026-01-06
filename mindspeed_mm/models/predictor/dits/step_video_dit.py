@@ -152,9 +152,9 @@ class StepVideoDiT(MultiModalModule):
     def prepare_attn_mask(self, encoder_attention_mask, encoder_hidden_states, q_seqlen):
         kv_seqlens = encoder_attention_mask.sum(dim=1).int()
         mask = torch.ones([len(kv_seqlens), q_seqlen, max(kv_seqlens)], dtype=torch.bool,
-                          device=encoder_attention_mask.device)# b s_q s_kv
-        encoder_hidden_states = encoder_hidden_states.squeeze(1)# b 1 s h => b s h
-        encoder_hidden_states = encoder_hidden_states[:, : max(kv_seqlens)]# b s h
+                          device=encoder_attention_mask.device)  # b s_q s_kv
+        encoder_hidden_states = encoder_hidden_states.squeeze(1)  # b 1 s h => b s h
+        encoder_hidden_states = encoder_hidden_states[:, : max(kv_seqlens)]  # b s h
         for i, kv_len in enumerate(kv_seqlens):
             mask[i, :, :kv_len] = 0
 
@@ -180,8 +180,8 @@ class StepVideoDiT(MultiModalModule):
             if hidden_states.ndim != 5:
                 raise ValueError("hidden_states's shape should be (bsz, f, ch, h ,w)")
 
-            encoder_hidden_states = prompt[0]# b 1 s h
-            encoder_hidden_states_2 = prompt[1]# b 1 s h
+            encoder_hidden_states = prompt[0]  # b 1 s h
+            encoder_hidden_states_2 = prompt[1]  # b 1 s h
             motion_score = kwargs.get("motion_score", 5.0)
             condition_hidden_states = kwargs.get("image_latents")
 
@@ -366,7 +366,7 @@ class StepVideoDiT(MultiModalModule):
             {"shape": (micro_batch_size * rtn_size, 6 * hidden_size), "dtype": dtype},  # predictor_timesteps
             {"shape": (micro_batch_size * rtn_size, hidden_size), "dtype": dtype},  # embedded_timestep
             {"shape": (micro_batch_size * rtn_size, seq_len, max_prompt_len), "dtype": dtype}, # origin_prompt_mask
-            {"shape": (seq_len * rtn_size, micro_batch_size, num_attention_heads, attention_head_dim), "dtype": torch.float32}, # rotary_pos_emb
+            {"shape": (seq_len * rtn_size, micro_batch_size, num_attention_heads, attention_head_dim), "dtype": torch.float32},  # rotary_pos_emb
             {"shape": (micro_batch_size, latent_size[0], channels, latent_size[1], latent_size[2]), "dtype": dtype},  # latents(x0)
             {"shape": (micro_batch_size, latent_size[0], channels, latent_size[1], latent_size[2]), "dtype": dtype},  # noised_latents
             {"shape": (micro_batch_size,), "dtype": torch.float32},  # timesteps

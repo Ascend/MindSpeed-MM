@@ -583,7 +583,7 @@ def collate_fn_default(batch):
 
 def pad_to_multiple(sequence, multiple=1, pad_value=0):
     current_length = sequence.size(0)
-    target_length = ((current_length + multiple - 1) // multiple) * multiple # 计算最近的N的倍数
+    target_length = ((current_length + multiple - 1) // multiple) * multiple  # Compute nearest multiple
     padding_length = target_length - current_length
     return F.pad(sequence, (0, padding_length), value=pad_value)
 
@@ -678,7 +678,7 @@ def preprocess_internvl2_5(
     targets = torch.tensor(np.concatenate(final_targets))[:tokenizer.model_max_length]
 
     if get_args().context_parallel_size > 1:
-        # 如果开启CP，序列长度自动padding到CP的倍数
+        # If CP is enabled, the sequence length is automatically padded to a multiple of CP
         cp_size = get_args().context_parallel_size
         input_ids = pad_to_multiple(input_ids, cp_size * 2, tokenizer.pad_token_id)
         targets = pad_to_multiple(targets, cp_size * 2, IGNORE_TOKEN_ID)

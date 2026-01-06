@@ -65,9 +65,10 @@ def qwen2vl_get_rope_index(
     """
     args = get_args()
     spatial_merge_size = getattr(args.mm.model.image_encoder.vision_encoder, 'spatial_merge_size', 2)
-    # image_token_id是在数据生成是固定的，用于从输入id中确定图片数量，151655对应原始数据中的"<|image_pad|>"
-    # video_token_id是在数据生成是固定的，用于从输入id中确定视频数量，151656对应原始数据中的"<|video_pad|>"
-    # 数据生成时固定的逻辑在函数 _register_template 中
+    # image_token_id is fixed during data generation, used to determine the number of images from input id.
+    # video_token_id is fixed during data generation, used to determine the number of videos from input id, 
+    # 151655 corresponds to "<|image_pad|>" in raw data, and 151656 corresponds to "<|video_pad|>" in raw data.
+    # The fixed logic for data generation is in the function _register_template.
     image_token_id = 151655
     video_token_id = 151656
     vision_start_token_id = getattr(args.mm.model, 'vision_start_token_id', 151652)

@@ -252,7 +252,7 @@ class Fsdp2Config:
         if self.offload_to_cpu:
             offload_policy = CPUOffloadPolicy(pin_memory=self.pin_memory)
         else:
-            offload_policy = OffloadPolicy() # means no offloading
+            offload_policy = OffloadPolicy()  # means no offloading
 
         kwargs = {
             "mp_policy": mp_policy,

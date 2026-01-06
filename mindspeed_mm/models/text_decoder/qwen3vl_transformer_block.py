@@ -145,7 +145,7 @@ class Qwen3vlTransformerBlock(TransformerBlock):
 
         return hidden_states
 
-    ### custom checkpoint_forward
+    # custom checkpoint_forward
     def _checkpointed_forward(
         self,
         hidden_states: Tensor,

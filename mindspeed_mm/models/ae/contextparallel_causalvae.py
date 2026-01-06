@@ -617,7 +617,7 @@ class Encoder(nn.Module):
             down.block = block
             down.attn = attn
 
-            if i_level != self.num_resolutions - 1:  # 3,最后一个downsample不压缩
+            if i_level != self.num_resolutions - 1:  # Skip compression for the final downsample
                 if i_level < self.temporal_compress_level:
                     down.downsample = DownSample3D(block_in, compress_time=True)
                 else:

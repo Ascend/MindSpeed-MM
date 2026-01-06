@@ -35,6 +35,7 @@ def model_provider(*args, **kwargs):
 
 
 def move_to_device(batch: Dict[str, Any], float_dtype: str):
+    """Move batch tensors to current device with given float dtype."""
     new_batch = dict()
     for k, v in batch.items():
         if isinstance(v, torch.Tensor):

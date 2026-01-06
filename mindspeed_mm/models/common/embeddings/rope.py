@@ -156,7 +156,7 @@ class DynamicRotaryEmbedding(RotaryEmbedding):
 
         freqs = torch.outer(seq, self.inv_freq)
         # first part even vector components, second part odd vector components,
-        #  2 * dim in dimension size
+        # 2 * dim in dimension size
         if not self.rotary_interleaved:
             emb = torch.cat((freqs, freqs), dim=-1)
         else:

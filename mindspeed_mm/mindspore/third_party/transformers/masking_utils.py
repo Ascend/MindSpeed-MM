@@ -75,7 +75,7 @@ if version.parse(transformers.__version__) >= version.parse("4.54.0.dev0"):
         # However, in more recent version of Pytorch, a trick was introduced to handle it - which is the reason we have
         # `sdpa_mask_recent_torch`, as it allows more general `mask_function`
 
-        ### MS adapt: fix vmap
+        # MS adapt: fix vmap
         causal_mask = mask_function(slice(None), None, cache_position.reshape(cache_position.shape[0], 1), kv_arange.reshape(1, kv_arange.shape[0]))
         causal_mask = causal_mask[None, None, :, :].expand(batch_size, -1, -1, -1)
         if padding_mask is not None:

@@ -192,7 +192,7 @@ def split_visual_seqs_with_cp(
             get_context_parallel_group_for_hybrid_ulysses(),
             dim=dim,
             split_sizes=split_gather_sizes
-        )# [s1+s2+s3+..., h]
+        )  # [s1+s2+s3+..., h]
     else:
         raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {args.context_parallel_algo}")
     

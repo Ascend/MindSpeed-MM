@@ -46,7 +46,7 @@ class RotaryEmbedding(ChameleonRotaryEmbedding):
             emb = torch.cat((freqs, freqs), dim=-1)
             cos = emb.cos()
             sin = emb.sin()
-        return cos, sin # 1, seq_len, dim
+        return cos, sin  # 1, seq_len, dim
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
@@ -186,7 +186,7 @@ class ChameleonAttention(nn.Module):
         cos, sin = self.rotary_emb(value_states, position_ids)
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, unsqueeze_dim=-2)
 
-        key_states = repeat_kv(key_states, self.num_key_value_groups) # BNSD
+        key_states = repeat_kv(key_states, self.num_key_value_groups)  # BNSD
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         if attention_mask is not None:  # no matter the length, we just slice it

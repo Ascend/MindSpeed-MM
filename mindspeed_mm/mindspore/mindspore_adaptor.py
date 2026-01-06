@@ -56,7 +56,7 @@ def masked_scatter_(self, mask, updates):
 
 
 def apply_mindspore_patch():
-    aspm.register_patch('mindspeed_mm.data.datasets.qwen2vl_dataset.get_qwen2vl_dataset', process_in_cpu_wrapper) # process dataset on cpu
+    aspm.register_patch('mindspeed_mm.data.datasets.qwen2vl_dataset.get_qwen2vl_dataset', process_in_cpu_wrapper)  # process dataset on cpu
     aspm.register_patch('torch.Tensor.masked_scatter', masked_scatter_)
     aspm.register_patch('mindspeed_mm.data.data_utils.func_utils.convert.SupervisedDatasetProcessor.preprocess_dataset', preprocess_dataset)
     aspm.register_patch('mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model.Qwen2VLViT.get_window_index', get_window_index)
@@ -76,11 +76,11 @@ def apply_mindspore_patch():
         from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
         ALL_MASK_ATTENTION_FUNCTIONS._global_mapping['sdpa'] = sdpa_mask_older_torch
 
-    #patch opensoraplan1.5t2v
+    # patch opensoraplan1.5t2v
     aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseUMMDiT.block_forward', block_forward)
     aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseMMDiTBlock.forward',
                         sparsemmditblock_forward)
-    #patch matmul&&linear input requir same stype
+    # patch matmul&&linear input requir same stype
     aspm.register_patch('torch.nn.functional.linear', ms_linear_wrapper)
     aspm.register_patch('mindspore.mint.matmul', ms_matmul_wrapper)
 

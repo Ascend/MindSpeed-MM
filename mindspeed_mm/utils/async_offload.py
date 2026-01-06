@@ -20,7 +20,7 @@ class GetCnt:
     """Tracks tensor count per block for unique key generation and prefetching."""
     def __init__(self):
         self._block_idx = -1
-        self._block_tensor_nums = {} # offload tensors per block {block_id: tensor_idx}
+        self._block_tensor_nums = {}  # offload tensors per block {block_id: tensor_idx}
 
     def get_cnt(self, block_idx):
         after_block = False

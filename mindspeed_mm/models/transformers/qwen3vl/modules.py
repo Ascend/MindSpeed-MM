@@ -324,7 +324,7 @@ class Qwen3VLVisionAttention(nn.Module):
                     query_states,
                     key_states,
                     value_states,
-                    self.num_heads // get_context_parallel_for_hybrid_ulysses_world_size(),# Num of heads per ring rank
+                    self.num_heads // get_context_parallel_for_hybrid_ulysses_world_size(),  # Num of heads per ring rank
                     self.scaling,
                     attn_mask=None,
                     dropout_p=0.,
@@ -653,7 +653,7 @@ class Qwen3VLTextAttention(nn.Module):
                     dropout_p=0.,
                     pse=None,
                     pse_type=None,
-                    shapes=None,# LLM inputs are padded to be divisible by 2*cp_size
+                    shapes=None,  # LLM inputs are padded to be divisible by 2*cp_size
                 )
                 # Convert back from SBH to BNSD format
                 attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=self.head_dim).contiguous()
@@ -697,7 +697,7 @@ class Qwen3VLTextAttention(nn.Module):
                     dropout_p=0.,
                     pse=None,
                     pse_type=None,
-                    shapes=None,# LLM inputs are padded to be divisible by 2*cp_size
+                    shapes=None,  # LLM inputs are padded to be divisible by 2*cp_size
                 )
                 attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=self.head_dim).contiguous()
                 attn_output = gather_heads_scatter_seq(

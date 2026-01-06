@@ -107,7 +107,7 @@ class Qwen2VLDPOTrainer(DPOTrainer):
             if has_video:
                 pixel_values = batch['pixel_values_videos'].to(torch.cuda.current_device())
                 image_grid_thw = batch['video_grid_thw'].to(torch.cuda.current_device())
-        else:  # 只有文本
+        else:  # Text only
             pixel_values = None
             image_grid_thw = None
         batch = {

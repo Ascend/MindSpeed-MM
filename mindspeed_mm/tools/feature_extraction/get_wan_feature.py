@@ -73,7 +73,7 @@ class WanTextVideoDataset(T2VDataset):
             train_pipeline=video_only_preprocess,
             transform_size={"max_height": vid_img_process['max_height'], "max_width": vid_img_process['max_width']}
         )
-        self.task = task # t2v or i2v
+        self.task = task  # t2v or i2v
 
     def __getitem__(self, index):
         example = {}
@@ -86,7 +86,7 @@ class WanTextVideoDataset(T2VDataset):
         video = self.video_processer(vframes=vframes, **sample)
 
         if self.task == "i2v":
-            first_frame = video[:, 0, :, :] # c t h w 
+            first_frame = video[:, 0, :, :]  # c t h w 
             example["first_frame"] = first_frame
         
         video = self.video_only_preprocess(video)

@@ -142,7 +142,7 @@ class MMEncoderMixin:
                 add_special_tokens=True,
                 return_tensors="pt",
             )
-            #  参数控制
+            #  Param control
             if hasattr(text_encoder,
                        "use_attention_mask") and text_encoder.use_attention_mask:
                 attention_mask = uncond_input.attention_mask.to(device)

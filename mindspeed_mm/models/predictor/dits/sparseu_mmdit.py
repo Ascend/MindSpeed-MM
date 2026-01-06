@@ -509,7 +509,7 @@ class SparseUMMDiT(MultiModalModule):
         height, width = height // self.patch_size, width // self.patch_size
 
         if pooled_projections is not None and pooled_projections.ndim == 2:
-            pooled_projections = pooled_projections.unsqueeze(1) # b d -> b 1 d
+            pooled_projections = pooled_projections.unsqueeze(1)  # b d -> b 1 d
 
         hidden_states, encoder_hidden_states, embedded_timestep = self._operate_on_patched_inputs(
             hidden_states, encoder_hidden_states, timestep, pooled_projections
@@ -870,7 +870,7 @@ class OpenSoraNormZero(nn.Module):
             raise ValueError("Shift, scale and gate must be float32.")
 
         weight_dtype = hidden_states.dtype
-        hidden_states = self.norm(hidden_states).float() * (1 + scale)[None, :, :] + shift[None, :, :] # because hidden_states'shape is (S B H), so we need to add None at the first dimension
+        hidden_states = self.norm(hidden_states).float() * (1 + scale)[None, :, :] + shift[None, :, :]  # because hidden_states'shape is (S B H), so we need to add None at the first dimension
         if self.norm_enc is not None:
             encoder_hidden_states = self.norm_enc(encoder_hidden_states).float() * (1 + enc_scale)[None, :, :] + enc_shift[None, :, :]
         return hidden_states.to(weight_dtype), encoder_hidden_states.to(weight_dtype), gate[None, :, :], enc_gate[None, :, :]

@@ -312,7 +312,7 @@ class InternVLModel(MultiModalModule):
         return combined_attention_mask.bool()
 
     def compute_loss(self, logits, labels, ignore_flag=False):
-        # 偏移tokens
+        # Shift tokens
         shift_logits = logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
 

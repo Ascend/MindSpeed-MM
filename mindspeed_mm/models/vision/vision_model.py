@@ -64,7 +64,8 @@ class VisionModel(MultiModalModule):
         self.post_process = post_process
         self.add_encoder = config.vision_encoder is not None
         self.add_projector = config.vision_projector is not None and self.post_process
-        self.projector = None  # 开pp时projector只在最后一张卡有projector，这里默认要设为None不然影响freeze
+        # When enabling PP, projector exists only on the last card, set to None by default (otherwise freeze is affected).
+        self.projector = None
         self.encoder = None
         if self.add_encoder:
             self.encoder = VISION_ENCODER_MAPPINGS[config.vision_encoder.model_id](

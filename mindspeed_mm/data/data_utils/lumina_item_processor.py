@@ -73,7 +73,7 @@ class ItemProcessorBase(ABC):
 
 @Registry.register
 class LoadFeatureItemProcessor(ItemProcessorBase):
-    image_end_token_id = 151666 # image_end_token <eoss> in vocabulary
+    image_end_token_id = 151666  # image_end_token <eoss> in vocabulary
 
     def __init__(self, **kwargs):
         pass

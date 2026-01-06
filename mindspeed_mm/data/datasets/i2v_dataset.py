@@ -138,7 +138,7 @@ class I2VDataset(T2VDataset):
         inpaint_cond_data = self.mask_processor(video_value, mask_type_ratio_dict=self.mask_type_ratio_dict_video)
         mask, masked_video = inpaint_cond_data['mask'], inpaint_cond_data['masked_pixel_values']
 
-        video_value = transforms_after_resize(video_value) # T C H W -> T C H W
+        video_value = transforms_after_resize(video_value)  # T C H W -> T C H W
         masked_video = transforms_after_resize(masked_video)  # T C H W -> T C H W
 
         video_value = torch.cat([video_value, masked_video, mask], dim=1)  # T 2C+1 H W

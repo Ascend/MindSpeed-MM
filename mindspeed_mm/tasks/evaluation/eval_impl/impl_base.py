@@ -36,7 +36,7 @@ class BaseEvalImpl:
         self.result_path = os.path.join(self.output_path, model_name + "_" + self.dataset_name + ".xlsx")
         self.prev_file = os.path.join(self.output_path, model_name + "_" + self.dataset_name + "_PREV.json")
 
-        # 保存每个卡上的结果
+        # Save the results on each rank.
         self.out_file = self._out_file(self.rank)
         self.report_file = self.result_path.replace('.xlsx', '_acc.xlsx')
         is_divisive = len(dataset) % self.world_size == 0
@@ -48,16 +48,15 @@ class BaseEvalImpl:
         elif not drop_last and not is_divisive:
             print(f"the length of dataset: {len(dataset)}, world_size: {self.world_size}, remainder: {remainder}")
             raise ValueError(f'The length of the dataset must be divided evenly by the world_size.')
-        sheet_indices = list(range(self.rank, data_len_total, self.world_size))  # 对数据进行分块，后面涉及到多卡评估
+        sheet_indices = list(range(self.rank, data_len_total, self.world_size))  # Chunk the data for multi-rank evaluation later
         print(f"Rank {self.rank} of the data parallel group has {len(sheet_indices)} evaluation data ")
         self.data = dataset.data.iloc[sheet_indices]
-        self.data_indices = [i for i in self.data['index']]  # 每个卡处理自己的index
+        self.data_indices = [i for i in self.data['index']]  # Each rank processes its own index
         self.result = load_json(self.prev_file) if os.path.exists(self.prev_file) else {}
 
     def __call__(self):
-
         """
-        调用pipeline开始进行评估，将评估结果写入文件中，
+        Call pipeline to start evaluation and write evaluation results to file
         """
 
         data = self.data[~self.data['index'].isin(self.result)]
@@ -101,7 +100,7 @@ class BaseEvalImpl:
                 print(response, flush=True)
                 self.result[data_index] = response
 
-            # 每20步存一下pkl文件
+            # Save pkl file every 20 steps
             if (
                 ((i + 1) % 20 == 0)
                 and mpu.is_pipeline_last_stage()
@@ -115,8 +114,7 @@ class BaseEvalImpl:
 
     def gather_result(self):
         """
-        获取每张卡上的计算结果
-
+        Get the calculation results on each rank
         """
         if self.world_size > 0:
             print("rank:", self.rank, " finish evaluate")

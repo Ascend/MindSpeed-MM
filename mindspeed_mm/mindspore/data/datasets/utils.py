@@ -16,7 +16,7 @@ def process_in_cpu_wrapper(func):
         # process dataset
         result = func(*args, **kwargs)
 
-        #set device to Ascend
+        # set device to Ascend
         msadapter.configs.set_pyboost(True)
         _pynative_executor.sync()
         mindspore.set_context(device_target="Ascend")

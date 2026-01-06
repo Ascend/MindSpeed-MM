@@ -281,7 +281,7 @@ class VideoDitSparse(MultiModalModule):
         frames, height, width = torch.tensor(frames), torch.tensor(height), torch.tensor(width)
 
         # Rotary positional embeddings
-        rotary_pos_emb = self.rope(batch_size, frames * mpu.get_context_parallel_world_size(), height, width, latents.device)# s b 1 d
+        rotary_pos_emb = self.rope(batch_size, frames * mpu.get_context_parallel_world_size(), height, width, latents.device)  # s b 1 d
         if mpu.get_context_parallel_world_size() > 1:
             rotary_pos_emb = rotary_pos_emb.chunk(mpu.get_context_parallel_world_size(), dim=0)[mpu.get_context_parallel_rank()]
 
@@ -418,8 +418,8 @@ class VideoDitSparse(MultiModalModule):
             {'shape': (max_prompt_len, micro_batch_size, hidden_size), 'dtype': dtype},  # prompt
             {'shape': (6, micro_batch_size, hidden_size), 'dtype': dtype},  # predictor_timesteps
             {'shape': (micro_batch_size, hidden_size), 'dtype': dtype},  # embedded_timestep
-            {'shape': (micro_batch_size, *latent_size), 'dtype': dtype},            # origin_video_mask
-            {'shape': (micro_batch_size, 1, max_prompt_len), 'dtype': dtype},       # origin_prompt_mask
+            {'shape': (micro_batch_size, *latent_size), 'dtype': dtype},  # origin_video_mask
+            {'shape': (micro_batch_size, 1, max_prompt_len), 'dtype': dtype},  # origin_prompt_mask
             {'shape': (micro_batch_size, channels, *latent_size), 'dtype': dtype},  # latents(x0)
             {'shape': (micro_batch_size, channels, *latent_size), 'dtype': dtype},  # noised_latents
             {'shape': (micro_batch_size,), 'dtype': dtype},  # timesteps

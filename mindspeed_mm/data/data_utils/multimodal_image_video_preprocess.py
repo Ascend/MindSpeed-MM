@@ -355,7 +355,7 @@ def get_frame_indices(num_frames, vlen, sample='rand', fix_start=None, input_fps
         for idx, interv in enumerate(intervals[:-1]):
             ranges.append((interv, intervals[idx + 1] - 1))
         if sample == 'rand':
-            frame_indices = [random.choice(range(x[0], x[1])) for x in ranges] # little different
+            frame_indices = [random.choice(range(x[0], x[1])) for x in ranges]  # little different
         elif fix_start is not None:
             frame_indices = [x[0] + fix_start for x in ranges]
         elif sample == 'middle':

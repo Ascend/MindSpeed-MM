@@ -131,7 +131,7 @@ class VbenchGenEvalImpl(BaseGenEvalImpl):
             StaticFilter.load_model = patch_static_filter_load_model
             self.check_dimension_list()
 
-            # 额外参数
+            # Extra params
             kwargs = {"sb_clip2clip_feat_extractor": 'dinov2', "bg_clip2clip_feat_extractor": "dreamsim",
                       "clip_length_config": "clip_length_mix.yaml", "w_inclip": 1.0, "w_clip2clip": 0.0,
                       "use_semantic_splitting": False,

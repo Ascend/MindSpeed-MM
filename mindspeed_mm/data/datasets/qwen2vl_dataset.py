@@ -52,9 +52,10 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
     tokenizer_module = load_tokenizer(process_args)
     tokenizer, processor = tokenizer_module['tokenizer'], tokenizer_module['processor']
     template = get_template_and_fix_tokenizer(tokenizer, data_args.template)
-    # 确保主进程进行数据处理，其他进程复用缓存避免重复计算，该策略和llamafactory对数据处理策略一致
+    # Ensure main process handles data processing, while other processes reuse cache to avoid redundant calculations.
+    # This strategy is consistent with the data processing strategy used by LLaMA Factory.
     with TrainingArguments(output_dir='./').main_process_first(desc="pre-process dataset"):
-        # -----------------load dataset from file-------------------------------------------------------------------------
+        # load dataset from file
         train_dataset = load_dataset(path="json", data_files=data_args.dataset, split="train",
                                      cache_dir=data_args.cache_dir,
                                      streaming=data_args.streaming)
@@ -83,17 +84,17 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
         else:
             kwargs = {
                 "num_proc": data_args.preprocessing_num_workers,
-                # 配置了overwrite_cache为false（默认为false)时，非rank0节点读取cache不再进行map处理
-                # 配置了overwrite_cache为true（默认为false)时，所有节点都读取cache不再进行map处理
+                # If overwrite_cache is false (default), only non-rank-0 nodes load cache without map processing.
+                # If overwrite_cache is true, all nodes read the cache and none of them perform map processing.
                 "load_from_cache_file": (not data_args.overwrite_cache) or (local_process_index != 0)
             }
         logger.debug(f'Rank: %s, kwargs: %s', local_process_index, kwargs)
-        # -----------------convert to sharegpt ---------------------------------------------------------------------------
+        # convert to sharegpt
         train_dataset = align_dataset(train_dataset, dataset_attr, data_args)
         if val_dataset:
             val_dataset = align_dataset(val_dataset, dataset_attr, data_args)
 
-        # -----------------convert text to token id ----------------------------------------------------------------------
+        # convert text to token id
         if dataset_attr.ranking:
             dataset_processor_cls = PairwiseDatasetProcessor
         else:
@@ -178,9 +179,10 @@ def get_reward_video_dataset(basic_param, preprocess_param, dataset_param):
 
     data_args = DataArgumentsForRewardVideo(**basic_param)
 
-    # 确保主进程进行数据处理，其他进程复用缓存避免重复计算，该策略和llamafactory对数据处理策略一致
+    # Ensure main process handles data processing, while other processes reuse cache to avoid redundant calculations.
+    # This strategy is consistent with the data processing strategy used by LLaMA Factory.
     with TrainingArguments(output_dir='./').main_process_first(desc="pre-process dataset"):
-        # -----------------load dataset from file-------------------------------------------------------------------------
+        # load dataset from file
         train_dataset = load_dataset(path="csv", data_files=data_args.data_path, split="train",
                                      cache_dir=data_args.cache_dir,
                                      streaming=data_args.streaming)
@@ -217,8 +219,8 @@ def get_reward_video_dataset(basic_param, preprocess_param, dataset_param):
         else:
             kwargs = {
                 "num_proc": data_args.preprocessing_num_workers,
-                # 配置了overwrite_cache为false（默认为false)时，非rank0节点读取cache不再进行map处理
-                # 配置了overwrite_cache为true（默认为false)时，所有节点都读取cache不再进行map处理
+                # If overwrite_cache is false (default), only non-rank-0 nodes load cache without map processing.
+                # If overwrite_cache is true, all nodes read the cache and none of them perform map processing.
                 "load_from_cache_file": (not data_args.overwrite_cache) or (local_process_index != 0)
             }
         logger.debug(f'Rank: %s, kwargs: %s', local_process_index, kwargs)

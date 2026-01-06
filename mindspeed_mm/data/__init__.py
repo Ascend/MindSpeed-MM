@@ -28,12 +28,16 @@ from mindspeed_mm.models.ae.training.global_vars import get_ae_args
 
 def build_mm_dataset(dataset_param):
     """
-    Build a multimodal dataset based on different tasks
+    Build a multimodal dataset based on different tasks.
 
     Args:
-        dataset_param
+        dataset_param: config of multimodal dataset with necessary core keys
     Return:
-        dataset
+        dataset: a matched multimodal dataset object corresponding to the given dataset_type
+
+    Raises:
+        AssertionError: An error raised when any core key parameter missing in dataset_param
+        NotImplementedError: An error raised when the given dataset_type is not supported
     """
     if not isinstance(dataset_param, dict):
         dataset_param = dataset_param.to_dict()
@@ -49,7 +53,7 @@ def build_mm_dataset(dataset_param):
         return I2VDataset(basic_param, preprocess_param, **dataset_param)
     elif dataset_type == "t2i":
         return T2IDataset(basic_param, preprocess_param, **dataset_param)
-    elif dataset_type == "dt2v":  # 构建动态分辨率数据集
+    elif dataset_type == "dt2v":  # Build a dynamic resolution dataset
         return DynamicVideoTextDataset(basic_param, preprocess_param, **dataset_param)
     elif dataset_type == "feature":
         return FeatureDataset(basic_param)
@@ -91,7 +95,7 @@ def build_mm_dataset(dataset_param):
 
 def build_mm_dataloader(dataset, dataloader_param, process_group=None, consumed_samples=0, dataset_param=None):
     """
-    Build a multimodal dataloader based on different tasks
+    Build a multimodal dataloader based on different tasks.
 
     dataloader_type interpretation:
     base: raw dataloader based on torch.utils.data.DataLoader
@@ -99,9 +103,18 @@ def build_mm_dataloader(dataset, dataloader_param, process_group=None, consumed_
     variable: used for variable dataset
 
     Args:
-        dataloader_param_dict
+        dataset: multimodal dataset object
+        dataloader_param: config of dataloader
     Return:
-        dataloader
+        dataloader: a multimodal dataloader object matched with the given dataloader_mode
+    Optional parameters:
+        process_group: if it is absent or None, use data parallel group from mpu module
+        consumed_samples: set as 0 means start iteration from the first sample of dataset
+        dataset_param: config of dataset
+
+    Raises:
+        AssertionError: An error raised when key parameter `dataloader_mode` missing in dataloader_param
+        NotImplementedError: An error raised when the given `dataloader_mode` is not supported
     """
     if not isinstance(dataloader_param, dict):
         dataloader_param = dataloader_param.to_dict()
@@ -138,12 +151,12 @@ def build_mm_dataloader(dataset, dataloader_param, process_group=None, consumed_
 
 def build_ae_dataset(dataset_param):
     """
-    Build an AE dataset based on different tasks
+    Build an AE dataset based on different tasks.
 
     Args:
-        dataset_param
+        dataset_param: config with necessary parameters for AE dataset construction
     Return:
-        dataset
+        dataset: an AE training dataset object
     """
     if not isinstance(dataset_param, dict):
         dataset_param = dataset_param.to_dict()
@@ -152,12 +165,18 @@ def build_ae_dataset(dataset_param):
 
 def build_ae_dataloader(dataset, dataloader_param, process_group=None):
     """
-    Build an AE dataloader based on different tasks
+    Build an AE dataloader based on different tasks.
 
     Args:
-        dataloader_param_dict
+        dataset: AE dataset object
+        dataloader_param: config of AE dataloader
     Return:
-        dataloader
+        dataloader: an AE dataloader object matched with the given dataloader_mode
+    Optional parameters:
+        process_group: if it is absent or None, use default process group
+
+    Raises:
+        NotImplementedError: An error raised when the given `dataloader_mode` is not supported
     """
     if not isinstance(dataloader_param, dict):
         dataloader_param = dataloader_param.to_dict()

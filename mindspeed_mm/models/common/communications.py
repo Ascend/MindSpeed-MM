@@ -117,7 +117,7 @@ def _all_to_all(
     if world_size == 1:
         return input_
 
-    # 非均匀切分
+    # non-uniform split
     if scatter_sizes is not None and gather_sizes is not None:
         input_list = [t.contiguous() for t in torch.split(input_, scatter_sizes, scatter_dim)]
         rank = dist.get_rank(group)

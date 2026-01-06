@@ -467,7 +467,7 @@ class VideoEncoder(nn.Module):
         h = self.mid.attn_1(h)
         h = self.mid.block_2(h, temb, is_init)
 
-        h = h.permute(0, 2, 3, 4, 1).contiguous() # b c l h w -> b l h w c
+        h = h.permute(0, 2, 3, 4, 1).contiguous()  # b c l h w -> b l h w c
 
         h = base_group_norm(h, self.norm_out, act_silu=True)
         h = h.permute(0, 4, 1, 2, 3).contiguous()
@@ -478,7 +478,7 @@ class VideoEncoder(nn.Module):
         h = self.conv_out(h.permute(0, 2, 3, 4, 1).contiguous(), is_init)
         h = h.add_(shortcut)
 
-        h = h.permute(0, 4, 1, 2, 3) # b l h w c -> b c l h w
+        h = h.permute(0, 4, 1, 2, 3)  # b l h w c -> b c l h w
 
         h = rearrange(h, "b c t h w -> b t c h w")
         return h

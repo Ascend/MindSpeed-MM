@@ -110,13 +110,13 @@ def main():
     # prepare pipeline
     sora_pipeline = prepare_pipeline(args, device)
 
-    # == Iter over all samples ==
+    # Iter over all samples
     video_grids = []
     start_idx = 0
     rank = mpu.get_data_parallel_rank()
     world_size = mpu.get_data_parallel_world_size()
     for i in range(rank * args.micro_batch_size, len(prompts), args.micro_batch_size * world_size):
-        # == prepare batch prompts ==
+        # prepare batch prompts
         batch_prompts = prompts[i: i + args.micro_batch_size]
         kwargs = {}
         if conditional_pixel_values_path:

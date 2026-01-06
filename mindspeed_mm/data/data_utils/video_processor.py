@@ -212,7 +212,7 @@ class CogVideoXProcessor(AbstractVideoProcessor):
                 # 3D VAE requires the number of frames to be 4k+1
                 num_frames = nearest_smaller_4k_plus_1(end - start)
                 end = int(start + num_frames)
-                tensor_frames = vframes.get_batch(np.arange(start, end)) # T C H W
+                tensor_frames = vframes.get_batch(np.arange(start, end))  # T C H W
 
         # the len of indices may be less than num_frames, due to round error
         tensor_frames = self._pad_last_frame(
@@ -346,7 +346,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         # Training configuration
         self.ae_stride_t = vae_scale_factor[0]
         from mindspeed_mm.utils.dpcp_utils import get_max_cp_size
-        self.sp_size = get_max_cp_size() if truncate_t_by_sp else 1 # For sequence parallel
+        self.sp_size = get_max_cp_size() if truncate_t_by_sp else 1  # For sequence parallel
         self.train_sp_batch_size = train_sp_batch_size
         self.gradient_accumulation_size = cal_gradient_accumulation_size()
         self.batch_size = get_value_from_args("micro_batch_size")
@@ -437,7 +437,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             )
         
         # Frame extraction and processing
-        video = vframes.get_batch(frame_indices) # T C H W
+        video = vframes.get_batch(frame_indices)  # T C H W
         if s_y is not None:
             video = video[:, :, s_y: e_y, s_x: e_x]
 
@@ -582,7 +582,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             sample["sample_frame_index"] = [0]
             sample["sample_num_frames"] = 1
             return True
-        elif ext.lower() in TENSOR_EXTENSIONS: # tensor
+        elif ext.lower() in TENSOR_EXTENSIONS:  # tensor
             return True
         else:
             raise NameError(
@@ -590,7 +590,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             )
         
     def _process_video_temporal(self, sample, stats):
-        # ======no fps and duration=====
+        # no fps and duration
         duration = sample.get("duration", None)
         fps = sample.get("fps", None)
         num_frames = sample.get("num_frames", None)
@@ -621,7 +621,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             stats.increment('too_short')
             return False
         
-        #  too long video will be temporal-crop randomly
+        # too long video will be temporal-crop randomly
         if len(frame_indices) > self.num_frames:
             begin_index, end_index = self.temporal_sample(len(frame_indices))
             frame_indices = frame_indices[begin_index:end_index]
@@ -642,7 +642,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         return True
 
     def _validate_aesthetic(self, sample, stats):
-        # ======no aesthetic=====
+        # no aesthetic
         if sample.get("aesthetic", None) is None or sample.get("aes", None) is None:
             stats.increment("no_aesthetic")
         else:

@@ -339,7 +339,8 @@ class MultiHeadLatentAttention(SelfAttention):
                     else:
                         cu_seqlens_q = cu_seqlens_kv = None
 
-                    # megatron 012 在计算rope时会对multi_latent_attention判断然后对入参做隔行切分，暂时规避
+                    # Megatron v0.12 judges multi_latent_attention when calculating RoPE, then slices input params row-wise alternately;
+                    # Skip temporarily.
                     tmp_multi_latent_attention = self.config.multi_latent_attention
                     self.config.multi_latent_attention = False
                     q_pe = apply_rotary_pos_emb(q_pe, q_pos_emb, config=self.config, cu_seqlens=cu_seqlens_q)

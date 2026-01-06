@@ -80,7 +80,7 @@ def check_answer_in_text(answer, choices):
 def extract_answer_from_item(item, dataset_name=None):
     logger_rank_0('Evaluation')
     # It will return: (pred, raw, llm_time)
-    choices = extract_choices(item)  # 提取选项
+    choices = extract_choices(item)  # extract choices
 
     ret = check_answer(item['prediction'], choices)
     if ret:

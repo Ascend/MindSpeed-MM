@@ -235,14 +235,14 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
             # ========== Compute 4 Corner Indices ==========
             # For bilinear interpolation, we need 4 surrounding grid points
             indices = [
-                (base_h[None].T + w_idxs_floor[None]).flatten(), # top-left
-                (base_h[None].T + w_idxs_ceil[None]).flatten(), # top-right
-                (base_h_ceil[None].T + w_idxs_floor[None]).flatten(), # bottom-left
-                (base_h_ceil[None].T + w_idxs_ceil[None]).flatten(), # bottom-right
+                (base_h[None].T + w_idxs_floor[None]).flatten(),  # top-left
+                (base_h[None].T + w_idxs_ceil[None]).flatten(),  # top-right
+                (base_h_ceil[None].T + w_idxs_floor[None]).flatten(),  # bottom-left
+                (base_h_ceil[None].T + w_idxs_ceil[None]).flatten(),  # bottom-right
             ]
             # Weights are based on inverse distance from each corner
             weights = [
-                ((1 - dh)[None].T * (1 - dw)[None]).flatten(), # top-left weight
+                ((1 - dh)[None].T * (1 - dw)[None]).flatten(),  # top-left weight
                 ((1 - dh)[None].T * dw[None]).flatten(),
                 (dh[None].T * (1 - dw)[None]).flatten(),
                 (dh[None].T * dw[None]).flatten(),
@@ -252,10 +252,10 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
                 idx_list[i].extend(indices[i].tolist())
                 weight_list[i].extend(weights[i].tolist())
 
-        idx_tensors = torch.tensor(idx_list, dtype=torch.long, device=self.pos_embed.weight.device)# [4, hw1+hw2+hw3...]
+        idx_tensors = torch.tensor(idx_list, dtype=torch.long, device=self.pos_embed.weight.device)  # [4, hw1+hw2+hw3...]
         weight_tensors = torch.tensor(
             weight_list, dtype=self.pos_embed.weight.dtype, device=self.pos_embed.weight.device
-        )# [4, hw1+hw2+hw3...]
+        )  # [4, hw1+hw2+hw3...]
 
         # ========== Per-Sample Processing ==========
         # Split combined tensors back into per-sample tensors
@@ -267,21 +267,21 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         patch_weight_tensors_permute = []
         merge_size = self.config.spatial_merge_size
         for idx_tensor, weight_tensor, t, h, w in zip(patch_idx_tensors, patch_weight_tensors, grid_ts, grid_hs, grid_ws):
-            idx_tensor = idx_tensor.repeat(1, t)# 4, thw
+            idx_tensor = idx_tensor.repeat(1, t)  # 4, thw
             weight_tensor = weight_tensor.repeat(1, t)
             idx_tensor = (
                 idx_tensor.view(4, t, h // merge_size, merge_size, w // merge_size, merge_size)
                 .permute(0, 1, 2, 4, 3, 5)
                 .flatten(1, 5)
-            )# 4, thw
+            )  # 4, thw
             weight_tensor = (
                 weight_tensor.view(4, t, h // merge_size, merge_size, w // merge_size, merge_size)
                 .permute(0, 1, 2, 4, 3, 5)
                 .flatten(1, 5)
-            )# 4, thw
+            )  # 4, thw
             patch_idx_tensors_permute.append(idx_tensor)
             patch_weight_tensors_permute.append(weight_tensor)
-        patch_idx_tensors_permute = torch.cat(patch_idx_tensors_permute, dim=1)# [4, s1+s2+s3...]
+        patch_idx_tensors_permute = torch.cat(patch_idx_tensors_permute, dim=1)  # [4, s1+s2+s3...]
         patch_weight_tensors_permute = torch.cat(patch_weight_tensors_permute, dim=1)
         
         # Split tensors across context parallel ranks for distributed processing
@@ -291,7 +291,7 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         
 
         # embedding
-        pos_embeds = self.pos_embed(patch_idx_tensors_permute) * patch_weight_tensors_permute[:, :, None]# 4, total_visual_tokens//cp_size, hidden_size
+        pos_embeds = self.pos_embed(patch_idx_tensors_permute) * patch_weight_tensors_permute[:, :, None]  # 4, total_visual_tokens//cp_size, hidden_size
         patch_pos_embeds = pos_embeds[0] + pos_embeds[1] + pos_embeds[2] + pos_embeds[3]
 
         return patch_pos_embeds
@@ -307,7 +307,7 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         Returns:
             `torch.Tensor`: hidden_states.
         """
-        hidden_states = self.patch_embed(hidden_states)# s1+s2+s3..., h
+        hidden_states = self.patch_embed(hidden_states)  # s1+s2+s3..., h
 
         rotary_pos_emb = self.rot_pos_emb(grid_thw)
 

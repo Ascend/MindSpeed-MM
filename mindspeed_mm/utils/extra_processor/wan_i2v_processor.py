@@ -38,9 +38,9 @@ class WanVideoI2VProcessor(torch.nn.Module):
         )
 
         # i2v_vae_encode_tiling mode:
-        # 1. auto: image encode和video encode的配置保持一致
-        # 2. true: image encode时强制开启
-        # 3. false: image encode时强制关闭
+        # 1. auto: Align image encoder and video encoder configurations
+        # 2. true: Force enable during image encoding
+        # 3. false: Force disable during image encoding
         self.enable_i2v_vae_encode_tiling = config.get("i2v_vae_encode_tiling", "auto")
 
     def __call__(self, vae_model, videos, first_frame, **kwargs):

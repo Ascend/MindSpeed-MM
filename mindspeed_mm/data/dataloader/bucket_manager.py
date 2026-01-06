@@ -200,7 +200,10 @@ class BucketManager:
         if cpu_count is None:
             return processes_num
 
-        # 线程数的设定规则：数据量小于5万时使用1/12个CPU核心数的线程，数据量大于等于5万时使用1/6个线程，最少8为线程
+        # Rules for setting the number of threads:
+        # 1. Use 1/12 of the total CPU cores as the number of threads when the data volume is less than 50,000;
+        # 2. Use 1/6 of the total CPU cores as the number of threads when the data volume is 50,000 or more;
+        # 3. The minimum number of threads is 8.
         if data_size < data_size_threshold:
             scale_factor = 1 / 12
         else:
@@ -239,22 +242,23 @@ class BucketManager:
 
     @staticmethod
     def generate_index_by_gbs(idx_range, final_results_dict, global_batch_size, num_replicas):
-        # 存储排序后的索引
+        # Store the sorted index
         sorted_indices = []
 
         sort_batch_size = int(global_batch_size / num_replicas)
         for i in range(0, len(idx_range), sort_batch_size):
             batch_indices = idx_range[i:i + sort_batch_size]
 
-            # 根据 batch_indices 从 result_dict 中取出对应的值并组合成元组 (idx, value)
+            # Retrieve the corresponding values from result_dict based on batch_indices, 
+            # combine them into tuples in the form of (idx, value).
             batch_data = [(idx, final_results_dict.get(idx)) for idx in batch_indices]
 
             batch_data.sort(key=lambda x: x[1])
 
-            # 提取排序后的索引并加入到 sorted_indices 中
+            # Extract the sorted indices and add them to sorted_indices
             sorted_batch_indices = [idx for idx, _ in batch_data]
 
-            sorted_indices.extend(sorted_batch_indices)  # 合并成一维列表
+            sorted_indices.extend(sorted_batch_indices)  # Merge into a one-dimensional list
         return sorted_indices
 
     def print_buckets(self):
@@ -354,7 +358,7 @@ class BucketManager:
 class BucketManager_qwen2vl(BucketManager):
     def __init__(
         self,
-        image_size: int = 512,  # 初始化分桶参数，所有参数的默认值来自于配置文件。配置文件中的这些参数可以根据需求进行修改。
+        image_size: int = 512,  # Initialize bucket parameters, default values from config file and can be modified on demand.
         min_pixels: int = 3136,
         max_pixels: int = 12845056,
         patch_size: int = 14,
@@ -364,7 +368,7 @@ class BucketManager_qwen2vl(BucketManager):
         num_replicas: int = 1,
         keep_remainder: bool = False,
         rank: int = 1,
-        bucket_interval: int = 200,  # 分桶的token间隔
+        bucket_interval: int = 200,  # Token interval for bucket
         global_batch_size: int = 128,
         priority_mode: str = "data_bucketing_img"
     ):
@@ -389,18 +393,18 @@ class BucketManager_qwen2vl(BucketManager):
         
     def create_buckets(self):
         merged_buckets = {}
-        # 根据image宽高计算Tokens
+        # Calculate tokens by image size
         resize_image_resolution = round(self.image_size / self.factor) * self.factor
         max_tokens = int(resize_image_resolution / self.patch_size) ** 2
 
-        # 根据bucket_interval，确定分桶的数值区间
+        # Determine the bucket range based on bucket_interval
         bucket_range = tuple(range(0, max_tokens + 1, self.bucket_interval))
 
-        # 确保 `max_tokens` 包含在 `bucket_range` 内
+        # Ensure max_tokens is included in bucket_range
         if max_tokens % self.bucket_interval != 0:
             bucket_range = bucket_range + (max_tokens,)
 
-        #将 `bucket_range` 转换为 (start, end) 的区间对
+        # Convert bucket_range to (start, end) interval pairs
         result_bucket_range = list(zip(bucket_range[:-1], bucket_range[1:]))
 
         for bucket_range in result_bucket_range:
@@ -435,7 +439,7 @@ class BucketManager_qwen2vl(BucketManager):
         return width, height
 
     def load_image_and_get_dimensions(self, image_fullpath):
-        # 复用Qwen2VL处理图像的逻辑
+        # Reuse Qwen2VL's image processing logic
         try:
             with Image.open(image_fullpath) as img:
                 width, height = img.width, img.height
@@ -494,7 +498,7 @@ class BucketManager_qwen2vl(BucketManager):
         self.processes_num = self.suggest_thread_count(dataset)
         with Pool(processes=self.processes_num) as pool:
             results = pool.starmap(self.process_calculate_images_token, [(idx, dataset) for idx in indices])
-        # 合并所有返回的字典
+        # Merge all returned dictionaries
         for result in results:
             self.final_results_dict.update(result)
         return self.final_results_dict
@@ -518,7 +522,7 @@ class BucketManager_qwen2vl(BucketManager):
                     bfind = True
                     break
 
-            # 如果没有找到合适的桶，则加入最后一个桶
+            # Add to the last bucket if no matching bucket found
             if not bfind:
                 last_bucket = self.buckets[-1]
                 group_id = idx // group_length
@@ -560,7 +564,7 @@ class BucketManager_internvl2(BucketManager):
         )
 
     def create_buckets(self):
-        # 计算所有可能的目标长宽比（target_ratios），范围在 [min_num, max_num] 之间。
+        # Calculate all possible target aspect ratios (target_ratios) within the range [min_num, max_num]
         for n in range(self.min_num, self.max_num + 1):
             for i in range(1, n + 1):
                 for j in range(1, n + 1):
@@ -572,7 +576,7 @@ class BucketManager_internvl2(BucketManager):
 
         merged_buckets = {}
         for ratio in sorted_target_ratios:
-            # 确保顺序一致，例如 (3, 4) 和 (4, 3) 视为同一个桶
+            # Ensure consistent order, e.g., (3,4) and (4,3) are treated as the same bucket
             sorted_ratio = tuple(sorted(ratio))
             if sorted_ratio not in merged_buckets:
                 merged_buckets[sorted_ratio] = BucketManager.Bucket(ratio, self.num_groups)
@@ -631,7 +635,7 @@ class BucketManager_internvl2(BucketManager):
         return result_dict
 
     def create_sorting_dictionary(self, dataset):
-        # 计算所有可能的目标长宽比（target_ratios），范围在 [min_num, max_num] 之间。
+        # Calculate all possible target aspect ratios (target_ratios) within the range [min_num, max_num]
         for n in range(self.min_num, self.max_num + 1):
             for i in range(1, n + 1):
                 for j in range(1, n + 1):
@@ -642,7 +646,7 @@ class BucketManager_internvl2(BucketManager):
         with Pool(processes=self.processes_num) as pool:
             results = pool.starmap(self.process_calculate_images_num, [(idx, dataset) for idx in indices])
         
-        # 合并所有返回的字典
+        # Merge all returned dictionaries
         for result in results:
             self.final_results_dict.update(result)
         return self.final_results_dict

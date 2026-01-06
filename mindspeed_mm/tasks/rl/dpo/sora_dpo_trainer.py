@@ -215,7 +215,7 @@ class SoRADPOTrainer(DPOTrainer):
         Returns:
             A tuple containing the log probabilities and other tensors.
         """
-        # # SNR is determined by snr_gamma in config and has been multiplied in training_losses.
+        # SNR is determined by snr_gamma in config and has been multiplied in training_losses.
         latents, noised_latents, timesteps, noise, video_mask = kwargs['latents'], kwargs['noised_latents'], kwargs['timesteps'], kwargs['noise'], kwargs['video_mask']
 
         l2_loss = self.hyper_model.diffusion.training_losses(model_output=output, x_start=latents, x_t=noised_latents, t=timesteps, noise=noise, mask=None, reduction='none')

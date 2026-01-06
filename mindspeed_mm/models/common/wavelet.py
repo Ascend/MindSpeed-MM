@@ -95,7 +95,7 @@ class InverseHaarWaveletTransform3D(nn.Module):
     def __init__(self, enable_cached=False, is_first_chunk=True, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        # 'h' 'g' 'hh' 'gh' 'h_v' 'g_v' 'hh_v' 'gh_v'都是在小波变换中表示不同的滤波器filter的卷积核, h低通滤波, g高通滤波
+        # 'h' 'g' 'hh' 'gh' 'h_v' 'g_v' 'hh_v' 'gh_v'=wavelet transform filter kernels; h=low-pass, g=high-pass
         self.register_buffer('h',
             torch.tensor([[[1, 1], [1, 1]], [[1, 1], [1, 1]]]).view(1, 1, 2, 2, 2) * 0.3536
         )

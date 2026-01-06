@@ -111,31 +111,26 @@
 ## 环境变量参数解释
 所有环境变量具体解释均可在[Ascend官网](https://www.hiascend.com/)搜索查询到详细信息，以下仅展示MM套件中常用的。
 
-source /usr/local/Ascend/ascend-toolkit/set_env.sh: cann安装路径，必须配置。
-export CUDA_DEVICE_MAX_CONNECTIONS: 整型，[1, 32]可选。在多GPU系统下，可以使用该变量来控制主机端并行连接多设备数量。注意当开启了序列并行时，需要置为1。
+| 环境初始化脚本 | 描述 | 
+|-----------------------------------------|--------------------------------------------------------------------|
+| `source /usr/local/Ascend/ascend-toolkit/set_env.sh`| cann安装路径，必须配置 |
+| `source /usr/local/Ascend/nnal/atb/set_env.sh` | nnal安装路径 |
 
-ASCEND_SLOG_PRINT_TO_STDOUT: 0 or 1,是否开启日志打印。开启后日志不会保存在log文件中，而是将产生的日志直接打印显示，默认置为0。
-
-ASCEND_GLOBAL_LOG_LEVEL: 整型，[0, 4]可选。设置日志级别，仅支持调试日志。
-* 0: DEBUG
-* 1: INFO
-* 2: WARNING
-* 3: ERROR,默认
-* 4: NULL
-注意设置为DEBUG级别后，可能会因为日志流量过大影响业务性能。
-
-TASK_QUEUE_ENABLE: 整型，[0, 2]可选，配置task_queue算子下发队列是否开启及优化等级，推荐配置为2。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_007.html)
-
-COMBINED_ENABLE: 0 or 1,设置combined标志，用于优化非连续两个算子组合类场景，推荐配置为1。
-
-CPU_AFFINITY_CONF: 粗\细粒度绑核功能设置，推荐配置为1。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_033.html)
-
-HCCL_CONNECT_TIMEOUT: 整型，[120, 7200]可选，分布式场景下用于限制不同设备间socket建链过程的超时等待时间，单位为秒。[详细介绍](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/maintenref/envvar/envref_07_0077.html)
-
-NPU_ASD_ENABLE: 0 or 1,是否开启Ascend EXTENSION FOR PyTorch的特征值检测功能，推荐置为0。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_029.html)
-
-ASCEND_LAUNCH_BLOCKING: 0 or 1,置为1时使能。控制算子执行时是否启动同步模式，主要用于定位代码实际出错位置，开启时会导致性能下降，仅在debug时使用。
-
-ACLNN_CACHE_LIMIT: 整型，[1, 10000000], 默认值为10000，用于配置单算子执行API在Host侧缓存的算子信息条目个数。
-
-PYTORCH_NPU_ALLOC_CONF=“expandable_segments:True”: [详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_012.html)
+| 环境变量 | 描述 | 取值说明 |
+|-------------------------------|--------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+| CUDA_DEVICE_MAX_CONNECTIONS | 用于控制多GPU系统下主机端并行连接的设备数量 | 需要配置为整数，取值范围`[1, 32]`；开启序列并行时需设置为1 |
+| [ASCEND_SLOG_PRINT_TO_STDOUT](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0121.html) | 是否开启日志打印，开启后日志不会保存在log文件中，而是将产生的日志直接打印显示 | `0`: 关闭日志打屏<br>`1`: 开启日志打屏 |
+| [ASCEND_GLOBAL_LOG_LEVEL](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0122.html) | 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志 | `0`: 对应DEBUG级别<br>`1`: 对应INFO级别<br>`2`: 对应WARNING级别<br>`3`: 对应ERROR级别<br>`4`: 对应NULL级别，不输出日志 <br>注意设置为DEBUG级别后，可能会因日志流量过大影响业务性能 |
+| [TASK_QUEUE_ENABLE](https://www.hiascend.com/document/detail/zh/Pytorch/720/comref/Envvariables/Envir_007.html) | 用于控制开启task_queue算子下发队列优化的等级 | `0`: 关闭<br>`1`: 开启Level 1优化<br>`2`: 开启Level 2优化 |
+| [COMBINED_ENABLE](https://www.hiascend.com/document/detail/zh/Pytorch/720/comref/Envvariables/Envir_005.html) | 设置combined标志。设置为0表示关闭此功能；设置为1表示开启，用于优化非连续两个算子组合类场景 | `0`: 关闭<br>`1`: 开启 |
+| [CPU_AFFINITY_CONF](https://www.hiascend.com/document/detail/zh/Pytorch/720/comref/Envvariables/Envir_033.html) | 控制CPU端算子任务的处理器亲和性，即设定任务绑核 | 设置`0`或未设置: 表示不启用绑核功能<br>`1`: 表示开启粗粒度绑核<br>`2`: 表示开启细粒度绑核 |
+| [HCCL_CONNECT_TIMEOUT](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0077.html) | 分布式场景下用于限制不同设备之间socket建链过程的超时等待时间 | 需要配置为整数，取值范围`[120, 7200]`，默认值为`120`，单位`s` |
+| [PYTORCH_NPU_ALLOC_CONF](https://www.hiascend.com/document/detail/zh/Pytorch/720/comref/Envvariables/Envir_012.html) | 控制缓存分配器行为 | `expandable_segments`: 使能内存池扩展段功能，即虚拟内存特征  |
+| [HCCL_EXEC_TIMEOUT](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0078.html) | 控制设备间执行时同步等待的时间，在该配置时间内各设备进程等待其他设备执行通信同步 | 需要配置为整数，取值范围`[68, 17340]`，默认值为`1800`，单位`s` |
+| [ACLNN_CACHE_LIMIT](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0031.html) | 配置单算子执行API在Host侧缓存的算子信息条目个数 | 需要配置为整数，取值范围`[1, 10,000,000]`，默认值为`10000` |
+| TOKENIZERS_PARALLELISM | 用于控制Hugging Face的transformers库中的分词器（tokenizer）在多线程环境下的行为 | `False`: 禁用并行分词<br>`True`: 开启并行分词 |
+| [MULTI_STREAM_MEMORY_REUSE](https://www.hiascend.com/document/detail/zh/Pytorch/720/comref/Envvariables/Envir_016.html) | 配置多流内存复用是否开启 | `0`: 关闭多流内存复用<br>`1`: 开启多流内存复用 |
+| [NPU_ASD_ENABLE](https://www.hiascend.com/document/detail/zh/Pytorch/720/comref/Envvariables/Envir_029.html) | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
+| [ASCEND_LAUNCH_BLOCKING](https://www.hiascend.com/document/detail/zh/Pytorch/720/comref/Envvariables/Envir_006.html) | 控制算子执行时是否启动同步模式，主要用于定位代码实际出错位置，开启时会导致性能下降，仅在debug时使用 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行 |
+| NPUS_PER_NODE | 配置一个计算节点上使用的NPU数量 | 整数值（如 `1`, `8` 等）|
+| [ASCEND_RT_VISIBLE_DEVICES](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0028.html) | 用于指定当前进程可见的Device，支持一次指定一个或多个Device ID | Device ID的数字组合，多个Device ID之间以英文逗号分隔 |

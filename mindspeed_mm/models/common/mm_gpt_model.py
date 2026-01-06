@@ -229,7 +229,7 @@ class MMGPTModel(LanguageModule):
             # decoder will get hidden_states from encoder.input_tensor
             decoder_input = None
 
-        # 考虑cp切分，计算实际长度必须放在切分之前
+        # Consider CP split, calculate actual length before splitting
         if getattr(self.config, 'use_remove_padding', False):
             if position_ids is not None and position_ids.dim() == 3:
                 position_ids_fa = position_ids[0]

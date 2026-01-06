@@ -176,7 +176,7 @@ class HunyuanImage3Config(PretrainedConfig):
             pad_id = -1,
             # Added
             moe_impl="eager",
-            vae_downsample_factor = (16, 16),     # (h, w)
+            vae_downsample_factor = (16, 16),  # (h, w)
             img_proj_type = "unet",
             patch_size = 1,
             patch_embed_hidden_dim = 1024,

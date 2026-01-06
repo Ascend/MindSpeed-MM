@@ -52,7 +52,7 @@ class InternVitTransformerLayer(TransformerLayer):
                          layer_number=layer_number, 
                          hidden_dropout=hidden_dropout)
 
-        # InternViT新增可学习参数
+        # InternViT adds trainable parameters
         self.ls1 = nn.Parameter(config.initializer_factor * torch.ones(config.hidden_size))
         self.ls2 = nn.Parameter(config.initializer_factor * torch.ones(config.hidden_size))
 

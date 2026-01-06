@@ -37,7 +37,7 @@ from mindspeed_mm.models.common.conv import CausalConv3d, WfCausalConv3d
 from mindspeed_mm.models.common.linear import MatmulAddLinear
 from mindspeed_mm.utils.async_offload import async_save_on_cpu
 
-# 使用megatron通信接口替换
+# Replace with Megatron communication interface
 from .communications import (
     all_to_all,
     all_to_all_SBH,
@@ -1163,7 +1163,7 @@ class ParallelMultiHeadAttentionSBH(nn.Module):
             v = split_forward_gather_backward(v, sp_group, dim=1, grad_scale="down")
 
         if self.use_rope:
-            #  原仓BUG，view使用错误，不能跨轴view
+            #  Official repo bug: incorrect use of view, cross-axis view is invalid
             q = q.view(-1, b, self.num_attention_heads_per_partition_per_cp, self.head_dim)
             k = k.view(-1, b, self.num_attention_heads_per_partition_per_cp, self.head_dim)
 

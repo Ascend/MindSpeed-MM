@@ -22,8 +22,28 @@ from mindspeed_mm.utils.utils import split_forward_gather_backward_with_megatron
 
 
 class TransformersModel(MultiModalModule):
+    """Transformer-based multi-modal model wrapper inherited from MultiModalModule.
 
+    Core wrapper class for initializing, loading and running transformer-based vision-language
+    multi-modal models with multiple loss calculation strategies and distributed parallel training support.
+    Implements context parallel loss computation, chunk-based memory-efficient loss calculation,
+    model sharding and MoE auxiliary loss for large-scale model training.
+
+    Attributes:
+        config: Core transformer model configuration parsed from global arguments.
+        transformer_config: HuggingFace AutoConfig instance for the underlying transformer model.
+        model: Initialized transformer multi-modal model instance.
+        loss_compute_mode: Loss calculation mode, supports `default` and `chunk`.
+        loss_chunk_size: Chunk size for memory-efficient chunk loss calculation (default: 1024).
+        router_aux_loss_coef: Coefficient for MoE model router auxiliary loss (default: 0.0).
+    """
     def __init__(self, config) -> None:
+        """Initialize the TransformersModel with given configuration and load pretrained weights.
+
+        Args:
+            config: General configuration for the multi-modal transformer model,
+            the configuration content is derived from model.json.
+        """
         super().__init__(config=config)
         args = get_args()
 

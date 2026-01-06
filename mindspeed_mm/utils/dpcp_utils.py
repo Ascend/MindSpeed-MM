@@ -184,7 +184,7 @@ def dynamic_dpcp_transfer_data(batch):
         else:
             received_batch = batch
 
-        # 广播 batch 中的每个字段
+        # Broadcast each item in batch
         for key, value in batch.items():
             if value is not None and isinstance(value, torch.Tensor):
                 shape = torch.tensor(list(value.shape), dtype=torch.long, device=device)
@@ -262,15 +262,15 @@ def data_aware_parallel_optimize(data_iterator):
     args = get_args()
     if is_use_dynamic_dpcp():
         batch = get_dpcp_batch_for_step(data_iterator)
-        # 0. 提取序列
+        # 0. Extract the sequence
         input_seq = {VIDEO: batch[VIDEO]}
-        # 1. 初始化为全DP
+        # 1. Initialize as full DP
         modify_parallel(0)
-        # 2. 优化算法，输出新的并行策略以及数据重排方式
+        # 2. Optimize the algorithm and output the new parallel strategy and data rearrangement method
         strategy_idx = get_optimized_parallel_strategy(input_seq)
         if strategy_idx > 0:
             print_rank_0("adjust [dp,cp] to {}".format(_PARALLEL_STRATEGY_LIST[strategy_idx]))
-            # 3. 刷新并行策略
+            # 3. Refresh the parallel strategy
             modify_parallel(strategy_idx)
             reconfigure_num_microbatches_calculator(
                 torch.distributed.get_rank(),
@@ -280,7 +280,7 @@ def data_aware_parallel_optimize(data_iterator):
                 _PARALLEL_STRATEGY_LIST[strategy_idx][0],
                 args.decrease_batch_size_if_needed)
 
-            # 4. 执行数据重排 
+            # 4. Execute data rearrangement
             dynamic_dpcp_transfer_data(batch) 
         else:
             reconfigure_num_microbatches_calculator(

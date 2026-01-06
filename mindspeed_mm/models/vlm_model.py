@@ -409,7 +409,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
 
     def compute_loss_with_tensor_parallel(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         args = get_args()
-        # 如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
+        # To align with torch.nn.CrossEntropyLoss, disable max normalization in vocab_parallel_cross_entropy (comment out)
         loss = tensor_parallel.vocab_parallel_cross_entropy(logits.float(), labels)
 
         # The three loss calculation modes are mutually exclusive:

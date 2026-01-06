@@ -19,11 +19,11 @@ from mindspeed_mm.tasks.evaluation.utils.string_utils import is_list_in_str
 
 
 def mmmu_open_question_preprocess(data):
-    # 使用向量化操作填充 A选项的空值, 如果A选项为空则为开放性问答
+    # Fill null values of option A with vectorized operation; open-ended Q&A if option A is empty
     mask = data['A'].isna()
     data.loc[mask, 'A'] = data.loc[mask, 'answer']
     data.loc[mask, 'B'] = 'Other Answers'
-    # 记录开放性问题数量
+    # Record the number of open-ended questions
     cnt = mask.sum()
     logger_rank_0(f'During MMMU_preproc in Evaluation, {cnt} open questions are re-formulated to multi-choice ones.')
     return data
@@ -37,14 +37,14 @@ def report_acc(data: pd.DataFrame):
     res['split'] = splits
 
     def calculate_accuracy(sub_df, splits):
-        # 按照splits类型划分不同的分数
+        # Split scores by splits type
         return [np.mean(sub_df[sub_df['split'] == sp]['hit']) for sp in splits]
 
     res['Overall'] = calculate_accuracy(data, splits)
     for group in ['l2-category', 'category']:
         if group in data:
             abilities = sorted(set(data[group]))
-            # 按照里面的category类型 统计分数
+            # Count scores by category type
             for ab in abilities:
                 ab_name = MMB_abbrs[ab] if ab in MMB_abbrs else ab
                 sub_df = data[data[group] == ab]

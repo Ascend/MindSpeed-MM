@@ -206,8 +206,8 @@ def build_reward_data(example, data_folder, eval_dim, fps, video_max_pixels, sam
     B_scores = []
 
     for eval_dim_ in eval_dim:
-        ### chosen_label: 1 if A is chosen, -1 if B is chosen, 0 if tied.
-        ### 22 if invalid.
+        # chosen_label: 1 if A is chosen, -1 if B is chosen, 0 if tied.
+        # 22 if invalid.
         try:
             if example[f"{eval_dim_}"] is not None:
                 if example[f"{eval_dim_}"] == "A":

@@ -288,7 +288,7 @@ class SatDiT(MultiModalModule):
             if self.sequence_parallel:
                 latents_vid = tensor_parallel.scatter_to_sequence_parallel_region(latents_vid)
         else:
-            t, h, w = self.input_size # PP currently does not support dynamic resolution.
+            t, h, w = self.input_size  # PP currently does not support dynamic resolution.
             frames = t - use_image_num
             vid_mask, img_mask = None, None
             prompt_vid_mask, prompt_img_mask = None, None
@@ -554,7 +554,7 @@ class SatDiT(MultiModalModule):
         elif self.sequence_parallel:
             prev_output_shape = (seq_len // mpu.get_context_parallel_world_size() // mpu.get_tensor_model_parallel_world_size(), micro_batch_size, self.inner_dim) # SBH
         else:
-            prev_output_shape = (micro_batch_size, seq_len, self.inner_dim) # BSH
+            prev_output_shape = (micro_batch_size, seq_len, self.inner_dim)  # BSH
 
         pipeline_tensor_shapes = [
             {'shape': prev_output_shape, 'dtype': dtype},                                           # prev_stage_output

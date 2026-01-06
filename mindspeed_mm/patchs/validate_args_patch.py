@@ -17,7 +17,7 @@ from mindspeed_mm.utils.utils import ensure_valid
 
 
 def safe_getattr(mm_object, mm_name, mm_default_value):
-    # 如果 mm_object.mm_name 不等于 mm_default_value， 则打印日志， 提示用户真实使用的值已被覆盖
+    # If mm_object.mm_name != mm_default_value, log and prompt user that the actual used value is overwritten
     mm_value = getattr(mm_object, mm_name, mm_default_value)
 
     if mm_value != mm_default_value:
@@ -30,10 +30,10 @@ def validate_args(args, defaults=None):
     if defaults is None:
         defaults = {}
 
-    #merge mm config to args
+    # merge mm config to args
     merge_mm_args(args)
 
-    #use model.json to fill args
+    # use model.json to fill args
     if hasattr(args.mm.model, 'text_decoder'):
         args.num_layers = safe_getattr(args.mm.model.text_decoder, 'num_layers', args.num_layers)
         args.hidden_size = safe_getattr(args.mm.model.text_decoder, 'hidden_size', args.hidden_size)

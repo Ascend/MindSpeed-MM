@@ -334,7 +334,7 @@ class WanDiT(MultiModalModule):
     ):
         if self.pre_process:
             timestep = timestep.to(x[0].device)
-            if self.seperated_timestep: # wan2.2 5B
+            if self.seperated_timestep:  # wan2.2 5B
                 timestep = torch.concat([
                     torch.zeros((1, x.shape[3] * x.shape[4] // 4), dtype=x.dtype, device=x.device),
                     torch.ones((x.shape[2] - 1, x.shape[3] * x.shape[4] // 4), dtype=x.dtype,
@@ -986,7 +986,7 @@ class WanVideoParallelAttention(ParallelAttention):
                 self.core_attention_flash = UlyssesContextAttention(self.core_attention_flash, ulysses_group)
         
         if self.cp_size > 1 and attention_type == AttnType.cross_attn:
-            #In the case of cross attention, it is equivalent to performing the raw npu_fusion_attention for the slicing q
+            # In the case of cross attention, it is equivalent to performing the raw npu_fusion_attention for the slicing q
             self.core_attention_flash.context_parallel_algo = "ulysses_cp_algo"
 
         # Normalize
@@ -1172,7 +1172,7 @@ class MLPProj(nn.Module):
             nn.Linear(in_dim, out_dim),
             FP32LayerNorm(out_dim) if fp32_calculate else nn.LayerNorm(out_dim),
         )
-        if flf_pos_emb:   # NOTE: only used in "flf2v"
+        if flf_pos_emb:  # NOTE: only used in "flf2v"
             self.emb_pos = nn.Parameter(torch.zeros(1, clip_token_len * 2, in_dim))
 
     def forward(self, image_emb):

@@ -88,7 +88,7 @@ def get_transforms(is_video=True, train_pipeline=None, image_size=None, transfor
     for pp_in in train_pipeline_info:
         param_info = pp_in.get("param", dict())
 
-        # 动态数据集场景下，用户须传入image_size,按照用户传的值做transforms
+        # For dynamic datasets, users must specify the image_size parameter and apply transforms with the given value
         if image_size and "size" in param_info and param_info["size"] == "auto":
             param_info["size"] = image_size
         elif transform_size and param_info.get("transform_size", None) == "auto":

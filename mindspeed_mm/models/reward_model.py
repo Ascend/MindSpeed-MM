@@ -104,7 +104,7 @@ class Qwen2VLRewardModelBT(VLMModel):
             else:
                 batch_size = input_embeds.shape[0]
 
-            ## get sequence length
+            # get sequence length
             if self.pad_token_id is None and batch_size != 1:
                 raise ValueError("Cannot handle batch sizes > 1 if no padding token is defined.")
             if self.pad_token_id is None:
@@ -118,11 +118,11 @@ class Qwen2VLRewardModelBT(VLMModel):
                 else:
                     sequence_lengths = -1
 
-            ## get the last token's logits
+            # get the last token's logits
             if self.reward_token == "last":
                 pooled_logits = logits[torch.arange(batch_size, device=logits.device), sequence_lengths]
             elif self.reward_token == "mean":
-                ## get the mean of all valid tokens' logits
+                # get the mean of all valid tokens' logits
                 valid_lengths = torch.clamp(sequence_lengths, min=0, max=logits.size(1) - 1)
                 pooled_logits = torch.stack([logits[i, :valid_lengths[i]].mean(dim=0) for i in range(batch_size)])
             elif self.reward_token == "special":

@@ -94,11 +94,11 @@ class VLMModel(MultiModalModule):
         proj_layer_spec = get_projector_layer_spec(config.vision_projector)
 
 
-        # image token format 形式
+        # image token format style
         self.tile_tag = config.tile_tag
         self.global_view_pos = config.global_view_pos
 
-        # 用于format image token sequence的特殊token
+        # Special token for format image token sequence
         embed_std = 1 / torch.sqrt(torch.tensor(config.vision_projector.n_embed, dtype=torch.float32))
         if self.tile_tag == "2D":
             # <|view_separator|>, <|\n|>
@@ -274,7 +274,7 @@ class VLMModel(MultiModalModule):
         shift_logits = logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
 
-        #如果想和torch.nn.CrossEntropyLoss对齐，需要将vocab_parallel_cross_entropy中的最大值归一化代码注释掉
+        # To align with torch.nn.CrossEntropyLoss, disable max normalization in vocab_parallel_cross_entropy (comment out)
         loss = tensor_parallel.vocab_parallel_cross_entropy(shift_logits.float(), shift_labels) 
         loss = loss * (shift_labels > -1)
         loss = torch.sum(loss) / torch.sum(shift_labels > -1)
@@ -334,7 +334,7 @@ class VLMModel(MultiModalModule):
         _, hw, n_dim = images_embeds.shape
         h = w = int(hw ** 0.5)
 
-        # 根据self.tile_tag & self.global_view_pos填充image token sequence
+        # Pad the image token sequence according to self.tile_tag & self.global_view_pos.
         tile_index = 0
         for idx in range(images_spatial_crop.shape[0]):
             images_in_this_batch = []
@@ -403,7 +403,7 @@ class VLMModel(MultiModalModule):
                             [local_features, self.view_seperator[None, :], global_features], dim=0)
 
                 else:
-                    # abandoned，实际上不会走这个逻辑
+                    # abandoned, this logic will not be executed in practice.
                     global_features = torch.cat(
                         [self.tile_indicators[0:1], global_features], dim=0
                     )

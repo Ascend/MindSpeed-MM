@@ -121,7 +121,7 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
             print("gathered_hps_reward_mean=", gathered_reward.mean().item())
             with open(args.hps_reward_save, 'a') as f:
                 f.write(f"{gathered_reward.mean().item()}\n")
-        # 计算advantage
+        # Calculate advantage
         if args.use_group:
             n = len(samples["rewards"]) // (args.num_generations)
             advantages = torch.zeros_like(samples["rewards"])

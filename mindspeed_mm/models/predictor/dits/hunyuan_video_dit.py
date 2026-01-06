@@ -105,7 +105,7 @@ class HunyuanVideoDiT(MultiModalModule):
     def __init__(
             self,
             patch_size: Tuple[int] = (1, 2, 2),
-            in_channels: int = 4, # should be VAE.latent_channels,
+            in_channels: int = 4,  # should be VAE.latent_channels,
             out_channels: Optional[int] = None,
             num_heads: int = 24,
             head_dim: int = 128,
@@ -417,9 +417,9 @@ class HunyuanVideoDiT(MultiModalModule):
         if isinstance(prompt_mask, list):
             prompt_mask = prompt_mask[0]
         prompt_mask = prompt_mask.to(x.device)
-        prompt[0] = prompt[0].view(-1, prompt[0].shape[-2], prompt[0].shape[-1]).to(self.dtype) # B*N, seq_len, Dim
-        prompt[1] = prompt[1].to(self.dtype) # B, N, Dim
-        prompt_mask = prompt_mask.view(-1, prompt_mask.shape[-1]) # B*N, seqlen
+        prompt[0] = prompt[0].view(-1, prompt[0].shape[-2], prompt[0].shape[-1]).to(self.dtype)  # B*N, seq_len, Dim
+        prompt[1] = prompt[1].to(self.dtype)  # B, N, Dim
+        prompt_mask = prompt_mask.view(-1, prompt_mask.shape[-1])  # B*N, seqlen
 
         # Prepare modulation vectors
         vec = self.time_in(timestep)
@@ -476,8 +476,8 @@ class HunyuanVideoDiT(MultiModalModule):
             theta=self.rope_theta, 
             theta_rescale_factor=1
         )
-        freqs_cos = freqs_cos.unsqueeze(0).unsqueeze(2).to(device=vec.device, dtype=vec.dtype) # b s n d
-        freqs_sin = freqs_sin.unsqueeze(0).unsqueeze(2).to(device=vec.device, dtype=vec.dtype) # b s n d
+        freqs_cos = freqs_cos.unsqueeze(0).unsqueeze(2).to(device=vec.device, dtype=vec.dtype)  # b s n d
+        freqs_sin = freqs_sin.unsqueeze(0).unsqueeze(2).to(device=vec.device, dtype=vec.dtype)  # b s n d
 
         if bs == 1:
             txt = txt[:, :prompt_mask.sum()]
@@ -496,7 +496,7 @@ class HunyuanVideoDiT(MultiModalModule):
                 mpu.get_context_parallel_group(),
                 dim=1,
                 grad_scale="down"
-            ) # b s n d
+            )  # b s n d
             freqs_cos = split_forward_gather_backward(
                 freqs_cos,
                 mpu.get_context_parallel_group(),
@@ -742,7 +742,7 @@ class MMDoubleStreamBlock(nn.Module):
             setattr(param, "sequence_parallel", self.sequence_parallel)
 
         if self.enable_tensor_parallel:
-            config.sequence_parallel = False # disable txt_seq sp
+            config.sequence_parallel = False  # disable txt_seq sp
             self.txt_attn_qkv = tensor_parallel.ColumnParallelLinear(
                 hidden_size,
                 hidden_size * 3,
@@ -800,7 +800,7 @@ class MMDoubleStreamBlock(nn.Module):
         )
 
         if self.enable_tensor_parallel:
-            config.sequence_parallel = False # disable txt_seq sp
+            config.sequence_parallel = False  # disable txt_seq sp
             self.txt_attn_proj = tensor_parallel.RowParallelLinear(
                 hidden_size,
                 hidden_size,
@@ -983,7 +983,7 @@ class MMDoubleStreamBlock(nn.Module):
         if self.enable_tensor_parallel:
             img_qkv = self.img_attn_qkv(img_modulated)[0]
             if self.sequence_parallel:
-                img_qkv = img_qkv.transpose(0, 1).contiguous() # s b h -> b s h
+                img_qkv = img_qkv.transpose(0, 1).contiguous()  # s b h -> b s h
         else:
             img_qkv = self.img_attn_qkv(img_modulated)
 
@@ -1043,7 +1043,7 @@ class MMDoubleStreamBlock(nn.Module):
         # Calculate the img blocks
         if self.enable_tensor_parallel:
             if self.sequence_parallel:
-                img_attn = img_attn.transpose(0, 1).contiguous() # b s h -> s b h
+                img_attn = img_attn.transpose(0, 1).contiguous()  # b s h -> s b h
             if self.i2v_condition_type == "token_replace":
                 x = self.img_attn_proj(img_attn)[0]
                 img_zero = x[:, :frist_frame_token_num] * tr_img_mod1_gate
@@ -1312,7 +1312,7 @@ class MMSingleStreamBlock(nn.Module):
                 txt_qkv = self.linear1_qkv(x_mod[img_len // self.tp_size:])[0]
                 self.linear1_qkv.sequence_parallel = True
                 qkv = torch.cat([img_qkv, txt_qkv], dim=0)
-                qkv = qkv.transpose(0, 1) # s b h -> b s h
+                qkv = qkv.transpose(0, 1)  # s b h -> b s h
             else:
                 qkv = self.linear1_qkv(x_mod)[0]
         else:
@@ -1330,7 +1330,7 @@ class MMSingleStreamBlock(nn.Module):
 
         # Apply RoPE if needed
         if freqs_cos is not None and freqs_sin is not None:
-            img_q, txt_q = q[:, :img_len, :, :], q[:, img_len:, :, :] # b s n d
+            img_q, txt_q = q[:, :img_len, :, :], q[:, img_len:, :, :]  # b s n d
             img_k, txt_k = k[:, :img_len, :, :], k[:, img_len:, :, :]
 
             img_q = npu_rotary_position_embedding(img_q, freqs_cos, freqs_sin, mode=1)
@@ -1355,11 +1355,11 @@ class MMSingleStreamBlock(nn.Module):
     ):
         if self.enable_tensor_parallel:
             if self.sequence_parallel:
-                attn = attn.transpose(0, 1).contiguous() # b s h -> s b h
+                attn = attn.transpose(0, 1).contiguous()  # b s h -> s b h
                 img_attn = attn[:img_len]
                 txt_attn = attn[img_len:]
                 
-                img_mod = x_mod[:img_len // mpu.get_tensor_model_parallel_world_size()] # s b h
+                img_mod = x_mod[:img_len // mpu.get_tensor_model_parallel_world_size()]  # s b h
                 txt_mod = x_mod[img_len // mpu.get_tensor_model_parallel_world_size():]
 
                 img_mlp = self.linear1_mlp(img_mod)[0]
@@ -1438,13 +1438,13 @@ def parallel_attention(
                 d2h_stream=d2h_stream
             )
             attn = attn.transpose(1, 2).contiguous()
-            img_attn = attn[:, :img_seq_len * mpu.get_context_parallel_world_size()] # b img_seq sub_n d
-            txt_attn = attn[:, img_seq_len * mpu.get_context_parallel_world_size():] # b txt_seq sub_n d
+            img_attn = attn[:, :img_seq_len * mpu.get_context_parallel_world_size()]  # b img_seq sub_n d
+            txt_attn = attn[:, img_seq_len * mpu.get_context_parallel_world_size():]  # b txt_seq sub_n d
         else:
             raise NotImplementedError("not implemented ulysses_cp_algo for batch_size > 1")
         
-        img_attn = all_to_all(img_attn, mpu.get_context_parallel_group(), scatter_dim=1, gather_dim=2) # b sub_img_seq n d
-        txt_attn = gather_forward_split_backward(txt_attn, mpu.get_context_parallel_group(), dim=2) # b txt_seq n d
+        img_attn = all_to_all(img_attn, mpu.get_context_parallel_group(), scatter_dim=1, gather_dim=2)  # b sub_img_seq n d
+        txt_attn = gather_forward_split_backward(txt_attn, mpu.get_context_parallel_group(), dim=2)  # b txt_seq n d
         attn = torch.cat([img_attn, txt_attn], dim=1)
         attn = attn.view(bs, -1, heads_num * head_dim)
     elif context_parallel_algo == "hybrid_cp_algo":

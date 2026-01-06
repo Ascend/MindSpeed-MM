@@ -64,7 +64,7 @@ class DictOutput(object):
         self.__dict__[key] = value
 
 
-# 对于inference sample也可以维护input_ids，反正最后不会用到
+# Maintain input_ids for inference samples, as they are not used in the end
 @dataclass
 class VLChatProcessorOutput(DictOutput):
     sft_format: str
@@ -301,7 +301,8 @@ class DeepseekVLV2Processor(ProcessorMixin):
                 images_seq_mask += seq_mask
 
             elif message['role'] == 'system' or message['role'] == 'deepseekapi-sys':
-                # 如果message里面有system，那就只允许出现在message的第一句，同时conv原本的system就会失效
+                # If 'system' exists in the message, it must only appear in the first sentence of the message,
+                # and the original 'system' of the conv will be invalidated.
                 if idx != 0:
                     raise AssertionError("system information should only exist in the beginning of the conversation")
                 formatted_system = message['content'].strip()
@@ -451,7 +452,7 @@ class DeepseekVLV2Processor(ProcessorMixin):
         target_ids[(input_ids < 0) | (input_ids == self.image_token_id)] = self.ignore_id
         input_ids[input_ids < 0] = self.pad_id
 
-        # 填充或裁剪到固定长度
+        # pad or truncate to a fixed length
         if not group_by_length:
             if len(input_ids) > max_length:
                 print_rank_0(f"[Warning]: input_ids length {len(input_ids)} is larger than max_length {max_length}, truncating to max_length.")
@@ -464,7 +465,7 @@ class DeepseekVLV2Processor(ProcessorMixin):
                 images_seq_mask = torch.cat([images_seq_mask, torch.full((max_length - len(images_seq_mask),), False, dtype=images_seq_mask.dtype, device=images_seq_mask.device)], dim=0)
         
         if inference_mode:
-            # 去掉结尾的eos token
+            # drop the ending eos token
             if input_ids[-1] != self.eos_id:
                 raise AssertionError("the last id of input_ids is not eos_id.")
             input_ids = input_ids[:-1]

@@ -59,10 +59,10 @@ class MlpProjector(MultiModalModule):
             x = x.permute(0, 3, 1, 2)
             patches = x.unfold(2, 2, 2).unfold(3, 2, 2)
             batch_size, channels, h_patches, w_patches, _, _ = patches.size()
-            # 在通道维度上拼接
+            # Concatenate on channel dim
             patches = patches.contiguous().view(batch_size, channels, h_patches * w_patches, -1)
 
-            # 通过线性层
+            # Through linear layer
             patches = patches.permute(0, 2, 1, 3).contiguous()
             patches = patches.view(batch_size, h_patches * w_patches, channels * 4)
 

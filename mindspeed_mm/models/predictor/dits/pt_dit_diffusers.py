@@ -270,7 +270,7 @@ class ProxyTokensTransformerBlock(nn.Module):
         proxy_token_number = p_compress_f * p_compress_h * p_compress_w
 
         h_dtype = hidden_states.dtype
-        batch_size, dim = hidden_states.shape[0] // window_number, hidden_states.shape[-1] # hidden_states shape of b * p, n, c
+        batch_size, dim = hidden_states.shape[0] // window_number, hidden_states.shape[-1]  # hidden_states shape of b * p, n, c
 
         if self.use_ada_layer_norm_single:
             shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
@@ -285,7 +285,7 @@ class ProxyTokensTransformerBlock(nn.Module):
 
         lora_scale = cross_attention_kwargs.get("scale", 1.0) if cross_attention_kwargs is not None else 1.0
         cross_attention_kwargs = cross_attention_kwargs.copy() if cross_attention_kwargs is not None else {}
-        gligen_kwargs = cross_attention_kwargs.pop("gligen", None) # None
+        gligen_kwargs = cross_attention_kwargs.pop("gligen", None)  # None
         
         #1.----------------------------------proxy token self attention-----------------------------------
         proxy_hidden_states = self.get_proxy_token(hidden_states, compress_ratios, self.scale_ratio, window_number, mode="mean")

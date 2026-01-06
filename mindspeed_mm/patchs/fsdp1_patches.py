@@ -190,7 +190,7 @@ class TorchFullyShardedDataParallel(_BaseDataParallel):
                         "tf32": torch.float,
                         "bf16": torch.bfloat16,
                         "fp16": torch.float16,
-                    }[fsdp_config.reduce_dtype], # fp32
+                    }[fsdp_config.reduce_dtype],  # fp32
                 ),
                 device_id=torch.cuda.current_device(),
                 sync_module_states=True,

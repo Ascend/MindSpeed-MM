@@ -38,7 +38,7 @@ class BaseEvalDataset(Dataset):
             data['image'] = [str(x) for x in data['image']]
             image_map = {x: y for x, y in zip(data['index'], data['image'])}
             for k in image_map:
-                if len(image_map[k]) <= 64:  # 判断image小于64 交换k v
+                if len(image_map[k]) <= 64:  # Swap k & v when image < 64
                     idx = image_map[k]
                     if idx not in image_map or len(image_map.get(idx, "")) <= 64:
                         raise ValueError(
