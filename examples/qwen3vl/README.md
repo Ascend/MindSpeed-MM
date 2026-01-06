@@ -230,13 +230,13 @@ dataset_param->basic_parameters->dataset
 
 当前支持vison encoder、vision projector、text decoder及lm head模块的冻结，其中，vison encoder、vision projector默认训练时为冻结状态，
 
-通过配置`model.json`文件中各个模块的`freeze`字段，来修改各个模块的冻结与否。
+通过配置`model_xxB.json`文件中各个模块的`freeze`字段，来修改各个模块的冻结与否。
 
 【MoE 加速配置】
 
-开启MoE融合可以提升模型训练性能，开启方式为将`model.json`文件中修改`use_npu_fused_moe`字段为`true`
+开启MoE融合可以提升模型训练性能，开启方式为将`model_xxB.json`文件中修改`use_npu_fused_moe`字段为`true`
 
-注意：FusedMoE特性依赖较新版本，参考【环境安装】章节进行环境安装。
+注意：FusedMoE特性依赖较新版本，新版本的下载链接和安装方式参考[【环境准备】](#jump1.1)章节。
 
 【序列并行配置】
 
@@ -253,11 +253,11 @@ GPT_ARGS="
 【Attention配置】
 
 - 是否计算AttnMask
-  配置方式为在 `model.json` 文件中修改`is_causal`字段。
+  配置方式为在 `model_xxB.json` 文件中修改`is_causal`字段。
   是否使用casual_mask，设置为 true 时按照casual mask计算，为 false 时会创建完整的attention mask，长序列时推荐使能以节省显存。
 
 - attn_implementation 和 layout配置
-  当前支持vision和text模块选择不同的Attntion实现方式，具体为在`model.json`文件中修改`attn_implementation`字段，当前支持情况如下表。
+  当前支持vision和text模块选择不同的Attntion实现方式，具体为在`model_xxB.json`文件中修改`attn_implementation`字段，当前支持情况如下表。
   | 模块| 支持的FA以及layout | 支持的cp类型 |
   | --- | --- | --- |
   | ViT | `flash_attention_2`: `TND` | ulysses、ring、usp |
