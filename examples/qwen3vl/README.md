@@ -268,6 +268,12 @@ OUTPUT_ARGS="
 根据实际情况配置`examples/qwen3vl/model_xxB.json`中的`image_encoder.vision_encoder.freeze`、`image_encoder.vision_projector.freeze`、`text_decoder.freeze`参数，该参数分别代表是否冻结vision model模块、projector模块、及language model模块。
 注：当前`examples/qwen3vl/model_xxB.json`中的各网络层数均为未过校验的无效配置，如需减层请修改原始hf路径下相关配置文件。
 
+【MoE 加速配置】
+
+开启MoE融合可以提升模型训练性能，开启方式为将`model_xxB.json`文件中修改`use_npu_fused_moe`字段为`true`
+
+注意：FusedMoE特性依赖较新版本，新版本的下载链接和安装方式参考[【环境准备】](#jump1.1)章节。
+
 【单机运行配置】
 
 配置`examples/qwen3vl/finetune_qwen3vl_xxB.sh`参数如下
