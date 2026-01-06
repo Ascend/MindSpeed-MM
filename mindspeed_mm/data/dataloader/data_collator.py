@@ -554,6 +554,89 @@ class DataCollatorForVideoAlign:
         }
         return model_inputs
 
+
+class DataCollatorForBagel:
+    def __init__(self, batch=None):
+        if batch is not None:
+            data = batch[0]
+            self.batch_data_indexes = data['batch_data_indexes']
+            self.sequence_length = data["sequence_length"]
+            self.sample_lens = data["sample_lens"]
+            self.packed_text_ids = data["packed_text_ids"]
+            self.packed_text_indexes = data["packed_text_indexes"]
+            self.packed_position_ids = data["packed_position_ids"]
+
+            self.use_flex = "nested_attention_masks" not in data.keys()
+
+            if self.use_flex:
+                self.split_lens = data["split_lens"]
+                self.attn_modes = data["attn_modes"]
+            else:
+                self.nested_attention_masks = data["nested_attention_masks"]
+
+            if "padded_images" in data.keys():
+                self.padded_images = data["padded_images"]
+                self.patchified_vae_latent_shapes = data["patchified_vae_latent_shapes"]
+                self.packed_latent_position_ids = data["packed_latent_position_ids"]
+                self.packed_vae_token_indexes = data["packed_vae_token_indexes"]
+
+            if "packed_vit_tokens" in data.keys():
+                self.packed_vit_tokens = data["packed_vit_tokens"]
+                self.packed_vit_position_ids = data["packed_vit_position_ids"]
+                self.packed_vit_token_indexes = data["packed_vit_token_indexes"]
+                self.vit_token_seqlens = data["vit_token_seqlens"]
+
+            if "packed_timesteps" in data.keys():
+                self.packed_timesteps = data["packed_timesteps"]
+                self.mse_loss_indexes = data["mse_loss_indexes"]
+
+            if "packed_label_ids" in data.keys():
+                self.packed_label_ids = data["packed_label_ids"]
+                self.ce_loss_indexes = data["ce_loss_indexes"]
+                self.ce_loss_weights = data["ce_loss_weights"]
+
+    def __call__(self, batch):
+        return DataCollatorForBagel(batch)
+
+    def to_dict(self):
+        data = dict(
+            sequence_length=self.sequence_length,
+            sample_lens=self.sample_lens,
+            packed_text_ids=self.packed_text_ids,
+            packed_text_indexes=self.packed_text_indexes,
+            packed_position_ids=self.packed_position_ids,
+            batch_data_indexes=self.batch_data_indexes,
+        )
+
+        if not self.use_flex:
+            data['nested_attention_masks'] = self.nested_attention_masks
+        else:
+            data['split_lens'] = self.split_lens
+            data['attn_modes'] = self.attn_modes
+
+        if hasattr(self, 'padded_images'):
+            data['padded_images'] = self.padded_images
+            data['patchified_vae_latent_shapes'] = self.patchified_vae_latent_shapes
+            data['packed_latent_position_ids'] = self.packed_latent_position_ids
+            data['packed_vae_token_indexes'] = self.packed_vae_token_indexes
+
+        if hasattr(self, 'packed_vit_tokens'):
+            data['packed_vit_tokens'] = self.packed_vit_tokens
+            data['packed_vit_position_ids'] = self.packed_vit_position_ids
+            data['packed_vit_token_indexes'] = self.packed_vit_token_indexes
+            data['vit_token_seqlens'] = self.vit_token_seqlens
+
+        if hasattr(self, 'packed_timesteps'):
+            data['packed_timesteps'] = self.packed_timesteps
+            data['mse_loss_indexes'] = self.mse_loss_indexes
+
+        if hasattr(self, 'packed_label_ids'):
+            data['packed_label_ids'] = self.packed_label_ids
+            data['ce_loss_indexes'] = self.ce_loss_indexes
+            data['ce_loss_weights'] = self.ce_loss_weights
+
+        return data
+
 DATA_COLLATOR = {
     "internvl": DataCollatorForInternvl,
     "whisper": DataCollatorSpeechSeq2SeqWithPadding,
@@ -563,5 +646,6 @@ DATA_COLLATOR = {
     "open_sora_plan": DataCollatorForOpenSoraPlan,
     "deepseekvl2": DataCollatorForDeepSeekVL,
     "videoalign": DataCollatorForVideoAlign,
-    "glm4v_moe": DataCollatorForQwen2vl
+    "glm4v_moe": DataCollatorForQwen2vl,
+    "bagel": DataCollatorForBagel
 }
