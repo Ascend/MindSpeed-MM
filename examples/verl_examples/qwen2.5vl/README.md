@@ -209,16 +209,16 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 4. 实际运行场景与默认配置脚本不一致时，需要根据实际场景调整`micro_batch_size`、`dispatch_size`等相关配置参数。
 
-5. 以 Qwen2.5VL 32B 模型为例,若增加机器规模的情况下，可通过修改[启动脚本](train_qwen2_5_vl_32b_grpo_full.sh)的配置：
+5. 以 Qwen2.5VL 32B 模型为例,若增加机器规模的情况下，可通过修改[启动脚本](train_qwen2_5_vl_32b_grpo_performance.sh)的配置：
 
     ```shell
-    vim examples/grpo_trainer/train_qwen2_5_vl_32b_grpo_full.sh
+    vim examples/grpo_trainer/train_qwen2_5_vl_32b_grpo_performance.sh
     ```
 
     修改以下配置，设置多机规模：
 
     ```shell
-    nnodes=1 # 节点数
+    nnodes=2 # 节点数
     n_npus_per_node=16 # NPU卡数
     ```
 
@@ -233,7 +233,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 6. 以 Qwen2.5VL 32B 模型为例，若想要增大步数，可修改以下配置参数：
 
     ```shell
-    vim examples/grpo_trainer/train_qwen2_5_vl_32b_grpo_full.sh
+    vim examples/grpo_trainer/train_qwen2_5_vl_32b_grpo_performance.sh
     ```
 
     增大`total_epochs`配置参数为想要训练的总步数（以300个epochs为例），并将`total_training_steps`设置为null：
