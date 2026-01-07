@@ -78,6 +78,16 @@ def create_qwen2vl_ops(enable_canonical_hf_struct: bool, vit_embed_dim: int, vit
                        group=vit_num_heads,
                        split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
                        ),
+            RelocateOp(name=r"visual.blocks.(\d+).attn.qkv.weight",
+                       new_name=r"visual.blocks.(\d+).attn.qkv.weight",
+                       group=vit_num_heads,
+                       split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
+                       ),
+            RelocateOp(name=r"visual.blocks.(\d+).attn.qkv.bias",
+                       new_name=r"visual.blocks.(\d+).attn.qkv.bias",
+                       group=vit_num_heads,
+                       split_size=[vit_embed_dim] * 3,  # vit的qkv不是gqa，所以切分的三份是相同的
+                       ),
         ]
         ops.extend(mega_ops)
 
