@@ -605,14 +605,20 @@ class SupervisedDatasetProcessor(DatasetProcessor):
                 )
                 continue
 
-            input_ids, labels = self._encode_data_example(
-                prompt=examples["_prompt"][i],
-                response=examples["_response"][i],
-                system=examples["_system"][i],
-                images=examples["_images"][i] or [],
-                videos=examples["_videos"][i] or [],
-                audios=examples["_audios"][i] or [],
-            )
+            try:
+                input_ids, labels = self._encode_data_example(
+                    prompt=examples["_prompt"][i],
+                    response=examples["_response"][i],
+                    system=examples["_system"][i],
+                    images=examples["_images"][i] or [],
+                    videos=examples["_videos"][i] or [],
+                    audios=examples["_audios"][i] or [],
+                )
+            except OSError as e:
+                err_img = examples["_images"][i] if examples["_images"][i] else "No images"
+                logger.warning(f"Skipping invalid sample: {err_img}. Error: {str(e)}")
+                continue
+
             model_inputs["input_ids"].append(input_ids)
             model_inputs["attention_mask"].append([1] * len(input_ids))
             model_inputs["labels"].append(labels)

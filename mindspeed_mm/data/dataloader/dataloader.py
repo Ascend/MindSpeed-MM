@@ -141,7 +141,7 @@ def prepare_base_dataloader(
     collate_fn = None
     if collate_param:
         data_collate_type = collate_param.pop("model_name")
-        collate_fn = DATA_COLLATOR[data_collate_type](**collate_param)
+        collate_fn = DATA_COLLATOR[data_collate_type](dataset_param=dataset_param, **collate_param)
     if persistent_workers is None:
         persistent_workers = True if num_workers > 0 else False
     return DataLoader(

@@ -133,7 +133,7 @@ def build_mm_dataloader(dataset, dataloader_param, process_group=None, consumed_
     )
     print_rank_0(f'[INFO] initialize `batch_size`/`num_workers`/`seed` from argument parser rather than `data.json`')
     if dataloader_mode == "base":
-        data_loader = prepare_base_dataloader(dataset, **dataloader_param)
+        data_loader = prepare_base_dataloader(dataset, **dataloader_param, dataset_param=dataset_param)
         return data_loader
     elif dataloader_mode == "sampler":
         data_loader = prepare_sampler_dataloader(

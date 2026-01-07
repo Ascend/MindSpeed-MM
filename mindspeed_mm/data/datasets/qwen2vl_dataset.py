@@ -1,6 +1,8 @@
 import os
 import warnings
 import copy
+import threading
+import queue
 
 import torch
 from datasets import load_dataset
@@ -9,6 +11,8 @@ from transformers.training_args import TrainingArguments
 
 from megatron.training import get_args
 from megatron.training.utils import is_rank0
+from megatron.core import mpu
+
 from mindspeed_mm.data.data_utils.func_utils.convert import (
     DataArguments,
     DataArgumentsForRewardVideo,
@@ -30,15 +34,61 @@ logger = get_logger(__name__)
 
 class DistributedIterableDataset(IterableDataset):
     def __init__(self, dataset, rank=None):
-        args = get_args()
-        self.data_parallel_size = args.data_parallel_size
+
+
         self.dataset = dataset
-        self.rank = torch.distributed.get_rank() if rank is None else rank
+        self.num_dp = mpu.get_data_parallel_world_size()
+        self.dp_rank = mpu.get_data_parallel_rank()
 
     def __iter__(self):
         for idx, item in enumerate(self.dataset):
-            if idx % self.data_parallel_size == self.rank % self.data_parallel_size:
+            if idx % self.num_dp == self.dp_rank:
                 yield item
+
+
+class AsyncPreprocessIterableDataset(IterableDataset):
+    def __init__(self, dataset, preprocess_fn, buffer_size=4):
+        self.dataset = dataset
+        self.preprocess_fn = preprocess_fn
+        self.buffer_size = buffer_size
+    
+    def __iter__(self):
+        q = queue.Queue(maxsize=self.buffer_size)
+        stop_event = threading.Event()
+
+        def worker():
+            batch = []
+            for item in self.dataset:
+                if stop_event.is_set():
+                    break
+                batch.append(item)
+                if len(batch) == 1:  # batch_size=1
+                    try:
+                        batch_dict = {k: [v] for k, v in batch[0].items()}
+                        processed = self.preprocess_fn(batch_dict)
+                        for i in range(len(next(iter(processed.values())))):
+                            q.put({k: v[i] for k, v in processed.items()})
+                    except Exception as e:
+                        raise RuntimeError("Preprocessing failed. Check input data and preprocessing function.") from e
+                    batch = []
+            if batch:
+                batch_dict = {k: [v] for k, v in batch[0].items()}
+                processed = self.preprocess_fn(batch_dict)
+                for i in range(len(next(iter(processed.values())))):
+                    q.put({k: v[i] for k, v in processed.items()})
+            q.put(None)
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+
+        try:
+            while True:
+                item = q.get()
+                if item is None:
+                    break
+                yield item
+        finally:
+            stop_event.set()
 
 
 def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
@@ -52,6 +102,10 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
     tokenizer_module = load_tokenizer(process_args)
     tokenizer, processor = tokenizer_module['tokenizer'], tokenizer_module['processor']
     template = get_template_and_fix_tokenizer(tokenizer, data_args.template)
+
+    args = get_args()
+    consumed_samples = args.consumed_train_samples
+
     # Ensure main process handles data processing, while other processes reuse cache to avoid redundant calculations.
     # This strategy is consistent with the data processing strategy used by LLaMA Factory.
     with TrainingArguments(output_dir='./').main_process_first(desc="pre-process dataset"):
@@ -61,6 +115,10 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                                      streaming=data_args.streaming)
         if data_args.max_samples and not data_args.streaming:
             train_dataset = train_dataset.select(range(data_args.max_samples))
+        
+        if consumed_samples > 0:
+            logger.info(f"Skipping first {consumed_samples} samples to resume from checkpoint.")
+            train_dataset.skip(consumed_samples)
 
         val_dataset = None
         if data_args.val_dataset:
@@ -103,11 +161,9 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                                                 data_args=data_args)
         preprocess_func = dataset_processor.preprocess_dataset
         if data_args.streaming:
-            if data_args.preprocess_on_fly:
-                train_dataset.set_transform(
-                    preprocess_func,
-                    output_all_columns=True,
-                )
+            if data_args.async_preprocess:
+                train_dataset = DistributedIterableDataset(train_dataset)
+                train_dataset = AsyncPreprocessIterableDataset(train_dataset, preprocess_func, buffer_size=8)
             else:
                 train_dataset = train_dataset.map(
                     preprocess_func,
@@ -116,16 +172,21 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                     remove_columns=(list(next(iter(train_dataset)).keys())),
                     **kwargs,
                 )
-            train_dataset = DistributedIterableDataset(train_dataset)
+                train_dataset = DistributedIterableDataset(train_dataset)
+            
             if val_dataset:
-                val_dataset = val_dataset.map(
-                    preprocess_func,
-                    batched=True,
-                    batch_size=data_args.preprocessing_batch_size,
-                    remove_columns=(list(next(iter(val_dataset)).keys())),
-                    **kwargs,
-                )
-                val_dataset = DistributedIterableDataset(val_dataset)
+                if data_args.async_preprocess:
+                    val_dataset = DistributedIterableDataset(val_dataset)
+                    val_dataset = AsyncPreprocessIterableDataset(val_dataset, preprocess_func, buffer_size=8)
+                else:
+                    val_dataset = val_dataset.map(
+                        preprocess_func,
+                        batched=True,
+                        batch_size=data_args.preprocessing_batch_size,
+                        remove_columns=(list(next(iter(val_dataset)).keys())),
+                        **kwargs,
+                    )
+                    val_dataset = DistributedIterableDataset(val_dataset)
                 return train_dataset, val_dataset
         else:
             if data_args.preprocess_on_fly:
