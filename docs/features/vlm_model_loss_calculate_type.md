@@ -42,14 +42,18 @@
 
 ## 使用方法
 
-### 1. 默认计算方式
+### megatron后端
+
+争对入口为`pretrain_vlm.py`的模型，使能方式如下：
+
+#### 1. 默认计算方式
 
 在模型训练脚本中**不启用**以下任一参数：
 
 - `--calculate-per-sample-loss` 按样本粒度计算 loss
 - `--calculate-per-token-loss` 按 token 粒度计算 loss
 
-### 2. 按样本粒度计算 Loss
+#### 2. 按样本粒度计算 Loss
 
 在模型训练脚本中启用参数：
 
@@ -60,7 +64,7 @@ GPT_ARGS="
 "
 ```
 
-### 3. 按 Token 粒度计算 Loss
+#### 3. 按 Token 粒度计算 Loss
 
 在模型训练脚本中启用参数：
 
@@ -71,7 +75,23 @@ GPT_ARGS="
 "
 ```
 
-## 注意事项
+### FSDP2后端
 
-1. `--calculate-per-sample-loss` 与 `--calculate-per-token-loss` 参数不可同时使用。
+对于训练入口为`pretrain_transformers.py`的模型，使能方式为在model.json中添加如下字段：
+
+```json
+"loss_cfg": {
+    "loss_type": "default/per_sample_loss/per_token_loss"
+}
+```
+
+其中`loss_type`可以设为以下几个值
+
+- `default`：默认计算方式
+- `per_sample_loss`：按样本粒度计算 loss
+- `per_token_loss`：按 token 粒度计算 loss
+
+### 注意事项
+
+1. 如果使用megatron后端，`--calculate-per-sample-loss` 与 `--calculate-per-token-loss` 参数不可同时使用。
 2. 如果loss计算方式选择不当，会对下游任务评测产生较大影响。用户需要根据实际数据集样本分布情况选择合适的计算方式。如果训练数据集样本分布不均，有的样本response很长，有的样本response很短，甚至是一个token。按 token 粒度计算 loss，则会使target token数量多的样本更受重视，从而引入不同样本间的不平衡，使得长输出会被训练的更充分。

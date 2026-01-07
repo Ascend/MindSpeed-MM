@@ -26,6 +26,7 @@ from mindspeed_mm.data.data_utils.utils import (
     collate_fn_default,
     cal_gradient_accumulation_size
 )
+from mindspeed_mm.data.data_utils.constants import GLOBAL_STEP_TOKEN_NUM, AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.data.datasets.t2v_dataset import DynamicVideoTextDataset
 from mindspeed_mm.data.dataloader.sampler import (
     LengthGroupedSampler,
@@ -37,6 +38,73 @@ from mindspeed_mm.data.dataloader.sampler import (
     LuminaMetaLenDistSampler
 )
 from mindspeed_mm.data.dataloader.data_collator import DATA_COLLATOR
+
+
+class PrefetchGradAccDataLoader:
+    """
+    A DataLoader wrapper that prefetches a fixed number of batches (equal to gradient 
+    accumulation steps), computes total and average valid token counts across them,
+    and injects these metrics into each batch before yielding.
+    
+    This is Used for calculate per-token-loss
+    """
+    def __init__(self, base_dataloader, grad_acc_step: int):
+        """
+        Args:
+            base_dataloader: The underlying PyTorch DataLoader to wrap.
+            grad_acc_step (int): Number of batches to accumulate gradients over.
+        """
+        if grad_acc_step <= 0:
+            raise ValueError("grad_acc_step must be a positive integer.")
+        self.grad_acc_step = grad_acc_step
+        self.base_dataloader = base_dataloader
+        self._current_iterator = None  # Holds the active generator
+        
+    def __iter__(self):
+        # Start a new iteration (reset state)
+        self._current_iterator = self._generate_batches()
+        return self  # Return self as the iterator
+
+    def __next__(self):
+        if self._current_iterator is None:
+            # If __next__ is called before __iter__, start iteration
+            self._current_iterator = self._generate_batches()
+        try:
+            return next(self._current_iterator)
+        except StopIteration:
+            self._current_iterator = None  # Reset on exhaustion
+            raise
+
+    def _generate_batches(self):
+        """Generator that yields batches with injected token counts."""
+        base_iter = iter(self.base_dataloader)
+        try:
+            while True:
+                buffer = []
+                total_tokens = 0
+                fetched = 0
+
+                # Prefetch grad_acc_step batches
+                try:
+                    for _ in range(self.grad_acc_step):
+                        batch = next(base_iter)
+                        valid_token_count = (batch["labels"] > -1).sum()
+                        total_tokens += valid_token_count
+                        buffer.append(batch)
+                        fetched += 1
+                except StopIteration:
+                    if fetched == 0:
+                        break  # No more data
+
+                avg_tokens = total_tokens / self.grad_acc_step
+                for batch in buffer:
+                    batch_dict = dict(batch)
+                    batch_dict[GLOBAL_STEP_TOKEN_NUM] = total_tokens
+                    batch_dict[AVG_PER_STEP_TOKEN_NUM] = avg_tokens
+                    yield batch_dict
+        finally:
+            if hasattr(base_iter, 'close'):
+                base_iter.close()
 
 
 def prepare_base_dataloader(

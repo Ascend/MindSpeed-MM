@@ -18,7 +18,10 @@ from transformers.utils.generic import OutputRecorder, check_model_inputs
 from transformers.models.qwen3_vl_moe.configuration_qwen3_vl_moe import Qwen3VLMoeConfig, Qwen3VLMoeTextConfig
 
 from megatron.training import get_args
+from megatron.core import mpu
 from mindspeed_mm.models.common.gmm import npu_group_gemm
+
+from mindspeed_mm.models.common.communications import split_forward_gather_backward_with_cp
 from mindspeed_mm.models.common.fused_moe import fused_ep_forward
 
 from .output import Qwen3VLMoeCausalLMOutputWithPast
@@ -372,8 +375,17 @@ def load_balancing_loss_func(
         )
 
         # Compute the percentage of tokens routed to each experts
-        tokens_per_expert = torch.sum(expert_mask.float() * expert_attention_mask, dim=0) / torch.sum(
-            expert_attention_mask, dim=0
+        sum_expert_attention_mask = torch.sum(expert_attention_mask, dim=0)
+        torch.distributed.all_reduce(
+            sum_expert_attention_mask, 
+            op=torch.distributed.ReduceOp.SUM, 
+            group=mpu.get_context_parallel_group()
+        )
+        tokens_per_expert = torch.sum(expert_mask.float() * expert_attention_mask, dim=0) / sum_expert_attention_mask
+        torch.distributed.all_reduce(
+            tokens_per_expert, 
+            op=torch.distributed.ReduceOp.SUM, 
+            group=mpu.get_context_parallel_group()
         )
 
         # Compute the mask that masks all padding tokens as 0 with the same shape of tokens_per_expert
@@ -385,6 +397,12 @@ def load_balancing_loss_func(
         )
 
         # Compute the average probability of routing to these experts
+        sum_router_per_expert_attention_mask = torch.sum(router_per_expert_attention_mask, dim=0)
+        torch.distributed.all_reduce(
+            sum_router_per_expert_attention_mask, 
+            op=torch.distributed.ReduceOp.SUM,
+            group=mpu.get_context_parallel_group()
+        )
         router_prob_per_expert = torch.sum(routing_weights * router_per_expert_attention_mask, dim=0) / torch.sum(
             router_per_expert_attention_mask, dim=0
         )
@@ -454,16 +472,14 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, Qwen3VLForCo
 
         aux_loss = None
         if kwargs.get("output_router_logits", False):
+            if attention_mask is not None:
+                attention_mask = split_forward_gather_backward_with_cp(attention_mask, dim=1)
             aux_loss = load_balancing_loss_func(
                 outputs.router_logits,
                 self.config.text_config.num_experts,
                 self.config.text_config.num_experts_per_tok,
                 attention_mask,
             )
-            if labels is not None:
-                loss += self.config.text_config.router_aux_loss_coef * aux_loss.to(
-                    loss.device
-                )  # make sure to reside in the same device
 
         return Qwen3VLMoeCausalLMOutputWithPast(
             loss=loss,

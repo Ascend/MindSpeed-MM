@@ -279,7 +279,7 @@ GPT_ARGS="
 参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/chunkloss.md)
 
 【负载均衡损失配置】
-支持自定义moe模型中专家负载均衡的aux_loss的系数，在`model_xxB.json`中的`router_aux_loss_coef`，默认为0.0，即不计算该损失。(注意当前不支持同时开启aux_loss和`--calculate-per-token-loss`)
+支持自定义moe模型中专家负载均衡的aux_loss的系数，在`model_xxB.json`中的`router_aux_loss_coef`，默认为0.0，即不计算该损失。
 
 【模型保存加载及日志信息配置】
 
@@ -332,6 +332,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 以Qwen3VL-xxB为例，启动微调训练任务。  
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+通过修改`model_xxB.json`文件中的`loss_type`字段可以在不同的loss计算方式中切换。
 
 ```shell
 bash examples/qwen3vl/finetune_qwen3vl_xxB.sh

@@ -16,7 +16,9 @@ from megatron.training import get_args, print_rank_0
 from megatron.training.utils import average_losses_across_data_parallel_group, unwrap_model
 from mindspeed_mm.configs.config import mm_extra_args_provider
 from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
-from mindspeed_mm.data.data_utils.utils import build_iterations
+from mindspeed_mm.data.data_utils.utils import build_iterations, cal_gradient_accumulation_size
+from mindspeed_mm.data.data_utils.constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
+from mindspeed_mm.data.dataloader.dataloader import PrefetchGradAccDataLoader
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.models.transformers_model import TransformersModel
 mindspeed_args = get_mindspeed_args()
@@ -38,7 +40,9 @@ def move_to_device(batch: Dict[str, Any], float_dtype: str):
     """Move batch tensors to current device with given float dtype."""
     new_batch = dict()
     for k, v in batch.items():
-        if isinstance(v, torch.Tensor):
+        if k in [AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM]:
+            new_batch[k] = v.to(device=torch.cuda.current_device())
+        elif isinstance(v, torch.Tensor):
             dtype = float_dtype if torch.is_floating_point(v) else None
             new_batch[k] = v.to(device=torch.cuda.current_device(), dtype=dtype)
         elif isinstance(v, list) and all(isinstance(t, torch.Tensor) for t in v):
@@ -75,19 +79,13 @@ def loss_func(output_tensor):
         torch.distributed.all_reduce(tokens_per_sample, group=mpu.get_data_parallel_group(with_context_parallel=True))
         loss_dir["tokens per sample"] = tokens_per_sample
 
-    if args.calculate_per_token_loss:
-        # for report
-        reporting_loss = torch.cat([loss.view(1), total_tokens.view(1)]).detach()
-        torch.distributed.all_reduce(reporting_loss[0], group=mpu.get_data_parallel_group(with_context_parallel=True))
-        torch.distributed.all_reduce(reporting_loss[1], group=mpu.get_data_parallel_group())
-        loss_dir["loss"] = (reporting_loss[0], reporting_loss[1])
-        # prepare per token loss
-        loss *= mpu.get_context_parallel_world_size()
-        num_tokens = total_tokens.clone().detach().to(torch.int)
-
-        return loss.clone(), num_tokens, loss_dir
-
-    averaged_loss = average_losses_across_data_parallel_group([loss])
+    averaged_loss = loss.clone().detach().view(1)
+    torch.distributed.all_reduce(
+        averaged_loss, 
+        group=mpu.get_data_parallel_group(with_context_parallel=True), 
+        op=torch.distributed.ReduceOp.AVG
+    )
+    averaged_loss *= mpu.get_context_parallel_world_size()
     loss_dir["loss"] = averaged_loss[0]
     loss = loss.unsqueeze(0).clone()
     return loss, loss_dir
@@ -139,6 +137,14 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
         else:
             train_dataloader = build_dataloader(train_dataset)
             train_dataloader, valid_dataloader, test_dataloader = build_iterations(train_dataloader)
+    
+    loss_config = getattr(args.mm.model, "loss_cfg", None)
+    use_prefetch_gradacc_dataloader = False
+    if loss_config:
+        use_prefetch_gradacc_dataloader = (getattr(loss_config, "loss_type", "default") == "per_token_loss")
+    if use_prefetch_gradacc_dataloader:
+        train_dataloader = PrefetchGradAccDataLoader(train_dataloader, grad_acc_step=cal_gradient_accumulation_size())
+    
     return train_dataloader, valid_dataloader, test_dataloader
 
 

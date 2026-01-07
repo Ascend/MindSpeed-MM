@@ -14,9 +14,10 @@ from mindspeed.core.context_parallel.model_parallel_utils import (
     get_context_parallel_for_hybrid_ulysses_world_size
 )
 
+from mindspeed_mm.data.data_utils.constants import AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.models.common.module import MultiModalModule
-from mindspeed_mm.models.common.chunkloss import chunk_loss, calculate_lm_loss
-from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward
+from mindspeed_mm.models.common.chunkloss import chunk_loss, calculate_lm_loss, fixed_cross_entropy
+from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward, split_forward_gather_backward_with_cp
 from mindspeed_mm.models.transformers.modelhub import ModelHub
 from mindspeed_mm.utils.utils import split_forward_gather_backward_with_megatron_cp
 
@@ -82,138 +83,6 @@ class TransformersModel(MultiModalModule):
 
         self.model.use_cache = False
 
-    def compute_language_model_loss_cp(self, logits: Tensor, labels: Tensor, ignore_index: int = -100) -> Tensor:
-        args = get_args()
-        token_nums = None
-        logits = logits.permute(0, 2, 1).contiguous()
-
-        if args.context_parallel_algo == "ulysses_cp_algo":
-            # pad and shift labels
-            labels = F.pad(labels, (0, 1), value=ignore_index)
-            shift_labels = labels[..., 1:].contiguous()
-            token_nums = (shift_labels > -1).sum(dim=1)
-            # shape: [bs, s] --> [b, s / cp]
-            split_sizes = cal_split_sizes(shift_labels.shape[-1], mpu.get_context_parallel_world_size())
-            shift_labels = split_forward_gather_backward(
-                shift_labels,
-                mpu.get_context_parallel_group(),
-                dim=1,
-                grad_scale="down",
-                split_sizes=split_sizes
-            )
-        elif args.context_parallel_algo == "megatron_cp_algo":
-            shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
-            # split and shift labels
-            # The default value of the ignore index is -100
-            shift_labels[..., -1] = ignore_index
-            # shape [batch size, s / cp size] --> [batch size]
-            token_nums = (shift_labels > -1).sum(dim=1)
-            shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels, mpu.get_context_parallel_group(), 1)
-        elif args.context_parallel_algo == "hybrid_cp_algo":
-            # shift labels,
-            shift_labels = torch.cat((labels[..., 1:], labels[..., :1]), dim=-1)
-            shift_labels[..., -1] = ignore_index  # use padding flag
-            token_nums = (shift_labels > -1).sum(dim=1)
-
-            # Split with Ring CP (first level)
-            shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels,
-                                                                    get_context_parallel_group_for_hybrid_ring(), dim=1)
-            # split shift_labels
-            split_gather_sizes = cal_split_sizes(shift_labels.shape[-1],
-                                                 get_context_parallel_for_hybrid_ulysses_world_size())
-            # Further split with Ulysses CP (second level)
-            shift_labels = split_forward_gather_backward(shift_labels, get_context_parallel_group_for_hybrid_ulysses(),
-                                                         1, split_sizes=split_gather_sizes)
-        else:
-            NotImplementedError("Only support ulysses_cp_algo,megatron_cp_algo,hybrid_cp_algo now")
-
-        loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
-        loss = loss * (shift_labels > -1)
-
-        if args.calculate_per_token_loss:
-            return loss.sum(), token_nums.sum()
-        elif args.calculate_per_sample_loss:
-            batch_mean_loss = loss.sum(dim=1) / token_nums
-            loss = batch_mean_loss.mean()
-            token_nums = token_nums.mean()
-        elif args.calculate_token_loss:
-            token_nums = torch.sum(token_nums)
-            loss = loss.sum() / token_nums
-        else:
-            raise NotImplementedError("Unsupported loss type now")
-        return loss, token_nums
-
-    def compute_language_model_loss(self, logits: Tensor, labels: Tensor, ignore_index: int = -100, **kwargs) -> Tensor:
-        args = get_args()
-        loss = None
-        labels = F.pad(labels, (0, 1), value=ignore_index)
-        shift_labels = labels[..., 1:].contiguous()
-        loss_mask = shift_labels > -1
-
-        # The three loss calculation modes are mutually exclusive:
-        # 1. Default behavior (calculate_per_sample_loss=False and calculate_per_token_loss=False):
-        #   Calculate the average loss for the micro batch and dividing by micro batch num
-        # 2. Token level (calculate_per_token_loss=True):
-        #    Keep per-token losses without any aggregation, used for scenarios requiring token-level loss
-        # 3. Sample level (calculate_per_sample_loss=True):
-        #    Calculate per-sample average loss by first computing the average loss of valid tokens within each sample, then averaging across all samples
-        if args.calculate_per_sample_loss:
-            logits = logits.permute(0, 2, 1).contiguous()
-            loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
-            batch_mean_loss = loss.sum(dim=1) / (shift_labels > -1).sum(dim=1)
-            loss = batch_mean_loss.mean()
-        elif args.calculate_per_token_loss:
-            shift_labels = shift_labels.view(-1)
-            # Flatten the tokens
-            logits = logits.view(-1, logits.shape[-1])
-            loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
-            loss = torch.sum(loss.view(-1) * loss_mask.view(-1))
-        elif args.calculate_token_loss:
-            shift_labels = shift_labels.view(-1)
-            # Flatten the tokens
-            logits = logits.view(-1, logits.shape[-1])
-            loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
-
-            loss_weight = (labels != -100).float()
-
-            shift_weights = loss_weight[..., 1:].contiguous()
-            shift_weights = shift_weights.view(-1)
-            shift_weights = shift_weights.to(logits.device)
-            shift_weights_sum = shift_weights.sum()
-
-            torch.distributed.all_reduce(shift_weights_sum, op=torch.distributed.ReduceOp.AVG)
-
-            loss = loss * shift_weights
-            loss = loss.sum() / shift_weights_sum
-
-        elif args.calculate_square_loss:
-            shift_labels = shift_labels.view(-1)
-            # Flatten the tokens
-            logits = logits.view(-1, logits.shape[-1])
-            loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=ignore_index)
-
-            loss_weight = (labels != -100).sum(dim=-1).float()
-            loss_weight = 1 / loss_weight.sqrt()
-            loss_weight = torch.where(labels != -100, loss_weight.unsqueeze(1), 0.0)
-
-            shift_weights = loss_weight[..., 1:].contiguous()
-            shift_weights = shift_weights.view(-1)
-            shift_weights = shift_weights.to(logits.device)
-            shift_weights_sum = shift_weights.sum()
-
-            torch.distributed.all_reduce(shift_weights_sum, op=torch.distributed.ReduceOp.AVG)
-
-            loss = loss * shift_weights
-            loss = loss.sum() / shift_weights_sum
-        else:
-            shift_labels = shift_labels.view(-1)
-            # Flatten the tokens
-            logits = logits.view(-1, logits.shape[-1])
-            loss = F.cross_entropy(logits, shift_labels, ignore_index=ignore_index)
-
-        return loss, loss_mask
-
-
     def forward(
             self,
             input_ids: torch.Tensor,
@@ -232,7 +101,7 @@ class TransformersModel(MultiModalModule):
             kwargs["output_router_logits"] = True
 
         if self.loss_compute_mode == "chunk":
-            loss_ctx, loss_mask = self.build_loss_ctx(labels, chunk_size=self.loss_chunk_size)
+            loss_ctx, loss_mask = self.build_loss_ctx(labels, chunk_size=self.loss_chunk_size, **kwargs)
             outputs = self.model(
                 input_ids=input_ids,
                 pixel_values=pixel_values,
@@ -259,14 +128,13 @@ class TransformersModel(MultiModalModule):
             )
             logits = outputs.logits.contiguous().float()
 
-            if mpu.get_context_parallel_world_size() > 1:
-                loss, token_nums = self.compute_language_model_loss_cp(logits, labels)
-                loss_dict["loss"] = loss
-                loss_dict["token_nums"] = token_nums
-            else:
-                loss, loss_mask = self.compute_language_model_loss(logits, labels, **kwargs)
-                loss_dict["loss"] = loss
-                loss_dict["loss_mask"] = loss_mask
+            loss_ctx, loss_mask = self.build_loss_ctx(labels, chunk_size=None, **kwargs)
+            loss_dict["loss"] = loss_ctx(logits)
+            loss_dict["loss_mask"] = loss_mask
+                
+        if hasattr(outputs, "aux_loss") and self.router_aux_loss_coef > 0:
+            loss_dict["loss"] += self.router_aux_loss_coef * outputs.aux_loss
+            
         return loss_dict
 
     def fully_shard(
@@ -289,7 +157,9 @@ class TransformersModel(MultiModalModule):
         labels,
         ignore_index=-100,
         chunk_size=1024,
+        **kwargs
     ):
+        bs = labels.shape[0]
         labels = F.pad(labels, (0, 1), value=ignore_index)
         # Shift labels to match the input sequence for next-token prediction.
         shift_labels = labels[..., 1:].contiguous()
@@ -297,71 +167,82 @@ class TransformersModel(MultiModalModule):
         # Create a mask to identify valid tokens (typically > -1 means non-special tokens)
         loss_mask = shift_labels > -1
 
-        # Retrieve global arguments to determine loss reduction behavior.
-        args = get_args()
-        if args.calculate_per_sample_loss:
+        # Retrieve loss_type arguments to determine loss reduction behavior.
+        if self.loss_type == "per_sample_loss":
             # Compute per-sample loss: alpha scales each sample by total valid tokens in the batch.
             alpha = loss_mask.sum(1) * loss_mask.shape[0]  # shape: [batch_size]
             reduction = "none"  # Keep per-token losses for sample-wise aggregation.
-        elif args.calculate_per_token_loss:
+        elif self.loss_type == "per_token_loss":
             # Use raw sum loss without normalization here;
-            # token-level loss equivalence will be achieved later by scaling the gradient norm.
-            alpha = torch.tensor(1)
+            avg_per_step_token_num = kwargs.get(AVG_PER_STEP_TOKEN_NUM, None)
+            if avg_per_step_token_num is None:
+                raise KeyError(f"per_token_loss must use PrefetchGradAccDataLoader")
+            torch.distributed.all_reduce(avg_per_step_token_num, op=torch.distributed.ReduceOp.AVG)
+            alpha = avg_per_step_token_num
             reduction = "sum"
-        elif args.calculate_token_loss:
-            raise NotImplementedError(f"Chunk loss not support token_loss now")
-        elif args.calculate_square_loss:
-            raise NotImplementedError(f"Chunk loss not support square_loss now")
-        else:
+        elif self.loss_type == "token_loss":
+            alpha = loss_mask.sum()
+            torch.distributed.all_reduce(alpha, op=torch.distributed.ReduceOp.AVG)
+            reduction = "none"
+        elif self.loss_type == "square_loss":
+            loss_weight = (labels != -100).sum(dim=-1).float()
+            loss_weight = 1 / loss_weight.sqrt()
+            loss_weight = torch.where(labels != -100, loss_weight.unsqueeze(1), 0.0)
+            shift_weights = loss_weight[..., 1:].contiguous().view(-1)
+            shift_weight_sum = shift_weights.sum()
+            torch.distributed.all_reduce(shift_weight_sum, op=torch.distributed.ReduceOp.AVG)
+            alpha = shift_weight_sum / shift_weights
+        elif self.loss_type == "default":
             # Default: normalize loss by total number of valid tokens in the batch.
-            alpha = loss_mask.sum()  # scalar
+            alpha = loss_mask.sum() # scalar
             reduction = "sum"
+        else:
+            raise NotImplementedError(f"{self.loss_type} is not implemented!")
 
         if mpu.get_context_parallel_world_size() > 1:
-            if args.context_parallel_algo == "ulysses_cp_algo":
-                split_gather_sizes = cal_split_sizes(shift_labels.shape[1], mpu.get_context_parallel_world_size())
-                shift_labels = split_forward_gather_backward(
-                    shift_labels,
-                    mpu.get_context_parallel_group(),
-                    dim=-1,
-                    grad_scale="down",
-                    split_sizes=split_gather_sizes
-                    )
-            elif args.context_parallel_algo == "megatron_cp_algo":
-                shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels, mpu.get_context_parallel_group(), dim=1)
-            elif args.context_parallel_algo == "hybrid_cp_algo":
-                # ring split
-                shift_labels = split_forward_gather_backward_with_megatron_cp(shift_labels, get_context_parallel_group_for_hybrid_ring(), dim=1)
-                # ulysses split in ring
-                split_gather_sizes = cal_split_sizes(shift_labels.shape[1], get_context_parallel_for_hybrid_ulysses_world_size())
-                shift_labels = split_forward_gather_backward(shift_labels, get_context_parallel_group_for_hybrid_ulysses(), dim=1, split_sizes=split_gather_sizes)
-            else:
-                raise NotImplementedError("Only support ulysses_cp_algo,megatron_cp_algo,hybrid_cp_algo now")
+            shift_labels = split_forward_gather_backward_with_cp(shift_labels, dim=-1)
+            
+            if self.loss_type == "square_loss":
+                alpha = split_forward_gather_backward_with_cp(alpha.view(bs, -1), chunk_size, dim=1).view(-1)
 
-        # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
-        chunk_labels = torch.split(shift_labels, chunk_size, dim=1)
+        if chunk_size:
+            # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
+            chunk_labels = torch.split(shift_labels, chunk_size, dim=1)
+            
+            if self.loss_type == "square_loss":
+                alpha = torch.split(alpha.view(bs, -1), chunk_size, dim=1)  
 
-        # Prepare keyword arguments for each chunk to be passed to the chunked loss function.
-        loss_ctx_kwargs = [
-            {
-                "shift_labels": chunk_labels[i],
-                "ignore_index": ignore_index,
-                "reduction": reduction,
-                "alpha": alpha,
-            }
-            for i in range(len(chunk_labels))
-        ]
+            # Prepare keyword arguments for each chunk to be passed to the chunked loss function.
+            loss_ctx_kwargs = [
+                {
+                    "shift_labels": chunk_labels[i],
+                    "ignore_index": ignore_index,
+                    "reduction": reduction,
+                    "alpha": alpha[i].view(-1) if isinstance(alpha, (list, tuple)) else alpha,
+                }
+                for i in range(len(chunk_labels))
+            ]
 
-        # Return a closure that computes the chunked language modeling loss using the prepared config.
-        def loss_ctx(hidden_states, head_weight, head_bias):
-            return chunk_loss(
-                hidden_states,
-                head_weight,
-                head_bias,
-                loss_forward=calculate_lm_loss,
-                loss_kwargs_chunks=loss_ctx_kwargs,
-                chunk_size=chunk_size
-            )
+            # Return a closure that computes the chunked language modeling loss using the prepared config.
+            def loss_ctx(hidden_states, head_weight, head_bias):
+                return chunk_loss(
+                    hidden_states,
+                    head_weight,
+                    head_bias,
+                    loss_forward=calculate_lm_loss,
+                    loss_kwargs_chunks=loss_ctx_kwargs,
+                    chunk_size=chunk_size
+                )
+        
+        else:
+            def loss_ctx(logits):
+                logits = logits.view(-1, logits.shape[-1])
+                labels = shift_labels.view(-1)
+                return fixed_cross_entropy(
+                    logits, labels,
+                    alpha=alpha,
+                    reduction=reduction
+                )
 
         return loss_ctx, loss_mask
 
@@ -375,8 +256,10 @@ class TransformersModel(MultiModalModule):
         self.loss_compute_mode = "default"
         self.loss_chunk_size = 1024
         self.router_aux_loss_coef = 0.0
+        self.loss_type = "default"
         if loss_cfg is not None:
             self.loss_compute_mode = getattr(loss_cfg, "compute_mode", "default")
+            self.loss_type = getattr(loss_cfg, "loss_type", "default")
             if self.loss_compute_mode == "default":
                 pass
             elif self.loss_compute_mode == "chunk":
@@ -384,9 +267,7 @@ class TransformersModel(MultiModalModule):
             else:
                 raise NotImplementedError(f"Unrecognized loss_compute_mode: {self.loss_compute_mode}.")
             
-            self.router_aux_loss_coef = getattr(loss_cfg, "router_aux_loss_coef", 0.0)
+            if self.loss_type not in ["default", "per_sample_loss", "per_token_loss", "token_loss", "square_loss"]:
+                raise NotImplementedError(f"Not implemented loss_type: {self.loss_type}.")
             
-            if self.router_aux_loss_coef > 0.0 and args.calculate_per_token_loss:
-                raise NotImplementedError(
-                    "Auxiliary loss computation and per-token loss calculation are currently not supported simultaneously."
-                )
+            self.router_aux_loss_coef = getattr(loss_cfg, "router_aux_loss_coef", 0.0)

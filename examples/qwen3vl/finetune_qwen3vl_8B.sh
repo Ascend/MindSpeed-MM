@@ -94,7 +94,6 @@ GPT_ARGS="
     --fsdp2-config-path $FSDP2_PATH \
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
-    --calculate-per-token-loss \
     --log-tps
 "
 

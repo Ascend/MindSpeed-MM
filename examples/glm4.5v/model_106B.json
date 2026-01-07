@@ -29,7 +29,8 @@
     },
     "loss_cfg": {
         "compute_mode": "default",
-        "chunk_size": 1024
+        "chunk_size": 1024,
+        "loss_type": "per_token_loss"
     },
     "patch": {
         "clip_grad_async": true,

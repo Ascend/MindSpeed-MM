@@ -55,3 +55,8 @@ MODEL_CONSTANTS = {
         'IMG_END_TOKEN': '<|vision_end|>',
     }
 }
+
+# some constants used for dataloader
+# PrefetchGradAccDataLoader
+GLOBAL_STEP_TOKEN_NUM = "global_step_token_num"
+AVG_PER_STEP_TOKEN_NUM = "avg_per_step_token_num"

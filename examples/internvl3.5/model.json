@@ -9,6 +9,9 @@
         "num_attention_heads": 999,
         "max_position_embeddings": 9999999
     },
+    "loss_cfg": {
+        "loss_type": "per_sample_loss"
+    },
     "patch": {
         "clip_grad_async": true,
         "scale_grad": true
