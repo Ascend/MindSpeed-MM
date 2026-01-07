@@ -38,12 +38,12 @@
 
 MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/mindspore/install_guide.md)。
 
-| 依赖软件         |                                                              |
-| ---------------- | ------------------------------------------------------------ |
+| 依赖软件         |                                                                                                                                   |
+| ---------------- |-----------------------------------------------------------------------------------------------------------------------------------|
 | 昇腾NPU驱动固件  | [在研版本](https://www.hiascend.com/hardware/firmware-drivers/community?product=1&model=30&cann=8.0.RC3.alpha002&driver=1.0.26.alpha) |
-| 昇腾 CANN        | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann) |
-| MindSpore        | [2.7.0](https://www.mindspore.cn/install/)         |
-| Python           | >=3.9                                                        |                                          |
+| 昇腾 CANN        | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann)                                               |
+| MindSpore        | [2.7.2](https://www.mindspore.cn/install/)                                                                                        |
+| Python           | >=3.10                                                                                                                            |                                          |
 
 
 ### 仓库拉取及环境搭建
@@ -60,7 +60,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 # 安装MindSpeed-Core-MS转换工具
-git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b r0.4.0
+git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b r0.5.0
 
 # 使用MindSpeed-Core-MS内部脚本自动拉取相关代码仓并一键适配、提供配置环境
 cd MindSpeed-Core-MS

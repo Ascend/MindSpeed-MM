@@ -68,7 +68,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 # 安装MindSpeed-Core-MS拉起工具
-git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git
+git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b r0.5.0
 
 # 使用MindSpeed-Core-MS内部脚本自动拉取相关代码仓并一键适配、提供配置环境
 cd MindSpeed-Core-MS

@@ -28,14 +28,14 @@
 
 MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/mindspore/install_guide.md)。
 
-| 依赖软件         |                                                              |
-| ---------------- | ------------------------------------------------------------ |
+| 依赖软件         |                                                                                                                                 |
+| ---------------- |---------------------------------------------------------------------------------------------------------------------------------|
 | 昇腾NPU驱动固件  | [在研版本](https://www.hiascend.com/hardware/firmware-drivers/community?product=1&model=30&cann=8.3.RC1&driver=Ascend+HDK+25.3.RC1) |
-| 昇腾 CANN        | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann) |
-| MindSpore        | [2.7.2](https://www.mindspore.cn/install/)         |
-| Python           | >=3.9                                                        |                                          |
-|transformers     |      [v4.53.0](https://github.com/huggingface/transformers/tree/v4.53.0)    |    |
-|mindspore_op_plugin | [在研版本](https://gitee.com/mindspore/mindspore_op_plugin) |
+| 昇腾 CANN        | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann)                                             |
+| MindSpore        | [2.7.2](https://www.mindspore.cn/install/)                                                                                      |
+| Python           | >=3.10                                                                                                                          |                                          |
+|transformers     | [v4.53.0](https://github.com/huggingface/transformers/tree/v4.53.0)                                                             |    |
+|mindspore_op_plugin | [在研版本](https://gitee.com/mindspore/mindspore_op_plugin)                                                                         |
 
 <a id="jump1.1"></a>
 ### 1. 仓库拉取及环境搭建
@@ -53,7 +53,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 # 安装MindSpeed-Core-MS一键拉起部署
-git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b master
+git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b r0.5.0
 
 # 使用MindSpeed-Core-MS内部脚本自动拉取相关代码仓并一键适配
 cd MindSpeed-Core-MS
