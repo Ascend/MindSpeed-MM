@@ -19,7 +19,7 @@ mkdir -p $GENERATE_JSON_DIR
 rm -rf $GENERATE_LOG_DIR/*
 rm -rf $GENERATE_JSON_DIR/*
 
-
+cd ../
 # step 2: running scripts and execute `test_ci_st.py`
 declare -A TEST_CASE_TIMES
 for test_case in "$SHELL_SCRIPTS_DIR"/*.sh; do

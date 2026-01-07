@@ -1,6 +1,8 @@
 import os
-import json
 from functools import wraps
+import json
+import yaml
+
 
 from mindspeed_mm.utils.utils import get_dtype
 
@@ -68,23 +70,31 @@ class MMConfig:
         input: a dict of json path
     """
 
-    def __init__(self, json_files: dict) -> None:
+    def __init__(self, files: dict) -> None:
         errors = []
-        for json_name, json_path in json_files.items():
+        for name, path in files.items():
             try:
-                if json_path == "":
+                if path == "":
                     continue
-                real_path = os.path.realpath(json_path)
-                config_dict = self.read_json(real_path)
-                setattr(self, json_name, ConfigReader(config_dict))
+                real_path = os.path.realpath(path)
+                config_dict = None
+                if real_path.endswith('.json'):
+                    with open(real_path, 'r') as f:
+                        config_dict = self.read_json(real_path)
+                elif real_path.endswith('.yaml'):
+                    with open(real_path, 'r') as f:
+                        config_dict = yaml.safe_load(f)[name]
+                setattr(self, name, ConfigReader(config_dict))
             except FileNotFoundError as e:
-                errors.append(f"Warning: Config file not found: {json_path} - {e}")
+                errors.append(f"Warning: Config file not found: {path} - {e}")
             except PermissionError as e:
-                errors.append(f"Error: Permission denied when reading: {json_path} - {e}")
+                errors.append(f"Error: Permission denied when reading: {path} - {e}")
             except json.JSONDecodeError as e:
-                errors.append(f"Error: Invalid JSON format in {json_path}: {e}")
+                errors.append(f"Error: Invalid JSON format in {path}: {e}")
+            except yaml.YAMLError as e:
+                errors.append(f"Error: Invalid YAML format in {path}: {e}")
             except Exception as e:
-                errors.append(f"Error: Unexpected error loading {json_path}: {e}")
+                errors.append(f"Error: Unexpected error loading {path}: {e}")
 
         if errors:
             for error in errors:

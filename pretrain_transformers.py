@@ -3,11 +3,14 @@
 from copy import deepcopy
 from functools import partial
 from typing import Dict, Any
+import importlib.util
 from dataclasses import dataclass
 
 from datasets import Dataset
 import torch
 
+spec = importlib.util.spec_from_file_location("config_loader", "mindspeed_mm/configs/read_yaml_config.py")
+spec.loader.exec_module(importlib.util.module_from_spec(spec))
 import mindspeed.megatron_adaptor
 from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.core import mpu
