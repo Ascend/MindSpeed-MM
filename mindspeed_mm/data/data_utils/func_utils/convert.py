@@ -394,6 +394,10 @@ class DataArguments:
         default=False,
         metadata={"help": "Whether to perform preprocess during training."},
     )
+    async_preprocess: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to perform async preprocess during training."},
+    )
 
     def __post_init__(self):
         self.dataset = self.dataset.split(",")
