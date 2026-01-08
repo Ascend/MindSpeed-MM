@@ -62,6 +62,7 @@ from mindspeed_mm.tools.profiler import Profiler
 from mindspeed_mm.tools.mem_profiler import memory_profiler
 from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.patchs.patch_manager import PatchesManager
+from mindspeed_mm.patchs.ep_patch import finalize_model_grads_wrapper
 from mindspeed_mm.utils.data_balance.data_balance import DataBalance
 from mindspeed_mm.utils.random import seed_all
 from mindspeed_mm.utils.dpcp_utils import (
@@ -122,7 +123,7 @@ def pretrain(
     """
     args_defaults = {} if args_defaults is None else args_defaults
     extra_args_provider = extra_args_provider_decorator(extra_args_provider)
-    
+
     new_parse_args = parse_args_wrapper(parse_args)
     argument = new_parse_args(extra_args_provider, False)
     if getattr(argument, "auto_parallel_mm", False):
@@ -156,11 +157,11 @@ def pretrain(
         initialize_parall_switch_list(timeout)
         print_rank_0("dynamic dpcp is enabled")
     merge_mm_args(args)
-    
+
     if args.log_throughput:
         print("[WARNING] Currently, the calculation of TFLOPS is incorrect for multimodal models. "
                              "Please do not use this as a reference for performance.")
-    
+
     if hasattr(args, "mm") and getattr(args, "profile_subgraph_seg", False):
         from mindspeed.core.auto_parallel.mm_search.profiling import set_profile_model_config
         set_profile_model_config(args)
@@ -422,7 +423,7 @@ def train(
         ] if optimizer is not None else []
         if len(model) == 1:
             config.param_sync_func = config.param_sync_func[0]
-    config.finalize_model_grads_func = finalize_model_grads
+    config.finalize_model_grads_func = finalize_model_grads_wrapper(finalize_model_grads)
 
     timers("interval-time", log_level=0).start(barrier=True)
     print_datetime("before the start of training step")

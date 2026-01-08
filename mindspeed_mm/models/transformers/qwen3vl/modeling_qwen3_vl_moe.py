@@ -63,7 +63,7 @@ class Qwen3VLMoeTextExperts(nn.Module):
         return gate_up_proj, down_proj
 
     def forward(
-        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor
+        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor, router_logits: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         When training it is more efficient to just loop over the experts and compute the output for each expert
@@ -79,6 +79,9 @@ class Qwen3VLMoeTextExperts(nn.Module):
             torch.Tensor
         """
         gate_up_proj, down_proj = self._view_experts_weight()
+
+        if router_logits is not None:
+            routing_weights = torch.zeros_like(router_logits).scatter_(1, router_indices, routing_weights)
 
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
@@ -115,26 +118,14 @@ class Qwen3VLMoeTextExperts(nn.Module):
         return next_states
 
     @staticmethod
-    def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices):
-        batch_size = hidden_states.shape[0]
-        hidden_states = hidden_states.reshape(-1, self.hidden_size)
-        hidden_states = fused_ep_forward(
-            self.num_experts,
-            routing_weights,
-            router_indices,
-            hidden_states,
-            fc1_weight=self.gate_up_proj,
-            fc2_weight=self.down_proj,
-            ep_group=ep_group
-        )
-        hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
-        return hidden_states
+    def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices, *args, **kwargs):
+        raise NotImplementedError("must set `use_npu_fused_moe=True` when enable expert parallelism.")
 
 
 class Qwen3VLNpuFusedMoETextExperts(Qwen3VLMoeTextExperts):
     """NPU fusd Moe"""
     def forward(
-        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor
+        self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor, router_logits: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         gate_up_proj, down_proj = self._view_experts_weight()
 
@@ -148,6 +139,22 @@ class Qwen3VLNpuFusedMoETextExperts(Qwen3VLMoeTextExperts):
         next_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=routing_weights)
         next_states = next_states.view(batch_size, -1, self.hidden_size)
         return next_states
+
+    @staticmethod
+    def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices, *args, **kwargs):
+        batch_size = hidden_states.shape[0]
+        hidden_states = hidden_states.reshape(-1, self.hidden_size)
+        hidden_states = fused_ep_forward(
+            self.num_experts,
+            routing_weights,
+            router_indices,
+            hidden_states,
+            fc1_weight=self.gate_up_proj,
+            fc2_weight=self.down_proj,
+            ep_group=ep_group
+        )
+        hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
+        return hidden_states
 
 
 class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
@@ -174,11 +181,7 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         routing_weights = routing_weights.to(hidden_states.dtype)
         hidden_states = hidden_states.reshape(batch_size, -1, self.hidden_size)
 
-        if self.use_npu_fused_moe:
-            routed_out = self.experts(hidden_states, routing_weights, router_indices)
-        else:
-            router_weights = torch.zeros_like(router_logits).scatter_(1, router_indices, routing_weights)
-            routed_out = self.experts(hidden_states, router_weights, router_indices)
+        routed_out = self.experts(hidden_states, routing_weights, router_indices, router_logits)
         return routed_out
 
 

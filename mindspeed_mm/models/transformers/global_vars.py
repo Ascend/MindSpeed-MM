@@ -1,6 +1,7 @@
 _FSDP2_EP_RANK = None
 _FSDP2_EP_SIZE = None
 _FSDP2_CHECK_MOE_FUNC = None
+_FSDP2_EP_GROUP = None
 
 
 def get_ep_rank():
@@ -17,6 +18,11 @@ def get_ep_size():
         return _FSDP2_EP_SIZE
     else:
         return 1
+
+
+def get_ep_fsdp_group():
+    global _FSDP2_EP_GROUP
+    return _FSDP2_EP_GROUP
 
 
 def get_check_moe_func():
@@ -40,3 +46,8 @@ def set_ep_size(ep_size):
 def set_check_moe_func(fn):
     global _FSDP2_CHECK_MOE_FUNC
     _FSDP2_CHECK_MOE_FUNC = fn
+
+
+def set_ep_fsdp_group(group):
+    global _FSDP2_EP_GROUP
+    _FSDP2_EP_GROUP = group

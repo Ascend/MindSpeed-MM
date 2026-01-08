@@ -29,6 +29,7 @@ from mindspeed_mm.models.transformers.global_vars import (
     set_ep_size,
     set_ep_rank,
     set_check_moe_func,
+    set_ep_fsdp_group,
     get_ep_size,
     get_check_moe_func
 )
@@ -677,7 +678,7 @@ class FSDP2Mixin:
         else:
             ep_fsdp2_kwargs["mesh"] = self.unit_device_mesh
             if torch.distributed.get_world_size(self.ep_device_mesh["EP_Replicate"].get_group()) != 1:
-                raise NotImplementedError("Reshard local experts only supports when EP_Replicate size is 1 now.")
+                set_ep_fsdp_group(self.ep_device_mesh["EP_Replicate"].get_group())
 
         for sub_module in moe_modules:
             for name, param in sub_module.named_parameters():

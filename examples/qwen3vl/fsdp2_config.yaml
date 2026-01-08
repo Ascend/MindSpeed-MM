@@ -10,3 +10,10 @@ offload_to_cpu: False
 # If True, each FSDP parameter group within a block contains only Linear layer parameters,
 # enabling aligned sharding for improved communication efficiency. Set to False to disable this optimization.
 align_fsdp_param_groups: True
+
+# Mixture of Experts Parallelism (EP) configuration
+# Experimental feature, only support expert_parallel_size = 1
+expert_parallel_size: 1
+reshard_local_experts: True
+moe_modules:
+  - model.language_model.layers.{*}.mlp.experts
