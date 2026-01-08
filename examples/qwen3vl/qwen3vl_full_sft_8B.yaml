@@ -1,0 +1,157 @@
+HF_MODEL_LOAD_PATH: &HF_MODEL_LOAD_PATH ./ckpt/hf_path/Qwen3-VL-8B-Instruct
+MM_MODEL_LOAD_PATH: &MM_MODEL_LOAD_PATH ./ckpt/mm_path/Qwen3-VL-8B-Instruct
+DATASET_PATH: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
+FSDP2_PATH: &FSDP2_PATH ./examples/qwen3vl/fsdp2_config.yaml
+SAVE_PATH: &SAVE_PATH save_dir
+MM_TOOL_PATH: ./mindspeed_mm/tools/tools.json
+
+
+### GPT args
+gpt_args:
+  ## parallel: （TP/PP/CP/FSDP）
+  context_parallel_size: 1
+  context_parallel_algo: ulysses_cp_algo
+  use_torch_fsdp2: true
+  fsdp2_config_path: *FSDP2_PATH
+  ckpt_format: torch_dcp
+
+  ## training:
+  clip_grad: 0.0
+  micro_batch_size: 1
+  global_batch_size: 8  #默认8卡配置， global_batch_sizes=micro_batch_size*grad_acc_step*dp=micro_batch_size*grad_acc_step*(world_size/cp)
+  optimizer_selection: fused_torch_adamw
+  lr: 1.0e-5
+  weight_decay: 0.0
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  lr_decay_style: cosine
+  lr_warmup_fraction: 0.1
+  train_iters: 10000
+  no_load_optim: true  # 不加载优化器状态，若需加载请移除
+  no_load_rng: true  # 不加载随机数状态，若需加载请移除
+  no_save_optim: true  # 不保存优化器状态，若需保存请移除
+  no_save_rng: true  # 不保存随机数状态，若需保存请移除
+  seed: 42
+
+  ## save_and_logging:
+  log_interval: 1
+  save_interval: 10000
+  eval_interval: 10000
+  eval_iters: 5000
+  save: *SAVE_PATH
+  log_tps: true
+
+  ## model:
+  load: *MM_MODEL_LOAD_PATH
+  use_cpu_initialization: true
+  init_model_with_meta_device: true
+  normalization: RMSNorm
+  use_fused_rmsnorm: true
+  swiglu: true
+  use_fused_swiglu: true
+  use_flash_attn: true
+  vocab_size: 152064
+  seq_length: 1024
+  make_vocab_size_divisible_by: 1
+  tokenizer_type: NullTokenizer
+  no_gradient_accumulation_fusion: true
+  untie_embeddings_and_output_weights: true
+  no_masked_softmax_fusion: true
+
+  ## data:
+  num_workers: 8
+
+
+### 数据相关配置
+data:
+  dataset_param:
+    dataset_type: huggingface
+    #数据集属性
+    attr:
+      system: null
+      images: images
+      videos: null
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+      observation_tag: null
+      function_tag: null
+      system_tag: null
+
+    # 数据预处理
+    preprocess_parameters:
+      model_name_or_path: *HF_MODEL_LOAD_PATH
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 0
+      video_fps: 2.0
+      video_maxlen: 64
+
+    basic_parameters:
+      template: qwen3_vl_nothink
+      enable_thinking: false
+      train_on_prompt: false
+      mask_history: false
+      tool_format: null
+      dataset_dir: ./data
+      dataset: *DATASET_PATH
+      cache_dir: ./data/cache_dir
+      overwrite_cache: false
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+
+  # 数据加载
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    collate_param:
+      model_name: qwen3vl
+      ignore_pad_token_for_loss: true
+
+
+### 模型相关配置
+model:
+  model_id: qwen3_vl
+  init_from_hf_path: *HF_MODEL_LOAD_PATH
+  image_encoder:
+    vision_encoder:
+      model_id: qwen3vit
+      num_layers: 27  # 此参数为megatron校验参数，运行中不生效，如需修改请修改HF_MODEL_LOAD_PATH目录下的config.json
+      hidden_size: 1152  # 此参数为megatron校验参数，运行中不生效
+      num_attention_heads: 16  # 此参数为megatron校验参数，运行中不生效
+      freeze: true
+      attn_implementation: flash_attention_2
+      attn_layout: TND
+      synchronize_per_layer: true
+    vision_projector:
+      model_id: lnmlp
+      num_layers: 1
+      freeze: true
+  text_decoder:
+    model_id: qwen3lm
+    num_layers: 36  # 此参数为megatron校验参数，运行中不生效，如需修改请修改HF_MODEL_LOAD_PATH目录下的config.json
+    hidden_size: 4096  # 此参数为megatron校验参数，运行中不生效
+    num_attention_heads: 32  # 此参数为megatron校验参数，运行中不生效
+    max_position_embeddings: 262144  # 此参数为megatron校验参数，运行中不生效
+    freeze: false
+    use_npu_fused_moe: false
+    attn_implementation: flash_attention_2
+    attn_layout: TND
+    is_causal: false
+    activation_offload: false
+    synchronize_per_layer: true
+  loss_cfg:
+      compute_mode: default
+      chunk_size: 1024
+      loss_type: default
+  patch:
+      clip_grad_async: true
