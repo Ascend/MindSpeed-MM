@@ -1109,5 +1109,6 @@ MindSpeed MM 由华为公司的下列部门及昇腾生态合作伙伴联合贡�
 * 360 AI Research
 * 北大OpenSoraPlan团队
 * 微信技术架构部基础架构中心
+* 京东零售九数研发技术部
 
 感谢来自社区的每一个PR，欢迎贡献 MindSpeed MM。
