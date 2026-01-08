@@ -3,8 +3,7 @@
         "dataset_type": "vace",
         "basic_parameters": {
             "data_path": "./examples/vace/feature_extract/data.txt",
-            "data_storage_mode": "vace",
-            "data_file_keys": ["cap", "vace_video", "vace_video_mask", "image"]
+            "data_storage_mode": "vace"
         },
         "preprocess_parameters": {
             "video_processor_type": "VACEVideoProcessor",

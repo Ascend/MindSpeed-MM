@@ -30,7 +30,8 @@ dependencies = [
     "peft==0.7.1",
     "pydantic>=2.10.4",
     "jsonargparse[all]>=4.40.0",
-    "gpytorch"
+    "gpytorch",
+    "orjson"
 ]
 
 [build-system]

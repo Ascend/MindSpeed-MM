@@ -29,7 +29,7 @@ class MMBaseDataset(Dataset):
         self.data_path = data_path
         self.data_folder = data_folder
         self.data_storage_mode = data_storage_mode
-        self.get_data = DataFileReader(data_storage_mode=data_storage_mode)
+        self.get_data = DataFileReader(data_storage_mode=data_storage_mode, **kwargs)
         self.data_samples = self.get_data(self.data_path, return_type=return_type)
 
     def __len__(self):

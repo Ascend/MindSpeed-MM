@@ -21,12 +21,15 @@ import urllib.parse as ul
 from collections import Counter, defaultdict
 from logging import getLogger
 from typing import Any, Dict, Optional, Tuple, Union, Sequence, Type, Callable
+from multiprocessing import shared_memory
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 try:
     import decord
 except Exception as e:
     print(f"Failed to import decord module. The reason of decord unavailable is {e}")
 
+import orjson
 import av
 import ftfy
 import torch
@@ -60,16 +63,26 @@ IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 class DataFileReader:
     """get the data from different types of files such as csv/json/parquat"""
 
-    def __init__(self, data_storage_mode="standard"):
+    def __init__(self, data_storage_mode="standard", **kwargs):
+        """
+        data_storage_mode: Controls how to load data. Default to standard
+        reserved_keys: List of keys to preserve. Set in data.json. Default to None means retaining all keys.
+        use_multiprocess:Enables parallel file processing using multiple CPU cores. Not recommended when the
+            number of files is small(less then 4). Set in data.json. Default to False.
+        """
         self.data_storage_mode = data_storage_mode
+        self.reserved_keys = kwargs.get("reserved_keys", None)
+        self.use_multiprocess = kwargs.get("use_multiprocess", False)
 
     def __call__(self, data_path, return_type="list"):
         if self.data_storage_mode == "standard":
             return self.get_datasamples(data_path, return_type=return_type)
         elif self.data_storage_mode == "combine" or self.data_storage_mode == "sorafeatured":
-            return self.get_cap_list(data_path)
+            redirect_keys = ["path"]
+            return self.get_cap_list(data_path, redirect_keys)
         elif self.data_storage_mode == "vace":
-            return self.get_vace_datasamples(data_path)
+            redirect_keys = ["video", "src_video", "src_video_mask", "src_ref_images"]
+            return self.get_cap_list(data_path, redirect_keys)
         else:
             raise NotImplementedError("Not support now.")
 
@@ -82,11 +95,9 @@ class DataFileReader:
             else:
                 return data_out
         elif data_path.endswith(".json"):
-            data_out = pd.read_json(data_path)
-            return data_out.to_dict("records")
+            return orjson_load(data_path)
         elif data_path.endswith(".jsonl"):
-            data_out = pd.read_json(data_path, lines=True)
-            return data_out.to_dict("records")
+            return orjson_load(data_path)
         elif data_path.endswith(".parquat"):
             data_out = pd.read_parquat(data_path)
             return data_out.to_dict("records")
@@ -98,49 +109,150 @@ class DataFileReader:
         else:
             raise NotImplementedError(f"Unsupported file format: {data_path}")
 
-    def get_cap_list(self, data_path):
-        cap_lists = []
+    def get_cap_list(self, data_path, redirect_keys=None):
         with open(data_path, "r") as f:
             folder_anno = [
                 i.strip().split(",")
                 for i in f.readlines()
                 if len(i.strip()) > 0
             ]
+        json_loader = JsonLoader([temp[1] for temp in folder_anno], use_multiprocess=self.use_multiprocess)
         for folder, anno in folder_anno:
-            sub_list = self.get_datasamples(anno)
-            print(f"Building {anno}...")
-            for sub in sub_list:
-                sub["path"] = os.path.join(folder, sub["path"])
-            cap_lists += sub_list
-        return cap_lists
+            json_loader.set_process_func(anno, self._change_path, redirect_keys, folder)
+        json_loader.set_process_func("all", self._remove_unused_keys, self.reserved_keys)
+        content = json_loader.get_data()
+        return content
 
-    def get_vace_datasamples(self, data_path):
-        data_file_keys = ["video", "src_video", "src_video_mask", "src_ref_images"]
-        cap_lists = []
-        with open(data_path, "r") as f:
-            folder_anno = [
-                i.strip().split(",")
-                for i in f.readlines()
-                if len(i.strip()) > 0
-            ]
-        for folder, anno in folder_anno:
-            sub_list = self.get_datasamples(anno)
-            print(f"Building {anno}...")
-            for sub in sub_list:
-                for key in data_file_keys:
-                    if check_none(sub[key]):
-                        sub[key] = None
-                    if sub[key]:
-                        if isinstance(sub[key], list):
-                            new_sub = []
-                            for file in sub[key]:
-                                new_sub.append(os.path.join(folder, file))
-                            sub[key] = new_sub
-                        else:
-                            sub[key] = os.path.join(folder, sub[key])
+    def _change_path(self, content, change_list, new_path):
+        """Update file paths in specified keys to new base directory"""
+        if change_list is None or len(change_list) == 0:
+            return content
+        for item in content:
+            for key in change_list:
+                if check_none(item[key]):
+                    item[key] = None
+                if item[key]:
+                    if isinstance(item[key], list):
+                        new_sub = []
+                        for file in item[key]:
+                            new_sub.append(os.path.join(new_path, file))
+                        item[key] = new_sub
+                    else:
+                        item[key] = os.path.join(new_path, item[key])
+        return content
 
-            cap_lists += sub_list
-        return cap_lists
+    def _remove_unused_keys(self, content, reserved_keys):
+        """Filter dictionary items to keep only specified keys"""
+        if reserved_keys is None or len(reserved_keys) == 0:
+            return content
+        new_contents = []
+        for sub in content:
+            new_contents.append({key: sub[key] for key in sub.keys() if key in reserved_keys})
+        return new_contents
+
+
+class JsonLoader:
+    def __init__(self, json_path, use_multiprocess=False):
+        """Initialize JsonLoader with JSON file paths and multiprocessing option"""
+        self.json_path = json_path
+        self.use_multiprocess = use_multiprocess
+        self.json_contents = None
+        self.process_funcs = {}
+
+        self._check()
+        self.json_path = [self.json_path] if isinstance(self.json_path, str) else self.json_path
+
+    def _check(self):
+        """Validate JSON file paths and check file existence"""
+        if isinstance(self.json_path, str):
+            if not os.path.exists(self.json_path):
+                raise FileExistsError(f"{self.json_path} don't exist")
+        elif isinstance(self.json_path, list):
+            for path in self.json_path:
+                if not isinstance(path, str):
+                    raise TypeError("Unsupported data type")
+                if not (path.endswith(".json") or path.endswith(".jsonl")):
+                    raise TypeError("Unsupported file type")
+                if not os.path.exists(path):
+                    raise FileExistsError(f"{path} don't exist")
+        else:
+            raise TypeError("Unsupported data type")
+
+    def set_process_func(self, file, process_func, *args, **kwargs):
+        """Register data processing function for specified file"""
+        if file == 'all':
+            for _path in self.json_path:
+                self.set_process_func(_path, process_func, *args, **kwargs)
+        else:
+            if file not in self.process_funcs:
+                self.process_funcs[file] = []
+            if all(fn["func"] != process_func for fn in self.process_funcs[file]):
+                self.process_funcs[file].append({'func': process_func, 'args': args, 'kwargs': kwargs})
+
+    def start_load(self):
+        """Load JSON data using multiprocessing or single-process mode"""
+        total_contents = []
+        if self.use_multiprocess:
+            total_contents = self._multiprocess_share_memory()
+        else:
+            for path in self.json_path:
+                json_content = orjson_load(path)
+                print(f"Building {path}...")
+                if path in self.process_funcs:
+                    for fn in self.process_funcs[path]:
+                        json_content = fn["func"](json_content, *fn['args'], **fn['kwargs'])
+                total_contents += json_content
+        self.json_contents = total_contents
+
+    def _multiprocess_share_memory(self):
+        """Load JSON data using shared memory multiprocessing"""
+        total_contents = []
+        num_processes = len(self.json_path)
+        shm_objects = []
+        shm_size = []
+        for path in self.json_path:
+            size = int(os.path.getsize(path) * 1.2)
+            shm = shared_memory.SharedMemory(create=True, size=size)
+            shm_objects.append(shm)
+            shm_size.append(size)
+        with ProcessPoolExecutor(max_workers=num_processes) as executor:
+            future_to_task = {}
+            for i in range(num_processes):
+                task = (self.json_path[i], shm_objects[i].name)
+                future = executor.submit(self._share_memory_process_func, *task)
+                future_to_task[future] = task
+            for future in as_completed(future_to_task):
+                try:
+                    shm_name = future.result()
+                    existing_shm = shared_memory.SharedMemory(name=shm_name)
+                    data_len = int.from_bytes(bytes(existing_shm.buf[:8]), 'big')
+                    content = existing_shm.buf[8:8 + data_len]
+                    content = bytes(content)
+                    total_contents += orjson.loads(content)
+                    existing_shm.close()
+                except Exception as error:
+                    print(f"Process {future_to_task[future][1]} file failed when using multiprocess: {error}")
+        return total_contents
+
+    def _share_memory_process_func(self, path, shm_name):
+        """Child process function: load single file and write to shared memory"""
+        json_content = orjson_load(path)
+        print(f"Building {path}...")
+        if path in self.process_funcs:
+            for fn in self.process_funcs[path]:
+                json_content = fn["func"](json_content, *fn["args"], **fn["kwargs"])
+        modified_bytes = orjson.dumps(json_content)
+        existing_shm = shared_memory.SharedMemory(name=shm_name)
+        existing_shm.buf[:8] = len(modified_bytes).to_bytes(8, "big")
+        existing_shm.buf[8:len(modified_bytes) + 8] = modified_bytes
+        existing_shm.close()
+        return shm_name
+
+    def get_data(self):
+        """Get loaded JSON data, load if not already loaded"""
+        if not self.json_contents:
+            self.start_load()
+        return self.json_contents
 
 
 class DecordInit:
@@ -174,7 +286,7 @@ class DataStats:
     def __init__(self):
         self.counters = defaultdict(int)
         self.collections = defaultdict(list)
-    
+
     def increment(self, key, value=1):
         self.counters[key] += value
 
@@ -386,7 +498,7 @@ class TextProcesser:
         text = ftfy.fix_text(text)
         text = html.unescape(html.unescape(text))
         return text.strip()
-    
+
     @staticmethod
     def whitespace_clean(text):
         text = re.sub(r'\s+', ' ', text)
@@ -729,7 +841,7 @@ def build_iterations(train_dl=None, val_dl=None, test_dl=None, iterator_type="cy
         while True:
             for x in dl:
                 yield x
-    
+
     def _get_iterator(dataloader, iter_type=iterator_type):
         """Return dataset iterator."""
         if iter_type == "single":
@@ -738,7 +850,7 @@ def build_iterations(train_dl=None, val_dl=None, test_dl=None, iterator_type="cy
             return iter(_cyclic_iter(dataloader))
         else:
             raise NotImplementedError("unexpected iterator type")
-    
+
     if train_dl is not None:
         train_data_iterator = _get_iterator(train_dl)
     else:
@@ -778,7 +890,7 @@ def cal_gradient_accumulation_size():
     world_size = torch.distributed.get_world_size()
     acc = int(args.global_batch_size / world_size / args.micro_batch_size * mpu.get_tensor_model_parallel_world_size()
                   * mpu.get_context_parallel_world_size() * mpu.get_pipeline_model_parallel_world_size())
-    
+
     if getattr(args, "dist_train", False):
         from mindspeed.core.multi_modal.dist_train.dist_parallel_state import is_in_subworld
         from mindspeed.core.multi_modal.dist_train.dist_train_config import get_dist_model_config
@@ -819,4 +931,17 @@ def check_none(value):
     if isinstance(value, (float, np.floating)):
         return math.isnan(value) or np.isnan(value)
     return False
+
+
+def orjson_load(data_path):
+    if data_path.endswith(".json"):
+        with open(data_path, 'rb') as file:
+            content = orjson.loads(file.read())
+    elif data_path.endswith(".jsonl"):
+        content = []
+        with open(data_path, 'rb') as file:
+            for line in file:
+                if line.strip():
+                    content.append(orjson.loads(line))
+    return content
 
