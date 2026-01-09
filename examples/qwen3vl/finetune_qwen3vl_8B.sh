@@ -24,6 +24,14 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
+DISTRIBUTED_ARGS="
+    --nproc_per_node $NPUS_PER_NODE \
+    --nnodes $NNODES \
+    --node_rank $NODE_RANK \
+    --master_addr $MASTER_ADDR \
+    --master_port $MASTER_PORT
+"
+
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 config_path=examples/qwen3vl/qwen3vl_full_sft_8B.yaml
 mkdir -p logs
