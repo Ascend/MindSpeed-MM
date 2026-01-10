@@ -1,0 +1,54 @@
+import torch
+
+from mindspeed.lite.distributed.expert_parallel.expert_parallel import expert_parallelize_modules
+from mindspeed.lite.distributed.expert_parallel.expert_fully_shard_parallel import expert_fully_shard_modules
+from mindspeed.lite.distributed.tensor_parallel.tensor_parallel import tensor_parallel_modules
+from mindspeed.lite.memory.recompute.recompute import recompute_modules
+
+from .fully_shard_parallel import fully_shard_parallel_modules
+from .parallel_state import get_parallel_state
+from ..params.parallel_args import ParallelArguments
+
+
+class ParallelApplier:
+    def __init__(self, parallel_config: ParallelArguments):
+        self.config = parallel_config
+        self.parallel_state = get_parallel_state()
+
+
+    def apply_fsdp_modules(self, model):
+        if self.config.fully_shard_parallel_size == 1:
+            return
+        model = fully_shard_parallel_modules(model, self.parallel_state.get_fsdp_device_mesh(), self.config.fsdp_plan)
+
+    def apply_tp_modules(self, model):
+        if self.config.tensor_parallel_size == 1:
+            return
+        model = tensor_parallel_modules(model, self.parallel_state.get_tp_device_mesh(), self.config.tp_plan)
+
+    def apply_ep_modules(self, model):
+        if self.config.expert_parallel_size > 1:
+            model = expert_parallelize_modules(model, self.parallel_state.get_ep_group(), self.config.ep_plan)
+        if self.config.expert_fully_shard_parallel_size > 1:
+            model = expert_fully_shard_modules(model, self.parallel_state.get_efsdp_device_mesh(), self.config.ep_plan)
+
+    def apply_recompute_modules(self, model):
+        if not self.config.recompute:
+            return
+        model = recompute_modules(model, self.config.recompute_plan)
+
+    def __call__(self, model):
+        # User-defined parallel strategy (highest priority)
+        # Check if model has a custom fully_shard method
+        if hasattr(model, 'fully_shard') and callable(getattr(model, 'fully_shard')):
+            execute_result = model.fully_shard()
+            if execute_result:
+                return
+        else:
+            # Apply configuration-based parallel strategies
+            # Order matters: TP -> EP -> Recompute -> FSDP
+            self.apply_tp_modules(model=model)
+            self.apply_ep_modules(model=model)
+            self.apply_recompute_modules(model=model)
+            self.apply_fsdp_modules(model=model)
+

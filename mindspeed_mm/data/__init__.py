@@ -4,11 +4,14 @@ __all__ = [
 
 import copy
 
+import torch
 from torch.utils.data import ConcatDataset
 from torch.distributed.distributed_c10d import _get_default_group
 
 from megatron.core import mpu
 from megatron.training import get_args, print_rank_0
+
+from mindspeed_mm.fsdp.distributed.parallel_state import is_lite_initialized, get_parallel_state
 from mindspeed_mm.data.dataloader.dataloader import (
     prepare_base_dataloader,
     prepare_sampler_dataloader,
@@ -105,17 +108,24 @@ def build_mm_dataloader(dataset, dataloader_param, process_group=None, consumed_
     if "dataloader_mode" not in dataloader_param:
         raise AssertionError("Key parameter missing: dataloader_mode")
     dataloader_mode = dataloader_param.pop("dataloader_mode")
-    if process_group is None:
-        process_group = mpu.get_data_parallel_group()
-    args = get_args()
-    dataloader_param.update(
-        {
-            "batch_size": args.micro_batch_size,
-            "num_workers": args.num_workers,
-            "seed": args.seed,
-        }
-    )
-    print_rank_0(f'[INFO] initialize `batch_size`/`num_workers`/`seed` from argument parser rather than `data.json`')
+    if is_lite_initialized():
+        if process_group is None:
+            ps = get_parallel_state()
+            process_group = ps.get_dp_group()
+            dataloader_param.update({"batch_size": dataloader_param.micro_batch_size})
+    else:
+        if process_group is None:
+            process_group = mpu.get_data_parallel_group()
+        args = get_args()
+        dataloader_param.update(
+            {
+                "batch_size": args.micro_batch_size,
+                "num_workers": args.num_workers,
+                "seed": args.seed,
+            }
+        )
+    if torch.distributed.get_rank() == 0:
+        print(f'[INFO] initialize `batch_size`/`num_workers`/`seed` from argument parser rather than `data.json`')
     if dataloader_mode == "base":
         data_loader = prepare_base_dataloader(dataset, **dataloader_param)
         return data_loader

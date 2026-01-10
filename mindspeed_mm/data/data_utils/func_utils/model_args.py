@@ -15,8 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass, field, asdict
+from typing import Optional, Dict, Any
 
 
 @dataclass
@@ -86,3 +86,9 @@ class ProcessorArguments:
         default=16000,
         metadata={"help": "The sampling rate of audio inputs."},
     )
+
+    def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
+        result = asdict(self)
+        if exclude_none:
+            result = {k: v for k, v in result.items() if v is not None}
+        return result

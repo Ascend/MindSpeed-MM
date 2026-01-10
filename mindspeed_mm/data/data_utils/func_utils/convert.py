@@ -17,7 +17,7 @@ import os
 import copy
 from abc import abstractmethod, ABC
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from enum import Enum, unique
 from typing import TYPE_CHECKING, Any, Optional, Union, Tuple, Literal, List, Dict, Type, TypedDict
 
@@ -299,6 +299,12 @@ class DatasetAttr:
     rejected: Optional[str] = None
     formatting: Literal["alpaca", "sharegpt"] = "sharegpt"
 
+    def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
+        result = asdict(self)
+        if exclude_none:
+            result = {k: v for k, v in result.items() if v is not None}
+        return result
+
 
 @dataclass
 class DataArguments:
@@ -396,7 +402,14 @@ class DataArguments:
     )
 
     def __post_init__(self):
-        self.dataset = self.dataset.split(",")
+        if not isinstance(self.dataset, list):
+            self.dataset = self.dataset.split(",")
+    
+    def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
+        result = asdict(self)
+        if exclude_none:
+            result = {k: v for k, v in result.items() if v is not None}
+        return result
 
 
 @dataclass
