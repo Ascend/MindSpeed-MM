@@ -66,8 +66,7 @@ mkdir logs data ckpt
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
-# checkout commit from MindSpeed core_r0.12.1
-git checkout 93c45456c7044bacddebc5072316c01006c938f9
+git checkout d76dbddd4517d48a2fc1cd494de8b9a6cfdbfbab
 
 # 安装mindspeed及依赖
 pip install -e .
@@ -273,7 +272,7 @@ OUTPUT_ARGS="
 为了在NPU上更快得运行模型训练，moe模块可使能NPU亲和的融合算子，在`examples/glm4.5v/model_106B.json`中配置"use_npu_fused_moe"为true即可，此处默认配置为true。
 
 【单机运行配置】
-
+注意：单机只能跑减层，可作为模型调试用；完整模型运行请使用多机配置。
 配置`examples/glm4.5v/model_106B.sh`参数如下
 
 ```shell
@@ -295,7 +294,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 # 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 # 根据分布式集群实际情况配置分布式参数
-NPUS_PER_NODE=8  # 每个节点的卡数，以实际情况填写
+NPUS_PER_NODE=16  # 每个节点的卡数，以实际情况填写
 MASTER_ADDR="your master node IP"  # 都需要修改为主节点的IP地址（不能为localhost）
 MASTER_PORT=6000
 NNODES=8  # 集群里的节点数，以实际情况填写
