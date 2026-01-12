@@ -36,7 +36,7 @@ def fused_ep_forward(
     input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert = (
         dispatch_preprocess(selected_experts, num_experts, ep_group)
     )
-    hidden_states, unpermute_indices = alltoall_dispatch(
+    hidden_states, unpermute_indices, post_dispatch_unpermute_indices = alltoall_dispatch(
         hidden_states,
         selected_experts,
         input_splits,
@@ -55,6 +55,7 @@ def fused_ep_forward(
     hidden_states = alltoall_combine(
         hidden_states,
         routing_weights,
+        post_dispatch_unpermute_indices,
         unpermute_indices,
         input_splits,
         output_splits,
@@ -102,15 +103,7 @@ def dispatch_preprocess(
     output_splits = num_global_tokens_per_local_expert.sum(dim=1).tolist()
 
     num_global_sum_tokens_per_local_expert = num_global_tokens_per_local_expert.sum(dim=0)
-    num_global_tokens_per_local_expert = num_global_tokens_per_local_expert.cpu()
     return input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert
-
-
-def sort_chunks_by_idxs(inputs: torch.Tensor, split_sizes: torch.Tensor, sorted_idxs: torch.Tensor):
-    """Split and sort the input tensor based on the split_sizes and sorted indices."""
-    inputs = torch.split(inputs, split_sizes.tolist(), dim=0)
-    outputs = torch.cat([inputs[i] for i in sorted_idxs], dim=0)
-    return outputs
 
 
 def alltoall_dispatch(
@@ -131,18 +124,18 @@ def alltoall_dispatch(
         raise ValueError(
             f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
     )
-    permute_order = torch.arange(num_global_experts).reshape(-1, num_local_experts).T.ravel().tolist()
-    hidden_states = sort_chunks_by_idxs(
-        hidden_states,
-        num_global_tokens_per_local_expert.ravel(),
-        permute_order,
-    )
-    return hidden_states, unpermute_indices
+    
+    _expert_ids_per_ep_rank = torch.arange(num_global_experts, dtype=torch.int32, device=hidden_states.device) % num_local_experts
+    global_input_tokens_local_experts_indices = torch.repeat_interleave(_expert_ids_per_ep_rank, num_global_tokens_per_local_expert.ravel())
+    hidden_states, post_dispatch_unpermute_indices = torch_npu.npu_moe_token_permute(hidden_states, global_input_tokens_local_experts_indices)
+    
+    return hidden_states, unpermute_indices, post_dispatch_unpermute_indices
 
 
 def alltoall_combine(
     hidden_states: torch.Tensor,
     routing_weights: torch.Tensor,
+    post_dispatch_unpermute_indices: torch.Tensor,
     unpermute_indices: torch.Tensor,
     input_splits: List,
     output_splits: List,
@@ -151,17 +144,12 @@ def alltoall_combine(
     ep_group: Optional[dist.ProcessGroup] = None,
 ):
     ep_size = 1 if ep_group is None else dist.get_world_size(ep_group)
-    num_local_experts = num_global_experts // ep_size
     if num_global_experts % ep_size != 0:
         raise ValueError(
             f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
     )
-    unpermute_order = torch.arange(num_global_experts).reshape(num_local_experts, -1).T.ravel().tolist()
-    hidden_states = sort_chunks_by_idxs(
-        hidden_states,
-        num_global_tokens_per_local_expert.T.ravel(),
-        unpermute_order,
-    )
+    
+    hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states, post_dispatch_unpermute_indices)
 
     hidden_states = all_to_all(hidden_states, ep_group, scatter_sizes=output_splits, gather_sizes=input_splits)
     hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states, unpermute_indices, probs=routing_weights)

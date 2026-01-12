@@ -673,8 +673,11 @@ class FSDP2Mixin:
 
             def shard_placement_fn(*args, **kwargs):
                 return Shard(1)
-
-            ep_fsdp2_kwargs["shard_placement_fn"] = shard_placement_fn
+            
+            # if experts shape: [num_experts, input_dim, output_dim], shard_placement_fn = Shard(1)
+            # elif experts shape: [num_experts * input_dim, output_dim], shard_placement_fn = Shard(0) (default)
+            if any(p.ndim == 3 for p in moe_modules[0].parameters()):
+                ep_fsdp2_kwargs["shard_placement_fn"] = shard_placement_fn
         else:
             ep_fsdp2_kwargs["mesh"] = self.unit_device_mesh
             if torch.distributed.get_world_size(self.ep_device_mesh["EP_Replicate"].get_group()) != 1:

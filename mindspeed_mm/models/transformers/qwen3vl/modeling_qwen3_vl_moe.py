@@ -56,10 +56,10 @@ class Qwen3VLMoeTextExperts(nn.Module):
 
     def _view_experts_weight(self):
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
-        gate_up_proj = gate_up_proj.view(self.num_experts, self.hidden_size, -1)
+        gate_up_proj = gate_up_proj.view(-1, self.hidden_size, 2 * self.expert_dim)
 
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
-        down_proj = down_proj.view(self.num_experts, self.expert_dim, -1)
+        down_proj = down_proj.view(-1, self.expert_dim, self.hidden_size)
         return gate_up_proj, down_proj
 
     def forward(
@@ -116,7 +116,7 @@ class Qwen3VLMoeTextExperts(nn.Module):
             )
             next_states = next_states.sum(dim=0)
         return next_states
-
+    
     @staticmethod
     def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices, *args, **kwargs):
         raise NotImplementedError("must set `use_npu_fused_moe=True` when enable expert parallelism.")
@@ -139,6 +139,23 @@ class Qwen3VLNpuFusedMoETextExperts(Qwen3VLMoeTextExperts):
         next_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=routing_weights)
         next_states = next_states.view(batch_size, -1, self.hidden_size)
         return next_states
+    
+    @staticmethod
+    def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices):
+        gate_up_proj, down_proj = self._view_experts_weight()
+        batch_size = hidden_states.shape[0]
+        hidden_states = hidden_states.reshape(-1, self.hidden_size)
+        hidden_states = fused_ep_forward(
+            self.num_experts,
+            routing_weights,
+            router_indices,
+            hidden_states,
+            fc1_weight=gate_up_proj,
+            fc2_weight=down_proj,
+            ep_group=ep_group
+        )
+        hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
+        return hidden_states
 
     @staticmethod
     def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices, *args, **kwargs):
