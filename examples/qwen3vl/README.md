@@ -327,7 +327,16 @@ mm-convert Qwen3VLConverter dcp_to_hf \
 ```
 其中，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径，`--model_assets_dir`原始huggingface权重的路径。
 
-完成权重转换之后，即可使用transformers库进行推理。
+完成权重转换之后，即可参考如下教程使用transformers库进行推理。
+```
+本脚本只为提供方便的推理工具以测试训练效果，不保证推理性能
+使用教程：
+1、按照用户自己的路径配置好MODEL_PATH、MODEL_TYPE和DATA_JSON_PATH
+2、cd 切换到MindSpeed-MM路径下
+3、source 用户的cann路径
+4、必须通过export ASCEND_RT_VISIBLE_DEVICES手动指定使用哪些卡，否则执行时会遇到无法自动识别多张卡导致OOM的情况
+5、执行python examples/qwen3vl/inference_demo.py
+```
 
 【多机运行配置】
 

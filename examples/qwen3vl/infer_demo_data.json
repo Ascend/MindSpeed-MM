@@ -1,0 +1,10 @@
+[
+    {
+        "image": "./examples/qwen2vl/demo.jpeg",
+        "text": "Describe this image and keep it within 100 words."
+    },
+    {
+        "image": "./examples/qwen2vl/demo.jpeg",
+        "text": "What is in the picture? Answer in English within 50 words."
+    }
+]
