@@ -1025,10 +1025,17 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
                 audios,
                 sampling_rate=getattr(processor, "audio_sampling_rate", 16000),
             )["audios"]
+            if getattr(processor, "audio_sampling_rate", 16000) != feature_extractor.sampling_rate:
+                import librosa
+                resampled_audios = []
+                for audio in audios:
+                    resampled_audio = librosa.resample(audio, orig_sr=getattr(processor, "audio_sampling_rate", 16000), target_sr=feature_extractor.sampling_rate)
+                    resampled_audios.append(resampled_audio)
+                audios = resampled_audios
             mm_inputs.update(
                 feature_extractor(
                     audios,
-                    sampling_rate=getattr(processor, "audio_sampling_rate", 16000),
+                    sampling_rate=feature_extractor.sampling_rate,
                     return_attention_mask=True,
                     padding="max_length",
                     return_tensors="pt",

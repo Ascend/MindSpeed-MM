@@ -256,6 +256,32 @@ dataset_param->basic_parameters->dataset
 
 ```
 
+如果需要进行音频数据训练，需要对`attr`进行修改，`images`字段设为null，并设置`audios`字段。输入音频采样率可以通过`audio_sampling_rate`字段进行配置，训练时会自动重采样到16kHz，以适配Qwen3-Omni音频特征提取。
+
+```json
+{
+    "dataset_param": {
+        ...
+        "preprocess_parameters": {
+            ...
+            "audio_sampling_rate": 16000
+            ...
+        },
+        ...
+    },
+    ...
+    "attr": {
+        ...
+        "system": null,
+        "images": null,
+        "videos": null,
+        "audios": "audios",
+        ...
+    }
+}
+
+```
+
 【模型保存加载及日志信息配置】
 
 根据实际情况配置`examples/qwen3omni/finetune_qwen3omni.sh`的参数，包括加载、保存路径以及保存间隔`--save-interval`（注意：分布式优化器保存文件较大耗时较长，请谨慎设置保存间隔）

@@ -10,7 +10,8 @@
             "video_max_pixels": 16384,
             "video_min_pixels": 256,
             "video_fps": 2.0,
-            "video_maxlen": 128
+            "video_maxlen": 128,
+            "audio_sampling_rate": 16000
         },
         "basic_parameters": {
             "template": "qwen3_omni",
