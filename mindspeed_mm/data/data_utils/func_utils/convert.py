@@ -41,6 +41,8 @@ class Role(str, Enum):
     SYSTEM = "system"
     FUNCTION = "function"
     OBSERVATION = "observation"
+    TOOL_CALL = "tool_call"
+    TOOL_RESPONSE = "tool_response"
 
 
 if TYPE_CHECKING:
@@ -216,9 +218,41 @@ class SharegptDatasetConverter(DatasetConverter):
         return output
 
 
+@dataclass
+class MultiModalToolDatasetConverter(DatasetConverter):
+    def __call__(self, example: Dict[str, Any]) -> Dict[str, Any]:
+        messages = example[self.dataset_attr.messages]
+        if (
+                self.dataset_attr.system_tag
+                and len(messages) != 0
+                and messages[0][self.dataset_attr.role_tag] == self.dataset_attr.system_tag
+        ):
+            system = messages[0][self.dataset_attr.content_tag]
+            messages = messages[1:]
+        else:
+            system = example[self.dataset_attr.system] if self.dataset_attr.system else ""
+
+        aligned_messages = messages
+
+        prompt = aligned_messages[:-1]
+        response = aligned_messages[-1:]
+
+        output = {
+            "_prompt": prompt,
+            "_response": response,
+            "_system": system,
+            "_images": self._find_media_files(example[self.dataset_attr.images]) if self.dataset_attr.images else None,
+            "_videos": self._find_media_files(example[self.dataset_attr.videos]) if self.dataset_attr.videos else None,
+            "_audios": self._find_media_files(example[self.dataset_attr.audios]) if self.dataset_attr.audios else None,
+            "_tools": example['tools'] or None
+        }
+        return output
+
+
 DATASET_CONVERTERS = {
     "alpaca": AlpacaDatasetConverter,
     "sharegpt": SharegptDatasetConverter,
+    "multimodal_tool": MultiModalToolDatasetConverter
 }
 
 
@@ -552,12 +586,13 @@ class SupervisedDatasetProcessor(DatasetProcessor):
             images: List["ImageInput"],
             videos: List["VideoInput"],
             audios: List["AudioInput"],
+            tools: List[str]
     ) -> Tuple[List[int], List[int]]:
         messages = self.template.mm_plugin.process_messages(prompt + response, images, videos, audios, self.processor)
         input_ids, labels = self.template.mm_plugin.process_token_ids(
             [], [], images, videos, audios, self.tokenizer, self.processor
         )
-        encoded_pairs = self.template.encode_multiturn(self.tokenizer, messages, system)
+        encoded_pairs = self.template.encode_multiturn(self.tokenizer, messages, system, tools)
         total_length = len(input_ids) + (1 if self.template.efficient_eos else 0)
         if self.data_args.mask_history:
             encoded_pairs = encoded_pairs[::-1]  # high priority for last turns
@@ -610,6 +645,10 @@ class SupervisedDatasetProcessor(DatasetProcessor):
                 continue
 
             try:
+                tool_schema = []
+                if '_tools' in examples:
+                    tool_schema = examples['_tools'][i]
+
                 input_ids, labels = self._encode_data_example(
                     prompt=examples["_prompt"][i],
                     response=examples["_response"][i],
@@ -617,6 +656,7 @@ class SupervisedDatasetProcessor(DatasetProcessor):
                     images=examples["_images"][i] or [],
                     videos=examples["_videos"][i] or [],
                     audios=examples["_audios"][i] or [],
+                    tools=tool_schema
                 )
             except OSError as e:
                 err_img = examples["_images"][i] if examples["_images"][i] else "No images"

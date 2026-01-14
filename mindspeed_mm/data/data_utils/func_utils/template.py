@@ -44,6 +44,7 @@ class Template:
     format_system: "Formatter"
     format_observation: "Formatter"
     format_prefix: "Formatter"
+    format_tool: "Formatter"
     default_system: str
     stop_words: List[str]
     efficient_eos: bool
@@ -56,12 +57,13 @@ class Template:
             self,
             tokenizer: "PreTrainedTokenizer",
             messages: Sequence[Dict[str, str]],
-            system: Optional[str] = None
+            system: Optional[str] = None,
+            tools: List[str] = None
     ) -> Tuple[List[int], List[int]]:
         r"""
         Returns a single pair of token ids representing prompt and response respectively.
         """
-        encoded_messages = self._encode(tokenizer, messages, system)
+        encoded_messages = self._encode(tokenizer, messages, system, tools)
         prompt_ids = []
         for encoded_ids in encoded_messages[:-1]:
             prompt_ids += encoded_ids
@@ -74,11 +76,12 @@ class Template:
             tokenizer: "PreTrainedTokenizer",
             messages: Sequence[Dict[str, str]],
             system: Optional[str] = None,
+            tools: List[str] = None
     ) -> List[Tuple[List[int], List[int]]]:
         r"""
         Returns multiple pairs of token ids representing prompts and responses respectively.
         """
-        encoded_messages = self._encode(tokenizer, messages, system)
+        encoded_messages = self._encode(tokenizer, messages, system, tools)
         return [(encoded_messages[i], encoded_messages[i + 1]) for i in range(0, len(encoded_messages), 2)]
 
     def add_thought(self, content: str = "") -> str:
@@ -98,7 +101,8 @@ class Template:
             self,
             tokenizer: "PreTrainedTokenizer",
             messages: Sequence[Dict[str, str]],
-            system: Optional[str]
+            system: Optional[str],
+            tools: List[str]
     ) -> List[List[int]]:
         r"""
         Encodes formatted inputs to pairs of token ids.
@@ -113,6 +117,14 @@ class Template:
             if i == 0:
                 elements += self.format_prefix.apply()
                 if system:
+                    # add tool schema to the end of system prompt
+                    if tools is not None and len(tools) > 0:
+                        tool_schema = []
+                        for t in tools:
+                            tool_schema.append(t)
+                        tool_schema = '\n'.join(tool_schema)
+                        tools_prompt = self.format_tool.apply(content=tool_schema)
+                        system += tools_prompt[0]
                     elements += self.format_system.apply(content=system)
 
             if message["role"] == Role.USER.value:
@@ -126,6 +138,12 @@ class Template:
                     content=message["content"])
             elif message["role"] == Role.FUNCTION.value:
                 elements += self.format_function.apply(
+                    content=message["content"])
+            elif message["role"] == Role.TOOL_CALL:
+                elements += self.format_assistant.apply(
+                    content=message["content"])
+            elif message["role"] == Role.TOOL_RESPONSE:
+                elements += self.format_observation.apply(
                     content=message["content"])
             else:
                 raise NotImplementedError(
@@ -230,6 +248,7 @@ class RegisterParams:
     format_system: Optional["Formatter"] = None,
     format_observation: Optional["Formatter"] = None
     format_prefix: Optional["Formatter"] = None
+    tool_prompt: Optional["Formatter"] = None
     default_system: str = ""
     stop_words: Optional[Sequence[str]] = None
     efficient_eos: bool = False
@@ -283,13 +302,14 @@ def _register_template(
         format_system=params.format_system or default_user_formatter,
         format_observation=params.format_observation or params.format_user or default_user_formatter,
         format_prefix=params.format_prefix or default_prefix_formatter,
+        format_tool=params.tool_prompt or None,
         default_system=params.default_system,
         stop_words=[] if params.stop_words is None else params.stop_words,
         efficient_eos=params.efficient_eos,
         replace_eos=params.replace_eos,
         enable_thinking=params.enable_thinking,
         thought_words=params.thought_words or ("<think>", "</think>"),
-        mm_plugin=mm_plugin,
+        mm_plugin=mm_plugin
     )
 
 
@@ -381,6 +401,21 @@ _register_template(
     template_class=ReasoningTemplate
 )
 
+tools_slot = '''
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{{content}}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>'''
 
 _register_template(
     name="qwen3_omni_nothink",
@@ -393,7 +428,8 @@ _register_template(
                 "<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
         ),
         stop_words=["<|im_end|>"],
-        replace_eos=True),
+        replace_eos=True,
+        tool_prompt=StringFormatter(slots=[tools_slot])),
     mm_plugin=get_mm_plugin(
         name="qwen3_omni", audio_token="<|audio_pad|>", image_token="<|image_pad|>", video_token="<|video_pad|>"),
 )
