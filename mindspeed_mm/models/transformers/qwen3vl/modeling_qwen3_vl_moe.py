@@ -141,7 +141,7 @@ class Qwen3VLNpuFusedMoETextExperts(Qwen3VLMoeTextExperts):
         return next_states
     
     @staticmethod
-    def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices):
+    def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices, *args, **kwargs):
         gate_up_proj, down_proj = self._view_experts_weight()
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)
@@ -152,22 +152,6 @@ class Qwen3VLNpuFusedMoETextExperts(Qwen3VLMoeTextExperts):
             hidden_states,
             fc1_weight=gate_up_proj,
             fc2_weight=down_proj,
-            ep_group=ep_group
-        )
-        hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
-        return hidden_states
-
-    @staticmethod
-    def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices, *args, **kwargs):
-        batch_size = hidden_states.shape[0]
-        hidden_states = hidden_states.reshape(-1, self.hidden_size)
-        hidden_states = fused_ep_forward(
-            self.num_experts,
-            routing_weights,
-            router_indices,
-            hidden_states,
-            fc1_weight=self.gate_up_proj,
-            fc2_weight=self.down_proj,
             ep_group=ep_group
         )
         hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
