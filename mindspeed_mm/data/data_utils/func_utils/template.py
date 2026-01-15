@@ -224,7 +224,7 @@ class ReasoningTemplate(Template):
             for i in range(1, len(messages), 2):
                 messages[i]["content"] = self.remove_thought(messages[i]["content"])
 
-        encoded_messages = self._encode(tokenizer, messages, system)
+        encoded_messages = self._encode(tokenizer, messages, system, tools)
         for i in range(0, len(messages), 2):
             if (
                 self.thought_words[0] not in messages[i + 1]["content"]
