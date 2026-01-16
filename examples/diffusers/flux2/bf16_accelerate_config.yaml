@@ -1,0 +1,30 @@
+compute_environment: LOCAL_MACHINE
+debug: false
+downcast_bf16: 'no'
+distributed_type: FSDP
+fsdp_config:
+  fsdp_version: 2
+  fsdp_offload_params: false
+  fsdp_sharding_strategy: HYBRID_SHARD
+  fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
+  fsdp_transformer_layer_cls_to_wrap: Flux2TransformerBlock,Flux2SingleTransformerBlock
+  fsdp_forward_prefetch: true
+  fsdp_sync_module_states: false
+  fsdp_state_dict_type: FULL_STATE_DICT
+  fsdp_use_orig_params: false
+  fsdp_activation_checkpointing: true
+  fsdp_reshard_after_forward: true
+  fsdp_cpu_ram_efficient_loading: false
+# main_process_ip: localhost
+# main_process_port: 6000
+machine_rank: 0
+num_machines: 1
+num_processes: 8
+main_training_function: main
+mixed_precision: bf16
+rdzv_backend: static
+same_network: true
+tpu_env: []
+tpu_use_cluster: false
+tpu_use_sudo: false
+use_cpu: false
