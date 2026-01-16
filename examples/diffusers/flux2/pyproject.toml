@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flux2-patch"
+version = "0.1"
+description = "Patch for flux2"
+requires-python = ">=3.8"
+dependencies = [
+    "accelerate==1.10.0",
+    "torch==2.7.1",
+    "torchvision",
+    "transformers==4.55.0",
+    "ftfy",
+    "tensorboard",
+    "Jinja2",
+    "peft==0.17.0",
+    "sentencepiece",
+    "einops",
+    "attrs",
+    "scipy",
+    "decorator",
+    "mindstudio-probe",
+    "datasets",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["flux2_patch"]
