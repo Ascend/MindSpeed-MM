@@ -6,7 +6,7 @@ MindSpeed-MM已支持接入华为自研AI套件MindSpore，旨在提供华为全
 
 ## 🔥🔥🔥Latest News
 
-🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../examples/mindspore/cogvideox/)、[InternVL2](../../examples/mindspore/internvl2)、[Qwen2.5VL](../../examples/mindspore/qwen2.5vl/README.md)、[Qwen25Omni](../../examples/mindspore/qwen2.5omni/README.md)、[Qwen3VL](../../examples/mindspore/qwen3vl/README.md)模型。
+🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../examples/mindspore/cogvideox/)、[Qwen2.5VL](../../examples/mindspore/qwen2.5vl/README.md)、[Qwen25Omni](../../examples/mindspore/qwen2.5omni/README.md)、[Qwen3VL](../../examples/mindspore/qwen3vl/README.md)模型。
 
 ## 版本配套
 
@@ -37,8 +37,6 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 |:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:-------:|:------:|:------:|:------:|
 |   CogVideoX系列-T2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
 |   CogVideoX系列-I2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
-|    InternVL2-2B     |  |  |  |                                            ✔                                            |  |   | ✔ | ✔ |  |
-|    InternVL2-8B     |  |  | ✔ |                                            ✔                                            |  |   | ✔ | ✔ |  |
 |    Qwen2.5VL-7B     | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
 |    Qwen2.5VL-72B    | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
 |    Qwen25Omni-7B    |  |  |  |                                            ✔                                            |  |   | ✔ |  |  |
@@ -75,6 +73,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <th>参考性能</th>
       <th>平均序列长度</th>
       <th>支持情况</th>
+      <th>支持版本</th>
     </tr>
   </thead>
   <tbody>
@@ -91,6 +90,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 0.46 (SPS) </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-I2V</a></td>
@@ -102,6 +102,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 0.46 (SPS) </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
   <tr>
       <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
@@ -113,6 +114,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 2.09 (SPS) </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
@@ -134,6 +136,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 2.01 (SPS) </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
@@ -155,6 +158,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 0.61 (SPS) </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/mindspore/wan2.1">Wan2.1-T2V</a></td>
@@ -166,6 +170,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 0.73 (SPS) </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers"> 1.3B </a></td>
@@ -178,48 +183,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td>支持中</td>
     </tr>
     <tr>
-      <td rowspan="20"> 多模态理解 </td>
-      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2-2B">2B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 22.46 (SPS) </td>
-      <td> / </td>
-      <td>✅</td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2-8B">8B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 11.00 (SPS) </td>
-      <td> / </td>
-      <td>✅</td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2-26B">26B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 3.26 (SPS) </td>
-      <td> / </td>
-      <td>支持中</td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2-Llama3-76B">76B</a></td>
-      <td> 全参微调 </td>
-      <td> 8x16 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 191 (TPS) </td>
-      <td> / </td>
-      <td>支持中</td>
-    </tr>
-    <tr>
+      <td rowspan="7"> 多模态理解 </td>
       <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/qwen2.5vl">Qwen2.5-VL</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct">3B</a></td>
       <td> 微调 </td>
@@ -239,6 +203,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 12.67 (SPS) </td>
       <td> 563 </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct">32B</a></td>
@@ -259,6 +224,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> 256.28 (TPS) </td>
       <td> 563 </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/qwen2.5omni">Qwen25Omni</a></td>
@@ -270,6 +236,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> / </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/qwen3vl">Qwen3VL</a></td>
@@ -281,6 +248,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> / </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Instruct/tree/main"> 30B </a></td>
@@ -291,6 +259,7 @@ MindSpeed-MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td> / </td>
       <td> / </td>
       <td>✅</td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     </tbody>
 </table>
