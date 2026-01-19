@@ -9,11 +9,19 @@ Options:
     -a, --arch ARCH         Target architecture (x86|arm) [required]
     -t, --torchversion VERSION   PyTorch version to install (default: 2.7.1)
     -m, --msid COMMIT_ID    MindSpeed commit ID [required]
+    -y, --yes               Auto confirm all reinstallations
+    -n, --no                Auto skip all reinstallations
     -h, --help              Display this help message and exit
 
 Examples:
-    bash $0 --arch x86 --torchversion 2.6.0 --msid 93c45456c7044bacddebc5072316c01006c938f9
-    bash $0 --arch arm --msid abcdef1234567890
+    # Auto confirm all reinstallations
+    bash $0 --arch x86 --torchversion 2.6.0 --msid 93c45456c7044bacddebc5072316c01006c938f9 --yes
+
+    # Auto skip all reinstallations
+    bash $0 --arch arm --msid abcdef1234567890 --no
+
+    # Interactive mode (default)
+    bash $0 --arch x86 --torchversion 2.7.1 --msid abcdef1234567890
 EOF
 }
 
@@ -21,6 +29,7 @@ EOF
 ARCH=""
 TORCH_VERSION="2.7.1"
 MINDSPEED_COMMIT_ID=""
+AUTO_CONFIRM=""  # 自动确认模式: "", "yes", "no"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -28,6 +37,8 @@ while [[ $# -gt 0 ]]; do
         -a|--arch) ARCH="$2"; shift 2 ;;
         -t|--torchversion) TORCH_VERSION="$2"; shift 2 ;;
         -m|--msid) MINDSPEED_COMMIT_ID="$2"; shift 2 ;;
+        -y|--yes) AUTO_CONFIRM="yes"; shift ;;
+        -n|--no) AUTO_CONFIRM="no"; shift ;;
         -h|--help) show_help; exit 0 ;;
         *) echo "Unknown parameter: $1"; show_help; exit 1 ;;
     esac
@@ -90,24 +101,75 @@ install_with_retry() {
     return 1
 }
 
+# Function to get torch version
+get_torch_version() {
+    if is_package_installed "torch"; then
+        pip3 show torch | grep "^Version:" | awk '{print $2}'
+    else
+        echo ""
+    fi
+}
+
 # Version validation function
 check_existing_versions() {
-    local need_confirmation=false
+    local install_torch=true
+    local install_torch_npu=true
     local message=""
+
+    echo "Auto confirm mode: ${AUTO_CONFIRM:-"interactive (no auto confirm)"}"
 
     # Check if torch is already installed
     if is_package_installed "torch"; then
         local current_torch_version
-        current_torch_version=$(pip3 show torch | grep "^Version:" | awk '{print $2}')
+        current_torch_version=$(get_torch_version)
 
         if [ "$current_torch_version" != "$TORCH_VERSION" ]; then
-            need_confirmation=true
-            message+="Currently installed torch version: $current_torch_version, target version: $TORCH_VERSION\n"
+            message+="\n=== PyTorch Version Mismatch ===\n"
+            message+="Currently installed torch version: $current_torch_version\n"
+            message+="Target version: $TORCH_VERSION\n"
+            message+="y: Reinstall PyTorch to target version\n"
+            message+="n: Skip PyTorch installation, continue with other components\n"
+
+            echo "Version check results:"
+            echo -e "$message"
+
+            # 处理自动确认逻辑
+            if [ "$AUTO_CONFIRM" = "yes" ]; then
+                echo "Auto confirming: Will reinstall PyTorch (--yes flag detected)"
+                install_torch=true
+            elif [ "$AUTO_CONFIRM" = "no" ]; then
+                echo "Auto skipping: Will skip PyTorch installation (--no flag detected)"
+                install_torch=false
+            else
+                # 交互式模式
+                while true; do
+                    echo "torch version mismatch detected. Reinstall PyTorch? (y/n)"
+                    read -r user_input
+
+                    case $user_input in
+                        [Yy]* )
+                            echo "Will reinstall PyTorch..."
+                            install_torch=true
+                            break
+                            ;;
+                        [Nn]* )
+                            echo "Will skip PyTorch installation..."
+                            install_torch=false
+                            break
+                            ;;
+                        ▪ )
+
+                            echo "Invalid input. Please enter y or n"
+                            ;;
+                    esac
+                done
+            fi
         else
-            message+="Current torch version matches target version: $TORCH_VERSION\n"
+            echo "Current torch version matches target version: $TORCH_VERSION"
+            install_torch=false
         fi
     else
-        message+="torch not detected, will install new version: $TORCH_VERSION\n"
+        echo "torch not detected, will install new version: $TORCH_VERSION"
     fi
 
     # Check if torch_npu is already installed
@@ -116,42 +178,53 @@ check_existing_versions() {
         current_torch_npu_version=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
 
         if [ "$current_torch_npu_version" != "$TORCH_VERSION" ]; then
-            need_confirmation=true
-            message+="Currently installed torch_npu version: $current_torch_npu_version, target version: $TORCH_VERSION\n"
+            echo -e "\n=== torch_npu Version Mismatch ==="
+            echo "Currently installed torch_npu version: $current_torch_npu_version"
+            echo "Target version: $TORCH_VERSION"
+
+            # 处理自动确认逻辑
+            if [ "$AUTO_CONFIRM" = "yes" ]; then
+                echo "Auto confirming: Will reinstall torch_npu (--yes flag detected)"
+                install_torch_npu=true
+            elif [ "$AUTO_CONFIRM" = "no" ]; then
+                echo "Auto skipping: Will skip torch_npu installation (--no flag detected)"
+                install_torch_npu=false
+            else
+                # 交互式模式
+                while true; do
+                    echo "Reinstall torch_npu to match PyTorch version? (y/n)"
+                    read -r user_input
+
+                    case $user_input in
+                        [Yy]* )
+                            echo "Will reinstall torch_npu..."
+                            install_torch_npu=true
+                            break
+                            ;;
+                        [Nn]* )
+                            echo "Will skip torch_npu installation..."
+                            install_torch_npu=false
+                            break
+                            ;;
+                        ▪ )
+
+                            echo "Invalid input. Please enter y or n"
+                            ;;
+                    esac
+                done
+            fi
         else
-            message+="Current torch_npu version matches target version: $TORCH_VERSION\n"
+            echo "Current torch_npu version matches target version: $TORCH_VERSION"
+            install_torch_npu=false
         fi
     else
-        message+="torch_npu not detected, will install new version: $TORCH_VERSION\n"
+        echo "torch_npu not detected, will install new version: $TORCH_VERSION"
     fi
 
-    # Display version information
-    echo "Version check results:"
-    echo -e "$message"
-
-    # If confirmation is needed, prompt user
-    if [ "$need_confirmation" = true ]; then
-        echo "Version mismatch detected. Continue installation? (y/n)"
-        read -r user_input
-
-        case $user_input in
-            [Yy]* )
-                echo "Continuing installation..."
-                return 0
-                ;;
-            [Nn]* )
-                echo "Installation cancelled"
-                exit 0
-                ;;
-            ▪ )
-
-                echo "Please enter y or n"
-                return 1
-                ;;
-        esac
-    else
-        return 0
-    fi
+    # Return values
+    echo "install_torch=$install_torch" > /tmp/install_flags
+    echo "install_torch_npu=$install_torch_npu" >> /tmp/install_flags
+    return 0
 }
 
 # Execute version check
@@ -159,54 +232,103 @@ if ! check_existing_versions; then
     exit 1
 fi
 
-# Determine architecture and install corresponding libraries
-if [ "$ARCH" = "x86" ]; then
-    echo "Installing x86 version of PyTorch $TORCH_VERSION..."
-    pip3 install torch=="$TORCH_VERSION+cpu" torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# Read installation flags
+source /tmp/install_flags
+rm -f /tmp/install_flags
 
-elif [ "$ARCH" = "arm" ]; then
-    echo "Installing ARM version of PyTorch $TORCH_VERSION..."
-    pip3 install torch=="$TORCH_VERSION" torchvision torchaudio
+echo ""
+echo "Installation plan:"
+echo "- Install torch: $install_torch"
+echo "- Install torch_npu: $install_torch_npu"
+echo ""
 
+# Install PyTorch components
+echo "Starting PyTorch components installation..."
+
+# Install PyTorch if needed
+if [ "$install_torch" = true ]; then
+    echo "Installing PyTorch $TORCH_VERSION..."
+
+    if [ "$ARCH" = "x86" ]; then
+        echo "Installing x86 version of PyTorch $TORCH_VERSION..."
+        pip3 install "torch==$TORCH_VERSION+cpu" "torchvision" "torchaudio" --index-url https://download.pytorch.org/whl/cpu
+    elif [ "$ARCH" = "arm" ]; then
+        echo "Installing ARM version of PyTorch $TORCH_VERSION..."
+        pip3 install "torch==$TORCH_VERSION" "torchvision" "torchaudio"
+    else
+        echo "Error: Unsupported architecture '$ARCH'"
+        show_help
+        exit 1
+    fi
+
+    if is_package_installed "torch"; then
+        installed_torch=$(get_torch_version)
+        echo "torch version: $installed_torch successfully installed！"
+    else
+        echo "[ERROR] Installation failed! Reason: torch installation error."
+    fi
 else
-    echo "Error: Unsupported architecture '$ARCH'"
-    show_help
-    exit 1
+    # 用户选择不重新安装torch，安装与当前torch版本兼容的torchvision和torchaudio
+    if is_package_installed "torch"; then
+        current_torch_version=$(get_torch_version)
+        echo "Using existing torch version: $current_torch_version"
+        echo "Installing torchvision and torchaudio compatible with torch $current_torch_version..."
+
+        if [ "$ARCH" = "x86" ]; then
+            echo "Installing x86 compatible packages..."
+            pip3 install "torch==$current_torch_version+cpu" "torchvision" "torchaudio" --index-url https://download.pytorch.org/whl/cpu
+        elif [ "$ARCH" = "arm" ]; then
+            echo "Installing ARM compatible packages..."
+            pip3 install "torch==$current_torch_version" "torchvision" "torchaudio"
+        fi
+    else
+        echo "torch not installed, installing default versions..."
+        if [ "$ARCH" = "x86" ]; then
+            pip3 install "torch" "torchvision" "torchaudio" --index-url https://download.pytorch.org/whl/cpu
+        elif [ "$ARCH" = "arm" ]; then
+            pip3 install "torch" "torchvision" "torchaudio"
+        fi
+    fi
 fi
 
-# Install torch_npu
-echo "Installing torch_npu $TORCH_VERSION..."
-pip3 install torch-npu=="$TORCH_VERSION"
+# Install torch_npu if needed
+if [ "$install_torch_npu" = true ]; then
+    echo "Installing torch_npu $TORCH_VERSION..."
+    pip3 install torch-npu=="$TORCH_VERSION"
 
-# Post-installation verification
-echo "Installation completed, verifying versions:"
-if is_package_installed "torch"; then
-    installed_torch=$(pip3 show torch | grep "^Version:" | awk '{print $2}')
-    echo "torch version: $installed_torch"
+    if is_package_installed "torch_npu"; then
+        installed_npu=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
+        echo "torch_npu version: $installed_npu successfully installed！"
+    else
+        echo "[ERROR] Installation failed! Reason: torch_npu installation error."
+    fi
 else
-    echo "torch installation failed"
-fi
-
-if is_package_installed "torch_npu"; then
-    installed_npu=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
-    echo "torch_npu version: $installed_npu"
-else
-    echo "torch_npu installation failed"
+    if is_package_installed "torch_npu"; then
+        current_torch_npu_version=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
+        echo "Using existing torch_npu version: $current_torch_npu_version"
+    fi
 fi
 
 # Install megatron
-echo "Installing Megatron-LM..."
+echo "[INFO] Installing Megatron-LM..."
 cd ..
 if [ ! -d "Megatron-LM" ]; then
     git clone https://github.com/NVIDIA/Megatron-LM.git
 fi
 cd Megatron-LM
 git checkout core_v0.12.1
+if [ ! -d "megatron" ]; then
+    echo "[ERROR] Installation failed! Reason: Megatron-LM installation error."
+    exit 1
+fi
+
 cp -r megatron ../MindSpeed-MM/
 cd ../MindSpeed-MM/
 
+echo "Megatron-LM successfully installed!"
+
 # Install mindspeed with retry mechanism
-echo "Installing MindSpeed with commit ID: $MINDSPEED_COMMIT_ID"
+echo "[INFO] Installing MindSpeed with commit ID: $MINDSPEED_COMMIT_ID"
 if [ ! -d "MindSpeed" ]; then
     git clone https://gitcode.com/Ascend/MindSpeed.git
 fi
@@ -215,19 +337,37 @@ git checkout "$MINDSPEED_COMMIT_ID"
 
 # Install MindSpeed with retry mechanism
 if ! install_with_retry "mindspeed" "pip3 install -e ."; then
-    echo "Critical error: MindSpeed installation failed after multiple attempts"
+    echo "[ERROR] Installation failed! Reason: MindSpeed installation failed after multiple attempts."
     exit 1
 fi
+
+echo "[INFO] MindSpeed with commit ID: $MINDSPEED_COMMIT_ID successfully installed!"
 
 cd ..
 
 # Create directories
-echo "Creating necessary directories..."
+echo "[INFO] Creating necessary directories..."
 mkdir -p logs data ckpt
 
 # Install mindspeed-mm dependency library with retry mechanism
-echo "Installing mindspeed-mm dependency library..."
+echo "[INFO] Installing mindspeed-mm dependency library..."
 if ! install_with_retry "mindspeed-mm" "pip3 install -e ."; then
-    echo "Critical error: mindspeed-mm installation failed after multiple attempts"
+    echo "[ERROR] Installation failed! Reason: mindspeed-mm installation failed after multiple attempts."
     exit 1
+fi
+
+packages=("mindspeed-mm" "mindspeed")
+all_found=true
+
+for pkg in "${packages[@]}"; do
+    if ! pip3 list 2>/dev/null | grep -q "^${pkg} "; then
+        all_found=false
+        break
+    fi
+done
+
+if $all_found; then
+    echo "[INFO] mindspeed mm successfully installed!"
+else
+    echo "[ERROR] Installation failed! Reason: mindspeed-mm or mindspeed install failed."
 fi

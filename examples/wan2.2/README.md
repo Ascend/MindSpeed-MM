@@ -70,38 +70,20 @@ url=https://github.com/huggingface/diffusers/tree/v0.35.1
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
 
 ### 仓库拉取
-
-```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
-git clone https://github.com/NVIDIA/Megatron-LM.git
-cd Megatron-LM
-git checkout core_v0.12.1
-cp -r megatron ../MindSpeed-MM/
-cd ../MindSpeed-MM
+拉取MindSpeed MM代码仓，并进入代码仓根目录：
+```bash
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+cd MindSpeed-MM
 ```
 
 ### 环境搭建
-
+对于X86架构机器，执行如下指令：
 ```bash
-# 安装对应python版本、x86或arm的torch、torch_npu
-# 参考 安装指南 -> PTA安装
-
-# 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh 
-
-# 安装加速库
-git clone https://gitcode.com/Ascend/MindSpeed.git
-cd MindSpeed
-# checkout commit from MindSpeed core_r0.12.1
-git checkout 93c45456c7044bacddebc5072316c01006c938f9
-pip install -e .
-cd ..
-
-# 安装其余依赖库
-pip install -e .
-
-# 更新diffusers、peft
-pip install diffusers==0.35.1 peft==0.17.1
+bash scripts/install.sh --arch x86 --msid 93c45456c7044bacddebc5072316c01006c938f9 && pip install -r examples/wan2.2/requirements.txt
+```
+对于ARM架构机器，执行如下指令：
+```bash
+bash scripts/install.sh --arch arm --msid 93c45456c7044bacddebc5072316c01006c938f9 && pip install -r examples/wan2.2/requirements.txt
 ```
 
 ### Decord搭建

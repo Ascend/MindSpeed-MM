@@ -51,6 +51,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 * [Oct. 31, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-8B/30B模型
 * [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型
 * [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型
+* [Sep. 8, 2025]: 🚀 MindSpeed MM支持FLUX **强化学习** DanceGRPO训练
 * **[Sep. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/verl_examples/qwen2.5vl/README.md)**
 * [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
 * [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
@@ -161,6 +162,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态，软件版本配套�
 ---
 
 MindSpeed MM具体的安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md#%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)。
+当前qwen3vl、wan2.2模型已支持一键安装，一键安装使用说明详见[一键安装使用说明](https://gitcode.com/young256/MindSpeed-MM/blob/install-simplify-add-doc/docs/user-guide/installation.md#4-%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85)。
 
 # 快速上手
 

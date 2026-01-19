@@ -77,7 +77,49 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh
 ```
 
-### 4. PTA安装
+### 4. 一键安装
+#### 4.1. 使用说明
+一键安装指令会依次安装pytorch、torch_npu、Megatron-LM、MindSpeed、MindSpeed-MM库。由于Megatron-LM对于`pip install`安装方式适配性待提升，采用源码拷贝方式进行使用。
+
+以qwen3vl模型安装指令为例：
+```bash
+bash scripts/install.sh --arch x86 --msid 93c45456c7044bacddebc5072316c01006c938f9 && pip install -r examples/qwen3vl/requirements.txt
+```
+
+scripts/install.sh提供了如下选项供使用：
+```text
+Options:
+    -a, --arch ARCH         Target architecture (x86|arm) [required]
+    -t, --torchversion VERSION   PyTorch version to install (default: 2.7.1)
+    -m, --msid COMMIT_ID    MindSpeed commit ID [required]
+    -h, --help              Display this help message and exit
+```
+-a, --arch：表示当前安装环境的机器的CPU架构，当前支持x86或arm。此选项为必选选项，会影响安装torch、torch_npu库时使用的版本。
+-t, --torchversion：非必选项。表示当前使用的torch版本，默认值为2.7.1。
+-m, --msid：必选选项。表示当前基于源码安装的MindSpeed加速库的commit id。
+-h, --help：非必选选项，显示安装帮助。
+
+若当前环境中已经安装了pytorch或torch_npu，安装时会在控制台打印如下信息，样例如下：
+```text
+Version check results:
+Currently installed torch version: 2.6.0, target version: 2.7.1
+Currently installed torch_npu version: 2.6.0, target version: 2.7.1
+Version mismatch detected. Continue installation? (y/n)
+```
+表示检测到环境中已经安装了2.6.0版本的pytorch和torch_npu。如果您希望安装新版本的torch和torch_npu，请输入`y`；如果希望保持已安装的pytorch和torch_npu，请输入`n`。
+
+在安装完成之后，若控制台打印如下信息：
+```text
+mindspeed mm successfully installed！
+```
+说明安装成功。
+
+
+#### 4.2. 支持模型列表
+目前qwen3vl、wan2.2模型已支持一键安装。
+
+### 5. PTA安装
+此章节适用于单独安装PTA进行开发调试的用户使用。
 
 准备[torch_npu](https://www.hiascend.com/developer/download/community/result?module=pt)，参考[Ascend Extension for PyTorch 配置与安装](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)或执行以下命令安装：
 
