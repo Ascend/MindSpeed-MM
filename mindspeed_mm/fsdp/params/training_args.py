@@ -4,6 +4,8 @@ from typing import List, Literal, Optional
 import logging
 import os
 
+from mindspeed_mm.fsdp.params.utils import allow_extra_fields
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +62,7 @@ class Profiler:
             self.profile_this_rank = False
 
 
+@allow_extra_fields
 @dataclass
 class TrainingArguments:
     profile: Profiler = field(default_factory=Profiler)

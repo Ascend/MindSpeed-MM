@@ -4,8 +4,10 @@ import logging
 import os
 from functools import partial
 from datetime import datetime
+import sys
 
 import torch
+import yaml
 
 from mindspeed.lite.utils.log import print_rank, set_log_level
 from mindspeed.lite.utils.device import set_accelerator_compatible
@@ -15,7 +17,6 @@ from mindspeed_mm.fsdp.params.data_args import DataArguments
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
-from mindspeed_mm.fsdp.params.parser import parse_args
 from mindspeed_mm.fsdp.utils.device import (
     get_dist_comm_backend,
     get_torch_device,
@@ -32,11 +33,13 @@ from mindspeed_mm.fsdp.optimizer.optimizer import build_optimizer
 from mindspeed_mm.fsdp.optimizer.lr_scheduler import build_lr_scheduler
 from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
 from mindspeed_mm.fsdp.tools.profiler import Profiler
+from mindspeed_mm.fsdp.params.utils import allow_extra_fields, instantiate_dataclass
 
 
 logger = logging.getLogger(__name__)
 
 
+@allow_extra_fields
 @dataclass
 class Arguments:
     """Root argument class: model/data/parallel/training four types of parameters"""
@@ -71,13 +74,42 @@ class BaseTrainer:
             self.profiler = Profiler(self.training_args.profile)
             self.profiler.start()
 
-
-    def parse_args(self):
-        """Parse command-line arguments into structured dataclasses."""
-        args = parse_args(Arguments)
-        
+    def validate_args(self, args):
+        """
+        Validate arguments and compute dependent parameters across configuration sections.
+        """
         # Compute distributed training parameters based on parallel configuration
         args.training.compute_distributed_training(args.parallel)
+
+    def parse_args(self):
+        """Parse YAML arguments into structured dataclasses."""
+
+        # Parse command line arguments
+        cmd_args = sys.argv[1:]
+
+        # Validate that a configuration file was provided
+        if not cmd_args:
+            raise ValueError(
+                "❌ No configuration file provided.\n"
+            )
+
+        # Handle config file input
+        input_data = {}
+        # Validate file extension to ensure it's a YAML configuration file
+        if not (cmd_args[0].endswith(".yaml") or cmd_args[0].endswith(".yml")):
+            raise ValueError(
+                f"❌ Invalid configuration file: '{cmd_args[0]}'\n"
+                f"Expected a YAML file with extension .yaml or .yml\n"
+            )
+        with open(os.path.abspath(cmd_args[0]), encoding="utf-8") as f:
+            input_data: Dict[str, Dict[str, Any]] = yaml.safe_load(f)
+        
+        # Instantiate the Arguments dataclass from YAML data
+        args = instantiate_dataclass(Arguments, input_data)
+        
+        # Critical: Resolve dependencies between different configuration sections
+        # and validate parameter consistency across the entire configuration
+        self.validate_args(args)
 
         return (
             args.parallel,

@@ -3,6 +3,8 @@ from typing import List, Literal, Optional
 import logging
 import os
 
+from mindspeed_mm.fsdp.params.utils import allow_extra_fields
+
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ class EPPlanConfig:
     _gradient_divide_factor: float = None
 
 
+@allow_extra_fields
 @dataclass
 class ParallelArguments():
     data_parallel_size: Optional[int] = field(
@@ -124,5 +127,3 @@ class ParallelArguments():
             raise ValueError("Tensor parallel size not supported yet.")
         if self.context_parallel_size != 1:
             raise ValueError("Context parallel size not supported yet.")
-        if self.ulysses_parallel_size != 1:
-            raise ValueError("Ulysses parallel size not supported yet.")

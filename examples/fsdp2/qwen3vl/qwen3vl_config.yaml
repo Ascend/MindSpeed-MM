@@ -82,6 +82,7 @@ data:
 
 # 模型配置
 model:
+  model_id: qwen3_vl_moe
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   freeze:
