@@ -12,6 +12,7 @@ from mindspeed.lite.utils.log import print_rank
 
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
+from mindspeed_mm.fsdp.models.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeForConditionalGeneration
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,9 @@ class ModelHub:
     """
     Responsible for building HuggingFace native models.
     """
-    MODEL_MAPPINGS = {}# Mapping from model IDs to custom model classes
+    MODEL_MAPPINGS = {
+        "qwen3_vl_moe": Qwen3VLMoeForConditionalGeneration,
+    }# Mapping from model IDs to custom model classes
 
     @staticmethod
     def build(model_args: ModelArguments, training_args: TrainingArguments):
@@ -50,9 +53,8 @@ class ModelHub:
         model_id = getattr(model_args, "model_id", None)
         if model_id:
             model_cls = ModelHub.MODEL_MAPPINGS.get(model_id, None)
-
         # If not found in mappings, try to get from transformers module using architecture name
-        if architectures:
+        elif architectures:
             transformers_module = importlib.import_module("transformers")
             model_cls = getattr(transformers_module, architectures[0], None)
 
