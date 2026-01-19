@@ -525,12 +525,13 @@ Megatron框架下的qwen2.5VL模型结构相比于Hugging Face的模型结构实
       ...
     },
     ...
-    "text_decoder": {
-      "model_id": "qwen2lm",
-      "canonical_model": true,
-      ...
-    }        
-  }
+  },
+  "text_decoder": {
+    "model_id": "qwen2_5_lm",
+    "canonical_model": true,
+    ...
+  },
+  ...
 }
 ```
 

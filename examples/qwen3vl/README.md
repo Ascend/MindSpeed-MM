@@ -311,7 +311,7 @@ bash examples/qwen3vl/finetune_qwen3vl_xxB.sh
 ```
 **优化特性：**
 
-- ChunkLoss：可以参考文档[ChunkLoss](docs/features/chunkloss.md)开启该特性优化长序列时的显存占用。
+- ChunkLoss：可以参考文档[ChunkLoss](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/chunkloss.md)开启该特性优化长序列时的显存占用。
 
 ---
 

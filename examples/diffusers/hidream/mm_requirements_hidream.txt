@@ -11,5 +11,5 @@ scipy
 decorator
 attrs
 mindstudio-probe
-datasets
+datasets==3.6.0
 deepspeed==0.17.2
