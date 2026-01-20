@@ -19,7 +19,6 @@ from mindspeed_mm.patchs import (
     infer_fa_patch,
     models_patches,
     fsdp1_patches,
-    hetero_patches,
     training_patches,
     fsdp2_patches,
     optimizer_patch
@@ -49,16 +48,6 @@ class PatchesManager:
         # This will override the default model loading behavior to handle distributed checkpoint format.
         "get_dist_model_load_from_pt": [
             ("megatron.training.training.get_model", training_patches.get_dist_model_load_from_pt)
-        ],
-        "hetero_parallel_cp": [
-            ("megatron.core.transformer.attention.Attention.__init__", \
-                hetero_patches.hetero_attention_init_wrapper),
-            ("mindspeed_mm.models.vlm_model.get_vit_layer_spec", \
-                hetero_patches.hetero_spec_wrapper),
-            ("mindspeed_mm.models.vlm_model.get_llm_layer_spec", \
-                hetero_patches.hetero_spec_wrapper),
-            ("mindspeed_mm.models.vlm_model.get_audio_layer_spec", \
-                hetero_patches.hetero_spec_wrapper),
         ],
         "scale_grad": [
             ("megatron.core.distributed.TorchFullyShardedDataParallel.scale_gradients", fsdp2_patches.scale_gradients)

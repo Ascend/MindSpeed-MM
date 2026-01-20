@@ -334,6 +334,22 @@ def validate_args(args, defaults=None):
         'fp32': torch.float32, 'bf16': torch.bfloat16, 'fp16': torch.float16, 'fp8': torch.uint8,
     }
 
+    if args.hetero_parallel:
+        ensure_valid(args.tensor_model_parallel_size == 1 and \
+                     args.pipeline_model_parallel_size == 1 and \
+                     args.context_parallel_size == 1, \
+            """when enabling hetero-parallel, text decoder initialized by shell is not supported anymore, 
+            please initial it by model.json and set parallelisms to 1 in shell""")
+        ensure_valid(not args.tp_2d, "tp_2d is not supported by hetero-parallel")
+        ensure_valid(hasattr(args, 'mm') and hasattr(args.mm, 'model') and hasattr(args.mm.model, 'text_decoder'), \
+                     """hetero-parallel only supports mm models that have text_decoder attr""")
+        args.tensor_model_parallel_size = args.mm.model.text_decoder.tp
+        args.pipeline_model_parallel_size = args.mm.model.text_decoder.pp
+        args.context_parallel_size = args.mm.model.text_decoder.cp
+        decoder_model_size = args.tensor_model_parallel_size * args.pipeline_model_parallel_size * args.context_parallel_size
+        args.global_batch_size = int(args.global_batch_size * args.world_size / decoder_model_size / args.data_parallel_size)
+        args.data_parallel_size = args.world_size // decoder_model_size
+
     def map_dtype(d):
         if isinstance(d, torch.dtype):
             return d

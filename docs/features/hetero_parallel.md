@@ -46,7 +46,7 @@ GPT_ARGS="
 "
 ```
 
-2. 在对应`model.json`中需要异构并行的子模块添加`tp/pp/cp、mbs`等参数，训练脚本中的并行配置默认为骨干网络LLM的配置。
+2. 在对应`model.json`中需要异构并行的子模块添加`tp/pp/cp、mbs`等参数, 注意，骨干网络不再支持通过shell脚本来initial 并行策略，并且shell脚本中的并行策略都要设为1。
 
 ```txt
 {
@@ -65,8 +65,20 @@ GPT_ARGS="
         "pp":1,
         "cp":1
     },
+    "text_decoder": {
+        ...
+        "tp":1,
+        "pp":1,
+        "cp":1
+    },
    ...
 }
+```
+
+```shell
+TP=1
+PP=1
+CP=1
 ```
 
 ### 适用范围

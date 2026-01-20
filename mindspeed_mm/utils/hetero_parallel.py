@@ -10,6 +10,9 @@ from mindspeed.patch_utils import MindSpeedPatchesManager as mspm
 from megatron.training import get_args, print_rank_0
 from megatron.core.parallel_state import initialize_model_parallel, is_initialized
 import megatron.core.parallel_state as mpu
+from megatron.training.arguments import parse_args
+from megatron.core.distributed.distributed_data_parallel_config import DistributedDataParallelConfig
+from megatron.core.model_parallel_config import ModelParallelConfig
 
 
 _ParallelStatesDict = {}
@@ -89,58 +92,83 @@ def audio_encoder_forward_hook(module, input, output):
     return output
 
 
-def parallel_config_extract(args_dict):
-    targets = ["tp", "cp", "pp"]
-    results = []
-
-    def dfs(curr, par_key=None):
-        if isinstance(curr, dict):
-            if all(k in curr for k in targets) and par_key:
-                results.append({
-                    par_key: {k: curr[k] for k in targets}
-                })
-            for k, v in curr.items():
-                dfs(v, k)
-        elif isinstance(curr, list):
-            for item in curr:
-                dfs(item, par_key)
-
-    dfs(args_dict)
-    return results
+def destroy_model_parallel_ranks(parallel_state):
+    for k, v in vars((mpu)).items():
+        is_global_variable = k.startswith('_') and not k.startswith('__') and not inspect.isfunction(v)
+        if is_global_variable and '_RANK' in k:
+            setattr(parallel_state, k, None)
 
 
-def initial_modules_mpu(reuse_module, args):
-    args_dict = args.to_dict()
+def initial_modules_mpu(config, kwargs):
+    config_dict = config.to_dict()
+
+
+    extra_args_provider = kwargs.get('extra_args_provider', None)
+    ignore_unknown_args = kwargs.get('ignore_unknown_args', False)
+    parsed_args = kwargs.get('parsed_args', None)
     
-    if is_initialized:
-        _ParallelStatesDict[reuse_module] = {}
-        state_snapshot = {
-            k: v for k, v in vars((mpu)).items()
-            if k.startswith('_') and not k.startswith('__') and not inspect.isfunction(v)
-        }
-        _ParallelStatesDict[reuse_module].update(state_snapshot)
+    if parsed_args is None:
+        args = parse_args(extra_args_provider, ignore_unknown_args)
+    else:
+        args = parsed_args
+
+    module_name = [['image_encoder', 'vision_encoder'], ['audio_encoder', 'audio_encoder'], ['text_decoder']]
+    module_config = {}
+
+    for module_group in module_name:
+        current_config = config_dict
+        for key in module_group:
+            try:
+                current_config = current_config[key]
+            except KeyError as e:
+                raise KeyError(f"Key '{key}' not found in current_config: {current_config}") from e
+        module_config[module_group[0]] = current_config
     
-    parallel_configs = parallel_config_extract(args_dict)
-    for parallel_config in parallel_configs:
-        module = next(iter(parallel_config))
-        TP = parallel_config[module]["tp"]
-        CP = parallel_config[module]["cp"]
-        PP = parallel_config[module]["pp"]
+    def pass_hetero_initial_arguments(key, module, default=None, use_args=False, main_module='text_decoder'):
+        """
+        pass the args by <module config - shell - megatron config - manual default> priority
+        """
+        if module in module_config and key in module_config[module]:
+            return module_config[module][key]
+
+        if module == main_module or use_args:
+            return getattr(args, key)
+
+        config_list = [ModelParallelConfig, DistributedDataParallelConfig]
+        for config in config_list:
+            if hasattr(config, key):
+                return getattr(config, key)
+        return default
+        
+
+
+    for module in module_config.keys():
 
         if module not in _ParallelStatesDict:
             _ParallelStatesDict[module] = {}
             mpu.destroy_model_parallel()
+            destroy_model_parallel_ranks(mpu)
+            
             initialize_model_parallel(
-                tensor_model_parallel_size=TP,
-                pipeline_model_parallel_size=PP,
-                virtual_pipeline_model_parallel_size=None,
-                pipeline_model_parallel_split_rank=None,
-                use_sharp=False,
-                context_parallel_size=CP,
-                expert_model_parallel_size=1,
-                nccl_communicator_config_path=None,
-                distributed_timeout_minutes=30,
-                order="tp-cp-ep-dp-pp")
+                tensor_model_parallel_size=pass_hetero_initial_arguments('tensor_model_parallel_size', module),
+                pipeline_model_parallel_size=pass_hetero_initial_arguments('pipeline_model_parallel_size', module),
+                virtual_pipeline_model_parallel_size=pass_hetero_initial_arguments('virtual_pipeline_model_parallel_size', module),
+                pipeline_model_parallel_split_rank=pass_hetero_initial_arguments('pipeline_model_parallel_split_rank', module),
+                pipeline_model_parallel_comm_backend=pass_hetero_initial_arguments('pipeline_model_parallel_comm_backend', module, use_args=True),
+                context_parallel_size=pass_hetero_initial_arguments('context_parallel_size', module),
+                hierarchical_context_parallel_sizes=pass_hetero_initial_arguments('hierarchical_context_parallel_sizes', module),
+                expert_model_parallel_size=pass_hetero_initial_arguments('expert_model_parallel_size', module),
+                num_distributed_optimizer_instances=pass_hetero_initial_arguments('num_distributed_optimizer_instances', module, use_args=True),
+                expert_tensor_parallel_size=pass_hetero_initial_arguments('expert_tensor_parallel_size', module),
+                distributed_timeout_minutes=pass_hetero_initial_arguments('distributed_timeout_minutes', module, use_args=True),
+                nccl_communicator_config_path=pass_hetero_initial_arguments('nccl_communicator_config_path', module, use_args=True),
+                order='tp-cp-ep-dp-pp' if not pass_hetero_initial_arguments('use_tp_pp_dp_mapping', module, use_args=True) else 'tp-cp-ep-pp-dp',
+                encoder_tensor_model_parallel_size=pass_hetero_initial_arguments('encoder_tensor_model_parallel_size', module, use_args=True),
+                encoder_pipeline_model_parallel_size=pass_hetero_initial_arguments('encoder_pipeline_model_parallel_size', module, use_args=True),
+                get_embedding_ranks=kwargs.get('get_embedding_ranks', None),
+                get_position_embedding_ranks=kwargs.get('get_position_embedding_ranks', None),
+                create_gloo_process_groups=pass_hetero_initial_arguments('enable_gloo_process_groups', module, use_args=True),
+            )
 
         state_snapshot = {
             k: v for k, v in vars((mpu)).items()
@@ -168,7 +196,9 @@ def initial_megatron_hetero_parallel_wrapper(fn):
         vlm_config = deepcopy(args.mm.model)
         from pretrain_vlm import _configure_modules
         _configure_modules(vlm_config, _HeteroParallelModules)
-        initial_modules_mpu(reuse_module='text_decoder', args=vlm_config)
+
+        initial_modules_mpu(config=vlm_config,
+                            kwargs=kwargs)
         return 
     return wrapper
 

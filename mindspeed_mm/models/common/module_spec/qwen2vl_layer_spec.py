@@ -16,7 +16,7 @@ from megatron.core.transformer.transformer_layer import (
     TransformerLayerSubmodules,
 )
 from megatron.core.models.gpt.gpt_layer_specs import _get_mlp_module_spec
-
+from megatron.training import get_args
 from mindspeed_mm.models.common.module_spec.llava_layer_spec import get_mlp_module_spec
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlVitSelfAttention, Qwen2vlSelfAttention, Qwen2_5VitDotProductAttention
 from mindspeed_mm.patchs.canonical_layer_patch import (
@@ -28,6 +28,13 @@ from mindspeed_mm.patchs.canonical_layer_patch import (
 
 
 def get_qwen2vl_llm_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
+
+    if get_args().hetero_parallel:
+        from mindspeed_mm.utils.hetero_utils.hetero_CP_utils import get_hetero_dotproductattention
+        DOTPRODUCTATTENTION = get_hetero_dotproductattention(config)
+    else:
+        DOTPRODUCTATTENTION = DotProductAttention
+
     qk_layernorm = False
     canonical_model = getattr(config, 'canonical_model', False)
     if canonical_model:
@@ -43,7 +50,7 @@ def get_qwen2vl_llm_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
                 params={"attn_mask_type": AttnMaskType.causal},
                 submodules=SelfAttentionSubmodules(
                     linear_qkv=ColumnParallelLinear,
-                    core_attention=DotProductAttention,
+                    core_attention=DOTPRODUCTATTENTION,
                     linear_proj=RowParallelLinear,
                     q_layernorm=TENorm if qk_layernorm else IdentityOp,
                     k_layernorm=TENorm if qk_layernorm else IdentityOp,
@@ -53,7 +60,7 @@ def get_qwen2vl_llm_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
                     q_proj=ColumnParallelLinear,
                     k_proj=ColumnParallelLinear,
                     v_proj=ColumnParallelLinear,
-                    core_attention=DotProductAttention,
+                    core_attention=DOTPRODUCTATTENTION,
                     linear_proj=RowParallelLinear,
                     q_layernorm=TENorm if qk_layernorm else IdentityOp,
                     k_layernorm=TENorm if qk_layernorm else IdentityOp,
@@ -73,6 +80,12 @@ def get_qwen2vl_llm_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
 
 def get_qwen2vl_layer_spec(config=None, is_vit=True, *args, **kwargs) -> ModuleSpec:
     attn_mask_type = AttnMaskType.no_mask if is_vit else AttnMaskType.causal
+    
+    if get_args().hetero_parallel:
+        from mindspeed_mm.utils.hetero_utils.hetero_CP_utils import get_hetero_dotproductattention
+        DOTPRODUCTATTENTION = get_hetero_dotproductattention(config)
+    else:
+        DOTPRODUCTATTENTION = DotProductAttention
 
     canonical_model = getattr(config, 'canonical_model', False)
     if canonical_model:
@@ -90,7 +103,7 @@ def get_qwen2vl_layer_spec(config=None, is_vit=True, *args, **kwargs) -> ModuleS
                 },
                 submodules=SelfAttentionSubmodules(
                     linear_qkv=ColumnParallelLinear,
-                    core_attention=DotProductAttention,
+                    core_attention=DOTPRODUCTATTENTION,
                     linear_proj=RowParallelLinear,
                     q_layernorm=IdentityOp,
                     k_layernorm=IdentityOp,

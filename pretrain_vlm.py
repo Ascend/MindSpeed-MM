@@ -96,6 +96,9 @@ def _configure_audio_encoder(vlm_config):
 
 def _configure_text_decoder(vlm_config):
     """Configure text decoder module."""
+    if get_args().hetero_parallel:
+        hetero_align_config(vlm_config.text_decoder, vlm_config.text_decoder)
+        
     vlm_config.text_decoder = get_model_config(vlm_config.text_decoder)
 
 

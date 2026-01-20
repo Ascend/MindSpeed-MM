@@ -122,9 +122,9 @@
         "add_bias_linear":false,
         "add_qkv_bias": true
     },
+    "tp":1,
+    "pp":1,
+    "cp":1,
     "text_encoder": null,
-    "video_encoder": null,
-    "patch": {
-        "hetero_parallel_cp": false
-    }
+    "video_encoder": null
 }
