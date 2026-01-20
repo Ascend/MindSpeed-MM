@@ -27,6 +27,13 @@ from megatron.core.transformer.transformer_layer import (
 
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlSelfAttention, Qwen2vlVitSelfAttention
 from mindspeed_mm.models.vision.vision_encoders.vision_transformer_block import Qwen3VLVisionTransformerLayer
+try:
+    from megatron.core.extensions.transformer_engine import (
+        TEColumnParallelLinear,
+        TEDotProductAttention
+    )
+except ImportError:
+    pass
 
 
 def get_mlp_module_spec(
@@ -83,9 +90,9 @@ def get_mlp_module_spec(
 
 def get_qwen3vl_llm_layer_local_spec(config=None, *args, **kwargs) -> ModuleSpec:
     if config.num_moe_experts:
-        mlp = get_mlp_module_spec(use_te=False, num_experts=config.num_moe_experts, moe_grouped_gemm=config.moe_grouped_gemm)
+        mlp = get_mlp_module_spec(use_te=config.use_te, num_experts=config.num_moe_experts, moe_grouped_gemm=config.moe_grouped_gemm)
     else:
-        mlp = get_mlp_module_spec(use_te=False)
+        mlp = get_mlp_module_spec(use_te=config.use_te)
     return ModuleSpec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
@@ -94,9 +101,9 @@ def get_qwen3vl_llm_layer_local_spec(config=None, *args, **kwargs) -> ModuleSpec
                 module=Qwen2vlSelfAttention,
                 params={"attn_mask_type": AttnMaskType.causal},
                 submodules=SelfAttentionSubmodules(
-                    linear_qkv=ColumnParallelLinear,
+                    linear_qkv=ColumnParallelLinear if not config.use_te else TEColumnParallelLinear,
                     core_attention=DotProductAttention,
-                    linear_proj=RowParallelLinear,
+                    linear_proj=RowParallelLinear if not config.use_te else TERowParallelLinear,
                     q_layernorm=TENorm if config.qk_layernorm else IdentityOp,
                     k_layernorm=TENorm if config.qk_layernorm else IdentityOp,
                 ),

@@ -50,7 +50,8 @@
         "sequence_parallel": false,
         "recompute_granularity": "full",
         "recompute_method": "block",
-        "recompute_num_layers": 4
+        "recompute_num_layers": 4,
+        "use_te": false
     },
     "image_encoder": {
         "vision_encoder": {

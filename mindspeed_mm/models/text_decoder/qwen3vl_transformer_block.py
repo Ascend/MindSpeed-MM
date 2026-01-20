@@ -17,6 +17,7 @@ from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.inference.contexts import BaseInferenceContext
 from megatron.core.fp8_utils import get_fp8_context
+from megatron.core.extensions.transformer_engine import te_checkpoint
 
 
 class Qwen3vlTransformerBlock(TransformerBlock):
@@ -99,6 +100,7 @@ class Qwen3vlTransformerBlock(TransformerBlock):
                     attention_bias=attention_bias,
                     packed_seq_params=packed_seq_params,
                     deepstack_visual_embeds=deepstack_visual_embeds,
+                    use_inner_fp8_context=use_inner_fp8_context,
                 )
             else:
                 for layer_idx, layer in enumerate(self.layers):
@@ -156,6 +158,7 @@ class Qwen3vlTransformerBlock(TransformerBlock):
         attention_bias: Tensor,
         packed_seq_params: PackedSeqParams,
         deepstack_visual_embeds: list,
+        use_inner_fp8_context: bool,
     ):
         """Forward method with activation checkpointing."""
 
@@ -165,16 +168,22 @@ class Qwen3vlTransformerBlock(TransformerBlock):
             ):
                 for index in range(start, end):
                     layer = self._get_layer(index)
-                    hidden_states, context = layer(
-                        hidden_states=hidden_states,
-                        attention_mask=attention_mask,
-                        context=context,
-                        context_mask=context_mask,
-                        rotary_pos_emb=rotary_pos_emb,
-                        attention_bias=attention_bias,
-                        inference_context=None,
-                        packed_seq_params=packed_seq_params,
+                    inner_fp8_context = (
+                        get_fp8_context(self.config, layer.layer_number - 1)
+                        if use_inner_fp8_context
+                        else nullcontext()
                     )
+                    with inner_fp8_context:
+                        hidden_states, context = layer(
+                            hidden_states=hidden_states,
+                            attention_mask=attention_mask,
+                            context=context,
+                            context_mask=context_mask,
+                            rotary_pos_emb=rotary_pos_emb,
+                            attention_bias=attention_bias,
+                            inference_context=None,
+                            packed_seq_params=packed_seq_params,
+                        )
                 return hidden_states, context
 
             return custom_forward

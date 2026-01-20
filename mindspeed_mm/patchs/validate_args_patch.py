@@ -762,6 +762,22 @@ def validate_args(args, defaults=None):
             + f"The supported position embedding types are rope and none."
         ))
 
+    if args.fp8 and args.transformer_impl == 'local':
+        raise AssertionError("FP just support TE implement.")
+    if args.use_ascend_coc and args.transformer_impl == "transformer_engine":
+        raise AssertionError("transformer engine does not support ascend coc.")
+    if args.fp8 and args.use_ascend_mc2:
+        raise AssertionError("FP8 currently does not support mc2.")
+    if (getattr(args, "transformer_impl", "transformer_engine") == "transformer_engine"
+        and getattr(args, "use_legacy_models", False)):
+        raise AssertionError("transformer engine only support for mcore models")
+    if args.use_gmm_fp8:
+        if args.fp8_recipe not in ("mxfp8", "tensorwise", "delayed"):
+            warnings.warn(
+                f"gmm fp8 only supports tensorwise, mxfp8, and delayed recipe, but {args.fp8_recipe} provided"
+                f"using bf16 gmm instead."
+            )
+
     # Print arguments.
     _print_args("arguments", args)
 
