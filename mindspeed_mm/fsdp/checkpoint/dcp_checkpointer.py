@@ -19,12 +19,14 @@ from torch.distributed.checkpoint.state_dict import (
     set_optimizer_state_dict,
 )
 from torch.distributed.checkpoint.stateful import Stateful
+from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 
 from mindspeed.lite.utils.log import print_rank
 from ..distributed.parallel_state import get_parallel_state
 from ..utils.device import empty_cache, synchronize
 from .checkpointer import CheckpointerBase
 from .utils import get_checkpoint_name, read_metadata, get_checkpoint_tracker_filename
+from .moe_utils import EPLoadPlanner, get_check_moe_func
 
 
 logger = logging.getLogger(__name__)
@@ -307,12 +309,12 @@ class DistributedCheckpointer(CheckpointerBase):
             state: state loaded
         """
         checkpoint_dir = path
-        
+
         iteration, release = -1, False
         tracker_filename = get_checkpoint_tracker_filename(checkpoint_dir)
         if os.path.isfile(tracker_filename):
             iteration, release = read_metadata(tracker_filename)
-        
+
         checkpoint_dir = get_checkpoint_name(checkpoint_dir, iteration, release)
 
         if state is None:
@@ -325,6 +327,20 @@ class DistributedCheckpointer(CheckpointerBase):
         if not release and "optimizer" in state:
             load_state["optimizer"] = OptimizerState(model=state["model"], optimizer=state["optimizer"])  # type: ignore[index]
 
+        ps = get_parallel_state()
+        if ps.get_ep_group():
+            ep_size = ps.get_ep_group_size()
+            ep_rank = ps.get_ep_rank()
+        else:
+            ep_size = 1
+            ep_rank = 0
+
+        if ep_size <= 1:
+            load_planner = DefaultLoadPlanner()
+        else:
+            check_moe_func = get_check_moe_func(state["model"])
+            load_planner = EPLoadPlanner(ep_rank=ep_rank, ep_size=ep_size, check_moe_fn=check_moe_func)
+
         if storage_reader is None:
             storage_reader = cls._create_storage_reader(checkpoint_dir)
 
@@ -332,6 +348,7 @@ class DistributedCheckpointer(CheckpointerBase):
             state_dict=load_state,
             storage_reader=storage_reader,
             process_group=process_group,
+            planner=load_planner,
         )
         # Note: further per-param DTensor alignment and device fixes happen inside OptimizerState.load_state_dict
 
