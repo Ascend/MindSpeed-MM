@@ -787,7 +787,7 @@ def validate_args(args, defaults=None):
     if (getattr(args, "transformer_impl", "transformer_engine") == "transformer_engine"
         and getattr(args, "use_legacy_models", False)):
         raise AssertionError("transformer engine only support for mcore models")
-    if args.use_gmm_fp8:
+    if getattr(args, "use_gmm_fp8", False):
         if args.fp8_recipe not in ("mxfp8", "tensorwise", "delayed"):
             warnings.warn(
                 f"gmm fp8 only supports tensorwise, mxfp8, and delayed recipe, but {args.fp8_recipe} provided"
