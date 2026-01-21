@@ -43,6 +43,8 @@ def process_args(parser):
     parser = _add_auto_settings_args(parser)
     parser = _add_optim_arguments(parser)
     parser = _add_muon_optim_arguments(parser)
+    parser = _add_text_dynamic_batching_args(parser)
+    parser = _add_image_mbs_balance_args(parser)
     return parser
 
 
@@ -240,7 +242,7 @@ def _add_network_args(parser):
 
 
 def _add_data_balance_args(parser):
-    group = parser.add_argument_group(title="data_balance")
+    group = parser.add_argument_group(title="GBS_data_balance")
     group.add_argument("--use-data-balance",
                        action='store_true',
                        default=False,
@@ -248,6 +250,33 @@ def _add_data_balance_args(parser):
     group.add_argument("--data_balance_sorting_algo", type=str, default="post_global_balancing_greedy_without_pad",
                        help="data balance sorting algorithm:"
                             "post_global_balancing_greedy_without_pad: a greedy post global balancing algorithm without padding")
+
+    return parser
+
+
+def _add_image_mbs_balance_args(parser):
+    group = parser.add_argument_group(title="MBS_data_balance")
+    group.add_argument("--use-image-mbs-data-balance",
+                       action='store_true',
+                       default=False,
+                       help="Enable data balance")
+    group.add_argument("--mbs_data_balance_sorting_algo", type=str, default="post_mbs_balancing_greedy_without_pad",
+                       help="data balance sorting algorithm:"
+                            "post_mbs_balancing_greedy_without_pad: a greedy post local balancing algorithm without padding")
+
+    return parser
+
+
+def _add_text_dynamic_batching_args(parser):
+    group = parser.add_argument_group(title="text_dynamic_batching")
+    group.add_argument("--use-txt-dynamic-batching",
+                       action='store_true',
+                       default=False,
+                       help="Enable dynamic batching for LLM")
+    group.add_argument("--max-seq-len", type=int, default=2048,
+                       help="max sequence length of concatenated text for each micro batch")
+    group.add_argument("--dynamic-batch-buffer-size", type=int, default=200,
+                       help="the size of dynamic batching buffer")
 
     return parser
 

@@ -63,7 +63,7 @@ from mindspeed_mm.tools.mem_profiler import memory_profiler
 from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.patchs.patch_manager import PatchesManager
 from mindspeed_mm.patchs.ep_patch import finalize_model_grads_wrapper
-from mindspeed_mm.utils.data_balance.data_balance import DataBalance
+from mindspeed_mm.utils.data_balance.data_balance import GBSImageDataBalance
 from mindspeed_mm.utils.random import seed_all
 from mindspeed_mm.utils.dpcp_utils import (
     data_aware_parallel_optimize,
@@ -362,14 +362,14 @@ def train(
     # Data balance initialize
     if args.use_data_balance:
         print_rank_0("[INFO] initializing data_balance ...")
-        data_balance_algo = DataBalance(
+        data_balance_algo = GBSImageDataBalance(
             args.virtual_pipeline_model_parallel_size,
             args.mm_model,
             args.data_balance_sorting_algo,
             len(model),
             train_data_iterator
         )
-        print_rank_0("[INFO] initialize data_balance successfully")
+        print_rank_0("[INFO] initialize GBS image data balance successfully")
         print_rank_0(f"[INFO] image encoder DP (in DataBalance): {data_balance_algo.image_encoder_dp}")
     else:
         data_balance_algo = None
@@ -541,11 +541,20 @@ def train(
             call_backs
         )
         iteration += 1
-        batch_size = (
-            mpu.get_data_parallel_world_size()
-            * args.micro_batch_size
-            * get_num_microbatches()
-        )
+        if args.use_txt_dynamic_batching:
+            dp_process_group = mpu.get_data_parallel_group()
+            num_replicas = dp_process_group.size()
+            batch_size_per_rank = train_data_iterator.iterable.gi_frame.f_locals['dl'].consumed_train_samples
+            batch_size_per_rank = torch.tensor(batch_size_per_rank).npu()
+            batch_size_all_rank = [torch.empty_like(batch_size_per_rank) for _ in range(num_replicas)]
+            torch.distributed.all_gather(batch_size_all_rank, batch_size_per_rank, group=dp_process_group)
+            batch_size = sum(batch_size_all_rank) - args.consumed_train_samples
+        else:
+            batch_size = (
+                mpu.get_data_parallel_world_size()
+                * args.micro_batch_size
+                * get_num_microbatches()
+            )
         args.consumed_train_samples += batch_size
         num_floating_point_operations_so_far += num_floating_point_operations(
             args, batch_size

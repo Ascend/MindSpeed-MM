@@ -60,6 +60,9 @@ class TransformersModel(MultiModalModule):
         if callable(getattr(model_cls, 'overwrite_transformer_config', None)):
             self.transformer_config = model_cls.overwrite_transformer_config(self.transformer_config)
 
+        self.transformer_config.vision_config.use_image_mbs_data_balance = self.config.use_image_mbs_data_balance
+        self.transformer_config.vision_config.mbs_data_balance_sorting_algo = self.config.mbs_data_balance_sorting_algo
+
         if args.init_model_with_meta_device:
             self.model = model_cls._from_config(self.transformer_config).float()
             for m in self.model.modules():

@@ -39,6 +39,7 @@ from mindspeed_mm.models.common.communications import (
     split_forward_gather_backward_with_cp
 )
 from mindspeed_mm.utils.async_offload import async_save_on_cpu
+from mindspeed_mm.utils.data_balance.data_balance import MBSImageDataBalance
 from mindspeed_mm.utils.utils import (
     split_forward_gather_backward_with_megatron_cp,
     gather_forward_split_backward_with_megatron_cp
@@ -166,6 +167,16 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
                 for _ in range(len(config.deepstack_visual_indexes))
             ]
         )
+
+        if config.use_image_mbs_data_balance:
+            if torch.distributed.get_rank() == 0:
+                print("[INFO] initialize image mbs data balance")
+            self.data_balance = MBSImageDataBalance(
+                sorting_algo_name=config.mbs_data_balance_sorting_algo,
+                spatial_merge_size=config.spatial_merge_size
+            )
+        else:
+            self.data_balance = None
 
         self.gradient_checkpointing = False
 
@@ -307,7 +318,12 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         Returns:
             `torch.Tensor`: hidden_states.
         """
-        hidden_states = self.patch_embed(hidden_states)  # s1+s2+s3..., h
+        if self.data_balance is not None:
+            hidden_states, grid_thw = self.data_balance.get_image_balance_data(
+                {'pixel_values': hidden_states, 'image_grid_thw': grid_thw}
+            )
+
+        hidden_states = self.patch_embed(hidden_states) # s1+s2+s3..., h
 
         rotary_pos_emb = self.rot_pos_emb(grid_thw)
 
@@ -368,6 +384,10 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
                 deepstack_feature_lists.append(deepstack_feature)
 
         hidden_states = self.merger(hidden_states)
+        if self.data_balance is not None:
+            hidden_states, deepstack_feature_lists = self.data_balance.reverse_img_balance_data(
+                hidden_states, deepstack_feature_lists
+            )
 
         # Gather outputs from all context parallel ranks for the final result
         set_seq_len("visual", seq_len // self.spatial_merge_size ** 2)
@@ -475,12 +495,18 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         set_seq_len("total", total_seq_len)
 
         if self.config.attn_layout == "TND":
-            seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
+            if "seqlens" not in kwargs.keys():
+                # if kwargs already have key "seqlens" (i.e. the form of input data is TND), do not calculate seqlens again
+                seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
+            else:
+                seqlens_in_batch = kwargs["seqlens"]
             cu_seqlens = F.pad(torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0))
             cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
-            indices = torch.nonzero(attention_mask.flatten(), as_tuple=False).flatten()
             kwargs["cu_seqlens"] = tuple(cu_seqlens.cpu().numpy().tolist())
-            kwargs["indices"] = indices
+            if "indices" not in kwargs.keys():
+                # if kwargs already have key "indices" (i.e. the form of input data is TND), do not calculate indices again
+                indices = torch.nonzero(attention_mask.flatten(), as_tuple=False).flatten()
+                kwargs["indices"] = indices
         else:
             if not self.config.is_causal:
                 attention_mask = create_causal_mask(
@@ -633,6 +659,7 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
         image_grid_thw: Optional[torch.LongTensor] = None,
         video_grid_thw: Optional[torch.LongTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
+        sequence_length: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Different from the original implementation, Qwen3VL use timestamps rather than absolute time position ids."""
 
@@ -647,20 +674,26 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
         vision_start_token_id = self.config.vision_start_token_id
         mrope_position_deltas = []
         if input_ids is not None and (image_grid_thw is not None or video_grid_thw is not None):
-            total_input_ids = input_ids
-            if attention_mask is None:
-                attention_mask = torch.ones_like(total_input_ids)
-            position_ids = torch.ones(
-                3,
-                input_ids.shape[0],
-                input_ids.shape[1],
-                dtype=input_ids.dtype,
-                device=input_ids.device,
-            )
+            if sequence_length is None:
+                total_input_ids = input_ids
+                if attention_mask is None:
+                    attention_mask = torch.ones_like(total_input_ids)
+                position_ids = torch.ones(
+                    3,
+                    input_ids.shape[0],
+                    input_ids.shape[1],
+                    dtype=input_ids.dtype,
+                    device=input_ids.device,
+                )
+                attention_mask = attention_mask.to(total_input_ids.device)
+            else:
+                total_input_ids = input_ids[0].split(sequence_length.tolist())
+                max_input_ids_len = max(sequence_length)
+                position_ids = [None] * len(sequence_length)
             image_index, video_index = 0, 0
-            attention_mask = attention_mask.to(total_input_ids.device)
             for i, input_ids in enumerate(total_input_ids):
-                input_ids = input_ids[attention_mask[i] == 1]
+                if sequence_length is None:
+                    input_ids = input_ids[attention_mask[i] == 1]
                 image_nums, video_nums = 0, 0
                 vision_start_indices = torch.argwhere(input_ids == vision_start_token_id).squeeze(1)
                 vision_tokens = input_ids[vision_start_indices + 1]
@@ -721,8 +754,14 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
                     llm_pos_ids_list.append(torch.arange(text_len).view(1, -1).expand(3, -1) + st_idx)
 
                 llm_positions = torch.cat(llm_pos_ids_list, dim=1).reshape(3, -1)
-                position_ids[..., i, attention_mask[i] == 1] = llm_positions.to(position_ids.device)
-                mrope_position_deltas.append(llm_positions.max() + 1 - len(total_input_ids[i]))
+                if sequence_length is None:
+                    position_ids[..., i, attention_mask[i] == 1] = llm_positions.to(position_ids.device)
+                    mrope_position_deltas.append(llm_positions.max() + 1 - len(total_input_ids[i]))
+                else:
+                    position_ids[i] = llm_positions.to(input_ids.device)
+                    mrope_position_deltas.append(llm_positions.max() + 1 - max_input_ids_len)
+            if sequence_length is not None:
+                position_ids = torch.cat(position_ids, dim=-1).unsqueeze(1)
             mrope_position_deltas = torch.tensor(mrope_position_deltas, device=input_ids.device).unsqueeze(1)
             return position_ids, mrope_position_deltas
         else:
@@ -929,7 +968,8 @@ class Qwen3VLModel(Qwen3VLPreTrainedModel):
                     input_ids,
                     image_grid_thw,
                     video_grid_thw,
-                    attention_mask=attention_mask_tensor,
+                    sequence_length=kwargs.get('seqlens', None),
+                    attention_mask=attention_mask_tensor if kwargs.get('seqlens', None) is None else None,
                 )
                 self.rope_deltas = rope_deltas
             # then use the prev pre-calculated rope-deltas to get the correct position ids

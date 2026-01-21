@@ -22,6 +22,7 @@ from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.data.data_utils.utils import build_iterations, cal_gradient_accumulation_size
 from mindspeed_mm.data.data_utils.constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
 from mindspeed_mm.data.dataloader.dataloader import PrefetchGradAccDataLoader
+from mindspeed_mm.data.dataloader.dynamic_batching_dataloader import DynamicBatchingDataLoader
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.models.transformers_model import TransformersModel
 mindspeed_args = get_mindspeed_args()
@@ -136,9 +137,25 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
             train_dataset, valid_dataset = dataset['train'], dataset['test']
             train_dataloader = build_dataloader(train_dataset)
             valid_dataloader = build_dataloader(valid_dataset)
+            if args.use_txt_dynamic_batching:
+                train_dataloader = DynamicBatchingDataLoader(
+                    train_dataloader,
+                    max_seq_len=args.max_seq_len,
+                    dynamic_batch_buffer_size=args.dynamic_batch_buffer_size,
+                    vision_layout=args.mm.model.image_encoder.vision_encoder.attn_layout,
+                    consumed_train_samples=args.consumed_train_samples,
+                )
             train_dataloader, valid_dataloader, test_dataloader = build_iterations(train_dataloader, valid_dataloader)
         else:
             train_dataloader = build_dataloader(train_dataset)
+            if args.use_txt_dynamic_batching:
+                train_dataloader = DynamicBatchingDataLoader(
+                    train_dataloader,
+                    max_seq_len=args.max_seq_len,
+                    dynamic_batch_buffer_size=args.dynamic_batch_buffer_size,
+                    vision_layout=args.mm.model.image_encoder.vision_encoder.attn_layout,
+                    consumed_train_samples=args.consumed_train_samples,
+                )
             train_dataloader, valid_dataloader, test_dataloader = build_iterations(train_dataloader)
     
     loss_config = getattr(args.mm.model, "loss_cfg", None)
