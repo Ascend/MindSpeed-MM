@@ -29,6 +29,7 @@ from mindspeed_mm.models.transformers.global_vars import (
     set_ep_size,
     set_ep_rank,
     set_check_moe_func,
+    set_ep_group,
     set_ep_fsdp_group,
     get_ep_size,
     get_check_moe_func
@@ -660,6 +661,7 @@ class FSDP2Mixin:
 
         set_ep_size(ep_size)
         set_ep_rank(ep_rank)
+        set_ep_group(ep_group)
         check_moe_fn = partial(check_moe_by_param_name, moe_param_names)
         set_check_moe_func(check_moe_fn)
 
@@ -673,7 +675,7 @@ class FSDP2Mixin:
 
             def shard_placement_fn(*args, **kwargs):
                 return Shard(1)
-            
+
             # if experts shape: [num_experts, input_dim, output_dim], shard_placement_fn = Shard(1)
             # elif experts shape: [num_experts * input_dim, output_dim], shard_placement_fn = Shard(0) (default)
             if any(p.ndim == 3 for p in moe_modules[0].parameters()):

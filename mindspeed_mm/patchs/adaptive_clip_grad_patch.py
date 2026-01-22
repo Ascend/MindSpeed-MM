@@ -107,7 +107,7 @@ def zero_and_clip_grad_(grads, clip_coef=1.0, zero_grad_flag=True):
             multi_tensor_scale_impl, dummy_overflow_buf, [grads, grads], 1 / (clip_coef + 1.0e-6)
         )
 
-    
+
 def get_grad_norm(grads_for_norm, norm_type=2.0, model_parallel_group=None):
     # Calculate norm.
     if norm_type == torch.inf:
@@ -208,7 +208,7 @@ def adaptive_clip_grad_norm_fp32_with_distributed_optimizer(
     nan_norm_flag = 0
     if torch.isnan(grad_norm_before_clip) or torch.isinf(grad_norm_before_clip):
         nan_norm_flag = 1
-        
+
     moving_avg_max_grad_norm = AdaptiveGradClipInfo.moving_avg_max_grad_norm
     moving_avg_max_grad_norm_var = AdaptiveGradClipInfo.moving_avg_max_grad_norm_var
     ema_decay = clip_grad_ema_decay
@@ -217,7 +217,7 @@ def adaptive_clip_grad_norm_fp32_with_distributed_optimizer(
     # initialize
     grad_norm_after_clip = grad_norm_before_clip
 
-    if is_first_step:  
+    if is_first_step:
         moving_avg_max_grad_norm = min(3 * grad_norm_before_clip, 1.0)
         moving_avg_max_grad_norm_var = 0.0
         max_grad_norm_var = moving_avg_max_grad_norm_var
@@ -232,7 +232,7 @@ def adaptive_clip_grad_norm_fp32_with_distributed_optimizer(
         AdaptiveGradClipInfo.clip_coef = clip_coef
         AdaptiveGradClipInfo.max_grad_norm = grad_norm_before_clip
         AdaptiveGradClipInfo.max_grad_norm_after_clip = max_grad_norm_after_clip
-        
+
     else:
         clip_threshold = moving_avg_max_grad_norm + 3.0 * (moving_avg_max_grad_norm_var ** 0.5)
         # For grads that are too large, we believe that the data at this point is extremely abnormal and not suitable for further training, so it is forced to terminate
@@ -310,7 +310,7 @@ def adaptive_clip_grad_norm_optimizer_init_wrapper(init_func):
     return adaptive_clip_grad_norm_optimizer_init
 
 
-# replace megatron DistribtedOptimizer.clip_grad_norm 
+# replace megatron DistribtedOptimizer.clip_grad_norm
 def adaptive_clip_grad_norm_wrapper(fn):
     @wraps(fn)
     def adaptive_clip_grad_norm(*args, **kwargs):
@@ -450,7 +450,12 @@ def clip_grad_by_total_norm_fp32_async(
 
     # Scale.
     clip_coeff = max_norm / (total_norm + 1.0e-6)
-    clip_coeff = clip_coeff.clamp(max=1.0)
+    if isinstance(clip_coeff, torch.Tensor):
+        clip_coeff = clip_coeff.clamp(max=1.0)
+    elif isinstance(clip_coeff, float):
+        clip_coeff = min(clip_coeff, 1.0)
+    else:
+        raise ValueError("clip_coeff must be float or torch.Tensor")
 
     multi_tensor_applier(
         multi_tensor_scale_impl, None, [grads, grads], clip_coeff

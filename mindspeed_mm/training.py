@@ -224,6 +224,12 @@ def pretrain(
     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
         model_provider, model_type, no_wd_decay_cond=no_wd_decay_cond, scale_lr_cond=scale_lr_cond, lr_mult=lr_mult)
 
+    if hasattr(optimizer, "chained_optimizers") and args.use_torch_fsdp2:
+        for sub_optimizer in optimizer.chained_optimizers:
+            if getattr(sub_optimizer, "is_moe_param") == "moe":
+                from mindspeed_mm.models.transformers.global_vars import get_ep_group
+                setattr(sub_optimizer, "grad_stats_parallel_group", get_ep_group())
+
     if getattr(args, "auto_parallel_profile", False):
         from mindspeed.core.auto_parallel.mm_search.memory_modeling import count_module_param
         from mindspeed.core.auto_parallel.mm_search.help import PROFILE_CONTENT
