@@ -1,4 +1,4 @@
-# Copyright 2024 HuggingFace Inc. and the LlamaFactory team.
+# Copyright 2025 HuggingFace Inc. and the LlamaFactory team.
 #
 # This code is inspired by the HuggingFace's transformers library.
 # https://github.com/huggingface/transformers/blob/v4.40.0/examples/pytorch/language-modeling/run_clm.py
@@ -85,4 +85,13 @@ class ProcessorArguments:
     audio_sampling_rate: int = field(
         default=16000,
         metadata={"help": "The sampling rate of audio inputs."},
+    )
+    trust_remote_code: bool = field(
+        default=False,
+        metadata={"help": "Whether or not to allow for custom models defined on the Hub in their own modeling files."},
+    )
+    fix_mistral_regex: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether or not to fix the Mistral tokenizer's regex issue (specifically for Mistral/Mixtral models with incorrect spaces)."},
     )

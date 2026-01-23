@@ -1013,9 +1013,13 @@ def load_tokenizer(model_args: "ProcessorArguments") -> "TokenizerModule":
 
     Note: including inplace operation of model_args.
     """
+    fix_mistral_regex = getattr(model_args, "fix_mistral_regex", False)
+    trust_remote_code = getattr(model_args, "trust_remote_code", False)
     config = AutoConfig.from_pretrained(model_args.model_name_or_path, local_files_only=True)
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
+        trust_remote_code=trust_remote_code,
+        fix_mistral_regex=fix_mistral_regex,
         use_fast=model_args.use_fast_tokenizer,
         split_special_tokens=model_args.split_special_tokens,
         padding_side="right", local_files_only=True

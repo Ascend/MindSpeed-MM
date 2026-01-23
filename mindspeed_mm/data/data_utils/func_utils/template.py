@@ -23,7 +23,7 @@ from typing_extensions import override
 from transformers import PreTrainedTokenizer
 
 from mindspeed_mm.data.data_utils.func_utils.convert import Role
-from mindspeed_mm.data.data_utils.func_utils.formatters import EmptyFormatter, Formatter, StringFormatter
+from mindspeed_mm.data.data_utils.func_utils.formatters import EmptyFormatter, Formatter, StringFormatter, FunctionFormatter, ToolFormatter
 from mindspeed_mm.data.data_utils.func_utils.formatters import SLOTS
 from mindspeed_mm.data.data_utils.func_utils.log import get_logger
 from mindspeed_mm.data.data_utils.func_utils.mm_plugin import get_mm_plugin
@@ -44,6 +44,8 @@ class Template:
     format_system: "Formatter"
     format_observation: "Formatter"
     format_prefix: "Formatter"
+    format_function: "Formatter"
+    format_tools: "Formatter"
     format_tool: "Formatter"
     default_system: str
     stop_words: List[str]
@@ -51,6 +53,7 @@ class Template:
     replace_eos: bool
     enable_thinking: Optional[bool]
     thought_words: tuple[str, str]
+    tool_call_words: tuple[str, str]
     mm_plugin: "BasePlugin"
 
     def encode_oneturn(
@@ -248,7 +251,10 @@ class RegisterParams:
     format_system: Optional["Formatter"] = None,
     format_observation: Optional["Formatter"] = None
     format_prefix: Optional["Formatter"] = None
+    format_function: Optional["Formatter"] = None
+    format_tools: Optional["Formatter"] = None
     tool_prompt: Optional["Formatter"] = None
+    tool_call_words: Optional[tuple[str, str]] = None
     default_system: str = ""
     stop_words: Optional[Sequence[str]] = None
     efficient_eos: bool = False
@@ -300,11 +306,14 @@ def _register_template(
         format_user=params.format_user or default_user_formatter,
         format_assistant=params.format_assistant or default_assistant_formatter,
         format_system=params.format_system or default_user_formatter,
+        format_function=params.format_function or default_user_formatter,
+        format_tools=params.format_tools or default_user_formatter,
         format_observation=params.format_observation or params.format_user or default_user_formatter,
         format_prefix=params.format_prefix or default_prefix_formatter,
         format_tool=params.tool_prompt or None,
         default_system=params.default_system,
         stop_words=[] if params.stop_words is None else params.stop_words,
+        tool_call_words=params.tool_call_words or ("", ""),
         efficient_eos=params.efficient_eos,
         replace_eos=params.replace_eos,
         enable_thinking=params.enable_thinking,
@@ -466,6 +475,22 @@ _register_template(
     ),
     mm_plugin=get_mm_plugin(name="glm4.1v", image_token="<|image|>", video_token="<|video|>"),
     template_class=ReasoningTemplate
+)
+
+
+_register_template(
+    name="mistral",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["[INST]{{content}}[/INST]"]),
+        format_system=StringFormatter(slots=["[SYSTEM_PROMPT]{{content}}[/SYSTEM_PROMPT]"]),
+        format_function=FunctionFormatter(slots=["[TOOL_CALLS]{{content}}", {"eos_token"}], tool_format="mistral"),
+        format_observation=StringFormatter(slots=["""[TOOL_RESULTS]{"content": {{content}}}[/TOOL_RESULTS]"""]),
+        default_system="""First draft your thinking process (inner monologue) until you arrive at a response. Format your response using Markdown, and use LaTeX for any mathematical equations. Write both your thoughts and the response in the same language as the input.
+Your thinking process must follow the template below:[THINK]Your thoughts or/and draft, like working through an exercise on scratch paper. Be as casual and as long as you want until you are confident to generate the response. Use the same language as the input.[/THINK]Here, provide a self-contained response.      """,
+        format_tools=ToolFormatter(tool_format="mistral"),
+        format_prefix=EmptyFormatter(slots=[{"bos_token"}]),
+    ),
+    mm_plugin=get_mm_plugin(name="pixtral", image_token="[IMG]"),
 )
 
 
