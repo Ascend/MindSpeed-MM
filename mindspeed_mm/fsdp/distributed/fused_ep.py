@@ -19,7 +19,7 @@ import torch
 import torch.distributed as dist
 import torch_npu
 
-from mindspeed.lite.distributed.dist_ops import all_to_all as _all_to_all
+from mindspeed.fsdp.distributed.dist_ops import all_to_all as _all_to_all
 
 
 def all_to_all(

@@ -63,13 +63,13 @@ data:
       train_on_prompt: false
       mask_history: false
       # tool_format: null
-      dataset_dir: /home/c00913881/czg/code/LLaMA-Factory/data/
-      dataset: &DATASET_PATH /home/c00913881/czg/code/LLaMA-Factory/data/mllm_format_llava_instruct_data.json
-      cache_dir: ../cache_dir/
+      dataset_dir: LLaMA-Factory/data/
+      dataset: &DATASET_PATH LLaMA-Factory/data/mllm_format_llava_instruct_data.json
+      cache_dir: ./cache_dir/
       overwrite_cache: false
       preprocessing_batch_size: 1000
       preprocessing_num_workers: 16
-      max_samples: 100
+      max_samples: 10000
 
   # 数据加载
   dataloader_param:
@@ -106,8 +106,8 @@ training:
   optimizer: adamw
   adam_fused: true
   save_interval: 10000
-  load: load
-  save: save
+  load: load_path
+  save: save_path
   use_deter_comp: false
   profile:
     enable: false

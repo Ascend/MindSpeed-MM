@@ -11,7 +11,6 @@ from torch.distributed.distributed_c10d import _get_default_group
 from megatron.core import mpu
 from megatron.training import get_args, print_rank_0
 
-from mindspeed_mm.fsdp.distributed.parallel_state import is_lite_initialized, get_parallel_state
 from mindspeed_mm.data.dataloader.dataloader import (
     prepare_base_dataloader,
     prepare_sampler_dataloader,
@@ -108,12 +107,8 @@ def build_mm_dataloader(dataset, dataloader_param, process_group=None, consumed_
     if "dataloader_mode" not in dataloader_param:
         raise AssertionError("Key parameter missing: dataloader_mode")
     dataloader_mode = dataloader_param.pop("dataloader_mode")
-    if is_lite_initialized():
-        if process_group is None:
-            ps = get_parallel_state()
-            process_group = ps.get_dp_group()
-            dataloader_param.update({"batch_size": dataloader_param.micro_batch_size})
-    else:
+
+    if mpu.is_initialized():
         if process_group is None:
             process_group = mpu.get_data_parallel_group()
         args = get_args()

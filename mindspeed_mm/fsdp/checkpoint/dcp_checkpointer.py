@@ -21,7 +21,7 @@ from torch.distributed.checkpoint.state_dict import (
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 
-from mindspeed.lite.utils.log import print_rank
+from mindspeed.fsdp.utils.log import print_rank
 from ..distributed.parallel_state import get_parallel_state
 from ..utils.device import empty_cache, synchronize
 from .checkpointer import CheckpointerBase

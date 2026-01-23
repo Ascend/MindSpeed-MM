@@ -6,9 +6,9 @@ import torch
 from torch.distributed.fsdp import fully_shard, MixedPrecisionPolicy
 from torch.distributed.device_mesh import DeviceMesh
 
-from mindspeed.lite.utils.log import print_rank
-from mindspeed.lite.utils.str_match import module_name_match
-from mindspeed.lite.distributed.fully_shard_parallel.fully_shard_parallel import get_ignored_modules
+from mindspeed.fsdp.utils.log import print_rank
+from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed.fsdp.distributed.fully_shard_parallel.fully_shard_parallel import get_ignored_modules
 
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
 

@@ -10,7 +10,7 @@ from transformers.training_args import TrainingArguments
 from megatron.training import get_args
 from megatron.training.utils import is_rank0
 
-from mindspeed_mm.fsdp.distributed.parallel_state import is_lite_initialized, get_parallel_state
+from mindspeed_mm.fsdp.distributed.parallel_state import is_parallel_state_initialized, get_parallel_state
 from mindspeed_mm.data.data_utils.func_utils.convert import (
     DataArguments,
     DataArgumentsForRewardVideo,
@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 
 class DistributedIterableDataset(IterableDataset):
     def __init__(self, dataset, rank=None):
-        if is_lite_initialized():
+        if is_parallel_state_initialized():
             ps = get_parallel_state()
             self.data_parallel_size = ps.get_dp_group_size()
         else:
@@ -49,7 +49,7 @@ class DistributedIterableDataset(IterableDataset):
 
 def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
     data_args = DataArguments(**basic_param)
-    if not is_lite_initialized():
+    if not is_parallel_state_initialized():
         data_args.cutoff_len = get_args().seq_length
     process_args = ProcessorArguments(**preprocess_param)
     dataset_attr = DatasetAttr(**dataset_param["attr"])

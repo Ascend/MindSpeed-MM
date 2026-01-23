@@ -5,9 +5,9 @@ from torch.distributed.fsdp import fully_shard, MixedPrecisionPolicy
 from torch.distributed.tensor import Shard
 from torch.distributed.distributed_c10d import ReduceOp
 
-from mindspeed.lite.mindspeed_lite_config import EPPlanConfig
-from mindspeed.lite.utils.log import print_rank
-from mindspeed.lite.utils.str_match import module_name_match
+from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
+from mindspeed.fsdp.utils.log import print_rank
+from mindspeed.fsdp.utils.str_match import module_name_match
 
 logger = logging.getLogger(__name__)
 

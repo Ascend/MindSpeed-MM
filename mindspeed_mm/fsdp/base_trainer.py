@@ -9,9 +9,9 @@ import sys
 import torch
 import yaml
 
-from mindspeed.lite.utils.log import print_rank, set_log_level
-from mindspeed.lite.utils.device import set_accelerator_compatible
-from mindspeed.lite.utils.random import set_seed
+from mindspeed.fsdp.utils.log import print_rank, set_log_level
+from mindspeed.fsdp.utils.device import set_accelerator_compatible
+from mindspeed.fsdp.utils.random import set_seed
 
 from mindspeed_mm.fsdp.params.data_args import DataArguments
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
@@ -120,7 +120,7 @@ class BaseTrainer:
     
     def initialize(self):
         """Initialize training environment: logging, random seeds, distributed groups."""
-        print_rank(logger.info, f"Starting Lite Initialization!!!")
+        print_rank(logger.info, f"Start initializing training environment!!!")
 
         # Set accelerator compatibility and logging level
         set_accelerator_compatible(get_torch_device())
@@ -163,9 +163,16 @@ class BaseTrainer:
         ps = get_parallel_state()
 
         datasets = build_mm_dataset(data_config.dataset_param)
+        dataloader_param = data_config.dataloader_param.to_dict()
+        dataloader_param.update(
+            {
+                "batch_size": self.training_args.micro_batch_size,
+                "seed": self.training_args.seed,
+            }
+        )
         build_dataloader = partial(
             build_mm_dataloader,
-            dataloader_param=data_config.dataloader_param,
+            dataloader_param=dataloader_param,
             process_group=ps.get_dp_group(),
             dataset_param=data_config.dataset_param,
             consumed_samples=self.consumed_train_samples

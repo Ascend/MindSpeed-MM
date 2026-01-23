@@ -8,11 +8,11 @@ import torch
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import Shard, DTensor, Replicate, distribute_tensor, distribute_module
 
-from mindspeed.lite.distributed.expert_parallel.dispatcher import get_experts_forward_fn
-from mindspeed.lite.distributed.expert_parallel.dispatcher_mc2 import get_experts_forward_mc2_fn
-from mindspeed.lite.mindspeed_lite_config import EPPlanConfig
-from mindspeed.lite.utils.log import print_rank
-from mindspeed.lite.utils.str_match import module_name_match
+from mindspeed.fsdp.distributed.expert_parallel.dispatcher import get_experts_forward_fn
+from mindspeed.fsdp.distributed.expert_parallel.dispatcher_mc2 import get_experts_forward_mc2_fn
+from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
+from mindspeed.fsdp.utils.log import print_rank
+from mindspeed.fsdp.utils.str_match import module_name_match
 
 from .fused_ep import fused_ep_forward
 

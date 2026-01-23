@@ -10,8 +10,6 @@ import torch
 from torch.distributed.device_mesh import init_device_mesh, DeviceMesh
 from torch.distributed import ProcessGroup
 
-from mindspeed.lite.utils.log import print_rank
-from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
 from mindspeed_mm.fsdp.utils.device import get_device_type
 
 
@@ -94,7 +92,8 @@ class ParallelState(metaclass=Singleton):
         self.ep_fsdp_device_mesh = init_device_mesh(device_type=get_device_type(), mesh_shape=mesh_shape, mesh_dim_names=mesh_dim_names)
         self.register_funcs(self.ep_fsdp_device_mesh, mesh_dim_names)
 
-        print_rank(logger.info, f'Parallel state initialized:\n {self.__str__()}')
+        if torch.distributed.get_rank() == 0:
+            logger.info(f'Parallel state initialized:\n {self.__str__()}')
 
     def __str__(self):
         info = ''
@@ -236,7 +235,7 @@ def get_parallel_state() -> ParallelState:
     return _PARALLEL_STATE
 
 
-def is_lite_initialized():
+def is_parallel_state_initialized():
     """Useful for code segments that may be accessed with or without mpu initialization"""
     global _PARALLEL_STATE
     return _PARALLEL_STATE is not None

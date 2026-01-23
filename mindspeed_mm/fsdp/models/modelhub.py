@@ -7,8 +7,8 @@ import torch.distributed as dist
 from transformers import AutoConfig
 from accelerate import init_empty_weights
 
-from mindspeed.lite.utils.str_match import module_name_match
-from mindspeed.lite.utils.log import print_rank
+from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed.fsdp.utils.log import print_rank
 
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
