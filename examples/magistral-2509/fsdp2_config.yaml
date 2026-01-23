@@ -1,0 +1,20 @@
+sharding_size: auto
+reshard_after_forward: True
+sub_modules_to_wrap:
+  - language_model.embed_tokens
+  - language_model.layers.{*}
+  - vision_tower.transformer.layers.{*}
+  - multi_modal_projector.linear_1
+  - multi_modal_projector.linear_2
+  - lm_head
+recompute_modules:
+  - language_model.embed_tokens
+  - language_model.layers.{*}
+  - vision_tower.transformer.layers.{*}
+  - lm_head
+param_dtype: "bf16"
+reduce_dtype: "bf16"
+cast_forward_inputs: True
+num_to_forward_prefetch: 1
+num_to_backward_prefetch: 1
+offload_to_cpu: False

@@ -1,0 +1,27 @@
+{
+    "model_id": "mistral3",
+    "init_from_hf_path": "/path/to/Magistral-Small-2509",
+    "image_token_index": 10,
+    "text_decoder": {
+        "model_id": "mistral",
+        "num_layers": 40,
+        "hidden_size": 5120,
+        "num_attention_heads": 32,
+        "max_position_embeddings": 131072,
+        "freeze": false
+    },
+    "vision_encoder": {
+        "model_id": "pixtral",
+        "num_layers": 24,
+        "hidden_size": 1024,
+        "num_attention_heads": 16,
+        "freeze": false
+    },
+    "vision_projector": {
+        "freeze": false
+    },
+    "patch": {
+        "clip_grad_async": true,
+        "scale_grad": true
+    }
+}
