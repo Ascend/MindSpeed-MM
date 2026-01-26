@@ -81,7 +81,7 @@
 
 <a id="jump3"></a>
 
-## 准备工作
+### 准备工作
 
 1. 【准备微调数据集】
 
@@ -243,11 +243,15 @@ FLUX 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
 <a id="jump6"></a>
 
-## 准备工作
+### 准备工作
 
 1. 【准备微调数据集】
 
     - 用户需自行获取并解压[kontext-community/relighting](https://huggingface.co/datasets/kontext-community/relighting)数据集，并在以下启动shell脚本中将`dataset_name`参数设置为本地数据集的绝对路径
+
+    ```shell
+    vim finetune_i2i_flux2_dreambooth_lora_fsdp_bf16.sh
+    ```
 
     ```shell
     dataset_name="kontext-community/relighting" # 数据集路径

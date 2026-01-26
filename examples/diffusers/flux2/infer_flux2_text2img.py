@@ -21,8 +21,8 @@ apply_patches()
 
 # --- Setup Environments ---
 OUTPUT_PATH = "./infer_result"  # Output path
-MODEL_PATH = "/data/datasets/FLUX.2-dev"  # Model path
-LORA_WEIGHTS = "./logs_t2i_5000/pytorch_lora_weights.safetensors"  # Path for saved LoRA
+MODEL_PATH = "black-forest-labs/FLUX.2-Kontext-dev"  # Model path
+LORA_WEIGHTS = "./logs_t2i/pytorch_lora_weights.safetensors"  # Path for saved LoRA
 PROMPT = (
     "Realistic macro photograph of a hermit crab using a soda can as its shell, "
     "partially emerging from the can, captured with sharp detail and natural colors, "
