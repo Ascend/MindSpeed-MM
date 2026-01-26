@@ -1,0 +1,283 @@
+训练参数
+===========================
+
+
+.. raw:: html
+
+    <a id="train_args"></a>
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            /* 基础表格样式 */
+            table {
+                width: 100%;
+                border-collapse: collapse; /* 合并边框，使线条更细 */
+                margin: 20px 0;
+                font-family: sans-serif;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.05); /* 添加轻微阴影 */
+            }
+
+            /* 表头样式 */
+            thead th {
+                background-color: #2c3e50; /* 深色背景 */
+                color: white;
+                padding: 12px 15px;
+                text-align: left;
+                font-weight: bold;
+                border-bottom: 3px solid #3498db; /* 底部边框 */
+            }
+
+            /* 单元格通用样式 */
+            td, tbody th {
+                padding: 12px 15px;
+                border: 1px solid #ddd; /* 浅灰色边框 */
+                vertical-align: top; /* 内容顶部对齐 */
+                line-height: 1.5;
+            }
+
+            /* 模块类型列样式 (第一列) */
+            td:first-child,
+            tbody th {
+                background-color: #f8f9fa; /* 轻微灰色背景 */
+                font-weight: bold;
+                color: #2c3e50;
+            }
+
+            /* 行交替背景色，提高可读性 */
+            tbody tr:nth-child(even) {
+                background-color: #f8f9fa;
+            }
+            tbody tr:hover {
+                background-color: #e9f7fe; /* 悬停高亮 */
+            }
+
+            /* 代码块样式 */
+            code {
+                background-color: #eee;
+                font-family: 'Courier New', Courier, monospace;
+                padding: 2px 6px;
+                border-radius: 3px;
+                color: #c7254e;
+                font-size: 0.9em;
+            }
+
+            /* 标题样式 */
+            caption {
+                font-size: 1.5em;
+                font-weight: bold;
+                margin: 10px 0;
+                color: #2c3e50;
+            }
+        </style>
+    </head>
+    <body>
+        <table>
+        <thead>
+            <tr style="background-color: #f5f5f5;">
+            <th style="text-align: left;">参数分类</th>
+            <th style="text-align: left;">参数名称</th>
+            <th style="text-align: left;">描述</th>
+            <th style="text-align: left;">取值</th>
+            <th style="text-align: left;">默认值</th>
+            <th style="text-align: left;">注意事项</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td rowspan="6" style="vertical-align: middle; font-weight: bold;">分布式相关参数</td>
+                <td><code>--nproc_per_node</code></td>
+                <td>每个节点的device数量</td>
+                <td>整数值</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--nnodes</code></td>
+                <td>节点个数</td>
+                <td>整数值</td>
+                <td>-</td>
+                <td>单机设置为<code>1</code>，多机设置<code>&gt1</code></td>
+            </tr>
+            <tr>
+                <td><code>--node_rank</code></td>
+                <td>节点编号</td>
+                <td>整数</td>
+                <td><code>0</code></td>
+                <td>通常0为主节点</td>
+            </tr>
+            <tr>
+                <td><code>--master_addr</code></td>
+                <td>主节点地址</td>
+                <td>节点的ip地址</td>
+                <td><code>localhost</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--master_port</code></td>
+                <td>主节点的端口号</td>
+                <td>整数</td>
+                <td><code>6000</code></td>
+                <td>注意端口冲突，最好不要设置为知名端口</td>
+            </tr>
+            <tr>
+                <td><code>--distributed-backend</code></td>
+                <td>分布式后端</td>
+                <td>GPU: <code>hccl</code>, NPU: <code>nccl</code>:, CPU: <code>gloo</code>, HPC: <code>mpi</code></td>
+                <td><code>hccl</code></td>
+                <td><code>hccl</code>会被<code>torch_npu</code> patch成为<code>nccl</code></td>
+            </tr>
+            
+            <tr>
+                <td rowspan="3" style="vertical-align: middle; font-weight: bold;">MM配置</td>
+                <td><code>--mm-data</code></td>
+                <td>数据集相关配置</td>
+                <td>json配置文件路径</td>
+                <td>-</td>
+                <td><code><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/数据配置.html">配置可以参考数据配置</code></td>
+            </tr>
+            <tr>
+                <td><code>--mm-model</code></td>
+                <td>模型相关配置</td>
+                <td>json配置文件路径</td>
+                <td>-</td>
+                <td><code><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/模型配置.html">配置可以参考模型配置</code></td>
+            </tr>
+            <tr>
+                <td><code>--mm-tool</code></td>
+                <td>工具相关配置</td>
+                <td>json配置文件路径</td>
+                <td><code>./mindspeed_mm/tools/tools.json</code></td>
+                <td><code><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/工具配置.html">配置可以参考工具配置</code></td>
+            </tr>
+            
+            <tr>
+                <td rowspan="17" style="vertical-align: middle; font-weight: bold;">GPT_ARGS</td>
+                <td><code>--use-mcore-models</code></td>
+                <td>使用mcore模型</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--tensor-model-parallel-size</code></td>
+                <td>TP并行度设置</td>
+                <td>整数值</td>
+                <td><code>1</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--pipeline-model-parallel-size</code></td>
+                <td>PP并行度设置</td>
+                <td>整数值</td>
+                <td><code>1</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--micro-batch-size</code></td>
+                <td>MBS设置</td>
+                <td>整数值</td>
+                <td><code>1</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--global-batch-size</code></td>
+                <td>GBS设置</td>
+                <td>整数值</td>
+                <td><code>$(($MBS*$GRAD_ACC_STEP*$DP))</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--num-workers</code></td>
+                <td>数据dataloader的进程数</td>
+                <td>整数值</td>
+                <td><code>1</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--lr</code></td>
+                <td>最大学习率</td>
+                <td>浮点数</td>
+                <td><code>-</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--min-lr</code></td>
+                <td>最小学习率</td>
+                <td>浮点数</td>
+                <td><code>-</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--adam-beta1</code></td>
+                <td>Adam优化器一阶矩超参数</td>
+                <td>浮点数</td>
+                <td><code>0.9</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--adam-beta2</code></td>
+                <td>Adam优化器二阶矩超参数</td>
+                <td>浮点数</td>
+                <td><code>0.999</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--adam-eps</code></td>
+                <td>adam_epsilon，防止分母为零</td>
+                <td>浮点数</td>
+                <td><code>1e-8</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--lr-decay-style</code></td>
+                <td>学习率衰减策略</td>
+                <td><code>constant</code>, <code>linear</code>, <code>cosine</code>, <code>inverse-square-root</code>, <code>WSD</code></td>
+                <td><code>linear</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--weight-decay</code></td>
+                <td>L2 正则化的超参数，用于防止模型过拟合</td>
+                <td>浮点数</td>
+                <td><code>0.1</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--lr-warmup-init</code></td>
+                <td>学习率预热的初始值</td>
+                <td>浮点数</td>
+                <td><code>0.0</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--lr-warmup-iters</code></td>
+                <td>学习率线性预热的迭代步数参数</td>
+                <td>整数</td>
+                <td><code>0</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--clip-grad</code></td>
+                <td>梯度裁剪的超参数</td>
+                <td>浮点数</td>
+                <td><code>1.0</code></td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><code>--train-iters</code></td>
+                <td>训练迭代次数</td>
+                <td>整数</td>
+                <td><code>-</code></td>
+                <td>-</td>
+            </tr>
+        </tbody>
+        </table>
+    </body>
+    </html>
+
+
+.. note::
+    更多Megatron和MindSpeed args可以参考 ``megatron/training/arguments.py`` 和 ``mindspeed/arguments.py``

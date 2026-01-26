@@ -1,0 +1,115 @@
+工具配置
+==========
+
+工具包括 性能profiler, 显存快照, SoRA模型特征提取工具, 以下分别介绍: 
+
+配置文件路径: ``mindspeed_mm/tools/tools.json``
+
+
+性能profiler
+----------------
+
+通用设置
+^^^^^^^^^^^
+.. code:: json
+
+    {
+        "profile": {
+            "enable": false,                     // 是否开启profiling采集
+            "profile_type": "static",            // 动态或静态的profiling采集类型, static / dynamic
+            "ranks": [0, 1, 2, 3],               // profiling采集的rank, -1 为采集全部rank
+        },
+        ......
+    }
+
+静态采集
+^^^^^^^^^^
+
+Static Profile静态采集功能为执行模型训练过程中的指定的steps区间进行采集, 操作步骤如下：
+
+在模型config设置里开启enable采集开关，设置profile_type 为 static, 设置 ranks
+
+配置静态采集的相关参数
+
+.. code:: json
+
+    {
+        "profile": {
+            ......
+            "static_param": {
+                "level": "level1",                            // profiling采集的level选择: level0, level1, level2
+                "with_stack": false,                          // 是否采集算子调用栈
+                "with_memory": false,                         // 是否采集内存占用情况
+                "record_shapes": false,                       // 是否采集算子的InputShapes和InputTypes
+                "with_cpu": true,                             // 是否采集CPU信息
+                "save_path": "./npu_profiling",               // profiling的保存路径
+                "start_step": 10,                             // 启动采集的步数
+                "end_step": 11,                               // 结束采集的步数
+                "data_simplification": false,                 // 是否采用简化数据
+                "aic_metrics_type": "PipeUtilization"         // 采集模式，目前支持PipeUtilization和ArithmeticUtilization两种，默认采用PipeUtilization
+            },
+            ......
+        },
+        ......
+    }
+
+动态采集
+^^^^^^^^^^
+
+Dynamic Profile动态采集功能可在执行模型训练过程中随时开启采集进程，操作步骤如下：
+
+在模型config设置里开启enable采集开关，设置profile_type 为 dynamic, 设置 ranks
+
+配置动态采集的相关参数
+
+.. code:: json
+
+    {
+        "profile": {
+            ......
+            "dynamic_param": {
+                "config_path": "path to dynamic config folder"       # config与log文件的路径
+            }
+        },
+        ......
+    }
+
+.. note::
+    当config_path指向空文件夹会自动生成profiler_config.json文件， 在模型运行过程中，随时修改profiler_config.json文件配置，profiling采集会在下一个step生效并开启
+    profiler_config.json 配置当时可以参考： `采集并解析性能数据（dynamic_profile） <https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118>`_ 
+
+
+内存快照
+----------------------
+
+.. code:: json
+
+    {
+        ......
+        "memory_profile": {
+            "enable": false,                           是否开启内存采集
+            "start_step": 0,                           开始录制的步数。训练步数的起始点，0代表初始化过程
+            "end_step": 2,                             结束录制的步数。数值为训练步数的起始点，0代表初始化过程
+            "save_path": "./memory_snapshot",          快照文件保存路径
+            "dump_ranks": [0],                         录制快照的rank列表，从0开始
+            "stacks": "all",                           堆栈信息录制。可选项：python/all
+            "max_entries": null,                       最大记录数，null则无限制
+            "mem_info":  false
+        },
+        ......
+    }
+
+
+SoRA类模型特征提取
+----------------------
+
+.. code:: json
+
+    {
+        ......
+        "sorafeature":{
+            "save_path": "./sora_features",                    保存路径
+            "extract_video_feature": false,                    是否提取视频特征
+            "extract_text_feature: false                       是否提取文本特征
+        }
+    }

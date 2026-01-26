@@ -1,0 +1,61 @@
+数据配置
+===========================
+
+以 `examples/qwen3vl/data_30.json <https://gitcode.com/cxiaolong/MindSpeed-MM_ulysses/blob/master/examples/qwen3vl/data_30B.json>`_ 为例：
+
+.. code:: json
+
+    {
+        "dataset_param": {
+            "dataset_type": "huggingface",                                           // 数据集类型，在 mindspeed_mm/data/build_mm_dataset 函数中解析，拿到对应DataSet类
+            "preprocess_parameters": {                                               // 预处理参数，是具体DataSet的入参
+                "model_name_or_path": "./ckpt/hf_path/Qwen3-VL-30B-Instruct",        
+                "use_fast_tokenizer": true,
+                "split_special_tokens": false,
+                "image_max_pixels": 262144,
+                "image_min_pixels": 1024,
+                "video_max_pixels": 16384,
+                "video_min_pixels": 0,
+                "video_fps": 2.0,
+                "video_maxlen": 64
+            },
+            "basic_parameters": {                                                   // 基础参数，是具体DataSet的入参
+                "template": "qwen3_vl_nothink",
+                "dataset_dir": "./data",
+                "dataset": "./data/mllm_format_llava_instruct_data.json",
+                "cache_dir": "./data/cache_dir",
+                "enable_thinking": false,
+                "overwrite_cache": false,
+                "train_on_prompt": false,
+                "mask_history": false,
+                "preprocessing_batch_size": 1000,
+                "preprocessing_num_workers": 16,
+                "max_samples": null,
+                "tool_format": null
+            },
+            "attr": {                                                              // 在 get_qwen2vl_dataset 中解析
+                "system": null,
+                "images": "images",
+                "videos": null,
+                "messages": "messages",
+                "role_tag": "role",
+                "content_tag": "content",
+                "user_tag": "user",
+                "assistant_tag": "assistant",
+                "observation_tag": null,
+                "function_tag": null,
+                "system_tag": null
+            }
+        },
+        "dataloader_param": {                                                      // DataLoader相关参数， 在 mindspeed_mm/data/build_mm_dataloader 函数中解析，拿到对应DataLoader类
+            "dataloader_mode": "sampler",
+            "drop_last": true,
+            "sampler_type": "BaseRandomBatchSampler",
+            "collate_param": {
+                "model_name": "qwen3vl",
+                "ignore_pad_token_for_loss": true
+            },
+            "pin_memory": true,
+            "shuffle": true
+        }
+    }

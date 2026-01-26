@@ -1,0 +1,21 @@
+/* 核心：移除内容区域的宽度限制 */
+.wy-nav-content {
+    max-width: none !important;
+}
+/* 可选：增加最大宽度但保持响应式，例如在超大屏幕上限制为1200px */
+/* .wy-nav-content {
+    max-width: 1200px !important;
+} */
+
+/* 为所有Mermaid图表设置样式 */
+.mermaid {
+    max-width: 100%; /* 图表最大宽度为容器宽度 */
+    text-align: center; /* 居中显示 */
+}
+/* 如果需要更精细的控制，可以指定一个具体的尺寸 */
+.mermaid svg {
+    width: 1000px; /* 设置SVG画布宽度 */
+    height: 600px; /* 设置SVG画布高度 */
+}
+
+#training_flow > svg { width: 1000px }

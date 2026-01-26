@@ -1,0 +1,217 @@
+权重转换
+===========================================================================
+Last updated: 12/19/2025. Author: Vectorwh
+
+背景与挑战
+-------------------------------------------------------------------------------
+
+MindSpeed-MM权重格式为megatron格式，与Hugging Face权重格式不同：以qwen模型为例，megatron格式的注意力机制中qkv权重、mlp的gate、up权重是合并在一起的，Hugging Face权重格式则是单独的；Megatron训练时需要进行pp、tp切分等，需要转换才能使用。
+
+
+解决方案
+-----------------------------------------------------------------------------------
+
+使用jsonargparse命令行+pydantic参数校验，开发一套统一权重转换工具，将MindSpeed-MM权重格式转换为Hugging Face权重格式，并添加权重转换工具到MindSpeed-MM中，方便用户使用。
+
+优点：
+
+1. **架构设计**：权重转换采用算子化设计，大幅减少冗余代码，转换入口与业务逻辑解耦，使整体架构更加清晰、易于维护。
+
+2. **类型安全与参数校验**：具备完善的类型注解和强大的静态检查能力，参数校验与业务代码分离，确保类型安全，同时支持通过shell脚本、环境变量、配置文件等多种方式传参，使用便捷灵活。
+
+3. **高质量与高可靠性**：设计明确的权重转换规则，并配有完整的UT测试用例，有效保障转换过程的正确性和稳定性，提升整体代码质量。
+
+
+使用方法
+-----------------------------------------------------------------------------------
+
+使用方式：
+::::::::::::::::::
+
+使用 ``-h`` 或 ``help`` 参数查看所有参数
+
+.. code:: bash
+
+    [root@node-xx-xx MindSpeed-MM]# mm-convert  -h
+    usage: mm-convert [-h] [--config CONFIG] [--print_config[=flags]] {Qwen2VLConverter,InternVLConverter} ...
+
+    options:
+      -h, --help            Show this help message and exit.
+      --config CONFIG       Path to a configuration file.
+      --print_config[=flags]
+                            Print the configuration after applying all other arguments and exit. The optional flags customizes the output and are one or more
+                            keywords separated by comma. The supported flags are: comments, skip_default, skip_null.
+
+    subcommands:
+      For more details of each subcommand, add it as an argument followed by --help.
+
+      Available subcommands:
+        Qwen2VLConverter    Qwen2VL模型转换工具
+        InternVLConverter   InternVL2.5/InternVL3模型转换工具
+
+
+
+可用到其中支持的子命令包括 ``Qwen2VLConverter`` 、 ``InternVLConverter`` 等
+
+继续对 ``Qwen2VLConverter`` 命令进行help可以看到
+
+.. code:: bash
+
+    [root@node-xx-xx MindSpeed-MM]# mm-convert  Qwen2VLConverter -h
+    usage: mm-convert [options] Qwen2VLConverter [-h] [--config CONFIG] [--print_config[=flags]] {hf_to_mm,mm_to_hf,resplit} ...
+    ...
+    subcommands:
+      For more details of each subcommand, add it as an argument followed by --help.
+
+      Available subcommands:
+        hf_to_mm            huggingface模型转换mindspeed-mm模型权重
+        mm_to_hf            mindspeed-mm模型转换huggingface模型权重
+        resplit             mindspeed-mm模型权重重新切分
+
+
+
+继续对子命令 ``hf_to_mm`` 命令进行help可以看到具体的参数
+
+.. code:: bash
+
+    mm-convert  Qwen2VLConverter hf_to_mm -h
+
+
+传参方式
+:::::::::::::::::::
+
+支持三种传参方式：
+
+命令行参数
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: bash
+
+    mm-convert  Qwen2VLConverter hf_to_mm \
+      --cfg.mm_dir "mm/Qwen2-VL-7B-Instruct" \
+      --cfg.hf_config.hf_dir "hf/Qwen2-VL-7B-Instruct" \
+      --cfg.parallel_config.llm_pp_layers [[1,10,10,7]] \
+      --cfg.parallel_config.vit_pp_layers [[32,0,0,0]] \
+      --cfg.parallel_config.tp_size 1
+
+
+yaml文件
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1.   yaml配置文件可自动生成基础版本，然后手动修改必要的配置
+
+     .. code:: bash
+
+      mm-convert  Qwen2VLConverter hf_to_mm --print_config=comments > hf_to_mm.yaml
+
+
+     会生成如下配置文件
+
+     .. code:: yaml
+
+         # huggingface模型转换mindspeed-mm模型权重
+
+         # huggingface权重转换为mindspeed-mm权重配置
+         cfg:
+
+           # mm保存的路径 (required, type: <class 'Path'>)
+           mm_dir:
+
+           # 并行配置
+           parallel_config:
+
+             # llm模块pipeline parallel切分每张卡上切分几层 (required, type: list[list[Annotated[int, Ge(ge=0)]]])
+             llm_pp_layers:
+
+             # vit模块pipeline parallel切分每张卡上切分几层 (required, type: list[list[Annotated[int, Ge(ge=0)]]])
+             vit_pp_layers:
+
+             # tensor parallel张量并行组，模型转换时不同的tp组要切分到不同的目录下 (type: Annotated[int, Gt(gt=0)], default: 1)
+             tp_size: 1
+
+           # hf下载的原始权重路径配置
+           hf_config:
+
+             # huggingface下载的路径 (required, type: Annotated[Path, PathType(path_type='dir')])
+             hf_dir:
+
+
+
+2.   修改配置文件中的内容
+
+     .. code:: yaml
+
+         # huggingface模型转换mindspeed-mm模型权重
+
+         # huggingface权重转换为mindspeed-mm权重配置
+         cfg:
+
+           # mm保存的路径 (required, type: <class 'Path'>)
+           mm_dir: "mm/Qwen2-VL-7B-Instruct"
+
+           # 并行配置
+           parallel_config:
+
+             # llm模块pipeline parallel切分每张卡上切分几层 (required, type: list[Annotated[int, Ge(ge=0)]])
+             llm_pp_layers: [[1,10,10,7]]
+
+             # vit模块pipeline parallel切分每张卡上切分几层 (required, type: list[Annotated[int, Ge(ge=0)]])
+             vit_pp_layers: [[32,0,0,0]]
+
+             # tensor parallel张量并行组，模型转换时不同的tp组要切分到不同的目录下 (type: Annotated[int, Gt(gt=0)], default: 1)
+             tp_size: 1
+
+           # hf下载的原始权重路径配置
+           hf_config:
+
+             # huggingface下载的路径 (required, type: Annotated[Path, PathType(path_type='dir')])
+             hf_dir: "hf/Qwen2-VL-7B-Instruct"
+
+
+3.   执行转换脚本
+
+     .. code:: bash
+
+        mm-convert  Qwen2VLConverter hf_to_mm --config hf_to_mm.yaml
+
+
+环境变量
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1.   环境变量模式当前默认未开启，如需开启可以使用配置环境变量
+
+     .. code:: bash
+
+        export JSONARGPARSE_DEFAULT_ENV=true
+
+
+2.   使用 ``-h`` 命令可以查看每个配置对应的环境变量
+
+     .. code:: bash
+
+        mm-convert  Qwen2VLConverter hf_to_mm -h
+
+
+3.   配置环境变量
+
+     .. code:: bash
+
+         export MM_CONVERT_QWEN2VLCONVERTER__HF_TO_MM__CFG__PARALLEL_CONFIG__LLM_PP_LAYERS="[[1,10,10,7]]"
+         export MM_CONVERT_QWEN2VLCONVERTER__HF_TO_MM__CFG__PARALLEL_CONFIG__VIT_PP_LAYERS="[[32,0,0,0]]"
+         export MM_CONVERT_QWEN2VLCONVERTER__HF_TO_MM__CFG__PARALLEL_CONFIG__TP_SIZE="1"
+         export MM_CONVERT_QWEN2VLCONVERTER__HF_TO_MM__CFG__HF_CONFIG__HF_DIR="Qwen2-VL-7B-Instruct"
+         export MM_CONVERT_QWEN2VLCONVERTER__HF_TO_MM__CFG__MM_DIR="hf/Qwen2-VL-7B-Instruct"
+
+
+4.   执行
+
+     .. code:: bash
+
+        mm-convert  Qwen2VLConverter hf_to_mm
+
+
+
+
+
+
+

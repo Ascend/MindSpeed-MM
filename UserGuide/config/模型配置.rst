@@ -1,0 +1,82 @@
+模型配置
+===========================
+
+以 `examples/wan2.2/A14B/t2v/pretrain_model_high.json <https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/wan2.2/A14B/t2v/pretrain_model_high.json>`_ 为例
+
+.. code:: json
+
+    {
+        "load_video_features": false,                           // 是否直接加载 vae 编码后的 video 特征
+        "load_text_features": false,                            // 是否直接加载 text_encoder 编码后的 text_embeds
+        "task": "t2v",
+        "diffusion": {                                          // diffusion 模型配置
+            "model_id": "wan_flow_match_scheduler",             // model_id 用于模型类映射，mindspeed_mm/models/diffusion/diffusion_model/DIFFUSION_MODEL_MAPPINGS
+            "num_train_timesteps": 1000,                        // 下面几行参数为实际的 DiffusionModel 的初始化参数
+            "shift": 5,
+            "sigma_min": 0.0,
+            "extra_one_step": true,
+            "max_timestep_boundary": 0.417,
+            "min_timestep_boundary": 0.0
+        },
+        "predictor": {                                           // DiT模型配置
+            "model_id": "wandit",                                // model_id 用于模型类映射，mindspeed_mm/models/predictor/predict_model/PREDICTOR_MODEL_MAPPINGS
+            "dtype": "bf16",                                     // 下面几行参数为实际的 PredictModel 的初始化参数
+            "model_type": "t2v",
+            "patch_size": [1, 2, 2],
+            "text_len": 512,
+            "in_dim": 16,
+            "hidden_size": 5120,
+            "ffn_dim": 13824,
+            "freq_dim": 256,
+            "text_dim": 4096,
+            "img_dim": 1280,
+            "out_dim": 16,
+            "num_heads": 40,
+            "num_layers": 40,
+            "pipeline_num_layers": [10,10,10,10],
+            "qk_norm": true,
+            "qk_norm_type": "rmsnorm",
+            "cross_attn_norm": true,
+            "eps": 1e-6,
+            "max_seq_len": 1024,
+            "attention_async_offload": false,
+            "use_fused_rmsnorm":true
+        },
+        "ae": {                                                   // AE 模型配置
+            "model_id": "wan_video_vae",                          // model_id 用于模型类映射，mindspeed_mm/ae/base/AE_MODEL_MAPPINGS
+            "from_pretrained": "Wan2.2-T2V-A14B-Diffusers/vae",   // AE 模型权重加载路径
+            "dtype": "bf16",                                      // 下面几行参数为实际的 AEModel 的初始化参数
+            "enable_tiling": false,
+            "tiling_param": {
+                "tile_sample_min_height": 256,
+                "tile_sample_min_width": 256,
+                "tile_sample_stride_height": 192,
+                "tile_sample_stride_width": 192
+            },
+            "norm_latents": true,
+            "norm_mode": "channel_specified_shift_scale",
+            "do_sample": false
+        },
+        "text_encoder": {                                                // TextEncoder 模型配置
+            "model_id": "UMT5",                                          // model_id 需要配置成实际的transformers模型类
+            "dtype": "bf16",                     
+            "hub_backend": "hf",                                         // hf 后端
+            "from_pretrained": "Wan2.2-T2V-A14B-Diffusers/text_encoder"  // TextEncoder模型权重和配置加载路径
+        }
+        "patch": {                                                       // patch
+            "clip_grad_async": true,
+            "get_dist_model_load_from_pt": true
+        },
+        "encoder_offload_interval": 8,                                   // encoder_offload_interval 优化特性配置 
+    }
+
+
+.. note:: 
+    用 ``TransformersModel(mindspeed_mm/models/TransformersModel)`` 初始化的类，模型配置来自于 huggingface 权重路径下的config.json，此时model.json不会作为实际模型初始化的配置，只为了Megatron底层对模型参数的校验。
+    
+    以 Qwen3VL 模型为例，其实际配置来自于 huggingface 权重路径 Qwen3-VL-*B-Instruct/config.json
+
+    但是由于 Qwen3VL 通过 overwrite_transformer_config (mindspeed_mm/models/transformers/qwen3vl/Qwen3VLFSDP2Mixin) 函数对部分配置进行复写
+
+    包括 ``attn_implementation`` ``attn_layout`` ``is_causal`` ``activation_offload`` ``synchronize``
+

@@ -1,0 +1,8 @@
+快速实践
+==========
+
+.. toctree::
+   :maxdepth: 2
+
+   Qwen3VL-30B-MoE模型微调实践
+   Wan2.2模型微调实践
