@@ -19,3 +19,6 @@ from checkpoint.sora_model.wan_converter import WanConverter
 from checkpoint.sora_model.cogvideo_converter import CogVideoConverter
 from checkpoint.sora_model.lumina_converter import LuminaConverter
 from checkpoint.sora_model.vace_converter import VACEConverter
+
+# generic dcp converter
+from checkpoint.fsdp.generic_dcp_converter import GenericDCPConverter

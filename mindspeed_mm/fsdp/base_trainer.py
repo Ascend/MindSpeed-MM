@@ -263,6 +263,7 @@ class BaseTrainer:
         self.model.train()
 
         # --- Train Loop ---
+        curr_step_lr = self.lr_scheduler.get_last_lr()[0]
         while self.iteration < self.training_args.train_iters:
             # Record memory usage if profiling
             if self.profiler is not None:
@@ -296,10 +297,12 @@ class BaseTrainer:
                 self.training_log(
                     self.iteration,
                     elapsed_time_per_iteration,
+                    curr_step_lr,
                     self.consumed_train_samples,
                     loss,
                     grad_norm
                 )
+            curr_step_lr = self.lr_scheduler.get_last_lr()[0]
             
             # Save checkpoint at specified intervals
             if self.training_args.save and self.training_args.save_interval > 0 and self.iteration % self.training_args.save_interval == 0:
@@ -313,6 +316,7 @@ class BaseTrainer:
         self,
         iteration,
         elapsed_time_per_iteration,
+        curr_step_lr,
         consumed_train_samples,
         loss,
         grad_norm
@@ -324,7 +328,7 @@ class BaseTrainer:
             consumed_train_samples)
         log_string += ' elapsed time per iteration (ms): {:.1f} |'.format(
             elapsed_time_per_iteration * 1000.0)
-        log_string += ' learning rate: {:.6E} |'.format(self.lr_scheduler.get_last_lr()[0])
+        log_string += ' learning rate: {:.6E} |'.format(curr_step_lr)
         log_string += ' global batch size: {:5d} |'.format(self.training_args.global_batch_size)
         log_string += ' loss: {:.6E} |'.format(loss.item())
         if grad_norm is not None:

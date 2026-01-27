@@ -71,7 +71,7 @@ class TrainingArguments:
         metadata={"help": "Maximum learning rate or defult learning rate, or init learning rate for warmup."},
     )
     lr_min: float = field(
-        default=1e-7,
+        default=0.0,
         metadata={"help": "Minimum learning rate."},
     )
     lr_start: float = field(
