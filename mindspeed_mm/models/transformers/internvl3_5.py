@@ -10,6 +10,7 @@ from transformers.models.qwen3_moe.modeling_qwen3_moe import (
 
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
 from mindspeed_mm.models.transformers.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeTextSparseMoeBlock
+from mindspeed_mm.models.transformers.custom_model_registry import register_model
 
 try:
     from internvl.modeling_internvl_chat import InternVLChatModel
@@ -43,6 +44,7 @@ def internvl_moe_decoder_layer_forward(self, hidden_states, **kwargs):
     return outputs
 
 
+@register_model("internvl")
 class InternVLChatModelGeneration(InternVLChatModel, FSDP2Mixin):
     def __init__(self, config, vision_model=None, language_model=None, use_flash_attn=True):
         Qwen3MoeDecoderLayer.__init__ = internvl_moe_decoder_layer_init

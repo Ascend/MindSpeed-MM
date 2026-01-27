@@ -10,6 +10,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 from megatron.training import print_rank_0, get_args
 from mindspeed_mm.models.transformers.glm4v_moe.modeling_glm4v_moe import Glm4vFusedMoeForConditionalGeneration
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
+from mindspeed_mm.models.transformers.custom_model_registry import register_model
 
 
 class Glm4VFSDP2Minxin(FSDP2Mixin):
@@ -67,6 +68,7 @@ class Glm4VFSDP2Minxin(FSDP2Mixin):
         print_rank_0(f"Set modules not trainable: {final_forbidden_modules}")
 
 
+@register_model("glm4v_moe")
 class Glm4vMoeForConditionalGeneration(WeightInitMixin, Glm4vFusedMoeForConditionalGeneration, Glm4VFSDP2Minxin):
     pass
 

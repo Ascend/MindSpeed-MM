@@ -21,6 +21,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 from megatron.training import print_rank_0
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
 from mindspeed_mm.models.common.gmm import npu_group_gemm
+from mindspeed_mm.models.transformers.custom_model_registry import register_model
 
 
 _orig_gelu = F.gelu
@@ -145,6 +146,7 @@ class Qwen3OmniMoeThinkerTextExperts(nn.ModuleList):
         return next_states
 
 
+@register_model("qwen3_omni_moe")
 class Qwen3OmniMoeThinkerForConditionalGeneration(transformers.Qwen3OmniMoeThinkerForConditionalGeneration, Qwen3OmniFSDP2Mixin):
     def __init__(self, config):
         self._apply_moe_block_patch()

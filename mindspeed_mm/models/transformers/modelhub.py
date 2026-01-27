@@ -1,31 +1,8 @@
 import importlib
-
-from mindspeed_mm.models.transformers.qwen3vl.qwen3vl import (
-    Qwen3VLForConditionalGeneration,
-    Qwen3VLMoeForConditionalGeneration
-)
-from mindspeed_mm.models.transformers.internvl3_5 import InternVLChatModelGeneration
-from mindspeed_mm.models.transformers.glm4v_moe.glm4_5v import Glm4vMoeForConditionalGeneration
-from mindspeed_mm.models.transformers.mistral3 import MultiModelMistral3ForConditionalGeneration
+from mindspeed_mm.models.transformers.custom_model_registry import get_model_class_global
 
 
 class ModelHub:
-
-    MODEL_MAPPINGS = {
-        "qwen3_vl": Qwen3VLForConditionalGeneration,
-        "qwen3_vl_moe": Qwen3VLMoeForConditionalGeneration,
-        'internvl': InternVLChatModelGeneration,
-        'glm4v_moe': Glm4vMoeForConditionalGeneration,
-        'mistral3': MultiModelMistral3ForConditionalGeneration
-    }
-
-    try:
-        # support newer transformers for qwen3omni
-        from mindspeed_mm.models.transformers.qwen3omni import Qwen3OmniMoeThinkerForConditionalGeneration
-        MODEL_MAPPINGS["qwen3_omni_moe"] = Qwen3OmniMoeThinkerForConditionalGeneration
-    except AttributeError:
-        pass
-
     @staticmethod
     def build(config, transformer_config):
         """
@@ -65,7 +42,7 @@ class ModelHub:
 
         model_id = getattr(config, "model_id", None)
         if model_id:
-            model_cls = ModelHub.MODEL_MAPPINGS.get(model_id, None)
+            model_cls = get_model_class_global(model_id)
             return model_cls
 
         if architectures:
@@ -75,7 +52,7 @@ class ModelHub:
                 return model_cls
 
         if model_type:
-            model_cls = ModelHub.MODEL_MAPPINGS.get(model_type, None)
+            model_cls = get_model_class_global(model_type)
             if model_cls is not None:
                 return model_cls
 

@@ -11,6 +11,7 @@ from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
 
 from mindspeed_mm.models.transformers.qwen3vl.modeling_qwen3_vl import Qwen3VLForConditionalGeneration as HFQwen3VLForConditionalGeneration
 from mindspeed_mm.models.transformers.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeForConditionalGeneration as HFQwen3VLMoeForConditionalGeneration
+from mindspeed_mm.models.transformers.custom_model_registry import register_model
 from .attention_utils import verify_attn_layout
 
 
@@ -145,9 +146,11 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         return transformer_config
 
 
+@register_model("qwen3_vl")
 class Qwen3VLForConditionalGeneration(HFQwen3VLForConditionalGeneration, Qwen3VLFSDP2Mixin):
     pass
 
 
+@register_model("qwen3_vl_moe")
 class Qwen3VLMoeForConditionalGeneration(HFQwen3VLMoeForConditionalGeneration, Qwen3VLFSDP2Mixin):
     pass
