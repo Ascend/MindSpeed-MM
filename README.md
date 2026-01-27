@@ -179,6 +179,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 
 |       模型 \ 特性       | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) | RL | [FSDP2](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/fsdp2.md) |
 |:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|:------:|:------:|
+|   Magistral-Small-2509   |  |  |  |  |  |  | ✔ | ✔ |  | ✔ |
 |   InternVL3.5-30B   |  |  |  |  |  |  | ✔ |  |  | ✔ |
 |       Qwen3-VL-8B        |  |  |  |  |  |  | ✔ |  |  | ✔ |
 |       Qwen3-VL-30B        |  |  |  |  |  |  | ✔ |  |  | ✔ |
