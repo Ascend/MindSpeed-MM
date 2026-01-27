@@ -10,6 +10,7 @@ sub_modules_to_wrap:
 recompute_modules:
   - language_model.layers.{*}
   - vision_tower.transformer.layers.{*}
+use_reentrant: False
 param_dtype: "bf16"
 reduce_dtype: "bf16"
 cast_forward_inputs: True

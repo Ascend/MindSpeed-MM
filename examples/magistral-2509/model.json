@@ -15,10 +15,10 @@
         "num_layers": 24,
         "hidden_size": 1024,
         "num_attention_heads": 16,
-        "freeze": false
+        "freeze": true
     },
     "vision_projector": {
-        "freeze": false
+        "freeze": true
     },
     "patch": {
         "clip_grad_async": true,

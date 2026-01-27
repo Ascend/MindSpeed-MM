@@ -175,6 +175,14 @@ class Mistral3Converter(DcpConverter):
     ):
         target_module_list = [module.strip() for module in lora_target_modules.split(",")]
         lora_state_dict = load_dcp_state_dict(lora_dcp_dir)
+
+        reverse_key_mapping = {v: k for k, v in self._checkpoint_conversion_mapping.items()}
+        new_lora_state_dict = {}
+        for k, v in lora_state_dict.items():
+            new_key = dict_key_convert_func(k, reverse_key_mapping)
+            new_lora_state_dict[new_key] = v
+        lora_state_dict = new_lora_state_dict
+
         base_state_dict = load_from_hf(Path(base_hf_dir))
         merge_state_dict = base_state_dict
         target_layers = set()
@@ -201,7 +209,7 @@ class Mistral3Converter(DcpConverter):
         processor.save_pretrained(save_path)
 
         save_hf_weights(
-            save_dir=save_merged_hf_dir,
+            save_path=save_path,
             model_assets_dir=str(base_hf_dir),
             state_dict=merge_state_dict,
             prefix="",

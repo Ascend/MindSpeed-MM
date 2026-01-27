@@ -21,6 +21,7 @@
   - [配置参数](#jump4.2)
   - [启动微调](#jump4.3)
   - [启动推理](#jump4.4)
+- [lora微调](#jump5)
 - [环境变量声明](#jump6)
 
 ## 版本说明
@@ -240,6 +241,35 @@ mm-convert Mistral3Converter dcp_to_hf --hf_dir "ckpt/hf_path/Magistral-Small-25
 
 完成权重转换之后，即可使用transformers库进行推理。
 
+<a id="jump5"></a>
+## lora微调
+
+与模型微调一样，需进行权重转换与脚本配置
+### lora权重转换
+
+```shell
+mm-convert Mistral3Converter hf_to_dcp --hf_dir "ckpt/hf_path/Magistral-Small-2509" --dcp_dir "ckpt/convert_path/Magistral-Small-2509-lora-base" --is_lora_base true
+```
+### 配置参数
+lora微调使用finetune_magistral_2509_lora.sh脚本，数据、模型路径等配置与微调一致
+
+首次lora微调，需将finetune_magistral_2509_lora.sh中的LOAD_PATH设置为转换后的权重路径，如ckpt/convert_path/Magistral-Small-2509-lora-base
+若要进行lora续训，则在finetune_magistral_2509_lora.sh中的GPT_ARGS中添加--load-base-model 参数
+--load-base-model配置为lora权重转换部分得到的权重，LOAD_PATH配置为上一次lora保存的权重
+
+### 启动lora微调
+```shell
+bash examples/magistral-2509/finetune_magistral_2509_lora.sh
+```
+
+### lora微调后权重合并
+```shell
+mm-convert Mistral3Converter merge_mm_lora_dcp_weight_to_base_hf \
+  --base_hf_dir ckpt/hf_path/Magistral-Small-2509 \ # 原始权重路径
+  --lora_dcp_dir /path/to/Magistral-Small-2509_lora_finetune_result \ # lora权重保存路径
+  --lora_target_modules q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj \ # lora计算模块
+  --save_merged_hf_dir /path/to/save  # 合并后保存路径
+```
 
 
 
