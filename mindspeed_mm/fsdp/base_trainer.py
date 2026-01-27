@@ -10,7 +10,6 @@ import torch
 import yaml
 
 from mindspeed.fsdp.utils.log import print_rank, set_log_level
-from mindspeed.fsdp.utils.device import set_accelerator_compatible
 from mindspeed.fsdp.utils.random import set_seed
 
 from mindspeed_mm.fsdp.params.data_args import DataArguments
@@ -20,7 +19,8 @@ from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
 from mindspeed_mm.fsdp.utils.device import (
     get_dist_comm_backend,
     get_torch_device,
-    get_device_type
+    get_device_type,
+    set_accelerator_compatible
 )
 from mindspeed_mm.fsdp.distributed.parallel_state import init_parallel_state, get_parallel_state
 from mindspeed_mm.fsdp.models.modelhub import ModelHub

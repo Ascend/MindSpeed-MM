@@ -26,10 +26,9 @@ from transformers.models.qwen3_vl_moe.configuration_qwen3_vl_moe import (
     Qwen3VLMoeVisionConfig
 )
 
-from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import all_to_all
-
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all, split_forward_gather_backward, gather_forward_split_backward
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward, gather_forward_split_backward
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
 
 
 _TOTAL_SEQ_LEN = None

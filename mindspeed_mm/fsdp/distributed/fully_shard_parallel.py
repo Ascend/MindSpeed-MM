@@ -8,7 +8,6 @@ from torch.distributed.device_mesh import DeviceMesh
 
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
-from mindspeed.fsdp.distributed.fully_shard_parallel.fully_shard_parallel import get_ignored_modules
 
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
 
@@ -83,3 +82,17 @@ def get_fsdp_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig, ignored_
     if len(fsdp_modules) == 0:
         raise RuntimeError(f'[FSDP2] No module named {fsdp_plan.apply_modules}.')
     return fsdp_modules
+
+
+def get_ignored_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig):
+    ignored_modules = set()
+    ignored_params = set()
+    if fsdp_plan.ignored_modules is None:
+        return ignored_modules, ignored_params
+    for name, module in model.named_modules():
+        for pattern in fsdp_plan.ignored_modules:
+            if module_name_match(pattern, name):
+                print_rank(logger.debug, f'[FSDP2]: Ignored module to apply fsdp2 <{name}>')
+                ignored_modules.add(name)
+                ignored_params.update(list(module.parameters(recurse=True)))
+    return ignored_modules, ignored_params
