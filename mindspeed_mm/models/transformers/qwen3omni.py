@@ -10,6 +10,7 @@ except ImportError:
 from transformers.activations import ACT2FN
 import torch
 from torch import nn
+import torch.nn.functional as F
 import torch_npu
 from torch.distributed.fsdp import fully_shard
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
@@ -20,6 +21,27 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 from megatron.training import print_rank_0
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
 from mindspeed_mm.models.common.gmm import npu_group_gemm
+
+
+_orig_gelu = F.gelu
+
+
+def npu_gelu_wrapper(input_tensor, approximate='none'):
+    """
+    Wrap npu_gelu to match the F.gelu interface
+    """
+    device_type = input_tensor.device.type if hasattr(input_tensor, 'device') else 'cpu'
+
+    valid_approximates = ['none', 'tanh']
+    if approximate not in valid_approximates:
+        import warnings
+        warnings.warn(f"NPU GELU does not support approximate='{approximate}'. "f"Using approximate='none' instead.")
+        approximate = 'none'
+
+    if device_type == 'npu':
+        return torch_npu.npu_gelu(input_tensor, approximate=approximate)
+    else:
+        return _orig_gelu(input_tensor, approximate=approximate)
 
 
 class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
@@ -126,12 +148,17 @@ class Qwen3OmniMoeThinkerTextExperts(nn.ModuleList):
 class Qwen3OmniMoeThinkerForConditionalGeneration(transformers.Qwen3OmniMoeThinkerForConditionalGeneration, Qwen3OmniFSDP2Mixin):
     def __init__(self, config):
         self._apply_moe_block_patch()
+        self._apply_gelu_patch()
         super().__init__(config)
     
     def _apply_moe_block_patch(self):
         if has_qwen3omni_support:
             modeling_qwen3_omni_moe.Qwen3OmniMoeThinkerTextExperts = Qwen3OmniMoeThinkerTextExperts
-    
+   
+    def _apply_gelu_patch(self):
+        if has_qwen3omni_support:
+            F.gelu = npu_gelu_wrapper
+
     @classmethod
     def from_pretrained(cls, hf_path, **kwargs):
         load_kwargs = {
