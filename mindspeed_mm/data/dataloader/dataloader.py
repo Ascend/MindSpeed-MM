@@ -118,6 +118,7 @@ def prepare_base_dataloader(
     prefetch_factor=None,
     persistent_workers=None,
     collate_param=None,
+    dataset_param=None,
     **kwargs,
 ):
     """
