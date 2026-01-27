@@ -536,7 +536,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
 
         return loss
 
-    def process_multimodal_embeddings(self, input_embeds, input_ids, vit_embeds, **kwargs):
+    def process_multimodal_embeddings(self, input_embeds, input_ids, vit_embeds, audio_embeds, **kwargs):
         deepstack_visual_embeds = []
         if vit_embeds is not None:
             if self.config.sequence_parallel:
@@ -565,10 +565,9 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                     deepstack_visual_embeds.append(deepstack_emb)
 
             if 'input_features' in kwargs:
-                audio_features = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
                 audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds)
-                audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
-                input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
+                audio_embeds = audio_embeds.to(input_embeds.device, input_embeds.dtype)
+                input_embeds = input_embeds.masked_scatter(audio_mask, audio_embeds)
 
             input_embeds = input_embeds.transpose(0, 1)  # sbh -> bsh
         return input_embeds, deepstack_visual_embeds
@@ -593,9 +592,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
     ) -> Union[Dict[str, torch.Tensor], torch.Tensor]:
 
         # hetero pipeline use
-        hetero_pp = False
-        if get_args().hetero_parallel and mpu.get_pipeline_model_parallel_world_size() > 1:
-            hetero_pp = True
+        hetero_pp = hasattr(mpu, "_IS_HETERO_PP_MOUDLE") and mpu._IS_HETERO_PP_MOUDLE
 
         # MM_GRPO use, if llm_only is True, directly get vit_embeds
         deepstack_visual_embeds = None
@@ -629,40 +626,25 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         # MM_GRPO use, if vit_only is True, only calculate vit_embeds and return
         if kwargs.get('vit_only', False) and self.image_encoder.post_process:
             return {"vit_embeds": vit_embeds}
+        
+        audio_embeds = None
+        if self.add_audio_encoder and 'input_features' in kwargs and not hetero_pp:
+            audio_embeds = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
+        
+        # hetero pipeline use
+        if hasattr(mpu, "_IS_HETERO_PP_MOUDLE") and not mpu._IS_HETERO_PP_MOUDLE:
+            change_parallel_state('image_encoder')
+            return [vit_embeds, audio_embeds] 
 
         if self.add_text_decoder:
-            if kwargs.get('vit_embeds') is not None and kwargs.get('audio_features') is not None:
-                if self.text_decoder.pre_process:
-                    vit_embeds = kwargs.get('vit_embeds')
-                    audio_features = kwargs.get('audio_features')
-                    input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
-                    if vit_embeds is not None:
-                        if self.config.sequence_parallel:
-                            input_embeds = gather_from_sequence_parallel_region(input_embeds)
-                        input_embeds = input_embeds.transpose(0, 1)  # bsh -> sbh
-
-                        image_mask = torch.eq(input_ids, self.img_context_token_id)
-                        vit_embeds = vit_embeds[:, 0, :]
-                        indices_tuple = torch.nonzero(image_mask, as_tuple=True)
-                        input_embeds[indices_tuple] = vit_embeds
-
-                        if 'input_features' in kwargs:
-                            audio_mask = torch.eq(input_ids, 151646).unsqueeze(-1).expand_as(input_embeds)
-                            audio_features = audio_features.to(input_embeds.device, input_embeds.dtype)
-                            input_embeds = input_embeds.masked_scatter(audio_mask, audio_features)
-
-                        input_embeds = input_embeds.transpose(0, 1)
-                else:
-                    input_embeds = None
-            elif get_args().hetero_parallel and mpu.get_pipeline_model_parallel_world_size() > 1:
-                audio_features = None
-                if 'input_features' in kwargs:
-                    audio_features = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
-                change_parallel_state('image_encoder')
-                return [vit_embeds, audio_features]
-            elif self.text_decoder.pre_process:
+            if self.text_decoder.pre_process:
                 input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
-                input_embeds, deepstack_visual_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, vit_embeds, **kwargs)
+                if kwargs.get('vit_embedings') is not None or kwargs.get('audio_embedings') is not None:
+                    vit_embeds = kwargs.get('vit_embedings')
+                    audio_embeds = kwargs.get('audio_embedings')
+                input_embeds, deepstack_visual_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, 
+                                                                                           vit_embeds, audio_embeds,
+                                                                                           **kwargs)
             else:
                 input_embeds = None
 

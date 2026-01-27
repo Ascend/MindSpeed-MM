@@ -120,8 +120,9 @@ class DecoderRerunDataIterator(RerunDataIterator):
                 audio_start_pos = audio_cumulative[start_idx]
                 audio_s_len = audio_cumulative[end_idx] - audio_cumulative[start_idx]
 
-                chunk['vit_embeds'] = vit_embeds[vit_start_pos: vit_start_pos + vit_s_len, :]
-                chunk['audio_features'] = audio_features[audio_start_pos: audio_start_pos + audio_s_len, :]
+                chunk['vit_embedings'] = vit_embeds[vit_start_pos: vit_start_pos + vit_s_len, :]
+                if audio_features is not None:
+                    chunk['audio_embedings'] = audio_features[audio_start_pos: audio_start_pos + audio_s_len, :]
 
                 for key, tensor in cur_dict.items():
                     chunk[key] = tensor[start_idx:end_idx]
@@ -158,6 +159,7 @@ def mpu_wrapper():
     mpu._HETERO_PIPELINE = False
     mpu._IS_LAST_PIPELINE = False
     mpu._IS_FIRST_PIPELINE = False
+    mpu._IS_HETERO_PP_MOUDLE = False
     return mpu
 
 
@@ -243,10 +245,12 @@ def hetero_pipeline(
 
     for module_meta, forward_backward_func in zip(pipeline_meta_list, forward_backward_func_list):
         if module_meta_pre is not None:
+            mpu._IS_HETERO_PP_MOUDLE = True
             mbs_scale = get_args().hetero_encoder_mbs_scale
             data_iterator = DecoderRerunDataIterator(current_batchs, output_tensors, mbs_scale)
             num_microbatches = get_num_microbatches()
         else:
+            mpu._IS_HETERO_PP_MOUDLE = False
             data_iterator = ReplayIterator(data_iterator)
             num_microbatches = num_microbatches // get_args().hetero_encoder_mbs_scale
 
