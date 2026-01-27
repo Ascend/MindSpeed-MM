@@ -21,6 +21,7 @@ from mindspeed.megatron_adaptor import get_mindspeed_args
 from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 from mindspeed_mm.models.transformers.global_vars import get_check_moe_func, get_ep_size, get_ep_rank
 from mindspeed_mm.models.transformers.moe_utils import EPLoadPlanner
+from mindspeed_mm.tasks.finetune.lora.utils import is_enable_lora, remove_base_layer_keys, restore_base_layer_keys
 
 
 def _load_base_checkpoint(
@@ -146,10 +147,9 @@ def _load_base_checkpoint(
             state_dict = sharded_state_dict
 
             if release:
-                state_dict.pop('args')
-                state_dict.pop('iteration')
-                state_dict.pop('rerun_state_machine')
-                state_dict.pop('num_floating_point_operations_so_far')
+                state_dict.pop('args', None)
+                state_dict.pop('rerun_state_machine', None)
+                state_dict.pop('num_floating_point_operations_so_far', None)
 
             # remove '_extra_state'
             _extra_state_list = [i for i in state_dict.get('model', {}).keys() if '_extra_state' in i]
@@ -165,11 +165,18 @@ def _load_base_checkpoint(
             else:
                 load_planner = EPLoadPlanner(allow_partial_load=True, ep_rank=ep_rank, ep_size=ep_size, check_moe_fn=check_moe_func)
 
+            if is_enable_lora():
+                new_state_dict, key_mapping = remove_base_layer_keys(state_dict.get('model', None))
+                state_dict['model'] = new_state_dict
+
             torch.distributed.checkpoint.load(
                 state_dict=state_dict,
                 checkpoint_id=checkpoint_name,
                 planner=load_planner
             )
+
+            if is_enable_lora():
+                state_dict['model'] = restore_base_layer_keys(state_dict['model'], key_mapping)
 
             curr_keys = load_planner.state_dict.keys()
             load_keys = load_planner.metadata.state_dict_metadata.keys()
@@ -193,5 +200,6 @@ def _load_base_checkpoint(
 
 
 mindspeed_args = get_mindspeed_args()
-if hasattr(mindspeed_args, 'ckpt_format') and mindspeed_args.ckpt_format == 'torch_dcp':
+if hasattr(mindspeed_args, 'ckpt_format') and mindspeed_args.ckpt_format == 'torch_dcp' and \
+        not hasattr(mindspeed_args, 'lora_target_modules'):
     pm.register_patch('megatron.training.checkpointing._load_base_checkpoint', _load_base_checkpoint, force_patch=True)

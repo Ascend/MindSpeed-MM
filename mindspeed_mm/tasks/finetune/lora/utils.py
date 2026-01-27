@@ -59,3 +59,29 @@ def modify_keys_with_dict(dictionary, exclude_words):
         modified_dict[new_key] = value
 
     return modified_dict
+
+
+def remove_base_layer_keys(state_dict):
+    key_mapping = {}
+    new_state_dict = {}
+
+    for key, value in state_dict.items():
+        if '.base_layer' in key:
+            new_key = key.replace('.base_layer', '')
+            new_state_dict[new_key] = value
+            key_mapping[key] = new_key
+        else:
+            new_state_dict[key] = value
+
+    return new_state_dict, key_mapping
+
+
+def restore_base_layer_keys(modified_state_dict, key_mapping):
+    reverse_mapping = {new_key: orig_key for orig_key, new_key in key_mapping.items()}
+    original_state_dict = {}
+
+    for key, value in modified_state_dict.items():
+        original_key = reverse_mapping.get(key, key)
+        original_state_dict[original_key] = value
+
+    return original_state_dict

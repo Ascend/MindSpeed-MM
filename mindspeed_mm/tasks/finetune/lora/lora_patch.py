@@ -61,6 +61,11 @@ def model_provider_func_wrapper(model_provider_func):
             from peft.tuners.tuners_utils import check_target_module_exists
             import mindspeed_mm.models.sora_model
             config = core_transformer_config_from_args(args)
+            if args.lora_target_modules and "," in args.lora_target_modules[0]:
+                args.lora_target_modules = args.lora_target_modules[0].split(",")
+            if args.lora_target_parameters and "," in args.lora_target_parameters:
+                args.lora_target_parameters = args.lora_target_parameters[0].split(",")
+
             lora_config = LoraConfig(
                 r=args.lora_r,
                 lora_alpha=args.lora_alpha,
@@ -70,6 +75,8 @@ def model_provider_func_wrapper(model_provider_func):
                 megatron_config=config,
                 megatron_core="megatron.core",
             )
+            if args.lora_target_parameters:
+                lora_config.target_parameters = args.lora_target_parameters
 
             freeze_params = [name for name, param in model.named_parameters() if not param.requires_grad]
             trainable_target_modules = []
@@ -161,14 +168,16 @@ def _load_base_checkpoint_wrapper(fn):
 
         if is_enable_lora() and state_dict is not None:
             args = get_args()
-            exclude_words = ['base_layer', 'lora_', 'norm']
-            state_dict['model'] = modify_keys_with_dict(state_dict['model'], exclude_words)
+            if not args.use_torch_fsdp2:
+                exclude_words = ['base_layer', 'lora_', 'norm']
+                state_dict['model'] = modify_keys_with_dict(state_dict['model'], exclude_words)
 
             if args.load_base_model is not None:
                 state_dict_lora, *_ = fn(args.load_base_model, args, **kwargs)
-                exclude_words = ['base_layer', 'lora_', 'norm']
-                state_dict_lora['model'] = modify_keys_with_dict(state_dict_lora['model'], exclude_words)
-                merge_dicts(state_dict, state_dict_lora)
+                if not args.use_torch_fsdp2:
+                    exclude_words = ['base_layer', 'lora_', 'norm']
+                    state_dict_lora['model'] = modify_keys_with_dict(state_dict_lora['model'], exclude_words)
+                    merge_dicts(state_dict, state_dict_lora)
         return state_dict, checkpoint_name, release, ckpt_type
 
     return wrapper
@@ -190,8 +199,13 @@ def load_checkpoint_wrapper(fn):
 def state_dict_for_save_checkpoint(state_dict):
     state_dict_ = dict()
     for key in state_dict:
-        if 'lora' in key:
-            state_dict_[key] = state_dict[key]
+        args = get_args()
+        if 'lora' in key and 'base_layer' not in key:
+            if args.use_torch_fsdp2:
+                prefix = "base_model.model."
+                state_dict_[prefix + key] = state_dict[key]
+            else:
+                state_dict_[key] = state_dict[key]
     return state_dict_
 
 
@@ -228,6 +242,16 @@ def peft_model_load_state_dict(self, state_dict, strict):
 def apply_patches():
     megatron.training.training.load_checkpoint = load_checkpoint_wrapper(
         megatron.training.checkpointing.load_checkpoint)
+
+    # apply dcp_patch before lora patch to megatron.training.checkpointing._load_base_checkpoint if use torch_dcp
+    from mindspeed.megatron_adaptor import get_mindspeed_args
+    from mindspeed_mm.patchs.torch_dcp_patch import _load_base_checkpoint as _load_base_checkpoint_dcp
+    mindspeed_args = get_mindspeed_args()
+    has_lora_target_modules = hasattr(mindspeed_args, 'lora_target_modules') and mindspeed_args.lora_target_modules
+    is_torch_dcp = hasattr(mindspeed_args, 'ckpt_format') and mindspeed_args.ckpt_format == 'torch_dcp'
+    if has_lora_target_modules and is_torch_dcp:
+        megatron.training.checkpointing._load_base_checkpoint = _load_base_checkpoint_dcp
+
     megatron.training.checkpointing._load_base_checkpoint = _load_base_checkpoint_wrapper(
         megatron.training.checkpointing._load_base_checkpoint)
     megatron.training.training.get_model = get_model_wrapper(megatron.training.training.get_model)

@@ -53,6 +53,8 @@ def _add_lora_args(parser):
 
     group.add_argument('--lora-target-modules', nargs='+', type=str, default=[],
                        help='Use lora in target modules.')
+    group.add_argument('--lora-target-parameters', nargs='+', type=str, default=[],
+                       help='Use lora in target parameters.')
     group.add_argument('--lora-apply-modules', nargs='+', type=str, default=["all"],
                        help='Use lora exclude modules')
     group.add_argument('--lora-mixed-training', type=bool, default=False,

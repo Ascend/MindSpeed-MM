@@ -4,7 +4,6 @@ from copy import deepcopy
 from functools import partial
 from typing import Dict, Any
 import importlib.util
-from dataclasses import dataclass
 
 from datasets import Dataset
 import torch
@@ -25,6 +24,7 @@ from mindspeed_mm.data.dataloader.dataloader import PrefetchGradAccDataLoader
 from mindspeed_mm.data.dataloader.dynamic_batching_dataloader import DynamicBatchingDataLoader
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.models.transformers_model import TransformersModel
+
 mindspeed_args = get_mindspeed_args()
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
     import mindspeed_mm.mindspore.mindspore_adaptor
@@ -99,7 +99,10 @@ def forward_step(data_iterator, model):
     """Forward step."""
     batch_data = get_batch(data_iterator)
     if get_args().use_torch_fsdp2:
-        dtype = unwrap_model(model).model._get_fsdp_state()._mp_policy.param_dtype
+        from mindspeed_mm.tasks.finetune.lora.utils import is_enable_lora
+        model_unwrapped = unwrap_model(model)
+        fsdp_core_model = model_unwrapped.model.model if is_enable_lora() else model_unwrapped.model
+        dtype = fsdp_core_model._get_fsdp_state()._mp_policy.param_dtype
         dtype = dtype if dtype is not None else torch.bfloat16
         batch_data = move_to_device(batch_data, dtype)
     else:
