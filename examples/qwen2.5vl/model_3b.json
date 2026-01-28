@@ -90,5 +90,8 @@
         "use_remove_padding": false
     },
     "text_encoder": null,
-    "video_encoder": null
+    "video_encoder": null,
+    "patch": {
+        "bridge_patch": false
+    }
 }

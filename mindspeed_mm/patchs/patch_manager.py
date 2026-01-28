@@ -21,7 +21,8 @@ from mindspeed_mm.patchs import (
     fsdp1_patches,
     training_patches,
     fsdp2_patches,
-    optimizer_patch
+    optimizer_patch,
+    bridge_patch
 )
 
 
@@ -48,6 +49,9 @@ class PatchesManager:
         # This will override the default model loading behavior to handle distributed checkpoint format.
         "get_dist_model_load_from_pt": [
             ("megatron.training.training.get_model", training_patches.get_dist_model_load_from_pt)
+        ],
+        "bridge_patch": [
+            ("megatron.training.training.load_checkpoint", bridge_patch.load_checkpoint_bridge)
         ],
         "scale_grad": [
             ("megatron.core.distributed.TorchFullyShardedDataParallel.scale_gradients", fsdp2_patches.scale_gradients)

@@ -91,5 +91,8 @@
         "add_qkv_bias": true
     },
     "text_encoder": null,
-    "video_encoder": null
+    "video_encoder": null,
+    "patch": {
+        "bridge_patch": false
+    }
 }

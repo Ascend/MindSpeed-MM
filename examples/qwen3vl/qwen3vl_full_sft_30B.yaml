@@ -156,3 +156,4 @@ model:
       loss_type: default
   patch:
       clip_grad_async: true
+      bridge_patch: false
