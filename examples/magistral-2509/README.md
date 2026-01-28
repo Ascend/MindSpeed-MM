@@ -234,10 +234,13 @@ bash examples/magistral-2509/finetune_magistral_2509.sh
 #### 4. 启动推理
 训练完成之后，将保存在`SAVE_PATH`目录下的权重转换成huggingface格式
 ```shell
-mm-convert Mistral3Converter dcp_to_hf --hf_dir "ckpt/hf_path/Magistral-Small-2509" --dcp_dir "Magistral-Small-2509_finetune_result/iter_000xx" --save_dir "ckpt/dcp_to_hf/Magistral-Small-2509"
+mm-convert Mistral3Converter dcp_to_hf  \
+  --load_dir "Magistral-Small-2509_finetune_result/iter_000xx" \
+  --save_dir "ckpt/dcp_to_hf/Magistral-Small-2509" \
+  --model_assets_dir "ckpt/hf_path/Magistral-Small-2509"
 ```
 
-其中，`--hf_dir`表示原始huggingface权重的路径，`--dcp_dir`表示微调后的权重保存路径，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径。
+其中，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径，`--model_assets_dir`原始huggingface权重的路径。
 
 完成权重转换之后，即可使用transformers库进行推理。
 
