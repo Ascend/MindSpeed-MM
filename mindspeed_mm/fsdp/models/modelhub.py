@@ -12,6 +12,7 @@ from mindspeed.fsdp.utils.log import print_rank
 
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
+from mindspeed_mm.fsdp.models.qwen3tts.core.models.modeling_qwen3_tts import Qwen3TTSForConditionalGeneration
 from mindspeed_mm.fsdp.models.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeForConditionalGeneration
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class ModelHub:
     """
     MODEL_MAPPINGS = {
         "qwen3_vl_moe": Qwen3VLMoeForConditionalGeneration,
+        "qwen3_tts": Qwen3TTSForConditionalGeneration,
     }# Mapping from model IDs to custom model classes
 
     @staticmethod

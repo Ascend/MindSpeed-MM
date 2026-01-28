@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from transformers import AutoConfig
 from transformers.configuration_utils import PretrainedConfig, layer_type_validation
 from transformers.modeling_rope_utils import rope_config_validation
 from transformers.utils import logging
@@ -499,5 +500,6 @@ class Qwen3TTSConfig(PretrainedConfig):
         self.tts_bos_token_id = tts_bos_token_id
         self.tts_eos_token_id = tts_eos_token_id
 
+AutoConfig.register("qwen3_tts", Qwen3TTSConfig)
 
 __all__ = ["Qwen3TTSConfig", "Qwen3TTSTalkerConfig", "Qwen3TTSSpeakerEncoderConfig"]

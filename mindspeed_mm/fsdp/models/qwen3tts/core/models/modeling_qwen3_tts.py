@@ -1854,6 +1854,51 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
 
         self.post_init()
 
+    def forward(
+        self,
+        input_ids,
+        ref_mels,
+        attention_mask,
+        text_embedding_mask,
+        codec_embedding_mask,
+        codec_0_labels,
+        codec_ids,
+        codec_mask,
+    ):
+        speaker_embedding = self.speaker_encoder(ref_mels.to(self.device).to(torch.bfloat16)).detach()
+
+        input_text_ids = input_ids[:, :, 0]
+        input_codec_ids = input_ids[:, :, 1]
+
+        input_text_embedding = self.talker.model.text_embedding(input_text_ids) * text_embedding_mask
+        input_codec_embedding = self.talker.model.codec_embedding(input_codec_ids) * codec_embedding_mask
+        input_codec_embedding[:, 6, :] = speaker_embedding
+
+        input_embeddings = input_text_embedding + input_codec_embedding
+
+        for i in range(1, 16):
+            codec_i_embedding = self.talker.code_predictor.get_input_embeddings()[i - 1](codec_ids[:, :, i])
+            codec_i_embedding = codec_i_embedding * codec_mask.unsqueeze(-1)
+            input_embeddings = input_embeddings + codec_i_embedding
+
+        outputs = self.talker(
+            inputs_embeds=input_embeddings[:, :-1, :],
+            attention_mask=attention_mask[:, :-1],
+            labels=codec_0_labels[:, 1:],
+            output_hidden_states=True
+        )
+
+        hidden_states = outputs.hidden_states[0][-1]
+        talker_hidden_states = hidden_states[codec_mask[:, 1:]]
+        talker_codec_ids = codec_ids[codec_mask]
+
+        sub_talker_logits, sub_talker_loss = (
+            self.talker.forward_sub_talker_finetune(talker_codec_ids, talker_hidden_states))
+
+        outputs.loss = outputs.loss + sub_talker_loss
+
+        return outputs
+
     def load_speech_tokenizer(self, speech_tokenizer):
         self.speech_tokenizer = speech_tokenizer
 
