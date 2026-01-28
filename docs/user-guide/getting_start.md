@@ -295,35 +295,40 @@ pip install decord==0.6.0
 需要对下载后的Wan2.1模型权重`transformer`部分进行权重转换，运行权重转换脚本：
 
 * 启动脚本中修改LOAD_PATH为权重转换后的路径 (./weights/Wan-AI/Wan2.1-T2V-1.3B-Diffusers/transformer/)，SAVE_PATH为保存路径
+
 ```shell
-python examples/wan2.1/convert_ckpt.py --source_path <./weights/Wan-AI/Wan2.1-{T2V/I2V}-{1.3/14}B-Diffusers/transformer/> --target_path <./weights/Wan-AI/Wan2.1-{T2V/I2V}-{1.3/14}B-Diffusers/transformer/> --mode convert_to_mm
+mm-convert WanConverter hf_to_mm \
+ --cfg.source_path <./weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/> \
+ --cfg.target_path <./weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
+ --cfg.target_parallel_config.pp_layers <pp_layers>
 ```
 
 权重转换脚本的参数说明如下：
 
-| 参数              | 含义                      | 默认值                                                                |
-|:----------------|:------------------------|:-------------------------------------------------------------------|
-| --source_path   | 原始下载权重transformer文件夹的路径 | ./weights/Wan-AI/Wan2.1-{T2V/I2V}-{1.3/14}B-Diffusers/transformer/ |
-| --target_path   | 转换后的权重保存路径              | ./weights/Wan-AI/Wan2.1-{T2V/I2V}-{1.3/14}B-Diffusers/transformer/ |
-| --mode          | 转换模式                    | 需选择convert_to_mm                                                   |
-| --pp_vpp_layers | PP/VPP层数                | 在convert_to_mm时, 使用PP和VPP需要指定各stage的层数并转换, 默认不使用                   |
+| 参数              | 含义                     | 默认值                                                       |
+| :---------------- | :----------------------- | :----------------------------------------------------------- |
+| --cfg.source_path | 原始权重路径             | /                                                            |
+| --cfg.target_path | 转换或切分后权重保存路径 | /                                                            |
+| --pp_layers   | PP/VPP层数               | 开启PP时, 使用PP和VPP需要指定各stage的层数并转换, 默认为`[]`，即不使用 |
 
 如需转回Hugging Face格式，需运行权重转换脚本：
 
-**注**： 如进行layer zero训练，则需首先进行其[训练权重后处理](#jump1)，再进行如下操作：
+**注**： 如进行layer zero进行训练，则需首先进行其`训练权重后处理`，再进行如下操作：
 
 ```shell
-python examples/wan2.1/convert_ckpt.py --source_path <path for your saved weight/> --ckpt_path <./weights/Wan-AI/Wan2.1-{T2V/I2V}-{1.3/14}B-Diffusers/transformer/> --target_path <path for your saved weight/> --mode convert_to_hf
+mm-convert WanConverter mm_to_hf \
+ --cfg.source_path <path for your saved weight/> \
+ --cfg.target_path <./converted_weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
+ --cfg.hf_dir <weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
 ```
 
 权重转换脚本的参数说明如下：
 
 |参数| 含义 | 默认值 |
 |:------------|:----|:----|
-| --source_path | 训练权重/layer zero训练后处理权重 | path for your saved weight |
-| --ckpt_path | 原始下载权重transformer文件夹的路径 | ./weights/Wan-AI/Wan2.1-{T2V/I2V}-{1.3/14}B-Diffusers/transformer/ |
-| --target_path | 转换后的权重保存路径 | ./weights/Wan-AI/Wan2.1-{T2V/I2V}-{1.3/14}B-Diffusers/transformer/ |
-| --mode | 转换模式 | 需选择convert_to_hf |
+| --cfg.source_path | MindSpeed MM保存的权重路径                                   | /      |
+| --cfg.target_path | 转换后的Hugging Face权重路径                                 | /      |
+| --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始Hugging Face配置文件 |    /   |
 
 ### 3. 数据预处理
 
