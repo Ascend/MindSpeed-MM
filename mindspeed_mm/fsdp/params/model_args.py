@@ -4,6 +4,26 @@ from typing import List, Literal, Optional
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields
 
 
+@dataclass
+class LossArguments:
+    loss_type: Optional[str] = field(
+        default='default',
+        metadata={"help": "Type of loss function type, If ot provided, will be computed based on default loss function"},
+    )
+    enable_chunk_loss: bool = field(
+        default=False,
+        metadata={"help": "Wether apply chunkloss for loss compute"},
+    )
+    chunk_size: int = field(
+        default=1024,
+        metadata={"help": "Size of each chunk loss"},
+    )
+    router_aux_loss_coef: float = field(
+        default=0.0,
+        metadata={"help": "Router Auxiliary Loss Coefficient"},
+    )
+
+
 @allow_extra_fields
 @dataclass
 class ModelArguments:
@@ -32,6 +52,7 @@ class ModelArguments:
         metadata={"help": "Attention implementation to use."},
     )
     freeze: List[str] = field(
-        default=None,
+        default_factory=list,
         metadata={"help": "List of module names to freeze during training."},
     )
+    loss_cfg: LossArguments = field(default_factory=LossArguments)

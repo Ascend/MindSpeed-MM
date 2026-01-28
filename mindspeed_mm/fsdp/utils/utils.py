@@ -3,6 +3,7 @@ import time
 
 import torch
 
+from mindspeed_mm.data.data_utils.constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
 from .device import get_device_type, get_torch_device
 
 
@@ -27,7 +28,9 @@ def to_empty_if_needed(model, device: torch.device | str | int | None, recurse: 
 def move_to_device(batch: Dict[str, Any], float_dtype: str = None):
     new_batch = dict()
     for k, v in batch.items():
-        if isinstance(v, torch.Tensor):
+        if k in [AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM]:
+            new_batch[k] = v.to(device=get_device_type())
+        elif isinstance(v, torch.Tensor):
             dtype = float_dtype if torch.is_floating_point(v) else None
             new_batch[k] = v.to(device=get_device_type(), dtype=dtype)
         elif isinstance(v, list) and all(isinstance(t, torch.Tensor) for t in v):

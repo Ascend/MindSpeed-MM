@@ -12,26 +12,26 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FSDPPlanConfig:
     """Configuration for Fully Sharded Data Parallelism (FSDP) plan."""
-    ignored_modules: List[str] = None
-    apply_modules: List[str] = None
+    ignored_modules: List[str] = field(default_factory=list)
+    apply_modules: List[str] = field(default_factory=list)
     enable_mixed_precision: bool = True
 
 
 @dataclass
 class TPPlanConfig:
     """Configuration for Tensor Parallelism (TP) plan."""
-    colwise_parallel: List[str] = None
-    rowwise_parallel: List[str] = None
-    sequence_parallel: List[str] = None
+    colwise_parallel: List[str] = field(default_factory=list)
+    rowwise_parallel: List[str] = field(default_factory=list)
+    sequence_parallel: List[str] = field(default_factory=list)
 
 
 
 @dataclass
 class EPPlanConfig:
     """Configuration for Expert Parallelism (EP) plan for MoE models."""
-    apply_modules: List[str] = None
+    apply_modules: List[str] = field(default_factory=list)
     dispatcher: Literal["eager", "fused", "mc2"] = "eager"
-    apply_efsdp_modules: List[str] = None
+    apply_efsdp_modules: List[str] = field(default_factory=list)
     _gradient_divide_factor: float = None
 
 
@@ -73,7 +73,7 @@ class ParallelArguments():
         default=False,
         metadata={"help": "Whether to enable Gradient Checkpointing (Activation Recomputation)."}
     )
-    recompute_plan: List[str] = None
+    recompute_plan: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         self.local_rank = int(os.getenv("LOCAL_RANK"))

@@ -47,7 +47,6 @@ class DataloaderArguments:
     pin_memory: bool = field(metadata={"help": "Whether to pin memory for faster data transfer to GPU."})
     collate_param: CollateArguments = field(default_factory=CollateArguments)
     num_workers: int = field(default=2, metadata={"help": "Number of worker processes for data loading."})
-    seed: int = field(default=42, metadata={"help": "Random seed for data loading reproducibility."})
 
     def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
         result = asdict(self)

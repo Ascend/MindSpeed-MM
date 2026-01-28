@@ -90,6 +90,11 @@ model:
   trust_remote_code: true
   freeze:
     - model.visual
+  loss_cfg:
+    loss_type: default
+    enable_chunk_loss: false
+    chunk_size: 1024
+    router_aux_loss_coef: 0.0
 
 # 训练配置
 training:

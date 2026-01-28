@@ -28,13 +28,14 @@ from mindspeed_mm.fsdp.distributed.torch_parallelize import ParallelApplier
 from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed, move_to_device, get_time
 from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.data.data_utils.utils import build_iterations
+from mindspeed_mm.data.dataloader.dataloader import PrefetchGradAccDataLoader
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.optimizer.optimizer import build_optimizer
 from mindspeed_mm.fsdp.optimizer.lr_scheduler import build_lr_scheduler
 from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
 from mindspeed_mm.fsdp.tools.profiler import Profiler
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields, instantiate_dataclass
-
+from mindspeed_mm.fsdp.loss.loss_ctx import build_loss_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +181,10 @@ class BaseTrainer:
         dataloader = build_dataloader(datasets)
         train_dataloader, _, _ = build_iterations(dataloader)
 
+        if self.model_args.loss_cfg.loss_type == "per_token_loss":
+            train_dataloader = PrefetchGradAccDataLoader(train_dataloader,
+                                                         grad_acc_step=self.training_args.gradient_accumulation_steps)
+
         return train_dataloader
 
     def get_optimizer(self):
@@ -233,6 +238,20 @@ class BaseTrainer:
             raise ValueError("Data iterator is None. Unable to retrieve batch.")
         return batch
 
+    def get_loss_ctx(self, batch_data):
+        if self.model_args.loss_cfg.enable_chunk_loss:
+            loss_ctx, loss_mask = build_loss_ctx(self.model_args.loss_cfg.loss_type,
+                                                 chunk_size=self.model_args.loss_cfg.chunk_size, **batch_data)
+        else:
+            loss_ctx, loss_mask = build_loss_ctx(self.model_args.loss_cfg.loss_type, chunk_size=None, **batch_data)
+        batch_data.update(
+            enable_chunk_loss=self.model_args.loss_cfg.enable_chunk_loss,
+            router_aux_loss_coef=self.model_args.loss_cfg.router_aux_loss_coef,
+            output_router_logits=self.model_args.loss_cfg.router_aux_loss_coef > 0.0,
+            loss_ctx=loss_ctx,
+        )
+        return batch_data
+
     def train_step(self):
         """Perform a single training step with gradient accumulation."""
         total_loss = 0
@@ -244,17 +263,17 @@ class BaseTrainer:
             # Move input to device and cast precision
             batch_data = move_to_device(batch_data, torch.bfloat16 if self.parallel_args.fsdp_plan.enable_mixed_precision else None)
 
+            # setup loss ctx
+            batch_data = self.get_loss_ctx(batch_data)
+
             # forward step
             output = self.model(**batch_data)
-            loss = output.loss
+            loss = output.loss / self.training_args.gradient_accumulation_steps
 
             # Backward
             loss.backward()
 
-            total_loss += loss
-        
-        # Average loss across data parallel group
-        total_loss = self.average_losses_across_data_parallel_group([total_loss])
+            total_loss += self.average_losses_across_data_parallel_group([loss])
 
         return total_loss
 

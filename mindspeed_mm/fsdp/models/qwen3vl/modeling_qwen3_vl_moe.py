@@ -5,6 +5,7 @@ from typing import Any, Callable, Optional, Union, List
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributed.tensor import DTensor
 
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache
@@ -446,7 +447,7 @@ class Qwen3VLMoePreTrainedModel(PreTrainedModel):
     _can_compile_fullgraph = False  # MoE models don't work with torch.compile (`torch.where(condition)` not supported)
     _supports_attention_backend = True
     _can_record_outputs = {
-        "router_logits": OutputRecorder(Qwen3VLMoeTextSparseMoeBlock, index=1),
+        "router_logits": OutputRecorder(nn.Linear, layer_name="mlp.gate", index=1),
         "hidden_states": Qwen3VLMoeTextDecoderLayer,
         "attentions": Qwen3VLMoeTextAttention,
     }
@@ -979,7 +980,6 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @check_model_inputs
     @auto_docstring
     def forward(
         self,
@@ -1354,6 +1354,7 @@ class Qwen3VLMoeModel(Qwen3VLMoePreTrainedModel):
 
     @auto_docstring
     @can_return_tuple
+    @check_model_inputs
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -1490,6 +1491,35 @@ class Qwen3VLMoeModel(Qwen3VLMoePreTrainedModel):
         )
 
 
+class Qwen3VLLMHead(nn.Linear):
+    def forward(self, hidden_states: torch.Tensor, loss_ctx: callable, enable_chunk_loss: bool = False):
+        # Handle distributed tensor (DTensor) weights and biases by converting to local tensors.
+        if isinstance(self.weight, DTensor):
+            w = self.weight.to_local()
+            if self.bias is not None:
+                if not isinstance(self.bias, DTensor):
+                    raise TypeError(
+                        f"Expected bias to be a DTensor when weight is a DTensor, "
+                        f"but got bias of type {type(self.bias)}."
+                    )
+                b = self.bias.to_local()
+            else:
+                b = None
+        else:
+            w = self.weight
+            b = self.bias
+
+        if not enable_chunk_loss:
+            # compute and return logits normally.
+            logits = F.linear(hidden_states, w, b).contiguous().float()
+            loss = loss_ctx(logits)
+            return logits, loss
+        else:
+            # Otherwise, delegate loss computation to the provided loss context function,
+            # which typically enables memory-efficient or chunked loss calculation.
+            return None, loss_ctx(hidden_states, w, b)
+
+
 @dataclass
 @auto_docstring(
     custom_intro="""
@@ -1520,6 +1550,101 @@ class Qwen3VLMoeCausalLMOutputWithPast(ModelOutput):
     rope_deltas: Optional[torch.LongTensor] = None
 
 
+def load_balancing_loss_func(
+    gate_logits: Union[torch.Tensor, tuple[torch.Tensor], None],
+    num_experts: Optional[int] = None,
+    top_k=2,
+    attention_mask: Optional[torch.Tensor] = None,
+) -> Union[torch.Tensor, int]:
+    r"""
+    Computes auxiliary load balancing loss as in Switch Transformer - implemented in Pytorch.
+
+    Args:
+        gate_logits:
+            Logits from the `gate`, should be a tuple of model.config.num_hidden_layers tensors of
+            shape [batch_size X sequence_length, num_experts].
+        num_experts:
+            Number of experts
+        top_k:
+            The number of experts to route per-token, can be also interpreted as the `top-k` routing
+            parameter.
+        attention_mask (`torch.Tensor`, *optional*):
+            The attention_mask used in forward function
+            shape [batch_size X sequence_length] if not None.
+
+    Returns:
+        The auxiliary loss.
+    """
+    if gate_logits is None or not isinstance(gate_logits, tuple):
+        return 0
+
+    if isinstance(gate_logits, tuple):
+        compute_device = gate_logits[0].device
+        concatenated_gate_logits = torch.cat([layer_gate.to(compute_device) for layer_gate in gate_logits], dim=0)
+
+    routing_weights = torch.nn.functional.softmax(concatenated_gate_logits, dim=-1)
+
+    _, selected_experts = torch.topk(routing_weights, top_k, dim=-1)
+
+    expert_mask = torch.nn.functional.one_hot(selected_experts, num_experts)
+
+    if attention_mask is None:
+        # Compute the percentage of tokens routed to each experts
+        tokens_per_expert = torch.mean(expert_mask.float(), dim=0)
+
+        # Compute the average probability of routing to these experts
+        router_prob_per_expert = torch.mean(routing_weights, dim=0)
+    else:
+        batch_size, sequence_length = attention_mask.shape
+        num_hidden_layers = concatenated_gate_logits.shape[0] // (batch_size * sequence_length)
+
+        # Compute the mask that masks all padding tokens as 0 with the same shape of expert_mask
+        expert_attention_mask = (
+            attention_mask[None, :, :, None, None]
+            .expand((num_hidden_layers, batch_size, sequence_length, top_k, num_experts))
+            .reshape(-1, top_k, num_experts)
+            .to(compute_device)
+        )
+
+        # Compute the percentage of tokens routed to each experts
+        sum_expert_attention_mask = torch.sum(expert_attention_mask, dim=0)
+        ps = get_parallel_state()
+        if ps.is_ulysses_enable():
+            torch.distributed.all_reduce(
+                sum_expert_attention_mask,
+                op=torch.distributed.ReduceOp.SUM,
+                group=ps.get_ulysses_group()
+            )
+        tokens_per_expert = torch.sum(expert_mask.float() * expert_attention_mask, dim=0) / sum_expert_attention_mask
+        if ps.is_ulysses_enable():
+            torch.distributed.all_reduce(
+                tokens_per_expert,
+                op=torch.distributed.ReduceOp.SUM,
+                group=ps.get_ulysses_group()
+            )
+
+        # Compute the mask that masks all padding tokens as 0 with the same shape of tokens_per_expert
+        router_per_expert_attention_mask = (
+            attention_mask[None, :, :, None]
+            .expand((num_hidden_layers, batch_size, sequence_length, num_experts))
+            .reshape(-1, num_experts)
+            .to(compute_device)
+        )
+
+        # Compute the average probability of routing to these experts
+        sum_router_per_expert_attention_mask = torch.sum(router_per_expert_attention_mask, dim=0)
+        if ps.is_ulysses_enable():
+            torch.distributed.all_reduce(
+                sum_router_per_expert_attention_mask,
+                op=torch.distributed.ReduceOp.SUM,
+                group=ps.get_ulysses_group()
+            )
+        router_prob_per_expert = torch.sum(routing_weights * router_per_expert_attention_mask, dim=0) / sum_router_per_expert_attention_mask
+
+    overall_loss = torch.sum(tokens_per_expert * router_prob_per_expert.unsqueeze(0))
+    return overall_loss * num_experts
+
+
 class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMixin):
     _checkpoint_conversion_mapping = {}
     _tied_weights_keys = ["lm_head.weight"]
@@ -1530,7 +1655,7 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
     def __init__(self, config):
         super().__init__(config)
         self.model = Qwen3VLMoeModel(config)
-        self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
+        self.lm_head = Qwen3VLLMHead(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
 
         self.post_init()
 
@@ -1612,35 +1737,32 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        logits = self.lm_head(hidden_states[:, slice_indices, :])
+        loss_ctx, enable_chunk_loss = kwargs.get('loss_ctx', None), kwargs.get('enable_chunk_loss', False)
 
-        loss = None
-        if labels is not None:
-            # Modification: sp loss
-            ps = get_parallel_state()
-            if ps.is_ulysses_enable():
-                # pad and shift labels
-                labels = F.pad(labels, (0, 1), value=IGNORE_INDEX)
-                shift_labels = labels[..., 1:].contiguous()
-                token_nums = (shift_labels > -1).sum(dim=1)
-                # shape: [bs, s] --> [b, s / cp]
-                split_sizes = cal_split_sizes(shift_labels.shape[-1], ps.get_ulysses_group_size())
-                shift_labels = split_forward_gather_backward(shift_labels, ps.get_ulysses_group(), dim=1, grad_scale="down", split_sizes=split_sizes)
-                # Flatten the tokens
-                logits = logits.view(-1, self.config.text_config.vocab_size)
-                shift_labels = shift_labels.view(-1)
-                loss = F.cross_entropy(logits, shift_labels, reduction='none', ignore_index=IGNORE_INDEX)
-                loss = loss * (shift_labels > -1)
-                # calculate local cp loss
-                token_nums = torch.sum(token_nums)
-                loss = loss.sum() / token_nums
-                
-                # gather and sum cp loss;scaling up grad
-                loss = loss.unsqueeze(0)
-                loss = gather_forward_split_backward(loss, process_group=ps.get_ulysses_group(), dim=0, grad_scale="up")
-                loss = loss.sum()
-            else:
-                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
+        if loss_ctx is None:
+            raise NotImplementedError(f"loss_ctx cannot be None!")
+
+        logits, loss = self.lm_head(hidden_states[:, slice_indices, :], loss_ctx, enable_chunk_loss=enable_chunk_loss)
+        ps = get_parallel_state()
+        if ps.is_ulysses_enable():
+            loss = gather_forward_split_backward(loss.unsqueeze(0), process_group=ps.get_ulysses_group(), dim=0, grad_scale="up")
+            loss = loss.sum()
+
+        aux_loss = None
+        if kwargs.get("output_router_logits", False):
+            router_aux_loss_coef = kwargs.get("router_aux_loss_coef", 0.0)
+            if attention_mask is not None:
+                ps = get_parallel_state()
+                split_sizes = cal_split_sizes(attention_mask.shape[-1], ps.get_ulysses_group_size())
+                attention_mask = split_forward_gather_backward(attention_mask, ps.get_ulysses_group(), dim=1,
+                                                               grad_scale="down", split_sizes=split_sizes)
+            aux_loss = load_balancing_loss_func(
+                outputs.router_logits,
+                self.config.text_config.num_experts,
+                self.config.text_config.num_experts_per_tok,
+                attention_mask,
+            )
+            loss += router_aux_loss_coef * aux_loss
 
         return Qwen3VLMoeCausalLMOutputWithPast(
             loss=loss,
