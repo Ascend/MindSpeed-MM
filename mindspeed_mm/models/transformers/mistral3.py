@@ -5,8 +5,10 @@ from megatron.training import print_rank_0
 from transformers import Mistral3ForConditionalGeneration
 
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
+from mindspeed_mm.models.transformers.custom_model_registry import register_model
 
 
+@register_model("mistral3")
 class MultiModelMistral3ForConditionalGeneration(Mistral3ForConditionalGeneration, FSDP2Mixin, WeightInitMixin):
 
     def freeze(self, config):
