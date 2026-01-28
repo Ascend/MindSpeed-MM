@@ -657,3 +657,11 @@ Tencent endeavors to promote safe and fair use of its tools and features, includ
 20.	To engage in the unauthorized or unlicensed practice of any profession including, but not limited to, financial, legal, medical/health, or other professional practices
 
 Copyright © 2025 Tencent. All Rights Reserved.
+
+Software Notice
+Software Qwen3-TTS
+License: Apache License 2.0
+For the full text of the license, please go to the above.
+
+Copyright Notice included in the software:
+Copyright 2026 QwenLM/Qwen3-TTS
