@@ -21,11 +21,11 @@ def transfer_logs_as_json(log_file, output_json_file):
     Args:
         log_file: str, path to the dir where the logs are located.
         output_json_file: str, path of the json file transferred from the logs.
-    
+
     Returns:
         data: json, the values parsed from the log, formatted as a json file.
     """
-    
+
     log_pattern = re.compile(
         r"elapsed time per iteration \(ms\):\s+([0-9.]+)\s+\|.*?loss:\s+([0-9.]+E[+-][0-9]+)"
     )
@@ -39,7 +39,7 @@ def transfer_logs_as_json(log_file, output_json_file):
         "time": [],
         "memo info": []
     }
-    with open(log_file, "r") as f:
+    with open(log_file, "r", encoding='utf-8', errors='replace') as f:
         log_content = f.read()
 
     log_matches = log_pattern.findall(log_content)

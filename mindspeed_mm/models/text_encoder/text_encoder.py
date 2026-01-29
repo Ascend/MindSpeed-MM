@@ -203,6 +203,8 @@ class TextEncoder(nn.Module):
 
         # Only huggingface backend is supported, OpenMind backend will be supported soon.
         model_id = config.pop("model_id")
+        # Adapted for transformers 5.0.0.
+        config.pop("load_in_8bit", None)
         if model_id in TRANSFORMERS_TEXT_ENCODER_MAPPING:
             module = importlib.import_module("transformers")
             self.automodel_name = TRANSFORMERS_TEXT_ENCODER_MAPPING[model_id]

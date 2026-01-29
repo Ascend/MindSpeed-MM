@@ -85,9 +85,11 @@ def acquire_exitcode(command):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,  # 将stderr合并到stdout
         universal_newlines=True,   # 文本模式
+        encoding='utf-8',
+        errors='replace',
         bufsize=1                 # 行缓冲
     )
-    
+
     # 实时读取并输出
     while True:
         output = process.stdout.readline()
@@ -95,7 +97,7 @@ def acquire_exitcode(command):
             break
         if output:
             print(output, end='', flush=True)
-    
+
     # 等待进程结束
     return process.wait()
 

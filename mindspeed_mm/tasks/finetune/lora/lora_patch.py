@@ -15,6 +15,7 @@
 
 
 from functools import wraps
+import torch
 
 import megatron
 import megatron.core
@@ -41,7 +42,7 @@ def lora_apply_to_module(lora_apply_modules, module_name):
     # LoRA is applied to all modules(default).
     if "all" in lora_apply_modules:
         return True
-    
+
     # Check if the module is in the list of modules with LoRA enabled.
     for apply_module in lora_apply_modules:
         if apply_module in module_name:
@@ -60,6 +61,39 @@ def model_provider_func_wrapper(model_provider_func):
             from peft import LoraConfig, get_peft_model, PeftModel, LoraModel
             from peft.tuners.tuners_utils import check_target_module_exists
             import mindspeed_mm.models.sora_model
+            # Fix 1: Avoid KeyError in reset_lora_parameters (comment out bias init)
+            from peft.tuners.lora.layer import LoraLayer
+            # Fix 2: Use hasattr to avoid AttributeError on tie_word_embeddings
+            from peft.utils.other import EMBEDDING_LAYER_NAMES
+            from peft.tuners.tuners_utils import BaseTuner
+            import torch.nn as nn
+            import math
+
+            def safe_reset_lora_parameters(self, adapter_name, init_lora_weights):
+                if init_lora_weights is False:
+                    return
+                if adapter_name in self.lora_A:
+                    if init_lora_weights is True:
+                        nn.init.kaiming_uniform_(self.lora_A[adapter_name].weight, a=math.sqrt(5))
+                    elif isinstance(init_lora_weights, str) and init_lora_weights.lower() == "gaussian":
+                        nn.init.normal_(self.lora_A[adapter_name].weight, std=1 / self.r[adapter_name])
+                    else:
+                        raise ValueError(f"Unknown initialization {init_lora_weights=}")
+                    nn.init.zeros_(self.lora_B[adapter_name].weight)
+                if adapter_name in getattr(self, 'lora_embedding_A', {}):
+                    nn.init.zeros_(self.lora_embedding_A[adapter_name])
+                    nn.init.normal_(self.lora_embedding_B[adapter_name])
+            LoraLayer.reset_lora_parameters = safe_reset_lora_parameters
+
+            def safe_get_tied_target_modules(self, model):
+                tied = []
+                model_config = self.get_model_config(model)
+                if hasattr(model_config, "tie_word_embeddings"):  # patched: use hasattr
+                    for target_module in self.targeted_module_names:
+                        if target_module.split(".")[-1] in EMBEDDING_LAYER_NAMES:
+                            tied.append(target_module)
+                return tied
+            BaseTuner._get_tied_target_modules = safe_get_tied_target_modules
             config = core_transformer_config_from_args(args)
             if args.lora_target_modules and "," in args.lora_target_modules[0]:
                 args.lora_target_modules = args.lora_target_modules[0].split(",")
@@ -82,7 +116,7 @@ def model_provider_func_wrapper(model_provider_func):
             trainable_target_modules = []
             lora_apply_modules = getattr(mm_model, 'lora_apply_modules', [])
             lora_mixed_training = getattr(mm_model, 'lora_mixed_training', False)
-            
+
             for module_name, _ in model.named_modules():
                 if lora_mixed_training and not lora_apply_to_module(lora_apply_modules, module_name):
                     continue
@@ -239,6 +273,90 @@ def peft_model_load_state_dict(self, state_dict, strict):
     return self.load_state_dict_before_patch(state_dict, strict)
 
 
+def patched_lora_forward(self, x: torch.Tensor, *args, **kwargs):
+    """
+    Forward function compatible with PEFT 0.7.1 and 0.18.1.
+
+    Problem addressed:
+    - PEFT 0.18.1 introduced breaking changes compared to 0.7.1:
+      1. Removed automatic tuple checking/unpacking in intermediate layers
+      2. Changed handling of adapter_names parameter
+      3. Modified data type conversion logic
+
+    Key modifications and effects:
+    1. Adapter Names Handling: Accepts adapter_names parameter from kwargs without throwing error
+    2. Tuple Unpacking: Manually checks and unpacks tuples returned by intermediate layers
+       to maintain compatibility with both PEFT versions
+    3. Data Type Conversion: Checks for newer _cast_input_dtype method, falls back to
+       direct type casting for older PEFT versions
+    4. Manual Tuple Processing: Explicitly handles cases where lora_A or lora_B might return tuples
+       and ensures only the tensor part is passed forward
+    5. Type Preservation: Ensures the output dtype matches the input dtype for consistency
+
+    Effects achieved:
+    - Maintains compatibility across PEFT library versions
+    - Prevents runtime errors due to API differences
+    - Preserves the forward pass behavior of LoRA layers
+    - Ensures proper gradient flow through LoRA components
+    """
+    # 0.18.1 Feature: Handle adapter_names parameter
+    adapter_names = kwargs.pop("adapter_names", None)
+    if adapter_names is not None:
+        pass
+
+    # Compatibility logic: Check args
+    if hasattr(self, "_check_forward_args"):
+        self._check_forward_args(x, *args, **kwargs)
+
+    previous_dtype = x.dtype  # Using 0.7.1 logic: record input x's dtype
+
+    # Base Layer Logic (similar in both versions)
+    if self.disable_adapters:
+        if self.merged:
+            self.unmerge()
+        result, bias = self.base_layer(x, *args, **kwargs)
+    elif self.merged:
+        result, bias = self.base_layer(x, *args, **kwargs)
+    else:
+        result, bias = self.base_layer(x, *args, **kwargs)
+
+        # Core Fix Area
+        for active_adapter in self.active_adapters:
+            if active_adapter not in self.lora_A.keys():
+                continue
+
+            lora_A = self.lora_A[active_adapter]
+            lora_B = self.lora_B[active_adapter]
+            dropout = self.lora_dropout[active_adapter]
+            scaling = self.scaling[active_adapter]
+
+            # Data Type Conversion Compatibility
+            if hasattr(self, "_cast_input_dtype"):
+                # 0.18.1 optimized approach
+                x_input = self._cast_input_dtype(x, lora_A.weight.dtype)
+            else:
+                # 0.7.1 approach
+                x_input = x.to(lora_A.weight.dtype)
+
+            # Manually perform Tuple Unpacking (restore 0.7.1 behavior)
+            # 1. Dropout -> lora_A
+            lora_A_output = lora_A(dropout(x_input))
+            if isinstance(lora_A_output, tuple):
+                lora_A_output = lora_A_output[0]
+
+            # 2. lora_A_output -> lora_B
+            lora_B_output = lora_B(lora_A_output)
+            if isinstance(lora_B_output, tuple):
+                lora_B_output = lora_B_output[0]
+
+            # 3. Scale and accumulate
+            result = result + lora_B_output * scaling
+
+        result = result.to(previous_dtype) # Restore to input x's dtype (0.7.1 behavior)
+
+    return result, bias
+
+
 def apply_patches():
     megatron.training.training.load_checkpoint = load_checkpoint_wrapper(
         megatron.training.checkpointing.load_checkpoint)
@@ -271,5 +389,7 @@ def apply_patches():
     PeftModel.load_state_dict_before_patch = PeftModel.load_state_dict
     PeftModel.load_state_dict = peft_model_load_state_dict
 
+    from peft.tuners.lora.tp_layer import LoraParallelLinear
+    LoraParallelLinear.forward = patched_lora_forward
 
 apply_patches()

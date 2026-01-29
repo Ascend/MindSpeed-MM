@@ -7,6 +7,29 @@ import importlib.util
 
 from datasets import Dataset
 import torch
+import transformers
+from packaging import version
+
+# Patch ALL possible locations BEFORE any transformers import
+if version.parse(transformers.__version__).major >= 5:
+    def _dummy_check_model_inputs(*args, **kwargs):
+        """
+        Universal dummy for @check_model_inputs.
+        Supports both:
+        - @check_model_inputs          → called as check_model_inputs(cls)
+        - @check_model_inputs(...)     → called as check_model_inputs(...)(cls)
+        """
+        if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
+            # Case 1: @check_model_inputs (no parentheses) → args[0] is the class/function
+            return args[0]
+        else:
+            # Case 2: @check_model_inputs(...) → return a decorator that returns the function
+            def decorator(fn):
+                return fn
+            return decorator
+
+    import transformers.utils.generic
+    transformers.utils.generic.check_model_inputs = _dummy_check_model_inputs
 
 spec = importlib.util.spec_from_file_location("config_loader", "mindspeed_mm/configs/read_yaml_config.py")
 spec.loader.exec_module(importlib.util.module_from_spec(spec))
@@ -70,13 +93,13 @@ def loss_func(output_tensor):
     args = get_args()
     loss_dir = {}
 
-    loss = output_tensor['loss']    
+    loss = output_tensor['loss']
     if output_tensor.get('token_nums', None) is not None:
         total_tokens = output_tensor['token_nums']
     else:
         loss_mask = output_tensor['loss_mask'].view(-1).float()
         total_tokens = loss_mask.sum()
-    
+
     if args.log_tps:
         dp_size = torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
         tokens_per_sample = torch.tensor(total_tokens / args.micro_batch_size, device=output_tensor['loss'].device) / dp_size
@@ -85,8 +108,8 @@ def loss_func(output_tensor):
 
     averaged_loss = loss.clone().detach().view(1)
     torch.distributed.all_reduce(
-        averaged_loss, 
-        group=mpu.get_data_parallel_group(with_context_parallel=True), 
+        averaged_loss,
+        group=mpu.get_data_parallel_group(with_context_parallel=True),
         op=torch.distributed.ReduceOp.AVG
     )
     averaged_loss *= mpu.get_context_parallel_world_size()
@@ -160,14 +183,14 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
                     consumed_train_samples=args.consumed_train_samples,
                 )
             train_dataloader, valid_dataloader, test_dataloader = build_iterations(train_dataloader)
-    
+
     loss_config = getattr(args.mm.model, "loss_cfg", None)
     use_prefetch_gradacc_dataloader = False
     if loss_config:
         use_prefetch_gradacc_dataloader = (getattr(loss_config, "loss_type", "default") == "per_token_loss")
     if use_prefetch_gradacc_dataloader:
         train_dataloader = PrefetchGradAccDataLoader(train_dataloader, grad_acc_step=cal_gradient_accumulation_size())
-    
+
     return train_dataloader, valid_dataloader, test_dataloader
 
 

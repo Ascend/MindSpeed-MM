@@ -9,8 +9,8 @@ import torch
 import torch_npu
 import torch.nn as nn
 import torch.nn.functional as F
-
-from transformers.models.qwen2_vl.modeling_qwen2_vl import Qwen2VLRotaryEmbedding
+from packaging import version
+import transformers
 
 from megatron.core import mpu
 from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
@@ -26,6 +26,14 @@ from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mappi
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.vision.vision_encoders.vision_transformer_block import Qwen2VLVisionTransformerBlock
 from mindspeed_mm.models.common.communications import split_forward_gather_backward
+
+TRANSFORMERS_V5_MAJOR = 5
+_trans_version = version.parse(transformers.__version__)
+
+if _trans_version.major >= TRANSFORMERS_V5_MAJOR:
+    from mindspeed_mm.models.transformers.qwen2vl.modeling_qwen2_vl import Qwen2VLRotaryEmbedding
+else:
+    from transformers.models.qwen2_vl.modeling_qwen2_vl import Qwen2VLRotaryEmbedding
 
 
 # Copied from transformers.models.llama.modeling_llama.rotate_half
@@ -64,10 +72,10 @@ class Qwen2VLRotaryEmbedding_llm(Qwen2VLRotaryEmbedding):
         super().__init__(config=config)
         # head_dim default: hidden_size // num_attention_heads, pass kv_channels to override it
         self.config.head_dim = self.config.kv_channels
-        inv_freq, self.attention_scaling = self.rope_init_fn(self.config)
-        self.register_buffer("inv_freq", inv_freq, persistent=False)
-        self.original_inv_freq = self.inv_freq
-
+        if _trans_version.major < TRANSFORMERS_V5_MAJOR:
+            inv_freq, self.attention_scaling = self.rope_init_fn(self.config)
+            self.register_buffer("inv_freq", inv_freq, persistent=False)
+            self.original_inv_freq = self.inv_freq
 
     @torch.no_grad()
     def forward(self, x_device, x_dtype, position_ids):
