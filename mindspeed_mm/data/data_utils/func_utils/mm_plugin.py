@@ -1116,7 +1116,7 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
                                 video_grid_thw[num_video_tokens][2] // image_processor.merge_size,
                             )
                             .flatten()
-                            * mm_inputs.get("video_second_per_grid").get(num_video_tokens)
+                            * mm_inputs.get("video_second_per_grid")[num_video_tokens]
                             * 25
                     ).long()
                     t_ntoken_per_chunk = 50

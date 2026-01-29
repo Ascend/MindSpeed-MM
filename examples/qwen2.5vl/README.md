@@ -399,7 +399,7 @@ dataset_param->basic_parameters->dataset
 }
 ```
 
-如加载大量数据遇到通信TIMEOUT，可以在`data_xxb.json`中添加`dataset_param.basic_parameters.preprocess_on_fly`字段并置为true。详情可参考[相关issue](https://gitcode.com/Ascend/MindSpeed-MM/issues/152)。
+如加载大量数据遇到通信TIMEOUT，可以在`data_xxb.json`中添加`dataset_param.basic_parameters.preprocess_on_fly`字段并置为true。
 
 【模型保存加载及日志信息配置】
 

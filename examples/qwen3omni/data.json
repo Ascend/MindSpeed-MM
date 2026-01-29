@@ -5,6 +5,7 @@
             "model_name_or_path": "./ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct",
             "use_fast_tokenizer": true,
             "split_special_tokens": false,
+            "use_audio_in_video": false,
             "image_max_pixels": 262144,
             "image_min_pixels": 1024,
             "video_max_pixels": 16384,

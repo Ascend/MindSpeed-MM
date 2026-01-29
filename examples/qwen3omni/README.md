@@ -235,8 +235,6 @@ dataset_param->basic_parameters->dataset
 ```
 
 如果需要加载大批量数据，可使用流式加载，修改`data.json`中的`sampler_type`字段，增加`streaming`字段。（注意：使用流式加载后当前仅支持`num_workers=0`，单进程处理数据，会有性能波动，并且不支持断点续训功能。）
-
-
 ```json
 {
     "dataset_param": {
@@ -282,6 +280,31 @@ dataset_param->basic_parameters->dataset
 }
 
 ```
+
+如果需要支持语音、视频数据，并进行跨模态融合，可以将`use_audio_in_video`设置为true.
+```json
+{
+    "dataset_param": {
+        ...
+        "preprocess_parameters": {
+            ...
+            "use_audio_in_video": true,
+            ...
+        },
+        "attr": {
+            ...
+            "images": null,
+            "videos": "videos",
+            "audios": "audios",
+            ...
+        },
+        ...
+    },
+    ...
+}
+```
+
+如果加载大量数据遇到通信TIMEOUT，可以在`data.json`中添加`dataset_param.basic_parameters.preprocess_on_fly`字段并置为true。
 
 【模型保存加载及日志信息配置】
 
