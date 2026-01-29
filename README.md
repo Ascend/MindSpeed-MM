@@ -39,6 +39,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 
+* [Jan. 28, 2026]: 🚀 MindSpeed MM基于FSDP2支持Magistral-Small-2509模型
 * [Jan. 08, 2026]: 🚀 MindSpeed MM支持FLUX.2模型【Prototype】
 * [Dec. 25, 2025]: 🎉 用户手册上线！体验链接：<https://mindspeed-mm.readthedocs.io/zh-cn/latest/>
 * [Dec. 03, 2025]: 🚀 MindSpeed MM基于FSDP2支持Glm4.5v模型训练demo【Prototype】
@@ -736,8 +737,9 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td rowspan="24"> 多模态理解 </td>
+      <td rowspan="25"> 多模态理解 </td>
     </tr>
+    <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/glm4.1v">GLM-4.1V</a></td>
       <td><a href="https://github.com/THUDM/GLM-4.1V-Thinking">9B</a></td>
       <td> 微调 </td>
@@ -748,7 +750,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 707 </td>
       <td>【Pass】</td>
     </tr>
-      </tr>
+    <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/deepseekocr">DeepSeek-OCR</a></td>
       <td><a href="https://github.com/deepseek-ai/DeepSeek-OCR">3B</a></td>
       <td> 微调 </td>
@@ -770,7 +772,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 602 </td>
       <td>【Test】</td>
     </tr>
-   <tr>
+    <tr>
       <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL2-2B">2B</a></td>
       <td> 微调 </td>
@@ -977,6 +979,17 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 131.3 (TPS) </td>
       <td> 16.4 (TPS) </td>
       <td> 288 </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/magistral-2509">Magistral-Small-2509</a></td>
+      <td><a href="https://huggingface.co/mistralai/Magistral-Small-2509">24B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+      <td> 1.843 (SPS) </td>
+      <td> 1.185 (SPS) </td>
+      <td> / </td>
       <td>【Test】</td>
     </tr>
     <tr>
