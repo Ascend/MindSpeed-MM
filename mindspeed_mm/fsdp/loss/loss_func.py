@@ -7,7 +7,7 @@ from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import cal_split_sizes, split_forward_gather_backward
 
 
-def build_loss_ctx(
+def build_loss_func(
     loss_type,
     ignore_index=-100,
     chunk_size=1024,
@@ -62,7 +62,7 @@ def build_loss_ctx(
             alpha = torch.split(alpha.view(bs, -1), chunk_size, dim=1)
 
             # Prepare keyword arguments for each chunk to be passed to the chunked loss function.
-        loss_ctx_kwargs = [
+        loss_func_kwargs = [
             {
                 "shift_labels": chunk_labels[i],
                 "ignore_index": ignore_index,
@@ -73,18 +73,18 @@ def build_loss_ctx(
         ]
 
         # Return a closure that computes the chunked language modeling loss using the prepared config.
-        def loss_ctx(hidden_states, head_weight, head_bias):
+        def loss_func(hidden_states, head_weight, head_bias):
             return chunk_loss(
                 hidden_states,
                 head_weight,
                 head_bias,
                 loss_forward=calculate_lm_loss,
-                loss_kwargs_chunks=loss_ctx_kwargs,
+                loss_kwargs_chunks=loss_func_kwargs,
                 chunk_size=chunk_size
             )
 
     else:
-        def loss_ctx(logits):
+        def loss_func(logits):
             logits = logits.view(-1, logits.shape[-1])
             labels = shift_labels.view(-1)
             return fixed_cross_entropy(
@@ -93,4 +93,4 @@ def build_loss_ctx(
                 reduction=reduction
             )
 
-    return loss_ctx, loss_mask
+    return loss_func, loss_mask

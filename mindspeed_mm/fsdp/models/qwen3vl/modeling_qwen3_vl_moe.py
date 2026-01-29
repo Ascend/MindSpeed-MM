@@ -1492,7 +1492,7 @@ class Qwen3VLMoeModel(Qwen3VLMoePreTrainedModel):
 
 
 class Qwen3VLLMHead(nn.Linear):
-    def forward(self, hidden_states: torch.Tensor, loss_ctx: callable, enable_chunk_loss: bool = False):
+    def forward(self, hidden_states: torch.Tensor, loss_func: callable, enable_chunk_loss: bool = False):
         # Handle distributed tensor (DTensor) weights and biases by converting to local tensors.
         if isinstance(self.weight, DTensor):
             w = self.weight.to_local()
@@ -1512,12 +1512,12 @@ class Qwen3VLLMHead(nn.Linear):
         if not enable_chunk_loss:
             # compute and return logits normally.
             logits = F.linear(hidden_states, w, b).contiguous().float()
-            loss = loss_ctx(logits)
+            loss = loss_func(logits)
             return logits, loss
         else:
             # Otherwise, delegate loss computation to the provided loss context function,
             # which typically enables memory-efficient or chunked loss calculation.
-            return None, loss_ctx(hidden_states, w, b)
+            return None, loss_func(hidden_states, w, b)
 
 
 @dataclass
@@ -1737,12 +1737,12 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        loss_ctx, enable_chunk_loss = kwargs.get('loss_ctx', None), kwargs.get('enable_chunk_loss', False)
+        loss_func, enable_chunk_loss = kwargs.get('loss_func', None), kwargs.get('enable_chunk_loss', False)
 
-        if loss_ctx is None:
-            raise NotImplementedError(f"loss_ctx cannot be None!")
+        if loss_func is None:
+            raise NotImplementedError(f"loss_func cannot be None!")
 
-        logits, loss = self.lm_head(hidden_states[:, slice_indices, :], loss_ctx, enable_chunk_loss=enable_chunk_loss)
+        logits, loss = self.lm_head(hidden_states[:, slice_indices, :], loss_func, enable_chunk_loss=enable_chunk_loss)
         ps = get_parallel_state()
         if ps.is_ulysses_enable():
             loss = gather_forward_split_backward(loss.unsqueeze(0), process_group=ps.get_ulysses_group(), dim=0, grad_scale="up")

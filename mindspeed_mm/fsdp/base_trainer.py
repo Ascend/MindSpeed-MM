@@ -35,7 +35,7 @@ from mindspeed_mm.fsdp.optimizer.lr_scheduler import build_lr_scheduler
 from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
 from mindspeed_mm.fsdp.tools.profiler import Profiler
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields, instantiate_dataclass
-from mindspeed_mm.fsdp.loss.loss_ctx import build_loss_ctx
+from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 
 logger = logging.getLogger(__name__)
 
@@ -238,17 +238,20 @@ class BaseTrainer:
             raise ValueError("Data iterator is None. Unable to retrieve batch.")
         return batch
 
-    def get_loss_ctx(self, batch_data):
+    def get_loss_func(self, batch_data):
+        if not self.model_args.loss_cfg == 'custom':
+            return batch_data
+
         if self.model_args.loss_cfg.enable_chunk_loss:
-            loss_ctx, loss_mask = build_loss_ctx(self.model_args.loss_cfg.loss_type,
+            loss_func, loss_mask = build_loss_func(self.model_args.loss_cfg.loss_type,
                                                  chunk_size=self.model_args.loss_cfg.chunk_size, **batch_data)
         else:
-            loss_ctx, loss_mask = build_loss_ctx(self.model_args.loss_cfg.loss_type, chunk_size=None, **batch_data)
+            loss_func, loss_mask = build_loss_func(self.model_args.loss_cfg.loss_type, chunk_size=None, **batch_data)
         batch_data.update(
             enable_chunk_loss=self.model_args.loss_cfg.enable_chunk_loss,
             router_aux_loss_coef=self.model_args.loss_cfg.router_aux_loss_coef,
             output_router_logits=self.model_args.loss_cfg.router_aux_loss_coef > 0.0,
-            loss_ctx=loss_ctx,
+            loss_func=loss_func,
         )
         return batch_data
 
@@ -264,7 +267,7 @@ class BaseTrainer:
             batch_data = move_to_device(batch_data, torch.bfloat16 if self.parallel_args.fsdp_plan.enable_mixed_precision else None)
 
             # setup loss ctx
-            batch_data = self.get_loss_ctx(batch_data)
+            batch_data = self.get_loss_func(batch_data)
 
             # forward step
             output = self.model(**batch_data)
