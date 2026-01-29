@@ -1,11 +1,10 @@
 import torch
 import torch.nn.functional as F
 
-from mindspeed.lite.memory.chunk_loss.chunk_loss import chunk_loss, calculate_lm_loss, fixed_cross_entropy
-from mindspeed_mm.data.data_utils.constants import AVG_PER_STEP_TOKEN_NUM
+from mindspeed.fsdp.memory.chunk_loss.chunk_loss import chunk_loss, calculate_lm_loss, fixed_cross_entropy
+from mindspeed_mm.fsdp.utils.constants import AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward, \
-    split_forward_gather_backward_with_cp
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import cal_split_sizes, split_forward_gather_backward
 
 
 def build_loss_ctx(

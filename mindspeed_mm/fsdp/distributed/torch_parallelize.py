@@ -25,7 +25,7 @@ class ParallelApplier:
         model = tensor_parallel_modules(model, self.parallel_state.get_tp_device_mesh(), self.config.tp_plan)
 
     def apply_ep_modules(self, model):
-        if self.config.ep_plan.apply_efsdp_modules is None:
+        if not self.config.ep_plan.apply_efsdp_modules:
             self.config.ep_plan.apply_efsdp_modules = self.config.ep_plan.apply_modules
         if self.config.ep_plan._gradient_divide_factor is None:
             self.config.ep_plan._gradient_divide_factor = torch.distributed.get_world_size()

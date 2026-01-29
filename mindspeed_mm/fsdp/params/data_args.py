@@ -2,9 +2,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict
 import logging
 
-from mindspeed_mm.data.data_utils.func_utils.convert import DatasetAttr
-from mindspeed_mm.data.data_utils.func_utils.convert import DataArguments as BasicDataAruments
-from mindspeed_mm.data.data_utils.func_utils.model_args import ProcessorArguments
+from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DatasetAttr
+from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DataArguments as BasicDataAruments
+from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields
 
 logger = logging.getLogger(__name__)

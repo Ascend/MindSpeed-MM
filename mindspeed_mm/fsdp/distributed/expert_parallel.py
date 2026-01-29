@@ -14,7 +14,6 @@ from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
 
-from .fused_ep import fused_ep_forward
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +111,7 @@ def apply_grad_division_hook(module, ep_size):
 
 
 def get_experts_forward_fn_for_qwen(ep_group, fused=True):
+    from .fused_ep import fused_ep_forward
 
     def experts_forward(self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor):
         batch_size = hidden_states.shape[0]

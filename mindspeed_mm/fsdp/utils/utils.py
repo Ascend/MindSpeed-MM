@@ -3,7 +3,7 @@ import time
 
 import torch
 
-from mindspeed_mm.data.data_utils.constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
+from .constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
 from .device import get_device_type, get_torch_device
 
 

@@ -26,9 +26,9 @@ from mindspeed_mm.fsdp.distributed.parallel_state import init_parallel_state, ge
 from mindspeed_mm.fsdp.models.modelhub import ModelHub
 from mindspeed_mm.fsdp.distributed.torch_parallelize import ParallelApplier
 from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed, move_to_device, get_time
-from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
-from mindspeed_mm.data.data_utils.utils import build_iterations
-from mindspeed_mm.data.dataloader.dataloader import PrefetchGradAccDataLoader
+from mindspeed_mm.fsdp.data import build_mm_dataloader, build_mm_dataset
+from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
+from mindspeed_mm.fsdp.data.dataloader.dataloader import PrefetchGradAccDataLoader
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.optimizer.optimizer import build_optimizer
 from mindspeed_mm.fsdp.optimizer.lr_scheduler import build_lr_scheduler
@@ -54,7 +54,7 @@ class BaseTrainer:
     def __init__(self):
         # 1. Parse arguments
         self.parallel_args, self.model_args, self.data_args, self.training_args = self.parse_args()
-        
+
         # 2. Initialize
         self.initialize()
 
@@ -104,10 +104,10 @@ class BaseTrainer:
             )
         with open(os.path.abspath(cmd_args[0]), encoding="utf-8") as f:
             input_data: Dict[str, Dict[str, Any]] = yaml.safe_load(f)
-        
+
         # Instantiate the Arguments dataclass from YAML data
         args = instantiate_dataclass(Arguments, input_data)
-        
+
         # Critical: Resolve dependencies between different configuration sections
         # and validate parameter consistency across the entire configuration
         self.validate_args(args)
@@ -118,7 +118,7 @@ class BaseTrainer:
             args.data,
             args.training
         )
-    
+
     def initialize(self):
         """Initialize training environment: logging, random seeds, distributed groups."""
         print_rank(logger.info, f"Start initializing training environment!!!")
@@ -154,7 +154,7 @@ class BaseTrainer:
         if self.training_args.init_model_with_meta_device:
             to_empty_if_needed(model, device=get_device_type())
             model.init_weights()
-        
+
         return model
 
     def build_dataloader(self):
@@ -199,7 +199,7 @@ class BaseTrainer:
             optimizer_type=self.training_args.optimizer,
         )
         return optimizer
-    
+
     def get_scheduler(self):
         """Build learning rate scheduler."""
         lr_scheduler = build_lr_scheduler(
@@ -213,7 +213,7 @@ class BaseTrainer:
             lr_start=self.training_args.lr_start,
         )
         return lr_scheduler
-    
+
     def get_checkpointer(self):
         """Return checkpointing class (can be overridden for different checkpoint formats)."""
         return DistributedCheckpointer
@@ -273,7 +273,10 @@ class BaseTrainer:
             # Backward
             loss.backward()
 
-            total_loss += self.average_losses_across_data_parallel_group([loss])
+            total_loss += loss
+
+        # Average loss across data parallel group
+        total_loss = self.average_losses_across_data_parallel_group([total_loss])
 
         return total_loss
 
@@ -307,7 +310,7 @@ class BaseTrainer:
             # Update training state
             self.consumed_train_samples += self.training_args.global_batch_size
             self.iteration += 1
-            
+
             # Calculate iteration time
             elapsed_time_per_iteration = get_time(barrier=True) - start_time
 
@@ -321,12 +324,13 @@ class BaseTrainer:
                     loss,
                     grad_norm
                 )
+
             curr_step_lr = self.lr_scheduler.get_last_lr()[0]
-            
+
             # Save checkpoint at specified intervals
             if self.training_args.save and self.training_args.save_interval > 0 and self.iteration % self.training_args.save_interval == 0:
                 self.save(self.iteration, self.consumed_train_samples)
-        
+
         # Final save after training completes
         if self.training_args.save:
             self.save(self.iteration, self.consumed_train_samples)
