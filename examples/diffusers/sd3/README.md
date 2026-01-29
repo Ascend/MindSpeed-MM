@@ -83,7 +83,7 @@
 
     ```shell
     pip install -e .
-    vim examples/dreambooth/requirements_sd3.txt #修改版本：torch==2.7.1, accelerate==1.10.0, 添加deepspeed==0.17.2, peft==0.7.1
+    vim examples/dreambooth/requirements_sd3.txt #修改版本：torch==2.7.1, accelerate==1.10.0, transformers==4.44.0，添加deepspeed==0.17.2, peft==0.7.1
     pip install -r examples/dreambooth/requirements_sd3.txt # 安装对应依赖
     ```
 
