@@ -122,6 +122,14 @@ mm-convert WanConverter hf_to_mm \
  --cfg.target_path ./weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer*
 ```
 
+通过进一步将权重转换为DCP格式，启动时分布式加载ckpt，可以降低对host侧的内存峰值压力（可选）。转换命令如下：
+
+```shell
+mm-convert WanConverter mm_to_dcp \
+ --cfg.source_path ./weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer* \
+ --cfg.target_path ./weights/Wan-AI/Wan2.2-{TI2V/T2V/I2V}-{5/A14}B-Diffusers/transformer*
+```
+
 权重转换脚本的参数说明如下：
 
 | 参数              | 含义                     |

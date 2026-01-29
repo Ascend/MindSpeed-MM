@@ -21,7 +21,7 @@ class LayerIndexConverter:
 class WanConverter(SoraModelConverter):
     """Converter for Wan2.1"""
 
-    _supported_methods = ["hf_to_mm", "resplit", "mm_to_hf", "layerzero_to_mm", "merge_lora_to_base"]
+    _supported_methods = ["hf_to_mm", "resplit", "mm_to_hf", "layerzero_to_mm", "merge_lora_to_base", "mm_to_dcp"]
     _enable_tp = False
     _enable_pp = True
     _enable_vpp = True

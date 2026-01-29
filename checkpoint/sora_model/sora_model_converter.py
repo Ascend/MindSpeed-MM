@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from pathlib import Path
 from typing import Optional
 import os
 import copy
@@ -6,6 +7,7 @@ import copy
 import torch
 
 from checkpoint.common.converter import Converter
+from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.sora_model.convert_utils.cfg import ConvertConfig, ParallelConfig
 from checkpoint.sora_model.convert_utils.save_load_utils import (
     load_from_mm,
@@ -21,6 +23,7 @@ from checkpoint.sora_model.convert_utils.utils import (
     check_parallel_config_support
 )
 from checkpoint.sora_model.convert_utils.tp_patterns import TP_PARTTERN_MAPPING
+from checkpoint.vlm_model.hf_to_mm import save_by_dcp
 
 
 class DefaultLayerIndexConverter:
@@ -89,6 +92,13 @@ class SoraModelConverter(Converter):
             flip_mapping(self.hf_to_mm_str_replace_mapping)
         )
         save_as_hf(state_dict, cfg.hf_dir, cfg.target_path)
+
+    @check_method_support
+    def mm_to_dcp(self, cfg: ConvertConfig):
+        state_dicts = load_from_mm(cfg.source_path)
+        state_dict = self._mm_merge(state_dicts)
+        save_by_dcp(state_dict, Path(cfg.target_path))
+        set_directory_permissions(Path(cfg.target_path))
 
     @check_method_support
     def resplit(self, cfg: ConvertConfig):
