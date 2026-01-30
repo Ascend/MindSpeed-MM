@@ -22,7 +22,7 @@ from megatron.core import mpu
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.transformer_config import TransformerConfig
 
-from megatron.bridge.models.conversion.utils import get_module_and_param_from_name, remove_non_pickleables
+from bridge.models.conversion.utils import get_module_and_param_from_name, remove_non_pickleables
 
 
 WeightType = TypeVar("WeightType", torch.Tensor, Dict[str, torch.Tensor])
@@ -875,6 +875,25 @@ class RowParallelMapping(MegatronParamMapping[torch.Tensor]):
         )
 
 
+class WeightReshapeMapping(MegatronParamMapping[torch.Tensor]):
+    """
+    Modification：Dimensionality Transformations During Qwen3-VL Weight Conversion
+    """
+    def hf_to_megatron(
+        self,
+        hf_weights: torch.Tensor,
+        megatron_module: nn.Module,
+    ) -> torch.Tensor:
+        if hasattr(megatron_module, "weight"):
+            target_device = megatron_module.weight.device
+        else:
+            # the parameter may not be called "weight"
+            target_device = next(megatron_module.parameters()).device
+        hf_weights = hf_weights.to(device=target_device)
+        hf_weights = hf_weights.view(-1, hf_weights.shape[-1])
+        return hf_weights
+
+
 class ReplicatedMapping(MegatronParamMapping[torch.Tensor]):
     """Mapping for weights that are **fully replicated** across TP ranks.
 
@@ -990,6 +1009,8 @@ class AutoMapping(MegatronParamMapping[torch.Tensor]):
         },
         "replicated": {
             # Normalization layers
+            "FSDPCheckpointWrapper",
+            "FSDPHead",
             "TENorm",
             "FusedLayerNorm",
             "WrappedTorchNorm",
@@ -1319,6 +1340,91 @@ class ConcatenatedQKVMapping(MegatronParamMapping[Dict[str, torch.Tensor]]):
         """Return a new *resolved* QKVMapping instance."""
         resolved_megatron_param, resolved_hf_param = self._resolve_names(captures)
 
+        return type(self)(resolved_megatron_param, resolved_hf_param)
+
+
+class VisionEncoderQKVMapping(MegatronParamMapping[Dict[str, torch.Tensor]]):
+    """
+    Mapping for vision encoder (ViT/ViT-like) attention projection weights.
+
+    This mapping handles the conversion between HuggingFace's vision encoder format
+    and Megatron's format for vision transformer models. The vision encoder typically
+    stores QKV weights in a grouped format that requires specific reshaping.
+
+    **HuggingFace format (vision encoder)**
+    - Weights: 5D tensor with shape [3, num_heads, -1, head_dim, hidden_size]
+    - Biases: 3D tensor with shape [3, num_heads, -1]
+
+    **Megatron format**
+    - Single concatenated tensor: [num_heads * 3 * head_dim, hidden_size] for weights
+    - Single concatenated tensor: [num_heads * 3 * head_dim] for biases
+
+    Note:
+        This is specifically for vision encoders (like ViT) and uses different
+        reshaping logic compared to text transformer QKV mappings.
+    """
+
+    def __init__(self, megatron_param: str, hf_param: str):
+        """Initialize vision encoder QKV mapping.
+
+        Args:
+            megatron_param (str): Megatron vision encoder QKV parameter name pattern.
+            hf_param (str): HF vision encoder QKV parameter name pattern.
+            vision_config (Optional[dict]): Vision encoder configuration containing
+                num_heads, hidden_size, etc. If None, will be extracted from module.
+        """
+        super().__init__(megatron_param, hf_param)
+
+        # Delegate tensor-parallel logic to AutoMapping
+        self._tp_mapping = AutoMapping(megatron_param, megatron_param)
+
+
+    def hf_to_megatron(
+        self,
+        hf_weights: torch.Tensor,
+        megatron_module: nn.Module,
+    ) -> torch.Tensor:
+        """Convert HF vision encoder QKV weights to Megatron format."""
+        if self.tp_rank == 0:
+            # Get vision configuration
+            config = self._get_config(megatron_module)
+
+            vision_num_heads = config.num_attention_heads
+            vision_hidden_size = config.hidden_size
+            vision_head_dim = vision_hidden_size // vision_num_heads
+
+            # Determine if this is bias or weight
+            is_bias = hf_weights.ndim == 1
+
+            # Reshape based on bias/weight
+            if is_bias:
+                in_shape = (3, vision_num_heads, -1)
+            else:
+                in_shape = (3, vision_num_heads, -1, vision_head_dim, vision_hidden_size)
+
+            # Reshape and separate Q, K, V
+            # Note: hf_weights[0] is used because original code had hf_weights as a list
+            q, k, v = hf_weights.view(*in_shape)
+            # Further reshape
+            q = q.view(vision_num_heads, vision_head_dim, -1)
+            k = k.view(vision_num_heads, vision_head_dim, -1)
+            v = v.view(vision_num_heads, vision_head_dim, -1)
+
+            # Merge Q, K, V
+            if is_bias:
+                qkv = torch.cat([q, k, v], dim=1).flatten()
+            else:
+                qkv = torch.cat([q, k, v], dim=1).reshape(-1, vision_hidden_size)
+        else:
+            qkv = None
+        # Delegate TP distribution to AutoMapping
+        return self._tp_mapping.hf_to_megatron(qkv, megatron_module)
+
+    def resolve(self, captures: Tuple[str, ...]) -> "MegatronParamMapping":
+        """Return a new resolved VisionEncoderQKVMapping instance."""
+        resolved_megatron_param, resolved_hf_param = self._resolve_names(captures)
+
+        # Pass vision_config to the new instance
         return type(self)(resolved_megatron_param, resolved_hf_param)
 
 

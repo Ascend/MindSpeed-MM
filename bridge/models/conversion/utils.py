@@ -130,6 +130,14 @@ def get_module_and_param_from_name(
     if result is not None:
         return result
 
+    # for wan2.1 wan2.2 weight conversion
+    if not param_name.startswith("predictor."):
+        predictor_name = f"predictor.{param_name}"
+        predictor_splitted = predictor_name.split(".")
+        result = try_get_param(predictor_splitted)
+        if result is not None:
+            return result
+
     # If full name doesn't work, try suffixes of the parameter name
     # This handles cases where models is a submodule but param_name is absolute
     for start_idx in range(1, len(splitted_name)):

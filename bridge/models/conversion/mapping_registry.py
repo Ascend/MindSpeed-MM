@@ -12,7 +12,7 @@
 import re
 from typing import List, Optional
 
-from megatron.bridge.models.conversion.param_mapping import MegatronParamMapping
+from bridge.models.conversion.param_mapping import MegatronParamMapping
 
 
 class MegatronMappingRegistry:

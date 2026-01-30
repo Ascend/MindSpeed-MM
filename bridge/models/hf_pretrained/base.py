@@ -18,7 +18,7 @@ from typing import ClassVar, Dict, List, Optional, Union
 import torch
 from transformers import AutoConfig, PreTrainedModel
 
-from megatron.bridge.models.hf_pretrained.state import SafeTensorsStateSource, StateDict, StateSource
+from bridge.models.hf_pretrained.state import SafeTensorsStateSource, StateDict, StateSource
 
 
 class PreTrainedBase(ABC):

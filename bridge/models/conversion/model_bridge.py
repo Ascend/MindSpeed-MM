@@ -37,15 +37,15 @@ from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from transformers.modeling_utils import PreTrainedModel
 from torch.distributed._tensor import DTensor
 
-from megatron.bridge.models.conversion.mapping_registry import MegatronMappingRegistry
-from megatron.bridge.models.conversion.param_mapping import MegatronParamMapping
-from megatron.bridge.models.conversion.utils import (
+from bridge.models.conversion.mapping_registry import MegatronMappingRegistry
+from bridge.models.conversion.param_mapping import MegatronParamMapping
+from bridge.models.conversion.utils import (
     extract_sort_key,
     get_module_and_param_from_name,
     unwrap_model,
     persistent_buffers,
 )
-from megatron.bridge.models.decorators.dispatch import dispatch
+from bridge.models.decorators.dispatch import dispatch
 
 logger = logging.getLogger(__name__)
 
@@ -297,9 +297,12 @@ class MegatronModelBridge(Generic[HFPreTrained, MegatronModel]):
 
         for vp_stage, model in enumerate(models_list):
             # persistent buffers are part of the model's state_dict, but not the named_parameters, so we must include them here separately
-            for local_param_name, _ in itertools.chain(model.named_parameters(), persistent_buffers(model)):
+            for local_param_name in model.state_dict().keys():
                 if "_extra_state" in local_param_name:
                     continue
+                # Modification: parameters mapping for FSDP Model
+                if "._checkpoint_wrapped_module." in local_param_name:
+                    local_param_name = local_param_name.replace("._checkpoint_wrapped_module.", ".")
 
                 local_param_name = self._unwrap_name(local_param_name)
                 global_param_name = _megatron_local_name_to_global(
@@ -504,7 +507,19 @@ class MegatronModelBridge(Generic[HFPreTrained, MegatronModel]):
                         f"  HF mapping: {task.mapping.hf_param}"
                     )
 
-                task.param_weight.data.copy_(converted_weights)
+                if isinstance(task.param_weight.data, DTensor):
+                    # Modification： weight conversion for DCP
+                    from torch.distributed.tensor import distribute_tensor
+                    device_mesh = task.param_weight.device_mesh
+                    placements = task.param_weight.placements
+                    new_dtensor = distribute_tensor(
+                        converted_weights,
+                        device_mesh=device_mesh,
+                        placements=placements
+                    )
+                    task.param_weight.data._local_tensor.copy_(new_dtensor.data._local_tensor)
+                else:
+                    task.param_weight.data.copy_(converted_weights)
 
 
         self._broadcast_shared_embeddings(megatron_model)
@@ -679,9 +694,12 @@ class MegatronModelBridge(Generic[HFPreTrained, MegatronModel]):
         tasks = [None] * len(sorted_global_param_names_all_pp_ranks)
         for vp_stage, model in enumerate(megatron_model):
             # persistent buffers are part of the model's state_dict, but not the named_parameters, so we must include them here separately
-            for local_name, _ in itertools.chain(model.named_parameters(), persistent_buffers(model)):
+            for local_name in model.state_dict().keys():
                 if "_extra_state" in local_name:
                     continue
+                # Modification: parameters mapping for FSDP Model
+                if "._checkpoint_wrapped_module." in local_name:
+                    local_name = local_name.replace("._checkpoint_wrapped_module.", ".")
 
                 local_name = self._unwrap_name(local_name)
                 global_name = _megatron_local_name_to_global(megatron_model, model_config, local_name, vp_stage)

@@ -19,9 +19,9 @@ import transformers
 from megatron.core.transformer.module import MegatronModule
 from transformers.configuration_utils import PretrainedConfig
 
-from megatron.bridge.models.conversion import model_bridge
-from megatron.bridge.models.conversion.model_bridge import MegatronModelBridge
-from megatron.bridge.models.hf_pretrained.causal_lm import PreTrainedCausalLM
+from bridge.models.conversion import model_bridge
+from bridge.models.conversion.model_bridge import MegatronModelBridge
+from bridge.models.hf_pretrained.causal_lm import PreTrainedCausalLM
 
 
 MegatronModelT = TypeVar("MegatronModelT", bound=MegatronModule)
@@ -32,6 +32,14 @@ SUPPORTED_HF_ARCHITECTURES: tuple[str, ...] = (
     "ForCausalLM",
     "ForConditionalGeneration",
     "NemotronH_Nano_VL_V2",
+)
+
+CLASS_MODULE_MAPPING = {
+    "WanTransformer3DModel": ("bridge.models", "WanTransformer3DModel"),
+}
+
+GENERATION_MODEL_PREFIXES = (
+    "WanTransformer",
 )
 
 # Preformatted display string for error/help messages
@@ -80,6 +88,18 @@ class AutoBridge(Generic[MegatronModelT]):
 
     @cached_property
     def _model_architecture(self):
+        # Modification：Model Index for Generative Models
+        config_path = os.path.join(self.hf_pretrained.model_name_or_path, 'config.json')
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        else:
+            config = {}
+
+
+        if isinstance(config, dict) and "_class_name" in config:
+            class_name = config["_class_name"]
+            return self._resolve_generation_model_architecture(class_name, config)
 
         if isinstance(self.hf_pretrained, PreTrainedCausalLM):
             config = self.hf_pretrained.config
@@ -121,6 +141,23 @@ class AutoBridge(Generic[MegatronModelT]):
                 f"3. There's a typo in the architecture name\n\n"
                 f"Please verify your transformers installation and the model requirements."
             ) from e
+
+    # Modification：Model Index for Generative Models
+    def _resolve_generation_model_architecture(self, class_name: str, config) -> Type:
+        if not any(class_name.startswith(prefix) for prefix in GENERATION_MODEL_PREFIXES):
+            raise ValueError(f"Unsupported model type: {class_name}")
+
+        if class_name not in CLASS_MODULE_MAPPING:
+            raise KeyError(f"No mapping found for: {class_name}")
+
+        try:
+            import importlib
+            module_name, actual_class_name = CLASS_MODULE_MAPPING[class_name]
+            module = importlib.import_module(module_name)
+            return getattr(module, actual_class_name)
+        except (ImportError, AttributeError) as e:
+            raise ImportError(f"Unable import {module_name}.{actual_class_name}: {e}") from e
+
 
     def _get_model_instance(self, model: list[MegatronModelT]) -> MegatronModelT:
         model_instance = model[0]

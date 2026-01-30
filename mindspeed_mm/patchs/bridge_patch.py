@@ -12,7 +12,7 @@ def load_checkpoint_bridge(ddp_model, optimizer, opt_param_scheduler, load_arg='
     args = get_args()
     load_dir = getattr(args, load_arg)
 
-    from megatron.bridge.models.conversion.auto_bridge import AutoBridge
+    from bridge.models.conversion.auto_bridge import AutoBridge
     bridge = AutoBridge.from_hf_pretrained(load_dir)
     bridge.load_hf_weights(ddp_model)
 
