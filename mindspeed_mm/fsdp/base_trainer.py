@@ -17,11 +17,11 @@ from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
 from mindspeed_mm.fsdp.utils.device import (
-    IS_NPU_AVAILABLE,
     get_dist_comm_backend,
     get_torch_device,
     get_device_type,
-    set_accelerator_compatible
+    set_accelerator_compatible,
+    set_allow_hf32
 )
 from mindspeed_mm.fsdp.distributed.parallel_state import init_parallel_state, get_parallel_state
 from mindspeed_mm.fsdp.models.modelhub import ModelHub
@@ -125,7 +125,7 @@ class BaseTrainer:
         print_rank(logger.info, f"Start initializing training environment!!!")
 
         # Set allow_hf32
-        self.set_allow_hf32(self.training_args.allow_hf32)
+        set_allow_hf32(self.training_args.allow_hf32)
 
         # Set accelerator compatibility and logging level
         set_accelerator_compatible(get_torch_device())
@@ -145,12 +145,6 @@ class BaseTrainer:
         # Initialize training state variables
         self.iteration = 0
         self.consumed_train_samples = 0
-    
-    def set_allow_hf32(self, allow_hf32: bool):
-        if IS_NPU_AVAILABLE:
-            torch.npu.aclnn.allow_hf32 = allow_hf32
-        else:
-            torch.backends.cudnn.allow_tf32 = allow_hf32
 
     def get_model(self):
         """Build and initialize the model with parallel strategies applied."""

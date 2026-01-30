@@ -92,3 +92,14 @@ def synchronize() -> None:
 def empty_cache() -> None:
     """Execute torch empty cache operation."""
     get_torch_device().empty_cache()
+
+
+def set_allow_hf32(allow_hf32=None) -> None:
+    """Set allow_hf32/allow_tf32 attribute based on device type."""
+    if allow_hf32 is None:
+        return
+
+    if IS_NPU_AVAILABLE:
+        torch.npu.aclnn.allow_hf32 = allow_hf32
+    else:
+        torch.backends.cudnn.allow_tf32 = allow_hf32

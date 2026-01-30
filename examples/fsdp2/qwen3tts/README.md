@@ -108,7 +108,7 @@ python examples/fsdp2/qwen3tts/process_data.py \
 # output_jsonl_path: 转换后数据文件的保存路径
 # ref_audio_path：参考音频文件路径，若参数不存在或参考音频不存在，则从数据集中随机选择一条数据作为参考音频
 ```
-通过上将数据转换脚本将原始数据文件处理为JSONL格式的train_raw.jsonl文件，每行为一个JSON对象，包含以下字段：
+通过上述数据转换脚本将原始数据文件处理为JSONL格式的train_raw.jsonl文件，每行为一个JSON对象，包含以下字段：
 | 字段      | 内容 |
 | ----------- | -------------------------------------------------- |
 | audio     | 目标训练音频文件路径，支持wav格式，频率仅支持24kHz |
@@ -171,7 +171,7 @@ python examples/fsdp2/qwen3tts/prepare_data.py \
 <a id="jump4.2"></a>
 #### 2. 启动微调
 
-使用如下命令，即可实现Qwen3-TTS的微调：
+在 `qwen3tts_config.yaml` 文件中配置好数据集和权重路径后，使用如下命令，即可实现Qwen3-TTS的微调：
 
 ```shell
 bash examples/fsdp2/qwen3tts/finetune_qwen3tts.sh

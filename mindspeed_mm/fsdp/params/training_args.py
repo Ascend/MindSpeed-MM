@@ -195,7 +195,7 @@ class TrainingArguments:
         metadata={"help": "Whether to use deterministic computation for reproducibility."},
     )
     allow_hf32: bool = field(
-        default=True,
+        default=None,
         metadata={"help": "This switch controls the value of `allow_hf32`."},
     )
 
