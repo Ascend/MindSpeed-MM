@@ -20,14 +20,25 @@ def preprocess_dataset(self, examples: Dict[str, List[Any]]) -> Dict[str, List[A
             )
             continue
 
-        input_ids, labels = self._encode_data_example(
-            prompt=examples["_prompt"][i],
-            response=examples["_response"][i],
-            system=examples["_system"][i],
-            images=examples["_images"][i] or [],
-            videos=examples["_videos"][i] or [],
-            audios=examples["_audios"][i] or [],
-        )
+        try:
+            tool_schema = []
+            if '_tools' in examples:
+                tool_schema = examples['_tools'][i]
+
+            input_ids, labels = self._encode_data_example(
+                prompt=examples["_prompt"][i],
+                response=examples["_response"][i],
+                system=examples["_system"][i],
+                images=examples["_images"][i] or [],
+                videos=examples["_videos"][i] or [],
+                audios=examples["_audios"][i] or [],
+                tools=tool_schema
+            )
+        except OSError as e:
+            err_img = examples["_images"][i] if examples["_images"][i] else "No images"
+            logger.warning(f"Skipping invalid sample: {err_img}. Error: {str(e)}")
+            continue
+
         model_inputs["input_ids"].append(input_ids)
         model_inputs["attention_mask"].append([1] * len(input_ids))
         model_inputs["labels"].append(labels)
