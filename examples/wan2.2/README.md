@@ -87,7 +87,7 @@ cd ../MindSpeed-MM
 # 参考 安装指南 -> PTA安装
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh 
+source /usr/local/Ascend/cann/set_env.sh 
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git

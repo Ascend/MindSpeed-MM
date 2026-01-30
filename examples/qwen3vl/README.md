@@ -49,7 +49,7 @@ commit_id=c0dbe09
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler&Software=cannToolKit)
-- [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)
+- [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0004.html)
 
 <a id="jump1.2"></a>
 #### 2. 环境搭建
@@ -280,7 +280,7 @@ OUTPUT_ARGS="
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=29501

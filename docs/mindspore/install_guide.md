@@ -50,7 +50,7 @@ bash Ascend-hdk-*-npu-driver_*.run --full --force
 ```shell
 bash Ascend-cann-toolkit_8.5.0_linux-aarch64.run --install
 bash Ascend-cann-*-ops_8.5.0_linux-aarch64.run --install
-source /usr/local/Ascend/ascend-toolkit/set_env.sh # 安装nnal包需要source环境变量
+source /usr/local/Ascend/cann/set_env.sh # 安装nnal包需要source环境变量
 bash Ascend-cann-nnal_8.5.0_linux-aarch64.run --install
 # 设置环境变量
 source /usr/local/Ascend/nnal/asdsip/set_env.sh

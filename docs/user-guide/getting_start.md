@@ -192,7 +192,7 @@ OUTPUT_ARGS="
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=29501
@@ -207,7 +207,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 NPUS_PER_NODE=8
 MASTER_ADDR=xx.xx.xx.xx  # 主节点IP
 MASTER_PORT=29501

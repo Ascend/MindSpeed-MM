@@ -1,5 +1,5 @@
 #!/bin/bash
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 
 # 通过此配置选择使用的NPU卡
 #export ASCEND_RT_VISIBLE_DEVICES="0,1,2,3"

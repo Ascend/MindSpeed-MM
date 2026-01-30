@@ -114,7 +114,7 @@ MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工�
 
 ```bash
 # 根据实际情况修改 ascend-toolkit 路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 
 # 8B
 mm-convert InternVLConverter hf_to_mm \
@@ -280,7 +280,7 @@ $save_dir
 
 ```shell
   # 根据实际情况修改 ascend-toolkit 路径
-  source /usr/local/Ascend/ascend-toolkit/set_env.sh
+  source /usr/local/Ascend/cann/set_env.sh
   NPUS_PER_NODE=8
   MASTER_ADDR=localhost
   MASTER_PORT=6000
@@ -340,7 +340,7 @@ bash examples/internvl3/finetune_internvl3_8B.sh
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 
 # 8B
 mm-convert InternVLConverter hf_to_mm \
@@ -410,7 +410,7 @@ mm-convert InternVLConverter hf_to_mm \
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 ...
 MM_MODEL="./examples/internvl3/inference_8B.json"
 ```

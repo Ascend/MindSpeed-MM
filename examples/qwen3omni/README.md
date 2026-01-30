@@ -50,7 +50,7 @@ commit_id=7a833d1
 推荐使用以下版本
 
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler&Software=cannToolKit)
-- [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0004.html)
+- [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0004.html)
 
 <a id="jump1.2"></a>
 #### 2. 环境搭建
@@ -293,7 +293,7 @@ OUTPUT_ARGS="
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 和 nnal 路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 source /usr/local/Ascend/nnal/asdsip/set_env.sh
 # 单机16卡可以跑满层
 NPUS_PER_NODE=16
@@ -314,7 +314,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 和 nnal 路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 source /usr/local/Ascend/nnal/asdsip/set_env.sh
 # 根据分布式集群实际情况配置分布式参数
 export GLOO_SOCKET_IFNAME="Your SOCKET IFNAME" # 通过ifconfig获取

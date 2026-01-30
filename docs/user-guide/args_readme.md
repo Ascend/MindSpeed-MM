@@ -98,7 +98,7 @@
 --save : 取值来自SAVE_PATH,权重保存路径。
 注：仅有该值配置时才会进行权重保存
 
---ckpt-format: 支持配置列表[torch，torch_dcp],权重保存方式。推荐优先使用torch_dcp[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md)。
+--ckpt-format: 支持配置列表[torch，torch_dcp],权重保存方式。推荐优先使用[torch_dcp](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md)。
 
 注:1、当在使用fsdp2进行模型训练时，仅支持使用torch_dcp配置。
 2、OUTPUT_ARGS下设置--ckpt-format为torch_dcp与GPT_ARGS下使能--ckpt-format torch_dcp二者作用相同，择一即可。
@@ -107,10 +107,10 @@
 ## 环境变量参数解释
 所有环境变量具体解释均可在[Ascend官网](https://www.hiascend.com/)搜索查询到详细信息，以下仅展示MM套件中常用的。
 
-source /usr/local/Ascend/ascend-toolkit/set_env.sh: cann安装路径，必须配置。
+source /usr/local/Ascend/cann/set_env.sh: cann安装路径，必须配置。
 export CUDA_DEVICE_MAX_CONNECTIONS: 整型，[1, 32]可选。在多GPU系统下，可以使用该变量来控制主机端并行连接多设备数量。注意当开启了序列并行时，需要置为1。
 
-ASCEND_SLOG_PRINT_TO_STDOUT: 0 or 1,是否开启日志打印。开启后日志不会保存在log文件中，而是将产生的日志直接打印显示，默认置为0。
+ASCEND_SLOG_PRINT_TO_STDOUT: 0 or 1，是否开启日志打印。开启后日志不会保存在log文件中，而是将产生的日志直接打印显示，默认置为0。
 
 ASCEND_GLOBAL_LOG_LEVEL: 整型，[0, 4]可选。设置日志级别，仅支持调试日志。
 * 0: DEBUG
@@ -120,18 +120,18 @@ ASCEND_GLOBAL_LOG_LEVEL: 整型，[0, 4]可选。设置日志级别，仅支持�
 * 4: NULL
 注意设置为DEBUG级别后，可能会因为日志流量过大影响业务性能。
 
-TASK_QUEUE_ENABLE: 整型，[0, 2]可选，配置task_queue算子下发队列是否开启及优化等级，推荐配置为2。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_007.html)
+TASK_QUEUE_ENABLE: 整型，[0, 2]可选，配置task_queue算子下发队列是否开启及优化等级，推荐配置为2。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/730/comref/Envvariables/Envir_007.html)
 
-COMBINED_ENABLE: 0 or 1,设置combined标志，用于优化非连续两个算子组合类场景，推荐配置为1。
+COMBINED_ENABLE: 0 or 1，设置combined标志，用于优化非连续两个算子组合类场景，推荐配置为1。
 
-CPU_AFFINITY_CONF: 粗\细粒度绑核功能设置，推荐配置为1。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_033.html)
+CPU_AFFINITY_CONF: 粗\细粒度绑核功能设置，推荐配置为1。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/730/comref/Envvariables/docs/zh/environment_variable_reference/CPU_AFFINITY_CONF.md)
 
 HCCL_CONNECT_TIMEOUT: 整型，[120, 7200]可选，分布式场景下用于限制不同设备间socket建链过程的超时等待时间，单位为秒。[详细介绍](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/maintenref/envvar/envref_07_0077.html)
 
-NPU_ASD_ENABLE: 0 or 1,是否开启Ascend EXTENSION FOR PyTorch的特征值检测功能，推荐置为0。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_029.html)
+NPU_ASD_ENABLE: 0 or 1，是否开启Ascend EXTENSION FOR PyTorch的特征值检测功能，推荐置为0。[详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/730/comref/Envvariables/Envir_029.html)
 
 ASCEND_LAUNCH_BLOCKING: 0 or 1,置为1时使能。控制算子执行时是否启动同步模式，主要用于定位代码实际出错位置，开启时会导致性能下降，仅在debug时使用。
 
 ACLNN_CACHE_LIMIT: 整型，[1, 10000000], 默认值为10000，用于配置单算子执行API在Host侧缓存的算子信息条目个数。
 
-PYTORCH_NPU_ALLOC_CONF=“expandable_segments:True”: [详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_012.html)
+PYTORCH_NPU_ALLOC_CONF=“expandable_segments:True”: [详细介绍](https://www.hiascend.com/document/detail/zh/Pytorch/730/comref/Envvariables/Envir_012.html)

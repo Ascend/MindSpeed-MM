@@ -56,7 +56,7 @@ conda create -n test python=3.10
 conda activate test
 
 # 使用环境变量
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 # 安装MindSpeed-Core-MS转换工具
@@ -284,7 +284,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：`
   该特性和TP不能兼容，开启时TP必须设置为1，使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
   
       ```bash
-      source /usr/local/Ascend/ascend-toolkit/set_env.sh
+      source /usr/local/Ascend/cann/set_env.sh
       # your_mindspeed_path和your_megatron_path分别替换为之前通过MindSpeed-Core-MS一键脚本拉取的mindspeed和megatron仓库的具体路径。这两个路径通常位于MindSpeed-Core-MS目录的相应子目录中。
       export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
       export PYTHONPATH=$PYTHONPATH:<your_megatron_path>

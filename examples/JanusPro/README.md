@@ -73,7 +73,7 @@ cd ..
 另外还需设置CANN包安装位置。
 
 ```shell
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    source /usr/local/Ascend/cann/set_env.sh
 ```
 
 #### 3. 启动脚本

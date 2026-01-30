@@ -52,7 +52,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
     # 创建并激活python环境，安装 torch 和 torch_npu，请参考上述安装指南
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    source /usr/local/Ascend/cann/set_env.sh
     ```
 
 2. 克隆仓库到本地服务器
