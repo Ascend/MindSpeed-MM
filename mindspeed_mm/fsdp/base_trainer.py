@@ -17,6 +17,7 @@ from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
 from mindspeed_mm.fsdp.utils.device import (
+    IS_NPU_AVAILABLE,
     get_dist_comm_backend,
     get_torch_device,
     get_device_type,
@@ -123,6 +124,9 @@ class BaseTrainer:
         """Initialize training environment: logging, random seeds, distributed groups."""
         print_rank(logger.info, f"Start initializing training environment!!!")
 
+        # Set allow_hf32
+        self.set_allow_hf32(self.training_args.allow_hf32)
+
         # Set accelerator compatibility and logging level
         set_accelerator_compatible(get_torch_device())
         set_log_level()
@@ -141,6 +145,12 @@ class BaseTrainer:
         # Initialize training state variables
         self.iteration = 0
         self.consumed_train_samples = 0
+    
+    def set_allow_hf32(self, allow_hf32: bool):
+        if IS_NPU_AVAILABLE:
+            torch.npu.aclnn.allow_hf32 = allow_hf32
+        else:
+            torch.backends.cudnn.allow_tf32 = allow_hf32
 
     def get_model(self):
         """Build and initialize the model with parallel strategies applied."""
@@ -239,7 +249,7 @@ class BaseTrainer:
         return batch
 
     def get_loss_func(self, batch_data):
-        if not self.model_args.loss_cfg == 'custom':
+        if self.model_args.loss_cfg.loss_type == "custom":
             return batch_data
 
         if self.model_args.loss_cfg.enable_chunk_loss:

@@ -90,7 +90,10 @@ def prepare_sampler_dataloader(
 
         if collate_param:
             data_collate_type = collate_param.pop("model_name")
-            collate_fn = DATA_COLLATOR[data_collate_type](**collate_param, dataset_param=dataset_param)
+            if hasattr(dataset, 'collate_fn') and callable(getattr(dataset, 'collate_fn')):
+                collate_fn = dataset.collate_fn
+            else:
+                collate_fn = DATA_COLLATOR[data_collate_type](**collate_param, dataset_param=dataset_param)
 
         return DataLoader(
             dataset,

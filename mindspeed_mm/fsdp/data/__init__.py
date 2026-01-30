@@ -2,6 +2,7 @@ from mindspeed_mm.fsdp.data.dataloader.dataloader import (
     prepare_sampler_dataloader,
 )
 from mindspeed_mm.fsdp.data.datasets.qwen2vl_dataset import get_qwen2vl_dataset
+from mindspeed_mm.fsdp.data.datasets.qwen3tts_dataset import TTSDataset
 
 
 def build_mm_dataset(dataset_param):
@@ -23,6 +24,8 @@ def build_mm_dataset(dataset_param):
     preprocess_param = dataset_param["preprocess_parameters"]
     if dataset_type == "huggingface":
         return get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param)
+    elif dataset_type == "qwen3tts":
+        return TTSDataset(basic_param, preprocess_param)
     else:
         raise NotImplementedError(dataset_type)
 

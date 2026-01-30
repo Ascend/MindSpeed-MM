@@ -1865,7 +1865,7 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
         codec_ids,
         codec_mask,
     ):
-        speaker_embedding = self.speaker_encoder(ref_mels.to(self.device).to(torch.bfloat16)).detach()
+        speaker_embedding = self.speaker_encoder(ref_mels.to(self.device).to(self.dtype)).detach()
 
         input_text_ids = input_ids[:, :, 0]
         input_codec_ids = input_ids[:, :, 1]

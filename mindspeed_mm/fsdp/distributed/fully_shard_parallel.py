@@ -72,15 +72,16 @@ def _post_order_traverse(model: torch.nn.Module, parent_path: str = ""):
 def get_fsdp_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig, ignored_modules: Set[str]) -> dict[Any, Any]:
     fsdp_modules = []
     # Traverse all modules in the model
-    for name, module in _post_order_traverse(model):
-        # Check if module matches any pattern in the FSDP plan
-        for pattern in fsdp_plan.apply_modules:
-            if module_name_match(pattern, name) and name not in ignored_modules:
-                print_rank(logger.debug, f'[FSDP2]: Apply fsdp2 to module <{name}>')
-                fsdp_modules.append(module)
-    # Ensure at least one module matches the FSDP plan
-    if len(fsdp_modules) == 0:
-        raise RuntimeError(f'[FSDP2] No module named {fsdp_plan.apply_modules}.')
+    if fsdp_plan.apply_modules:
+        for name, module in _post_order_traverse(model):
+            # Check if module matches any pattern in the FSDP plan
+            for pattern in fsdp_plan.apply_modules:
+                if module_name_match(pattern, name) and name not in ignored_modules:
+                    print_rank(logger.debug, f'[FSDP2]: Apply fsdp2 to module <{name}>')
+                    fsdp_modules.append(module)
+        # Ensure at least one module matches the FSDP plan
+        if len(fsdp_modules) == 0:
+            raise RuntimeError(f'[FSDP2] No module named {fsdp_plan.apply_modules}.')
     return fsdp_modules
 
 

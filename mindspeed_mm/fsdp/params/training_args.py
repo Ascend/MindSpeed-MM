@@ -194,6 +194,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use deterministic computation for reproducibility."},
     )
+    allow_hf32: bool = field(
+        default=True,
+        metadata={"help": "This switch controls the value of `allow_hf32`."},
+    )
 
     def __post_init__(self):
         self._train_steps = -1
