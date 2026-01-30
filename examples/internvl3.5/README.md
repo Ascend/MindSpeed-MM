@@ -273,7 +273,7 @@ $save_dir
 
 ```shell
   # 根据实际情况修改 ascend-toolkit 路径
-  source /usr/local/Ascend/ascend-toolkit/set_env.sh
+  source /usr/local/Ascend/cann/set_env.sh
   NPUS_PER_NODE=16 # A3单机可跑
   MASTER_ADDR=localhost
   MASTER_PORT=6000
@@ -288,7 +288,7 @@ $save_dir
 
 ```shell
   # 根据实际情况修改 ascend-toolkit 路径
-  source /usr/local/Ascend/ascend-toolkit/set_env.sh
+  source /usr/local/Ascend/cann/set_env.sh
   # 根据分布式集群实际情况配置分布式参数
   GPUS_PER_NODE=8  # 每个节点的卡数，以实际情况填写
   MASTER_ADDR="your master node IP"  # 都需要修改为主节点的IP地址（不能为localhost）

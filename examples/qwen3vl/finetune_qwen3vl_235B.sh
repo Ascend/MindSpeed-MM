@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 # Runtime environment variables, for details please refer to the readme.
 export CUDA_DEVICE_MAX_CONNECTIONS=2 # 开启FSDP2时，不能置为1
 export ASCEND_SLOG_PRINT_TO_STDOUT=0

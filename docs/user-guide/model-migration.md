@@ -47,7 +47,7 @@ NVIDIA GPU采用CUDA（Compute Unified Device Architecture）的并行计算架�
 在进行模型迁移前，需要了解如下模型迁移约束，评估当前模型迁移的可行性，完成迁移前的环境准备：
 
 迁移前要保证选定的模型能在三方平台（如GPU）上运行，并输出精度和性能基线。
-模型迁移前需要参考[《Ascend Extension for PyTorch 软件安装指南》](https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0001.html)完成昇腾PyTorch训练环境安装，以便完成迁移支持度分析与后续的模型训练，包括NPU驱动和固件、CANN软件（Toolkit、Kernels和NNAL）、以及PyTorch框架和torch_npu插件的安装。
+模型迁移前需要参考[《Ascend Extension for PyTorch 软件安装指南》](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0001.html)完成昇腾PyTorch训练环境安装，以便完成迁移支持度分析与后续的模型训练，包括NPU驱动和固件、CANN软件（Toolkit、Kernels和NNAL）、以及PyTorch框架和torch_npu插件的安装。
 目前已知的不支持场景：
 
 当前不支持使用DP（Data Parallel，数据并行）模式的模型迁移。若用户训练脚本中包含NPU平台不支持的torch.nn.parallel.DataParallel接口，则需手动修改该接口为torch.nn.parallel.DistributedDataParallel接口，以执行多卡训练。原脚本需要在GPU环境下基于Python3.10 及以上跑通。
@@ -55,7 +55,7 @@ APEX库中的FusedAdam融合优化器，目前不支持使用自动迁移或PyTo
 大模型迁移暂不支持bmtrain框架的迁移。
 bitsandbytes已支持在昇腾上进行安装，具体可单击[Supported Backends](https://github.com/bitsandbytes-foundation/bitsandbytes/blob/main/docs/source/installation.mdx#supported-backendsmulti-backend-supported-backends)进行参考，目前仅支持NF4量化/反量化迁移，用于LLM QLoRA微调，其余功能暂不支持。
 大模型迁移暂不支持colossai三方库中HybridAdam优化器相关接口的迁移。
-目前暂不原生支持xFormers训练，如需使用xFormers中的[FlashAttentionScore](https://www.hiascend.com/document/detail/zh/Pytorch/720/ptmoddevg/trainingmigrguide/performance_tuning_0034.html)融合算子的迁移，用户可参考FlashAttentionScore章节进行替换。
+目前暂不原生支持xFormers训练，如需使用xFormers中的[FlashAttentionScore](https://www.hiascend.com/document/detail/zh/Pytorch/730/ptmoddevg/trainingmigrguide/performance_tuning_0034.html)融合算子的迁移，用户可参考FlashAttentionScore章节进行替换。
 当前NPU不支持grouped_gemm第三方库安装。
 当前NPU支持composer第三方库安装，但NPU未做适配，无法使用。
 
@@ -95,7 +95,7 @@ export TASK_QUEUE_ENABLE=2
 
 **绑核优化**
 
-在PyTorch的训练或推理场景，可以通过设置环境变量[CPU_AFFINITY_CONF](https://www.hiascend.com/document/detail/zh/Pytorch/710/comref/Envvariables/Envir_033.html)来控制CPU端算子任务的处理器亲和性，即设定任务绑核。该配置能够优化任务的执行效率，避免跨 NUMA（非统一内存访问架构）节点的内存访问，减少任务调度开销。
+在PyTorch的训练或推理场景，可以通过设置环境变量[CPU_AFFINITY_CONF](https://www.hiascend.com/document/detail/zh/Pytorch/730/comref/Envvariables/docs/zh/environment_variable_reference/CPU_AFFINITY_CONF.md)来控制CPU端算子任务的处理器亲和性，即设定任务绑核。该配置能够优化任务的执行效率，避免跨 NUMA（非统一内存访问架构）节点的内存访问，减少任务调度开销。
 
 可选的绑核方案如下：
 
@@ -164,7 +164,7 @@ conda create -n test python=3.10
 conda activate test
 
 # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
-# 下载路径参考 https://www.hiascend.com/document/detail/zh/Pytorch/720/configandinstg/instg/insg_0001.html
+# 下载路径参考 https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0001.html
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 

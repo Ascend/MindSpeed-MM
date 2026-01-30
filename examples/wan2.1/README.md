@@ -95,7 +95,7 @@ pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 # 建议从原仓编译安装 
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh 
+source /usr/local/Ascend/cann/set_env.sh 
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git
@@ -300,7 +300,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
   - 训练权重后处理：使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
 
     ```bash
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    source /usr/local/Ascend/cann/set_env.sh
     mm-convert WanConverter layerzero_to_mm \
      --cfg.source_path <./save_ckpt/wan2.1/> \
      --cfg.target_path <./save_ckpt/wan2.1_megatron_ckpt/>

@@ -2,7 +2,7 @@ pkill -9 python
 ray stop --force
 rm -rf /tmp/ray
 
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh
 
 export HCCL_CONNECT_TIMEOUT=5400

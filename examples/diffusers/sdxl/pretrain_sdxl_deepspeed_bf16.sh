@@ -1,5 +1,5 @@
 
-# 网络名称,同目录名称,需要模型审视修改
+# 网络名称,同目录名称，需要模型审视修改
 Network="sdxl_pretrain"
 
 scripts_path="./sdxl"

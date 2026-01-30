@@ -685,7 +685,7 @@ Step6: 训练脚本
 .. code:: bash
 
     #!/bin/bash
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    source /usr/local/Ascend/cann/set_env.sh
 
     export CUDA_DEVICE_MAX_CONNECTIONS=2  # 开启FSDP2时，不能置为1
 

@@ -49,7 +49,7 @@ bash Ascend-hdk-*-npu-driver_*.run --full --force
 
 ```shell
 bash Ascend-cann-toolkit_8.3.RC1_linux-aarch64.run --install
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 
 bash Ascend-cann-kernels-*_8.3.RC1_linux-aarch64.run --install
 bash Ascend-cann-nnal_8.3.RC1_linux-aarch64.run --install

@@ -52,7 +52,7 @@ Qwen Image Edit 是基于 Qwen Image 基础模型扩展的图像编辑功能，�
     # 创建并激活python环境，安装 torch 和 torch_npu，请参考上述安装指南
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    source /usr/local/Ascend/cann/set_env.sh
     ```
 
 2. 克隆仓库到本地服务器
@@ -294,7 +294,7 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
   3. 运行代码
 
       ```shell
-      source /usr/local/Ascend/ascend-toolkit/set_env.sh
+      source /usr/local/Ascend/cann/set_env.sh
       python examples/qwen_image/model_inference/inference_qwen_image_edit_bf16.py
       ```
 
@@ -332,7 +332,7 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
   3. 运行代码
 
       ```shell
-      source /usr/local/Ascend/ascend-toolkit/set_env.sh
+      source /usr/local/Ascend/cann/set_env.sh
       python examples/qwen_image/model_inference/inference_qwen_image_edit_lora_bf16.py
       ```
   

@@ -91,7 +91,7 @@ pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 # 建议从原仓编译安装 
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh 
+source /usr/local/Ascend/cann/set_env.sh 
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git
@@ -347,7 +347,7 @@ vim diffsynth/models/wan_video_dit.py
 ### 启动推理
 
 ```shell
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 python examples/wanvideo/model_inference/Wan-VACE-Inference.py ../inference/inference_wan{2.1/2.2}_{model_type}.json
 ```
 

@@ -53,7 +53,7 @@
     # 建议从原仓编译安装
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    source /usr/local/Ascend/cann/set_env.sh
     ```
 
 2. 克隆仓库到本地服务器
@@ -163,7 +163,7 @@
     --dataloader_num_workers=0 \ # 请基于系统配置与数据大小进行调整num workers
     ```
 
-    数据集选择：如果选择默认[原仓数据集](https://huggingface.co/datasets/diffusers/dog-example),需修改两处`dataset_name`为`input_dir`：
+    数据集选择：如果选择默认[原仓数据集](https://huggingface.co/datasets/diffusers/dog-example)，需修改两处`dataset_name`为`input_dir`：
 
     ```shell
     input_dir="dog"

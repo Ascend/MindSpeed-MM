@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 # Runtime environment variables, for details please refer to the readme.
 export TASK_QUEUE_ENABLE=2
 export ASCEND_LAUNCH_BLOCKING=0

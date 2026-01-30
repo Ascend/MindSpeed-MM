@@ -1,5 +1,5 @@
 #!/bin/bash
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 
 # 该变量只用于规避megatron对其校验，对npu无效
 export CUDA_DEVICE_MAX_CONNECTIONS=1

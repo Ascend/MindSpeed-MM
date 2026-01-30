@@ -64,7 +64,7 @@ conda create -n test python=3.10
 conda activate test
 
 # 使用环境变量
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 # 安装MindSpeed-Core-MS拉起工具
@@ -254,7 +254,7 @@ mm-convert WanConverter mm_to_hf \
   - 训练权重后处理：使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
 
     ```bash
-    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    source /usr/local/Ascend/cann/set_env.sh
     mm-convert WanConverter layerzero_to_mm \
      --cfg.source_path <./save_ckpt/wan2.1/> \
      --cfg.target_path <./save_ckpt/wan2.1_megatron_ckpt/>

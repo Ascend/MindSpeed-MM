@@ -26,10 +26,10 @@ Last updated: 12/08/2025. Author: zs-derrick
 
 为系统性地完成上述适配工作，我们将模型迁移过程分解为四个关键流程：
 
-1. **迁移准备** ：基于业务需求选取合适模型，确保其在第三方平台（如GPU）可成功运行并建立性能/精度基线；准备NPU环境，使用 `迁移分析工具 <https://www.hiascend.com/document/detail/zh/Pytorch/720/ptmoddevg/trainingmigrguide/PT_LMTMOG_0007.html#ZH-CN_TOPIC_0000002503407585__section56695751919>`__ 采集模型算子清单，分析NPU算子支持度，针对未支持算子制定替换或开发适配方案。
-2. **模型迁移** ​：通过 `模型脚本迁移 <https://www.hiascend.com/document/detail/zh/Pytorch/720/ptmoddevg/trainingmigrguide/PT_LMTMOG_0012.html>`__ ，针对模型结构、数据工程、分布式训练策略等关键模块进行迁移分析。
+1. **迁移准备** ：基于业务需求选取合适模型，确保其在第三方平台（如GPU）可成功运行并建立性能/精度基线；准备NPU环境，使用 `迁移分析工具 <https://www.hiascend.com/document/detail/zh/Pytorch/730/ptmoddevg/trainingmigrguide/PT_LMTMOG_0007.html#ZH-CN_TOPIC_0000002503407585__section56695751919>`__ 采集模型算子清单，分析NPU算子支持度，针对未支持算子制定替换或开发适配方案。
+2. **模型迁移** ​：通过 `模型脚本迁移 <https://www.hiascend.com/document/detail/zh/Pytorch/730/ptmoddevg/trainingmigrguide/PT_LMTMOG_0012.html>`__ ，针对模型结构、数据工程、分布式训练策略等关键模块进行迁移分析。
 3. **精度对齐** ​：系统性分析精度误差来源，从超参数、数据处理、模型/优化器、计算精度等维度确保迁移前后精度一致性
-4. **性能调优** ​：借助 `性能调优工具 <https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850alpha001/devaids/Profiling/atlasprofiling_16_0001.html>`__ 对模型进行系统性性能分析，定位瓶颈模块；基于 `性能调优方法 <https://www.hiascend.com/document/detail/zh/Pytorch/720/ptmoddevg/trainingmigrguide/performance_tuning_0024.html>`__ 从NPU亲和适配、内存优化、通信优化、调度优化等多个维度实施针对性优化。
+4. **性能调优** ​：借助 `性能调优工具 <https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850alpha001/devaids/Profiling/atlasprofiling_16_0001.html>`__ 对模型进行系统性性能分析，定位瓶颈模块；基于 `性能调优方法 <https://www.hiascend.com/document/detail/zh/Pytorch/730/ptmoddevg/trainingmigrguide/performance_tuning_0024.html>`__ 从NPU亲和适配、内存优化、通信优化、调度优化等多个维度实施针对性优化。
 
 MM架构迁移指南
 -----------------

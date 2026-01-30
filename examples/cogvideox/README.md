@@ -96,7 +96,7 @@ pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 # 建议从原仓编译安装 
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-source /usr/local/Ascend/ascend-toolkit/set_env.sh 
+source /usr/local/Ascend/cann/set_env.sh 
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git
@@ -310,7 +310,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
   该特性和TP不能兼容，开启时TP必须设置为1，使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
   
       ```bash
-      source /usr/local/Ascend/ascend-toolkit/set_env.sh
+      source /usr/local/Ascend/cann/set_env.sh
       # your_mindspeed_path和your_megatron_path分别替换为之前下载的mindspeed和megatron的路径
       export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
       export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
