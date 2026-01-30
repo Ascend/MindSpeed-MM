@@ -30,7 +30,8 @@ from transformers.models.qwen3_vl_moe.configuration_qwen3_vl_moe import (
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all, split_forward_gather_backward, gather_forward_split_backward
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
-
+from mindspeed_mm.fsdp.utils.device import get_device_type, create_stream
+from mindspeed_mm.fsdp.memory.async_offload import async_save_on_cpu
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
@@ -977,6 +978,11 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel):
         self.rotary_emb = Qwen3VLMoeTextRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
 
+        self.activation_offload = False
+        if config.activation_offload and get_device_type() == "npu":
+            self.activation_offload = True
+            self.swap_stream = create_stream()
+
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -1057,15 +1063,34 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel):
 
         # decoder layers
         for layer_idx, decoder_layer in enumerate(self.layers):
-            layer_outputs = decoder_layer(
-                hidden_states,
-                attention_mask=attention_mask,
-                position_ids=text_position_ids,
-                past_key_values=past_key_values,
-                cache_position=cache_position,
-                position_embeddings=position_embeddings,
-                **kwargs,
-            )
+            if self.activation_offload:
+                with async_save_on_cpu(
+                    h2d_stream=self.swap_stream,
+                    d2h_stream=self.swap_stream,
+                    block_idx=layer_idx,
+                    depth=len(self.layers),
+                    custom_check_fn=lambda x: x.data_ptr() == hidden_states.data_ptr(),
+                    prefetch=True,
+                ):
+                    layer_outputs = decoder_layer(
+                        hidden_states,
+                        attention_mask=attention_mask,
+                        position_ids=text_position_ids,
+                        past_key_values=past_key_values,
+                        cache_position=cache_position,
+                        position_embeddings=position_embeddings,
+                        **kwargs,
+                    )
+            else:
+                layer_outputs = decoder_layer(
+                    hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=text_position_ids,
+                    past_key_values=past_key_values,
+                    cache_position=cache_position,
+                    position_embeddings=position_embeddings,
+                    **kwargs,
+                )
             hidden_states = layer_outputs
 
             # add visual features to the hidden states of first several layers
@@ -1658,6 +1683,18 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
         self.lm_head = Qwen3VLLMHead(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
 
         self.post_init()
+
+    @staticmethod
+    def overwrite_transformer_config(transformer_config, model_args):
+        # set activation offload, only suppport offload text activations now
+        llm_activation_offload = getattr(model_args.text_decoder, "activation_offload", False)
+        setattr(transformer_config.text_config, "activation_offload", llm_activation_offload)
+
+        # set router_aux_loss_coef, for moe model
+        router_aux_loss_coef = getattr(model_args.loss_cfg, "router_aux_loss_coef", 0.0)
+        transformer_config.text_config.router_aux_loss_coef = router_aux_loss_coef
+
+        return transformer_config
 
     def get_input_embeddings(self):
         return self.model.get_input_embeddings()

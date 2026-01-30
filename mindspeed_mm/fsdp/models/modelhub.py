@@ -63,6 +63,10 @@ class ModelHub:
         if model_cls is None:
             raise ValueError("load model from config failed")
 
+        # overwrite transformer config with model_args
+        if callable(getattr(model_cls, 'overwrite_transformer_config', None)):
+            transformer_config = model_cls.overwrite_transformer_config(transformer_config, model_args)
+
         # Initialize model with meta device for memory efficiency if specified
         if training_args.init_model_with_meta_device:
             with init_empty_weights():

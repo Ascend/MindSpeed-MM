@@ -2,7 +2,7 @@
 import sys
 import types
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import torch
 
@@ -92,6 +92,24 @@ def synchronize() -> None:
 def empty_cache() -> None:
     """Execute torch empty cache operation."""
     get_torch_device().empty_cache()
+
+
+def create_stream(device: Optional[torch.device] = None, priority: int = 0) -> Any:
+    "Create custom stream."
+    return get_torch_device().Stream(device=device, priority=priority)
+
+
+def create_event(enable_timing: bool = False, blocking: bool = False) -> Any:
+    "Create empty event."
+    return get_torch_device().Event(enable_timing=enable_timing, blocking=blocking)
+
+
+def get_current_stream() -> Any:
+    return get_torch_device().current_stream()
+
+
+def switch_to_specified_stream(stream) -> Any:
+    return get_torch_device().Stream(stream)
 
 
 def set_allow_hf32(allow_hf32=None) -> None:

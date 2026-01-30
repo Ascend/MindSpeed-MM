@@ -11,19 +11,10 @@ from torch.distributed.device_mesh import init_device_mesh, DeviceMesh
 from torch.distributed import ProcessGroup
 
 from mindspeed_mm.fsdp.utils.device import get_device_type
+from mindspeed_mm.fsdp.utils.utils import Singleton
 
 
 logger = logging.getLogger(__name__)
-
-
-class Singleton(type):
-    """Singleton metaclass to ensure only one instance of ParallelState exists."""
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        return cls._instances[cls]
 
 
 def get_last_mesh_dim(mesh_shape):

@@ -7,6 +7,38 @@ from functools import wraps
 logger = logging.getLogger(__name__)
 
 
+def create_nested_dataclass_field(
+    parent_cls: type,
+    field_name: str,
+    nested_data: Dict[str, Any],
+) -> None:
+    nested_cls_name = f"{field_name.capitalize()}Field"
+    nested_dataclass = create_nested_dataclass(nested_cls_name, nested_data)
+
+    setattr(parent_cls, field_name, field(default_factory=nested_dataclass))
+    if '__annotations__' not in parent_cls.__dict__:
+        parent_cls.__annotations__ = {}
+    parent_cls.__annotations__[field_name] = nested_dataclass
+
+
+def create_nested_dataclass(cls_name: str, data: Dict[str, Any]) -> type:
+    nested_fields = {}
+    nested_annotations = {}
+    for k, v in data.items():
+        if isinstance(v, dict):
+            sub_cls = create_nested_dataclass(f"{cls_name}_{k}", v)
+            nested_fields[k] = field(default_factory=sub_cls)
+            nested_annotations[k] = sub_cls
+        else:
+            field_type = type(v) if v is not None else Any
+            nested_fields[k] = field(default=v)
+            nested_annotations[k] = field_type
+
+    dynamic_cls = type(cls_name, (), nested_fields)
+    dynamic_cls.__annotations__ = nested_annotations
+    return dataclass(dynamic_cls)
+
+
 def allow_extra_fields(cls):
     """
     Decorator: Allows dataclass to accept extra fields beyond its defined attributes.
@@ -72,9 +104,24 @@ def allow_extra_fields(cls):
         if not hasattr(self, '_extra_fields'):
             self._extra_fields = {}
 
+        def _assign_nested_fields(obj: Any, data: Dict[str, Any]) -> None:
+            for k, v in data.items():
+                if isinstance(v, dict):
+                    sub_obj = getattr(obj, k)
+                    _assign_nested_fields(sub_obj, v)
+                else:
+                    setattr(obj, k, v)
+
         # Process extra fields: set them as attributes and track in _extra_fields
         for key, value in extra_kwargs.items():
-            setattr(self, key, value)
+            if isinstance(value, dict):
+                create_nested_dataclass_field(self, key, value)
+                nested_cls = get_type_hints(self)[key]
+                nested_instance = nested_cls()
+                _assign_nested_fields(nested_instance, value)
+                setattr(self, key, nested_instance)
+            else:
+                setattr(self, key, value)
             self._extra_fields[key] = value
 
     cls.__init__ = new_init
