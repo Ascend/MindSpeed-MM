@@ -154,9 +154,16 @@ cd ../../verl/
 
 ## 数据集准备及处理
 
-多模态模型使用[geo3k](https://huggingface.co/datasets/hiyouga/geometry3k)数据集，在模型根目录下执行命令，下载并处理数据集，`--local_dir`为可选参数，不设置默认下载位置为`~/data/geo3k`。
+多模态模型使用[geo3k](https://huggingface.co/datasets/hiyouga/geometry3k)数据集，在模型根目录下执行命令，下载并处理数据集，`--local_save_dir`为可选参数，不设置默认下载位置为`~/data/geo3k`。
 
-下载数据集的过程中，保证网络正常。若下载原始数据比较慢，可以手动下载原始数据到本地，通过修改代码进行数据处理：
+下载数据集的过程中，保证网络正常:
+
+```shell
+# 在线下载原始数据并预处理
+python ./examples/data_preprocess/geo3k.py --local_save_dir=./data/geo3k
+```
+
+若下载原始数据比较慢，可以手动下载原始数据到本地，通过修改代码进行数据处理：
 
 ```shell
 vim ./examples/data_preprocess/geo3k.py
@@ -165,11 +172,6 @@ vim ./examples/data_preprocess/geo3k.py
 ```python
 ## 44行附近修改data_source为原始数据路径
 dataset = dataset.load_dataset(data_source) # 将data_source修改为数据集下载路径
-```
-
-```shell
-# 在线下载原始数据并预处理
-python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 ```
 
 <a id="jump4"></a>
