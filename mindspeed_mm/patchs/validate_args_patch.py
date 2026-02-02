@@ -334,7 +334,7 @@ def validate_args(args, defaults=None):
         'fp32': torch.float32, 'bf16': torch.bfloat16, 'fp16': torch.float16, 'fp8': torch.uint8,
     }
 
-    if args.hetero_parallel:
+    if hasattr(args, 'hetero_parallel') and args.hetero_parallel:
         ensure_valid(args.tensor_model_parallel_size == 1 and \
                      args.pipeline_model_parallel_size == 1 and \
                      args.context_parallel_size == 1, \
