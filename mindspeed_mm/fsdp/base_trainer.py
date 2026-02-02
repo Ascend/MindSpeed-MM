@@ -37,6 +37,8 @@ from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointe
 from mindspeed_mm.fsdp.tools.profiler import Profiler
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields, instantiate_dataclass
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
+from mindspeed_mm.fsdp.utils.register import import_plugin
+
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +136,9 @@ class BaseTrainer:
         torch.accelerator.set_device_index(int(os.environ['LOCAL_RANK']))
         # Set random seeds for reproducibility
         set_seed(self.training_args.seed, set_deterministic=self.training_args.use_deter_comp)
+
+        # import plugin and trigger register
+        import_plugin(getattr(self.training_args, "plugin", []))
 
         # Initialize process group for distributed training
         if not torch.distributed.is_initialized():

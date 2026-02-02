@@ -30,6 +30,7 @@ from transformers.models.qwen3_vl_moe.configuration_qwen3_vl_moe import (
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all, split_forward_gather_backward, gather_forward_split_backward
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
+from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.device import get_device_type, create_stream
 from mindspeed_mm.fsdp.memory.async_offload import async_save_on_cpu
 
@@ -1670,6 +1671,7 @@ def load_balancing_loss_func(
     return overall_loss * num_experts
 
 
+@model_register.register("qwen3_vl_moe")
 class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMixin):
     _checkpoint_conversion_mapping = {}
     _tied_weights_keys = ["lm_head.weight"]

@@ -42,12 +42,13 @@ from transformers.modeling_utils import (ALL_ATTENTION_FUNCTIONS,
 from transformers.processing_utils import Unpack
 from transformers.utils import can_return_tuple, logging
 from transformers.utils.hub import cached_file
-
+from mindspeed_mm.fsdp.utils.register import model_register
 from .configuration_qwen3_tts import (Qwen3TTSConfig,
                                       Qwen3TTSSpeakerEncoderConfig,
                                       Qwen3TTSTalkerCodePredictorConfig,
                                       Qwen3TTSTalkerConfig)
 from ...inference.qwen3_tts_tokenizer import Qwen3TTSTokenizer
+
 
 logger = logging.get_logger(__name__)
 
@@ -1824,6 +1825,7 @@ class Qwen3TTSTalkerForConditionalGeneration(Qwen3TTSTalkerTextPreTrainedModel, 
         return model_kwargs
 
 
+@model_register.register("qwen3_tts")
 class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin):
     config_class = Qwen3TTSConfig
 

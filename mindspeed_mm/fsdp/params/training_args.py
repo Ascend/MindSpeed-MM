@@ -198,6 +198,10 @@ class TrainingArguments:
         default=None,
         metadata={"help": "This switch controls the value of `allow_hf32`."},
     )
+    plugin: List[str] = field(
+        default_factory=list,
+        metadata={"help": "Path to load custom dataset/model plugin."},
+    )
 
     def __post_init__(self):
         self._train_steps = -1
@@ -212,7 +216,7 @@ class TrainingArguments:
         Computes the training steps per epoch according to the data length.
         """
         data_parallel_size = getattr(parallel_args, "data_parallel_size", 1)
-        
+
         if self.gradient_accumulation_steps is None:
             self.global_batch_size = self.micro_batch_size * data_parallel_size
             self.gradient_accumulation_steps = 1

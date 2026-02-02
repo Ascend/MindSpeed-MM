@@ -122,3 +122,6 @@ training:
     with_memory: false
     with_stack: false
     ranks: [0]
+  plugin:
+    - mindspeed_mm/fsdp/models/qwen3vl
+    - mindspeed_mm/fsdp/data/datasets/huggingface

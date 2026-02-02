@@ -24,6 +24,8 @@ from transformers import AutoConfig, AutoProcessor
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DataArguments
 from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
 from mindspeed_mm.fsdp.models.qwen3tts.core.models.modeling_qwen3_tts import mel_spectrogram
+from mindspeed_mm.fsdp.utils.register import data_register
+
 
 AudioLike = Union[
     str,  # wav path, URL, base64
@@ -34,8 +36,9 @@ AudioLike = Union[
 MaybeList = Union[Any, List[Any]]
 
 
+@data_register.register("qwen3tts")
 class TTSDataset(Dataset):
-    def __init__(self, basic_param, preprocess_param, lag_num=-1):
+    def __init__(self, basic_param, preprocess_param, lag_num=-1, **kwargs):
         data_args = DataArguments(**basic_param)
         process_args = ProcessorArguments(**preprocess_param)
 

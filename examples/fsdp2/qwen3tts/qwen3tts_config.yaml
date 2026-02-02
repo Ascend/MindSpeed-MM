@@ -20,8 +20,8 @@ data:
       model_name_or_path: &HF_MODEL_LOAD_PATH /model/Qwen3-TTS-12Hz-1.7B-Base
 
     basic_parameters:
-      dataset_dir: /data/train_with_codes.jsonl
-      dataset: &DATASET_PATH /data/train_with_codes.jsonl
+      dataset_dir: &DATASET_PATH /data/train_with_codes.jsonl
+      dataset:  *DATASET_PATH
 
   # 数据加载
   dataloader_param:
@@ -71,3 +71,6 @@ training:
     with_memory: false
     with_stack: false
     ranks: [0]
+  plugin:
+    - mindspeed_mm/fsdp/models/qwen3tts
+    - mindspeed_mm/fsdp/data/datasets/qwen3tts

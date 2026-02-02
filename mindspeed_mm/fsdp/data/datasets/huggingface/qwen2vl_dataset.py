@@ -18,6 +18,7 @@ from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import (
 from mindspeed_mm.fsdp.data.data_utils.func_utils.log import get_logger
 from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
 from mindspeed_mm.fsdp.data.data_utils.func_utils.template import get_template_and_fix_tokenizer
+from mindspeed_mm.fsdp.utils.register import data_register
 
 
 logger = get_logger(__name__)
@@ -37,7 +38,8 @@ class DistributedIterableDataset(IterableDataset):
                 yield item
 
 
-def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
+@data_register.register("huggingface")
+def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
     data_args = DataArguments(**basic_param)
     process_args = ProcessorArguments(**preprocess_param)
     dataset_attr = DatasetAttr(**dataset_param["attr"])

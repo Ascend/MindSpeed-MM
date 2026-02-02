@@ -12,8 +12,8 @@ from mindspeed.fsdp.utils.log import print_rank
 
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
-from mindspeed_mm.fsdp.models.qwen3tts.core.models.modeling_qwen3_tts import Qwen3TTSForConditionalGeneration
-from mindspeed_mm.fsdp.models.qwen3vl.modeling_qwen3_vl_moe import Qwen3VLMoeForConditionalGeneration
+from mindspeed_mm.fsdp.utils.register import model_register
+
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +22,16 @@ class ModelHub:
     """
     Responsible for building HuggingFace native models.
     """
-    MODEL_MAPPINGS = {
-        "qwen3_vl_moe": Qwen3VLMoeForConditionalGeneration,
-        "qwen3_tts": Qwen3TTSForConditionalGeneration,
-    }# Mapping from model IDs to custom model classes
 
     @staticmethod
     def build(model_args: ModelArguments, training_args: TrainingArguments):
         """
         Build a model instance from HuggingFace based on model arguments and training configuration.
-        
+
         Args:
             model_args: Contains model_name_or_path, trust_remote_code, etc.
             training_args: Contains training configuration like init_model_with_meta_device, etc.
-        
+
         Returns:
             Configured model instance ready for training.
         """
@@ -54,7 +50,7 @@ class ModelHub:
         # First try to get model class from custom MODEL_MAPPINGS using model_id
         model_id = getattr(model_args, "model_id", None)
         if model_id:
-            model_cls = ModelHub.MODEL_MAPPINGS.get(model_id, None)
+            model_cls = model_register.get(model_id)
         # If not found in mappings, try to get from transformers module using architecture name
         elif architectures:
             transformers_module = importlib.import_module("transformers")
