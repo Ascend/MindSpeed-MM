@@ -103,7 +103,10 @@ class TransformersModel(MultiModalModule):
         if self.router_aux_loss_coef > 0.0:
             kwargs["output_router_logits"] = True
 
-        if self.loss_compute_mode == "chunk":
+        if self.loss_compute_mode == "dynamic_chunk":
+            kwargs["total_size"] = self.loss_chunk_size
+
+        if self.loss_compute_mode in ["chunk", "dynamic_chunk"]:
             loss_ctx, loss_mask = self.build_loss_ctx(labels, chunk_size=self.loss_chunk_size, **kwargs)
             outputs = self.model(
                 input_ids=input_ids,
@@ -155,6 +158,39 @@ class TransformersModel(MultiModalModule):
             )
         return False
 
+    def calculate_chunk_size(self, batch_size: int, total_size: int) -> int:
+        """
+        Calculate dynamic Chunk Size to ensure batch_size * chunk_size ≤ total size, 
+        where chunk_size is the largest power of two not exceeding the theoretical maximum value.
+
+        Args:
+            batch_size (int): Input batch size
+            total_size (int): Upper limit of total tokens (batch_size * chunk_size),
+                typically configured as the maximum token capacity of the device (e.g., 4096/8192 tokens).
+
+        Returns:
+            int: Dynamic Chunk Size that meets the requirements, returns 1 by default (when input is invalid)
+        """
+        if batch_size <= 0 or total_size <= 0:
+            print_rank_0(f"[ERROR] Batch size={batch_size} or total size={total_size} must be a positive integer!")
+            return 1
+        if batch_size >= total_size:
+            print_rank_0(f"[ERROR] Batch size={batch_size} exceeds total size={total_size}!")
+            return 1
+
+        max_possible_chunk_size = total_size // batch_size
+
+        if max_possible_chunk_size == 0:
+            print_rank_0(f"[ERROR] No valid Chunk Size for batch size batch_size={batch_size}!")
+            return 1
+
+        max_power_of_two_chunk_size = 1 << (max_possible_chunk_size.bit_length() - 1)
+
+        if max_power_of_two_chunk_size > max_possible_chunk_size:
+            max_power_of_two_chunk_size = max_power_of_two_chunk_size >> 1  # Right shift by 1 bit = divide by 2
+
+        return max_power_of_two_chunk_size
+
     def build_loss_ctx(
         self,
         labels,
@@ -163,6 +199,10 @@ class TransformersModel(MultiModalModule):
         **kwargs
     ):
         bs = labels.shape[0]
+        total_size = kwargs.get("total_size", None)
+        if total_size:
+            chunk_size = self.calculate_chunk_size(bs, total_size)
+            print_rank_0(f"[INFO] Batch size={bs}, chunk size={chunk_size}")
         labels = F.pad(labels, (0, 1), value=ignore_index)
         # Shift labels to match the input sequence for next-token prediction.
         shift_labels = labels[..., 1:].contiguous()
@@ -267,6 +307,8 @@ class TransformersModel(MultiModalModule):
                 pass
             elif self.loss_compute_mode == "chunk":
                 self.loss_chunk_size = getattr(loss_cfg, "chunk_size", 1024)
+            elif self.loss_compute_mode == "dynamic_chunk":
+                self.loss_chunk_size = getattr(loss_cfg, "chunk_size", 4096)
             else:
                 raise NotImplementedError(f"Unrecognized loss_compute_mode: {self.loss_compute_mode}.")
             

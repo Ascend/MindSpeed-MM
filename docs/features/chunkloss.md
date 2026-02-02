@@ -23,8 +23,11 @@
 
 - `compute_mode`：
   - 设为 `"default"` 表示使用原始的 loss 计算方式；
-  - 设为 `"chunk"` 则启用 ChunkLoss 功能。
-- `chunk_size`：指定序列分块后每个子序列的最大长度（即每个 chunk 所包含的 token 数量）。
+  - 设为 `"chunk"` 则启用 ChunkLoss 静态分块功能，按固定长度对序列分块后计算loss；
+  - 设为 `"dynamic_chunk"` 则启用 ChunkLoss 动态分块功能, 自适应调整分块大小。
+- `chunk_size`：
+  - 当`compute_mode`设为`"chunk"`时：表示指定序列分块后，每个子序列的最大长度（即每个 chunk 所包含的 token 数量）；
+  - 当`compute_mode`设为`"dynamic_chunk"`：表示"每个子序列长度 × 批次大小（batch_size）"的最大长度（用于约束动态分块的总计算量，避免显存溢出）。
 
 通过合理配置 `chunk_size`，可在保证训练正确性的同时有效控制显存占用。
 
