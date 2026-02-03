@@ -11,33 +11,36 @@
 - [环境安装](#jump1)
   - [环境准备](#jump1.1)
   - [环境搭建](#jump1.2)
-- [权重下载及转换](#jump2)
+- [权重下载及离线转换](#jump2)
   - [权重下载](#jump2.1)
   - [权重转换hf2mm](#jump2.2)
   - [权重转换mm2hf](#jump2.3)
   - [权重重切分](#jump2.4)
-- [数据集准备及处理](#jump3)
-  - [数据集下载](#jump3.1)
-  - [混合数据集处理](#jump3.2)
-- [微调](#jump4)
+- [权重下载及在线加载](#jump3)
+  - [权重下载](#jump3.1)
+  - [权重加载](#jump3.2)
+- [数据集准备及处理](#jump4)
+  - [数据集下载](#jump4.1)
+  - [混合数据集处理](#jump4.2)
+- [微调](#jump5)
   - [长序列支持](#长序列支持)
-  - [准备工作](#jump4.1)
-  - [配置参数](#jump4.2)
-  - [启动微调](#jump4.3)
-  - [支持FSDP2训练](#jump4.4)
-- [推理](#jump5)
   - [准备工作](#jump5.1)
-  - [启动推理](#jump5.2)
-- [视频理解](#jump6)
-  - [加载数据集](#jump6.1)
-  - [配置参数](#jump6.2)
-  - [启动微调](#jump6.3)
-- [评测](#jump7)
-  - [数据集准备](#jump7.1)
+  - [配置参数](#jump5.2)
+  - [启动微调](#jump5.3)
+  - [支持FSDP2训练](#jump5.4)
+- [推理](#jump6)
+  - [准备工作](#jump6.1)
+  - [启动推理](#jump6.2)
+- [视频理解](#jump7)
+  - [加载数据集](#jump7.1)
   - [配置参数](#jump7.2)
-  - [启动评测](#jump7.3)
-- [环境变量声明](#jump8)
-- [注意事项](#jump9)
+  - [启动微调](#jump7.3)
+- [评测](#jump8)
+  - [数据集准备](#jump8.1)
+  - [配置参数](#jump8.2)
+  - [启动评测](#jump8.3)
+- [环境变量声明](#jump9)
+- [注意事项](#jump10)
 
 ## 版本说明
 #### 参考实现
@@ -90,7 +93,7 @@ pip install -e .
 
 ---
 <a id="jump2"></a>
-## 权重下载及转换
+## 权重下载及离线转换
 
 <a id="jump2.1"></a>
 #### 1. 权重下载
@@ -279,9 +282,42 @@ m-convert  Qwen2_5_VLConverter lora_mm_to_hf \
 
 ---
 <a id="jump3"></a>
-## 数据集准备及处理
+## 权重下载及在线加载
 
 <a id="jump3.1"></a>
+#### 1. 权重下载
+
+已验证模型及其权重下载链接:
+
+- 模型地址: [Qwen2.5-VL-3B](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct/tree/main)；
+- 模型地址: [Qwen2.5-VL-7B](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)；
+- 模型地址: [Qwen2.5-VL-32B](https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct/tree/main)；
+
+
+ 将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-7B-Instruct`目录下。
+
+<a id="jump3.2"></a>
+#### 2. 在线加载
+
+如果需要用在线权重加载进行模型训练的话，只需将下载的huggingface原始权重赋于`examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh`中的`LOAD_PATH`参数：
+
+```shell
+LOAD_PATH="ckpt/hf_path/Qwen2.5-VL-7B-Instruct"
+```
+
+同时，将`examples/qwen2.5vl/model_7b.json`中的`bridge_patch`置为`true`
+
+```shell
+    "patch": {
+        "bridge_patch": true
+    }
+```
+
+---
+<a id="jump4"></a>
+## 数据集准备及处理
+
+<a id="jump4.1"></a>
 #### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
@@ -308,7 +344,7 @@ dataset_param->basic_parameters->dataset
 
 同时注意`data.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
 
-<a id="jump3.2"></a>
+<a id="jump4.2"></a>
 #### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
@@ -338,7 +374,7 @@ dataset_param->basic_parameters->dataset
 }
 ```
 
-<a id="jump4"></a>
+<a id="jump5"></a>
 ## 微调
 
 #### 长序列支持
@@ -357,12 +393,12 @@ dataset_param->basic_parameters->dataset
 
 ---
 
-<a id="jump4.1"></a>
+<a id="jump5.1"></a>
 #### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
-<a id="jump4.2"></a>
+<a id="jump5.2"></a>
 #### 2. 配置参数
 
 【数据目录配置】
@@ -597,7 +633,7 @@ GPT_ARGS="
 "
 ```
 
-<a id="jump4.3"></a>
+<a id="jump5.3"></a>
 #### 3. 启动微调
 
 以Qwen2.5VL-7B为例，启动微调训练任务。  
@@ -606,7 +642,7 @@ loss计算方式差异会对训练效果造成不同的影响，在启动训练�
 bash examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh
 ```
 
-<a id="jump4.4"></a>
+<a id="jump5.4"></a>
 #### 4. 支持FSDP2训练
 
 当前Qwen2.5VL-72B使用FSDP2训练，MFU已达到30%以上
@@ -637,10 +673,10 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_72b_fsdp.sh
 
 
 ---
-<a id="jump5"></a>
+<a id="jump6"></a>
 ## 推理
 
-<a id="jump5.1"></a>
+<a id="jump6.1"></a>
 #### 1、配置参数
 
 根据实际情况修改examples/qwen2.5vl/inference_qwen2_5_vl_7b.json和examples/qwen2.5vl/inference_qwen2_5_vl_7b.sh中的路径配置，包括tokenizer的加载路径from_pretrained。需注意
@@ -649,7 +685,7 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_72b_fsdp.sh
 
 （2）shell文件中的LOAD_PATH的路径为经过权重转换后的模型路径（可PP切分）。
 
-<a id="jump5.2"></a>
+<a id="6.2"></a>
 #### 2、启动推理
 
 ```shell
@@ -657,10 +693,10 @@ bash examples/qwen2.5vl/inference_qwen2_5_vl_7b.sh
 ```
 
 ---
-<a id="jump6"></a>
+<a id="jump7"></a>
 ## Qwen2.5vl支持视频理解
 
-<a id="jump6.1"></a>
+<a id="jump7.1"></a>
 ### 1、加载视频数据集
 
 数据集中的视频数据集取自llamafactory，https://github.com/hiyouga/LLaMA-Factory/tree/main/data
@@ -696,7 +732,7 @@ bash examples/qwen2.5vl/inference_qwen2_5_vl_7b.sh
 }
 ```
 
-<a id="jump6.2"></a>
+<a id="jump7.2"></a>
 ### 2、修改模型配置
 
 在model.json中，修改`img_context_token_id`为下图所示：
@@ -705,7 +741,7 @@ bash examples/qwen2.5vl/inference_qwen2_5_vl_7b.sh
 ```
 说明：img_context_token_id 是标识视觉内容的 token ID，用于在forward中标记视觉token的位置，所以需要根据输入做相应修改。
 
-<a id="jump6.3"></a>
+<a id="jump7.3"></a>
 ### 3、启动微调
 以Qwen2.5VL-7B为例，启动微调训练任务。
 
@@ -714,10 +750,10 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh
 ```
 
 ---
-<a id="jump7"></a>
+<a id="jump8"></a>
 ## 评测
 
-<a id="jump7.1"></a>
+<a id="jump8.1"></a>
 ### 数据集准备
 
 当前模型支持AI2D(test)、ChartQA(test)、Docvqa(val)、MMMU(val)四种数据集的评测。
@@ -728,7 +764,7 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh
 - [AI2D_TEST](https://opencompass.openxlab.space/utils/VLMEval/AI2D_TEST.tsv)
 - [ChartQA_TEST](https://opencompass.openxlab.space/utils/VLMEval/ChartQA_TEST.tsv)
 
-<a id="jump7.2"></a>
+<a id="jump8.2"></a>
 ### 参数配置
 
 如果要进行评测需要将要评测的数据集名称和路径传到examples/qwen2.5vl/evaluate_qwen2_5_vl_7b.json
@@ -766,7 +802,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-7B-Instruct"
 NPUS_PER_NODE=8
 ```
 
-<a id="jump7.3"></a>
+<a id="jump8.3"></a>
 ### 启动评测
 评测额外依赖一些python包，使用下面命令进行安装
 
@@ -774,7 +810,7 @@ NPUS_PER_NODE=8
 pip install -e ".[evaluate]"
 ```
 
-<a id="jump7.4"></a>
+<a id="jump8.4"></a>
 启动shell开始评测
 ```shell
 # 在MindSpeed-MM目录下执行
@@ -786,7 +822,7 @@ bash examples/qwen2.5vl/evaluate_qwen2_5_vl_7b.sh
 - *.xlsx文件，这个文件会输出每道题的预测结果和答案等详细信息。
 - *.csv文件，这个文件会输出统计准确率等数据。
 
-<a id="jump8"></a>
+<a id="jump9"></a>
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
@@ -808,7 +844,7 @@ bash examples/qwen2.5vl/evaluate_qwen2_5_vl_7b.sh
 
 
 ---
-<a id="jump9"></a>
+<a id="jump10"></a>
 ## 注意事项
 
 1. 在 `finetune_xx.sh`里，与模型结构相关的参数并不生效，以`examples/qwen2.5vl/model_xb.json`里同名参数配置为准，非模型结构的训练相关参数在 `finetune_xx.sh`修改。

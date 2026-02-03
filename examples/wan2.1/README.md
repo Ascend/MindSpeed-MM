@@ -9,9 +9,12 @@
     - [仓库拉取](#仓库拉取)
     - [环境搭建](#环境搭建)
     - [Decord搭建](#decord搭建)
-  - [权重下载及转换](#权重下载及转换)
+  - [权重下载及离线转换](#权重下载及离线转换)
     - [Diffusers权重下载](#diffusers权重下载)
     - [权重转换](#权重转换)
+  - [权重下载及在线加载](#权重下载及在线加载)
+    - [Diffusers权重下载](#diffusers权重下载)
+    - [权重在线加载](#权重在线加载)
   - [预训练](#预训练)
     - [数据预处理](#数据预处理)
     - [特征提取](#特征提取)
@@ -129,7 +132,7 @@ pip install decord==0.6.0
 
 ---
 
-## 权重下载及转换
+## 权重下载及离线转换
 
 ### Diffusers权重下载
 
@@ -178,6 +181,34 @@ mm-convert WanConverter mm_to_hf \
 | --cfg.source_path | MindSpeed MM保存的权重路径                                   | /      |
 | --cfg.target_path | 转换后的Hugging Face权重路径                                 | /      |
 | --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始Hugging Face配置文件 |    /   |
+
+
+---
+
+## 权重下载及在线加载
+
+### Diffusers权重下载
+
+| 模型(已验证)  |   Hugging Face下载链接   |
+|----------| ---- |
+| T2V-1.3B |   <https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers>   |
+| T2V-14B  |  <https://huggingface.co/Wan-AI/Wan2.1-T2V-14B-Diffusers>    |
+
+### 在线加载
+
+如果需要用在线权重加载进行模型训练的话，只需将下载的huggingface原始权重赋于`examples/wan2.1/14b/t2v/pretrain_fsdp2.sh`中的`LOAD_PATH`参数：
+
+```shell
+LOAD_PATH="./weights/Wan-AI/Wan2.1-T2V-14B-Diffusers/transformer/"
+```
+
+同时，将`examples/wan2.1/14b/t2v/pretrain_fsdp2.sh`中的`bridge_patch`置为`true`
+
+```shell
+    "patch": {
+        "bridge_patch": true
+    }
+```
 
 ---
 
