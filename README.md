@@ -38,7 +38,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 # 最新消息
 
 ---
-
+* [Jan. 29, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3-TTS](https://gitcode.com/Ascend/MindSpeed-MM/tree/fsdp2_dev/examples/fsdp2/qwen3tts)模型
 * [Jan. 28, 2026]: 🚀 MindSpeed MM基于FSDP2支持Magistral-Small-2509模型
 * [Jan. 08, 2026]: 🚀 MindSpeed MM支持FLUX.2模型【Prototype】
 * [Dec. 25, 2025]: 🎉 用户手册上线！体验链接：<https://mindspeed-mm.readthedocs.io/zh-cn/latest/>
