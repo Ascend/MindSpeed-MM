@@ -312,6 +312,7 @@ class DatasetAttr:
     """
 
     # basic configs
+    packing: bool = False
     ranking: bool = False
     # common columns
     system: Optional[str] = None
@@ -696,6 +697,9 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
                 )
                 continue
 
+            tool_schema = []
+            if '_tools' in examples:
+                tool_schema = examples['_tools'][i]
             input_ids, labels = self._encode_data_example(
                 prompt=examples["_prompt"][i],
                 response=examples["_response"][i],
@@ -703,6 +707,7 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
                 images=examples["_images"][i] or [],
                 videos=examples["_videos"][i] or [],
                 audios=examples["_audios"][i] or [],
+                tools=tool_schema
             )
             length = len(input_ids)
             if length > self.data_args.cutoff_len:

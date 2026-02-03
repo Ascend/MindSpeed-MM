@@ -218,6 +218,9 @@ $save_dir
   NODE_RANK="current node id"  # 当前节点的RANK，多个节点不能重复，主节点为0, 其他节点可以是1,2..
   WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
 ```
+【Data Packing】（可选）
+如需开启Data Packing，在`data.json`中将`packing`设置为`true`，并根据需要调整`finetune_magistral_2509.sh`中的SEQ_LEN
+
 
 <a id="jump4.3"></a>
 

@@ -40,7 +40,8 @@
             "assistant_tag": "assistant",
             "observation_tag": null,
             "function_tag": null,
-            "system_tag": null
+            "system_tag": null,
+            "packing": false
         }
     },
     "dataloader_param": {
