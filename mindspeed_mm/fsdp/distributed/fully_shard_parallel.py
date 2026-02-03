@@ -71,6 +71,8 @@ def _post_order_traverse(model: torch.nn.Module, parent_path: str = ""):
 
 def get_fsdp_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig, ignored_modules: Set[str]) -> dict[Any, Any]:
     fsdp_modules = []
+    if fsdp_plan.apply_modules is None:
+        return fsdp_modules
     # Traverse all modules in the model
     if fsdp_plan.apply_modules:
         for name, module in _post_order_traverse(model):
