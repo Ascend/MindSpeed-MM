@@ -92,8 +92,9 @@ model:
     enable_chunk_loss: false
     chunk_size: 1024
     router_aux_loss_coef: 0.0
-  text_decoder:
-    activation_offload: false
+  activation_offload_plan:
+    apply_modules:
+      - model.language_model.layers.{*}
 
 # 训练配置
 training:

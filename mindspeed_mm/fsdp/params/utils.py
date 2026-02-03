@@ -31,7 +31,10 @@ def create_nested_dataclass(cls_name: str, data: Dict[str, Any]) -> type:
             nested_annotations[k] = sub_cls
         else:
             field_type = type(v) if v is not None else Any
-            nested_fields[k] = field(default=v)
+            if field_type in (list, set):
+                nested_fields[k] = field(default_factory=field_type)
+            else:
+                nested_fields[k] = field(default=v)
             nested_annotations[k] = field_type
 
     dynamic_cls = type(cls_name, (), nested_fields)

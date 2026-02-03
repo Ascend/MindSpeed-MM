@@ -26,6 +26,7 @@ from mindspeed_mm.fsdp.utils.device import (
 from mindspeed_mm.fsdp.distributed.parallel_state import init_parallel_state, get_parallel_state
 from mindspeed_mm.fsdp.models.modelhub import ModelHub
 from mindspeed_mm.fsdp.distributed.torch_parallelize import ParallelApplier
+from mindspeed_mm.fsdp.features.apply_features import FeaturesApplier
 from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed, move_to_device, get_time
 from mindspeed_mm.fsdp.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
@@ -64,6 +65,7 @@ class BaseTrainer:
         # 3. Build each module
         self.checkpointer = self.get_checkpointer()
         self.model_parallel_applier = ParallelApplier(self.parallel_args)
+        self.model_features_applier = FeaturesApplier(self.model_args)
         self.model = self.get_model()
         self.optimizer = self.get_optimizer()
         self.lr_scheduler = self.get_scheduler()
@@ -157,6 +159,7 @@ class BaseTrainer:
 
         # Apply parallel strategies (FSDP2, tensor parallelism, etc.)
         self.model_parallel_applier(model)
+        self.model_features_applier(model)
         print_rank(logger.info, f"model: \n{model}")
 
         # Initialize weights on meta device if specified (for memory efficiency)

@@ -1,8 +1,16 @@
+import logging
+import warnings
+from functools import wraps
 import torch
 from torch.autograd.graph import saved_tensors_hooks
 
-from mindspeed_mm.fsdp.utils.device import create_event, get_current_stream, switch_to_specified_stream
+from mindspeed.fsdp.utils.log import print_rank
+from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.device import create_stream, create_event, get_current_stream, switch_to_specified_stream
 from mindspeed_mm.fsdp.utils.utils import Singleton
+
+
+logger = logging.getLogger(__name__)
 
 
 def base_check_fn(tensor) -> bool:
@@ -137,6 +145,7 @@ class OffloadManager(metaclass=Singleton):
         self.check = check
         self.npu_item = []
         self.getcnt = GetCnt()
+        self.swap_stream = create_stream()
 
     def get_cnt(self, block_idx):
         return self.getcnt.get_cnt(block_idx)
@@ -208,9 +217,7 @@ class async_save_on_cpu(saved_tensors_hooks):
     and host-to-device (H2D) transfer during the backward pass.
     """
     def __init__(
-            self, 
-            h2d_stream, 
-            d2h_stream, 
+            self,
             block_idx, 
             depth,
             custom_check_fn=None, 
@@ -226,6 +233,7 @@ class async_save_on_cpu(saved_tensors_hooks):
                 return tensor
 
             key, after_block = OffloadManager().get_cnt(block_idx)
+            d2h_stream = OffloadManager().swap_stream
 
             if after_block:
                 OffloadManager().del_npu_tensor("{}_".format(block_idx - 1))
@@ -242,7 +250,9 @@ class async_save_on_cpu(saved_tensors_hooks):
         def _unpack_from_cpu(swap_tensor) -> torch.Tensor:
             if isinstance(swap_tensor, torch.Tensor):
                 return swap_tensor
-            
+
+            d2h_stream = OffloadManager().swap_stream
+            h2d_stream = OffloadManager().swap_stream
             swap_tensor.launch_h2d(h2d_stream)
             
             # make sure d2h copy is done before into backward
@@ -254,3 +264,75 @@ class async_save_on_cpu(saved_tensors_hooks):
             return swap_tensor.tensor
         
         super().__init__(_pack_to_cpu, _unpack_from_cpu)
+
+
+def get_offload_modules(modules, plan):
+    matched_submodules = []
+    for plan_name in plan:
+        if '{*}' in plan_name:
+            prefix = plan_name.split("{*}")[0].rstrip(".")
+            parent_module = modules
+            try:
+                for sub_name in prefix.split("."):
+                    parent_module = getattr(parent_module, sub_name)
+                if parent_module is None:
+                    continue
+                depth = len(parent_module)
+                for layer_idx, module in enumerate(parent_module):
+                    full_module_name = f"{prefix}.{layer_idx}"
+                    matched_submodules.append((full_module_name, module, layer_idx, depth))
+            except AttributeError as e:
+                print_rank(f"Skip plan {plan_name}: Attribute error - {e}")
+        else:
+            layer_idx = 0
+            depth = 1
+            for name, module in modules.named_modules():
+                if module_name_match(plan_name, name):
+                    if not any(item[0] == name for item in matched_submodules):
+                        matched_submodules.append((name, module, layer_idx, depth))
+    return matched_submodules
+
+
+def async_offload_modules(modules):
+    for name, module, layer_idx, depth in modules:
+        print_rank(logger.info, f'Applying activation offload to module: {name}')
+        module.forward = with_async_save_on_cpu(name, layer_idx, depth)(module.forward)
+
+
+def with_async_save_on_cpu(module_name, layer_idx, depth, prefetch=True, hidden_states_idx=0):
+    """
+    Decorator adapted for PyTorch Module.forward: adds async_save_on_cpu context for forward propagation.
+
+    depth: Total number of layers {Replace the original layers;
+    prefetch: Whether to enable prefetching, default is True.
+    hidden_states_idx: Index of hidden_states in the forward parameters, default is 0 {The first parameter of a PyTorch layer is usually the input tensor}.
+    """
+
+    def decorator(forward_func):
+        @wraps(forward_func)
+        def wrapper(*args, **kwargs):
+            try:
+                hidden_states = args[hidden_states_idx]
+                if not hasattr(hidden_states, "data_ptr"):
+                    raise IndexError
+            except IndexError:
+                warnings.warn(
+                    f"{module_name} forward has no valid hidden_states at index {hidden_states_idx}, async save on cpu will not work.",
+                    category=RuntimeWarning,
+                    stacklevel=2
+                )
+                return forward_func(*args, **kwargs)
+
+            context = async_save_on_cpu(
+                block_idx=layer_idx,
+                depth=depth,
+                custom_check_fn=lambda x: x.data_ptr() == hidden_states.data_ptr(),
+                prefetch=prefetch
+            )
+
+            with context:
+                return forward_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
