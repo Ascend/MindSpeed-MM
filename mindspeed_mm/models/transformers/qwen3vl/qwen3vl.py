@@ -143,6 +143,10 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         router_aux_loss_coef = getattr(model_cfg.loss_cfg, "router_aux_loss_coef", 0.0)
         transformer_config.text_config.router_aux_loss_coef = router_aux_loss_coef
 
+        # set encoder mbs data balance for qwen3vl moe model
+        transformer_config.vision_config.use_image_mbs_data_balance = args.use_image_mbs_data_balance
+        transformer_config.vision_config.mbs_data_balance_sorting_algo = args.mbs_data_balance_sorting_algo
+
         return transformer_config
 
 
