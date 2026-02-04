@@ -74,9 +74,6 @@ cd ..
 # 安装mindspeed mm及依赖
 pip install -e .
 
-#安装指定版本transformers
-pip install transformers==4.57.1
-
 ```
 
 <a id="jump2"></a>

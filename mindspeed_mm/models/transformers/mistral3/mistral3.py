@@ -1,15 +1,22 @@
 
 # Copyright 2025 HuggingFace Inc. and the LlamaFactory team.
 
-from megatron.training import print_rank_0
 from transformers import Mistral3ForConditionalGeneration
 
+from megatron.training import print_rank_0
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 from mindspeed_mm.models.transformers.custom_model_registry import register_model
+from mindspeed_mm.models.transformers.mistral3.modules import MMMistralAttention
+from mindspeed_mm.models.transformers.mistral3.modeling_mistral import MMMistralModel
 
 
 @register_model("mistral3")
 class MultiModelMistral3ForConditionalGeneration(Mistral3ForConditionalGeneration, FSDP2Mixin, WeightInitMixin):
+    def __init__(self, config):
+        super().__init__(config)
+        self.model.language_model = MMMistralModel(config=config.text_config)
+        for idx, layer in enumerate(self.model.language_model.layers):
+            layer.self_attn = MMMistralAttention(config=config.text_config, layer_idx=idx)
 
     def freeze(self, config):
         forbidden_modules = set()
