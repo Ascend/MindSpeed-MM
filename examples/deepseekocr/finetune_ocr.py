@@ -206,7 +206,7 @@ class OCRTrainer:
 
 def get_parser():
     parser = argparse.ArgumentParser(
-        description='Ming Model Training Configuration',
+        description='DeepSeekOCR Model Training Configuration',
         allow_abbrev=False
     )
 

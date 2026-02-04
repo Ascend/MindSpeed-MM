@@ -1,0 +1,11 @@
+transformers==4.46.3
+tokenizers==0.20.3
+addict
+easydict
+datasets==4.0.0
+torchvision==0.22.1
+PyMuPDF
+img2pdf
+Pillow
+numpy
+einops
