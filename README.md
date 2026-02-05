@@ -25,6 +25,12 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 📅未来规划会动态刷新在[MindSpeed MM RoadMap](https://gitcode.com/Ascend/MindSpeed-MM/issues/176)中，欢迎大家通过此链接进行互动并提出诉求
 
+# 社区会议
+
+---
+
+- MindSpeed系列TC及SIG会议安排请查看[Ascend会议中心](https://meeting.ascend.osinfra.cn/)
+
 # 加入我们
 
 ---
