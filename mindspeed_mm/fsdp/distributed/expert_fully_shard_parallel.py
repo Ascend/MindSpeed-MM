@@ -8,14 +8,16 @@ from torch.distributed.distributed_c10d import ReduceOp
 from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
+from mindspeed_mm.fsdp.distributed.fully_shard_parallel import get_mixprecision_policy
 
 logger = logging.getLogger(__name__)
 
 
-def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, plan: EPPlanConfig) -> torch.nn.Module:
-    efsdp_modules = get_efsdp_modules(model, plan)
+def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, ep_plan: EPPlanConfig, fsdp_plan: FSDPPlanConfig) -> torch.nn.Module:
+    efsdp_modules = get_efsdp_modules(model, ep_plan)
     config = {'mesh': efsdp_mesh,
-              'mp_policy': MixedPrecisionPolicy(param_dtype=torch.bfloat16, reduce_dtype=torch.float32),
+              'mp_policy': get_mixprecision_policy(fsdp_plan),
               'shard_placement_fn': lambda x: Shard(1)}
 
     apply_hccl_premul_sum_patch()
@@ -23,10 +25,10 @@ def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, plan: EPPlanC
         if isinstance(experts, torch.nn.ModuleList):
             for expert in experts:
                 fully_shard(expert, **config)
-                set_gradient_divide_factor(expert, plan._gradient_divide_factor)
+                set_gradient_divide_factor(expert, ep_plan._gradient_divide_factor)
         else:
             fully_shard(experts, **config)
-            set_gradient_divide_factor(experts, plan._gradient_divide_factor)
+            set_gradient_divide_factor(experts, ep_plan._gradient_divide_factor)
 
     return model
 

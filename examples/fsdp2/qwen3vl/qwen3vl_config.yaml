@@ -12,7 +12,8 @@ parallel:
       - model.language_model.layers.{*}
       - model.language_model
       - lm_head
-    enable_mixed_precision: true
+    param_dtype: bf16
+    reduce_dtype: fp32
   recompute: true
   recompute_plan:
     - model.language_model.layers.{*}

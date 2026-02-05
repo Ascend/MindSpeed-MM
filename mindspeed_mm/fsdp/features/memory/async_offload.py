@@ -303,7 +303,7 @@ def with_async_save_on_cpu(module_name, layer_idx, depth, prefetch=True, hidden_
     """
     Decorator adapted for PyTorch Module.forward: adds async_save_on_cpu context for forward propagation.
 
-    depth: Total number of layers {Replace the original layers;
+    depth: Total number of layers Replace the original layers;
     prefetch: Whether to enable prefetching, default is True.
     hidden_states_idx: Index of hidden_states in the forward parameters, default is 0 {The first parameter of a PyTorch layer is usually the input tensor}.
     """

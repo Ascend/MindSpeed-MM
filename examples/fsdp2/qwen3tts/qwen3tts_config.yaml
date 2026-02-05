@@ -2,8 +2,6 @@
 parallel:
   tensor_parallel_size: 1
   fully_shard_parallel_size: auto
-  fsdp_plan:
-    enable_mixed_precision: false
   recompute: false
   context_parallel_size: 1
   ulysses_parallel_size: 1

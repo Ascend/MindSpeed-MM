@@ -11,6 +11,7 @@ import yaml
 
 from mindspeed.fsdp.utils.log import print_rank, set_log_level
 from mindspeed.fsdp.utils.random import set_seed
+from mindspeed.fsdp.utils.dtype import get_dtype
 
 from mindspeed_mm.fsdp.params.data_args import DataArguments
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
@@ -276,7 +277,7 @@ class BaseTrainer:
             batch_data = self.get_batch(self.train_dataloder)
 
             # Move input to device and cast precision
-            batch_data = move_to_device(batch_data, torch.bfloat16 if self.parallel_args.fsdp_plan.enable_mixed_precision else None)
+            batch_data = move_to_device(batch_data, get_dtype(self.parallel_args.fsdp_plan.param_dtype) if self.parallel_args.fsdp_plan.param_dtype else None)
 
             # setup loss ctx
             batch_data = self.get_loss_func(batch_data)

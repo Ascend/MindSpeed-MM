@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Literal, Optional
 import logging
 import os
+import torch
 
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields
 
@@ -14,7 +15,17 @@ class FSDPPlanConfig:
     """Configuration for Fully Sharded Data Parallelism (FSDP) plan."""
     ignored_modules: List[str] = field(default_factory=list)
     apply_modules: List[str] = field(default_factory=list)
-    enable_mixed_precision: bool = True
+
+    # mp_policy settings
+    param_dtype: Optional[torch.dtype] = None
+    reduce_dtype: Optional[torch.dtype] = None
+    output_dtype: Optional[torch.dtype] = None
+    cast_forward_inputs: bool = True
+    reshard_after_forward: bool = True
+
+    # prefetch settings
+    num_to_forward_prefetch: Optional[int] = 0
+    num_to_backward_prefetch: Optional[int] = 0
 
 
 @dataclass
