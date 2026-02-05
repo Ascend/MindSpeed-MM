@@ -10,7 +10,6 @@
 
 import torch
 from megatron.core.transformer.module import MegatronModule
-from transformers import Qwen2_5_VLForConditionalGeneration
 from bridge.models.conversion.mapping_registry import MegatronMappingRegistry
 from bridge.models.conversion.model_bridge import MegatronModelBridge
 from bridge.models.conversion.param_mapping import (
@@ -21,6 +20,10 @@ from bridge.models.conversion.param_mapping import (
     VisionEncoderQKVMapping,
 )
 from mindspeed_mm.models.vlm_model import VLMModel
+
+
+class Qwen2_5_VLForConditionalGeneration():
+    pass
 
 
 @MegatronModelBridge.register_bridge(source=Qwen2_5_VLForConditionalGeneration, target=VLMModel)

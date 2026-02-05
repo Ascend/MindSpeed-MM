@@ -31,7 +31,8 @@ dependencies = [
     "pydantic>=2.10.4",
     "jsonargparse[all]>=4.40.0",
     "gpytorch",
-    "orjson"
+    "orjson",
+    "rich"
 ]
 
 [build-system]

@@ -1,5 +1,4 @@
 import torch
-from transformers import Qwen3VLForConditionalGeneration, Qwen3VLMoeForConditionalGeneration
 from megatron.core.transformer.module import MegatronModule
 from bridge.models.conversion.mapping_registry import MegatronMappingRegistry
 from bridge.models.conversion.model_bridge import MegatronModelBridge
@@ -11,6 +10,10 @@ from bridge.models.conversion.param_mapping import (
     WeightReshapeMapping,
 )
 from mindspeed_mm.models.vlm_model import VLMModel
+
+
+class Qwen3VLForConditionalGeneration():
+    pass
 
 
 @MegatronModelBridge.register_bridge(source=Qwen3VLForConditionalGeneration, target=VLMModel)
@@ -33,6 +36,10 @@ class Qwen3VLBridge(MegatronModelBridge):
         )
 
         return MegatronMappingRegistry(*mapping_list)
+
+
+class Qwen3VLMoeForConditionalGeneration():
+    pass
 
 
 @MegatronModelBridge.register_bridge(source=Qwen3VLMoeForConditionalGeneration, target=VLMModel)
