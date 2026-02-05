@@ -12,7 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+A dataloader implementing dynamic batching. It selects appropriate samples from a buffer based on text length
+and concatenates them into a new batch of a specified `max_seq_len`. The key workflow is as follows:
+    1. `_get_data_from_dataloader` fetches a batch from the original dataloader and splits it along the batch
+    dimension into individual samples.
+    2. `batching_strategy` places the obtained samples into a buffer.
+    3. When the buffer is full, `batching_strategy` selects a subset of samples such that the sum of their text
+    lengths is as close as possible to `max_seq_len`.
+    4. `collate_fn` concatenates the selected samples into a single batch and outputs it.
+"""
+
 import traceback
+import warnings
+from collections.abc import Iterable
 
 import torch
 from torch.utils.data import default_collate
@@ -41,6 +54,7 @@ class DynamicBatchingDataLoader:
         )
         self.drop_last = drop_last
         self.consumed_train_samples = consumed_train_samples
+        self.non_packing_data = {}
         print_rank_0("[INFO] Successfully initialize dynamic batching DataLoader")
 
     def __len__(self):
@@ -86,6 +100,23 @@ class DynamicBatchingDataLoader:
 
     def _get_data_from_dataloader(self):
         data = next(self._data_iter)
+
+        # Remove non-packing data, these data will be added latter
+        origin_mbs = data['input_ids'].shape[0]
+        for data_name, value in data.items():
+            if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
+                self.non_packing_data[data_name] = value
+            elif data_name != 'pixel_values' and len(value) != origin_mbs:
+                warnings.warn(
+                    f"The iterable data {data_name} (of type {type(value)}) in micro batch extracted from "
+                    f"the original dataloader has a length inconsistent with the micro batch size (mbs). To ensure "
+                    f"correct decomposition into mbs individual samples, it has been moved to non_packing_data. "
+                    f"Please verify the actual purpose of this data and apply appropriate adjustments."
+                )
+                self.non_packing_data[data_name] = value
+        for data_name in self.non_packing_data:
+            data.pop(data_name)
+
         data_names = data.keys()
 
         data['input_ids'] = [data['input_ids'][i][mask] for i, mask in enumerate(data['attention_mask'].bool())]
@@ -105,10 +136,14 @@ class DynamicBatchingDataLoader:
         micro_batch = self.collect_fn(micro_batch, self.vision_layout)
         return micro_batch
 
-    @staticmethod
-    def collect_fn(features, vision_layout):
+    def collect_fn(self, features, vision_layout):
         seqlens = torch.tensor([len(feature['input_ids']) for feature in features], dtype=torch.long)
         batch = {"seqlens": seqlens}
+
+        # Add non-packing data that remove in previous
+        for data_name, value in self.non_packing_data.items():
+            batch[data_name] = value
+
         for input_name in features[0].keys():
             if input_name in ('input_ids', 'attention_mask', 'labels'):
                 batch[input_name] = torch.cat([feature[input_name] for feature in features]).unsqueeze(0)
