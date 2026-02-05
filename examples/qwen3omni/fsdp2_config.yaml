@@ -3,6 +3,6 @@ reshard_after_forward: True
 param_dtype: bf16
 reduce_dtype: fp32
 cast_forward_inputs: True
-num_to_forward_prefetch: 0
-num_to_backward_prefetch: 0
+num_to_forward_prefetch: 1
+num_to_backward_prefetch: 1
 offload_to_cpu: False

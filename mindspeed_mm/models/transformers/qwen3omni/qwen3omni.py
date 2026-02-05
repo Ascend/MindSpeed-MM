@@ -1,5 +1,6 @@
-from typing import Any
+from typing import Any, List
 
+from torch import nn
 from torch.distributed.fsdp import fully_shard
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
@@ -46,6 +47,26 @@ class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
             fully_shard(layer, **fsdp2_kwargs)
         fully_shard(self.lm_head, **fsdp2_kwargs)
         fully_shard(self, **fsdp2_kwargs)
+
+        # forward prefetch
+        if fsdp2_config.num_to_forward_prefetch > 0:
+            for curr_layer, next_layer in zip(self.audio_tower.layers[:-1], self.audio_tower.layers[1:]):
+                curr_layer.set_modules_to_forward_prefetch([next_layer])
+            self.audio_tower.layers[-1].set_modules_to_forward_prefetch([self.visual.blocks[0]])
+
+            for i, (curr_block, next_block) in enumerate(zip(self.visual.blocks[:-1], self.visual.blocks[1:])):
+                prefetch_modules: List[nn.Module] = []
+                if i in self.visual.deepstack_visual_indexes:
+                    prefetch_modules.append(self.visual.deepstack_merger_list[self.visual.deepstack_visual_indexes.index(i)])
+                prefetch_modules.append(next_block)
+                curr_block.set_modules_to_forward_prefetch(prefetch_modules)
+            self.visual.blocks[-1].set_modules_to_forward_prefetch([self.visual.merger])
+            self.visual.merger.set_modules_to_forward_prefetch([self.model.embed_tokens])
+
+            self.model.embed_tokens.set_modules_to_forward_prefetch([self.model.layers[0]])
+            for curr_layer, next_layer in zip(self.model.layers[:-1], self.model.layers[1:]):
+                curr_layer.set_modules_to_forward_prefetch([next_layer])
+            self.model.layers[-1].set_modules_to_forward_prefetch([self.lm_head])
 
     def freeze(self, config):
         forbidden_modules = set()

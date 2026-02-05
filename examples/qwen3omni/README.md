@@ -359,7 +359,7 @@ OUTPUT_ARGS="
 配置`examples/qwen3omni/finetune_qwen3omni.sh`参数如下
 
 ```shell
-# 根据实际情况修改 ascend-toolkit 和 nnal 路径
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 # 单机16卡可以跑满层
 NPUS_PER_NODE=16
@@ -379,7 +379,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 配置`examples/qwen3omni/finetune_qwen3omni.sh`参数如下（性能场景默认双机运行配置）
 
 ```shell
-# 根据实际情况修改 ascend-toolkit 和 nnal 路径
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 # 根据分布式集群实际情况配置分布式参数
 export GLOO_SOCKET_IFNAME="Your SOCKET IFNAME" # 通过ifconfig获取
