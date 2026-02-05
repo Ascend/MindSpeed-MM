@@ -292,6 +292,10 @@ FLUX 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
 3. 【修改代码文件】
 
+    ```shell
+    vim train_dreambooth_lora_flux2_img2img.py # 进入Python文件
+    ```
+
     1. 【Optional】Ubuntu系统需在1796行附近 添加 `accelerator.print("")`
 
         ```python

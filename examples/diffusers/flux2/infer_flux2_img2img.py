@@ -21,7 +21,7 @@ from transformers import AutoConfig, Mistral3ForConditionalGeneration, PixtralPr
 apply_patches()
 # --- Setup Environments ---
 OUTPUT_PATH = "./infer_result"  # Output path
-MODEL_PATH = "black-forest-labs/FLUX.2-Kontext-dev"  # Model path
+MODEL_PATH = "black-forest-labs/FLUX.2-dev"  # Model path
 LORA_WEIGHTS = "./logs_i2i/pytorch_lora_weights.safetensors"  # Path for saved LoRA
 IMAGE = "./infer_result/flux2.fsdp_ulysses4.png"  # Image path that you want to edit
 PROMPT = "Change the crab to a dog"  # Prompt for editing task
