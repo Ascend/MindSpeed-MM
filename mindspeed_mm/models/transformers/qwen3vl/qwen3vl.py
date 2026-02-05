@@ -87,7 +87,7 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
     def freeze(self, config):
         forbidden_modules = set()
         if config.image_encoder.vision_encoder.freeze:
-            vision_model_keys = ["visual.patch_embed", "visual.blocks"]
+            vision_model_keys = ["visual.patch_embed", "visual.blocks", "visual.pos_embed"]
             forbidden_modules.update(vision_model_keys)
 
         if config.image_encoder.vision_projector.freeze:
