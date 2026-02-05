@@ -1,10 +1,11 @@
 # Copyright (c) 2024, Huawei Technologies Co., Ltd.  All rights reserved.
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 import torch
 import torch.distributed as dist
 
-from .utils import cal_split_sizes
+from .utils import cal_split_sizes, reorder_output, cal_split_sizes_multi
+from ...distributed.parallel_state import get_parallel_state
 
 
 PERMUTE_DIMS1 = {
@@ -604,3 +605,322 @@ def gather_forward_split_backward(
         torch.Tensor: The resulting tensor after gathering and concatenating.
     """
     return _GatherForwardSplitBackward.apply(input_, process_group, dim, gather_sizes, grad_scale)
+
+
+class _SplitForwardGatherBackWardWithMegatronCP(torch.autograd.Function):
+    '''
+    Split the input tensor in the forward pass and gather the gradients in the backward pass. 
+    It will be implemented in Mindspeed in the future.
+    '''
+    @staticmethod
+    def forward(ctx, val, cp_rank, cp_size, seq_dim, cp_group=None):
+        val = val.view(
+            *val.shape[0:seq_dim],
+            2 * cp_size,
+            val.shape[seq_dim] // (2 * cp_size),
+            *val.shape[(seq_dim + 1):],
+        )
+        index = torch.tensor([cp_rank, (2 * cp_size - cp_rank - 1)], device=val.device)
+        val = val.index_select(seq_dim, index)
+        val = val.view(*val.shape[0:seq_dim], -1, *val.shape[(seq_dim + 2):])
+
+        ctx.cp_group = cp_group
+        ctx.cp_rank = cp_rank
+        ctx.cp_size = cp_size
+        ctx.seq_dim = seq_dim
+
+        return val
+        
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad_input = {}
+        grad_input = _gather(grad_output, ctx.cp_group, dim=ctx.seq_dim) / ctx.cp_size
+        grad_input = reorder_output(grad_input, ctx.cp_rank, ctx.cp_size, ctx.cp_group, dim=ctx.seq_dim)
+        return grad_input, None, None, None, None
+
+
+class _GatherForwardSplitBackWardWithMegatronCP(torch.autograd.Function):
+    '''
+    Split the input tensor in the forward pass and gather the gradients in the backward pass with megatron cp(Ring Attention)
+    It will be implemented in Mindspeed in the future.
+    '''
+    @staticmethod
+    def forward(ctx, val, cp_rank, cp_size, seq_dim, cp_group=None):
+        # Step 1: All-gather shards from all CP ranks along the sequence dimension
+        val = _gather(val, cp_group, dim=seq_dim)
+        # Step 2: Reorder the gathered tensor
+        val = reorder_output(val, cp_rank, cp_size, cp_group, dim=seq_dim)
+
+        ctx.cp_group = cp_group
+        ctx.cp_rank = cp_rank
+        ctx.cp_size = cp_size
+        ctx.seq_dim = seq_dim
+
+        return val
+        
+    @staticmethod
+    def backward(ctx, grad_output):
+        cp_group = ctx.cp_group
+        cp_rank = ctx.cp_rank
+        cp_size = ctx.cp_size
+        seq_dim = ctx.seq_dim
+
+        grad_output = grad_output.view(
+            *grad_output.shape[0:seq_dim],
+            2 * cp_size,
+            grad_output.shape[seq_dim] // (2 * cp_size),
+            *grad_output.shape[(seq_dim + 1):],
+        ) * cp_size  # Scale gradients up by cp_size
+        # Select the two chunks that belong to the current rank:
+        # - One from the forward direction (index = cp_rank)
+        # - One from the backward direction (index = 2*cp_size - cp_rank - 1)
+        index = torch.tensor([cp_rank, (2 * cp_size - cp_rank - 1)], device=grad_output.device)
+        grad_output = grad_output.index_select(seq_dim, index)
+
+        # Collapse the two selected chunks back into a single contiguous local sequence
+        grad_input = grad_output.view(*grad_output.shape[0:seq_dim], -1, *grad_output.shape[(seq_dim + 2):])
+        
+        return grad_input, None, None, None, None
+
+
+def load_balanced_split_forward_gather_backward(
+        input_: torch.Tensor,
+        process_group: torch.distributed.ProcessGroup,
+        dim: int = 0
+) -> torch.Tensor:
+    cp_size = torch.distributed.get_world_size(group=process_group)
+    cp_rank = torch.distributed.get_rank(group=process_group)
+
+    return _SplitForwardGatherBackWardWithMegatronCP.apply(input_, cp_rank, cp_size, dim, process_group)
+
+
+def load_balanced_gather_forward_split_backward(
+    input_: torch.Tensor,
+    process_group: torch.distributed.ProcessGroup,
+    dim: int = 0
+) -> torch.Tensor:
+    cp_size = torch.distributed.get_world_size(group=process_group)
+    cp_rank = torch.distributed.get_rank(group=process_group)
+
+    return _GatherForwardSplitBackWardWithMegatronCP.apply(input_, cp_rank, cp_size, dim, process_group)
+
+
+def split_forward_gather_backward_with_cp(
+    input_: torch.Tensor,
+    dim: int,
+) -> torch.Tensor:
+    """
+    Perform a context-parallel-aware tensor split during forward pass and gather during backward pass.
+    
+    This function supports multiple context parallel (CP) algorithms:
+      - Ulysses-style CP: uniform or non-uniform split across CP ranks.
+      - Ring Attention: typically used with sequence parallelism and ring-based communication.
+      - Hybrid CP: combines ring and Ulysses-style splitting in nested groups.
+    """
+    ps = get_parallel_state()
+    seq_len = input_.shape[dim]
+    if ps.is_ring_enable():
+        if seq_len % (2 * ps.get_ring_group_size()) != 0:
+            raise ValueError(f"Seq lens should be multiple of 2 * ring_size, but got seq_len: {seq_len}, ring_size: {ps.get_ring_group_size()}")
+        input_ = load_balanced_split_forward_gather_backward(input_, ps.get_ring_group(), dim=dim)
+        seq_len = input_.shape[dim]
+    if ps.is_ulysses_enable():
+        split_gather_sizes = cal_split_sizes(seq_len, ps.get_ulysses_group_size())
+        input_ = split_forward_gather_backward(input_, ps.get_ulysses_group(), dim=dim, split_sizes=split_gather_sizes)
+    
+    return input_
+
+
+def gather_forward_split_backward_with_cp(
+    input_: torch.Tensor,
+    dim: int,
+    gather_size: int
+):
+    """
+    Perform a context-parallel-aware tensor gather during forward pass and split during backward pass.
+    This is the reverse operation of split_forward_gather_backward_with_cp.
+    """
+    ps = get_parallel_state()
+    if ps.is_ring_enable():
+        if gather_size % (2 * ps.get_ring_group_size()) != 0:
+            raise ValueError(f"Total gather size should be multiple of 2 * ring_size, but got total gather size: {gather_size}, ring_size: {ps.get_ring_group_size()}")
+        # Calculate the sequence length per ring CP group for Ulysses processing. 
+        # Since padding is applied in ring groups, the division yields an integer.
+        gather_size = gather_size // ps.get_ring_group_size()
+    
+    if ps.is_ulysses_enable():
+        gather_size_list = cal_split_sizes(gather_size, ps.get_ulysses_group_size())
+        input_ = gather_forward_split_backward(input_, ps.get_ulysses_group(), dim=dim, gather_sizes=gather_size_list)
+    if ps.is_ring_enable():
+        input_ = load_balanced_gather_forward_split_backward(input_, ps.get_ring_group(), dim=dim)
+    
+    return input_
+
+
+def packed_data_split_forward_gather_backward(
+    hidden_states: torch.Tensor,  # Concatenated sequences: s1+s2+s3+...
+    process_group: torch.distributed.ProcessGroup,
+    sequence_lengths: List[int],  # List of individual sequence lengths: [s1_len, s2_len, s3_len, ...]
+    dim: int = 0
+) -> torch.Tensor:
+    """
+    Split packed hidden states for sequence parallelism, handling multiple variable-length sequences.
+
+    This function:
+    1. Splits each sequence across all processes in the process group
+    2. Returns the local chunks for the current rank
+
+    Args:
+        hidden_states: Concatenated hidden states of all sequences [total_seq_len, hidden_dim]
+        process_group: Distributed process group for parallelism
+        sequence_lengths: List of lengths for each individual sequence
+        dim: Dimension along which to split (default: 0 - sequence dimension)
+
+    Returns:
+        local_hidden_states: Local chunks of hidden states for current rank
+    """
+
+    world_size = torch.distributed.get_world_size(process_group)
+    local_sequence_chunks = []     # Local chunks for current rank
+
+    current_position = 0
+
+    # Process each sequence individually
+    for _, seq_len in enumerate(sequence_lengths):
+        # Extract the current sequence from packed hidden states
+        sequence_end = current_position + seq_len
+        current_sequence = hidden_states.narrow(dim=dim, start=current_position, length=seq_len)
+        current_position = sequence_end
+
+        # Calculate how to split this sequence across all ranks
+        sequence_split_sizes = cal_split_sizes(seq_len, world_size)
+
+        # Split sequence and get local chunk for current rank
+        local_chunk = split_forward_gather_backward(
+            current_sequence,
+            process_group=process_group,
+            dim=dim,
+            grad_scale="down",  # Scale gradients during backward
+            split_sizes=sequence_split_sizes
+        )
+        local_sequence_chunks.append(local_chunk)
+
+    # Concatenate all local chunks along sequence dimension
+    local_hidden_states = torch.cat(local_sequence_chunks, dim=dim)
+
+    return local_hidden_states
+
+
+def packed_data_gather_forward_split_backward(
+    local_hidden_states: torch.Tensor,
+    all_split_sizes: torch.Tensor,  # [world_size, num_sequences]
+    process_group: torch.distributed.ProcessGroup,
+    dim: int = 0
+) -> torch.Tensor:
+    """
+    Gather distributed sequence chunks and reconstruct original packed sequences.
+
+    Reconstruction process:
+    1. For each sequence: gather chunks from all ranks and concatenate
+    2. Concatenate all reconstructed sequences along sequence dimension
+
+    Args:
+        local_hidden_states: Local hidden states [local_seq_len, hidden_dim]
+        all_split_sizes: Split sizes tensor [world_size, num_sequences] showing how each sequence
+                        was distributed across ranks
+        process_group: Distributed process group for communication
+        dim: Dimension along which sequences were split (default: 0 - sequence dimension)
+
+    Returns:
+        reconstructed_sequences: Reconstructed packed sequences [total_seq_len, hidden_dim]
+    """
+    world_size, num_sequences = all_split_sizes.shape
+    rank = torch.distributed.get_rank(process_group)
+
+    # Calculate total sequence length handled by each rank
+    # This sums up all sequence chunks that belong to each rank
+    rank_total_sizes = []
+    for r in range(world_size):
+        total_size_this_rank = all_split_sizes[r].sum().item()  # Sum across all sequences
+        rank_total_sizes.append(total_size_this_rank)
+
+    # Step 1: Gather all local chunks from all ranks into a single tensor
+    all_gathered_tensor = gather_forward_split_backward(
+        local_hidden_states,
+        process_group=process_group,
+        dim=dim,
+        grad_scale="up",  # Scale gradients during backward
+        gather_sizes=rank_total_sizes
+    )
+
+    # Step 2: Split the gathered tensor into chunks corresponding to each rank's contribution
+    # This separates the gathered data back into per-rank chunks for processing
+    rank_chunks = torch.split(all_gathered_tensor, rank_total_sizes, dim=dim)
+    rank_seq_chunks = [list(torch.split(rank_chunks[i], all_split_sizes[i].tolist(), dim=dim)) for i in range(world_size)]
+
+    # Step 3: Reconstruct each original sequence by collecting chunks from all ranks
+    reconstructed_sequences = []
+
+    for _ in range(num_sequences):
+        # For current sequence, collect chunks from all ranks
+        sequence_chunks = [rank_seq_chunks[i].pop(0) for i in range(world_size)]
+        # Concatenate all chunks for this sequence
+        reconstructed_sequences.extend(sequence_chunks)
+
+    # Step 4: Concatenate all reconstructed sequences along sequence dimension
+    return torch.cat(reconstructed_sequences, dim=dim)
+
+
+def packed_data_split_forward_gather_backward_with_cp(
+    x: torch.Tensor,
+    dim: int,
+    seq_lens: List[int]
+):
+    """
+    Split packed sequences across context parallel (CP) ranks during the forward pass,
+    and gather full gradients during the backward pass.
+
+    This function supports three CP strategies:
+      - **Ulysses CP**: Splits the entire packed sequence uniformly (or near-uniformly) across all CP ranks.
+      - **Ring Attention**: Splits *each individual sample sequence* (e.g., image tokens) across CP ranks,
+        then concatenates the resulting shards to form a new packed tensor.
+      - **Hybrid CP**: First applies ring-based splitting per sample, then further splits the result
+        using Ulysses within each ring subgroup.
+    Args:
+        x: Concatenated sequences: s1+s2+s3+...
+    """
+    ps = get_parallel_state()
+    if ps.is_ring_enable():
+        x = packed_data_split_forward_gather_backward(x, ps.get_ring_group(), seq_lens, dim)
+    if ps.is_ulysses_enable():
+        split_gather_sizes = cal_split_sizes(x.shape[dim], ps.get_ulysses_group_size())
+        x = split_forward_gather_backward(x, ps.get_ulysses_group(), dim=dim, split_sizes=split_gather_sizes)
+    return x
+
+
+def packed_data_gather_forward_split_backward_with_cp(
+    x: torch.Tensor,  # Concatenated sequences: s1+s2+s3+...
+    dim: int,
+    seq_lens: List[int]
+):
+    """
+    Gather visual sequences across context parallel (CP) ranks during the forward pass,
+    and split gradients back during the backward pass.
+
+    This function supports multiple CP strategies:
+      - **Ulysses CP**: All-gather full sequence using precomputed per-rank sequence lengths.
+      - **Ring Attention**: Reconstruct packed tensor from sequence chunks distributed across CP ranks.
+      - **Hybrid CP**: First gather within Ulysses subgroups, then across ring-based CP groups.
+    """
+    ps = get_parallel_state()
+    # Step 1: Gather within Ulysses subgroups (inner CP group)
+    # First, compute how packed seqs are distributed across ring CP ranks
+    all_split_sizes_tensor = cal_split_sizes_multi(seq_lens, ps.get_ring_group_size())
+    gather_sizes = cal_split_sizes(all_split_sizes_tensor[ps.get_ring_rank()].sum(), ps.get_ulysses_group_size()) 
+    if ps.is_ulysses_enable():
+        x = gather_forward_split_backward(x, ps.get_ulysses_group(), dim=dim, gather_sizes=gather_sizes)
+    # Step 2: Gather across ring CP ranks
+    if ps.is_ring_enable():
+        x = packed_data_gather_forward_split_backward(x, all_split_sizes_tensor, ps.get_ring_group(), dim=dim)
+    
+    return x

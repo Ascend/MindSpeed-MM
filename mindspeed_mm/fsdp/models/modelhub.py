@@ -40,7 +40,8 @@ class ModelHub:
         print_rank(logger.info, f"> Loading AutoConfig from {model_args.model_name_or_path}...")
         transformer_config = AutoConfig.from_pretrained(
             model_args.model_name_or_path,
-            trust_remote_code=model_args.trust_remote_code
+            trust_remote_code=model_args.trust_remote_code,
+            _attn_implementation=model_args.attn_implementation
         )
 
         # Get model architecture from config

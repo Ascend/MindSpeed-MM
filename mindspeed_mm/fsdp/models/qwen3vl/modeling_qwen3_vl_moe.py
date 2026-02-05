@@ -27,14 +27,23 @@ from transformers.models.qwen3_vl_moe.configuration_qwen3_vl_moe import (
     Qwen3VLMoeVisionConfig
 )
 
-from mindspeed.fsdp.utils.str_match import module_name_match
-from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all, split_forward_gather_backward, gather_forward_split_backward
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+    all_to_all,
+    split_forward_gather_backward,
+    gather_forward_split_backward,
+    split_forward_gather_backward_with_cp,
+    gather_forward_split_backward_with_cp,
+    packed_data_split_forward_gather_backward_with_cp,
+    packed_data_gather_forward_split_backward_with_cp
+)
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
 from mindspeed_mm.fsdp.utils.register import model_register
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
+_VISUAL_PER_SEQ_LEN = None
 IGNORE_INDEX = -100
 
 
@@ -45,6 +54,9 @@ def get_seq_len(seq_type: str = None) -> int:
     elif seq_type == "visual":
         global _VISUAL_SEQ_LEN
         return _VISUAL_SEQ_LEN
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        return _VISUAL_PER_SEQ_LEN
     else:
         raise ValueError(
             f"Invalid sequence type: '{seq_type}'. Expected 'total' or 'visual'."
@@ -58,6 +70,9 @@ def set_seq_len(seq_type: str = None, seq_len: Optional[Union[int, List[int]]] =
     elif seq_type == "visual":
         global _VISUAL_SEQ_LEN
         _VISUAL_SEQ_LEN = seq_len
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        _VISUAL_PER_SEQ_LEN = seq_len
     else:
         raise ValueError(
             f"Invalid sequence type: '{seq_type}'. Expected 'total' or 'visual'."
@@ -302,14 +317,6 @@ class Qwen3VLMoeTextAttention(nn.Module):
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
-        # Modification: a2a for qkv
-        total_seq_len = get_seq_len("total")
-        ps = get_parallel_state()
-        if ps.is_ulysses_enable():
-            query_states, key_states, value_states = map(
-                lambda x: all_to_all(x, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2, gather_size=total_seq_len),
-                [query_states, key_states, value_states]
-            )
         if past_key_values is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
@@ -319,6 +326,8 @@ class Qwen3VLMoeTextAttention(nn.Module):
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
+        # Modification: add total_seq_len、 for Attention
+        total_seq_len = get_seq_len("total")
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -327,12 +336,12 @@ class Qwen3VLMoeTextAttention(nn.Module):
             attention_mask,
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
+            ring_fa_layout="BNSD",
+            is_causal=True,
+            total_seq_len=total_seq_len,
+            seq_split_lens=None,
             **kwargs,
         )# bsnd
-
-        # Modification: a2a for attn output
-        if ps.is_ulysses_enable():
-            attn_output = all_to_all(attn_output, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2)
 
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
         attn_output = self.o_proj(attn_output)
@@ -525,10 +534,10 @@ class Qwen3VLMoeVisionPatchMerger(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Modifcation: Gather x from all context parallel ranks for downsampling
         ps = get_parallel_state()
-        if ps.is_ulysses_enable():
+        if ps.is_cp_enable():
             gather_sizes = cal_split_sizes(get_seq_len("visual"), ps.get_ulysses_group_size())
             if self.use_postshuffle_norm:
-                x = gather_forward_split_backward(x, process_group=ps.get_ulysses_group(), dim=0, grad_scale="up", gather_sizes=gather_sizes)
+                x = packed_data_gather_forward_split_backward_with_cp(x, dim=0, seq_lens=get_seq_len("per_visual"))
                 x = x.view(-1, self.hidden_size)
                 # after down_sample hidden_state, should split it again
                 split_sizes = cal_split_sizes(x.shape[0], ps.get_ulysses_group_size())
@@ -538,7 +547,7 @@ class Qwen3VLMoeVisionPatchMerger(nn.Module):
                 x = self.norm(x)
             else:
                 x = self.norm(x)
-                x = gather_forward_split_backward(x, process_group=ps.get_ulysses_group(), dim=0, grad_scale="up", gather_sizes=gather_sizes)
+                x = packed_data_gather_forward_split_backward_with_cp(x, dim=0, seq_lens=get_seq_len("per_visual"))
                 x = x.view(-1, self.hidden_size)
                 # after down_sample hidden_state, should split it again
                 split_sizes = cal_split_sizes(x.shape[0], ps.get_ulysses_group_size())
@@ -603,14 +612,7 @@ class Qwen3VLMoeVisionAttention(nn.Module):
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
-        # Modification: a2a for qkv
-        ps = get_parallel_state()
-        total_visual_seqlen = int(cu_seqlens[-1])
-        if ps.is_ulysses_enable():
-            query_states, key_states, value_states = map(
-                lambda x: all_to_all(x, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2, gather_size=total_visual_seqlen),
-                [query_states, key_states, value_states]
-            )
+        # Modification: pass total_visual_seqlen
         if self.config._attn_implementation == "flash_attention_2":
             # Flash Attention 2: Use cu_seqlens for variable length attention
             max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
@@ -627,6 +629,9 @@ class Qwen3VLMoeVisionAttention(nn.Module):
                 max_length_q=max_seqlen,
                 max_length_k=max_seqlen,
                 is_causal=False,
+                ring_fa_layout="TND",
+                total_seq_len=get_seq_len("visual"),
+                seq_split_lens=cal_split_sizes_multi(get_seq_len("per_visual"), get_parallel_state().get_ring_group_size()),
                 **kwargs,
             )
         else:
@@ -650,9 +655,6 @@ class Qwen3VLMoeVisionAttention(nn.Module):
             ]
             attn_output = torch.cat(attn_outputs, dim=1)# bsnd
 
-        # Modification: a2a for attn output
-        if ps.is_ulysses_enable():
-            attn_output = all_to_all(attn_output, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2)
         attn_output = attn_output.reshape(seq_length, -1).contiguous()
         attn_output = self.proj(attn_output)
         return attn_output
@@ -846,17 +848,6 @@ class Qwen3VLMoeVisionModel(Qwen3VLMoePreTrainedModel):
         hidden_states = hidden_states.reshape(seq_len, -1)
         rotary_pos_emb = rotary_pos_emb.reshape(seq_len, -1)
 
-        # Modification: slice rotary_pos_emb and hidden_states if using sp
-        # Set global sequence length variables for sp
-        set_seq_len("visual", seq_len)
-        ps = get_parallel_state()
-        if ps.is_ulysses_enable():
-            split_gather_sizes = cal_split_sizes(seq_len, ps.get_ulysses_group_size())
-            rotary_pos_emb = split_forward_gather_backward(rotary_pos_emb, process_group=ps.get_ulysses_group(), dim=0, grad_scale="down", split_sizes=split_gather_sizes)
-            hidden_states = split_forward_gather_backward(hidden_states, process_group=ps.get_ulysses_group(), dim=0, grad_scale="down", split_sizes=split_gather_sizes)
-        emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
-        position_embeddings = (emb.cos(), emb.sin())
-
         cu_seqlens = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cumsum(
             dim=0,
             # Select dtype based on the following factors:
@@ -864,7 +855,30 @@ class Qwen3VLMoeVisionModel(Qwen3VLMoePreTrainedModel):
             #  - torch.onnx.export requires that cu_seqlens_q must have same dtype as grid_thw
             dtype=grid_thw.dtype if torch.jit.is_tracing() else torch.int32,
         )
+        # Modification: cu_seqlens move to cpu, in case of cpu-gpu synchronizing on NPU
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
+        if IS_NPU_AVAILABLE:
+            cu_seqlens = cu_seqlens.cpu()
+        
+        # Modification: slice rotary_pos_emb and hidden_states if using cp
+        # Set global sequence length variables for cp
+        sequence_lengths = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cpu()
+        set_seq_len("visual", seq_len)
+        set_seq_len("per_visual", sequence_lengths)
+        ps = get_parallel_state()
+        # Split sequences across context parallel groups for distributed processing
+        if ps.is_cp_enable():
+            rotary_pos_emb = packed_data_split_forward_gather_backward_with_cp(rotary_pos_emb, dim=0, seq_lens=sequence_lengths)
+            hidden_states = packed_data_split_forward_gather_backward_with_cp(hidden_states, dim=0, seq_lens=sequence_lengths)
+            # update cu_seqlens if ring
+            if ps.is_ring_enable():
+                all_split_sizes_tensor = cal_split_sizes_multi(sequence_lengths, ps.get_ring_group_size())
+                # Get cumulative split sizes for the current ring cp rank
+                cu_seqlens = all_split_sizes_tensor.cumsum(dim=1)[ps.get_ring_rank()]
+                cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
+        
+        emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
+        position_embeddings = (emb.cos(), emb.sin())
 
         deepstack_feature_lists = []
         for layer_num, blk in enumerate(self.blocks):
@@ -884,7 +898,7 @@ class Qwen3VLMoeVisionModel(Qwen3VLMoePreTrainedModel):
 
         # Modification: Gather outputs from all context parallel ranks for the final result
         set_seq_len("visual", seq_len // self.spatial_merge_size ** 2)
-        if ps.is_ulysses_enable():
+        if ps.is_cp_enable():
             gather_sizes = cal_split_sizes(get_seq_len("visual"), ps.get_ulysses_group_size())
             hidden_states = gather_forward_split_backward(
                 hidden_states,
@@ -1045,11 +1059,10 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel):
         total_seq_len = inputs_embeds.shape[1]
         set_seq_len("total", total_seq_len)
         ps = get_parallel_state()
-        if self.training and ps.is_ulysses_enable():
-            split_gather_sizes = cal_split_sizes(total_seq_len, ps.get_ulysses_group_size())
-            position_ids = split_forward_gather_backward(position_ids, process_group=ps.get_ulysses_group(), dim=2, split_sizes=split_gather_sizes)
-            text_position_ids = split_forward_gather_backward(text_position_ids, process_group=ps.get_ulysses_group(), dim=1, split_sizes=split_gather_sizes)
-            inputs_embeds = split_forward_gather_backward(inputs_embeds, process_group=ps.get_ulysses_group(), dim=1, split_sizes=split_gather_sizes)
+        if self.training and ps.is_cp_enable():
+            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
+            text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
+            inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
 
         hidden_states = inputs_embeds
 
@@ -1087,24 +1100,25 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel):
     def _deepstack_process(
         self, hidden_states: torch.Tensor, visual_pos_masks: torch.Tensor, visual_embeds: torch.Tensor
     ):
-        # Modification: Gather visual_embeds from all context parallel ranks for deepstack process
+        # Modification: Gather visual_embeds and hidden_states from all context parallel ranks for deepstack process
         ps = get_parallel_state()
-        if ps.is_ulysses_enable():
+        if ps.is_cp_enable():
+            # Gather visual_embeds without considering cp type
             visual_seq_len = get_seq_len("visual")
             visual_gather_sizes = cal_split_sizes(visual_seq_len, ps.get_ulysses_group_size())
             visual_embeds = gather_forward_split_backward(visual_embeds, ps.get_ulysses_group(), dim=0, grad_scale="up", gather_sizes=visual_gather_sizes)
 
-            total_gather_sizes = cal_split_sizes(get_seq_len("total"), ps.get_ulysses_group_size())
-            hidden_states = gather_forward_split_backward(hidden_states, ps.get_ulysses_group(), dim=1, grad_scale="up", gather_sizes=total_gather_sizes)
+            # Gather hidden_states
+            hidden_states = gather_forward_split_backward_with_cp(hidden_states, dim=1, gather_size=get_seq_len("total"))
+        
         visual_pos_masks = visual_pos_masks.to(hidden_states.device)
         visual_embeds = visual_embeds.to(hidden_states.device, hidden_states.dtype)
         local_this = hidden_states[visual_pos_masks, :].clone() + visual_embeds
         hidden_states[visual_pos_masks, :] = local_this
 
         # Modification: split again
-        if ps.is_ulysses_enable():
-            split_gather_sizes = cal_split_sizes(hidden_states.shape[1], ps.get_ulysses_group_size())
-            hidden_states = split_forward_gather_backward(hidden_states, ps.get_ulysses_group(), dim=1, split_sizes=split_gather_sizes)
+        if ps.is_cp_enable():
+            hidden_states = split_forward_gather_backward_with_cp(hidden_states, dim=1)
         return hidden_states
 
 
@@ -1753,9 +1767,10 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
             raise NotImplementedError(f"loss_func cannot be None!")
 
         logits, loss = self.lm_head(hidden_states[:, slice_indices, :], loss_func, enable_chunk_loss=enable_chunk_loss)
+        # Modification: all gather loss in all cp ranks for scaling up the grad.
         ps = get_parallel_state()
-        if ps.is_ulysses_enable():
-            loss = gather_forward_split_backward(loss.unsqueeze(0), process_group=ps.get_ulysses_group(), dim=0, grad_scale="up")
+        if ps.is_cp_enable():
+            loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0)
             loss = loss.sum()
 
         aux_loss = None

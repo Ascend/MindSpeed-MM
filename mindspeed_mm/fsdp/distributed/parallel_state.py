@@ -32,7 +32,7 @@ class ParallelState(metaclass=Singleton):
     data_parallel_size: int = 1
     fully_shard_parallel_size: int = 1
     tensor_parallel_size: int = 1
-    context_parallel_size: int = 1
+    ring_attention_size: int = 1
     ulysses_parallel_size: int = 1
 
     expert_parallel_size: int = 1
@@ -47,15 +47,15 @@ class ParallelState(metaclass=Singleton):
             self.device_mesh_map = dict()
 
         # create DP/CP/Ulysses/TP groups
-        dp_shard_size = self.fully_shard_parallel_size // self.context_parallel_size // self.ulysses_parallel_size
+        dp_shard_size = self.fully_shard_parallel_size // self.ring_attention_size // self.ulysses_parallel_size
         dp_replicate_size = self.data_parallel_size // dp_shard_size
         # Define mesh dimensions and their sizes
-        mesh_dim_names = ("dp_replicate", "dp_shard", "ulysses", "cp", "tp")
+        mesh_dim_names = ("dp_replicate", "dp_shard", "ulysses", "ring", "tp")
         mesh_shape = (
             dp_replicate_size,
             dp_shard_size,
             self.ulysses_parallel_size,
-            self.context_parallel_size,
+            self.ring_attention_size,
             self.tensor_parallel_size,
         )
         self.device_mesh = init_device_mesh(device_type=get_device_type(), mesh_shape=mesh_shape, mesh_dim_names=mesh_dim_names)
@@ -63,15 +63,15 @@ class ParallelState(metaclass=Singleton):
         # Flatten mesh dimensions to create hierarchical groups
         # Combine dp_replicate and dp_shard into dp (data parallel) group
         self.device_mesh[("dp_replicate", "dp_shard")]._flatten(mesh_dim_name="dp")
-        # Combine ulysses and cp into sp (sequence parallel) group
-        self.device_mesh[("ulysses", "cp")]._flatten(mesh_dim_name="sp")
-        # Combine dp_shard, ulysses, cp into dp_shard_sp group
-        self.device_mesh[("dp_shard", "ulysses", "cp")]._flatten(mesh_dim_name="dp_shard_sp")
-        # Combine all dp and sp dimensions into dp_sp group
-        self.device_mesh[("dp_replicate", "dp_shard", "ulysses", "cp")]._flatten(mesh_dim_name="dp_sp")
+        # Combine ulysses and ring into cp group
+        self.device_mesh[("ulysses", "ring")]._flatten(mesh_dim_name="cp")
+        # Combine dp_shard, ulysses, ring into dp_shard_cp group
+        self.device_mesh[("dp_shard", "ulysses", "ring")]._flatten(mesh_dim_name="dp_shard_cp")
+        # Combine all dp and cp dimensions into dp_cp group
+        self.device_mesh[("dp_replicate", "dp_shard", "ulysses", "ring")]._flatten(mesh_dim_name="dp_cp")
 
         # Register helper functions for all mesh dimensions
-        self.register_funcs(self.device_mesh, ["dp", "sp", "ulysses", "cp", "tp"])
+        self.register_funcs(self.device_mesh, ["dp", "cp", "ulysses", "ring", "tp"])
 
 
         # create EP_DP/EP groups
@@ -98,19 +98,19 @@ class ParallelState(metaclass=Singleton):
     
     # ----------------------------- FSDP ----------------------------- #
     def get_fsdp_group(self) -> Optional["ProcessGroup"]:
-        return self.device_mesh.get_group("dp_sp")
+        return self.device_mesh.get_group("dp_cp")
 
     def get_fsdp_group_size(self) -> Optional["ProcessGroup"]:
-        return self.device_mesh.get_group("dp_sp").size()
+        return self.device_mesh.get_group("dp_cp").size()
 
     def get_fsdp_device_mesh(self) -> "DeviceMesh":
         if self.device_mesh.get_group("dp_replicate").size() > 1:
-            return self.device_mesh["dp_replicate", "dp_shard_sp"]
+            return self.device_mesh["dp_replicate", "dp_shard_cp"]
         else:
-            return self.device_mesh["dp_shard_sp"]
+            return self.device_mesh["dp_shard_cp"]
 
     def get_fsdp_rank(self) -> int:
-        return self.device_mesh.get_local_rank("dp_sp")
+        return self.device_mesh.get_local_rank("dp_cp")
 
     def is_group_enable(self, mesh_name: str) -> bool:
         if mesh_name in self.device_mesh_map:
@@ -187,7 +187,7 @@ def init_parallel_state(
     data_parallel_size: int = 1,
     fully_shard_parallel_size: int = 1,
     tensor_parallel_size: int = 1,
-    context_parallel_size: int = 1,
+    ring_attention_size: int = 1,
     ulysses_parallel_size: int = 1,
     expert_parallel_size: int = 1,
     expert_fully_shard_parallel_size: int = 1,
@@ -199,7 +199,7 @@ def init_parallel_state(
         data_parallel_size=data_parallel_size,
         fully_shard_parallel_size=fully_shard_parallel_size,
         tensor_parallel_size=tensor_parallel_size,
-        context_parallel_size=context_parallel_size,
+        ring_attention_size=ring_attention_size,
         ulysses_parallel_size=ulysses_parallel_size,
         expert_parallel_size=expert_parallel_size,
         expert_fully_shard_parallel_size=expert_fully_shard_parallel_size,

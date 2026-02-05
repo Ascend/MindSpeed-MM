@@ -5,6 +5,7 @@ import os
 import torch
 
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class ParallelArguments():
     )
     tp_plan: TPPlanConfig = field(default_factory=TPPlanConfig)
 
-    context_parallel_size: int = 1 # Size for context parallelism(ring)
+    ring_attention_size: int = 1 # Size for Ring Attention
     ulysses_parallel_size: int = 1 # Size for Ulysses parallelism
 
     expert_parallel_size: int = field(
@@ -104,13 +105,13 @@ class ParallelArguments():
             self.world_size
             % (
                 self.tensor_parallel_size
-                * self.context_parallel_size
+                * self.ring_attention_size
                 * self.ulysses_parallel_size
             )
             != 0
         ):
             raise ValueError(
-                f"World size should be a multiple of tensor_parallel_size: {self.tensor_parallel_size}, ulysses_parallel_size: {self.ulysses_parallel_size}, context_parallel_size: {self.context_parallel_size}."
+                f"World size should be a multiple of tensor_parallel_size: {self.tensor_parallel_size}, ulysses_parallel_size: {self.ulysses_parallel_size}, ring_attention_size: {self.ring_attention_size}."
             )
         if (
             self.world_size
@@ -126,18 +127,18 @@ class ParallelArguments():
 
         dp_size = self.world_size // (
             self.tensor_parallel_size
-            * self.context_parallel_size
+            * self.ring_attention_size
             * self.ulysses_parallel_size
         )
         if self.data_parallel_size is None:
             self.data_parallel_size = dp_size
 
         if self.data_parallel_size != dp_size:
-            raise ValueError(f"data_parallel_size should be equal to tensor_parallel_size: {self.tensor_parallel_size}, ulysses_parallel_size: {self.ulysses_parallel_size}, context_parallel_size: {self.context_parallel_size}.")
+            raise ValueError(f"data_parallel_size should be equal to tensor_parallel_size: {self.tensor_parallel_size}, ulysses_parallel_size: {self.ulysses_parallel_size}, ring_attention_size: {self.ring_attention_size}.")
 
-        if self.fully_shard_parallel_size < self.context_parallel_size * self.ulysses_parallel_size:
-            raise ValueError("fully shard parallel size should be greater the context_parallel_size * ulysses_parallel_size.")
+        if self.fully_shard_parallel_size < self.ring_attention_size * self.ulysses_parallel_size:
+            raise ValueError("fully shard parallel size should be greater the ring_attention_size * ulysses_parallel_size.")
         if self.tensor_parallel_size != 1:
             raise ValueError("Tensor parallel size not supported yet.")
-        if self.context_parallel_size != 1:
-            raise ValueError("Context parallel size not supported yet.")
+        if self.ring_attention_size != 1 and not IS_NPU_AVAILABLE:
+            raise ValueError("Ring Attention only support on NPU.")

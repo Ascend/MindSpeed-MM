@@ -3,7 +3,7 @@ parallel:
   tensor_parallel_size: 1
   fully_shard_parallel_size: auto
   recompute: false
-  context_parallel_size: 1
+  ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
   expert_fully_shard_parallel_size: 1

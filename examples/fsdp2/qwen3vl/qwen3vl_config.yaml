@@ -17,7 +17,7 @@ parallel:
   recompute: true
   recompute_plan:
     - model.language_model.layers.{*}
-  context_parallel_size: 1
+  ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
   ep_plan:
@@ -86,6 +86,7 @@ model:
   model_id: qwen3_vl_moe
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
+  attn_implementation: flash_attention_2
   freeze:
     - model.visual
   loss_cfg:

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from mindspeed.fsdp.memory.chunk_loss.chunk_loss import chunk_loss, calculate_lm_loss, fixed_cross_entropy
 from mindspeed_mm.fsdp.utils.constants import AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.fsdp.distributed.context_parallel.communication import cal_split_sizes, split_forward_gather_backward
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import split_forward_gather_backward_with_cp
 
 
 def build_loss_func(
@@ -49,10 +49,8 @@ def build_loss_func(
         raise NotImplementedError(f"{loss_type} is not implemented!")
 
     ps = get_parallel_state()
-    if ps.is_ulysses_enable():
-        split_sizes = cal_split_sizes(shift_labels.shape[-1], ps.get_ulysses_group_size())
-        shift_labels = split_forward_gather_backward(shift_labels, ps.get_ulysses_group(), dim=1, grad_scale="down",
-                                                     split_sizes=split_sizes)
+    if ps.is_cp_enable():
+        shift_labels = split_forward_gather_backward_with_cp(shift_labels, dim=1)
 
     if chunk_size:
         # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
@@ -61,7 +59,7 @@ def build_loss_func(
         if loss_type == "square_loss":
             alpha = torch.split(alpha.view(bs, -1), chunk_size, dim=1)
 
-            # Prepare keyword arguments for each chunk to be passed to the chunked loss function.
+        # Prepare keyword arguments for each chunk to be passed to the chunked loss function.
         loss_func_kwargs = [
             {
                 "shift_labels": chunk_labels[i],
