@@ -5,6 +5,7 @@ import torch_npu
 import torch.nn as nn
 
 from mindspeed_mm.models.text_encoder.hunyuan_mllm_text_encoder import HunyuanMLLmModel
+from mindspeed_mm.models.text_encoder.hunyuan15_mllm_text_encoder import Hunyuan15MLLmModel
 from mindspeed_mm.models.text_encoder.hunyuan15_glyph_text_encoder import Hunyuan15GlyphModel
 from mindspeed_mm.models.text_encoder.stepllm_text_encoder import StepLLmModel
 from mindspeed_mm.utils.utils import get_dtype
@@ -22,6 +23,7 @@ TRANSFORMERS_TEXT_ENCODER_MAPPING = {
 CUSTOM_TEXT_ENCODER_MAPPING = {
     "StepLLmModel": StepLLmModel,
     "HunyuanMLLmModel": HunyuanMLLmModel,
+    "Hunyuan15MLLmModel": Hunyuan15MLLmModel,
     "Hunyuan15GlyphModel": Hunyuan15GlyphModel,
 }
 

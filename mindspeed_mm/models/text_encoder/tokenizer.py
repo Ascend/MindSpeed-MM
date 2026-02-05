@@ -1,6 +1,7 @@
 import importlib
 
 from mindspeed_mm.models.text_encoder.hunyuan_mllm_tokenizer import HunyuanMllmTokenizer
+from mindspeed_mm.models.text_encoder.hunyuan15_mllm_tokenizer import Hunyuan15MllmTokenizer
 from mindspeed_mm.models.text_encoder.hunyuan15_glyph_tokenizer import Hunyuan15GlyphTokenizer
 from mindspeed_mm.models.text_encoder.stepllm_tokenizer import WrappedStepChatTokenizer
 from mindspeed_mm.models.text_encoder.lumina_mgpt2_tokenizer import LuminaMGPT2Tokenizer
@@ -8,6 +9,7 @@ from mindspeed_mm.models.text_encoder.lumina_mgpt2_tokenizer import LuminaMGPT2T
 TOKENIZER_MODEL_MAPPINGS = {
     "stepchat": WrappedStepChatTokenizer,
     "hunyuanMLLmTokenizer": HunyuanMllmTokenizer,
+    "hunyuan15MLLmTokenizer": Hunyuan15MllmTokenizer,
     "hunyuan15GlyphTokenizer": Hunyuan15GlyphTokenizer,
     "luminaMGPT2Tokenizer": LuminaMGPT2Tokenizer
 }
