@@ -8,7 +8,7 @@ from torch.distributed.device_mesh import DeviceMesh
 
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
-from mindspeed.fsdp.utils.dtype import get_dtype
+from mindspeed_mm.fsdp.utils.dtype import get_dtype
 
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
 

@@ -11,8 +11,8 @@ import yaml
 
 from mindspeed.fsdp.utils.log import print_rank, set_log_level
 from mindspeed.fsdp.utils.random import set_seed
-from mindspeed.fsdp.utils.dtype import get_dtype
 
+from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.params.data_args import DataArguments
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
