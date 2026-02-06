@@ -1,6 +1,7 @@
 import json
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 
 import torch
 import torch.nn.functional as F
@@ -88,9 +89,7 @@ class BaseDataBalance(ABC):
         data_list, rank_table = self._rank_table_mapping(rank_table, dp_rank)
 
         balance_data_mapping_index = [torch.where(rank_table[dp_rank][:, 0] == r)[0] for r in range(num_replicas)]
-        self.state_buffer[data_type] = {
-            'balance_data_mapping_index': torch.cat(balance_data_mapping_index),
-        }
+        self.state_buffer[data_type]['balance_data_mapping_index'] = torch.cat(balance_data_mapping_index)
         balanced_datas = {}
         balanced_data_lengths = torch.empty(
             num_replicas, 2, dtype=rank_table[dp_rank].dtype, device=rank_table[dp_rank].device
@@ -233,6 +232,21 @@ class GBSImageDataBalance(BaseDataBalance):
                 batch['pixel_values'],
                 mpu.get_data_parallel_group())
 
+        if data_type not in self.state_buffer:
+            self.state_buffer[data_type] = {}
+        for data_name, value in batch.items():
+            if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
+                if "non_balanced_data" not in self.state_buffer[data_type]:
+                    self.state_buffer[data_type]["non_balanced_data"] = {}
+                    warnings.warn(
+                        f"find un-iterable data: {data_name}, type:{type(value)}. To ensure "
+                        f"correct decomposition into mbs individual samples, it has been moved to non_balanced_data. "
+                        f"Please verify the actual purpose of this data and apply appropriate adjustments."
+                    )
+                self.state_buffer[data_type]["non_balanced_data"][data_name] = value
+        for data_name in self.state_buffer[data_type]["non_balanced_data"]:
+            batch.pop(data_name)
+
         split_batch, split_lengths = self._split_batch_data(batch)
         balanced_datas = self._data_balance(
             data_lengths=split_lengths,
@@ -248,7 +262,7 @@ class GBSImageDataBalance(BaseDataBalance):
             num_microbatches,
             data_type
         )
-        micro_batchs = self.collate_fn(balanced_global_batchs)
+        micro_batchs = self.collate_fn(balanced_global_batchs, data_type)
         if self.virtual_pipeline_model_parallel_size:
             batch_generator = [PrefetchMicroBatchIterator(micro_batchs) for _ in range(self.len_model)]
         else:
@@ -327,8 +341,11 @@ class GBSImageDataBalance(BaseDataBalance):
         merge_datas[self.state_buffer[data_type]['balance_data_mapping_index']] = datas
         return merge_datas
 
-    def collate_fn(self, balanced_global_batchs):
+    def collate_fn(self, balanced_global_batchs, data_type):
         micro_batchs = [dict(zip(balanced_global_batchs.keys(), row)) for row in zip(*balanced_global_batchs.values())]
+        for batch in micro_batchs:
+            if "non_balanced_data" in self.state_buffer[data_type]:
+                batch.update(self.state_buffer[data_type]["non_balanced_data"])
         return micro_batchs
 
     def _all_gather_data_lengths(self, data_lengths, num_replicas, dp_process_group):
@@ -384,6 +401,8 @@ class MBSImageDataBalance(BaseDataBalance):
         return rank_table_for_current_rank, rank_table
 
     def get_image_balance_data(self, image_batch, data_type='image'):
+        if data_type not in self.state_buffer:
+            self.state_buffer[data_type] = {}
         split_batch, split_lengths = self._split_batch_data(image_batch)
         balanced_datas = self._data_balance(
             data_lengths=torch.stack(split_lengths, dim=-1),
