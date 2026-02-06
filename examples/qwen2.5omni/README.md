@@ -428,13 +428,13 @@ mm-convert  Qwen2_5_OmniConverter hf_to_mm \
 
 <a id="jump5.2"></a>
 #### 2. 配置参数
-参考**微调**章节进行数据目录配置和模型保存加载等配置，需要注意的是在配置`examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh`时要增加`--hetero-parallel`开启异构并行训练；
+参考**微调**章节进行数据目录配置和模型保存加载等配置，同时在配置`examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh`时需增加`--hetero-parallel`开启异构并行训练；
 
-注意llm的并行配置在finetune_qwen2_5_omni_7b.sh文件中定义，vit和audio的并行配置在model_7b.json文件中定义，vit和audio以及llm三者的gbs是一致的，需要关注llm的MBS配置；
-例如vit和audio模块不切分，而llm采用tp4切分时，llm的MBS必须是自身TP的整数倍，以确保vit和audio的DP域能够均匀分配到整数的MBS值；
+llm，vit和audio的并行配置都在model_7b.json文件中定义，并且examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh中的并行配置需要全部设置为1；vit和audio以及llm三者的gbs是一致的，需要关注llm的MBS配置；
+为确保vit间和audio间具有等量数据进行计算，llm的DP * MBS的数值需要被vit的DP和audio的DP整除：例如vit和audio模块采用全DP，而llm采用tp4切分时，llm的MBS需要设为4的倍数来满足该条件；
 
 ```shell
-TP=4
+TP=1
 PP=1
 CP=1
 MBS=4
@@ -445,10 +445,6 @@ GPT_ARGS="
     ...
 "
 ```
-
-【模型异构并行配置】
-
-如需修改vit或audio的并行配置，需在model_7b.json中的image_encoder和audio_encoder部分修改对应的并行参数
 
 ```json
 {
@@ -462,6 +458,11 @@ GPT_ARGS="
     "audio_encoder": {
         "audio_encoder": {},
         "tp":1,
+        "pp":1,
+        "cp":1
+    },
+    "text_decoder": {
+        "tp":4,
         "pp":1,
         "cp":1
     }

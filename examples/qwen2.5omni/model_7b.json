@@ -120,11 +120,11 @@
         "gated_linear_unit": true,
         "layernorm_epsilon": 1e-06,
         "add_bias_linear":false,
-        "add_qkv_bias": true
+        "add_qkv_bias": true,
+        "tp":1,
+        "pp":1,
+        "cp":1
     },
-    "tp":1,
-    "pp":1,
-    "cp":1,
     "text_encoder": null,
     "video_encoder": null
 }
