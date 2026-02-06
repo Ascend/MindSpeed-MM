@@ -26,10 +26,7 @@ def expert_parallelize_modules(modules: torch.nn.Module, ep_mesh: DeviceMesh, pl
     ep_size = torch.distributed.get_world_size(ep_group)
 
     for module in ep_modules:
-        for name, param in module.named_parameters(recurse=False):
-            dtensor = distribute_tensor(param, ep_mesh, [Shard(0)])
-            local_chunk = torch.nn.Parameter(dtensor.to_local(), requires_grad=param.requires_grad)
-            module.register_parameter(name, local_chunk)
+        distribute_experts_module(module, ep_mesh)
 
         # replace forward with ep forward
         experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group)
@@ -116,13 +113,15 @@ def get_experts_forward_fn_for_qwen(ep_group, fused=True):
     def experts_forward(self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor):
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)
+        gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
+        down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
         hidden_states = fused_ep_forward(
             self.num_experts,
             routing_weights,
             router_indices,
             hidden_states,
-            fc1_weight=self.gate_up_proj,
-            fc2_weight=self.down_proj,
+            fc1_weight=gate_up_proj,
+            fc2_weight=down_proj,
             ep_group=ep_group
         )
         hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)

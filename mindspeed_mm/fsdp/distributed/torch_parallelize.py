@@ -3,8 +3,8 @@ import torch
 from mindspeed.fsdp.distributed.tensor_parallel.tensor_parallel import tensor_parallel_modules
 from mindspeed.fsdp.memory.recompute.recompute import recompute_modules
 
-from .expert_parallel import expert_parallelize_modules
-from .expert_fully_shard_parallel import expert_fully_shard_modules
+from .expert_parallel.expert_parallel import expert_parallelize_modules
+from .expert_parallel.expert_fully_shard_parallel import expert_fully_shard_modules
 from .fully_shard_parallel import fully_shard_parallel_modules
 from .parallel_state import get_parallel_state
 from ..params.parallel_args import ParallelArguments

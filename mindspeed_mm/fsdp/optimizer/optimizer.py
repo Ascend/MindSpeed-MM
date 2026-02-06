@@ -104,6 +104,9 @@ class MultiOptimizer(Optimizer, Stateful):
     def __len__(self) -> int:
         return len(self.optimizers_dict)
 
+    def __repr__(self) -> str:
+        return self.optimizers_dict.__repr__()
+
 
 def _make_param_groups_for_subset(
     model: "nn.Module",
