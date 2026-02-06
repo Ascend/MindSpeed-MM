@@ -18,24 +18,18 @@ from typing import Any, List, Tuple, Optional, Union, Dict
 import torch
 import torch.nn as nn
 from einops import rearrange
-from loguru import logger
 
 from mindspeed_mm.models.common.module import MultiModalModule
-from mindspeed_mm.models.text_encoder.byt5 import ByT5Mapper
-from mindspeed_mm.models.hyvideo.commons import maybe_fallback_attn_mode
-from mindspeed_mm.models.hyvideo.models.transformers.modules.activation_layers import get_activation_layer
-from mindspeed_mm.models.hyvideo.models.transformers.modules.norm_layers import get_norm_layer
-from mindspeed_mm.models.hyvideo.models.transformers.modules.embed_layers import TimestepEmbedder, PatchEmbed, \
-    TextProjection, VisionProjection
-from mindspeed_mm.models.hyvideo.models.transformers.modules.attention import parallel_attention
-from mindspeed_mm.models.hyvideo.models.transformers.modules.posemb_layers import apply_rotary_emb, \
-    get_nd_rotary_pos_embed
-from mindspeed_mm.models.hyvideo.models.transformers.modules.mlp_layers import MLP, MLPEmbedder, FinalLayer, \
-    LinearWarpforSingle
-from mindspeed_mm.models.hyvideo.models.transformers.modules.modulate_layers import ModulateDiT, modulate, apply_gate
-from mindspeed_mm.models.hyvideo.models.transformers.modules.token_refiner import SingleTokenRefiner
-from mindspeed_mm.models.hyvideo.utils.communications import all_gather
-from mindspeed_mm.models.hyvideo.commons.parallel_states import get_parallel_state
+from mindspeed_mm.models.text_encoder.hunyuan15_byt5 import ByT5Mapper
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import maybe_fallback_attn_mode
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.embed_layers import TimestepEmbedder, PatchEmbed, \
+    TextProjection, VisionProjection, MLP, LinearWarpforSingle, MLPEmbedder, FinalLayer, ModulateDiT, modulate, \
+    apply_gate, apply_rotary_emb, get_nd_rotary_pos_embed
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.attention import parallel_attention, get_activation_layer, \
+    get_norm_layer
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.token_refiner import SingleTokenRefiner
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.communications import all_gather
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import get_parallel_state
 
 
 class HunyuanVideo15DiT(MultiModalModule):
@@ -77,12 +71,12 @@ class HunyuanVideo15DiT(MultiModalModule):
             byt5_in_out_dim: int = 2048,
             byt5_in_hidden_dim: int = 2048,
             attn_param: dict = None,
+            task_type: str = "t2v",
             **kwargs
     ):
         super().__init__(config=None)
         self.model_id = model_id
         self.from_pretrained = from_pretrained
-        self.dtype = dtype
         self.kwargs_dict = kwargs
         factory_kwargs = {}
 
@@ -127,6 +121,7 @@ class HunyuanVideo15DiT(MultiModalModule):
             )
         self.hidden_size = hidden_size
         self.heads_num = heads_num
+        self.task_type = task_type
 
         self.img_in = PatchEmbed(
             self.patch_size, self.in_channels, self.hidden_size,
@@ -239,7 +234,7 @@ class HunyuanVideo15DiT(MultiModalModule):
 
             if not self.glyph_byT5_v2:
                 raise AssertionError("text type embedding is only used when glyph_byT5_v2 is True")
-            if vision_projection is not None:
+            if vision_projection is None:
                 raise AssertionError("text type embedding is only used when vision_projection is not None")
             # 0: text_encoder feature
             # 1: byt5 feature
@@ -272,9 +267,9 @@ class HunyuanVideo15DiT(MultiModalModule):
 
         result = self.load_state_dict(state_dict, strict=False)
         if result.missing_keys:
-            logger.info("[load.py] Missing keys when loading state_dict:")
+            print("[load.py] Missing keys when loading state_dict:")
         if result.unexpected_keys:
-            logger.info("[load.py] Unexpected keys when loading state_dict:")
+            print("[load.py] Unexpected keys when loading state_dict:")
         if result.missing_keys or result.unexpected_keys:
             pass
 
@@ -362,33 +357,33 @@ class HunyuanVideo15DiT(MultiModalModule):
 
     def forward(
             self,
-            hidden_states: torch.Tensor,
+            noised_latents: torch.Tensor,
             timestep: torch.LongTensor,
-            text_states: torch.Tensor,
-            text_states_2: torch.Tensor,
-            encoder_attention_mask: torch.Tensor,
+            prompt: List[torch.Tensor],
+            prompt_mask: List[torch.Tensor],
             timestep_r=None,
-            vision_states: torch.Tensor = None,
             output_features=False,
             output_features_stride=8,
-            attention_kwargs: Optional[Dict[str, Any]] = None,
             freqs_cos: Optional[torch.Tensor] = None,
             freqs_sin: Optional[torch.Tensor] = None,
-            return_dict: bool = False,
             guidance=None,
-            mask_type="t2v",
-            extra_kwargs=None,
+            **kwargs
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        b, c, f, h, w = noised_latents.shape
+        cond_latents = torch.zeros([b, c + 1, f, h, w], device=noised_latents.device, dtype=noised_latents.dtype)
+
+        hidden_states = torch.cat([noised_latents, cond_latents], dim=1)
+        vision_states = kwargs.get("vision_states", None)
 
         if guidance is None:
             guidance = torch.tensor(
                 [6016.0], device=hidden_states.device, dtype=torch.bfloat16
             )
 
-        img = x = hidden_states
-        text_mask = encoder_attention_mask
+        img = x = hidden_states.to(self.dtype)
+        text_mask = prompt_mask[0]
         t = timestep
-        txt = text_states
+        txt = prompt[0]
         bs, _, ot, oh, ow = x.shape
         tt, th, tw = (
             ot // self.patch_size[0],
@@ -416,10 +411,6 @@ class HunyuanVideo15DiT(MultiModalModule):
         # Prepare modulation vectors
         vec = self.time_in(t)
 
-        if text_states_2 is not None:
-            vec_2 = self.vector_in(text_states_2)
-            vec = vec + vec_2
-
         if self.guidance_embed:
             if guidance is None:
                 raise ValueError(
@@ -445,9 +436,9 @@ class HunyuanVideo15DiT(MultiModalModule):
             )
             txt = txt + cond_emb
 
-        if self.glyph_byT5_v2:
-            byt5_text_states = extra_kwargs["byt5_text_states"]
-            byt5_text_mask = extra_kwargs["byt5_text_mask"]
+        if self.glyph_byT5_v2 and len(prompt) == 2 and len(prompt_mask) == 2:
+            byt5_text_states = prompt[1]
+            byt5_text_mask = prompt_mask[1]
             byt5_txt = self.byt5_in(byt5_text_states)
             if self.cond_type_embedding is not None:
                 cond_emb = self.cond_type_embedding(
@@ -461,7 +452,7 @@ class HunyuanVideo15DiT(MultiModalModule):
         if self.vision_in is not None and vision_states is not None:
             extra_encoder_hidden_states = self.vision_in(vision_states)
             # If t2v, set extra_attention_mask to 0 to avoid attention to semantic tokens
-            if mask_type == "t2v" and torch.all(vision_states == 0):
+            if self.task_type == "t2v" and torch.all(vision_states == 0):
                 extra_attention_mask = torch.zeros(
                     (bs, extra_encoder_hidden_states.shape[1]),
                     dtype=text_mask.dtype,
@@ -551,8 +542,6 @@ class HunyuanVideo15DiT(MultiModalModule):
         if sp_enabled:
             img = all_gather(img, dim=1, group=parallel_dims.sp_group)
         img = self.unpatchify(img, tt, th, tw)
-        if return_dict:
-            raise AssertionError("return_dict is not supported.")
         if output_features:
             features_list = torch.stack(features_list, dim=0)
             if sp_enabled:
@@ -560,6 +549,16 @@ class HunyuanVideo15DiT(MultiModalModule):
         else:
             features_list = None
         return (img, features_list)
+
+    @property
+    def dtype(self) -> torch.dtype:
+        """The dtype of the module (assuming that all the module parameters have the same dtype)."""
+        params = tuple(self.parameters())
+        if len(params) > 0:
+            return params[0].dtype
+        else:
+            buffers = tuple(self.buffers())
+            return buffers[0].dtype
 
     def unpatchify(self, x, t, h, w):
         """
@@ -668,10 +667,10 @@ class HunyuanVideo15DiT(MultiModalModule):
             try:
                 save_function(lora_layers_to_save, save_path)
             except OSError as e:
-                logger.info(f"Failed to save model: {e}")
+                print(f"Failed to save model: {e}")
             except Exception as e:
-                logger.info(f"Unexpected error: {e}")
-        logger.info(f"Model weights saved in {save_path}")
+                print(f"Unexpected error: {e}")
+        print(f"Model weights saved in {save_path}")
 
 
 class MMDoubleStreamBlock(nn.Module):
@@ -696,7 +695,7 @@ class MMDoubleStreamBlock(nn.Module):
         self.heads_num = heads_num
         self.attn_mode = attn_mode
 
-        if hidden_size % heads_num == 0:
+        if hidden_size % heads_num != 0:
             raise AssertionError(f"hidden_size({hidden_size}) must be divisible by heads_num({heads_num})")
         head_dim = hidden_size // heads_num
         mlp_hidden_dim = int(hidden_size * mlp_width_ratio)
