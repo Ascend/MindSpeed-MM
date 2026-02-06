@@ -79,4 +79,3 @@ for file_name in "${!TEST_CASE_TIMES[@]}"; do
     echo "* Execution Time for $file_name: ${TEST_CASE_TIMES[$file_name]} *"
 done
 echo "$(printf '*%.0s' {1..40})"
-

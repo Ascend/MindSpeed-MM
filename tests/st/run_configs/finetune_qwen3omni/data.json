@@ -2,7 +2,7 @@
     "dataset_param": {
         "dataset_type": "huggingface",
         "preprocess_parameters": {
-            "model_name_or_path": "./ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct",
+            "model_name_or_path": "/home/ci_resource/models/Qwen3-Omni-30B-A3B-Instruct",
             "use_fast_tokenizer": true,
             "split_special_tokens": false,
             "use_audio_in_video": false,
@@ -17,14 +17,14 @@
         "basic_parameters": {
             "template": "qwen3_omni",
             "dataset_dir": "./data",
-            "dataset": "./data/mllm_format_llava_instruct_data.json",
+            "dataset": "/home/ci_resource/data/qwen2.5vl/mllm_format_llava_instruct_data.json",
             "cache_dir": "./data/cache_dir",
             "overwrite_cache": true,
             "train_on_prompt": false,
             "mask_history": false,
             "preprocessing_batch_size": 1000,
             "preprocessing_num_workers": 1,
-            "max_samples": 10000,
+            "max_samples": 50,
             "tool_format": null
         },
         "attr": {
@@ -51,6 +51,6 @@
             "ignore_pad_token_for_loss": true
         },
         "pin_memory": true,
-        "shuffle": true
+        "shuffle": false
     }
 }

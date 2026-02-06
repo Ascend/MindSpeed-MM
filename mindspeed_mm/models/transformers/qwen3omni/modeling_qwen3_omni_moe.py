@@ -163,7 +163,7 @@ class Qwen3OmniMoeThinkerTextModel(Qwen3OmniMoePreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @check_model_inputs()
+    @check_model_inputs
     @auto_docstring
     def forward(
         self,
@@ -325,6 +325,7 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(transformers.Qwen3OmniMoeThink
         
         return super()._from_config(config, **kwargs)
     
+    @check_model_inputs
     @can_return_tuple
     @auto_docstring  
     def forward(
