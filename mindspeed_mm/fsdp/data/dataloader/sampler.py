@@ -1,10 +1,11 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
+from torchdata.stateful_dataloader.sampler import StatefulDistributedSampler
 
 
-class BaseRandomBatchSampler(DistributedSampler):
+class BaseRandomBatchSampler(StatefulDistributedSampler):
     """
     Args:
         dataset: Dataset used for sampling.
@@ -33,13 +34,13 @@ class BaseRandomBatchSampler(DistributedSampler):
         shuffle: bool = True,
         seed: int = 0,
         drop_last: bool = True,
-        consumed_samples: int = 0,
         data_sharding: bool = False,
     ):
         super().__init__(dataset, num_replicas, rank, shuffle, seed, drop_last)
         self.total_samples = len(dataset)
         self.micro_batch_size = batch_size
-        self.consumed_samples = consumed_samples
+        self.consumed_samples = 0
+        self.next_consumed_samples = None
         self.data_sharding = data_sharding
         self.epoch = 0
         self.micro_batch_times_data_parallel_size = \
@@ -53,6 +54,11 @@ class BaseRandomBatchSampler(DistributedSampler):
         return self.total_samples
 
     def __iter__(self):
+        # resume sampler
+        if self.next_consumed_samples is not None:
+            self.consumed_samples = self.next_consumed_samples
+            self.next_consumed_samples = None
+
         active_total_samples = self.total_samples - self.last_batch_size
         self.epoch = self.consumed_samples // active_total_samples
         current_epoch_samples = self.consumed_samples % active_total_samples
@@ -92,3 +98,13 @@ class BaseRandomBatchSampler(DistributedSampler):
                 self.consumed_samples += self.micro_batch_times_data_parallel_size
                 yield batch
                 batch = []
+
+    def state_dict(self) -> Dict[str, Any]:
+        return {self._YIELDED: self.consumed_samples}
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        if self._YIELDED not in state_dict:
+            raise ValueError("Invalid state_dict")
+        if state_dict[self._YIELDED] < 0:
+            raise ValueError("Cannot load state_dict with negative yielded value")
+        self.next_consumed_samples = state_dict[self._YIELDED]

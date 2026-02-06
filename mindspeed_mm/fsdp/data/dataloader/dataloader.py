@@ -18,11 +18,14 @@ from typing import Optional
 import torch
 from torch.distributed import ProcessGroup
 from torch.utils.data import DataLoader
+from torchdata.stateful_dataloader import StatefulDataLoader
 
 from mindspeed_mm.fsdp.data.data_utils.utils import get_seed_worker
 from mindspeed_mm.fsdp.data.dataloader.sampler import BaseRandomBatchSampler
 from mindspeed_mm.fsdp.data.dataloader.data_collator import DATA_COLLATOR
 from mindspeed_mm.fsdp.utils.constants import GLOBAL_STEP_TOKEN_NUM, AVG_PER_STEP_TOKEN_NUM
+from mindspeed_mm.fsdp.utils.device import get_device_type
+from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 
 
 def prepare_sampler_dataloader(
@@ -36,16 +39,10 @@ def prepare_sampler_dataloader(
     prefetch_factor=None,
     persistent_workers=None,
     process_group: Optional[ProcessGroup] = None,
-    consumed_samples=0,
     data_sharding=False,
     sampler_type="stateful_distributed_sampler",
-    group_frame=False,
-    group_resolution=False,
-    group_data=False,
-    initial_global_step_for_sampler=0,
     collate_param=None,
     dataset_param=None,
-    priority_mode="data_bucketing_img",
 ):
     """
     Prepare a dataloader for distributed training. The dataloader will be wrapped by
@@ -80,7 +77,6 @@ def prepare_sampler_dataloader(
             rank=process_group.rank(),
             shuffle=shuffle,
             drop_last=drop_last,
-            consumed_samples=consumed_samples,
             data_sharding=data_sharding,
         )
         if collate_param is None:
@@ -95,9 +91,10 @@ def prepare_sampler_dataloader(
             else:
                 collate_fn = DATA_COLLATOR[data_collate_type](**collate_param, dataset_param=dataset_param)
 
-        return DataLoader(
+        return StatefulDataLoader(
             dataset,
             pin_memory=pin_memory,
+            pin_memory_device=get_device_type(),
             collate_fn=collate_fn,
             worker_init_fn=get_seed_worker(seed),
             num_workers=num_workers,
@@ -118,7 +115,7 @@ class PrefetchGradAccDataLoader:
     This is Used for calculate per-token-loss
     """
 
-    def __init__(self, base_dataloader, grad_acc_step: int):
+    def __init__(self, base_dataloader: StatefulDataLoader, grad_acc_step: int):
         """
         Args:
             base_dataloader: The underlying PyTorch DataLoader to wrap.
@@ -147,7 +144,7 @@ class PrefetchGradAccDataLoader:
 
     def _generate_batches(self):
         """Generator that yields batches with injected token counts."""
-        base_iter = iter(self.base_dataloader)
+        base_iter, _, _ = build_iterations(self.base_dataloader)
         try:
             while True:
                 buffer = []
@@ -175,3 +172,9 @@ class PrefetchGradAccDataLoader:
         finally:
             if hasattr(base_iter, 'close'):
                 base_iter.close()
+    
+    def state_dict(self):
+        return self.base_dataloader.state_dict()
+    
+    def load_state_dict(self, **kwargs):
+        self.base_dataloader.load_state_dict(**kwargs)

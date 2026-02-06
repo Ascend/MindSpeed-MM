@@ -70,11 +70,10 @@ class BaseTrainer:
         self.model = self.get_model()
         self.optimizer = self.get_optimizer()
         self.lr_scheduler = self.get_scheduler()
+        self.train_dataloader = self.build_dataloader()
         # Load checkpoint if specified
         if self.training_args.load:
             self.iteration, self.consumed_train_samples = self.load()
-
-        self.train_dataloder = self.build_dataloader()
 
         self.profiler = None
         if self.training_args.profile.profile_this_rank:
@@ -188,11 +187,9 @@ class BaseTrainer:
             build_mm_dataloader,
             dataloader_param=dataloader_param,
             process_group=ps.get_dp_group(),
-            dataset_param=data_config.dataset_param,
-            consumed_samples=self.consumed_train_samples
+            dataset_param=data_config.dataset_param
         )
-        dataloader = build_dataloader(datasets)
-        train_dataloader, _, _ = build_iterations(dataloader)
+        train_dataloader = build_dataloader(datasets)
 
         if self.model_args.loss_cfg.loss_type == "per_token_loss":
             train_dataloader = PrefetchGradAccDataLoader(train_dataloader,
@@ -268,13 +265,13 @@ class BaseTrainer:
         )
         return batch_data
 
-    def train_step(self):
+    def train_step(self, train_dataloader_iter):
         """Perform a single training step with gradient accumulation."""
         total_loss = 0
         # Gradient accumulation
         for _ in range(self.training_args.gradient_accumulation_steps):
             # Get current batch data
-            batch_data = self.get_batch(self.train_dataloder)
+            batch_data = self.get_batch(train_dataloader_iter)
 
             # Move input to device and cast precision
             batch_data = move_to_device(batch_data, get_dtype(self.parallel_args.fsdp_plan.param_dtype) if self.parallel_args.fsdp_plan.param_dtype else None)
@@ -298,6 +295,7 @@ class BaseTrainer:
 
     def train(self):
         """Main training loop."""
+        train_dataloader_iter, _, _ = build_iterations(self.train_dataloader)
         self.model.train()
 
         # --- Train Loop ---
@@ -308,7 +306,7 @@ class BaseTrainer:
                 self.profiler.memory_record()
             start_time = get_time(barrier=True)
 
-            loss = self.train_step()
+            loss = self.train_step(train_dataloader_iter)
 
             # Clip gradients when clip_grad>0 and get total grad_norm
             grad_norm = clip_grad_norm(self.model, max_norm=self.training_args.clip_grad, foreach=self.training_args.clip_grad_foreach)
@@ -386,6 +384,7 @@ class BaseTrainer:
             consumed_train_samples = state["extra_state"]["consumed_train_samples"]
 
             self.lr_scheduler.load_state_dict(state["extra_state"]["lr_scheduler"])
+            self.train_dataloader.load_state_dict(state["extra_state"]["train_dataloader"])
             torch.set_rng_state(state["extra_state"]["torch_rng_state"])
 
         # Synchronize all processes after loading
@@ -404,6 +403,7 @@ class BaseTrainer:
                 "consumed_train_samples": consumed_train_samples,
                 "lr_scheduler": self.lr_scheduler.state_dict(),
                 "torch_rng_state": torch.get_rng_state(),
+                "train_dataloader": self.train_dataloader.state_dict()
             },
         }
         self.checkpointer.save(self.training_args.save, state=state, iteration=iteration)

@@ -19,6 +19,7 @@ dependencies = [
     "pandas==2.0.3",
     "torch==2.7.1",
     "torchvision",
+    "torchdata",
     "diffusers==0.30.3",
     "transformers==4.57.0",
     "accelerate==0.32.1",

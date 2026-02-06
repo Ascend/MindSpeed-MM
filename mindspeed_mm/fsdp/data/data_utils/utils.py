@@ -7,12 +7,17 @@ import torch
 
 def build_iterations(train_dl=None, val_dl=None, test_dl=None, iterator_type="cyclic"):
 
+    def _cyclic_iter(dl):
+        while True:
+            for x in dl:
+                yield x
+    
     def _get_iterator(dataloader, iter_type=iterator_type):
         """Return dataset iterator."""
         if iter_type == "single":
             return iter(dataloader)
         elif iter_type == "cyclic":
-            return itertools.cycle(dataloader)
+            return iter(_cyclic_iter(dataloader))
         else:
             raise NotImplementedError("unexpected iterator type")
 
