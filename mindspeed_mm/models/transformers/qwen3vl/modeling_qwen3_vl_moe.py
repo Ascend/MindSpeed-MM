@@ -407,9 +407,7 @@ def load_balancing_loss_func(
             op=torch.distributed.ReduceOp.SUM,
             group=mpu.get_context_parallel_group()
         )
-        router_prob_per_expert = torch.sum(routing_weights * router_per_expert_attention_mask, dim=0) / torch.sum(
-            router_per_expert_attention_mask, dim=0
-        )
+        router_prob_per_expert = torch.sum(routing_weights * router_per_expert_attention_mask, dim=0) / sum_router_per_expert_attention_mask
 
     overall_loss = torch.sum(tokens_per_expert * router_prob_per_expert.unsqueeze(0))
     return overall_loss * num_experts

@@ -232,6 +232,7 @@ class TransformersModel(MultiModalModule):
             shift_weight_sum = shift_weights.sum()
             torch.distributed.all_reduce(shift_weight_sum, op=torch.distributed.ReduceOp.AVG)
             alpha = shift_weight_sum / shift_weights
+            reduction = "none"
         elif self.loss_type == "default":
             # Default: normalize loss by total number of valid tokens in the batch.
             alpha = loss_mask.sum() # scalar
