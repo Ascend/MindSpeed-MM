@@ -74,12 +74,18 @@ def create_default_local_load_plan_with_moe(
                     moe_req = _create_read_items(fqn, md, obj)
             else:
                 moe_req = _create_read_items(fqn, md, obj)
-            requests += [get_chunk_readitem(req, ep_rank) for req in moe_req]
+            
+            if obj.device_mesh.mesh_dim_names:
+                ep_fsdp_sharding_size = torch.distributed.get_world_size(obj.device_mesh["EP_Replicate"].get_group())
+            else:
+                ep_fsdp_sharding_size = 1
+            
+            requests += [get_chunk_readitem(req, ep_rank, ep_fsdp_sharding_size) for req in moe_req]
 
     return LoadPlan(requests)
 
 
-def get_chunk_readitem(readitem, ep_rank, operate_dim=0):
+def get_chunk_readitem(readitem, ep_rank, ep_fsdp_sharding_size=1, operate_dim=0):
     """Get the chunk read item for expert parallelism.
 
     Args:
@@ -92,12 +98,26 @@ def get_chunk_readitem(readitem, ep_rank, operate_dim=0):
     """
     storage_offsets = readitem.storage_offsets
     lengths = readitem.lengths
+    experts_ndim = len(storage_offsets)
+    
     if len(storage_offsets) != len(lengths):
         raise ValueError("storage_offsets and lengths must have the same size.")
     offset_list = []
     for i, (a, b) in enumerate(zip(storage_offsets, lengths)):
         if i == operate_dim:
-            offset_list.append(a + b * ep_rank)
+            if experts_ndim == 3:
+                # experts shape: [num_experts, in_dim, out_dim]
+                # EP (Expert Parallel) shards along dim 0; FSDP shards along dim 1.
+                offset_list.append(a + b * ep_rank)
+            elif experts_ndim == 2:
+                # experts shape: [num_experts * in_dim, out_dim]
+                # Both EP and FSDP shard along dim 0, so the effective shard size is scaled by ep_fsdp_sharding_size.
+                offset_list.append(a + b * ep_rank * ep_fsdp_sharding_size)
+            else:
+                raise NotImplementedError(
+                    f"Expert parallelism is not implemented for expert weight tensors with ndim != 2 or 3. "
+                    f"Received ndim: {experts_ndim}"
+                )
         else:
             offset_list.append(a)
     new_storage_offsets = torch.Size(offset_list)
