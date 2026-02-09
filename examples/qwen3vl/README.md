@@ -220,6 +220,16 @@ data:
 
 注意：FusedMoE特性依赖较新版本，新版本的下载链接和安装方式参考[【环境准备】](#jump1.1)章节。
 
+【MoE 专家并行配置】
+
+开启MOE专家并行可以有效降低内存峰值，当前开启专家并行时，需先设置MOE融合加速，即将`qwen3vl_full_sft_xxB.yaml`文件中修改`use_npu_fused_moe`字段为`true`。
+专家并行开启方式在`fsdp2_config.yaml`文件中设置expert_parallel_size > 1，例如:
+```yaml
+expert_parallel_size: 16
+```
+
+注意：专家并行数需能够被模型专家数整除。
+
 【序列并行配置】
 
 当前已支持Ulysses序列并行，当使用长序列训练时，需要开启CP特性，开启方式为在`qwen3vl_full_sft_xxB.yaml`中设置context_parallel_size > 1，例如
@@ -273,7 +283,7 @@ gpt_args:
   no_load_rng: true  # 不加载随机数状态，若需加载请移除
   no_save_optim: true  # 不保存优化器状态，若需保存请移除
   no_save_rng: true  # 不保存随机数状态，若需保存请移除
-  
+
   ## save_and_logging:
   log_interval: 1  # 日志间隔
   save_interval: 10000   # 保存间隔
@@ -302,7 +312,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 <a id="jump4.3"></a>
 #### 3. 启动微调
 
-以Qwen3VL-xxB为例，启动微调训练任务。  
+以Qwen3VL-xxB为例，启动微调训练任务。
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 通过修改`qwen3vl_full_sft_xxB.yaml`文件中的`loss_type`字段可以在不同的loss计算方式中切换。
 

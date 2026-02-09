@@ -573,8 +573,6 @@ class FSDP2Mixin:
             tuple: (fsdp2_kwargs, fsdp2_config) - Configuration parameters for FSDP2
         """
         self.fsdp2_config, self.fsdp2_kwargs = initialize_fsdp2_config(fsdp2_config_path, self, process_group)
-        if self.fsdp2_config.expert_parallel_size > 1:
-            raise NotImplementedError("Expert Parallel is not supported in fsdp2 now.")
         self.ep_device_mesh, self.unit_device_mesh = create_ep_device_mesh(self.fsdp2_config.expert_parallel_size, self.fsdp2_config.reshard_local_experts)
 
     def to_empty_if_needed(self, *, device: torch.device | str | int | None, recurse: bool = True):
@@ -710,11 +708,15 @@ class FSDP2Mixin:
         # bugfix for HCCL premul sum issue, will be fixed in future torch release
         from mindspeed_mm.patchs.premul_sum_patch import apply_hccl_premul_sum_patch
         apply_hccl_premul_sum_patch()
+        if self.fsdp2_config.reshard_local_experts:
+            scale_factor = torch.distributed.get_world_size()
+        else:
+            scale_factor = ep_size
         for sub_module in moe_modules:
             if hasattr(sub_module, "set_gradient_divide_factor"): # torch>=2.8
-                sub_module.set_gradient_divide_factor(ep_size)
+                sub_module.set_gradient_divide_factor(scale_factor)
             else: # torch==2.7.1
-                sub_module.set_reduce_scatter_divide_factor(ep_size)
+                sub_module.set_reduce_scatter_divide_factor(scale_factor)
 
     def _ep_fully_shard(self, ep_fsdp2_kwargs, moe_modules):
         """
