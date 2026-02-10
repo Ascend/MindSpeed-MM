@@ -146,7 +146,6 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             else:  # for qwen2vl
                 features["position_ids"], features["rope_deltas"] = self.model.get_rope_index(**rope_index_kwargs)
         features.update(mm_inputs)
-        features["use_audio_in_video"] = getattr(self.processor, "use_audio_in_video", False)
         return features
 
 

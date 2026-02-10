@@ -47,7 +47,7 @@
         "drop_last": true,
         "sampler_type": "BaseRandomBatchSampler",
         "collate_param": {
-            "model_name": "qwen2vl",
+            "model_name": "qwen3omni",
             "ignore_pad_token_for_loss": true
         },
         "pin_memory": true,
