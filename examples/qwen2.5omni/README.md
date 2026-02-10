@@ -15,10 +15,9 @@
   - [权重下载](#jump2.1)
   - [权重转换hf2mm](#jump2.2)
   - [权重转换mm2hf](#jump2.3)
-- [数据集准备及处理](#jump3)
-  - [数据集下载](#jump3.1)
-  - [混合数据集处理](#jump3.2)  
-  - [视频音频数据集](#jump3.3)  
+- [数据集准备及处理](#jump3)  
+  - [视频音频数据集](#jump3.1)
+  - [混合数据集处理](#jump3.2)
 - [微调](#jump4)
   - [准备工作](#jump4.1)
   - [配置参数](#jump4.2)
@@ -164,8 +163,19 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-Omni-7B"
 <a id="jump3"></a>
 ## 数据集准备及处理
 
+
 <a id="jump3.1"></a>
-#### 1. 数据集下载（以COCO2017数据集为例）
+#### 1.视频音频数据集
+
+数据集中的视频数据集取自llamafactory，https://github.com/hiyouga/LLaMA-Factory/tree/main/data
+
+视频取自mllm_video_demo，使用时需要将该数据放到自己的data文件夹中去，同时将llamafactory上的mllm_video_audio_demo.json也放到自己的data文件夹中
+
+
+<a id="jump3.2"></a>
+#### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
+
+##### 1) 图文数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
 
@@ -190,9 +200,6 @@ dataset_param->basic_parameters->dataset
 从"./data/mllm_format_llava_instruct_data.json"修改为"./data/mllm_format_llava_instruct_data.json,./data/mllm_format_llava_instruct_data2.json"
 
 同时注意`data.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
-
-<a id="jump3.2"></a>
-#### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
 
@@ -220,17 +227,8 @@ dataset_param->basic_parameters->dataset
   ],
 }
 ```
-
-<a id="jump3.3"></a>
-#### 3.视频音频数据集
-
-##### 1）加载视频数据集
-
-数据集中的视频数据集取自llamafactory，https://github.com/hiyouga/LLaMA-Factory/tree/main/data
-
-视频取自mllm_video_demo，使用时需要将该数据放到自己的data文件夹中去，同时将llamafactory上的mllm_video_audio_demo.json也放到自己的data文件中
-
-之后根据实际情况修改 `data.json` 中的数据集路径，包括 `model_name_or_path` 、 `dataset_dir` 、 `dataset` 字段，并修改"attr"中  `images` 、 `videos` 字段，修改结果参考下图。
+##### 2）加载图文数据集
+之后根据实际情况修改 `data.json` 中的数据集路径，包括 `model_name_or_path` 、 `dataset_dir` 、 `dataset` 字段，并修改"attr"中  `images` 、 `videos` 、`audios`字段，修改结果参考下图。
 
 ```json
 {
@@ -243,16 +241,16 @@ dataset_param->basic_parameters->dataset
         "basic_parameters": {
             ...
             "dataset_dir": "./data",
-            "dataset": "./data/mllm_video_audio_demo.json",
+            "dataset": "./data/mllm_format_llava_instruct_data.json",
             "cache_dir": "./data/cache_dir",
             ...
         },
         ...
         "attr": {
             "system": null,
-            "images": null,
-            "videos": "videos",
-            "audios": "audios",
+            "images": "images",
+            "videos": null,
+            "audios": null,
             ...
         },
     },
@@ -260,13 +258,16 @@ dataset_param->basic_parameters->dataset
 }
 ```
 
-##### 2）修改模型配置
+##### 3）修改模型配置
 
 在model.json中，修改`img_context_token_id`为下图所示：
 ```
-"img_context_token_id": 151656
+"img_context_token_id": 151655
 ```
 注意， `image_token_id` 和 `img_context_token_id`两个参数作用不一样。前者是固定的，是标识图片的 token ID，在qwen2_5_omni_get_rope_index中用于计算图文输入情况下序列中的图片数量。后者是标识视觉内容的 token ID，用于在forward中标记视觉token的位置，所以需要根据输入做相应修改。
+
+
+
 
 
 <a id="jump4"></a>
