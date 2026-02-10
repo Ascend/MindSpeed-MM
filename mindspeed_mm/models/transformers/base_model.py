@@ -708,10 +708,8 @@ class FSDP2Mixin:
         # bugfix for HCCL premul sum issue, will be fixed in future torch release
         from mindspeed_mm.patchs.premul_sum_patch import apply_hccl_premul_sum_patch
         apply_hccl_premul_sum_patch()
-        if self.fsdp2_config.reshard_local_experts:
-            scale_factor = torch.distributed.get_world_size()
-        else:
-            scale_factor = ep_size
+
+        scale_factor = torch.distributed.get_world_size()
         for sub_module in moe_modules:
             if hasattr(sub_module, "set_gradient_divide_factor"): # torch>=2.8
                 sub_module.set_gradient_divide_factor(scale_factor)
