@@ -90,6 +90,7 @@ model:
     chunk_size: 1024
     router_aux_loss_coef: 0.0
   use_triton_gdn: true
+  use_grouped_expert_matmul: true
   # activation_offload_plan:
   #   apply_modules:
   #     - model.language_model.layers.{*}
