@@ -263,6 +263,12 @@ gpt_args:
 【activation_offload配置】
 使用activation_offload可以将重计算过程中产生的checkpoint点的激活值移动到host，反向异步从host传输到device，降低device激活显存占用，配置方式为在`qwen3vl_full_sft_xxB.yaml`中将`activation_offload`字段设置为True。
 
+【FSDP2 offload_to_cpu配置】
+在fsdp2_config.yaml配置offload_to_cpu为True, 可以将参数，梯度和优化器状态卸载到CPU内存，进一步降低显存。但同时训练速度相对会变慢，在显存足够的情况下不建议开启。
+功能描述请详见：docs/features/fsdp2.md。
+开启该功能时，同时需要在`qwen3vl_full_sft_xxB.yaml`文件中`gpt_args`配置项里配置`distributed_backend: npu:hccl,cpu:gloo`，以开启双通信后端。
+
+
 【chunkloss 配置】
 参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/chunkloss.md)
 

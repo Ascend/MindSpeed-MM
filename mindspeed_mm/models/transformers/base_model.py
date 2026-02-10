@@ -587,10 +587,14 @@ class FSDP2Mixin:
             The (maybe) moved module.
         """
         device = torch.empty((), device=device).device
-        return self._apply(
-            lambda t: torch.empty_like(t, device=device) if t.device != device else t,
-            recurse=recurse,
-        )
+        
+        def _replace_tensor(t):
+            if isinstance(t, torch.nn.Parameter):
+                return torch.empty_like(t, device=device) if t.device != device else t
+            else:
+                # we do not offload buffer to cpu when enable FSDP2 offload_to_cpu function.
+                return torch.empty_like(t, device='cuda')
+        return self._apply(_replace_tensor, recurse=recurse)
 
     def _post_fully_shard(self):
         """
