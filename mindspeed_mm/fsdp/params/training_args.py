@@ -209,6 +209,12 @@ class TrainingArguments:
         self.global_rank = int(os.getenv("RANK"))
         self.world_size = int(os.getenv("WORLD_SIZE"))
 
+        if self.lr < self.lr_start:
+            raise ValueError(f"Learning rate {self.lr} < starting lr {self.lr_start}. Check scheduler configuration.")
+        
+        if self.lr < self.lr_min:
+            raise ValueError(f"Learning rate {self.lr} < minimum lr {self.lr_min}. Check scheduler configuration.")
+
     def compute_distributed_training(
         self, parallel_args
     ) -> None:
