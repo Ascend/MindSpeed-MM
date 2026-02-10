@@ -89,6 +89,7 @@ model:
     enable_chunk_loss: false
     chunk_size: 1024
     router_aux_loss_coef: 0.0
+  use_triton_gdn: true
   # activation_offload_plan:
   #   apply_modules:
   #     - model.language_model.layers.{*}

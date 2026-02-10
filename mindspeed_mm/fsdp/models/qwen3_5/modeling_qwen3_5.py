@@ -494,14 +494,14 @@ class Qwen3_5GatedDeltaNet(nn.Module):
 
         self.causal_conv1d_fn = causal_conv1d_fn
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
-        
-        # TODO lmy: 后续增加为可配置的配置项，现在fsdp分支代码不稳定，rebase新代码再适配
-        use_triton_gdn = False
-        if use_triton_gdn:
+
+        self.use_triton_gdn = config.use_triton_gdn
+        if self.use_triton_gdn:
             from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_delta_rule
             self.chunk_gated_delta_rule = chunk_gated_delta_rule
         else:
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
+
         self.recurrent_gated_delta_rule = fused_recurrent_gated_delta_rule or torch_recurrent_gated_delta_rule
 
         if not is_fast_path_available:
@@ -1843,6 +1843,12 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
         self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
 
         self.post_init()
+
+    @staticmethod
+    def overwrite_transformer_config(transformer_config, model_args):
+        use_triton_gdn = getattr(model_args, "use_triton_gdn", False)
+        transformer_config.text_config.use_triton_gdn = use_triton_gdn
+        return transformer_config
 
     def get_input_embeddings(self):
         return self.model.get_input_embeddings()
