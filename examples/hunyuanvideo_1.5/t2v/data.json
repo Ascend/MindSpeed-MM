@@ -1,0 +1,82 @@
+{
+    "dataset_param": {
+        "dataset_type": "t2v",
+        "basic_parameters": {
+            "data_path": "./HunyuanVideo1.5/dataset/data.txt",
+            "data_storage_mode": "combine"
+        },
+        "preprocess_parameters": {
+            "video_processor_type": "OpensoraplanVideoProcessor",
+            "video_reader_type": "DecordVideo",
+            "image_reader_type": "Image",
+            "num_frames": 29,
+            "frame_interval": 1,
+            "max_height": 480,
+            "max_width": 848,
+            "max_hxw": 407040,
+            "train_fps": 24,
+            "speed_factor": 1.0,
+            "drop_short_ratio": 0.0,
+            "cfg": 0.0,
+            "hw_stride": 8,
+            "force_resolution": false,
+            "hw_aspect_thr": 2.0,
+            "train_pipeline": {
+                "video": [
+                    {
+                        "trans_type": "ToTensorVideo"
+                    },
+                    {
+                        "trans_type": "CenterCropResizeVideo",
+                        "param": {
+                            "use_short_edge": false,
+							"top_crop": false,
+							"align_corners": false,
+							"antialias": false,
+							"transform_size": "auto"
+                        }
+                    },
+                    {
+                        "trans_type": "norm_fun",
+                        "param": {
+                            "mean": 0.5,
+                            "std": 0.5
+                        }
+                    }
+                ]
+            }
+        },
+        "use_text_processer": true,
+        "enable_text_preprocessing": false,
+        "tokenizer_config": [
+            {
+                "autotokenizer_name": "hunyuan15MLLmTokenizer",
+                "hub_backend": "hf",
+                "from_pretrained": "HunyuanVideo1.5/text_encoder/llm",
+                "padding_side": "right",
+                "template_file_path": "examples/hunyuanvideo_1.5/template.json",
+                "template_id": "li-dit-encode-video-json",
+                "model_max_length": 300
+            },
+            {
+                "autotokenizer_name": "Hunyuan15GlyphTokenizer",
+                "hub_backend": "hf",
+                "from_pretrained": "HunyuanVideo1.5/text_encoder/byt5-small",
+                "byt5_max_length": 256,
+                "color_ann_path": "HunyuanVideo1.5/text_encoder/Glyph-SDXL-v2/assets/color_idx.json",
+                "font_ann_path": "HunyuanVideo1.5/text_encoder/Glyph-SDXL-v2/assets/multilingual_10-lang_idx.json"
+            }
+        ]
+    },
+    "dataloader_param": {
+        "dataloader_mode": "sampler",
+        "sampler_type": "LengthGroupedSampler",
+        "shuffle": false,
+        "drop_last": false,
+        "pin_memory": true,
+        "group_frame": false,
+        "group_resolution": false,
+        "group_data": true,
+        "initial_global_step_for_sampler": 0
+    }
+}

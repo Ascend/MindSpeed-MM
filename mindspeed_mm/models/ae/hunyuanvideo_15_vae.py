@@ -652,29 +652,31 @@ class AutoencoderKLConv3D(ModelMixin, ConfigMixin):
         raise RuntimeError('Temporal tiling is not supported for this VAE.')
 
 
-    def encode(self, x: Tensor, return_dict: bool = True):
+    def encode(self, x: Tensor, do_sample: bool = True):
+        with torch.no_grad(), torch.autocast(device_type="npu", dtype=torch.float16):
+            def _encode(x):
+                if self.use_temporal_tiling and x.shape[-3] > self.tile_sample_min_tsize:
+                    return self.temporal_tiled_encode(x)
+                if self.use_spatial_tiling and (
+                        x.shape[-1] > self.tile_sample_min_size or x.shape[-2] > self.tile_sample_min_size):
+                    return self.spatial_tiled_encode(x)
+                return self.encoder(x)
 
-        def _encode(x):
-            if self.use_temporal_tiling and x.shape[-3] > self.tile_sample_min_tsize:
-                return self.temporal_tiled_encode(x)
-            if self.use_spatial_tiling and (
-                    x.shape[-1] > self.tile_sample_min_size or x.shape[-2] > self.tile_sample_min_size):
-                return self.spatial_tiled_encode(x)
-            return self.encoder(x)
+            if len(x.shape) != 5:  # (B, C, T, H, W)
+                raise ValueError("input shape is invalid.")
+            if self.use_slicing and x.shape[0] > 1:
+                encoded_slices = [_encode(x_slice) for x_slice in x.split(1)]
+                h = torch.cat(encoded_slices)
+            else:
+                h = _encode(x)
+            posterior = DiagonalGaussianDistribution(h)
 
-        if len(x.shape) != 5:  # (B, C, T, H, W)
-            raise ValueError("input shape is invalid.")
-        if self.use_slicing and x.shape[0] > 1:
-            encoded_slices = [_encode(x_slice) for x_slice in x.split(1)]
-            h = torch.cat(encoded_slices)
-        else:
-            h = _encode(x)
-        posterior = DiagonalGaussianDistribution(h)
+            if do_sample:
+                z = posterior.sample() * self.scaling_factor
+            else:
+                z = posterior.mode() * self.scaling_factor
 
-        if not return_dict:
-            return (posterior,)
-
-        return AutoencoderKLOutput(latent_dist=posterior)
+            return z
 
     def decode(self, z: Tensor, return_dict: bool = True, generator=None):
 
@@ -754,7 +756,7 @@ class CausalConv3d(nn.Module):
             self.conv = nn.Conv3d(chan_in, chan_out, kernel_size, stride=stride, dilation=dilation, **kwargs)
 
     def forward(self, x):
-        x = F.pad(x, self.time_causal_padding, mode=self.pad_mode)
+        x = F.pad(x.to(torch.float32), self.time_causal_padding, mode=self.pad_mode)
         return self.conv(x)
 
 

@@ -44,7 +44,7 @@ class HunyuanVideo15DiT(MultiModalModule):
             concat_condition: bool = True,
             out_channels: int = None,
             hidden_size: int = 3072,
-            heads_num: int = 24,
+            num_heads: int = 24,
             mlp_width_ratio: float = 4.0,
             mlp_act_type: str = "gelu_tanh",
             mm_double_blocks_depth: int = 20,
@@ -110,17 +110,17 @@ class HunyuanVideo15DiT(MultiModalModule):
                 use_residual=False
             )
 
-        if hidden_size % heads_num != 0:
+        if hidden_size % num_heads != 0:
             raise ValueError(
-                f"Hidden size {hidden_size} must be divisible by heads_num {heads_num}"
+                f"Hidden size {hidden_size} must be divisible by num_heads {num_heads}"
             )
-        pe_dim = hidden_size // heads_num
+        pe_dim = hidden_size // num_heads
         if sum(rope_dim_list) != pe_dim:
             raise ValueError(
                 f"Got {rope_dim_list} but expected positional dim {pe_dim}"
             )
         self.hidden_size = hidden_size
-        self.heads_num = heads_num
+        self.num_heads = num_heads
         self.task_type = task_type
 
         self.img_in = PatchEmbed(
@@ -149,7 +149,7 @@ class HunyuanVideo15DiT(MultiModalModule):
             self.txt_in = SingleTokenRefiner(
                 text_states_dim,
                 hidden_size,
-                heads_num,
+                num_heads,
                 depth=2,
                 **factory_kwargs,
             )
@@ -185,7 +185,7 @@ class HunyuanVideo15DiT(MultiModalModule):
             [
                 MMDoubleStreamBlock(
                     self.hidden_size,
-                    self.heads_num,
+                    self.num_heads,
                     mlp_width_ratio=mlp_width_ratio,
                     mlp_act_type=mlp_act_type,
                     attn_mode=attn_mode,
@@ -202,7 +202,7 @@ class HunyuanVideo15DiT(MultiModalModule):
             [
                 MMSingleStreamBlock(
                     self.hidden_size,
-                    self.heads_num,
+                    self.num_heads,
                     mlp_width_ratio=mlp_width_ratio,
                     mlp_act_type=mlp_act_type,
                     attn_mode=attn_mode,
@@ -300,7 +300,7 @@ class HunyuanVideo15DiT(MultiModalModule):
 
     def get_rotary_pos_embed(self, rope_sizes):
         target_ndim = 3
-        head_dim = self.hidden_size // self.heads_num
+        head_dim = self.hidden_size // self.num_heads
         rope_dim_list = self.rope_dim_list
         if rope_dim_list is None:
             rope_dim_list = [head_dim // target_ndim for _ in range(target_ndim)]
@@ -369,186 +369,187 @@ class HunyuanVideo15DiT(MultiModalModule):
             guidance=None,
             **kwargs
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        b, c, f, h, w = noised_latents.shape
-        cond_latents = torch.zeros([b, c + 1, f, h, w], device=noised_latents.device, dtype=noised_latents.dtype)
+        with torch.autocast(device_type="npu", dtype=torch.bfloat16):
+            b, c, f, h, w = noised_latents.shape
+            cond_latents = torch.zeros([b, c + 1, f, h, w], device=noised_latents.device, dtype=noised_latents.dtype)
 
-        hidden_states = torch.cat([noised_latents, cond_latents], dim=1)
-        vision_states = kwargs.get("vision_states", None)
+            hidden_states = torch.cat([noised_latents, cond_latents], dim=1)
+            vision_states = kwargs.get("vision_states", None)
 
-        if guidance is None:
-            guidance = torch.tensor(
-                [6016.0], device=hidden_states.device, dtype=torch.bfloat16
-            )
-
-        img = x = hidden_states.to(self.dtype)
-        text_mask = prompt_mask[0]
-        t = timestep
-        txt = prompt[0]
-        bs, _, ot, oh, ow = x.shape
-        tt, th, tw = (
-            ot // self.patch_size[0],
-            oh // self.patch_size[1],
-            ow // self.patch_size[2],
-        )
-        self.attn_param['thw'] = [tt, th, tw]
-        if freqs_cos is None and freqs_sin is None:
-            freqs_cos, freqs_sin = self.get_rotary_pos_embed((tt, th, tw))
-
-        img = self.img_in(img)
-        parallel_dims = get_parallel_state()
-        sp_enabled = parallel_dims.sp_enabled
-        if sp_enabled:
-            sp_size = parallel_dims.sp
-            sp_rank = parallel_dims.sp_rank
-            if img.shape[1] % sp_size != 0:
-                n_token = img.shape[1]
-                if not n_token > (n_token // sp_size + 1) * (sp_size - 1):
-                    raise AssertionError(f'Too short context length for SP {sp_size}')
-            img = torch.chunk(img, sp_size, dim=1)[sp_rank]
-            freqs_cos = torch.chunk(freqs_cos, sp_size, dim=0)[sp_rank]
-            freqs_sin = torch.chunk(freqs_sin, sp_size, dim=0)[sp_rank]
-
-        # Prepare modulation vectors
-        vec = self.time_in(t)
-
-        if self.guidance_embed:
             if guidance is None:
-                raise ValueError(
-                    "Didn't get guidance strength for guidance distilled model."
+                guidance = torch.tensor(
+                    [6016.0], device=hidden_states.device, dtype=torch.bfloat16
                 )
-            vec = vec + self.guidance_in(guidance)
 
-        if timestep_r is not None:
-            vec = vec + self.time_r_in(timestep_r)
-
-        # Embed text tokens
-        if self.text_projection == "linear":
-            txt = self.txt_in(txt)
-        elif self.text_projection == "single_refiner":
-            txt = self.txt_in(txt, t, text_mask if self.use_attention_mask else None)
-        else:
-            raise NotImplementedError(
-                f"Unsupported text_projection: {self.text_projection}"
+            img = x = hidden_states.to(self.dtype)
+            text_mask = prompt_mask[0][0]
+            t = timestep
+            txt = prompt[0][0]
+            bs, _, ot, oh, ow = x.shape
+            tt, th, tw = (
+                ot // self.patch_size[0],
+                oh // self.patch_size[1],
+                ow // self.patch_size[2],
             )
-        if self.cond_type_embedding is not None:
-            cond_emb = self.cond_type_embedding(
-                torch.zeros_like(txt[:, :, 0], device=text_mask.device, dtype=torch.long)
-            )
-            txt = txt + cond_emb
+            self.attn_param['thw'] = [tt, th, tw]
+            if freqs_cos is None and freqs_sin is None:
+                freqs_cos, freqs_sin = self.get_rotary_pos_embed((tt, th, tw))
 
-        if self.glyph_byT5_v2 and len(prompt) == 2 and len(prompt_mask) == 2:
-            byt5_text_states = prompt[1]
-            byt5_text_mask = prompt_mask[1]
-            byt5_txt = self.byt5_in(byt5_text_states)
-            if self.cond_type_embedding is not None:
-                cond_emb = self.cond_type_embedding(
-                    torch.ones_like(byt5_txt[:, :, 0], device=byt5_txt.device, dtype=torch.long)
-                )
-                byt5_txt = byt5_txt + cond_emb
-            txt, text_mask = self.reorder_txt_token(
-                byt5_txt, txt, byt5_text_mask, text_mask, zero_feat=True
-            )
+            img = self.img_in(img)
+            parallel_dims = get_parallel_state()
+            sp_enabled = parallel_dims.sp_enabled
+            if sp_enabled:
+                sp_size = parallel_dims.sp
+                sp_rank = parallel_dims.sp_rank
+                if img.shape[1] % sp_size != 0:
+                    n_token = img.shape[1]
+                    if not n_token > (n_token // sp_size + 1) * (sp_size - 1):
+                        raise AssertionError(f'Too short context length for SP {sp_size}')
+                img = torch.chunk(img, sp_size, dim=1)[sp_rank]
+                freqs_cos = torch.chunk(freqs_cos, sp_size, dim=0)[sp_rank]
+                freqs_sin = torch.chunk(freqs_sin, sp_size, dim=0)[sp_rank]
 
-        if self.vision_in is not None and vision_states is not None:
-            extra_encoder_hidden_states = self.vision_in(vision_states)
-            # If t2v, set extra_attention_mask to 0 to avoid attention to semantic tokens
-            if self.task_type == "t2v" and torch.all(vision_states == 0):
-                extra_attention_mask = torch.zeros(
-                    (bs, extra_encoder_hidden_states.shape[1]),
-                    dtype=text_mask.dtype,
-                    device=text_mask.device,
-                )
-                # Set vision tokens to zero to mitigate potential block mask error in SSTA
-                extra_encoder_hidden_states = extra_encoder_hidden_states * 0.0
+            # Prepare modulation vectors
+            vec = self.time_in(t)
+
+            if self.guidance_embed:
+                if guidance is None:
+                    raise ValueError(
+                        "Didn't get guidance strength for guidance distilled model."
+                    )
+                vec = vec + self.guidance_in(guidance)
+
+            if timestep_r is not None:
+                vec = vec + self.time_r_in(timestep_r)
+
+            # Embed text tokens
+            if self.text_projection == "linear":
+                txt = self.txt_in(txt)
+            elif self.text_projection == "single_refiner":
+                txt = self.txt_in(txt, t, text_mask if self.use_attention_mask else None)
             else:
-                extra_attention_mask = torch.ones(
-                    (bs, extra_encoder_hidden_states.shape[1]),
-                    dtype=text_mask.dtype,
-                    device=text_mask.device,
+                raise NotImplementedError(
+                    f"Unsupported text_projection: {self.text_projection}"
                 )
-            # Ensure valid tokens precede padding tokens
             if self.cond_type_embedding is not None:
                 cond_emb = self.cond_type_embedding(
-                    2 * torch.ones_like(
-                        extra_encoder_hidden_states[:, :, 0],
-                        dtype=torch.long,
-                        device=extra_encoder_hidden_states.device,
-                    )
+                    torch.zeros_like(txt[:, :, 0], device=text_mask.device, dtype=torch.long)
                 )
-                extra_encoder_hidden_states = extra_encoder_hidden_states + cond_emb
+                txt = txt + cond_emb
 
-            txt, text_mask = self.reorder_txt_token(
-                extra_encoder_hidden_states, txt, extra_attention_mask, text_mask
-            )
-
-        freqs_cis = (freqs_cos, freqs_sin) if freqs_cos is not None else None
-
-        # Pass through double-stream blocks
-        for index, block in enumerate(self.double_blocks):
-            force_full_attn = (
-                    self.attn_mode in ["flex-block-attn"]
-                    and self.attn_param["win_type"] == "hybrid"
-                    and self.attn_param["win_ratio"] > 0
-                    and (
-                            (index + 1) % self.attn_param["win_ratio"] == 0
-                            or (index + 1) == len(self.double_blocks)
+            if self.glyph_byT5_v2 and len(prompt) == 2 and len(prompt_mask) == 2:
+                byt5_text_states = prompt[1][0]
+                byt5_text_mask = prompt_mask[1][0]
+                byt5_txt = self.byt5_in(byt5_text_states)
+                if self.cond_type_embedding is not None:
+                    cond_emb = self.cond_type_embedding(
+                        torch.ones_like(byt5_txt[:, :, 0], device=byt5_txt.device, dtype=torch.long)
                     )
-            )
-            self.attn_param["layer-name"] = f"double_block_{index + 1}"
-            img, txt = block(
-                img=img,
-                txt=txt,
-                vec=vec,
-                freqs_cis=freqs_cis,
-                text_mask=text_mask,
-                attn_param=self.attn_param,
-                is_flash=force_full_attn,
-                block_idx=index,
-            )
+                    byt5_txt = byt5_txt + cond_emb
+                txt, text_mask = self.reorder_txt_token(
+                    byt5_txt, txt, byt5_text_mask, text_mask, zero_feat=True
+                )
 
-        txt_seq_len = txt.shape[1]
-        img_seq_len = img.shape[1]
+            if self.vision_in is not None and vision_states is not None:
+                extra_encoder_hidden_states = self.vision_in(vision_states)
+                # If t2v, set extra_attention_mask to 0 to avoid attention to semantic tokens
+                if self.task_type == "t2v" and torch.all(vision_states == 0):
+                    extra_attention_mask = torch.zeros(
+                        (bs, extra_encoder_hidden_states.shape[1]),
+                        dtype=text_mask.dtype,
+                        device=text_mask.device,
+                    )
+                    # Set vision tokens to zero to mitigate potential block mask error in SSTA
+                    extra_encoder_hidden_states = extra_encoder_hidden_states * 0.0
+                else:
+                    extra_attention_mask = torch.ones(
+                        (bs, extra_encoder_hidden_states.shape[1]),
+                        dtype=text_mask.dtype,
+                        device=text_mask.device,
+                    )
+                # Ensure valid tokens precede padding tokens
+                if self.cond_type_embedding is not None:
+                    cond_emb = self.cond_type_embedding(
+                        2 * torch.ones_like(
+                            extra_encoder_hidden_states[:, :, 0],
+                            dtype=torch.long,
+                            device=extra_encoder_hidden_states.device,
+                        )
+                    )
+                    extra_encoder_hidden_states = extra_encoder_hidden_states + cond_emb
 
-        # Merge image and text for single-stream blocks
-        x = torch.cat((img, txt), 1)
-        features_list = [] if output_features else None
-        if len(self.single_blocks) > 0:
-            for index, block in enumerate(self.single_blocks):
+                txt, text_mask = self.reorder_txt_token(
+                    extra_encoder_hidden_states, txt, extra_attention_mask, text_mask
+                )
+
+            freqs_cis = (freqs_cos, freqs_sin) if freqs_cos is not None else None
+
+            # Pass through double-stream blocks
+            for index, block in enumerate(self.double_blocks):
                 force_full_attn = (
                         self.attn_mode in ["flex-block-attn"]
                         and self.attn_param["win_type"] == "hybrid"
                         and self.attn_param["win_ratio"] > 0
                         and (
                                 (index + 1) % self.attn_param["win_ratio"] == 0
-                                or (index + 1) == len(self.single_blocks)
+                                or (index + 1) == len(self.double_blocks)
                         )
                 )
-                self.attn_param["layer-name"] = f"single_block_{index + 1}"
-                x = block(
-                    x=x,
+                self.attn_param["layer-name"] = f"double_block_{index + 1}"
+                img, txt = block(
+                    img=img,
+                    txt=txt,
                     vec=vec,
-                    txt_len=txt_seq_len,
-                    freqs_cis=(freqs_cos, freqs_sin),
+                    freqs_cis=freqs_cis,
                     text_mask=text_mask,
                     attn_param=self.attn_param,
                     is_flash=force_full_attn,
+                    block_idx=index,
                 )
-                if output_features and index % output_features_stride == 0:
-                    features_list.append(x[:, :img_seq_len, ...])
-        img = x[:, :img_seq_len, ...]
 
-        # Final Layer
-        img = self.final_layer(img, vec)
-        if sp_enabled:
-            img = all_gather(img, dim=1, group=parallel_dims.sp_group)
-        img = self.unpatchify(img, tt, th, tw)
-        if output_features:
-            features_list = torch.stack(features_list, dim=0)
+            txt_seq_len = txt.shape[1]
+            img_seq_len = img.shape[1]
+
+            # Merge image and text for single-stream blocks
+            x = torch.cat((img, txt), 1)
+            features_list = [] if output_features else None
+            if len(self.single_blocks) > 0:
+                for index, block in enumerate(self.single_blocks):
+                    force_full_attn = (
+                            self.attn_mode in ["flex-block-attn"]
+                            and self.attn_param["win_type"] == "hybrid"
+                            and self.attn_param["win_ratio"] > 0
+                            and (
+                                    (index + 1) % self.attn_param["win_ratio"] == 0
+                                    or (index + 1) == len(self.single_blocks)
+                            )
+                    )
+                    self.attn_param["layer-name"] = f"single_block_{index + 1}"
+                    x = block(
+                        x=x,
+                        vec=vec,
+                        txt_len=txt_seq_len,
+                        freqs_cis=(freqs_cos, freqs_sin),
+                        text_mask=text_mask,
+                        attn_param=self.attn_param,
+                        is_flash=force_full_attn,
+                    )
+                    if output_features and index % output_features_stride == 0:
+                        features_list.append(x[:, :img_seq_len, ...])
+            img = x[:, :img_seq_len, ...]
+
+            # Final Layer
+            img = self.final_layer(img, vec)
             if sp_enabled:
-                features_list = all_gather(features_list, dim=2, group=parallel_dims.sp_group)
-        else:
-            features_list = None
-        return (img, features_list)
+                img = all_gather(img, dim=1, group=parallel_dims.sp_group)
+            img = self.unpatchify(img, tt, th, tw)
+            if output_features:
+                features_list = torch.stack(features_list, dim=0)
+                if sp_enabled:
+                    features_list = all_gather(features_list, dim=2, group=parallel_dims.sp_group)
+            else:
+                features_list = None
+            return (img, features_list)
 
     @property
     def dtype(self) -> torch.dtype:
@@ -678,7 +679,7 @@ class MMDoubleStreamBlock(nn.Module):
     def __init__(
             self,
             hidden_size: int,
-            heads_num: int,
+            num_heads: int,
             mlp_width_ratio: float,
             mlp_act_type: str = "gelu_tanh",
             attn_mode: str = None,
@@ -692,12 +693,12 @@ class MMDoubleStreamBlock(nn.Module):
         super().__init__()
 
         self.deterministic = False
-        self.heads_num = heads_num
+        self.num_heads = num_heads
         self.attn_mode = attn_mode
 
-        if hidden_size % heads_num != 0:
-            raise AssertionError(f"hidden_size({hidden_size}) must be divisible by heads_num({heads_num})")
-        head_dim = hidden_size // heads_num
+        if hidden_size % num_heads != 0:
+            raise AssertionError(f"hidden_size({hidden_size}) must be divisible by num_heads({num_heads})")
+        head_dim = hidden_size // num_heads
         mlp_hidden_dim = int(hidden_size * mlp_width_ratio)
 
         self.img_mod = ModulateDiT(
@@ -784,9 +785,9 @@ class MMDoubleStreamBlock(nn.Module):
         img_q = self.img_attn_q(img_modulated)
         img_k = self.img_attn_k(img_modulated)
         img_v = self.img_attn_v(img_modulated)
-        img_q = rearrange(img_q, "B L (H D) -> B L H D", H=self.heads_num)
-        img_k = rearrange(img_k, "B L (H D) -> B L H D", H=self.heads_num)
-        img_v = rearrange(img_v, "B L (H D) -> B L H D", H=self.heads_num)
+        img_q = rearrange(img_q, "B L (H D) -> B L H D", H=self.num_heads)
+        img_k = rearrange(img_k, "B L (H D) -> B L H D", H=self.num_heads)
+        img_v = rearrange(img_v, "B L (H D) -> B L H D", H=self.num_heads)
         img_q = self.img_attn_q_norm(img_q).to(img_v)
         img_k = self.img_attn_k_norm(img_k).to(img_v)
 
@@ -803,9 +804,9 @@ class MMDoubleStreamBlock(nn.Module):
         txt_q = self.txt_attn_q(txt_modulated)
         txt_k = self.txt_attn_k(txt_modulated)
         txt_v = self.txt_attn_v(txt_modulated)
-        txt_q = rearrange(txt_q, "B L (H D) -> B L H D", H=self.heads_num)
-        txt_k = rearrange(txt_k, "B L (H D) -> B L H D", H=self.heads_num)
-        txt_v = rearrange(txt_v, "B L (H D) -> B L H D", H=self.heads_num)
+        txt_q = rearrange(txt_q, "B L (H D) -> B L H D", H=self.num_heads)
+        txt_k = rearrange(txt_k, "B L (H D) -> B L H D", H=self.num_heads)
+        txt_v = rearrange(txt_v, "B L (H D) -> B L H D", H=self.num_heads)
         txt_q = self.txt_attn_q_norm(txt_q).to(txt_v)
         txt_k = self.txt_attn_k_norm(txt_k).to(txt_v)
 
@@ -846,7 +847,7 @@ class MMSingleStreamBlock(nn.Module):
     def __init__(
             self,
             hidden_size: int,
-            heads_num: int,
+            num_heads: int,
             mlp_width_ratio: float = 4.0,
             mlp_act_type: str = "gelu_tanh",
             attn_mode: str = None,
@@ -863,8 +864,8 @@ class MMSingleStreamBlock(nn.Module):
         self.attn_mode = attn_mode
 
         self.hidden_size = hidden_size
-        self.heads_num = heads_num
-        head_dim = hidden_size // heads_num
+        self.num_heads = num_heads
+        head_dim = hidden_size // num_heads
         mlp_hidden_dim = int(hidden_size * mlp_width_ratio)
         self.mlp_hidden_dim = mlp_hidden_dim
         self.scale = qk_scale or head_dim ** -0.5
@@ -912,9 +913,9 @@ class MMSingleStreamBlock(nn.Module):
         k = self.linear1_k(x_mod)
         v = self.linear1_v(x_mod)
 
-        q = rearrange(q, "B L (H D) -> B L H D", H=self.heads_num)
-        k = rearrange(k, "B L (H D) -> B L H D", H=self.heads_num)
-        v = rearrange(v, "B L (H D) -> B L H D", H=self.heads_num)
+        q = rearrange(q, "B L (H D) -> B L H D", H=self.num_heads)
+        k = rearrange(k, "B L (H D) -> B L H D", H=self.num_heads)
+        v = rearrange(v, "B L (H D) -> B L H D", H=self.num_heads)
 
         mlp = self.linear1_mlp(x_mod)
 
@@ -949,8 +950,3 @@ class MMSingleStreamBlock(nn.Module):
         output = self.linear2(attn, self.mlp_act(mlp))
 
         return x + apply_gate(output, gate=mod_gate)
-
-
-if __name__ == "__main__":
-    model = HunyuanVideo15DiT(hidden_size=1, heads_num=1)
-    print(model)

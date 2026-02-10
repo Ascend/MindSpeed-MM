@@ -576,7 +576,6 @@ def apply_rotary_emb(
     return xq_out, xk_out
 
 
-@cache
 def get_nd_rotary_pos_embed(
     rope_dim_list,
     start,
@@ -649,7 +648,6 @@ def get_nd_rotary_pos_embed(
         return emb
 
 
-@cache
 def get_1d_rotary_pos_embed(
     dim: int,
     pos: Union[torch.FloatTensor, int],

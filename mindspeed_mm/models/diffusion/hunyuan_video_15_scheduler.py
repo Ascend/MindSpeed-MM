@@ -502,5 +502,5 @@ class Hunyuan_15_FlowMatchDiscreteScheduler:
         if kwargs.get("target", None) is not None:
             target = kwargs.get("target", None).to(dtype=model_output.dtype)
 
-        loss = nn.functional.mse_loss(model_output, target)
+        loss = nn.functional.mse_loss(model_output, target.to(dtype=model_output.dtype))
         return loss

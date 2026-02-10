@@ -58,7 +58,7 @@ def validate_args(args, defaults=None):
             mm_double_blocks_depth = getattr(args.mm.model.predictor, 'mm_double_blocks_depth', 0)
             if mm_double_blocks_depth <= 0:
                 raise AssertionError(f"MindSpeed-MM Error: mm_double_blocks_depth must > 0, actually:{mm_double_blocks_depth}")
-            args.num_layers = safe_getattr(args.mm.model.predictor, 'mm_single_blocks_depth', args.num_layers)
+            args.num_layers = max(safe_getattr(args.mm.model.predictor, 'mm_single_blocks_depth', args.num_layers), mm_double_blocks_depth)
         args.num_layers = safe_getattr(args.mm.model.predictor, 'num_layers', args.num_layers)
         # Some models have num_layers as a list in the predictor, so sum it up to get total layers
         if isinstance(args.num_layers, (tuple, list)):

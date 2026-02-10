@@ -10,6 +10,7 @@ from .hunyuanvideo_i2v_diffusion import HunyuanVideoI2VDiffusion
 from .opensoraplanv1_5_scheduler import OpenSoraPlanScheduler
 from .opensora2_flow_match_scheduler import Opensora2FlowMatchScheduler
 from .diffusers_scheduler import DIFFUSERS_SCHEDULE_MAPPINGS, DiffusersScheduler
+from .hunyuan_video_15_scheduler import Hunyuan_15_FlowMatchDiscreteScheduler
 
 
 DIFFUSION_MODEL_MAPPINGS = {
@@ -20,6 +21,7 @@ DIFFUSION_MODEL_MAPPINGS = {
     "flow_match_discrete_scheduler": FlowMatchDiscreteScheduler,
     "wan_flow_match_scheduler": WanFlowMatchScheduler,
     "hunyuanvideo_i2v_diffusion": HunyuanVideoI2VDiffusion,
+    "hunyuanvideo_15_diffusion": Hunyuan_15_FlowMatchDiscreteScheduler,
     "OpenSoraPlan": OpenSoraPlanScheduler,
     "opensora2_flow_match_scheduler": Opensora2FlowMatchScheduler
 }
