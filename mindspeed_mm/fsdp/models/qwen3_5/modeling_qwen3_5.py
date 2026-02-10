@@ -49,6 +49,7 @@ from transformers.utils.import_utils import is_causal_conv1d_available, is_flash
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5Config, Qwen3_5TextConfig, Qwen3_5VisionConfig
 
 from mindspeed_mm.fsdp.utils.register import  model_register
+from mindspeed_mm.fsdp.utils.utils import is_npu_available
 
 
 if is_causal_conv1d_available():
@@ -496,7 +497,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
 
         self.use_triton_gdn = config.use_triton_gdn
-        if self.use_triton_gdn:
+        if self.use_triton_gdn and is_npu_available():
             from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_delta_rule
             self.chunk_gated_delta_rule = chunk_gated_delta_rule
         else:

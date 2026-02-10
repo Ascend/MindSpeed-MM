@@ -50,9 +50,8 @@ from transformers.utils.import_utils import is_causal_conv1d_available, is_flash
 from transformers.utils.output_capturing import OutputRecorder
 from transformers.models.qwen3_5_moe.configuration_qwen3_5_moe import Qwen3_5MoeConfig, Qwen3_5MoeTextConfig, Qwen3_5MoeVisionConfig
 
-
 from mindspeed_mm.fsdp.utils.register import  model_register
-
+from mindspeed_mm.fsdp.utils.utils import is_npu_available
 
 if is_causal_conv1d_available():
     from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
@@ -499,7 +498,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
         self.use_triton_gdn = config.use_triton_gdn
 
-        if self.use_triton_gdn:
+        if self.use_triton_gdn and is_npu_available():
             from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_delta_rule
             self.chunk_gated_delta_rule = chunk_gated_delta_rule
         else:

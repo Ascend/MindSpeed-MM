@@ -85,6 +85,12 @@ def get_time(barrier=False):
     get_torch_device().synchronize()
     return time.time()
 
+def is_npu_available():
+    try:
+        import torch_npu
+        return torch_npu.npu.is_available()
+    except ImportError:
+        return False
 
 class Singleton(type):
     """Singleton metaclass to ensure only one instance of ParallelState exists."""
