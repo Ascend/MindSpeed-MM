@@ -32,7 +32,7 @@ commit_id=fc91372
 
 #### 变更记录
 
-2026.02.xx: 首次支持Qwen3_5模型
+2026.02.10: 首次支持Qwen3_5模型
 
 ---
 <a id="jump1"></a>
@@ -52,23 +52,18 @@ commit_id=fc91372
 
 <a id="jump1.2"></a>
 #### 2. 环境搭建
+拉取MindSpeed MM代码仓，并进入代码仓根目录：
 ```bash
-git clone --branch fsdp2_dev https://gitcode.com/Ascend/MindSpeed-MM.git
-
-# 安装mindspeed及依赖
-git clone https://gitcode.com/Ascend/MindSpeed.git
-cd MindSpeed
-cp -r mindspeed ../MindSpeed-MM/
-
-# 安装mindspeed mm及依赖
-cd ../MindSpeed-MM
-pip install -e .
-
-# 安装新版transformers
-git clone https://github.com/huggingface/transformers.git
-cd transformers
-git checkout fc91372
-pip install -e .
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+cd MindSpeed-MM
+```
+对于X86架构机器，执行如下指令：
+```bash
+bash scripts/install.sh --arch x86 --msid eb10b92fa0660c8d5426012795cfe2335814496f && pip install -r examples/fsdp2/qwen3_5/requirements.txt
+```
+对于ARM架构机器，执行如下指令：
+```bash
+bash scripts/install.sh --arch arm --msid eb10b92fa0660c8d5426012795cfe2335814496f && pip install -r examples/fsdp2/qwen3_5/requirements.txt
 ```
 
 ---
