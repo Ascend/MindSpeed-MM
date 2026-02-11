@@ -1981,3 +1981,9 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
             model_kwargs["encoder_outputs"] = _expand_dict_for_generation(model_kwargs["encoder_outputs"])
 
         return input_ids, model_kwargs
+
+
+if IS_NPU_AVAILABLE:
+    from .npu_patch import apply_qwen3vl_moe_npu_patch
+
+    apply_qwen3vl_moe_npu_patch()
