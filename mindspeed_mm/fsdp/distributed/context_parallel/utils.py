@@ -2,6 +2,9 @@ from typing import List, Optional, Union, Tuple
 
 import torch
 import torch.distributed as dist
+from transformers.modeling_flash_attention_utils import prepare_fa_kwargs_from_position_ids
+
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
 
 def cal_split_sizes(dim_size: int, world_size: int):
@@ -63,3 +66,23 @@ def reorder_output(attn_output, cp_rank, cp_size, cp_group, dim=0):
     reordered_chunks = [chunks[idx] for idx in target_list]
     attn_output = torch.concat(reordered_chunks, dim=dim)
     return attn_output
+
+
+def generate_ulysses_cu_seqlen_params(position_ids):
+    """
+    Generate cumulative sequence length parameters for Ulysses Flash Attention.
+    """
+    (cu_seq_lens_q, cu_seq_lens_k), (max_length_q, max_length_k) = prepare_fa_kwargs_from_position_ids(position_ids)
+    
+    # Handle device placement based on NPU availability
+    # GPU needs cuda. But NPU needs cpu in case of host&device synchronizing when calculating FA.
+    if IS_NPU_AVAILABLE:
+        cu_seq_lens_q = cu_seq_lens_q.cpu()
+        cu_seq_lens_k = cu_seq_lens_k.cpu()
+
+    return {
+        "cu_seq_lens_q": cu_seq_lens_q,
+        "cu_seq_lens_k": cu_seq_lens_k,
+        "max_length_q": max_length_q,
+        "max_length_k": max_length_k
+    }

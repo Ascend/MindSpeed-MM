@@ -40,6 +40,7 @@ from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
@@ -1055,10 +1056,14 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel):
             position_ids=text_position_ids,
         )
 
+        # Modification: For Ulysses, cu_seq_len needs to be calculated before position_ids split
+        ps = get_parallel_state()
+        if ps.is_ulysses_enable():
+            kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
+
         # Modification: sequence parallel patch
         total_seq_len = inputs_embeds.shape[1]
         set_seq_len("total", total_seq_len)
-        ps = get_parallel_state()
         if self.training and ps.is_cp_enable():
             position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
             text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
