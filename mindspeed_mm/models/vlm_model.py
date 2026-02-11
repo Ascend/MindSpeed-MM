@@ -90,6 +90,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         self.share_embeddings_and_output_weights = not getattr(config.text_decoder,
                                                                'untie_embeddings_and_output_weights', True)
         self.img_context_token_id = config.img_context_token_id
+        self.vision_start_token_id = getattr(config, "vision_start_token_id", None)
 
         # initialize pipeline parallel configs
         self.pp_size = mpu.get_pipeline_model_parallel_world_size()
@@ -599,7 +600,8 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         if self.add_image_encoder and self.image_encoder.pre_process and kwargs.get('llm_only', False):
             vit_embeds = kwargs.get('vit_embeds').unsqueeze(1)
         elif self.add_image_encoder and pixel_values is not None and not hetero_pp:
-            encoder_out = self.image_encoder(pixel_values, image_grid_thw)
+            text_img_num = (input_ids == self.vision_start_token_id).sum(dim=1) if get_args().hetero_parallel else None
+            encoder_out = self.image_encoder(pixel_values, image_grid_thw, text_img_num)
             if isinstance(encoder_out, tuple) and len(encoder_out) == 2:
                 vit_embeds, deepstack_image_embeds = encoder_out
                 kwargs["deepstack_image_embeds"] = deepstack_image_embeds

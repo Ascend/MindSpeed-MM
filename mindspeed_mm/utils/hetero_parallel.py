@@ -21,30 +21,35 @@ _HeteroParallelModules = ['image_encoder', 'audio_encoder', 'text_decoder']
 
 def apply_hetero_parallel_hooks(model):
 
-    if hasattr(model, 'image_encoder'):
+    if hasattr(model, 'image_encoder') and model.image_encoder is not None:
         model.image_encoder.register_forward_pre_hook(image_encoder_forward_pre_hook)
         model.image_encoder.register_forward_hook(image_encoder_forward_hook)
-    if hasattr(model, 'audio_encoder'):
+    if hasattr(model, 'audio_encoder') and model.audio_encoder is not None:
         model.audio_encoder.register_forward_pre_hook(audio_encoder_forward_pre_hook)
         model.audio_encoder.register_forward_hook(audio_encoder_forward_hook)
 
 
 def image_encoder_forward_pre_hook(module, input):
-    pixel_values, image_grid_thw = input
-            
+    pixel_values, image_grid_thw, text_img_num = input
     change_parallel_state('text_decoder')
     pixel_values, _ = all_gather_dp_group(pixel_values, pad_dim=0, remove_padding=True)
-    image_grid_thw, _ = all_gather_dp_group(image_grid_thw)
+    image_grid_thw, _ = all_gather_dp_group(image_grid_thw, pad_dim=0, remove_padding=True)
+    text_img_num, _ = all_gather_dp_group(text_img_num, cat_dim=0)
     change_parallel_state('image_encoder')
 
-    chunk_seq_lens = []
-    for chunk in torch.chunk(image_grid_thw, chunks=mpu.get_data_parallel_world_size(), dim=0):
-        chunk_seq_lens.append(chunk.prod(dim=1).sum())
-    chunk_seq_lens = torch.stack(chunk_seq_lens).tolist()
-
-    pixel_values = split_tensor_dp_group(pixel_values, pad_dim=0, chunk_seq_lens=chunk_seq_lens)  # [B, S]
-    image_grid_thw = split_tensor_dp_group(image_grid_thw, split_dim=0)
-
+    pv_lens = []	
+    thw_num_per_DP_rank = []
+    for text_img_num_chunk in torch.chunk(text_img_num, chunks=mpu.get_data_parallel_world_size(), dim=0):
+        thw_num_per_DP_rank.append(text_img_num_chunk.sum())
+    start = 0
+    for thw_num in thw_num_per_DP_rank:
+        end = start + thw_num
+        block = image_grid_thw[start:end]         
+        prod = block.prod(dim=1).sum()          
+        pv_lens.append(prod)
+        start = end
+    pixel_values = split_tensor_dp_group(pixel_values, pad_dim=0, chunk_seq_lens=pv_lens)  # [B, S]
+    image_grid_thw = split_tensor_dp_group(image_grid_thw, split_dim=0, chunk_seq_lens=thw_num_per_DP_rank)
     return pixel_values, image_grid_thw
 
 
