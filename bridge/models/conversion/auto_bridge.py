@@ -38,9 +38,6 @@ CLASS_MODULE_MAPPING = {
     "WanTransformer3DModel": ("bridge.models", "WanTransformer3DModel"),
 }
 
-GENERATION_MODEL_PREFIXES = (
-    "WanTransformer",
-)
 
 # Preformatted display string for error/help messages
 SUPPORTED_HF_ARCHITECTURES_DISPLAY = " or ".join(f"'{s}'" for s in SUPPORTED_HF_ARCHITECTURES)
@@ -144,9 +141,6 @@ class AutoBridge(Generic[MegatronModelT]):
 
     # Modification：Model Index for Generative Models
     def _resolve_generation_model_architecture(self, class_name: str, config) -> Type:
-        if not any(class_name.startswith(prefix) for prefix in GENERATION_MODEL_PREFIXES):
-            raise ValueError(f"Unsupported model type: {class_name}")
-
         if class_name not in CLASS_MODULE_MAPPING:
             raise KeyError(f"No mapping found for: {class_name}")
 

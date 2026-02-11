@@ -51,7 +51,7 @@ class PatchesManager:
             ("megatron.training.training.get_model", training_patches.get_dist_model_load_from_pt)
         ],
         "bridge_patch": [
-            ("megatron.training.training.load_checkpoint", bridge_patch.load_checkpoint_bridge)
+            ("megatron.training.training.get_model", bridge_patch.get_model)
         ],
         "scale_grad": [
             ("megatron.core.distributed.TorchFullyShardedDataParallel.scale_gradients", fsdp2_patches.scale_gradients)

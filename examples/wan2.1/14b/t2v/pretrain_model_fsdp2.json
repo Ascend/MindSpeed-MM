@@ -35,7 +35,6 @@
     },
     "patch": {
         "clip_grad_async": true,
-        "get_dist_model_load_from_pt": true,
-        "bridge_patch": false
+        "bridge_patch": true
     }
 }
