@@ -25,17 +25,12 @@ data:
     dataset_type: huggingface
     #数据集属性
     attr:
-      # system: null
       images: images
-      # videos: null
       messages: messages
       role_tag: role
       content_tag: content
       user_tag: user
       assistant_tag: assistant
-      # observation_tag: null
-      # function_tag: null
-      # system_tag: null
 
     # 数据预处理
     preprocess_parameters:
@@ -55,7 +50,6 @@ data:
       enable_thinking: false
       train_on_prompt: false
       mask_history: false
-      # tool_format: null
       dataset_dir: ./data
       dataset: &DATASET_PATH /data2/data/qwen_data/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
@@ -90,9 +84,6 @@ model:
     chunk_size: 1024
     router_aux_loss_coef: 0.0
   use_triton_gdn: true
-  # activation_offload_plan:
-  #   apply_modules:
-  #     - model.language_model.layers.{*}
 
 # 训练配置
 training:
@@ -109,8 +100,8 @@ training:
   optimizer: adamw
   adam_fused: true
   save_interval: 10000
-  # load: load_path
-  # save: save_path
+  load: dcp_load_path
+  save: save_path
   use_deter_comp: false
   profile:
     enable: false
