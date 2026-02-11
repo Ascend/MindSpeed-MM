@@ -36,6 +36,7 @@ SUPPORTED_HF_ARCHITECTURES: tuple[str, ...] = (
 
 CLASS_MODULE_MAPPING = {
     "WanTransformer3DModel": ("bridge.models", "WanTransformer3DModel"),
+    "HunyuanVideo_1_5_DiffusionTransformer": ("bridge.models", "HunyuanVideo_1_5_DiffusionTransformer")
 }
 
 
