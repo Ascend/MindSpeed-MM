@@ -82,6 +82,20 @@ bash scripts/install.sh --arch arm --msid eb10b92fa0660c8d5426012795cfe233581449
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
 
+如果使用fsdp2的meta init初始化模型，需要先完成以下权重转换
+```bash
+mm-convert GenericDCPConverter hf_to_dcp \
+--hf_dir ckpt/hf_path/xxxxxxx \
+--dcp_dir ckpt/mm_path/xxxxxxx \
+--tie_weight_mapping '{"lm_head.weight":"model.language_model.embed_tokens.weight"}' 
+
+# 转换后的目录结构为：
+# ———— xxxxxxx
+#   |—— release
+#   |—— latest_checkpointed_iteration.txt
+```
+并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
+
 ---
 <a id="jump3"></a>
 ## 数据集准备及处理
