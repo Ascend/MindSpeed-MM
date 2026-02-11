@@ -88,7 +88,7 @@ class Profiler:
             on_trace_ready=handler_fn,
             record_shapes=self.config.record_shapes,
             profile_memory=self.config.with_memory,
-            with_modules=True,
+            with_modules=False,
             with_stack=self.config.with_stack,
             experimental_config=experimental_config,
         )

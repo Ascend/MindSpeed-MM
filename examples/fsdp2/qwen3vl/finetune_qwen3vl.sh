@@ -15,5 +15,5 @@ DISTRIBUTED_ARGS="
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT
 "
-torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/base_trainer.py \
+torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
     examples/fsdp2/qwen3vl/qwen3vl_config.yaml
