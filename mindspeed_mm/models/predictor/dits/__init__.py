@@ -5,7 +5,7 @@ __all__ = [
     "VideoDitSparseI2V",
     "PTDiT",
     "HunyuanVideoDiT",
-    "HunyuanVideo15DiT"
+    "HunyuanVideo15DiT",
     "WanDiT",
     "StepVideoDiT",
     "SparseUMMDiT",

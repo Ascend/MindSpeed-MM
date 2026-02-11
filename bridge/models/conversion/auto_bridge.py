@@ -23,7 +23,6 @@ from bridge.models.conversion import model_bridge
 from bridge.models.conversion.model_bridge import MegatronModelBridge
 from bridge.models.hf_pretrained.causal_lm import PreTrainedCausalLM
 
-
 MegatronModelT = TypeVar("MegatronModelT", bound=MegatronModule)
 DataclassT = TypeVar("DataclassT")
 
@@ -60,10 +59,10 @@ class AutoBridge(Generic[MegatronModelT]):
             raise ValueError(f"Failed to load model with AutoBridge: {e}") from e
 
     def load_hf_weights(
-        self,
-        model: list[MegatronModelT],
-        hf_path: str | Path | None = None,
-        allowed_mismatched_params: list[str] | None = None,
+            self,
+            model: list[MegatronModelT],
+            hf_path: str | Path | None = None,
+            allowed_mismatched_params: list[str] | None = None,
     ) -> None:
 
         if hf_path is None:
@@ -93,7 +92,6 @@ class AutoBridge(Generic[MegatronModelT]):
                 config = json.load(f)
         else:
             config = {}
-
 
         if isinstance(config, dict) and "_class_name" in config:
             class_name = config["_class_name"]
@@ -152,7 +150,6 @@ class AutoBridge(Generic[MegatronModelT]):
             return getattr(module, actual_class_name)
         except (ImportError, AttributeError) as e:
             raise ImportError(f"Unable import {module_name}.{actual_class_name}: {e}") from e
-
 
     def _get_model_instance(self, model: list[MegatronModelT]) -> MegatronModelT:
         model_instance = model[0]
