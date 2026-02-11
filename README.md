@@ -45,49 +45,49 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 
-* [Feb. 03, 2026]: 🚀 MindSpeed MM基于FSDP2支持[DeepseekOCR2](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/deepseekocr2/README.md)模型训练demo【Prototype】
-* [Jan. 29, 2026]: 🎉 昇腾镜像仓库上线[MindSpeed MM镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)
-* [Jan. 29, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3-TTS](https://gitcode.com/Ascend/MindSpeed-MM/tree/fsdp2_dev/examples/fsdp2/qwen3tts)模型
-* [Jan. 28, 2026]: 🚀 MindSpeed MM基于FSDP2支持Magistral-Small-2509模型
-* [Jan. 08, 2026]: 🚀 MindSpeed MM支持FLUX.2模型【Prototype】
-* [Dec. 25, 2025]: 🎉 用户手册上线！体验链接：<https://mindspeed-mm.readthedocs.io/zh-cn/latest/>
-* [Dec. 03, 2025]: 🚀 MindSpeed MM基于FSDP2支持Glm4.5v模型训练demo【Prototype】
-* [Dec. 02, 2025]: 🚀 MindSpeed MM支持Self-Forcing基于Wan2.1-1.3B的DMD蒸馏 【Prototype】
-* [Nov. 27, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-235B模型
-* [Nov. 20, 2025]: 🚀 MindSpeed MM基于FSDP2支持Qwen3-Omni模型
-* [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型 【Prototype】
-* [Nov. 13, 2025]: 🚀 MindSpeed MM基于FSDP2支持InternVL3.5-30B模型
-* [Nov. 06, 2025]: 🚀 MindSpeed MM基于FSDP2支持DeepseekOCR模型训练demo【Prototype】
-* [Oct. 31, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-8B/30B模型
-* [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型
-* [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型
-* [Sep. 8, 2025]: 🚀 MindSpeed MM支持FLUX **强化学习** DanceGRPO训练
-* **[Sep. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/verl_examples/qwen2.5vl/README.md)**
-* [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
-* [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
-* [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型
-* [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型
-* [Jun. 30, 2025]: 🌴 MindSpeed MM版本2.1.0发布
-* [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型
-* [Jun. 05, 2025]: 🚀 MindSpeed MM支持Qwen2.5Omni-7B模型
-* [Jun. 05, 2025]: 🤝 MindSpeed MM**原生支持**OpenSoraPlan 1.5模型
-* [Apr. 03, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-32B模型
-* [Mar. 27, 2025]: 🚀 MindSpeed MM支持Wan2.1-1.3B/14B模型
-* [Mar. 26, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-3B/7B/72B模型
-* [Feb. 20, 2025]: 🚀 MindSpeed MM支持InternVL2.5-78B模型
-* [Feb. 18, 2025]: 🚀 MindSpeed MM支持HunyuanVideo模型
-* [Feb. 17, 2025]: 🔥 MindSpeed MM支持Mindspeed-Core & Megatron 0.8.0版本
-* [Feb. 15, 2025]: 🚀 MindSpeed MM支持Sana模型
-* [Jan. 24, 2025]: 🚀 MindSpeed MM支持CogVideoX 1.5模型
-* [Dec. 30, 2024]: 🌴 MindSpeed MM版本1.0.0发布
-* [Dec. 16, 2024]: 🤝 MindSpeed MM**原生支持**Qihoo-T2X模型
-* [Dec. 03, 2024]: 🚀 MindSpeed MM支持SD3.5模型
-* [Nov. 30, 2024]: 🎉 MindSpeed MM支持多模态理解测评
-* [Nov. 22, 2024]: 🚀 MindSpeed MM支持CogVideoX模型
-* [Nov. 06, 2024]: 🚀 MindSpeed MM支持FLUX模型
-* [Oct. 30, 2024]: 🤝 MindSpeed MM**原生支持**OpenSoraPlan 1.3模型
-* [Oct. 21, 2024]: 🚀 MindSpeed MM支持InternVL2、以及Qwen2VL模型
-* [Oct. 16, 2024]: 🌱 MindSpeed MM首版本1.0.RC3发布
+- [Feb. 03, 2026]: 🚀 MindSpeed MM基于FSDP2支持[DeepseekOCR2](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/deepseekocr2/README.md)模型训练demo【Prototype】
+- [Jan. 29, 2026]: 🎉 昇腾镜像仓库上线[MindSpeed MM镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)
+- [Jan. 29, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3-TTS](https://gitcode.com/Ascend/MindSpeed-MM/tree/fsdp2_dev/examples/fsdp2/qwen3tts)模型【Prototype】
+- [Jan. 28, 2026]: 🚀 MindSpeed MM基于FSDP2支持Magistral-Small-2509模型【Prototype】
+- [Jan. 08, 2026]: 🚀 MindSpeed MM支持FLUX.2模型【Prototype】
+- [Dec. 25, 2025]: 🎉 用户手册上线！体验链接：<https://mindspeed-mm.readthedocs.io/zh-cn/latest/>
+- [Dec. 03, 2025]: 🚀 MindSpeed MM基于FSDP2支持Glm4.5v模型训练demo【Prototype】
+- [Dec. 02, 2025]: 🚀 MindSpeed MM支持Self-Forcing基于Wan2.1-1.3B的DMD蒸馏 【Prototype】
+- [Nov. 27, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-235B模型
+- [Nov. 20, 2025]: 🚀 MindSpeed MM基于FSDP2支持Qwen3-Omni模型
+- [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型
+- [Nov. 13, 2025]: 🚀 MindSpeed MM基于FSDP2支持InternVL3.5-30B模型
+- [Nov. 06, 2025]: 🚀 MindSpeed MM基于FSDP2支持DeepseekOCR模型训练demo
+- [Oct. 31, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-8B/30B模型
+- [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型
+- [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型
+- [Sep. 8, 2025]: 🚀 MindSpeed MM支持FLUX **强化学习** DanceGRPO训练
+- **[Sep. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/verl_examples/qwen2.5vl/README.md)**
+- [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
+- [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
+- [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型
+- [Jul. 02, 2025]: ⚡ MindSpeed MM **0Day**支持GLM-4.1V模型
+- [Jun. 30, 2025]: 🌴 MindSpeed MM版本2.1.0发布
+- [Jun. 25, 2025]: 🚀 MindSpeed MM支持HiDream-I1模型
+- [Jun. 05, 2025]: 🚀 MindSpeed MM支持Qwen2.5Omni-7B模型
+- [Jun. 05, 2025]: 🤝 MindSpeed MM**原生支持**OpenSoraPlan 1.5模型
+- [Apr. 03, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-32B模型
+- [Mar. 27, 2025]: 🚀 MindSpeed MM支持Wan2.1-1.3B/14B模型
+- [Mar. 26, 2025]: 🚀 MindSpeed MM支持Qwen2.5VL-3B/7B/72B模型
+- [Feb. 20, 2025]: 🚀 MindSpeed MM支持InternVL2.5-78B模型
+- [Feb. 18, 2025]: 🚀 MindSpeed MM支持HunyuanVideo模型
+- [Feb. 17, 2025]: 🔥 MindSpeed MM支持Mindspeed-Core & Megatron 0.8.0版本
+- [Feb. 15, 2025]: 🚀 MindSpeed MM支持Sana模型
+- [Jan. 24, 2025]: 🚀 MindSpeed MM支持CogVideoX 1.5模型
+- [Dec. 30, 2024]: 🌴 MindSpeed MM版本1.0.0发布
+- [Dec. 16, 2024]: 🤝 MindSpeed MM**原生支持**Qihoo-T2X模型
+- [Dec. 03, 2024]: 🚀 MindSpeed MM支持SD3.5模型
+- [Nov. 30, 2024]: 🎉 MindSpeed MM支持多模态理解测评
+- [Nov. 22, 2024]: 🚀 MindSpeed MM支持CogVideoX模型
+- [Nov. 06, 2024]: 🚀 MindSpeed MM支持FLUX模型
+- [Oct. 30, 2024]: 🤝 MindSpeed MM**原生支持**OpenSoraPlan 1.3模型
+- [Oct. 21, 2024]: 🚀 MindSpeed MM支持InternVL2、以及Qwen2VL模型
+- [Oct. 16, 2024]: 🌱 MindSpeed MM首版本1.0.RC3发布
 
 > 注意： **Prototype**特性未经过充分验证，可能存在不稳定和bug问题，**beta**表示非商用特性。
 
@@ -191,8 +191,8 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 |:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|:------:|:------:|
 |   Magistral-Small-2509   |  |  |  |  |  |  | ✔ | ✔ |  | ✔ |
 |   InternVL3.5-30B   |  |  |  |  |  |  | ✔ |  |  | ✔ |
-|       Qwen3-VL-8B        |  |  |  |  |  |  | ✔ |  |  | ✔ |
-|       Qwen3-VL-30B        |  |  |  |  |  |  | ✔ |  |  | ✔ |
+|       Qwen3-VL-8B        |  |  |  |  |  |  | ✔ |  | ✔ | ✔ |
+|       Qwen3-VL-30B        |  |  |  |  |  |  | ✔ |  | ✔ | ✔ |
 |       Wan2.2        |  |  |  |  | CP (Ulysses) |  | ✔ |  |  | ✔ |
 | OpenSoraPlan1.5-T2V | ✔ | ✔ |  |  |  |  | ✔ |  |  |  |
 |       Wan2.1        |  |  |  |  | CP (Ulysses) | ✔ | ✔ | ✔ |  | ✔ |
@@ -216,18 +216,18 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 
 备注：
 
-* TP: [Tensor Parallel](https://arxiv.org/abs/1909.08053)
-* TP-SP: [Tensor Parallel with Sequence Parallel](https://arxiv.org/abs/2205.05198)
-* VPP: [Virtual Pipeline Parallel](https://arxiv.org/abs/2104.04473)
-* PP: [Pipeline Parallel](https://arxiv.org/abs/2104.04473)
-* DSP: [Dynamic Sequence Parallel](https://arxiv.org/abs/2403.10266)
-* CP (Ulysses): [Context Parallel](https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/context_parallel.html) by leveraging [Deepspeed Ulysses](https://arxiv.org/abs/2309.14509) with Sequence Parallel
-* CP (Ring Attention): Context Parallel with [Ring Attention](https://arxiv.org/abs/2310.01889)
-* Distributed Optimizer: [Zero Redundancy Optimizer](https://arxiv.org/abs/1910.02054) (ZeRO)
-* Recomputation: Reducing Activation [Recomputation](https://arxiv.org/abs/2205.05198)
-* LoRA: [Low-Rank Adaptation](https://arxiv.org/abs/2106.09685)
-* RL: Reinforcement Learning
-* FSDP2: [Fully Sharded Data Parallelism](https://arxiv.org/abs/2304.11277)
+- TP: [Tensor Parallel](https://arxiv.org/abs/1909.08053)
+- TP-SP: [Tensor Parallel with Sequence Parallel](https://arxiv.org/abs/2205.05198)
+- VPP: [Virtual Pipeline Parallel](https://arxiv.org/abs/2104.04473)
+- PP: [Pipeline Parallel](https://arxiv.org/abs/2104.04473)
+- DSP: [Dynamic Sequence Parallel](https://arxiv.org/abs/2403.10266)
+- CP (Ulysses): [Context Parallel](https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/context_parallel.html) by leveraging [Deepspeed Ulysses](https://arxiv.org/abs/2309.14509) with Sequence Parallel
+- CP (Ring Attention): Context Parallel with [Ring Attention](https://arxiv.org/abs/2310.01889)
+- Distributed Optimizer: [Zero Redundancy Optimizer](https://arxiv.org/abs/1910.02054) (ZeRO)
+- Recomputation: Reducing Activation [Recomputation](https://arxiv.org/abs/2205.05198)
+- LoRA: [Low-Rank Adaptation](https://arxiv.org/abs/2106.09685)
+- RL: Reinforcement Learning
+- FSDP2: [Fully Sharded Data Parallelism](https://arxiv.org/abs/2304.11277)
 
 ---
 
@@ -1026,12 +1026,12 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 
 ---
 
-* 【新模型】  JanusPro
-* 【模型特性】 CogVideoX: PP
-* 【模型特性】 OpensoraPlan1.3: CP (Ring Attention)
-* 【模型特性】 Qwen2VL: VPP, CP (Ulysses & Ring Attention)
-* 【模型特性】 InternVL2: TP, CP (Ulysses & Ring Attention)
-* 【基础特性】 Hetero-parallel
+- 【新模型】  JanusPro
+- 【模型特性】 CogVideoX: PP
+- 【模型特性】 OpensoraPlan1.3: CP (Ring Attention)
+- 【模型特性】 Qwen2VL: VPP, CP (Ulysses & Ring Attention)
+- 【模型特性】 InternVL2: TP, CP (Ulysses & Ring Attention)
+- 【基础特性】 Hetero-parallel
 
 <a id="jump2"></a>
 
@@ -1149,16 +1149,16 @@ MindSpeed MM 由华为公司的下列部门及昇腾生态合作伙伴联合贡�
 
 华为公司：
 
-* 计算产品线
-* 公共开发部
-* 2012实验室
-* 华为云
+- 计算产品线
+- 公共开发部
+- 2012实验室
+- 华为云
 
 生态合作伙伴：
 
-* 360 AI Research
-* 北大OpenSoraPlan团队
-* 微信技术架构部基础架构中心
-* 京东零售九数研发技术部
+- 360 AI Research
+- 北大OpenSoraPlan团队
+- 微信技术架构部基础架构中心
+- 京东零售九数研发技术部
 
 感谢来自社区的每一个PR，欢迎贡献 MindSpeed MM。
