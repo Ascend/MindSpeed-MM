@@ -1,1 +1,3 @@
 -e git+https://github.com/huggingface/transformers.git@fc91372#egg=transformers
+triton-ascend==3.2.0
+accelerate==1.2.0

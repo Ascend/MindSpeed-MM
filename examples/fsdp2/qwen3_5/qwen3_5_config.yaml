@@ -1,7 +1,7 @@
 # 并行策略
 parallel:
   tensor_parallel_size: 1
-  fully_shard_parallel_size: 2
+  fully_shard_parallel_size: auto
   fsdp_plan:
     apply_modules:
       - model.visual.blocks.{*}

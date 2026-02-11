@@ -6,8 +6,12 @@ parallel:
     apply_modules:
       - model.visual.blocks.{*}
       - model.visual
+      - model.language_model.layers.{*}.linear_attn
+      - model.language_model.layers.{*}.mlp
       - model.language_model.layers.{*}
       - model.language_model.embed_tokens
+      - model.language_model.norm
+      - model.language_model.rotary_emb
       - model.language_model
       - lm_head
     param_dtype: bf16
