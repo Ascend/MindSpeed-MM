@@ -31,7 +31,7 @@ from transformers.activations import ACT2FN
 from transformers.utils import auto_docstring, can_return_tuple
 from transformers.masking_utils import create_causal_mask
 from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
-from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel
 from transformers.modeling_outputs import BaseModelOutput, BaseModelOutputWithPast
 from transformers.utils.generic import OutputRecorder, TransformersKwargs, check_model_inputs
 from transformers.processing_utils import Unpack
@@ -47,7 +47,14 @@ import torch.nn.functional as F
 
 from mindspeed_mm.models.common.gmm import npu_group_gemm
 from mindspeed_mm.utils.async_offload import async_save_on_cpu
-from .modules import Qwen3OmniLMHead
+from mindspeed_mm.models.transformers.qwen3vl.utils import get_seq_len, set_seq_len
+from .modules import (
+    Qwen3OmniMoeAudioAttention,
+    Qwen3OmniMoeVisionAttention,
+    Qwen3OmniMoeThinkerTextRMSNorm,
+    Qwen3OmniMoeThinkerTextAttention,
+    Qwen3OmniLMHead,
+)
 from .modeling_outputs import Qwen3OmniMoeThinkerCausalLMOutputWithPast
 
 
@@ -434,117 +441,7 @@ class Qwen3OmniMoePreTrainedModelForConditionalGeneration(Qwen3OmniMoePreTrained
             return position_ids, mrope_position_deltas
 
 
-def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
-    """
-    This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
-    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
-    """
-    batch, num_key_value_heads, slen, head_dim = hidden_states.shape
-    if n_rep == 1:
-        return hidden_states
-    hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
-    return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
-
-
-def eager_attention_forward(
-    module: nn.Module,
-    query: torch.Tensor,
-    key: torch.Tensor,
-    value: torch.Tensor,
-    attention_mask: Optional[torch.Tensor],
-    scaling: float,
-    dropout: float = 0.0,
-    **kwargs,
-):
-    key_states = repeat_kv(key, module.num_key_value_groups)
-    value_states = repeat_kv(value, module.num_key_value_groups)
-
-    attn_weights = torch.matmul(query, key_states.transpose(2, 3)) * scaling
-    if attention_mask is not None:
-        causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
-        attn_weights = attn_weights + causal_mask
-
-    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query.dtype)
-    attn_weights = nn.functional.dropout(attn_weights, p=dropout, training=module.training)
-    attn_output = torch.matmul(attn_weights, value_states)
-    attn_output = attn_output.transpose(1, 2).contiguous()
-
-    return attn_output, attn_weights
-
-
-class Qwen3OmniMoeAudioAttention(nn.Module):
-    """Multi-headed attention from 'Attention Is All You Need' paper"""
-
-    def __init__(self, config):
-        super().__init__()
-        self.embed_dim = config.d_model
-        self.num_heads = config.encoder_attention_heads
-        self.dropout = config.attention_dropout
-        self.head_dim = self.embed_dim // self.num_heads
-        self.num_key_value_groups = 1  # needed for eager attention
-        self.config = config
-
-        if (self.head_dim * self.num_heads) != self.embed_dim:
-            raise ValueError(
-                f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim}"
-                f" and `num_heads`: {self.num_heads})."
-            )
-        self.scaling = self.head_dim**-0.5
-        self.attention_dropout = 0.0
-        self.is_decoder = False
-        self.is_causal = False
-        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
-        self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
-        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
-        self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
-
-    def forward(
-        self,
-        hidden_states: torch.Tensor,
-        cu_seqlens: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        **kwargs,
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[tuple[torch.Tensor]]]:
-        """Input shape: Batch x Time x Channel"""
-
-        seq_length, _ = hidden_states.size() # [seq_length, d_model=1280]
-
-        query_states = self.q_proj(hidden_states).reshape(seq_length, self.num_heads, -1) # [s,n,]
-        key_states = self.k_proj(hidden_states).reshape(seq_length, self.num_heads, -1)
-        value_states = self.v_proj(hidden_states).reshape(seq_length, self.num_heads, -1)
-
-        query_states = query_states.transpose(0, 1).unsqueeze(0) # [1,n,s,]
-        key_states = key_states.transpose(0, 1).unsqueeze(0)
-        value_states = value_states.transpose(0, 1).unsqueeze(0)
-        max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
-
-        attention_interface: Callable = eager_attention_forward
-        if self.config._attn_implementation != "eager":
-            attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-
-        attn_output, _ = attention_interface(
-            self,
-            query_states,
-            key_states,
-            value_states,
-            attention_mask=attention_mask,
-            dropout=0.0 if not self.training else self.attention_dropout,
-            scaling=self.scaling,
-            cu_seq_lens_q=cu_seqlens,  # pass cu seq lens for FA2
-            cu_seq_lens_k=cu_seqlens,
-            max_length_q=max_seqlen,
-            max_length_k=max_seqlen,
-            is_causal=False,
-            **kwargs,
-        )
-
-        attn_output = attn_output.reshape(seq_length, -1).contiguous()
-        attn_output = self.out_proj(attn_output)
-
-        return attn_output
-
-
-class Qwen3OmniMoeAudioEncoderLayer(GradientCheckpointingLayer):
+class Qwen3OmniMoeAudioEncoderLayer(nn.Module):
     def __init__(self, config: Qwen3OmniMoeAudioEncoderConfig):
         super().__init__()
         self.embed_dim = config.d_model
@@ -747,6 +644,8 @@ class Qwen3OmniMoeAudioEncoder(Qwen3OmniMoePreTrainedModel):
             if remainder != 0:
                 cu_chunk_lens += [remainder]
         cu_seqlens = torch.tensor(cu_chunk_lens, device=aftercnn_lens.device).cumsum(-1, dtype=torch.int32)
+        cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
+        cu_seqlens = tuple(cu_seqlens.cpu().numpy().tolist())
 
         for encoder_layer in self.layers:
             layer_outputs = encoder_layer(
@@ -808,111 +707,6 @@ class Qwen3OmniMoeAudioEncoder(Qwen3OmniMoePreTrainedModel):
         input_lengths = (input_lengths - 1) // 2 + 1
         output_lengths = (input_lengths - 2) // 2 + 1
         return input_lengths, output_lengths
-
-
-def rotate_half(x):
-    """Rotates half the hidden dims of the input."""
-    x1 = x[..., :x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2:]
-    return torch.cat((-x2, x1), dim=-1)
-
-
-def apply_rotary_pos_emb_vision(
-    q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor
-) -> tuple[torch.Tensor, torch.Tensor]:
-    orig_q_dtype = q.dtype
-    orig_k_dtype = k.dtype
-    q, k = q.float(), k.float()
-    cos, sin = cos.unsqueeze(-2).float(), sin.unsqueeze(-2).float()
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
-    q_embed = q_embed.to(orig_q_dtype)
-    k_embed = k_embed.to(orig_k_dtype)
-    return q_embed, k_embed
-
-
-class Qwen3OmniMoeVisionAttention(nn.Module):
-    def __init__(self, config: Qwen3OmniMoeVisionEncoderConfig) -> None:
-        super().__init__()
-        self.dim = config.hidden_size
-        self.num_heads = config.num_heads
-        self.head_dim = self.dim // self.num_heads
-        self.num_key_value_groups = 1  # needed for eager attention
-        self.qkv = nn.Linear(self.dim, self.dim * 3, bias=True)
-        self.proj = nn.Linear(self.dim, self.dim)
-        self.scaling = self.head_dim**-0.5
-        self.config = config
-        self.attention_dropout = 0.0
-        self.is_causal = False
-
-    def forward(
-        self,
-        hidden_states: torch.Tensor,
-        cu_seqlens: torch.Tensor,
-        rotary_pos_emb: Optional[torch.Tensor] = None,
-        position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,
-        **kwargs,
-    ) -> torch.Tensor:
-        seq_length = hidden_states.shape[0]
-        query_states, key_states, value_states = (
-            self.qkv(hidden_states).reshape(seq_length, 3, self.num_heads, -1).permute(1, 0, 2, 3).unbind(0)
-        )
-        cos, sin = position_embeddings
-        query_states, key_states = apply_rotary_pos_emb_vision(query_states, key_states, cos, sin)
-
-        query_states = query_states.transpose(0, 1).unsqueeze(0)
-        key_states = key_states.transpose(0, 1).unsqueeze(0)
-        value_states = value_states.transpose(0, 1).unsqueeze(0)
-
-        attention_interface: Callable = eager_attention_forward
-        if self.config._attn_implementation != "eager":
-            attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-
-        if self.config._attn_implementation == "flash_attention_2":
-            # Flash Attention 2: Use cu_seqlens for variable length attention
-            max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
-            attn_output, _ = attention_interface(
-                self,
-                query_states,
-                key_states,
-                value_states,
-                attention_mask=None,
-                scaling=self.scaling,
-                dropout=0.0 if not self.training else self.attention_dropout,
-                cu_seq_lens_q=cu_seqlens,
-                cu_seq_lens_k=cu_seqlens,
-                max_length_q=max_seqlen,
-                max_length_k=max_seqlen,
-                is_causal=False,
-                **kwargs,
-            )
-        else:
-            # Other implementations: Process each chunk separately
-            lengths = cu_seqlens[1:] - cu_seqlens[:-1]
-            splits = [
-                torch.split(tensor, lengths.tolist(), dim=2)
-                for tensor in (query_states, key_states, value_states)
-            ]
-
-            attn_outputs = [
-                attention_interface(
-                    self,
-                    q,
-                    k,
-                    v,
-                    attention_mask=None,
-                    scaling=self.scaling,
-                    dropout=0.0 if not self.training else self.attention_dropout,
-                    is_causal=False,
-                    **kwargs,
-                )[0]
-                for q, k, v in zip(*splits)
-            ]
-            attn_output = torch.cat(attn_outputs, dim=1)
-
-        attn_output = attn_output.reshape(seq_length, -1).contiguous()
-        attn_output = self.proj(attn_output)
-        return attn_output
 
 
 class Qwen3OmniMoeVisionPatchMerger(nn.Module):
@@ -985,7 +779,7 @@ class Qwen3OmniMoeVisionRotaryEmbedding(nn.Module):
         return freqs
 
 
-class Qwen3OmniMoeVisionBlock(GradientCheckpointingLayer):
+class Qwen3OmniMoeVisionBlock(nn.Module):
     def __init__(self, config, attn_implementation: str = "sdpa") -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(config.hidden_size, eps=1e-6)
@@ -1182,6 +976,8 @@ class Qwen3OmniMoeVisionEncoder(Qwen3OmniMoePreTrainedModel):
             dtype=grid_thw.dtype if torch.jit.is_tracing() else torch.int32,
         )
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
+        cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
+        cu_seqlens = tuple(cu_seqlens.cpu().numpy().tolist())
 
         deepstack_feature_lists = []
         for layer_num, blk in enumerate(self.blocks):
@@ -1204,7 +1000,6 @@ class Qwen3OmniMoeVisionEncoder(Qwen3OmniMoePreTrainedModel):
     @property
     def deepstack_merger_list(self):
         return self.merger_list
-
 
 
 class Qwen3OmniMoeThinkerTextRotaryEmbedding(nn.Module):
@@ -1382,132 +1177,7 @@ class Qwen3OmniMoeThinkerTextSparseMoeBlock(nn.Module):
         return final_hidden_states.reshape(batch_size, sequence_length, hidden_dim)
 
 
-@use_kernel_forward_from_hub("RMSNorm")
-class Qwen3OmniMoeThinkerTextRMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6):
-        """
-        Qwen3OmniMoeThinkerTextRMSNorm is equivalent to T5LayerNorm
-        """
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.variance_epsilon = eps
-
-    def forward(self, hidden_states):
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * hidden_states.to(input_dtype)
-
-    def extra_repr(self):
-        return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
-
-
-def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
-    """Applies Rotary Position Embedding to the query and key tensors.
-
-    Args:
-        q (`torch.Tensor`): The query tensor.
-        k (`torch.Tensor`): The key tensor.
-        cos (`torch.Tensor`): The cosine part of the rotary embedding.
-        sin (`torch.Tensor`): The sine part of the rotary embedding.
-        position_ids (`torch.Tensor`, *optional*):
-            Deprecated and unused.
-        unsqueeze_dim (`int`, *optional*, defaults to 1):
-            The 'unsqueeze_dim' argument specifies the dimension along which to unsqueeze cos[position_ids] and
-            sin[position_ids] so that they can be properly broadcasted to the dimensions of q and k. For example, note
-            that cos[position_ids] and sin[position_ids] have the shape [batch_size, seq_len, head_dim]. Then, if q and
-            k have the shape [batch_size, heads, seq_len, head_dim], then setting unsqueeze_dim=1 makes
-            cos[position_ids] and sin[position_ids] broadcastable to the shapes of q and k. Similarly, if q and k have
-            the shape [batch_size, seq_len, heads, head_dim], then set unsqueeze_dim=2.
-    Returns:
-        `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
-    """
-    cos = cos.unsqueeze(unsqueeze_dim)
-    sin = sin.unsqueeze(unsqueeze_dim)
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
-    return q_embed, k_embed
-
-
-class Qwen3OmniMoeThinkerTextAttention(nn.Module):
-    """Multi-headed attention from 'Attention Is All You Need' paper"""
-
-    def __init__(self, config, layer_idx):
-        super().__init__()
-        self.config = config
-        self.layer_idx = layer_idx
-        self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
-        self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
-        self.scaling = self.head_dim**-0.5
-        self.attention_dropout = config.attention_dropout
-        self.is_causal = True
-
-        self.q_proj = nn.Linear(
-            config.hidden_size, config.num_attention_heads * self.head_dim, bias=config.attention_bias
-        )
-        self.k_proj = nn.Linear(
-            config.hidden_size, config.num_key_value_heads * self.head_dim, bias=config.attention_bias
-        )
-        self.v_proj = nn.Linear(
-            config.hidden_size, config.num_key_value_heads * self.head_dim, bias=config.attention_bias
-        )
-        self.o_proj = nn.Linear(
-            config.num_attention_heads * self.head_dim, config.hidden_size, bias=config.attention_bias
-        )
-        self.q_norm = Qwen3OmniMoeThinkerTextRMSNorm(
-            self.head_dim, eps=config.rms_norm_eps
-        )  # unlike olmo, only on the head dim!
-        self.k_norm = Qwen3OmniMoeThinkerTextRMSNorm(
-            self.head_dim, eps=config.rms_norm_eps
-        )  # thus post q_norm does not need reshape
-        self.sliding_window = None
-
-    def forward(
-        self,
-        hidden_states: torch.Tensor,
-        position_embeddings: tuple[torch.Tensor, torch.Tensor],
-        attention_mask: Optional[torch.Tensor],
-        past_key_values: Optional[Cache] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
-        input_shape = hidden_states.shape[:-1]
-        hidden_shape = (*input_shape, -1, self.head_dim)
-        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
-
-        cos, sin = position_embeddings
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-
-        if past_key_values is not None:
-            # sin and cos are specific to RoPE models; cache_position needed for the static cache
-            cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
-            key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx, cache_kwargs)
-
-        attention_interface: Callable = eager_attention_forward
-        if self.config._attn_implementation != "eager":
-            attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-
-        attn_output, attn_weights = attention_interface(
-            self,
-            query_states,
-            key_states,
-            value_states,
-            attention_mask,
-            dropout=0.0 if not self.training else self.attention_dropout,
-            scaling=self.scaling,
-            sliding_window=self.sliding_window,  # diff with Llama
-            **kwargs,
-        )
-
-        attn_output = attn_output.reshape(*input_shape, -1).contiguous()
-        attn_output = self.o_proj(attn_output)
-        return attn_output, attn_weights
-
-
-class Qwen3OmniMoeThinkerTextDecoderLayer(GradientCheckpointingLayer):
+class Qwen3OmniMoeThinkerTextDecoderLayer(nn.Module):
     def __init__(self, config, layer_idx):
         super().__init__()
         self.self_attn = Qwen3OmniMoeThinkerTextAttention(config, layer_idx)
@@ -1535,7 +1205,7 @@ class Qwen3OmniMoeThinkerTextDecoderLayer(GradientCheckpointingLayer):
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         # Self Attention
-        hidden_states, _ = self.self_attn(
+        hidden_states = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -1642,14 +1312,31 @@ class Qwen3OmniMoeThinkerTextModel(Qwen3OmniMoePreTrainedModel):
         else:
             text_position_ids = position_ids[0]
 
-        attention_mask = create_causal_mask(
-            config=self.config,
-            input_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            cache_position=cache_position,
-            past_key_values=past_key_values,
-            position_ids=text_position_ids,
-        )
+        total_seq_len = inputs_embeds.shape[1]
+        set_seq_len("total", total_seq_len)
+
+        if self.config.attn_layout == "TND":
+            if "seqlens" not in kwargs.keys():
+                # if kwargs already have key "seqlens" (i.e. the form of input data is TND), do not calculate seqlens again
+                seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
+            else:
+                seqlens_in_batch = kwargs["seqlens"]
+            cu_seqlens = F.pad(torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0))
+            cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
+            kwargs["cu_seqlens"] = tuple(cu_seqlens.cpu().numpy().tolist())
+            if "indices" not in kwargs.keys():
+                # if kwargs already have key "indices" (i.e. the form of input data is TND), do not calculate indices again
+                indices = torch.nonzero(attention_mask.flatten(), as_tuple=False).flatten()
+                kwargs["indices"] = indices
+        else:
+            attention_mask = create_causal_mask(
+                config=self.config,
+                input_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+                position_ids=text_position_ids,
+            )
 
         hidden_states = inputs_embeds
 

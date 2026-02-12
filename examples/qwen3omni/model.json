@@ -9,7 +9,7 @@
             "num_attention_heads": 16,
             "freeze": true,
             "attn_implementation": "flash_attention_2",
-            "attn_layout": "BNSD"
+            "attn_layout": "TND"
         },
         "vision_projector": {
             "model_id": "lnmlp",
@@ -25,7 +25,7 @@
             "num_attention_heads": 20,
             "freeze": true,
             "attn_implementation": "flash_attention_2",
-            "attn_layout": "BNSD"
+            "attn_layout": "TND"
         }
     },
     "text_decoder": {
@@ -36,7 +36,7 @@
         "max_position_embeddings": 128000,
         "freeze": false,
         "attn_implementation": "flash_attention_2",
-        "attn_layout": "BNSD",
+        "attn_layout": "TND",
         "activation_offload": true
     },
     "loss_cfg": {

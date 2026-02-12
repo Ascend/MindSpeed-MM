@@ -35,7 +35,7 @@ from mindspeed.utils import get_actual_seq_len
 
 from mindspeed_mm.models.common.communications import cal_split_sizes, cal_split_sizes_multi, gather_forward_split_backward, split_forward_gather_backward
 from .utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq, gather_visual_seqs_with_cp, set_seq_len
-from .attention_utils import ALL_ATTENTION_FUNCTIONS, pad_out
+from ..attention_utils import ALL_ATTENTION_FUNCTIONS, pad_out
 
 
 class Qwen3VLEmptyModule(nn.Module):
@@ -170,32 +170,6 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
         return hidden_states
     hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
     return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
-
-
-def eager_attention_forward(
-    module: nn.Module,
-    query: torch.Tensor,
-    key: torch.Tensor,
-    value: torch.Tensor,
-    attention_mask: Optional[torch.Tensor],
-    scaling: float,
-    dropout: float = 0.0,
-    **kwargs: Unpack[TransformersKwargs],
-):
-    key_states = repeat_kv(key, module.num_key_value_groups)
-    value_states = repeat_kv(value, module.num_key_value_groups)
-
-    attn_weights = torch.matmul(query, key_states.transpose(2, 3)) * scaling
-    if attention_mask is not None:
-        causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
-        attn_weights = attn_weights + causal_mask
-
-    attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query.dtype)
-    attn_weights = nn.functional.dropout(attn_weights, p=dropout, training=module.training)
-    attn_output = torch.matmul(attn_weights, value_states)
-    attn_output = attn_output.transpose(1, 2).contiguous()
-
-    return attn_output, attn_weights
 
 
 def do_vit_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask=None, dropout_p=0., pse=None, pse_type=None, shapes=None):

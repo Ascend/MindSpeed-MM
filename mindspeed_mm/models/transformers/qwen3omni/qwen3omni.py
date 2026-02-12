@@ -11,7 +11,7 @@ from megatron.training import print_rank_0, get_args
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin
 from mindspeed_mm.models.transformers.custom_model_registry import register_model
 from .modeling_qwen3_omni_moe import Qwen3OmniMoeThinkerForConditionalGeneration as HFQwen3OmniMoeThinkerForConditionalGeneration
-from .attention_utils import verify_attn_layout
+from ..attention_utils import verify_attn_layout
 
 
 class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
@@ -71,7 +71,7 @@ class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
     def freeze(self, config):
         forbidden_modules = set()
         if config.image_encoder.vision_encoder.freeze:
-            vision_model_keys = ['visual.patch_embed', 'visual.blocks']
+            vision_model_keys = ['visual.patch_embed', 'visual.blocks', 'visual.merger_list', 'visual.pos_embed']
             print_rank_0(f"Set vision model not trainable: {vision_model_keys}")
             forbidden_modules.update(vision_model_keys)
 
@@ -99,14 +99,16 @@ class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
         args = get_args()
         model_cfg = args.mm.model
 
-        # attn_implementation support eager, flash_attention_2(layout BNSD), default flash_attention_2
+        # attn_implementation support eager, sdpa, flash_attention_2, default flash_attention_2
         vit_attn_implementation = getattr(model_cfg.image_encoder.vision_encoder, "attn_implementation", "flash_attention_2")
         aud_attn_implementation = getattr(model_cfg.audio_encoder.audio_encoder, "attn_implementation", "flash_attention_2")
         llm_attn_implementation = getattr(model_cfg.text_decoder, "attn_implementation", "flash_attention_2")
 
-        vit_attn_layout = getattr(model_cfg.image_encoder.vision_encoder, "attn_layout", "BNSD")
-        aud_attn_layout = getattr(model_cfg.audio_encoder.audio_encoder, "attn_layout", "BNSD")
-        llm_attn_layout = getattr(model_cfg.text_decoder, "attn_layout", "BNSD")
+        # layout support BNSD, TND, default TND
+        vit_attn_layout = getattr(model_cfg.image_encoder.vision_encoder, "attn_layout", "TND")
+        aud_attn_layout = getattr(model_cfg.audio_encoder.audio_encoder, "attn_layout", "TND")
+        # layout support BNSD, TND, BSND, default TND
+        llm_attn_layout = getattr(model_cfg.text_decoder, "attn_layout", "TND")
 
         verify_attn_layout(vit_attn_implementation, vit_attn_layout)
         verify_attn_layout(aud_attn_implementation, aud_attn_layout)

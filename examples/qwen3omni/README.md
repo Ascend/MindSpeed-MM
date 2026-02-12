@@ -310,12 +310,19 @@ dataset_param->basic_parameters->dataset
   当前支持audio、vision和text模块选择不同的Attntion实现方式，具体为在`model.json`文件中修改`attn_implementation`字段，当前支持情况如下表。
   | 模块| 支持的FA以及layout |
   | --- | --- |
-  | AuT | `eager`: `BNSD` |
   | AuT | `flash_attention_2`: `BNSD` |
-  | ViT | `eager`: `BNSD` |
+  | AuT | `flash_attention_2`: `TND` |
+  | AuT | `sdpa`: `BNSD` |
+  | AuT | `eager`: `BNSD` |
   | ViT | `flash_attention_2`: `BNSD` |
-  | LLM | `eager`: `BNSD` |
+  | ViT | `flash_attention_2`: `TND` |
+  | ViT | `sdpa`: `BNSD` |
+  | ViT | `eager`: `BNSD` |
   | LLM | `flash_attention_2`: `BNSD` |
+  | LLM | `flash_attention_2`: `TND` |
+  | LLM | `flash_attention_2`: `BSND` |
+  | LLM | `sdpa`: `BNSD` |
+  | LLM | `eager`: `BNSD` |
 
 【activation_offload配置】
 使用activation_offload可以将重计算过程中产生的checkpoint点的激活值移动到host，反向异步从host传输到device，降低device激活显存占用，配置方式为在`model.json`中将`activation_offload`字段设置为true。
