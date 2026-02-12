@@ -6,58 +6,146 @@ show_help() {
 Usage: $0 [OPTIONS]
 
 Options:
-    -a, --arch ARCH         Target architecture (x86|arm) [required]
     -t, --torchversion VERSION   PyTorch version to install (default: 2.7.1)
     -m, --msid COMMIT_ID    MindSpeed commit ID [required]
     -y, --yes               Auto confirm all reinstallations
     -n, --no                Auto skip all reinstallations
     -mt, --megatron         Install Megatron-LM
+    -ic, --install-cann     Install CANN (Compute Architecture for Neural Networks)
     -h, --help              Display this help message and exit
 
 Examples:
+    # Install everything including CANN
+    bash $0 --torchversion 2.7.1 --msid 93c45456c7044bacddebc5072316c01006c938f9 --install-cann
+
+    # Install without CANN
+    bash $0 --torchversion 2.7.1 --msid 93c45456c7044bacddebc5072316c01006c938f9
+
     # Auto confirm all reinstallations
-    bash $0 --arch x86 --torchversion 2.6.0 --msid 93c45456c7044bacddebc5072316c01006c938f9 --yes
+    bash $0 --torchversion 2.6.0 --msid 93c45456c7044bacddebc5072316c01006c938f9 --yes
 
     # Auto skip all reinstallations
-    bash $0 --arch arm --msid abcdef1234567890 --no
+    bash $0 --msid abcdef1234567890 --no
 
     # Interactive mode (default)
-    bash $0 --arch x86 --torchversion 2.7.1 --msid abcdef1234567890
+    bash $0 --torchversion 2.7.1 --msid abcdef1234567890
 EOF
 }
 
 # Default values
-ARCH=""
 TORCH_VERSION="2.7.1"
 MINDSPEED_COMMIT_ID=""
 AUTO_CONFIRM=""  # 自动确认模式: "", "yes", "no"
 INSTALL_MEGATRON=false  # 是否安装Megatron-LM
+INSTALL_CANN=false  # 是否安装CANN
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -a|--arch) ARCH="$2"; shift 2 ;;
         -t|--torchversion) TORCH_VERSION="$2"; shift 2 ;;
         -m|--msid) MINDSPEED_COMMIT_ID="$2"; shift 2 ;;
         -y|--yes) AUTO_CONFIRM="yes"; shift ;;
         -n|--no) AUTO_CONFIRM="no"; shift ;;
         -mt|--megatron) INSTALL_MEGATRON=true; shift ;;
+        -ic|--install-cann) INSTALL_CANN=true; shift ;;
         -h|--help) show_help; exit 0 ;;
         *) echo "Unknown parameter: $1"; show_help; exit 1 ;;
     esac
 done
 
 # Check required parameters
-if [ -z "$ARCH" ]; then
-    echo "Error: Architecture parameter is required"
-    show_help
-    exit 1
-fi
-
 if [ -z "$MINDSPEED_COMMIT_ID" ]; then
     echo "Error: MindSpeed commit ID parameter is required"
     show_help
     exit 1
+fi
+
+echo "========================================"
+echo "Installation Configuration"
+echo "========================================"
+echo "PyTorch Version: $TORCH_VERSION"
+echo "MindSpeed Commit ID: $MINDSPEED_COMMIT_ID"
+echo "Auto Confirm Mode: ${AUTO_CONFIRM:-"interactive"}"
+echo "Install Megatron-LM: $INSTALL_MEGATRON"
+echo "Install CANN: $INSTALL_CANN"
+echo "========================================"
+echo ""
+
+# Function to detect CPU architecture
+detect_architecture() {
+    local arch
+    arch=$(uname -m)
+
+    case $arch in
+        x86_64|X86_64|amd64|AMD64)
+            echo "x86"
+            ;;
+        aarch64|AARCH64|arm64|ARM64)
+            echo "arm"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+# Auto-detect CPU architecture
+ARCH=$(detect_architecture)
+
+# If auto-detection fails, ask user to input manually
+if [ -z "$ARCH" ]; then
+    echo "Unable to auto-detect CPU architecture."
+    echo "Detected CPU architecture: $(uname -m)"
+    echo "Please manually input CPU architecture (x86 or arm):"
+    read -r user_arch
+
+    # Convert to lowercase for comparison
+    user_arch_lower=$(echo "$user_arch" | tr '[:upper:]' '[:lower:]')
+
+    if [ "$user_arch_lower" = "x86" ]; then
+        ARCH="x86"
+    elif [ "$user_arch_lower" = "arm" ]; then
+        ARCH="arm"
+    else
+        echo "Error: Unsupported architecture '$user_arch'"
+        echo "Only x86 and arm architectures are supported."
+        echo "Detected CPU architecture: $(uname -m)"
+        exit 1
+    fi
+fi
+
+echo "Detected CPU architecture: $ARCH"
+
+# 定义CANN安装脚本路径变量
+CANN_INSTALL_SCRIPT="scripts/install_cann.sh"
+
+# 只有在指定了--install-cann参数时才执行CANN安装
+if [ "$INSTALL_CANN" = true ]; then
+    # 检查install_cann.sh是否存在
+    if [ ! -f "$CANN_INSTALL_SCRIPT" ]; then
+        echo "Error: $CANN_INSTALL_SCRIPT not found in current directory"
+        echo "Please ensure install_cann.sh exists in $(pwd)"
+        exit 1
+    fi
+
+    # 检查install_cann.sh是否有执行权限
+    if [ ! -x "$CANN_INSTALL_SCRIPT" ]; then
+        echo "Setting execute permission for install_cann.sh..."
+        chmod +x "$CANN_INSTALL_SCRIPT"
+    fi
+
+    # 调用install_cann.sh并传入ARCH参数
+    echo "Calling install_cann.sh with architecture: $ARCH"
+    if "$CANN_INSTALL_SCRIPT" "$ARCH"; then
+        echo "CANN installation completed successfully"
+    else
+        cann_exit_code=$?
+        echo "Error: CANN installation failed with exit code: $cann_exit_code"
+        echo "Continuing with other components..."
+    fi
+else
+    echo "Skipping CANN Installation ..."
+    echo "  (Use --install-cann flag to install CANN)"
 fi
 
 # Function to check if package is installed

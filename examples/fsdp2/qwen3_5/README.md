@@ -57,13 +57,9 @@ commit_id=fc91372
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
-对于X86架构机器，执行如下指令：
+执行如下指令一键安装：
 ```bash
-bash scripts/install.sh --arch x86 --msid eb10b92fa0660c8d5426012795cfe2335814496f && pip install -r examples/fsdp2/qwen3_5/requirements.txt
-```
-对于ARM架构机器，执行如下指令：
-```bash
-bash scripts/install.sh --arch arm --msid eb10b92fa0660c8d5426012795cfe2335814496f && pip install -r examples/fsdp2/qwen3_5/requirements.txt
+bash scripts/install.sh --msid eb10b92 && pip install -r examples/fsdp2/qwen3_5/requirements.txt
 ```
 
 ---
