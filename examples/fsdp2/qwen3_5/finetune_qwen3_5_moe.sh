@@ -1,5 +1,6 @@
- source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export NON_MEGATRON=true
+export MULTI_STREAM_MEMORY_REUSE=2
 
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
