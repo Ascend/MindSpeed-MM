@@ -59,7 +59,11 @@ cd MindSpeed-MM
 ```
 执行如下指令一键安装：
 ```bash
-bash scripts/install.sh --msid eb10b92 && pip install -r examples/fsdp2/qwen3_5/requirements.txt
+bash scripts/install.sh --msid eb10b92 && bash examples/fsdp2/qwen3_5/install_extensions.sh
+```
+如果您希望同时安装CANN，可以执行如下一键命令，除了安装mm依赖环境外，还会自动安装CANN：
+```bash
+bash scripts/install.sh --msid eb10b92 --install-cann && bash examples/fsdp2/qwen3_5/install_extensions.sh
 ```
 
 ---
