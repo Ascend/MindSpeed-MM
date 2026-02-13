@@ -25,7 +25,7 @@ GBS=$(($WORLD_SIZE*$MBS/$CP/$TP))
 MM_DATA="./examples/hunyuanvideo_1.5/t2v/data.json"
 MM_MODEL="./examples/hunyuanvideo_1.5/t2v/model_hunyuanvideo_15.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
-LOAD_PATH="./ckpt/hunyuanvideo_1.5"
+LOAD_PATH="./HunyuanVideo1.5/transformers/720_t2v"
 SAVE_PATH="./save_ckpt/hunyuanvideo_1.5"
 fsdp2_config="./examples/hunyuanvideo_1.5/fsdp2_config.yaml"
 

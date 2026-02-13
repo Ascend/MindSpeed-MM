@@ -35,7 +35,6 @@
             "low_cpu_mem_usage": true
         },
         {
-        {
             "model_id": "Hunyuan15GlyphModel",
             "dtype": "fp16",
             "from_pretrained": "HunyuanVideo1.5/text_encoder/byt5-small",
