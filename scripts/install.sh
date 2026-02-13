@@ -136,17 +136,35 @@ if [ "$INSTALL_CANN" = true ]; then
 
     # 调用install_cann.sh并传入ARCH参数
     echo "Calling install_cann.sh with architecture: $ARCH"
-    if "$CANN_INSTALL_SCRIPT" "$ARCH"; then
-        echo "CANN installation completed successfully"
-    else
+    # 执行CANN安装脚本
+    if ! "$CANN_INSTALL_SCRIPT" "$ARCH"; then
         cann_exit_code=$?
         echo "Error: CANN installation failed with exit code: $cann_exit_code"
-        echo "Continuing with other components..."
+        echo "Aborting installation due to CANN installation failure."
+        exit 1
+    fi
+
+    # 验证CANN安装是否成功
+    echo "Validating CANN installation..."
+
+    if [ -f "/usr/local/Ascend/ascend-toolkit/set_env.sh" ]; then
+        source /usr/local/Ascend/ascend-toolkit/set_env.sh
+        # 验证能否导入acl模块
+        if python3 -c "import acl; print(acl.get_soc_name())" 2>/dev/null | grep -qi ascend; then
+            echo "CANN installation successful"
+        else
+            echo "Error: CANN validation failed - unable to import acl module"
+            exit 1
+        fi
+    else
+        echo "Error: CANN installation failed - ascend-toolkit not found"
+        exit 1
     fi
 else
     echo "Skipping CANN Installation ..."
     echo "  (Use --install-cann flag to install CANN)"
 fi
+
 
 # Function to check if package is installed
 is_package_installed() {
@@ -248,7 +266,8 @@ check_existing_versions() {
                             install_torch=false
                             break
                             ;;
-                        * )
+                        ▪ )
+
                             echo "Invalid input. Please enter y or n"
                             ;;
                     esac
@@ -296,7 +315,8 @@ check_existing_versions() {
                             install_torch_npu=false
                             break
                             ;;
-                        * )
+                        ▪ )
+
                             echo "Invalid input. Please enter y or n"
                             ;;
                     esac
