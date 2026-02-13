@@ -32,76 +32,7 @@ from torch.nn import Conv3d
 
 from mindspeed_mm.models.common.checkpoint import load_checkpoint
 from mindspeed_mm.models.common.distrib import DiagonalGaussianDistribution
-
-
-@dataclass
-class ParallelDims:
-    sp: int = 1
-    world_size: int = -1
-    dp_replicate: int = 1
-
-    def __post_init__(self):
-        if self.world_size == -1:
-            if dist.is_initialized():
-                self.world_size = dist.get_world_size()
-            else:
-                self.world_size = int(os.getenv("WORLD_SIZE", "1"))
-        self.build_mesh("cuda")
-
-    def build_mesh(self, device_type):
-        if self.dp_replicate == -1:
-            if self.world_size % 8 == 0:
-                self.dp_replicate = self.world_size // 8
-            else:
-                raise ValueError("world_size must be divisible by 8 for dp_replicate==-1")
-        if self.world_size % self.sp != 0:
-            raise ValueError("world_size must be divisible by sp")
-        if self.world_size % self.dp_replicate != 0:
-            raise ValueError("world_size must be divisible by dp_replicate")
-
-        fsdp_shard = self.world_size // self.dp_replicate
-
-        mesh = init_device_mesh(
-            device_type,
-            [self.world_size // self.sp, self.sp],
-            mesh_dim_names=["dp", "sp"]
-        )
-        self.world_mesh = mesh
-        self.fsdp_mesh = init_device_mesh(
-            device_type,
-            [self.dp_replicate, fsdp_shard],
-            mesh_dim_names=["dp_replicate", "fsdp_shard"]
-        )
-
-        if self.sp_enabled:
-            self.sp_rank = mesh['sp'].get_local_rank()
-            self.sp_group = mesh['sp'].get_group()
-        else:
-            self.sp_rank = dist.get_rank()
-            self.sp_group = None
-
-        return mesh
-
-    @property
-    def sp_enabled(self):
-        return self.sp > 1
-
-    @property
-    def sp_mesh(self):
-        return self.world_mesh['sp']
-
-    @property
-    def dp_enabled(self):
-        return self.sp > 1
-
-__parallel_dims = None
-
-
-def get_parallel_state():
-    if __parallel_dims is None:
-        # create default parallel states (without enabling any parallelism)
-        return ParallelDims(sp=1, dp_replicate=1)
-    return __parallel_dims
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import get_parallel_state
 
 
 @dataclass

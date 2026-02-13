@@ -57,7 +57,7 @@ def _all_to_all_4D(
             if not seq_lens[0] > seq_lens[-1]:
                 raise ValueError("seq_lens is invalid")
             gap = seq_lens[0] - seq_lens[-1]
-            if dist.get_group_rank(group, mindspeed_mm.models.predictor.dits.hunyuanvideo15.commons.utils.get_rank()) == seq_world_size - 1:
+            if dist.get_group_rank(group, dist.get_rank()) == seq_world_size - 1:
                 if inputs.shape[1] != seq_lens[-1]:
                     raise ValueError("inputs is invalid")
                 inputs = F.pad(inputs, (0, 0, 0, 0, 0, gap))
@@ -141,7 +141,7 @@ def _all_to_all_4D(
         # (hc, seqlen/N, bs, hs) -tranpose(0,2)-> (bs, seqlen/N, hc, hs)
         output = output.transpose(0, 2).contiguous().reshape(bs, shard_seqlen, hc, hs)
 
-        if gap > 0 and dist.get_group_rank(group, mindspeed_mm.models.predictor.dits.hunyuanvideo15.commons.utils.get_rank()) == seq_world_size - 1:
+        if gap > 0 and dist.get_group_rank(group, dist.get_rank()) == seq_world_size - 1:
             output = output[:, :-gap]
 
         return output
@@ -286,7 +286,7 @@ class _AllGather(torch.autograd.Function):
     def backward(ctx, grad_output):
         group = ctx.group
         world_size = dist.get_world_size(group)
-        global_rank = mindspeed_mm.models.predictor.dits.hunyuanvideo15.commons.utils.get_rank()
+        global_rank = dist.get_rank()
         rank = dist.get_group_rank(group, global_rank)
         dim = ctx.dim
         input_size = ctx.input_size

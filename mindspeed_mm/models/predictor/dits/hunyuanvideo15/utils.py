@@ -96,7 +96,7 @@ class ParallelDims:
                 self.world_size = dist.get_world_size()
             else:
                 self.world_size = int(os.getenv("WORLD_SIZE", "1"))
-        self.build_mesh("cuda")
+        self.build_mesh("npu")
 
     def build_mesh(self, device_type):
         if self.dp_replicate == -1:
@@ -126,7 +126,7 @@ class ParallelDims:
             self.sp_rank = mesh['sp'].get_local_rank()
             self.sp_group = mesh['sp'].get_group()
         else:
-            self.sp_rank = get_rank()
+            self.sp_rank = dist.get_rank()
             self.sp_group = None
 
         return mesh
@@ -144,8 +144,23 @@ class ParallelDims:
         return self.sp > 1
 
 
+__parallel_dims = None
+
+
+def initialize_parallel_state(
+    sp: int = 1,
+    dp_replicate: int = 1,
+):
+    global __parallel_dims
+    __parallel_dims = ParallelDims(sp=sp, dp_replicate=dp_replicate)
+    return __parallel_dims
+
+
 def get_parallel_state():
-    return ParallelDims(sp=1, dp_replicate=1)
+    if __parallel_dims is None:
+        # create default parallel states (without enabling any parallelism)
+        initialize_parallel_state()
+    return __parallel_dims
 
 
 def _ntuple(n):
@@ -181,10 +196,6 @@ def auto_offload_model(models, device, enabled=True):
         for model in models:
             if model is not None:
                 model.to(torch.device('cpu'))
-
-
-def get_rank():
-    return int(os.environ.get('RANK', '0'))
 
 
 class HyIndexPutFirstAxis(torch.autograd.Function):
