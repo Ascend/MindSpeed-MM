@@ -20,7 +20,7 @@ from mindspeed_mm.fsdp.distributed.parallel_state import init_parallel_state, ge
 from mindspeed_mm.fsdp.models.modelhub import ModelHub
 from mindspeed_mm.fsdp.distributed.torch_parallelize import ParallelApplier
 from mindspeed_mm.fsdp.features.apply_features import FeaturesApplier
-from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed
+from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed, init_model_weights
 from mindspeed_mm.fsdp.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.fsdp.data.dataloader.dataloader import PrefetchGradAccDataLoader
 from mindspeed_mm.fsdp.optimizer.optimizer import build_optimizer
@@ -118,7 +118,7 @@ class Trainer():
         # Initialize weights on meta device if specified (for memory efficiency)
         if args.training.init_model_with_meta_device:
             to_empty_if_needed(model, device=get_device_type())
-            model.init_weights()
+            init_model_weights(model)
         
         return model
 
