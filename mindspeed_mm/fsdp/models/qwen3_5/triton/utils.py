@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2023-2025, Songlin Yang, Yu Zhang
-# Copyright (c) 2024, Huawei Technologies Co., Ltd.  All rights reserved.
 
 import itertools
 import contextlib

@@ -51,7 +51,7 @@ from transformers.utils.import_utils import is_causal_conv1d_available, is_flash
 from transformers.utils.output_capturing import OutputRecorder
 from transformers.models.qwen3_5_moe.configuration_qwen3_5_moe import Qwen3_5MoeConfig, Qwen3_5MoeTextConfig, Qwen3_5MoeVisionConfig
 
-from mindspeed_mm.fsdp.utils.register import  model_register
+from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.utils import is_npu_available
 
 if is_causal_conv1d_available():
@@ -285,7 +285,7 @@ class Qwen3_5MoeRMSNormGated(nn.Module):
 
 def apply_mask_to_padding_states(hidden_states, attention_mask):
     """
-    Tunes out the hidden states for padding tokens, see https://github.com/state-spaces/mamba/issues/66
+    Tunes out the hidden states for padding tokens
     """
     # NOTE: attention mask is a 2D boolean tensor
     if attention_mask is not None and attention_mask.shape[1] > 1 and attention_mask.shape[0] > 1:
@@ -510,8 +510,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         if not is_fast_path_available:
             logger.warning_once(
                 "The fast path is not available because one of the required library is not installed. Falling back to "
-                "torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and"
-                " https://github.com/Dao-AILab/causal-conv1d"
+                "torch implementation."
             )
 
         self.in_proj_qkv = nn.Linear(self.hidden_size, self.key_dim * 2 + self.value_dim, bias=False)
@@ -928,7 +927,6 @@ class Qwen3_5MoeRMSNorm(nn.Module):
     def forward(self, x):
         output = self._norm(x.float())
         # Llama does x.to(float16) * w whilst Qwen3_5Moe is (x * w).to(float16)
-        # See https://github.com/huggingface/transformers/pull/29402
         output = output * (1.0 + self.weight.float())
         return output.type_as(x)
 
@@ -1368,7 +1366,6 @@ class Qwen3_5MoeVisionModel(Qwen3_5MoePreTrainedModel):
             # Select dtype based on the following factors:
             #  - FA2 requires that cu_seqlens_q must have dtype int32
             #  - torch.onnx.export requires that cu_seqlens_q must have same dtype as grid_thw
-            # See https://github.com/huggingface/transformers/pull/34852 for more information
             dtype=grid_thw.dtype if torch.jit.is_tracing() else torch.int32,
         )
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
@@ -1398,7 +1395,7 @@ class Qwen3_5MoeVisionModel(Qwen3_5MoePreTrainedModel):
 class Qwen3_5MoeModelOutputWithPast(ModelOutput):
     r"""
     past_key_values (`Cache`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
-        It is a [`~cache_utils.Cache`] instance. For more details, see our [kv cache guide](https://huggingface.co/docs/transformers/en/kv_cache).
+        It is a [`~cache_utils.Cache`] instance.
 
         Contains pre-computed hidden-states (key and values in the self-attention blocks) that can be used (see
         `past_key_values` input) to speed up sequential decoding.
@@ -1427,7 +1424,7 @@ class Qwen3_5MoeCausalLMOutputWithPast(ModelOutput):
     logits (`torch.FloatTensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
         Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
     past_key_values (`Cache`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
-        It is a [`~cache_utils.Cache`] instance. For more details, see our [kv cache guide](https://huggingface.co/docs/transformers/en/kv_cache).
+        It is a [`~cache_utils.Cache`] instance.
 
         Contains pre-computed hidden-states (key and values in the self-attention blocks) that can be used (see
         `past_key_values` input) to speed up sequential decoding.
@@ -1869,7 +1866,7 @@ def load_balancing_loss_func(
     r"""
     Computes auxiliary load balancing loss as in Switch Transformer - implemented in Pytorch.
 
-    See Switch Transformer (https://huggingface.co/papers/2101.03961) for more details. This function implements the loss
+    See Switch Transformer for more details. This function implements the loss
     function presented in equations (4) - (6) of the paper. It aims at penalizing cases where the routing between
     experts is too unbalanced.
 
@@ -2152,7 +2149,7 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
                 "content": [
                     {
                         "type": "image",
-                        "image": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg",
+                        "image": "./Qwen-VL/assets/demo.jpeg",
                     },
                     {"type": "text", "text": "Describe this image in short."},
                 ],

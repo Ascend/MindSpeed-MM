@@ -1,4 +1,5 @@
-# Copyright (c) 2025, Huawei Technologies Co., Ltd. All rights reserved.
+# -*- coding: utf-8 -*-
+# Copyright (c) 2023-2025, Songlin Yang, Yu Zhang
 
 from typing import Optional
 

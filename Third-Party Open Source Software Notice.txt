@@ -302,6 +302,13 @@ Software guided-diffusion
 License: MIT License
 For the full text of the license, please go to the above.
 
+
+Software Notice
+Software flash-linear-attention
+License: MIT License
+For the full text of the license, please go to the above.
+
+
 Copyright Notice included in the software: 
 Copyright Copyright (c) 2021 OpenAI
 
