@@ -21,4 +21,4 @@ DISTRIBUTED_ARGS="
     --master_port $MASTER_PORT
 "
 torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
-    examples/fsdp2/kimik2_5/finetune_kimik2_5.sh
+    examples/fsdp2/kimik2_5/kimik2_5_config.yaml

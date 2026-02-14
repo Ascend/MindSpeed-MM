@@ -1153,6 +1153,29 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
         return messages
 
 
+class KimiK25Plugin(BasePlugin):
+    @override
+    def process_messages(self, messages, images, videos, audios, processor):
+        self._validate_input(processor, images, videos, audios)
+        self._validate_messages(messages, images, videos, audios)
+
+        num_image_tokens = 0
+        messages = deepcopy(messages)
+        for message in messages:
+            content = message["content"]
+            while IMAGE_PLACEHOLDER in content:
+                content = content.replace(
+                    IMAGE_PLACEHOLDER,
+                    f"<|media_start|>image<|media_content|>{self.image_token}<|media_end|>",
+                    1,
+                )
+                num_image_tokens += 1
+
+            message["content"] = content
+
+        return messages
+
+
 PLUGINS = {
     "base": BasePlugin,
     "qwen2_vl": Qwen2VLPlugin,
@@ -1160,6 +1183,7 @@ PLUGINS = {
     "qwen3_vl": Qwen3VLPlugin,
     "glm4.1v": GLM4VPlugin,
     "qwen3_omni": Qwen3OmniPlugin,
+    "kimi_k25": KimiK25Plugin,
 }
 
 

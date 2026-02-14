@@ -45,7 +45,7 @@ class Role(str, Enum):
 if TYPE_CHECKING:
     from datasets import Dataset, IterableDataset
     from transformers import Seq2SeqTrainingArguments
-    from mindspeed_mm.data.data_utils.func_utils.template import Template
+    from .template import Template
     from .mm_plugin import AudioInput, ImageInput, VideoInput
 
     MediaType = Union[ImageInput, VideoInput, AudioInput]
@@ -751,19 +751,27 @@ def load_tokenizer(model_args: "ProcessorArguments") -> "TokenizerModule":
 
     Note: including inplace operation of model_args.
     """
-    config = AutoConfig.from_pretrained(model_args.model_name_or_path, local_files_only=True)
+    config = AutoConfig.from_pretrained(
+        model_args.model_name_or_path,
+        local_files_only=True,
+        trust_remote_code=model_args.trust_remote_code,
+    )
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         use_fast=model_args.use_fast_tokenizer,
         split_special_tokens=model_args.split_special_tokens,
-        padding_side="right", local_files_only=True
+        padding_side="right",
+        local_files_only=True,
+        trust_remote_code=model_args.trust_remote_code,
     )
 
     try:
         processor = AutoProcessor.from_pretrained(
             model_args.model_name_or_path,
             use_fast=model_args.use_fast_tokenizer,
-            local_files_only=True)
+            local_files_only=True,
+            trust_remote_code=model_args.trust_remote_code,
+        )
         setattr(processor, "tokenizer", tokenizer)
         setattr(processor, "image_max_pixels", model_args.image_max_pixels)
         setattr(processor, "image_min_pixels", model_args.image_min_pixels)

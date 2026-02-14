@@ -10,13 +10,14 @@ parallel:
       - language_model.model.embed_tokens
       - language_model.model.layers.{*}
       - language_model.lm_head
-    enable_mixed_precision: true
+    param_dtype: bf16
+    reduce_dtype: fp32
   recompute: true
   recompute_plan:
     - language_model.model.layers.{*}
   context_parallel_size: 1
   ulysses_parallel_size: 1
-  expert_parallel_size: 1
+  expert_parallel_size: 128
   ep_plan:
     apply_modules:
       - language_model.model.layers.{*}.mlp.experts
@@ -36,7 +37,8 @@ data:
 
     # 数据预处理
     preprocess_parameters:
-      model_name_or_path: &HF_MODEL_LOAD_PATH mindspeed_mm/fsdp/models/kimik25
+      model_name_or_path: &HF_MODEL_LOAD_PATH mindspeed_mm/fsdp/models/kimik2_5
+      trust_remote_code: true
       use_fast_tokenizer: true
       split_special_tokens: false
       image_max_pixels: 262144
@@ -99,8 +101,6 @@ training:
   optimizer: adamw
   adam_fused: true
   save_interval: 10000
-  load: load_path
-  save: save_path
   use_deter_comp: false
   profile:
     enable: false
@@ -112,5 +112,5 @@ training:
     with_stack: false
     ranks: [0]
   plugin:
-    - mindspeed_mm/fsdp/models/kimik25
+    - mindspeed_mm/fsdp/models/kimik2_5
     - mindspeed_mm/fsdp/data/datasets/huggingface

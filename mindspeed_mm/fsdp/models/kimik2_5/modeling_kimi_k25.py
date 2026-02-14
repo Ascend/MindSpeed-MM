@@ -47,6 +47,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch_npu
 from transformers import activations
 
 try:
@@ -63,8 +64,10 @@ from transformers.models.llava.modeling_llava import \
     LlavaCausalLMOutputWithPast
 from transformers.utils import is_flash_attn_2_available
 
-from .configuration_kimi_k25 import KimiK25Config
-from .modeling_deepseek import DeepseekV3ForCausalLM
+from mindspeed_mm.fsdp.utils.register import model_register
+from mindspeed_mm.fsdp.models.base_model import WeightInitMixin
+from mindspeed_mm.fsdp.models.kimik2_5.configuration_kimi_k25 import KimiK25Config
+from mindspeed_mm.fsdp.models.kimik2_5.modeling_deepseek import DeepseekV3ForCausalLM
 
 # Flash attention imports
 if is_flash_attn_2_available():
@@ -97,17 +100,23 @@ def multihead_attention(
         output: shape (batch_size, seqlen, dim) or (tot_seqlens, dim) if packing,
             where dim = num_heads * head_dim
     """
-    attn_out = flash_attn_varlen_func(
+    # Modification start
+    head_num = q.shape[1]
+    attn_out = torch_npu.npu_fusion_attention(
         q,
         k,
         v,
-        q_cu_seqlens,
-        k_cu_seqlens,
-        max_seqlen_q,
-        max_seqlen_k,
-        causal=False,
-        deterministic=deterministic,
-    )
+        head_num,
+        pse=None,
+        atten_mask=None,
+        scale=1.0 / math.sqrt(q.shape[-1]),
+        keep_prob=1,
+        input_layout="TND",
+        actual_seq_qlen=tuple(q_cu_seqlens[1:].cpu().numpy().tolist()),
+        actual_seq_kvlen=tuple(k_cu_seqlens[1:].cpu().numpy().tolist()),
+    )[0]
+    # Modification end
+
     if isinstance(attn_out, tuple):
         attn_out = attn_out[0]
 
@@ -186,7 +195,6 @@ def get_rope_shape_decorate(func):
 
 
 @get_rope_shape_decorate
-@torch.compile(dynamic=True)
 def get_rope_shape(org, interpolation_mode, shape):
     return (F.interpolate(
         org.permute((2, 0, 1)).unsqueeze(0),
@@ -209,13 +217,12 @@ def apply_rope(xq: torch.Tensor, xk: torch.Tensor,
     _apply_rope_input_validation(xk, freqs_cis)
 
     freqs_cis = freqs_cis.unsqueeze(-2)  # ..., 1, head_dim/2
-    # ..., num_heads, head_dim/2
-    xq_ = torch.view_as_complex(xq.float().view(*xq.shape[:-1], -1, 2))
-    xk_ = torch.view_as_complex(xk.float().view(*xq.shape[:-1], -1, 2))
-    xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(
-        -2)  # ..., num_heads, head_dim
-    xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(
-        -2)  # ..., num_heads, head_dim
+    # Modification start
+    cos = freqs_cis.real.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
+    sin = freqs_cis.imag.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
+    xq_out = torch_npu.npu_rotary_mul(xq.float(), cos, sin, rotary_mode="interleave")
+    xk_out = torch_npu.npu_rotary_mul(xk.float(), cos, sin, rotary_mode="interleave")
+    # Modification end
     return xq_out.type_as(xq), xk_out.type_as(xk)
 
 
@@ -577,7 +584,7 @@ class MoonViT3dEncoder(nn.Module):
         self.blocks = nn.ModuleList([
             MoonViTEncoderLayer(
                 **block_cfg,
-                use_deterministic_attn=self.use_deterministic_attn)
+                use_deterministic_attn=False)  # Modification
             for _ in range(num_layers)
         ])
         self.final_layernorm = nn.LayerNorm(hidden_dim)
@@ -831,7 +838,9 @@ class ProjectorConfig:
         self.projector_ln_eps = config.projector_ln_eps
 
 
-class KimiK25ForConditionalGeneration(KimiK25PreTrainedModel):
+# Modification
+@model_register.register("kimi_k25")
+class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
 
     def __init__(self, config: KimiK25Config):
         super().__init__(config)
@@ -852,7 +861,6 @@ class KimiK25ForConditionalGeneration(KimiK25PreTrainedModel):
             )
 
         self.language_model = DeepseekV3ForCausalLM(config.text_config)
-        self.post_init()
 
         if hasattr(self.language_model, 'dtype'):
             target_dtype = self.language_model.dtype
@@ -1070,6 +1078,7 @@ class KimiK25ForConditionalGeneration(KimiK25PreTrainedModel):
                 (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
 
         ```"""
+        use_cache = False  # Modification
         if self.vision_tower is None:
             raise AssertionError("vision_tower is not loaded")
         output_attentions = (output_attentions if output_attentions is not None

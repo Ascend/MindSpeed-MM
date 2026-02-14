@@ -86,6 +86,10 @@ class ProcessorArguments:
         default=16000,
         metadata={"help": "The sampling rate of audio inputs."},
     )
+    trust_remote_code: bool = field(
+        default=False,
+        metadata={"help": "Trust remote code for Huggingface."},
+    )
 
     def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
         result = asdict(self)

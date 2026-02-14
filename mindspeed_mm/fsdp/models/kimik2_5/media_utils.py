@@ -208,6 +208,7 @@ def _to_pil(data: str | bytes):
 
 
 def ensure_media_type(media: MediaInput) -> MediaInput:
+    media = {"type": "image", "image": media}  # Modification
     if media['type'] == 'image':
         media['image'] = _to_pil(media['image'])
         return media

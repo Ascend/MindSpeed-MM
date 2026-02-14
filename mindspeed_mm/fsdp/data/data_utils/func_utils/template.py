@@ -400,6 +400,24 @@ _register_template(
 
 
 _register_template(
+    name="kimi_k25",
+    params=RegisterParams(
+        format_user=StringFormatter(
+            slots=["<|im_user|>user<|im_middle|>{{content}}<|im_end|><|im_assistant|>assistant<|im_middle|>"]
+        ),
+        format_assistant=StringFormatter(slots=["{{content}}<|im_end|>"]),
+        format_system=StringFormatter(slots=["<|im_system|>system<|im_middle|>{{content}}<|im_end|>"]),
+        default_system="You are a helpful assistant",
+        stop_words=["<|im_end|>"],
+        thought_words=("◁think▷", "◁/think▷"),
+        replace_eos=True,
+    ),
+    mm_plugin=get_mm_plugin("kimi_k25", image_token="<|media_pad|>"),
+    template_class=ReasoningTemplate,
+)
+
+
+_register_template(
     name="glm4.1v",
     params=RegisterParams(
         format_user=StringFormatter(slots=["<|user|>\n{{content}}<|assistant|>"]),
