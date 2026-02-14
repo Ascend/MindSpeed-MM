@@ -91,9 +91,11 @@ model:
     - model.visual
   loss_cfg:
     loss_type: default   # If you want custom loss in model, loss_type can be set to "custom".
-    enable_chunk_loss: false
-    chunk_size: 1024
     router_aux_loss_coef: 0.0
+  enable_chunk_loss: false
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 1024
   activation_offload_plan:
     apply_modules:
       - model.language_model.layers.{*}

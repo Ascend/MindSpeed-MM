@@ -1511,35 +1511,6 @@ class Qwen3VLMoeModel(Qwen3VLMoePreTrainedModel):
         )
 
 
-class Qwen3VLLMHead(nn.Linear):
-    def forward(self, hidden_states: torch.Tensor, loss_func: callable, enable_chunk_loss: bool = False):
-        # Handle distributed tensor (DTensor) weights and biases by converting to local tensors.
-        if isinstance(self.weight, DTensor):
-            w = self.weight.to_local()
-            if self.bias is not None:
-                if not isinstance(self.bias, DTensor):
-                    raise TypeError(
-                        f"Expected bias to be a DTensor when weight is a DTensor, "
-                        f"but got bias of type {type(self.bias)}."
-                    )
-                b = self.bias.to_local()
-            else:
-                b = None
-        else:
-            w = self.weight
-            b = self.bias
-
-        if not enable_chunk_loss:
-            # compute and return logits normally.
-            logits = F.linear(hidden_states, w, b).contiguous().float()
-            loss = loss_func(logits)
-            return logits, loss
-        else:
-            # Otherwise, delegate loss computation to the provided loss context function,
-            # which typically enables memory-efficient or chunked loss calculation.
-            return None, loss_func(hidden_states, w, b)
-
-
 @dataclass
 @auto_docstring(
     custom_intro="""
@@ -1676,14 +1647,14 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
     def __init__(self, config):
         super().__init__(config)
         self.model = Qwen3VLMoeModel(config)
-        self.lm_head = Qwen3VLLMHead(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
 
         self.post_init()
 
     @staticmethod
     def overwrite_transformer_config(transformer_config, model_args):
         # set router_aux_loss_coef, for moe model
-        router_aux_loss_coef = getattr(model_args.loss_cfg, "router_aux_loss_coef", 0.0)
+        router_aux_loss_coef = getattr(model_args.loss_cfg, "router_aux_loss_coef", 0.0) if getattr(model_args, "loss_cfg", None) else 0.0
         transformer_config.text_config.router_aux_loss_coef = router_aux_loss_coef
 
         return transformer_config
@@ -1766,12 +1737,15 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        loss_func, enable_chunk_loss = kwargs.get('loss_func', None), kwargs.get('enable_chunk_loss', False)
+        if getattr(self, "enable_chunk_loss", False):
+            logits = None
+            loss = self.lm_head(hidden_states[:, slice_indices, :], self.loss_function)
+        else:
+            logits = self.lm_head(hidden_states[:, slice_indices, :])
 
-        if loss_func is None:
-            raise NotImplementedError(f"loss_func cannot be None!")
-
-        logits, loss = self.lm_head(hidden_states[:, slice_indices, :], loss_func, enable_chunk_loss=enable_chunk_loss)
+            loss = None
+            if labels is not None:
+                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
         # Modification: all gather loss in all cp ranks for scaling up the grad.
         ps = get_parallel_state()
         if ps.is_cp_enable():
@@ -1780,7 +1754,7 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
 
         aux_loss = None
         if kwargs.get("output_router_logits", False):
-            router_aux_loss_coef = kwargs.get("router_aux_loss_coef", 0.0)
+            router_aux_loss_coef = self.config.text_config.router_aux_loss_coef
             if attention_mask is not None:
                 ps = get_parallel_state()
                 split_sizes = cal_split_sizes(attention_mask.shape[-1], ps.get_ulysses_group_size())

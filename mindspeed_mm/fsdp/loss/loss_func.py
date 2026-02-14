@@ -82,8 +82,8 @@ def build_loss_func(
             )
 
     else:
-        def loss_func(logits):
-            logits = logits.view(-1, logits.shape[-1])
+        def loss_func(logits, labels=None, vocab_size=None):
+            logits = logits.view(-1, logits.shape[-1]).contiguous().float()
             labels = shift_labels.view(-1)
             return fixed_cross_entropy(
                 logits, labels,

@@ -125,6 +125,7 @@ class PrefetchGradAccDataLoader:
             raise ValueError("grad_acc_step must be a positive integer.")
         self.grad_acc_step = grad_acc_step
         self.base_dataloader = base_dataloader
+        self.base_iter, _, _ = build_iterations(self.base_dataloader)
         self._current_iterator = None  # Holds the active generator
 
     def __iter__(self):
@@ -144,7 +145,6 @@ class PrefetchGradAccDataLoader:
 
     def _generate_batches(self):
         """Generator that yields batches with injected token counts."""
-        base_iter, _, _ = build_iterations(self.base_dataloader)
         try:
             while True:
                 buffer = []
@@ -154,7 +154,7 @@ class PrefetchGradAccDataLoader:
                 # Prefetch grad_acc_step batches
                 try:
                     for _ in range(self.grad_acc_step):
-                        batch = next(base_iter)
+                        batch = next(self.base_iter)
                         valid_token_count = (batch["labels"] > -1).sum()  # tokens of shift labels
                         total_tokens += valid_token_count
                         buffer.append(batch)
@@ -170,11 +170,11 @@ class PrefetchGradAccDataLoader:
                     batch_dict[AVG_PER_STEP_TOKEN_NUM] = avg_tokens
                     yield batch_dict
         finally:
-            if hasattr(base_iter, 'close'):
-                base_iter.close()
-    
+            if hasattr(self.base_iter, 'close'):
+                self.base_iter.close()
+
     def state_dict(self):
         return self.base_dataloader.state_dict()
-    
+
     def load_state_dict(self, **kwargs):
         self.base_dataloader.load_state_dict(**kwargs)

@@ -61,23 +61,23 @@ class TrainEngine:
             raise ValueError("Data iterator is None. Unable to retrieve batch.")
         return batch
 
-    def get_loss_func(self, batch_data):
+    def set_loss_func(self, batch_data):
         args = self.args
-        if args.model.loss_cfg.loss_type == "custom":
-            return batch_data
+        if args.model.loss_cfg.loss_type == "raw":
+            return
 
-        if args.model.loss_cfg.enable_chunk_loss:
+        if args.model.enable_chunk_loss:
             loss_func, loss_mask = build_loss_func(args.model.loss_cfg.loss_type,
-                                                 chunk_size=args.model.loss_cfg.chunk_size, **batch_data)
+                                                 chunk_size=args.model.chunkloss_plan.chunk_size, **batch_data)
         else:
             loss_func, loss_mask = build_loss_func(args.model.loss_cfg.loss_type, chunk_size=None, **batch_data)
-        batch_data.update(
-            enable_chunk_loss=args.model.loss_cfg.enable_chunk_loss,
-            router_aux_loss_coef=args.model.loss_cfg.router_aux_loss_coef,
-            output_router_logits=args.model.loss_cfg.router_aux_loss_coef > 0.0,
-            loss_func=loss_func,
-        )
-        return batch_data
+
+        if hasattr(self.model, "loss_function"):
+            self.model.loss_function = loss_func
+        else:
+            setattr(self.model, "loss_function", loss_func)
+
+        batch_data.update(output_router_logits=args.model.loss_cfg.router_aux_loss_coef > 0.0)
 
     def train_step(self, train_dataloader_iter):
         """Perform a single training step with gradient accumulation."""
@@ -92,7 +92,7 @@ class TrainEngine:
             batch_data = move_to_device(batch_data, get_dtype(args.parallel.fsdp_plan.param_dtype) if args.parallel.fsdp_plan.param_dtype else None)
 
             # setup loss ctx
-            batch_data = self.get_loss_func(batch_data)
+            self.set_loss_func(batch_data)
 
             # forward step
             output = self.model(**batch_data)

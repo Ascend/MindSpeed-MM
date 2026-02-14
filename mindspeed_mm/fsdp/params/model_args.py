@@ -5,18 +5,22 @@ from mindspeed_mm.fsdp.params.utils import allow_extra_fields
 
 
 @dataclass
-class LossArguments:
-    loss_type: Optional[str] = field(
-        default='default',
-        metadata={"help": "Type of loss function type, If ot provided, will be computed based on default loss function"},
-    )
-    enable_chunk_loss: bool = field(
-        default=False,
-        metadata={"help": "Wether apply chunkloss for loss compute"},
+class ChunkLossPlanConfig:
+    apply_module: str = field(
+        default="lm_head",
+        metadata={"help": "module that applied chunk loss"}
     )
     chunk_size: int = field(
         default=1024,
         metadata={"help": "Size of each chunk loss"},
+    )
+
+
+@dataclass
+class LossArguments:
+    loss_type: Optional[str] = field(
+        default="raw",
+        metadata={"help": "Type of loss function type, If ot provided, will be computed based on raw model loss function"},
     )
     router_aux_loss_coef: float = field(
         default=0.0,
@@ -56,3 +60,8 @@ class ModelArguments:
         metadata={"help": "List of module names to freeze during training."},
     )
     loss_cfg: LossArguments = field(default_factory=LossArguments)
+    enable_chunk_loss: bool = field(
+        default=False,
+        metadata={"help": "Whether apply chunkloss for loss compute"},
+    )
+    chunkloss_plan: ChunkLossPlanConfig = field(default_factory=ChunkLossPlanConfig)
