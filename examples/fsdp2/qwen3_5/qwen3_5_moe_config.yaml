@@ -70,7 +70,7 @@ data:
     dataloader_mode: sampler
     drop_last: true
     sampler_type: BaseRandomBatchSampler
-    num_workers: 0
+    num_workers: 8
     collate_param:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
@@ -85,9 +85,11 @@ model:
     - model.visual
   loss_cfg:
     loss_type: default   # If you want custom loss in model, loss_type can be set to "custom".
-    enable_chunk_loss: false
-    chunk_size: 1024
     router_aux_loss_coef: 0.0
+  enable_chunk_loss: false
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 1024
   use_triton_gdn: true
   use_grouped_expert_matmul: true
 
