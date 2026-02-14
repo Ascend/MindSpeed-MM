@@ -31,7 +31,22 @@ dependencies = [
     "peft==0.7.1",
     "pydantic>=2.10.4",
     "jsonargparse[all]>=4.40.0",
-    "gpytorch"
+    "gpytorch",
+    "pybind11",
+    "ninja",
+    "wheel",
+    "six",
+    "regex",
+    "decorator",
+    "attrs",
+    "psutil",
+    "pyyaml",
+    "protobuf",
+    "einops",
+    "scipy",
+    "pytest-mock",
+    "scikit-learn",
+    "SQLAlchemy"
 ]
 
 [build-system]

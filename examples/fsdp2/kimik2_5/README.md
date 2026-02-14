@@ -42,6 +42,10 @@ commit_id=3367c8d
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)，完成昇腾软件安装。
 
+‼️ 部分特性依赖较新版本的CANN，请使用 8.5.0 以上版本:
+- [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
+
+
 <a id="jump1.2"></a>
 #### 2. 环境搭建
 ```bash
@@ -129,7 +133,7 @@ pip install tiktoken==0.12.0
 <a id="jump3.1"></a>
 #### 1. 准备工作
 
-从Huggingface库 （[Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)） 下载`tiktoken.model`文件并放置于本地`mindspeed_mm/fsdp/models/kimik25/`路径下；
+从Huggingface库 （[Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)） 下载`tiktoken.model`文件并放置于本地`mindspeed_mm/fsdp/models/kimik2_5`路径下；
 
 Kimi-K2.5模型需要配置多机训练，如需拉起多机训练，请修改启动脚本下的 `MASTER_ADDR`、`NNODES` 以及 `NODE_RANK` 变量：
 ``` shell

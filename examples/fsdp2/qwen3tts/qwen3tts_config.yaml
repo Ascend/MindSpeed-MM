@@ -38,7 +38,7 @@ model:
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   loss_cfg:
-    loss_type: custom
+    loss_type: raw
 
 # 训练配置
 training:
