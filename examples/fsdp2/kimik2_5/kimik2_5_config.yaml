@@ -82,7 +82,7 @@ model:
   freeze:
     - vision_tower
   loss_cfg:
-    loss_type: custom
+    loss_type: raw
   text_decoder:
     activation_offload: false
 
