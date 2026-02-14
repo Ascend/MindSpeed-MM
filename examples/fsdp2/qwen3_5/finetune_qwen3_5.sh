@@ -20,6 +20,6 @@ DISTRIBUTED_ARGS="
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
-torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/base_trainer.py \
+torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
     examples/fsdp2/qwen3_5/qwen3_5_config.yaml \
     2>&1 | tee logs/train_${logfile}.log

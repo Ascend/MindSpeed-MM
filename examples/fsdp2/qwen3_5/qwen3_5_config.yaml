@@ -34,7 +34,7 @@ data:
 
     # 数据预处理
     preprocess_parameters:
-      model_name_or_path: &HF_MODEL_LOAD_PATH /home/l00809928/qwen/ckpt/Qwen35-dense
+      model_name_or_path: &HF_MODEL_LOAD_PATH ./ckpt/hf_path/Qwen35-xxB
       use_fast_tokenizer: true
       split_special_tokens: false
       image_max_pixels: 262144
@@ -51,12 +51,12 @@ data:
       train_on_prompt: false
       mask_history: false
       dataset_dir: ./data
-      dataset: &DATASET_PATH /data2/data/qwen_data/mllm_format_llava_instruct_data.json
+      dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false
       preprocessing_batch_size: 1000
-      preprocessing_num_workers: 0
-      max_samples: 100
+      preprocessing_num_workers: 16
+      max_samples: null
 
   # 数据加载
   dataloader_param:
@@ -75,7 +75,7 @@ model:
   model_id: qwen3_5
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
-  attn_implementation: sdpa # flash_attention_2
+  attn_implementation: sdpa
   freeze:
     - model.visual
   loss_cfg:
@@ -100,8 +100,8 @@ training:
   optimizer: adamw
   adam_fused: true
   save_interval: 10000
-  load: dcp_load_path
-  save: save_path
+  load: ./ckpt/hf_path/Qwen35-xxB
+  save: ./save_path
   use_deter_comp: false
   profile:
     enable: false
