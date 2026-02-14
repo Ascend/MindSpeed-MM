@@ -23,7 +23,7 @@ class Profiler:
     def __init__(self, config: Profiler):
         self.config = config
         self.first_step = True  # flagging the first step for record memory history
-        self.current_step = 1
+        self.current_step = 0
         self.global_rank = int(os.getenv("RANK"))
         if self.config.enable:
             self._p = self._create_profiler()
@@ -76,11 +76,13 @@ class Profiler:
 
         active = self.config.end_step - self.config.start_step
 
+        skip_first = self.config.start_step - 1
         schedule = profiler_module.schedule(
             wait=0,
             warmup=0,
             active=active,
             repeat=1,
+            skip_first=skip_first,
         )
         base_profiler = profiler_module.profile(
             activities=activities,
@@ -118,9 +120,8 @@ class Profiler:
     def step(self, *a, **kw):
         if not self.config.enable:
             return
-        if self.current_step >= self.config.start_step and self.current_step <= self.config.end_step:
-            out = self._p.step(*a, **kw)
 
+        out = self._p.step(*a, **kw)
         self.current_step += 1
     
     def memory_record(self):
