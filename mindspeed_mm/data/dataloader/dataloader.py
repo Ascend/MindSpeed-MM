@@ -180,6 +180,7 @@ def prepare_sampler_dataloader(
     collate_param=None,
     dataset_param=None,
     priority_mode="data_bucketing_img",
+    generator=None
 ):
     """
     Prepare a dataloader for distributed training. The dataloader will be wrapped by
@@ -232,7 +233,8 @@ def prepare_sampler_dataloader(
             num_workers=num_workers,
             collate_fn=collate_fn,
             prefetch_factor=prefetch_factor,
-            persistent_workers=persistent_workers
+            persistent_workers=persistent_workers,
+            generator=generator
         )
 
     elif sampler_type == "LengthGroupedSampler":
@@ -301,7 +303,8 @@ def prepare_sampler_dataloader(
             sampler=sampler if sampler is not None else None,
             drop_last=drop_last,
             prefetch_factor=prefetch_factor,
-            persistent_workers=persistent_workers
+            persistent_workers=persistent_workers,
+            generator=generator
         )
 
     elif sampler_type == "BaseRandomBatchSampler":
@@ -332,7 +335,8 @@ def prepare_sampler_dataloader(
             num_workers=num_workers,
             batch_sampler=batch_sampler,
             prefetch_factor=prefetch_factor,
-            persistent_workers=persistent_workers
+            persistent_workers=persistent_workers,
+            generator=generator
         )
 
     elif sampler_type == "BucketBatchSampler":
@@ -365,7 +369,8 @@ def prepare_sampler_dataloader(
             num_workers=num_workers,
             batch_sampler=batch_sampler,
             prefetch_factor=prefetch_factor,
-            persistent_workers=persistent_workers
+            persistent_workers=persistent_workers,
+            generator=generator
         )
 
     elif sampler_type == "SequentialSampler":
@@ -393,7 +398,8 @@ def prepare_sampler_dataloader(
             pin_memory=pin_memory,
             num_workers=num_workers,
             prefetch_factor=prefetch_factor,
-            persistent_workers=persistent_workers
+            persistent_workers=persistent_workers,
+            generator=generator
         )
     elif sampler_type == "LuminaMetaLenDistSampler":
         acc_grad = cal_gradient_accumulation_size()
@@ -415,6 +421,7 @@ def prepare_sampler_dataloader(
             persistent_workers=persistent_workers,
             collate_fn=lambda batch: tuple(zip(*batch)),
             drop_last=drop_last,
+            generator=generator
         )
     else:
         raise NotImplementedError(f"sampler type: {sampler_type}")

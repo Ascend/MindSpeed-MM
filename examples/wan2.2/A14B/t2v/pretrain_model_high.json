@@ -37,7 +37,7 @@
     },
     "patch": {
         "clip_grad_async": true,
-        "get_dist_model_load_from_pt": true
+        "bridge_patch": true
     },
     "encoder_offload_interval": 8,
     "ae": {

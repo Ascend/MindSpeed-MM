@@ -516,6 +516,11 @@ def validate_args(args, defaults=None):
         ensure_valid(args.min_lr <= args.lr)
     if args.save is not None:
         ensure_valid(args.save_interval is not None)
+    if hasattr(args, 'encoder_offload_interval') and args.encoder_offload_interval is not None and args.save is not None:
+        ensure_valid(args.save_interval % args.encoder_offload_interval == 0, \
+            f"to use checkpointing under the encoder_offload_interval feature, " \
+            f"save_interval ({args.save_interval}) must be an integer multiple of " \
+            f"encoder_offload_interval ({args.encoder_offload_interval}).")
     # Mixed precision checks.
     if args.fp16_lm_cross_entropy:
         ensure_valid(args.fp16, 'lm cross entropy in fp16 only support in fp16 mode.')

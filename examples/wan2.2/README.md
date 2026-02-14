@@ -79,11 +79,11 @@ cd MindSpeed-MM
 ### 环境搭建
 对于X86架构机器，执行如下指令：
 ```bash
-bash scripts/install.sh --arch x86 --msid 93c45456c7044bacddebc5072316c01006c938f9 && pip install -r examples/wan2.2/requirements.txt
+bash scripts/install.sh --arch x86 --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/wan2.2/requirements.txt
 ```
 对于ARM架构机器，执行如下指令：
 ```bash
-bash scripts/install.sh --arch arm --msid 93c45456c7044bacddebc5072316c01006c938f9 && pip install -r examples/wan2.2/requirements.txt
+bash scripts/install.sh --arch arm --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/wan2.2/requirements.txt
 ```
 
 ### Decord搭建

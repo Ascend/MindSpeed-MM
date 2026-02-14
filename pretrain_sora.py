@@ -154,6 +154,9 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
     """Build train, valid, and test datasets."""
     args = get_args()
     data_config = args.mm.data
+    generator = torch.Generator()
+    dataloader_seed = getattr(args, 'seed')
+    generator.manual_seed(dataloader_seed)
     train_dataset = build_mm_dataset(data_config.dataset_param)
 
     enable_encoder_dp = args.mm.model.enable_encoder_dp if hasattr(args.mm.model, "enable_encoder_dp") else False
@@ -168,6 +171,7 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
         process_group=process_group,
         consumed_samples=args.consumed_train_samples,
         dataset_param=data_config.dataset_param,
+        generator=generator,
     )
     data_iterator, _, _ = build_iterations(train_dl=train_dataloader)
     return data_iterator, None, None
