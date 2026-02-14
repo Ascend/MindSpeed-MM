@@ -1,0 +1,127 @@
+# 并行策略
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  recompute: false
+  context_parallel_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+
+# 训练配置
+training:
+  micro_batch_size: &MBS 16
+  gradient_accumulation_steps: 2
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: constant
+  lr_warmup_ratio: 0
+  weight_decay: 0
+  train_iters: 5000
+  clip_grad: 5.0
+  init_model_with_meta_device: false
+  optimizer: adamw
+  adam_fused: false
+  save_interval: 10000
+  save: ./checkpoints/cosyvoice3
+  # load: load_path  # 仅在续训场景需要配置
+  use_deter_comp: false
+  allow_hf32: false
+  log_interval: 1
+  
+  # 2. 模型精度
+  profile:
+    enable: false
+    start_step: 11
+    end_step: 12
+    save_path: ./cosyvoice3_npu_profiling
+    record_shapes: false
+    with_memory: false
+    with_stack: false
+    ranks: [0]
+
+  plugin:
+    - mindspeed_mm/fsdp/models/cosyvoice3
+    - mindspeed_mm/fsdp/data/datasets/cosyvoice3
+
+### 数据相关配置
+data:
+  dataset_param:
+    dataset_type: cosyvoice
+    preprocess_parameters: null
+    basic_parameters:
+      dataset_dir: &DATASET_PATH data/train-clean-100/parquet/data.list
+      dataset: *DATASET_PATH
+    shuffle: false
+    partition: true
+    processor:
+      tokenize:
+        token_path: &ENCODER_PATH <local_path>/Fun-CosyVoice3-0.5B-2512/CosyVoice-BlankEN/
+        skip_special_tokens: true
+        allowed_special: all
+      filter:
+        max_length: 40960
+        min_length: 100
+        token_max_length: 200
+        token_min_length: 1
+        min_output_input_ratio: 0.0005
+        max_output_input_ratio: 1
+      resample:
+        resample_rate: 24000
+        min_sample_rate: 16000
+      compute_fbank:
+        token_mel_ratio: 2
+        mel_n_fft: 1920
+        mel_num_mels: 80
+        mel_sampling_rate: 24000
+        mel_hop_size: 480
+        mel_win_size: 1920
+        mel_fmin: 0
+        mel_fmax: null
+        mel_center: false
+      parse_embedding:
+        normalize: true
+      shuffle:
+        shuffle_size: 1000
+      sort:
+        sort_size: 500
+      batch:
+        batch_type: static
+        batch_size: *MBS  # static模式时生效
+        max_frames_in_batch: 2000  # dynamic模式时生效
+      padding:
+        use_spk_embedding: false
+
+  # 数据加载
+  dataloader_param:
+    dataloader_mode: custom
+    sampler_type: custom
+    num_workers: 16
+    prefetch_factor: 1
+    pin_memory: true
+    shuffle: null
+    drop_last: false
+    collate_param:
+      model_name: custom
+
+
+# 模型配置
+model:
+  model_id: cosyvoice3_lm
+  model_name_or_path: <local_path>/Fun-CosyVoice3-0.5B-2512/llm.pt
+  trust_remote_code: true
+  loss_cfg:
+    loss_type: custom
+  train_moudule: llm
+  llm_input_size: 896
+  llm_output_size: 896
+  speech_token_size: 6561
+  length_normalized_loss: true
+  lsm_weight: 0
+  mix_ratio: [5, 15]
+  llm_encoder: *ENCODER_PATH
+  sampling:
+    top_p: 0.8
+    top_k: 25
+    win_size: 10
+    tau_r: 0.1

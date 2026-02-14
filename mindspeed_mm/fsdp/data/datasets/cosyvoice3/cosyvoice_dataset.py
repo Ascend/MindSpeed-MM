@@ -30,6 +30,7 @@ import pyarrow.parquet as pq
 import pyworld as pw
 
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DataArguments
+from mindspeed_mm.fsdp.utils.register import data_register
 
 
 LANGUAGES = {
@@ -636,7 +637,7 @@ def data_pipeline(processor_args):
     batch_fn = partial(batch, **processor_args['batch'])
     padding_fn = partial(padding, **processor_args['padding'])
     data_fn_pipeline = [parquet_opener_fn, tokenize_fn, filter_fn, resample_fn, compute_fbank_fn, parse_embedding_fn,
-                        batch_fn, padding_fn]
+                        shuffle_fn, sort_fn, batch_fn, padding_fn]
     
     return data_fn_pipeline
 
@@ -862,3 +863,33 @@ class DataList(IterableDataset):
             data = dict(src=self.lists[index])
             data.update(sampler_info)
             yield data
+
+
+@data_register.register("cosyvoice")
+def get_cosyvoice_dataset(basic_param, dataset_param, **kwargs):
+    """ Construct dataset from arguments
+
+        We have two shuffle stage in the Dataset. The first is global
+        shuffle at shards tar/raw file level. The second is global shuffle
+        at training samples level.
+
+        Args:
+            data_type(str): raw/shard
+            tokenizer (BaseTokenizer): tokenizer to tokenize
+            partition(bool): whether to do data partition in terms of rank
+    """
+    data_lists = basic_param['dataset']
+    data_fn_pipeline = data_pipeline(dataset_param['processor'])
+    lists = []
+    for data_list in data_lists:
+        lists += read_lists(data_list)
+    dataset = DataList(
+        lists,
+        shuffle=dataset_param.get('shuffle'),
+        partition=dataset_param.get('partition'),
+    )
+
+    for func in data_fn_pipeline:
+        dataset = Processor(dataset, func)
+
+    return dataset

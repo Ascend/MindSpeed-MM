@@ -57,7 +57,7 @@ class Trainer():
         self.model = self.get_model(model_provider)
         self.optimizer = self.get_optimizer()
         self.lr_scheduler = self.get_scheduler()
-        self.train_dataloader = self.get_dataloader() if dataloader_provider is None else dataloader_provider()
+        self.train_dataloader = self.get_dataloader() if dataloader_provider is None else dataloader_provider(args)
         self.checkpointer = self.get_checkpointer()
 
         # Create the training engine

@@ -22,6 +22,8 @@ class DataSetArguments:
 
     def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
         result = asdict(self)
+        if hasattr(self, "_extra_fields"):
+            result.update(self._extra_fields)
         if exclude_none:
             result = {k: v for k, v in result.items() if v is not None}
         return result
@@ -50,6 +52,8 @@ class DataloaderArguments:
 
     def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
         result = asdict(self)
+        if hasattr(self, "_extra_fields"):
+            result.update(self._extra_fields)
         if exclude_none:
             result = {k: v for k, v in result.items() if v is not None}
         return result
