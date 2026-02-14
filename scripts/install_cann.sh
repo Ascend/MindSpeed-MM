@@ -33,8 +33,8 @@ detect_os() {
 # 操作系统安装函数定义
 # 函数命名格式: install_cann_{NPU_TYPE}_{ARCH}_{OS_TYPE}
 
-# 910B NPU安装函数
-install_cann_910b_x86_apt() {
+# a2 NPU安装函数
+install_cann_a2_x86_apt() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
 
@@ -49,7 +49,7 @@ install_cann_910b_x86_apt() {
     bash ./Ascend-cann-910b-ops_8.5.0_linux-x86_64.run --install
 }
 
-install_cann_910b_x86_yum() {
+install_cann_a2_x86_yum() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
 
@@ -63,7 +63,7 @@ install_cann_910b_x86_yum() {
     bash ./Ascend-cann-910b-ops_8.5.0_linux-x86_64.run --install
 }
 
-install_cann_910b_arm_apt() {
+install_cann_a2_arm_apt() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo apt-get update
@@ -76,7 +76,7 @@ install_cann_910b_arm_apt() {
     bash ./Ascend-cann-910b-ops_8.5.0_linux-aarch64.run --install
 }
 
-install_cann_910b_arm_yum() {
+install_cann_a2_arm_yum() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo yum makecache
@@ -89,8 +89,8 @@ install_cann_910b_arm_yum() {
     bash ./Ascend-cann-910b-ops_8.5.0_linux-aarch64.run --install
 }
 
-# 910C NPU安装函数
-install_cann_910c_x86_apt() {
+# a3 NPU安装函数
+install_cann_a3_x86_apt() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo apt-get update
@@ -103,7 +103,7 @@ install_cann_910c_x86_apt() {
     bash ./Ascend-cann-A3-ops_8.5.0_linux-x86_64.run --install
 }
 
-install_cann_910c_x86_yum() {
+install_cann_a3_x86_yum() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo yum makecache
@@ -116,7 +116,7 @@ install_cann_910c_x86_yum() {
     bash ./Ascend-cann-A3-ops_8.5.0_linux-x86_64.run --install
 }
 
-install_cann_910c_arm_apt() {
+install_cann_a3_arm_apt() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo apt-get update
@@ -129,7 +129,7 @@ install_cann_910c_arm_apt() {
     bash ./Ascend-cann-A3-ops_8.5.0_linux-aarch64.run --install
 }
 
-install_cann_910c_arm_yum() {
+install_cann_a3_arm_yum() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo yum makecache
@@ -239,16 +239,16 @@ main() {
     # 根据设备ID确定NPU类型（忽略大小写，完全匹配）
     case "$npu_device_id_lower" in
         d802)
-            NPU_TYPE="910b"
-            echo "NPU Type: Ascend 910B (d802)"
+            NPU_TYPE="a2"
+            echo "NPU Type: Ascend A2 (d802)"
             ;;
         d803)
-            NPU_TYPE="910c"
-            echo "NPU Type: Ascend 910C (d803)"
+            NPU_TYPE="a3"
+            echo "NPU Type: Ascend A3 (d803)"
             ;;
         *)
             echo "Error: Unsupported NPU device ID: $npu_device_id"
-            echo "Supported device IDs: d802 (Ascend 910B), d803 (Ascend 910C)"
+            echo "Supported device IDs: d802 (Ascend Atlas A2), d803 (Ascend Atlas A3)"
             echo "Your device ID: $npu_device_id"
             return 1
             ;;
