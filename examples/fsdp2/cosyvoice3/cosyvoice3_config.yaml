@@ -110,8 +110,6 @@ model:
   model_id: cosyvoice3_lm
   model_name_or_path: <local_path>/Fun-CosyVoice3-0.5B-2512/llm.pt
   trust_remote_code: true
-  loss_cfg:
-    loss_type: custom
   train_moudule: llm
   llm_input_size: 896
   llm_output_size: 896
