@@ -26,6 +26,7 @@ __all__ = [
     # wan Models
     "Wan21Bridge",
     "WanTransformer3DModel",
+    "HunyuanVideo_1_5_DiffusionTransformer"
 ]
 
 from bridge.models.conversion.auto_bridge import AutoBridge
@@ -49,3 +50,5 @@ from bridge.models.wan import (
     Wan21Bridge,
     WanTransformer3DModel,
 )
+
+from bridge.models.hunyuan import HunyuanVideo_1_5_DiffusionTransformer
