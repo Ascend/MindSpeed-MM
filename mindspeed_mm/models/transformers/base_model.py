@@ -593,7 +593,7 @@ class FSDP2Mixin:
                 return torch.empty_like(t, device=device) if t.device != device else t
             else:
                 # we do not offload buffer to cpu when enable FSDP2 offload_to_cpu function.
-                return torch.empty_like(t, device='cuda')
+                return torch.empty_like(t, device='cuda') if t.device == torch.device('cpu') else t
         return self._apply(_replace_tensor, recurse=recurse)
 
     def _post_fully_shard(self):
