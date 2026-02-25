@@ -30,6 +30,7 @@ from mindspeed_mm.models.predictor.dits.hunyuanvideo15.attention import parallel
 from mindspeed_mm.models.predictor.dits.hunyuanvideo15.token_refiner import SingleTokenRefiner
 from mindspeed_mm.models.predictor.dits.hunyuanvideo15.communications import all_gather
 from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import get_parallel_state
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import get_parallel_state, sync_tensor_for_sp
 
 
 class HunyuanVideo15DiT(MultiModalModule):
@@ -242,6 +243,10 @@ class HunyuanVideo15DiT(MultiModalModule):
         else:
             self.cond_type_embedding = None
 
+        self.parallel_state = get_parallel_state()
+        self.sp_enabled = self.parallel_state.sp_enabled
+        self.sp_group = self.parallel_state.sp_group if self.sp_enabled else None
+
     def load_hunyuan_state_dict(self, model_path):
         load_key = "module"
         bare_model = "unknown"
@@ -370,6 +375,8 @@ class HunyuanVideo15DiT(MultiModalModule):
             **kwargs
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         with torch.autocast(device_type="npu", dtype=torch.bfloat16):
+            parallel_dims = get_parallel_state()
+
             b, c, f, h, w = noised_latents.shape
             cond_latents = torch.zeros([b, c + 1, f, h, w], device=noised_latents.device, dtype=noised_latents.dtype)
 
@@ -382,6 +389,10 @@ class HunyuanVideo15DiT(MultiModalModule):
                 )
 
             img = x = hidden_states.to(self.dtype)
+            if parallel_dims.sp_enabled:
+                prompt_mask = sync_tensor_for_sp(prompt_mask, parallel_dims.sp_group)
+                prompt = sync_tensor_for_sp(prompt, parallel_dims.sp_group)
+
             text_mask = prompt_mask[0][0]
             t = timestep
             txt = prompt[0][0]
@@ -396,7 +407,7 @@ class HunyuanVideo15DiT(MultiModalModule):
                 freqs_cos, freqs_sin = self.get_rotary_pos_embed((tt, th, tw))
 
             img = self.img_in(img)
-            parallel_dims = get_parallel_state()
+
             sp_enabled = parallel_dims.sp_enabled
             if sp_enabled:
                 sp_size = parallel_dims.sp

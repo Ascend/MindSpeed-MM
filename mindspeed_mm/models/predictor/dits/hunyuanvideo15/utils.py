@@ -148,8 +148,8 @@ __parallel_dims = None
 
 
 def initialize_parallel_state(
-    sp: int = 1,
-    dp_replicate: int = 1,
+        sp: int = 1,
+        dp_replicate: int = 1,
 ):
     global __parallel_dims
     __parallel_dims = ParallelDims(sp=sp, dp_replicate=dp_replicate)
@@ -345,3 +345,76 @@ def flash_attn_no_pad_v3(
 ):
     output = flash_attn_no_pad(qkv, key_padding_mask, causal, dropout_p, softmax_scale, deterministic)
     return output
+
+
+def is_src_rank(src, group_src, group):
+    if src is None and group_src is None:
+        raise ValueError("Either 'src' or 'group_src' must be provided, but both are None.")
+    if src is not None and group_src is not None:
+        raise ValueError("Only one of 'src' or 'group_src' can be provided, but both are given.")
+    if src is not None:
+        return dist.get_rank() == src
+    if group_src is not None:
+        return dist.get_rank() == dist.get_global_rank(group, group_src)
+    raise RuntimeError("src and group_src cannot be both None")
+
+
+def broadcast_object(
+        obj,
+        src=None,
+        group=None,
+        device=None,
+        group_src=None,
+):
+    kwargs = dict(
+        src=src,
+        group_src=group_src,
+        group=group,
+        device=device,
+    )
+    buffer = [obj] if is_src_rank(src, group_src, group) else [None]
+
+    dist.broadcast_object_list(buffer, **kwargs)
+    return buffer[0]
+
+
+def broadcast_tensor(
+        tensor,
+        src=None,
+        group=None,
+        async_op: bool = False,
+        group_src=None,
+):
+    """shape and dtype safe broadcast of tensor"""
+    kwargs = dict(
+        src=src,
+        group_src=group_src,
+        group=group,
+        async_op=async_op,
+    )
+    if is_src_rank(src, group_src, group):
+        tensor = tensor.npu().contiguous()
+    if is_src_rank(src, group_src, group):
+        shape, dtype = tensor.shape, tensor.dtype
+    else:
+        shape, dtype = None, None
+    shape = broadcast_object(shape, src=src, group_src=group_src, group=group)
+    dtype = broadcast_object(dtype, src=src, group_src=group_src, group=group)
+
+    buffer = tensor if is_src_rank(src, group_src, group) else torch.empty(shape, device='npu', dtype=dtype)
+    dist.broadcast(buffer, **kwargs)
+    return buffer
+
+
+def sync_tensor_for_sp(tensor: torch.Tensor, sp_group) -> torch.Tensor:
+    """
+    Sync tensor within sequence parallel group.
+    Ensures all ranks in the SP group have the same tensor values.
+    """
+    if sp_group is None:
+        return tensor
+    if not isinstance(tensor, torch.Tensor):
+        obj_list = [tensor]
+        dist.broadcast_object_list(obj_list, group_src=0, group=sp_group)
+        return obj_list[0]
+    return broadcast_tensor(tensor, group_src=0, group=sp_group)

@@ -2,10 +2,14 @@
 import math
 from enum import Enum
 from typing import Optional, Union, Callable
-from tqdm.auto import tqdm
+
 import torch
-from torch import nn
 from diffusers.training_utils import compute_density_for_timestep_sampling
+from torch import nn
+from tqdm.auto import tqdm
+
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import get_parallel_state, sync_tensor_for_sp, \
+    initialize_parallel_state
 
 
 def rescale_noise_cfg(noise_cfg, noise_pred_text, guidance_rescale=0.0):
@@ -202,6 +206,11 @@ class Hunyuan_15_FlowMatchDiscreteScheduler:
         )
         self.train_timestep_shift = train_timestep_shift
 
+        initialize_parallel_state(sp=kwargs['sp_size'], dp_replicate=kwargs['dp_replicate'])
+        self.parallel_state = get_parallel_state()
+        self.sp_enabled = self.parallel_state.sp_enabled
+        self.sp_group = self.parallel_state.sp_group if self.sp_enabled else None
+
     @property
     def step_index(self):
         """
@@ -384,6 +393,8 @@ class Hunyuan_15_FlowMatchDiscreteScheduler:
             **kwargs
     ):
         latents = kwargs.get("latents", x_start)
+        if self.sp_enabled:
+            latents = sync_tensor_for_sp(latents, self.sp_group)
         b, _, _, _, _ = latents.shape
         if noise is None:
             noise = torch.randn_like(latents)
@@ -501,6 +512,9 @@ class Hunyuan_15_FlowMatchDiscreteScheduler:
 
         if kwargs.get("target", None) is not None:
             target = kwargs.get("target", None).to(dtype=model_output.dtype)
+
+        if self.sp_enabled:
+            target = sync_tensor_for_sp(target, self.sp_group)
 
         loss = nn.functional.mse_loss(model_output, target.to(dtype=model_output.dtype))
         return loss

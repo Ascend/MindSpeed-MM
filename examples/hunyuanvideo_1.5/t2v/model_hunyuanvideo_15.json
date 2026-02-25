@@ -54,7 +54,9 @@
         "reverse": true,
         "solver": "euler",
         "snr": "lognorm",
-        "train_timestep_shift": 3.0
+        "train_timestep_shift": 3.0,
+        "sp_size": 1,
+        "dp_replicate": 1
     },
     "predictor": {
         "model_id": "hunyuanvideo15dit",
@@ -72,7 +74,7 @@
         "mm_double_blocks_depth": 20,
         "mm_single_blocks_depth": 0,
         "rope_dim_list": [16, 56, 56],
-        "qkv_bias": true, 
+        "qkv_bias": true,
         "qk_norm": true,
         "qk_norm_type": "rms",
         "guidance_embed": false,
@@ -104,5 +106,9 @@
         "vision_states_dim": 1152,
         "is_reshape_temporal_channels": false,
         "use_cond_type_embedding": true
+    },
+    "patch": {
+        "clip_grad_async": true,
+        "bridge_patch": true
     }
 }
