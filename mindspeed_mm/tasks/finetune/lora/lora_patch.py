@@ -149,6 +149,11 @@ def model_provider_func_wrapper(model_provider_func):
                                 _sub_name = sub_name.split(".")[-1]
                                 if _sub_name in layer:
                                     sub_module.register_forward_hook(_hook)
+                    elif hasattr(module, "language_model"):
+                        for sub_name, sub_module in module.language_model.named_modules():
+                            _sub_name = sub_name.split(".")[-1]
+                            if _sub_name in layer:
+                                sub_module.register_forward_hook(_hook)
 
             image_encoder = getattr(mm_model, 'image_encoder', None) if mm_model else None
             text_config = getattr(mm_model, 'text_decoder', None) if mm_model else None

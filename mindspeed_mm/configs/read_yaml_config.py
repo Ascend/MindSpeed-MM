@@ -50,6 +50,8 @@ def get_sys_args_from_yaml():
     flat_args = flatten_config(config['gpt_args'])
     if 'gpt_args' not in config:
         raise KeyError("The required keyword 'gpt_args' is missing from the configuration file.")
+    if 'lora_args' in config:
+        flat_args.update(flatten_config(config['lora_args']))
     for key, value in flat_args.items():
         if isinstance(value, bool) and value:
             new_argv.append(f'--{key}')

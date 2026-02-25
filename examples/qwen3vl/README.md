@@ -315,6 +315,52 @@ NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```
 
+【LoRA微调（可选）】
+
+LoRA为框架通用能力，当前已支持30B模型的语言模块LoRA微调，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/lora_finetune.md)。
+
+LoRA微调场景下，需要先对原始权重完成以下权重转换
+```bash
+mm-convert Qwen3VLConverter hf_to_dcp \
+  --hf_dir Qwen3-VL-30B-A3B-Instruct \
+  --dcp_dir Qwen3-VL-30B-A3B-Instruct-dcp \
+  --is_lora_base true
+
+# 转换后的目录结构为：
+# ———— Qwen3-VL-30B-A3B-Instruct-dcp
+#   |—— release
+#   |—— latest_checkpointed_iteration.txt
+```
+
+若需加载LoRA预训练权重，需要先对LoRA权重完成以下权重转换
+```bash
+mm-convert Qwen3VLConverter lora_hf_to_dcp \
+  --hf_dir Qwen3-VL-30B-A3B-Instruct-lora \
+  --dcp_dir Qwen3-VL-30B-A3B-Instruct-lora-dcp
+
+# 转换后的目录结构为：
+# ———— Qwen3-VL-30B-A3B-Instruct-lora-dcp
+#   |—— release
+#   |—— latest_checkpointed_iteration.txt
+```
+
+并在`examples/qwen3vl/qwen3vl_lora_sft_30B.yaml`中添加LoRA预训练权重路径，相关配置修改如下：
+
+```shell
+MM_MODEL_LOAD_PATH: &MM_MODEL_LOAD_PATH ./ckpt/mm_path/Qwen3-VL-30B-A3B-Instruct
+LORA_MODEL_LOAD_PATH: &LORA_MODEL_LOAD_PATH ./ckpt/mm_path/Qwen3-VL-30B-A3B-Instruct-lora
+
+...
+# 原始的 load: *MM_MODEL_LOAD_PATH 需替换为 load_base_model: *MM_MODEL_LOAD_PATH
+load: *LORA_MODEL_LOAD_PATH
+load_base_model: *MM_MODEL_LOAD_PATH
+...
+```
+运行以下命令进行LoRA微调
+```shell
+bash examples/qwen3vl/finetune_lora_qwen3vl_30B.sh
+```
+
 <a id="jump4.3"></a>
 #### 3. 启动微调
 
