@@ -45,6 +45,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 * [Feb. 16, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/fsdp2_dev/examples/fsdp2/qwen3_5)模型【Prototype】
+* [Feb. 14, 2026]: 🚀 MindSpeed MM基于FSDP2支持[CosyVoice3](https://gitcode.com/Ascend/MindSpeed-MM/tree/fsdp2_dev/examples/fsdp2/cosyvoice3)模型训练
 * [Feb. 13, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Kimi-K2.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/fsdp2_dev/examples/fsdp2/kimik2_5)模型【Prototype】
 * [Feb. 12, 2026]: 🚀 MindSpeed MM基于FSDP2支持[HunyuanVideo1.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/hunyuanvideo_1.5)模型训练demo【Prototype】
 * [Feb. 03, 2026]: 🚀 MindSpeed MM基于FSDP2支持[DeepseekOCR2](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/deepseekocr2/README.md)模型训练demo【Prototype】
@@ -1029,6 +1030,18 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 93.38 (SPS) </td>
       <td> 109.23 (SPS) </td>
       <td> / </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td> 语音生成 </td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/fsdp2_dev/examples/fsdp2/cosyvoice3">CosyVoice3</a></td>
+      <td><a href="https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512">0.5B</a></td>
+      <td> 预训练 </td>
+      <td> 1x8</td>
+      <td> BF16 </td>
+      <td> 315.46 (SPS) </td>
+      <td> 326.11 (SPS) </td>
+      <td> 24 </td>
       <td>【Test】</td>
     </tr>
     </tbody>
