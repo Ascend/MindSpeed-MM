@@ -25,7 +25,7 @@ from transformers.utils import auto_docstring
 
 from mindspeed_mm.fsdp.models.cosyvoice3.common import IGNORE_ID, th_accuracy, make_pad_mask, ras_sampling
 from mindspeed_mm.fsdp.models.base_model import BaseModel
-from mindspeed_mm.fsdp.utils.device import get_device_type
+from mindspeed_mm.fsdp.utils.device import get_device_type, IS_NPU_AVAILABLE
 from mindspeed_mm.fsdp.utils.register import model_register
 
 
@@ -510,3 +510,9 @@ class CosyVoice3LMOutputWithPast(ModelOutput):
     acc: Optional[torch.FloatTensor] = None
     logits: Optional[torch.FloatTensor] = None
     last_hidden_states: Optional[torch.FloatTensor] = None
+
+
+if IS_NPU_AVAILABLE:
+    from mindspeed_mm.fsdp.models.cosyvoice3.npu_patch import apply_cosyvoice_npu_patch
+
+    apply_cosyvoice_npu_patch()

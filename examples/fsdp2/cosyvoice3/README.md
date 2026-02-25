@@ -84,14 +84,14 @@ pip install -r examples/fsdp2/cosyvoice3/requirements.txt
 tar -xzvf train-clean-100.tar.gz
 ```
 ### 2. 数据预处理
-修改数据预处理脚本`examples\fsdp2\cosyvoice3\data_preprocess.sh`中的`data_dir`与`pretrained_model_dir`配置，运行数据预处理脚本：
+修改数据预处理脚本`examples/fsdp2/cosyvoice3/data_preprocess.sh`中的`data_dir`与`pretrained_model_dir`配置，运行数据预处理脚本：
 
 ```
 # 修改路径，执行数据格式转换脚本，预处理后数据将默认保存在./data路径下
 # data_dir: 修改为本地数据集路径，若本地路径为/data/LibriTTS，修改为/data
 # pretrained_model_dir: 修改为本地下载的权重路径
 
-bash examples\fsdp2\cosyvoice3\data_preprocess.sh
+bash examples/fsdp2/cosyvoice3/data_preprocess.sh
 ```
 
 ## 微调
@@ -102,13 +102,14 @@ bash examples\fsdp2\cosyvoice3\data_preprocess.sh
 
 ### 2. 启动微调
 
-在 `examples\fsdp2\cosyvoice3\cosyvoice3_config.yaml` 文件中配置好数据集和权重路径:
+在 `examples/fsdp2/cosyvoice3/cosyvoice3_config.yaml` 文件中配置好数据集和权重路径:
 1. 将所有`<local_path>`修改为本地权重所在目录
 2. 将`DATASET_PATH`修改为数据预处理后保存的parquet路径，若使用train-clean-100数据集按照上述命令执行则无需修改
+3. 在本地权重的`Fun-CosyVoice3-0.5B-2512/CosyVoice-BlankEN/config.json`配置文件中加入`"attn_implementation": "flash_attention_2"`字段以使能flash_attention_2加速训练
 
 使用如下命令，启动CosyVoice3的微调任务：
 ```shell
-bash examples\fsdp2\cosyvoice3\finetune_cosyvoice3.sh
+bash examples/fsdp2/cosyvoice3/finetune_cosyvoice3.sh
 ```
 
 ## 环境变量声明
