@@ -39,27 +39,27 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
 <table border="0">
   <tr>
     <td> MindSpeed版本 </td>
-    <td> 2.2.0_core_r0.12.1 </td>
+    <td> 2.3.0_core_r0.12.1 </td>
   </tr>
   <tr>
     <td> Megatron-LM版本 </td>
-    <td> core_v0.12.1 </td>
+    <td> core_r0.12.1 </td>
   </tr>
   <tr>
     <td> CANN版本 </td>
-    <td> CANN 8.3.RC1 </td>
+    <td> CANN 8.5.0 </td>
   </tr>
   <tr>
     <td> MindSpore版本 </td>
-    <td> 2.7.0 </td>
+    <td> 2.7.2 </td>
   </tr>
   <tr>
     <td> MSAdapter版本 </td>
-    <td> r0.3.0 </td>
+    <td> r0.4.0 </td>
   </tr>
   <tr>
     <td> Python版本 </td>
-    <td> Python3.9.x, Python3.10.x </td>
+    <td> Python3.10.x </td>
   </tr>
 </table>
 
@@ -101,7 +101,7 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
 - 下载MindSpeed-Core-MS源码master分支，执行一键适配。
 
   ```shell
-    git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b r0.4.0
+    git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b r0.5.0
     cd MindSpeed-Core-MS
     source auto_convert.sh mm
   ```
