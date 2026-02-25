@@ -133,7 +133,30 @@ pip install tiktoken==0.12.0
 <a id="jump3.1"></a>
 #### 1. 准备工作
 
-从Huggingface库 （[Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)） 下载`tiktoken.model`文件并放置于本地`mindspeed_mm/fsdp/models/kimik2_5`路径下；
+从Huggingface库 （[Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)） 下载下列文件并放置于本地`mindspeed_mm/fsdp/models/kimik2_5`路径下；
+```shell
+# HF_PATH配置为HuggingFace库下载文件的存放路径
+HF_PATH="/download/Kimi-K2.5"
+# MM_PATH配置为MindSpeed-MM根目录路径
+MM_PATH="/home/workspace/MindSpeed-MM"
+
+cd ${HF_PATH}
+cp -f \
+  chat_template.jinja \
+  config.json \
+  configuration_deepseek.py \
+  configuration_kimi_k25.py \
+  generation_config.json \
+  kimi_k25_processor.py \
+  kimi_k25_vision_processing.py \
+  preprocessor_config.json \
+  tiktoken.model \
+  tokenization_kimi.py \
+  tokenizer_config.json \
+  tool_declaration_ts.py \
+  ${MM_PATH}/mindspeed_mm/fsdp/models/kimik2_5/
+cd ${MM_PATH}
+```
 
 Kimi-K2.5模型需要配置多机训练，如需拉起多机训练，请修改启动脚本下的 `MASTER_ADDR`、`NNODES` 以及 `NODE_RANK` 变量：
 ``` shell
