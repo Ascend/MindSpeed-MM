@@ -20,6 +20,7 @@ import einops
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch_npu
 
 from .utils import flash_attn_no_pad, flash_attn_no_pad_v3
 from .utils import get_parallel_state
@@ -331,7 +332,4 @@ class RMSNorm(nn.Module):
             torch.Tensor: The output tensor after applying RMSNorm.
 
         """
-        output = self._norm(x.float()).type_as(x)
-        if hasattr(self, "weight"):
-            output = output * self.weight
-        return output
+        return torch_npu.npu_rms_norm(x, self.weight, epsilon=self.eps)[0]
