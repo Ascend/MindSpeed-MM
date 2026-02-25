@@ -5,7 +5,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，因此下面�
 更多细节请[参考](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl)
 ### 1. 环境安装
 #### 1.1 昇腾软件安装
-昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/user-guide/installation.md)
+昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/installation.md)
 (基于Python3.10)
 
 #### 1.2 仓库拉取以及MindSpeed MM依赖安装
@@ -53,7 +53,7 @@ pip install -e .
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-3B-Instruct`目录下。
 
 #### 2.2 权重转换
-MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分，详情参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
+MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分，详情参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)。
 
 以下是hf2mm的转换示例：
 ```bash
@@ -228,7 +228,7 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_3b.sh
 更多细节请[参考](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.1)
 ### 1. 环境安装
 #### 1.1 昇腾软件安装
-昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/user-guide/installation.md)
+昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/installation.md)
 (基于python3.10)
 
 #### 1.2 仓库拉取以及MindSpeed MM依赖安装

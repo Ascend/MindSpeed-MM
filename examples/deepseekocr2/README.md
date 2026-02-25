@@ -38,7 +38,7 @@ commit_id=c548f2e60d409fc1d92208472c0f2389998af632
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../docs/user-guide/installation.md)
+请参考[安装指南](../../docs/zh/pytorch/installation.md)
 
 > 注意：Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
 

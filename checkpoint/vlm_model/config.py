@@ -58,13 +58,13 @@ class VppParallelConfig(BaseModel):
     """权模型切分配置，包括tp的size，以及pp切分时vit和llm在pp域每张卡上切分的层数"""
 
     llm_pp_layers: List[List[NonNegativeInt]]
-    """llm模块pipeline parallel切分每张卡上切分几层, vpp切分配置参考docs/features/virtual_pipeline_parallel.md"""
+    """llm模块pipeline parallel切分每张卡上切分几层, vpp切分配置参考docs/zh/features/virtual_pipeline_parallel.md"""
 
     vit_pp_layers: List[List[NonNegativeInt]]
-    """vit模块pipeline parallel切分每张卡上切分几层, vpp切分配置参考docs/features/virtual_pipeline_parallel.md"""
+    """vit模块pipeline parallel切分每张卡上切分几层, vpp切分配置参考docs/zh/features/virtual_pipeline_parallel.md"""
 
     audio_pp_layers: Optional[List[List[NonNegativeInt]]] = None
-    """audio模块pipeline parallel切分每张卡上切分几层, vpp切分配置参考docs/features/virtual_pipeline_parallel.md"""
+    """audio模块pipeline parallel切分每张卡上切分几层, vpp切分配置参考docs/zh/features/virtual_pipeline_parallel.md"""
 
     tp_size: PositiveInt = 1
     """默认tensor parallel张量并行组，模型转换时不同的tp组要切分到不同的目录下"""

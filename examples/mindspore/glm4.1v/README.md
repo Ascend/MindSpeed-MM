@@ -29,7 +29,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 <a id="jump1.1"></a>
 #### 1. 仓库拉取
@@ -71,7 +71,7 @@ mkdir ckpt
 <a id="jump2.2"></a>
 #### 2. 权重转换(hf2mm)
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)
 
 ```bash
 # 9B PP1
@@ -228,13 +228,13 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 比如9b默认的值`[24,0,0,0]`、`[5,12,12,11]`，其含义为PP域内第一张卡先放24层`vision_encoder`再放5层`text_decoder`、第二张卡放`text_decoder`接着的12层、第三张卡放`text_decoder`接着的12层、第四张卡放`text_decoder`接着的11层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[22,2,0,0]`、`[5,12,12,11]`的配置是错的）
 
-同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[5,12,12,11]`），需要在`finetune_glm4.1v_9b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)。
+同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[5,12,12,11]`），需要在`finetune_glm4.1v_9b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dummy_optimizer.md)。
 
 <a id="jump4.3"></a>
 #### 3. 启动微调
 
 以GLM4.1V-9B为例，启动微调训练任务。  
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
 ```shell
 bash examples/experimental/glm4.1v/finetune_glm4.1v_9b.sh
 ```

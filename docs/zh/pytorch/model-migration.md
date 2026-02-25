@@ -36,7 +36,7 @@ NVIDIA GPU采用CUDA（Compute Unified Device Architecture）的并行计算架�
 
 ## 模型迁移总体流程
 通用模型迁移适配方法，可以分为四个阶段：迁移分析、模型迁移、精度调试与性能调优，总体流程如下图所示。
-![alt text](migration_process1.png)
+![alt text](../../../sources/images/migration_guide/migration_process1.png)
 
 ## 迁移分析
 建议用户在选取迁移模型时，尽可能选取权威PyTorch模型实现仓，包括但不限于PyTorch（imagenet/vision等）、Meta Research（Detectron/detectron2等）、open-mmlab（MMDetection/mmpose等）。
@@ -67,7 +67,7 @@ bitsandbytes已支持在昇腾上进行安装，具体可单击[Supported Backen
 - **模型调试**：在进行迁移和变量适配，应按步骤进行对应调试，从单模块到全流程，依次进行。
 
 总体流程如下：
-![alt text](migration_process2.png)
+![alt text](../../../sources/images/migration_guide/migration_process2.png)
 
 ## 精度调优
 训练一个大模型，往往涉及到高额的成本投入与复杂的技术难题。例如，MetaAI公开了OPT-175B大模型的训练日志，披露了从2021-10-20到2022-01-06之间75天内训练大模型遇到的各种问题以及应对方案。这些问题非常有代表性：例如大量硬件失效，需要移除出错节点、排查软件栈错误后重启训练；再比如出现Loss上扬、梯度范数异常等棘手的问题，需要调整学习率、batch大小，或者跳过异常训练语料来解决或规避。从上述示例中可以看出，即使在最先进、最主流的AI加速器上，训练大模型仍需克服诸多难关。除了OPT-175B，AI2发布了OLMo系列模型的技术报告、数据、权重、超参数，甚至公开了处理数据、评估模型的代码以及训练日志。OLMo即便只是7B参数的语言模型，涉及到的细节仍然非常繁杂，例如混合精度配置、数据处理、大量训练内部状态监控等。
@@ -124,20 +124,20 @@ export CPU_AFFINITY_CONF=<mode>,npu<value1>:<value2>-<value3>
 
 **融合算子**
 当前已支持如下算子：
-- [rms_norm融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/rms_norm.md)
-- [swiglu融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swiglu.md)
-- [Rotary Position Embedding 融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/rotary-embedding.md)
-- [flash attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/flash-attention.md)
+- [rms_norm融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/rms_norm.md)
+- [swiglu融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/swiglu.md)
+- [Rotary Position Embedding 融合优化](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/rotary-embedding.md)
+- [flash attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/flash-attention.md)
 
 **内存优化**
 通过高效的device内存运用，能够更好发挥选择性重计算等方法：
-- [激活函数重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/activation-function-recompute.md)
-- [Swap-attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/swap_attention.md)
-- [Norm重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/norm-recompute.md)
+- [激活函数重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/activation-function-recompute.md)
+- [Swap-attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/swap_attention.md)
+- [Norm重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/norm-recompute.md)
 
 ### 通信优化          
 当前主要支持DP域的计算通信并行掩盖：
-[Megatron 权重更新通信隐藏](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/async-ddp-param-gather.md)。
+[Megatron 权重更新通信隐藏](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/async-ddp-param-gather.md)。
 
 ## 模型训练
 此处以Qwen2VL 7B模型为例，对MindSpeed MM训练进行介绍。
@@ -193,7 +193,7 @@ pip install -e .
 
 #### 2. 权重转换(hf2mm)
 
-MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)
 ```bash
 # 7b
 mm-convert  Qwen2VLConverter hf_to_mm \

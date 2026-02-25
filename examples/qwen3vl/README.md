@@ -44,7 +44,7 @@ commit_id=c0dbe09
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
@@ -265,12 +265,12 @@ gpt_args:
 
 【FSDP2 offload_to_cpu配置】
 在fsdp2_config.yaml配置offload_to_cpu为True, 可以将参数，梯度和优化器状态卸载到CPU内存，进一步降低显存。但同时训练速度相对会变慢，在显存足够的情况下不建议开启。
-功能描述请详见：docs/features/fsdp2.md。
+功能描述请详见：docs/zh/features/fsdp2.md。
 开启该功能时，同时需要在`qwen3vl_full_sft_xxB.yaml`文件中`gpt_args`配置项里配置`distributed_backend: npu:hccl,cpu:gloo`，以开启双通信后端。
 
 
 【chunkloss 配置】
-参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/chunkloss.md)
+参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/chunkloss.md)
 
 【负载均衡损失配置】
 支持自定义moe模型中专家负载均衡的aux_loss的系数，在`qwen3vl_full_sft_xxB.yaml`中的`router_aux_loss_coef`，默认为0.0，即不计算该损失。
@@ -365,7 +365,7 @@ bash examples/qwen3vl/finetune_lora_qwen3vl_30B.sh
 #### 3. 启动微调
 
 以Qwen3VL-xxB为例，启动微调训练任务。
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
 通过修改`qwen3vl_full_sft_xxB.yaml`文件中的`loss_type`字段可以在不同的loss计算方式中切换。
 
 ```shell
@@ -373,7 +373,7 @@ bash examples/qwen3vl/finetune_qwen3vl_xxB.sh
 ```
 **优化特性：**
 
-- ChunkLoss：可以参考文档[ChunkLoss](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/chunkloss.md)开启该特性优化长序列时的显存占用。
+- ChunkLoss：可以参考文档[ChunkLoss](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/chunkloss.md)开启该特性优化长序列时的显存占用。
 
 ---
 

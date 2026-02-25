@@ -5,19 +5,22 @@
 
 ## 目录
 
-- [环境安装](#jump1)
-  - [仓库拉取](#jump1.1)
-  - [环境搭建](#jump1.2)
-- [权重下载及转换](#jump2)
-  - [权重下载](#jump2.1)
-- [数据集准备及处理](#jump3)
-  - [数据集下载](#jump3.1)
-- [微调](#jump4)
-  - [准备工作](#jump4.1)
-  - [配置参数](#jump4.2)
-  - [启动微调](#jump4.3)
-- [性能数据](#性能数据)
-- [环境变量声明](#jump5)
+- [DeepSeekVL2 使用指南](#deepseekvl2-使用指南)
+  - [目录](#目录)
+  - [环境安装](#环境安装)
+      - [1. 仓库拉取](#1-仓库拉取)
+      - [2. 环境搭建](#2-环境搭建)
+  - [权重下载及转换](#权重下载及转换)
+      - [1. 权重下载](#1-权重下载)
+      - [2. 权重转换](#2-权重转换)
+  - [数据集准备及处理](#数据集准备及处理)
+      - [1. 数据集下载](#1-数据集下载)
+  - [微调](#微调)
+      - [1. 准备工作](#1-准备工作)
+      - [2. 配置参数](#2-配置参数)
+      - [3. 启动微调](#3-启动微调)
+  - [性能数据](#性能数据)
+  - [环境变量声明](#环境变量声明)
 
 ---
 <a id="jump1"></a>
@@ -26,7 +29,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 <a id="jump1.1"></a>
 
@@ -92,7 +95,7 @@ pip install -e .
 
 MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及TP（Tensor Parallel）和EP（Expert Parallel）的权重切分。
 
-`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)
 
 **注意**
 

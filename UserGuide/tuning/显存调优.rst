@@ -178,7 +178,7 @@ DDP
 FSDP
 ^^^^
 
-套件支持FSDP2特性，可以参考 :doc:`FSDP2使用说明 <docs/features/fsdp2.rst>` 使用FSDP2。
+套件支持FSDP2特性，可以参考 :doc:`FSDP2使用说明 <docs/zh/features/fsdp2.rst>` 使用FSDP2。
 启用此特性，默认情况下可以对静态显存做完全切分。
 
 静态显存调优
@@ -248,7 +248,7 @@ MM内置的模型如qwen2.5VL、OpenSoraPlan1.3支持开启模型切分，详情
 在生成模型的DiT、理解模型的decoder等主干transformer模型前反向计算阶段，激活值中间结果的保存是一个常见的瓶颈。
 激活值重计算可以仅保存少量保存点，并在反向计算时从保存点再次计算出中间变量用于反向计算，避免了保存大部分中间结果到反向，可以大幅降低激活值。
 
-对于FSDP2模型，重计算在yaml中配置生效，使用方法参考 :doc:`FSDP2使用说明 <docs/features/fsdp2.rst>` 使用
+对于FSDP2模型，重计算在yaml中配置生效，使用方法参考 :doc:`FSDP2使用说明 <docs/zh/features/fsdp2.rst>` 使用
 
     - ``recompute_modules``
         - 描述：配置激活值重计算，以计算换内存

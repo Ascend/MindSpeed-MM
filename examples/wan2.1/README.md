@@ -71,7 +71,7 @@ commit_id=f8d4a1e
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 ### 仓库拉取
 
@@ -315,11 +315,11 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   - 默认使能方式为Ulysses序列并行。
 
-  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
+  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_ring_attention.md)
 
-  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
+  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_usp.md)
 
-  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/fpdt.md)
+  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/fpdt.md)
 
 - layer_zero
 
@@ -403,7 +403,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存。
   
-  - 使能方式：`examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dist`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/fsdp2.md)
+  - 使能方式：`examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dist`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
 
 #### 启动训练
 

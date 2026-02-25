@@ -44,7 +44,7 @@ commit_id=bf576ef1d5ddc643cf814b1dff4f4dcc9a7581c7
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 ### 1. 仓库拉取
 拉取MindSpeed MM代码仓，并进入代码仓根目录：
@@ -206,7 +206,7 @@ HunyuanVideo1.5
 
   - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存，默认开启。
   
-  - 使能方式：`examples/hunyuanvideo_1.5/{task}/pretrain_*.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dcp`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/fsdp2.md)
+  - 使能方式：`examples/hunyuanvideo_1.5/{task}/pretrain_*.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dcp`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
   <a id="jump1"></a>
 #### 启动训练
 

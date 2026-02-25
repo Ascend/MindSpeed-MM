@@ -7,7 +7,7 @@
 - 模型异构：不同编码器（vision/audio encoder）、骨干（LLM）的计算量、模型大小不同，带来存算不均衡问题，导致计算空泡。具体表现为`LLM bound`和`encoder bound`现象。
 - 数据异构：训练样本中不同模态数据（文本、语音、视觉）token数量差异大且动态变化（动态分辨率），从而导致不同编码器、骨干网络计算量差异，带来负载不均衡问题。具体有`Intra-microbatch`和`inter-microbatch`不均衡。
 
-针对模型异构和数据异构，MindSpeed MM分别设计了hetero-parallel和(在线数据重排方案)[https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/online_data_rearrange.md]。
+针对模型异构和数据异构，MindSpeed MM分别设计了hetero-parallel和(在线数据重排方案)[https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/online_data_rearrange.md]。
 
 
 ## hetero-parallel

@@ -39,7 +39,7 @@ commit_id=2149f36f22db601f9dbf70472fea11576f62a0f6
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../docs/user-guide/installation.md)
+请参考[安装指南](../../docs/zh/pytorch/installation.md)
 
 > DanceGRPO场景下，Python版本推荐3.10
 

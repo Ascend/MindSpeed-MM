@@ -12,7 +12,7 @@ MindSpeed MM 昇腾多模态训练解决方案整体架构如下图，整体分�
 - **第三层：多模态核心套件层**：集成了自研的高性能训练套件 MindSpeed-MM。
 
 
-<img src="mm-arch.png" width="600" height="600">
+<img src="../../../sources/images/migration_guide/mm-arch.png" width="600" height="600">
 
 
 MindSpeed-MM 组件组成有预置模型、模型组件、多模态优化特性、和双分布式后端。
@@ -27,7 +27,7 @@ MindSpeed-MM 设计上支持双训练后端，分别为基于 MindSpeed Core（�
 
 随着近年来计算硬件的快速迭代与高速互联网络技术的普及，训练任务的通信瓶颈逐步缓解，同时多模态模型结构日趋多样化和复杂化，对训练框架的灵活性与适配效率提出了更高要求。在这一背景下，FSDP2 作为新一代分布式训练策略，因其具备并行策略与模型结构高度解耦、实现简洁且易于扩展等优势，逐渐成为快速适配各类新兴架构的理想选择。为更好地支持不断涌现的多模态模型并降低用户的使用与迁移成本，MindSpeed-MM 在已有 Megatron 后端的基础上，进一步增强了对 FSDP2 的兼容与优化。目前，采用 FSDP2 作为并行后端已成功应用于包括 Wan2.2、Qwen3VL 在内的多个开源多模态模型训练任务中，有效兼顾了训练效率与代码可维护性。
 
-使用方式上，当前FSDP2后端的训练流程仍然嵌入在Megatron training里，因此训练脚本文件需要编写 GPT_ARGS、 MM_ARGS、OUTPUT_ARGS 等参数以通过Megatron的参数校验。当使用 FSDP2 训练时，需要传入`--use-torch-fsdp2`来标识使用FSDP2训练，FSDP2配置具体可参考[FSDP2使用文档](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/fsdp2.md)。
+使用方式上，当前FSDP2后端的训练流程仍然嵌入在Megatron training里，因此训练脚本文件需要编写 GPT_ARGS、 MM_ARGS、OUTPUT_ARGS 等参数以通过Megatron的参数校验。当使用 FSDP2 训练时，需要传入`--use-torch-fsdp2`来标识使用FSDP2训练，FSDP2配置具体可参考[FSDP2使用文档](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)。
 
 ## MindSpeed-MM 训练流程
 

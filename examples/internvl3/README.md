@@ -42,7 +42,7 @@ commit_id=d779db3
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 <a id="jump1.1"></a>
 
@@ -109,7 +109,7 @@ pip install -e .
 
 MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及PP（Pipeline Parallel）的权重切分。
 
-`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)。
+`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)。
 
 
 ```bash
@@ -291,7 +291,7 @@ $save_dir
 
 【模型并行配置】
 
-InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，特性说明[参考](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/unaligned_linear.md)
+InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，特性说明[参考](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/unaligned_linear.md)
 ```shell
 --unaligned-linear \
 ```
@@ -311,7 +311,7 @@ InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，�
 --variable-seq-lengths \
 ```
 
-开启VPP需要添加以下参数（N为VPP切分数），特性说明[参考](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/virtual_pipeline_parallel.md)：
+开启VPP需要添加以下参数（N为VPP切分数），特性说明[参考](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/virtual_pipeline_parallel.md)：
 ```shell
 --virtual-pipeline-model-parallel-size N \
 ```
@@ -321,7 +321,7 @@ InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，�
 #### 3. 启动微调
 
 以InternVL3-8B为例，启动微调训练任务。  
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
 ```shell
 bash examples/internvl3/finetune_internvl3_8B.sh
 ```

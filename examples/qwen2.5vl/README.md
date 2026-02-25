@@ -66,7 +66,7 @@ commit_id=fa56dcc
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 #### 2. 环境搭建
@@ -111,7 +111,7 @@ pip install -e .
 <a id="jump2.2"></a>
 #### 2. 权重转换(hf2mm)
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)
 
 ```bash
 # 3b
@@ -491,7 +491,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 注意，当开启PP时，`model.json`中配置的`vision_encoder`和`text_decoder`的`pipeline_num_layer`参数控制了各自的PP切分策略。对于流水线并行，要先处理`vision_encoder`再处理`text_decoder`。
 比如7b默认的值`[32,0,0,0]`、`[1,10,10,7]`，其含义为PP域内第一张卡先放32层`vision_encoder`再放1层`text_decoder`、第二张卡放`text_decoder`接着的10层、第三张卡放`text_decoder`接着的10层、第四张卡放`text_decoder`接着的7层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[30,2,0,0]`、`[1,10,10,7]`的配置是错的）
 
-同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[30,2,0,0]`、`[0,11,10,7]`），需要在`finetune_qwen2_5_vl_7b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dummy_optimizer.md)。
+同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[30,2,0,0]`、`[0,11,10,7]`），需要在`finetune_qwen2_5_vl_7b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dummy_optimizer.md)。
 
 【vit模块重计算配置（可选）】
 
@@ -545,7 +545,7 @@ TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重�
 
 Megatron框架下的qwen2.5VL模型结构相比于Hugging Face的模型结构实现有差异，对训练效果造成的影响。  
 
-开启该功能可以使用完全与Hugging Face一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/canonical_model.md) 
+开启该功能可以使用完全与Hugging Face一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/canonical_model.md) 
 
 开启方式：
 `model_xxb.json`使能`canonical_model`
@@ -573,7 +573,7 @@ Megatron框架下的qwen2.5VL模型结构相比于Hugging Face的模型结构实
 
 【LoRA微调（可选）】
 
-LoRA为框架通用能力，当前功能已支持，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/lora_finetune.md)。
+LoRA为框架通用能力，当前功能已支持，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md)。
 
 开启LoRA微调需在启动脚本`examples/qwen2.5vl/finetune_qwen2_5_vl_xxb.sh`中添加LoRA参数，相关配置修改如下：
 
@@ -637,7 +637,7 @@ GPT_ARGS="
 #### 3. 启动微调
 
 以Qwen2.5VL-7B为例，启动微调训练任务。  
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
 ```shell
 bash examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh
 ```
@@ -664,7 +664,7 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh
     CP=4
     --seq-length 32768 \
     ```
-当前fsdp2的配置文件位于`examples/qwen2.5vl/fsdp2_config.yaml`，相关参数介绍参考[文档](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/fsdp2.md)
+当前fsdp2的配置文件位于`examples/qwen2.5vl/fsdp2_config.yaml`，相关参数介绍参考[文档](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
 
 执行FSDP2的训练脚本
 ```shell

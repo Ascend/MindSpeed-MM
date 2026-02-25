@@ -171,14 +171,14 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态，软件版本配套�
 > “在研版本”指当前正处于开发迭代中的版本，由于该版本的功能仍处于持续迭代与优化阶段，其配套依赖项即使采用已发布的商用版本，仍可能存在兼容性风险或运行不稳定性，如需稳定使用，建议优先使用已正式发布的商用版本。
 
 
-更多详情请参考[版本配套表](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md#%E7%89%88%E6%9C%AC%E9%85%8D%E5%A5%97%E8%A1%A8)。
+更多详情请参考[版本配套表](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md#%E7%89%88%E6%9C%AC%E9%85%8D%E5%A5%97%E8%A1%A8)。
 
 # 安装
 
 ---
 
-MindSpeed MM具体的安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md#%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)。
-当前qwen3vl、wan2.2模型已支持一键安装，一键安装使用说明详见[一键安装使用说明](https://gitcode.com/young256/MindSpeed-MM/blob/install-simplify-add-doc/docs/user-guide/installation.md#4-%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85)。
+MindSpeed MM具体的安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md#%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)。
+当前qwen3vl、wan2.2模型已支持一键安装，一键安装使用说明详见[一键安装使用说明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md#4-%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85)。
 
 # 快速上手
 
@@ -192,7 +192,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 
 ## 已支持特性概览
 
-|       模型 \ 特性        | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/sequence-parallel.md) | [VPP](docs/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/recomputation.md) | [LoRA](./docs/features/lora_finetune.md) | RL | [FSDP2](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/fsdp2.md) |
+|       模型 \ 特性        | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/sequence-parallel.md) | [VPP](docs/zh/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md) | [LoRA](./docs/zh/features/lora_finetune.md) | RL | [FSDP2](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md) |
 |:--------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|:------:|:------:|
 | Magistral-Small-2509 |  |  |  |  |  |  | ✔ | ✔ |  | ✔ |
 |   InternVL3.5-30B    |  |  |  |  |  |  | ✔ |  |  | ✔ |
@@ -1119,7 +1119,7 @@ MindSpeed MM已发布版本维护策略：
 
 ---
 
-相关FAQ请参考链接：[FAQ](./docs/FAQ.md)
+相关FAQ请参考链接：[FAQ](./docs/zh/FAQ.md)
 
 # 相关资源
 
@@ -1138,7 +1138,7 @@ MindSpeed MM已发布版本维护策略：
 
 ---
 
-[MindSpeed MM 安全声明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/SECURITYNOTE.md)
+[MindSpeed MM 安全声明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/SECURITYNOTE.md)
 
 # 免责声明
 

@@ -28,9 +28,9 @@
 
 --lr-warmup-fraction: 0~1之间浮点数，用于学习率“预热”阶段占总步长的比例。
 
---weight-decay-exclude-modules: 参数级的权重衰减排除，通过配置参数名关键词（可多个）排除特定参数的权重衰减。 [详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/parameter_lr_wd_tuning.md)
+--weight-decay-exclude-modules: 参数级的权重衰减排除，通过配置参数名关键词（可多个）排除特定参数的权重衰减。 [详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/parameter_lr_wd_tuning.md)
 
---lr-scale-modules：参数级学习率缩放，通过配置参数名关键词（可多个）来对特定参数的学习率进行缩放。 [详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/parameter_lr_wd_tuning.md)
+--lr-scale-modules：参数级学习率缩放，通过配置参数名关键词（可多个）来对特定参数的学习率进行缩放。 [详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/parameter_lr_wd_tuning.md)
 
 --clip-grad: 浮点数，默认为1，非0时启用该功能。在优化器中对权重做限制，防止loss波动过大。
 
@@ -42,11 +42,11 @@
 
 --variable-seq-lengths: store_true,启用可变序列长度。
 
---calculate-per-sample-loss：按样本粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+--calculate-per-sample-loss：按样本粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
 
---calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](  https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+--calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](  https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
 
---ckpt-format torch_dcp: 保存时使用dcp格式。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md)
+--ckpt-format torch_dcp: 保存时使用dcp格式。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/torch_dcp.md)
 
 --init-model-with-meta-device: 使用fsdp2的meta初始化模型，目前仅qwen3vl模型支持，详细使用请参考examples下具体模型readme.md界面。
 
@@ -58,7 +58,7 @@
 
 --context-parallel-size: 非0整数，默认为1。取值来自\${CP}。序列并行数量设置，沿着序列维度进行数据切分。主要用于长序列任务，减少单卡内存占用，会引入额外通信时间影响性能。
 
---context-parallel-algo: string, CP算法选择，可选范围[ulysses_cp_algo, hybrid_cp_algo, megatron_cp_algo]，[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/ulysses-context-parallel.md)
+--context-parallel-algo: string, CP算法选择，可选范围[ulysses_cp_algo, hybrid_cp_algo, megatron_cp_algo]，[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/ulysses-context-parallel.md)
 
 --expert-model-parallel-size: 非0整数，默认为1。取值来自\${EP}。MOE网络中专家并行设置，把专家分配到不同卡上去进行计算。主要用来减少单张卡显存限制无法放下所有专家问题，但会引起专家负载不均衡，计算效率低的问题。
 
@@ -89,7 +89,7 @@
 
 --use-fused-rmsnorm: 使能相关融合算子，仅在使用rmsnorm时有效。
 
---overlap-grad-reduce 与 --overlap-param-gather: 权重更新通信掩盖，仅在使能--use-distributed-optimizer时有效。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/async-ddp-param-gather.md)
+--overlap-grad-reduce 与 --overlap-param-gather: 权重更新通信掩盖，仅在使能--use-distributed-optimizer时有效。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/async-ddp-param-gather.md)
 
 ---
 ## MOE_ARGS下参数解释
@@ -102,7 +102,7 @@
 --save : 取值来自SAVE_PATH,权重保存路径。
 注：仅有该值配置时才会进行权重保存
 
---ckpt-format: 支持配置列表[torch，torch_dcp],权重保存方式。推荐优先使用[torch_dcp](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md)。
+--ckpt-format: 支持配置列表[torch，torch_dcp],权重保存方式。推荐优先使用[torch_dcp](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/torch_dcp.md)。
 
 注:1、当在使用fsdp2进行模型训练时，仅支持使用torch_dcp配置。
 2、OUTPUT_ARGS下设置--ckpt-format为torch_dcp与GPT_ARGS下使能--ckpt-format torch_dcp二者作用相同，择一即可。

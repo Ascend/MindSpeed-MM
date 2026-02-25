@@ -120,4 +120,4 @@ MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功�
 
 ### 公网地址声明
 
-代码涉及公网地址参考 [public_address_statement.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/public_address_statement.md)
+代码涉及公网地址参考 [public_address_statement.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/public_address_statement.md)

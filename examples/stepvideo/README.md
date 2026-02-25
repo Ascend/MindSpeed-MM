@@ -48,7 +48,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 #### 仓库拉取
 
@@ -385,7 +385,7 @@ bash examples/stepvideo/i2v/inference_i2v.sh
 
 #### 环境准备
 
-1. 参考docs/features/vbench-evaluate.md中的环境安装指导完成vbench及依赖三方件的安装
+1. 参考docs/zh/features/vbench-evaluate.md中的环境安装指导完成vbench及依赖三方件的安装
 2. 将VBench的 [t2v json](https://github.com/Vchitect/VBench/blob/master/vbench/VBench_full_info.json) 下载到MM代码根路径"./vbench/VBench_full_info.json"
 
 #### 生成视频样本

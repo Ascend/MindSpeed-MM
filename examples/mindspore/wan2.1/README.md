@@ -42,7 +42,7 @@ commit_id=03ea278
 
 ## 环境安装
 
-MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/mindspore/install_guide.md)。
+MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/zh/mindspore/install_guide.md)。
 
 | 依赖软件         |                                                              |
 | ---------------- | ------------------------------------------------------------ |
@@ -238,11 +238,11 @@ mm-convert WanConverter mm_to_hf \
 
   - 默认使能方式为Ulysses序列并行。
 
-  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
+  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_ring_attention.md)
 
-  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
+  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_usp.md)
 
-  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/fpdt.md)
+  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/fpdt.md)
 
 - layer_zero
 

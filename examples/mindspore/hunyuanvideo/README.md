@@ -50,7 +50,7 @@ commit_id=2766232ceaafeb680ca32fe0a7e9735c04b561d4
 
 ## 环境安装
 
-MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/mindspore/install_guide.md)。
+MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/zh/mindspore/install_guide.md)。
 
 | 依赖软件         |                                                                                                                                   |
 | ---------------- |-----------------------------------------------------------------------------------------------------------------------------------|
@@ -271,8 +271,8 @@ mm-convert HunyuanVideoConverter --version i2v-lora source_to_mm \
   - 使用场景：在视频序列（分辨率X帧数）较大时，可以开启来降低内存占用。
   - 使能方式：在启动脚本中设置 CP > 1，如：CP=2；
     - 默认为Ulysses序列并行
-    - RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
-    - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
+    - RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_ring_attention.md)
+    - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_usp.md)
   - 限制条件：
     - 使用Ulysses序列并行时，head 数量需要能够被TP*CP整除（在`examples/mindspore/hunyuanvideo/{task_name}/model_hunyuanvideo.json`中配置，默认为24）
     - 使用RingAttention或者USP序列并行时，CP不能大于单个计算节点上的NPU数量`NPUS_PER_NODE`
