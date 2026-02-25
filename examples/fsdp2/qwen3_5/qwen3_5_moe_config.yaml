@@ -84,7 +84,7 @@ model:
   freeze:
     - model.visual
   loss_cfg:
-    loss_type: default   # If you want custom loss in model, loss_type can be set to "custom".
+    loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
     router_aux_loss_coef: 0.0
   enable_chunk_loss: false
   chunkloss_plan:
