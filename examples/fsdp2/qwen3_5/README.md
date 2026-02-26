@@ -78,7 +78,7 @@ bash scripts/install.sh --msid eb10b92 --install-cann && bash examples/fsdp2/qwe
 
 从Huggingface库下载对应的模型权重:
 
-- 模型地址: [xxxxxxx]()；
+- 模型地址: [Qwen3.5-*B](https://huggingface.co/collections/Qwen/qwen35)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
 
