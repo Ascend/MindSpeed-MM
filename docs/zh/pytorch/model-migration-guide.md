@@ -1,8 +1,8 @@
-# MindSpeed-MM模型迁移指南
+# MindSpeed MM模型迁移指南
 
-## 1. 核心接口适配
+## 核心接口适配
 
-MindSpeed-MM训练逻辑整体沿用Megatron风格，各类模型使用统一的`pretrain_xxx.py`文件启动，通过配置文件对训练过程进行调控。examples目录下提供各类模型启动的训练脚本。
+MindSpeed MM训练逻辑整体沿用Megatron风格，各类模型使用统一的`pretrain_xxx.py`文件启动，通过配置文件对训练过程进行调控。examples目录下提供各类模型启动的训练脚本。
 
 `pretrain_xxx.py`中提供了模型训练过程中涉及的主要（回调）函数，用户需要根据具体任务需求，在这些函数中实现相应的业务逻辑。这些函数将在训练过程中被自动调用：
 
@@ -14,7 +14,7 @@ MindSpeed-MM训练逻辑整体沿用Megatron风格，各类模型使用统一的
 | `forward_step`                          | 模型前向，并计算损失                   | 
 | `train_valid_test_datasets_provider` | 构造数据加载器                             |
 
-## 2. 核心接口调用流程
+## 核心接口调用流程
 
 ```mermaid
 sequenceDiagram
@@ -62,11 +62,11 @@ sequenceDiagram
     E-->>M: 训练完成
 ```
 
-## 3. 模型迁移
+## 模型迁移
 
 整体迁移的要点围绕上述核心接口展开。
 
-### 3.1. 环境搭建
+### 环境搭建
 
 【模型开发时推荐使用配套的环境版本】
 
@@ -96,11 +96,11 @@ cd ..
 pip install -e .
 ```
 
-### 3.2. 数据模块迁移
+### 数据模块迁移
 
-#### 3.2.1. 迁移基本原则
+#### 迁移基本原则
 
-MindSpeed-MM 框架对数据模块提供了高度兼容性，用户现有的 `DataSet` 和 `DataLoader` 实现可以无缝迁移。
+MindSpeed MM 框架对数据模块提供了高度兼容性，用户现有的 `DataSet` 和 `DataLoader` 实现可以无缝迁移。
 **快速迁移步骤：**
 
 1. ​**保持现有实现**​：用户自定义的 `DataSet`、`DataLoader` 等数据模块无需修改
@@ -130,13 +130,13 @@ def get_batch(data_iterator, args):
     return batch
 ```
 
-#### 3.2.2. 原生数据组件使用
+#### 原生数据组件使用
 
-MindSpeed-MM 同时提供了一套优化的多模态数据集处理模块，包括`build_mm_dataset`、`build_mm_dataloader`等，用户可通过 `data.json` 配置文件灵活定义数据源、预处理流程及加载策略。
+MindSpeed MM 同时提供了一套优化的多模态数据集处理模块，包括`build_mm_dataset`、`build_mm_dataloader`等，用户可通过 `data.json` 配置文件灵活定义数据源、预处理流程及加载策略。
 
-### 3.3. 模型结构迁移
+### 模型结构迁移
 
-在 MindSpeed-MM 框架中，所有训练模型都通过标准化的入口函数进行构建和执行：`model_provider`构造模型，`forward_step`执行前向结果，`loss_func`计算训练损失。
+在 MindSpeed MM 框架中，所有训练模型都通过标准化的入口函数进行构建和执行：`model_provider`构造模型，`forward_step`执行前向结果，`loss_func`计算训练损失。
 
 ```python
 def model_provider(*args, **kwargs):
@@ -156,9 +156,9 @@ def forward_step(data_iterator, model):
     return output_tensor, loss_func
 ```
 
-#### 3.3.1. FSDP2 训练必备条件
+#### FSDP2 训练必备条件
 
-##### 3.3.1.1. 用户自定义模型
+##### 用户自定义模型
 
 对于用户自行开发的模型，使用 FSDP2 进行分布式训练只需简单继承指定的 Mixin 类，​**模型本体的实现无需任何修改**​：
 
@@ -171,9 +171,9 @@ class CustomModel(MultiModalModule, FSDP2Mixin, WeightInitMixin)：
     ...
 ```
 
-##### 3.3.1.2. 三方库模型适配
+##### 三方库模型适配
 
-对于从第三方库（如 Transformers）导入的模型，MindSpeed-MM 提供了统一的适配方案：
+对于从第三方库（如 Transformers）导入的模型，MindSpeed MM 提供了统一的适配方案：
 
 1. ​**创建适配类**​：将第三方模型继承 FSDP2 Mixin 类
 2. ​**注册到模型库**​：将适配后的类添加到 `ModelHub`
@@ -222,9 +222,9 @@ def model_provider(*args, **kwargs):
 	return model
 ```
 
-#### 3.3.2. FSDP2配置文件驱动训练（推荐）
+#### FSDP2配置文件驱动训练（推荐）
 
-MindSpeed-MM 支持通过 YAML 配置文件灵活管理 FSDP2 训练策略，实现训练配置与模型代码的完全解耦。
+MindSpeed MM 支持通过 YAML 配置文件灵活管理 FSDP2 训练策略，实现训练配置与模型代码的完全解耦。
 
 **配置文件参数说明**
 
@@ -374,7 +374,7 @@ num_to_backward_prefetch: 2
 offload_to_cpu: False
 ```
 
-#### 3.3.3. 自定义切分策略（可选）
+#### 自定义切分策略（可选）
 
 针对模型结构复杂或无法通过 YAML 配置满足需求的场景，用户可通过 `FSDP2Mixin` 提供的接口实现自定义切分策略。此时 YAML 配置文件中仅需提供基础配置即可。
 
@@ -403,7 +403,7 @@ class YourModel(MultiModalModule, FSDP2Mixin, WeightInitMixin)：
 
 如需更深入的定制，请参考 `FSDP2Mixin` 类的完整实现，了解各个方法的详细用法和扩展点。
 
-### 3.4. 启动命令配置
+### 启动命令配置
 
 启动 FSDP2 训练时，**需要在标准 Megatron 训练命令的基础上**添加以下参数
 

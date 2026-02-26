@@ -84,6 +84,6 @@ GPT_ARGS="
 
 ## 注意事项
 
-1.MindSpeed-MM对vpp进行了优化，支持不均匀切分。用户可对权重转换脚本、model.json和shell进行修改，自定义vpp切分方式
+1.MindSpeed MM对vpp进行了优化，支持不均匀切分。用户可对权重转换脚本、model.json和shell进行修改，自定义vpp切分方式
 
 2.Megatron虚拟流水并行vpp影响权重切分方式，保存、加载权重时需保证vpp配置一致，才能正常加载

@@ -38,7 +38,7 @@
 <a id="jump1"></a>
 ## 环境安装
 
-MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/zh/mindspore/install_guide.md)。
+MindSpeed MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/zh/mindspore/install_guide.md)。
 
 | 依赖软件         |                                                                                                                               |
 | ---------------- |-------------------------------------------------------------------------------------------------------------------------------|
@@ -95,7 +95,7 @@ mkdir logs
 <a id="jump2.2"></a>
 ### 2. 权重转换(hf2mm)
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)了解该工具的具体使用。**注意当前在MindSpore后端下，转换出的权重无法用于Torch后端的训练**。
+MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)了解该工具的具体使用。**注意当前在MindSpore后端下，转换出的权重无法用于Torch后端的训练**。
 
 ```bash
 # 3b
@@ -146,7 +146,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-7B-Instruct"
 <a id="jump2.3"></a>
 ### 3. 权重转换(mm2hf)
 
-MindSpeed-MM修改了部分原始网络的结构名称，在微调后，如果需要将权重转回huggingface格式，可使用`mm-convert`权重转换工具对微调后的权重进行转换，将权重名称修改成和原始网络一致。
+MindSpeed MM修改了部分原始网络的结构名称，在微调后，如果需要将权重转回huggingface格式，可使用`mm-convert`权重转换工具对微调后的权重进行转换，将权重名称修改成和原始网络一致。
 
 ```bash
 mm-convert  Qwen2_5_VLConverter mm_to_hf \
@@ -390,7 +390,7 @@ pip install qwen_vl_utils
 
 注：如果使用huggingface下载的原始权重，需要权重转换，权重转换步骤中，根据具体需求设置PP切分的参数。
 
-注：如果使用的MindSpeed-MM中保存的权重则无需进行转换，可直接加载（需要保证与训练的切分一致）。
+注：如果使用的MindSpeed MM中保存的权重则无需进行转换，可直接加载（需要保证与训练的切分一致）。
 
 <a id="jump5.2"></a>
 ### 2. 配置参数

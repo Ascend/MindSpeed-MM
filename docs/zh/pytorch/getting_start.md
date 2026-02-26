@@ -1,14 +1,16 @@
 # 快速上手
-MindSpeed MM同时支持多模态生成和多模态理解模型，因此下面分别介绍wan2.1和Qwen2.5VL两个典型模型使用方法，引导开发者快速上手预置模型在昇腾NPU上的高效运行。
+MindSpeed MM同时支持多模态生成和多模态理解模型，因此下面分别以wan2.1（生成模型）和Qwen2.5VL（理解模型）两个典型模型为例，介绍MindSpeed MM的使用方法，引导开发者快速上手预置模型在昇腾NPU上的高效运行。
 
-## Qwen2.5-VL-3B 快速上手指南
-更多细节请[参考](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl)
-### 1. 环境安装
-#### 1.1 昇腾软件安装
+## 多模态理解模型快速上手指南
+本章节以Qwen2.5VL为例，介绍如何高效运行多模态理解模型。
+
+### 环境安装
+#### 昇腾软件安装
 昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/installation.md)
 (基于Python3.10)
 
-#### 1.2 仓库拉取以及MindSpeed MM依赖安装
+#### 仓库拉取以及MindSpeed MM依赖安装
+
 仓库拉取：
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
@@ -43,8 +45,8 @@ cd ..
 pip install -e .
 ```
 
-### 2. 权重下载及转换
-#### 2.1 权重下载
+### 权重下载及转换
+#### 权重下载
 
 从Hugging Face库下载对应的模型权重:
 
@@ -52,8 +54,8 @@ pip install -e .
 
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-VL-3B-Instruct`目录下。
 
-#### 2.2 权重转换
-MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分，详情参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)。
+#### 权重转换
+MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分，详情参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)。
 
 以下是hf2mm的转换示例：
 ```bash
@@ -99,13 +101,13 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
 LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 ```
 
-### 3. 数据集准备及处理
-#### 3.1 数据集下载（以coco2017数据集为例）
+### 数据集准备及处理
+#### 数据集下载（以coco2017数据集为例）
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
 (2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
 
-#### 3.2 数据集处理
+#### 数据集处理
 运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
 
    ```
@@ -121,12 +123,12 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 
 ---
 
-### 4. 启动微调
-#### 4.1 准备工作
+### 启动微调
+#### 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
-#### 4.2 配置参数
+#### 配置参数
 
 【数据目录配置】
 
@@ -216,7 +218,7 @@ NODE_RANK=i  # i为节点顺序编号，取值[0:N-1]
 WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```
 
-#### 4.3 启动微调
+#### 启动微调
 
 以Qwen2.5VL-3B为例，启动微调训练任务。
 
@@ -224,14 +226,19 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 bash examples/qwen2.5vl/finetune_qwen2_5_vl_3b.sh
 ```
 
-## Wan2.1（T2V 1.3B） 快速上手指南
-更多细节请[参考](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.1)
-### 1. 环境安装
-#### 1.1 昇腾软件安装
+### 更多细节参考
+
+更多细节请[参考](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl)
+
+## 多模态生成模型快速上手指南
+
+本章节以wan2.1-T2V-1.3B为例，介绍如何高效运行多模态生成模型。
+### 环境安装
+#### 昇腾软件安装
 昇腾环境安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/installation.md)
 (基于python3.10)
 
-#### 1.2 仓库拉取以及MindSpeed MM依赖安装
+#### 仓库拉取以及MindSpeed MM依赖安装
 仓库拉取：
 ```shell
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
@@ -267,7 +274,7 @@ pip install diffusers==0.33.1
 
 ```
 
-#### 1.3 Decord搭建
+#### Decord搭建
 
 【X86版安装】
 
@@ -281,16 +288,16 @@ pip install decord==0.6.0
 
 `yum`方式安装请[参考脚本](https://github.com/dmlc/decord/blob/master/tools/build_manylinux2010.sh)
 
-### 2. 权重下载及转换
+### 权重下载及转换
 
-#### 2.1 Diffusers权重下载
+#### Diffusers权重下载
 
 |   模型   |   Hugging Face下载链接   |
 | ---- | ---- |
 |   T2V-1.3B   |   <https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers>   |
 
 
-#### 2.2 权重转换
+#### 权重转换
 
 需要对下载后的Wan2.1模型权重`transformer`部分进行权重转换，运行权重转换脚本：
 
@@ -330,7 +337,7 @@ mm-convert WanConverter mm_to_hf \
 | --cfg.target_path | 转换后的Hugging Face权重路径                                 | /      |
 | --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始Hugging Face配置文件 |    /   |
 
-### 3. 数据预处理
+### 数据预处理
 
 将数据处理成如下格式
 
@@ -372,13 +379,13 @@ mm-convert WanConverter mm_to_hf \
 
 修改`examples/wan2.1/feature_extract/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
 
-### 4.1 特征提取
+### 特征提取
 
-#### 4.2 准备工作
+#### 准备工作
 
 在开始之前，请确认环境准备、模型权重和数据集预处理已经完成
 
-#### 4.3 参数配置
+#### 参数配置
 
 检查模型权重路径、数据集路径、提取后的特征保存路径等配置是否完成
 
@@ -391,7 +398,7 @@ mm-convert WanConverter mm_to_hf \
 | examples/wan2.1/feature_extract/model.json |    from_pretrained    | 修改为下载的权重所对应路径（包括vae, text_encoder） |
 | mindspeed_mm/tools/tools.json                 |    save_path          | 提取后的特征保存路径                               |
 
-#### 4.4 启动特征提取
+#### 启动特征提取
 * 修改`examples/wan2.1/feature_extract/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔。
 
 * 修改`examples/wan2.1/feature_extract/model.json`修改为下载的权重所对应路径（包括vae, tokenizer, text_encoder）
@@ -400,13 +407,13 @@ mm-convert WanConverter mm_to_hf \
 bash examples/wan2.1/feature_extract/feature_extraction.sh
 ```
 
-### 5. 启动训练
+### 启动训练
 
-#### 5.1 准备工作
+#### 准备工作
 
 在开始之前，请确认环境准备、模型权重下载、特征提取已完成。
 
-#### 5.2 参数配置
+#### 参数配置
 
 检查模型权重路径、并行参数配置等是否完成。
 
@@ -422,9 +429,13 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 | examples/wan2.1/{model_size}/{task}/pretrain.sh |         CP          | 训练时的CP size（建议根据训练时设定的分辨率调整）   |
 
 
-#### 5.3 启动训练
+#### 启动训练
 feature_data.json中修改tokenizer权重路径
 
 ```bash
 bash examples/wan2.1/1.3b/t2v/pretrain.sh
 ```
+
+### 更多细节参考
+
+更多细节请[参考](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/wan2.1)

@@ -1,5 +1,5 @@
 
-# MindSpeed-MM MindSpore后端迁移开发指南
+# MindSpeed MM MindSpore后端迁移开发指南
 
 ## 概述
 
@@ -7,7 +7,7 @@
 
 **建议用户先参照《[MindSpeed MM迁移调优指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/docs/user-guide/model-migration.md)》进行基于torch生态的代码开发，之后根据本指南迁移至MindSpore后端运行来获取更优的模型训练推理性能。**
 
-本指南侧重提供MindSpeed-MM MindSpore后端的迁移开发指导，帮助用户快速地将大模型训练从PyTorch后端迁移至MindSpore后端。在介绍迁移开发前，先简要介绍MindSpore动态图和API适配工具MSAdapter，供用户了解MindSpore后端和PyTorch后端的差异，以启发用户在模型迁移开发遇到问题时进行问题排查。
+本指南侧重提供MindSpeed MM MindSpore后端的迁移开发指导，帮助用户快速地将大模型训练从PyTorch后端迁移至MindSpore后端。在介绍迁移开发前，先简要介绍MindSpore动态图和API适配工具MSAdapter，供用户了解MindSpore后端和PyTorch后端的差异，以启发用户在模型迁移开发遇到问题时进行问题排查。
 
 ### MindSpore动态图介绍
 

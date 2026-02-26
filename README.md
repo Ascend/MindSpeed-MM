@@ -41,6 +41,29 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 <p align="center"> <img src="./sources/images/MM_wechat_qrcode.jpg" width=150> </p>
 
+
+# 目录结构
+
+关键目录如下，详细目录介绍参见[目录介绍](docs/zh/dir_structure.md)
+
+```bash
+├─bridge          # mbridge在线权重转换
+├─checkpoint      # 离线权重转换工具
+├─ci              # Continuous Integration
+├─docs            # 项目文档目录
+│  └─zh           # 中文文档目录
+├─examples        # 预置模型，包括模型配置、数据集配置、训练脚本、推理脚本等文件
+├─mindspeed_mm    # 核心代码目录
+├─scripts         # 脚本目录
+├─sources         # 图片视频目录
+├─tests           # 测试代码目录
+│  ├─st           # 系统测试用例
+│  └─ut           # 单元测试用例
+├─UserGuide       # 用户指南目录
+└─verl_plugin     # verl插件模块
+```
+
+
 # 最新消息
 
 ---
@@ -169,6 +192,7 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态，软件版本配套�
 | 2.0.0（商用）    | 2.0.0_core_r0.8.0  | Core 0.8.0   | 2.1.0        | 7.0.0         | 8.1.RC1  | Python3.8, Python3.10 |
 | 1.0.0（商用）    | 1.0.0_core_r0.6.0  | Core 0.6.0   | 2.1.0        | 6.0.0         | 8.0.0    | Python3.8, Python3.10 |
 
+>[!Note]
 > “在研版本”指当前正处于开发迭代中的版本，由于该版本的功能仍处于持续迭代与优化阶段，其配套依赖项即使采用已发布的商用版本，仍可能存在兼容性风险或运行不稳定性，如需稳定使用，建议优先使用已正式发布的商用版本。
 
 
@@ -1076,7 +1100,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 
 MindSpeed MM集成了昇腾profiling采集工具，以提供对模型运行情况的分析。该工具能够依照配置采集模型的算子、显存等关键信息，同时支持动静态两种采集方式，协助开发者分析模型瓶颈，并可根据实际场景需求选择使用。
 
-  具体方法见 [README](./mindspeed_mm/tools/README.md) 的profiling章节
+  具体方法见 [README](./docs/zh/tools.md) 的profiling章节
 
 ## MindStudio Insight性能分析工具
 
@@ -1089,19 +1113,19 @@ MindStudio Insight提供了包括Timeline视图、通信分析、计算耗时等
 
 MindSpeed MM支持提取视频和文本特征并保存
 
-  具体方法见 [README](./mindspeed_mm/tools/README.md) 的Sora类模型特征提取章节
+  具体方法见 [README](./docs/zh/tools.md) 的Sora类模型特征提取章节
 
 ## 内存快照提取
 
 MindSpeed MM集成了昇腾内存快照采集工具，以提供对模型运行情况的分析。
 
-  具体方法见 [README](./mindspeed_mm/tools/README.md) 的内存快照提取章节
+  具体方法见 [README](./docs/zh/tools.md) 的内存快照提取章节
 
 ## Tensorboard使用
 
 MindSpeed MM支持Tensorboard的使用
 
-  具体方法见 [README](./mindspeed_mm/tools/README.md) 的Tensorboard使用章节
+  具体方法见 [README](./docs/zh/tools.md) 的Tensorboard使用章节
 
 # 版本维护
 
@@ -1175,6 +1199,8 @@ Ascend MindSpeed MM提供的模型，如模型目录下存在License的，以该
 
 # 贡献声明
 
+---
+
 ## 1. 报告问题
 
 - 如果您发现任何问题，请先查看仓库的[issues列表](https://gitcode.com/Ascend/MindSpeed-MM/issues)，尝试寻找类似问题或解决方案。
@@ -1188,7 +1214,7 @@ Ascend MindSpeed MM提供的模型，如模型目录下存在License的，以该
 
 - 在您的个人分支上开发并提交，然后向本项目仓库发起Pull Request（PR）；
 
-- 在我们的[SIG例会PR评审申请登记中](https://gitcode.com/Ascend/MindSpeed-MM/issues/256)，参照既定格式申请PR评审，并按时参加对应的评审会议；
+- 在我们的[SIG例会PR评审申请登记](https://gitcode.com/Ascend/MindSpeed-MM/issues/256)中，参照既定格式申请PR评审，并按时参加对应的评审会议；
 
 - 根据评审意见进行修改，并更新PR；
 

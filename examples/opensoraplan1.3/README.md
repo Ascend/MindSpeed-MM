@@ -130,7 +130,7 @@ pip install decord==0.6.0
 
 #### 2. 权重转换
 
-MindSpeed-MM修改了部分原始网络的结构名称，因此需要使用权重转换工具进行转换，该转换工具实现了从hugging face下载的预训练权重到到MindSpeed-MM权重的转换以及TP（Tensor Parallel）和PP（Pipeline Parallel）权重的切分。
+MindSpeed MM修改了部分原始网络的结构名称，因此需要使用权重转换工具进行转换，该转换工具实现了从hugging face下载的预训练权重到到MindSpeed-MM权重的转换以及TP（Tensor Parallel）和PP（Pipeline Parallel）权重的切分。
 
 转换vae部分的权重
 

@@ -97,7 +97,7 @@ pip install -e .
 
  将下载的模型权重保存到本地的`ckpt/hf_path/GLM-4.5V`目录下。(*表示对应的尺寸)
 
-为了使网络能够流畅运行，MindSpeed-MM修改了moe中专家的结构名称，需对原始预训练权重进行转换：
+为了使网络能够流畅运行，MindSpeed MM修改了moe中专家的结构名称，需对原始预训练权重进行转换：
 ```bash
 mm-convert ExpertMergeDcpConverter hf_to_dcp --hf_dir "ckpt/hf_path/GLM-4.5V" --save_dir "ckpt/mm_path/GLM-4.5V"
 ```

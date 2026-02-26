@@ -24,7 +24,7 @@
 
 ## 环境安装
 
-MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/zh/mindspore/install_guide.md)。
+MindSpeed MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/zh/mindspore/install_guide.md)。
 
 | 依赖软件         |                                                                                                                                 |
 | ---------------- |---------------------------------------------------------------------------------------------------------------------------------|
@@ -79,7 +79,7 @@ mkdir logs
 
 #### 2. 权重转换
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及PP（Pipeline Parallel）的权重切分。
+MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的转换以及PP（Pipeline Parallel）的权重切分。
 
 `mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)。
 

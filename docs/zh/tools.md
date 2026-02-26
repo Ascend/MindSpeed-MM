@@ -1,20 +1,20 @@
-# MindSpeed-MM 工具库使用指南
+# MindSpeed MM 工具库使用指南
 
 <p align="left">
         <b>简体中文</b> |
 </p>
 
-- [MindSpeed-MM 工具库使用指南](#mindspeed-mm-工具库使用指南)
+- [MindSpeed MM 工具库使用指南](#mindspeed-mm-工具库使用指南)
   - [Profiling采集工具](#profiling采集工具)
     - [静态采集](#静态采集)
     - [动态采集](#动态采集)
   - [Sora类模型特征提取](#sora类模型特征提取)
   - [内存快照提取](#内存快照提取)
-  - [Tensorboard使用](#Tensorboard使用)
+  - [Tensorboard使用](#tensorboard使用)
 
 ## <a id="jump1"></a>Profiling采集工具
 
-套件集成了昇腾[profiling采集工具](./profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](./tools.json)文件即可生效。
+套件集成了昇腾[profiling采集工具](../../mindspeed_mm/tools/profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件即可生效。
 
 【若新增模型，请先适配如下设置】
 
@@ -92,7 +92,7 @@ prof.stop()
 
 ## <a id="sorafeature"></a>Sora类模型特征提取
 
-[feature_extraction](./feature_extraction)目录下工具可用于提取视频和文本特征并保存，目前支持单batch静态数据集特征提取。按需修改[tools.json](./tools.json)文件。
+[feature_extraction](../../mindspeed_mm/tools/feature_extraction)目录下工具可用于提取视频和文本特征并保存，目前支持单batch静态数据集特征提取。按需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件。
 
 ```bash
 --extract_video_feature # 是否提取视频特征
@@ -111,7 +111,7 @@ prof.stop()
 
 ## <a id="memory"></a>内存快照提取
 
-套件集成了昇腾[内存快照采集工具](./mem_profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](./tools.json)文件即可生效。
+套件集成了昇腾[内存快照采集工具](../../mindspeed_mm/tools/mem_profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件即可生效。
 
 对复用[训练流程](../../mindspeed_mm/training.py)的模型，同样仅需修改配置。支持的配置项如下。
 

@@ -37,7 +37,7 @@
 
 ## 环境安装
 
-MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/zh/mindspore/install_guide.md)。
+MindSpeed MM MindSpore后端的依赖配套如下表，安装步骤参考[基础安装指导](../../../docs/zh/mindspore/install_guide.md)。
 
 | 依赖软件         |                                                              |
 | ---------------- | ------------------------------------------------------------ |
