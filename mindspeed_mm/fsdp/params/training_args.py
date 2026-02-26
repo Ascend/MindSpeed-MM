@@ -178,9 +178,25 @@ class TrainingArguments:
         default=None,
         metadata={"help": "Path to load checkpoint from. Used for resuming training."},
     )
+    no_load_optim: bool = field(
+        default=False,
+        metadata={"help": "Do not load optimizer when loading checkpoint."},
+    )
+    no_load_rng: bool = field(
+        default=False,
+        metadata={"help": "Do not load rng state when loading checkpoint."},
+    )
     save: str = field(
         default=None,
         metadata={"help": "Directory path to save checkpoints to."},
+    )
+    no_save_optim: bool = field(
+        default=False,
+        metadata={"help": "Do not save current optimizer."},
+    )
+    no_save_rng: bool = field(
+        default=False,
+        metadata={"help": "Do not save current rng state."},
     )
     log_interval: int = field(
         default=1,

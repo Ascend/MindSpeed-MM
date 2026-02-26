@@ -196,7 +196,11 @@ class TrainEngine:
         """Load checkpoint and restore training state."""
         args = self.args
         iteration, consumed_train_samples = 0, 0
-        state = {"model": self.model, "optimizer": self.optimizer, "extra_state": {}}  # cannot be None
+        
+        state = {"model": self.model, "extra_state": {}}  # cannot be None
+        if not args.training.no_load_optim:
+            state["optimizer"] = self.optimizer
+
         release = self.checkpointer.load(path=args.training.load, state=state)
 
         if not release:
@@ -205,7 +209,11 @@ class TrainEngine:
 
             self.lr_scheduler.load_state_dict(state["extra_state"]["lr_scheduler"])
             self.train_dataloader.load_state_dict(state["extra_state"]["train_dataloader"])
-            torch.set_rng_state(state["extra_state"]["torch_rng_state"])
+            if not args.training.no_load_rng:
+                if "torch_rng_state" not in state["extra_state"]:
+                    print_rank(logger.warning, f"No RNG state found in checkpoint, skipping RNG loading")
+                else:
+                    torch.set_rng_state(state["extra_state"]["torch_rng_state"])
 
         # Synchronize all processes after loading
         torch.distributed.barrier()
@@ -217,15 +225,17 @@ class TrainEngine:
         args = self.args
         state = {
             "model": self.model,
-            "optimizer": self.optimizer,
             "extra_state": {
                 "iteration": iteration,
                 "consumed_train_samples": consumed_train_samples,
                 "lr_scheduler": self.lr_scheduler.state_dict(),
-                "torch_rng_state": torch.get_rng_state(),
                 "train_dataloader": self.train_dataloader.state_dict()
             },
         }
+        if not args.training.no_save_optim:
+            state["optimizer"] = self.optimizer
+        if not args.training.no_save_rng:
+            state["extra_state"]["torch_rng_state"] = torch.get_rng_state()
         self.checkpointer.save(args.training.save, state=state, iteration=iteration)
 
         # Synchronize all processes after saving
