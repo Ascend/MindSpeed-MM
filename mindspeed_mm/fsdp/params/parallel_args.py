@@ -37,7 +37,6 @@ class TPPlanConfig:
     sequence_parallel: List[str] = field(default_factory=list)
 
 
-
 @dataclass
 class EPPlanConfig:
     """Configuration for Expert Parallelism (EP) plan for MoE models."""
@@ -45,6 +44,13 @@ class EPPlanConfig:
     dispatcher: Literal["eager", "fused", "mc2"] = "eager"
     apply_efsdp_modules: List[str] = field(default_factory=list)
     _gradient_divide_factor: float = None
+
+
+@dataclass
+class RecomputePlanConfig:
+    """Configuration for recompute plan."""
+    apply_modules: List[str] = field(default_factory=list)
+    use_reentrant: bool = False
 
 
 @allow_extra_fields
@@ -85,7 +91,7 @@ class ParallelArguments():
         default=False,
         metadata={"help": "Whether to enable Gradient Checkpointing (Activation Recomputation)."}
     )
-    recompute_plan: List[str] = field(default_factory=list)
+    recompute_plan: RecomputePlanConfig = field(default_factory=RecomputePlanConfig)
 
     def __post_init__(self):
         self.local_rank = int(os.getenv("LOCAL_RANK"))

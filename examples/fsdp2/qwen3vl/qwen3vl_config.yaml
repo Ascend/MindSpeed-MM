@@ -16,7 +16,8 @@ parallel:
     reduce_dtype: fp32
   recompute: true
   recompute_plan:
-    - model.language_model.layers.{*}
+      apply_modules:
+        - model.language_model.layers.{*}
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
