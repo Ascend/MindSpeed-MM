@@ -3,6 +3,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, TypeVar, Union,
 import logging
 from functools import wraps
 
+from mindspeed.fsdp.utils.log import print_rank
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ def allow_extra_fields(cls):
             else:
                 # Unknown field: store separately and log warning
                 extra_kwargs[key] = value
-                logger.warning(
+                print_rank(logger.warning,
                     f"Field '{key}' is not defined in {cls.__name__}. "
                     f"Adding as dynamic attribute."
                 )

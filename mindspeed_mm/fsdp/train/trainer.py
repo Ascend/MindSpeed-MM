@@ -60,11 +60,36 @@ class Trainer():
         self.train_dataloader = self.get_dataloader() if dataloader_provider is None else dataloader_provider(args)
         self.checkpointer = self.get_checkpointer()
 
+        # Validate and calculate training iterations
+        self._validate_and_set_train_iters(args)
+
         # Create the training engine
         self.trainer = TrainEngine(
             args, self.train_dataloader, self.model, self.optimizer, self.lr_scheduler, self.checkpointer
         )
 
+    def _validate_and_set_train_iters(self, args: Arguments):
+        # Calculate total training iterations based on epochs if specified
+        if args.training.train_epochs is not None:
+            if not hasattr(self.train_dataloader, "__len__"):
+                raise ValueError(
+                    f"Cannot calculate train_iters from epochs because the dataloader "
+                    f"(type: {type(self.train_dataloader).__name__}) does not have __len__ attribute. "
+                    f"This typically happens when using IterableDataset or streaming data. "
+                    f"Please either:\n"
+                    f"1. Specify train_iters directly instead of epochs, or\n"
+                    f"2. Use a dataloader with a determinable length (regular Dataset), or\n"
+                    f"3. Provide a custom dataloader_provider that returns a dataloader with __len__"
+                )
+            elif len(self.train_dataloader) == 0:
+                raise ValueError(
+                    f"Cannot calculate train_iters from epochs because the dataloader "
+                    f"(type: {type(self.train_dataloader).__name__}) has zero length. "
+                    f"This indicates an empty dataset or invalid dataloader configuration. "
+                    f"Please check your dataset or dataloader setup."
+                )
+            else:
+                args.training.train_iters = args.training.train_epochs * len(self.train_dataloader)
 
     def initialize(self):
         """Initialize training environment: logging, random seeds, distributed groups."""

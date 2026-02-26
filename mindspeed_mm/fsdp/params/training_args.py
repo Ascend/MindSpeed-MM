@@ -174,6 +174,10 @@ class TrainingArguments:
         default=10000,
         metadata={"help": "Total number of training iterations."},
     )
+    train_epochs: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of training epochs."},
+    )
     load: str = field(
         default=None,
         metadata={"help": "Path to load checkpoint from. Used for resuming training."},

@@ -132,6 +132,12 @@ class PrefetchGradAccDataLoader:
         # Start a new iteration (reset state)
         self._current_iterator = self._generate_batches()
         return self  # Return self as the iterator
+        
+    def __len__(self):
+        if hasattr(self.base_dataloader, "__len__"):
+            return len(self.base_dataloader)
+        else:
+            return 0
 
     def __next__(self):
         if self._current_iterator is None:
