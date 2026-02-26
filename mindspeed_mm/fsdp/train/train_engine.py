@@ -11,6 +11,7 @@ from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.tools.profiler import Profiler
+from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
 
@@ -36,10 +37,8 @@ class TrainEngine:
         if args.training.load:
             self.iteration, self.consumed_train_samples = self.load()
 
-        self.profiler = None
-        if args.training.profile.profile_this_rank:
-            self.profiler = Profiler(args.training.profile)
-            self.profiler.start()
+        self.profiler = Profiler(args.tools.profile)
+        self.profiler.start()
 
     def average_losses_across_data_parallel_group(self, losses):
         """Reduce a tensor of losses across all GPUs."""
@@ -119,9 +118,8 @@ class TrainEngine:
         # --- Train Loop ---
         curr_step_lr = self.lr_scheduler.get_last_lr()[0]
         while self.iteration < args.training.train_iters:
-            # Record memory usage if profiling
-            if self.profiler is not None:
-                self.profiler.memory_record()
+            # Record memory usage if enabled
+            memory_profiler.step()
             start_time = get_time(barrier=True)
 
             loss = self.train_step(train_dataloader_iter)
@@ -135,9 +133,7 @@ class TrainEngine:
             self.optimizer.zero_grad()
 
             # Stop profiling if enabled
-            if self.profiler is not None:
-                self.profiler.step()
-                self.profiler.stop()
+            self.profiler.step()
 
             # Update training state
             self.consumed_train_samples += args.training.global_batch_size
@@ -163,6 +159,9 @@ class TrainEngine:
             if args.training.save and args.training.save_interval > 0 and self.iteration % args.training.save_interval == 0:
                 self.save(self.iteration, self.consumed_train_samples)
 
+        # Stop profiling if enabled
+        self.profiler.stop()
+        memory_profiler.stop()
         # Final save after training completes
         if args.training.save:
             self.save(self.iteration, self.consumed_train_samples)

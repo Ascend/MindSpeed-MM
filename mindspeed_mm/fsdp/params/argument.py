@@ -10,6 +10,7 @@ from mindspeed_mm.fsdp.params.data_args import DataArguments
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
+from mindspeed_mm.fsdp.params.tools_args import ToolsArguments
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields, instantiate_dataclass
 
 
@@ -21,6 +22,7 @@ class Arguments:
     model: ModelArguments = field(default_factory=ModelArguments)
     data: DataArguments = field(default_factory=DataArguments)
     training: TrainingArguments = field(default_factory=TrainingArguments)
+    tools: ToolsArguments = field(default_factory=ToolsArguments)
 
 
 def parse_args(dataclass_type: Arguments):

@@ -112,6 +112,27 @@ def switch_to_specified_stream(stream) -> Any:
     return get_torch_device().Stream(stream)
 
 
+def get_max_memory_reserved():
+    if IS_NPU_AVAILABLE:
+        return torch.npu.max_memory_reserved()
+    else:
+        return torch.cuda.memory.max_memory_reserved()
+
+
+def get_max_memory_allocated():
+    if IS_NPU_AVAILABLE:
+        return torch.npu.max_memory_allocated()
+    else:
+        return torch.cuda.memory.max_memory_allocated()
+
+
+def reset_peak_memory_stats():
+    if IS_NPU_AVAILABLE:
+        return torch.npu.reset_peak_memory_stats()
+    else:
+        return torch.cuda.memory.reset_peak_memory_stats()
+
+
 def set_allow_hf32(allow_hf32=None) -> None:
     """Set allow_hf32/allow_tf32 attribute based on device type."""
     if allow_hf32 is None:

@@ -28,6 +28,7 @@ from mindspeed_mm.fsdp.optimizer.lr_scheduler import build_lr_scheduler
 from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
 from mindspeed_mm.fsdp.utils.register import import_plugin
 from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
+from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.train.train_engine import TrainEngine
 
 
@@ -52,6 +53,9 @@ class Trainer():
         # Initialize model parallelization and feature application
         self.model_parallel_applier = ParallelApplier(args.parallel)
         self.model_features_applier = FeaturesApplier(args.model)
+
+        # Reset memory profiler
+        memory_profiler.reset(args.tools.memory_profile)
 
         # Build core training components
         self.model = self.get_model(model_provider)

@@ -28,18 +28,6 @@ training:
   use_deter_comp: false
   allow_hf32: false
   log_interval: 1
-  
-  # 2. 模型精度
-  profile:
-    enable: false
-    start_step: 11
-    end_step: 12
-    save_path: ./cosyvoice3_npu_profiling
-    record_shapes: false
-    with_memory: false
-    with_stack: false
-    ranks: [0]
-
   plugin:
     - mindspeed_mm/fsdp/models/cosyvoice3
     - mindspeed_mm/fsdp/data/datasets/cosyvoice3
@@ -123,3 +111,30 @@ model:
     top_k: 25
     win_size: 10
     tau_r: 0.1
+
+# 工具配置
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false

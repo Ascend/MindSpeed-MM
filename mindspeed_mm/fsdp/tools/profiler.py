@@ -1,133 +1,165 @@
-# Copyright 2025 Bytedance Ltd. and/or its affiliates
-import datetime
-import os
+# coding=utf-8
+# Copyright (c) 2024, HUAWEI CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
+import argparse
 
 import torch
-
-from mindspeed_mm.fsdp.params.training_args import Profiler
-from mindspeed_mm.fsdp.utils.device import (
-    IS_CUDA_AVAILABLE,
-    IS_NPU_AVAILABLE,
-    get_torch_device
-)
+from mindspeed_mm.fsdp.params.tools_args import Profiler
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
 
 if IS_NPU_AVAILABLE:
     import torch_npu
+    from torch_npu.profiler.profiler import analyse
+
 
 logger = logging.getLogger(__name__)
 
 
 class Profiler:
+    """
+    Instantiate a Profiler from config.
+
+    example:
+        prof = Profiler(prof_config)
+        prof.start()
+        while train:
+            train_one_step
+            prof.step()
+        prof.stop()
+    """
+
     def __init__(self, config: Profiler):
-        self.config = config
-        self.first_step = True  # flagging the first step for record memory history
-        self.current_step = 0
-        self.global_rank = int(os.getenv("RANK"))
-        if self.config.enable:
-            self._p = self._create_profiler()
+        self.enable = config.enable
+        self.profile_type = config.profile_type
+        self.ranks = config.ranks
 
-    def _create_profiler(self):
-        """
-        Creates a profiler to record the CPU and CUDA activities. Default export to trace.json.
-        Profile steps in [start_step, end_step).
+        self.sp_level = config.static_param.level
+        self.sp_with_stack = config.static_param.with_stack
+        self.sp_with_memory = config.static_param.with_memory
+        self.sp_record_shapes = config.static_param.record_shapes
+        self.sp_with_cpu = config.static_param.with_cpu
+        self.sp_save_path = config.static_param.save_path
+        self.sp_start_step = config.static_param.start_step
+        self.sp_end_step = config.static_param.end_step
+        self.sp_data_simplification = config.static_param.data_simplification
+        self.sp_analyse_flag = config.static_param.analyse_flag
 
-        When is_npu_available = True, the profiler will be created as torch_npu.profiler.
-
-        Args:
-            start_step (int): The step to start recording.
-            end_step (int): The step to end recording.
-            save_path (str): The path to save the profiling result.
-            record_shapes (bool): Whether to record the shapes of the tensors.
-            with_memory (bool): Whether to profile the memory usage.
-            with_stack (bool): Whether to include the stack trace.
-        """
-
-        def handler_fn(p):
-            time = int(datetime.datetime.now().timestamp())
-
-            trace_file_extention = "pt.trace.json.gz"
-
-            os.makedirs(self.config.save_path, exist_ok=True)
-            trace_file = os.path.join(self.config.save_path, f"rank{self.global_rank}_{time}.{trace_file_extention}")
-
-            if IS_NPU_AVAILABLE:
-                nonlocal npu_trace_handler
-                npu_trace_handler(p)
-                trace_file = p.prof_if.prof_path
-            elif IS_CUDA_AVAILABLE:
-                p.export_chrome_trace(trace_file)
-            logger.info(f"Profiling result saved at {trace_file}.")
+        self.aic_metrics_type = config.static_param.aic_metrics_type
 
         if IS_NPU_AVAILABLE:
-            profiler_module = torch_npu.profiler
-            activities = [profiler_module.ProfilerActivity.CPU, profiler_module.ProfilerActivity.NPU]
-            npu_trace_handler = torch_npu.profiler.tensorboard_trace_handler(self.config.save_path)
-            experimental_config = torch_npu.profiler._ExperimentalConfig(
-                aic_metrics=torch_npu.profiler.AiCMetrics.PipeUtilization,
-                profiler_level=torch_npu.profiler.ProfilerLevel.Level1,
-                data_simplification=False,
-            )
+            if self.profile_type == "static":
+                if self.sp_level == 'level0':
+                    profiler_level = torch_npu.profiler.ProfilerLevel.Level0
+                elif self.sp_level == 'level1':
+                    profiler_level = torch_npu.profiler.ProfilerLevel.Level1
+                elif self.sp_level == 'level2':
+                    profiler_level = torch_npu.profiler.ProfilerLevel.Level2
+                else:
+                    raise ValueError(f"profiler_level only supports level0,"
+                                     f" 1, and 2, but gets {self.sp_level}")
+                if self.aic_metrics_type == 'PipeUtilization':
+                    aic_metrics_type = torch_npu.profiler.AiCMetrics.PipeUtilization
+                elif self.aic_metrics_type == 'ArithmeticUtilization':
+                    aic_metrics_type = torch_npu.profiler.AiCMetrics.ArithmeticUtilization
+                else:
+                    raise ValueError(f"aic_metrics_type only supports PipeUtilization and ArithmeticUtilization")
+                experimental_config = torch_npu.profiler._ExperimentalConfig(
+                    aic_metrics=aic_metrics_type,
+                    profiler_level=profiler_level,
+                    data_simplification=self.sp_data_simplification,
+                )
+                skip_first = self.sp_start_step
+                active = self.sp_end_step - self.sp_start_step
+
+                activities = [torch_npu.profiler.ProfilerActivity.NPU]
+                if self.sp_with_cpu:
+                    activities.append(torch_npu.profiler.ProfilerActivity.CPU)
+
+                self.prof = torch_npu.profiler.profile(
+                    with_stack=self.sp_with_stack,
+                    record_shapes=self.sp_record_shapes,
+                    profile_memory=self.sp_with_memory,
+                    activities=activities,
+                    schedule=torch_npu.profiler.schedule(
+                        wait=0, warmup=0, active=active, repeat=1, skip_first=skip_first),
+                    on_trace_ready=torch_npu.profiler.tensorboard_trace_handler(self.sp_save_path, analyse_flag=self.sp_analyse_flag),
+                    experimental_config=experimental_config)
+
+            else:
+                raise ValueError(f"profile_type only supports static,"
+                                 f" but gets {self.profile_type}")
         else:
-            profiler_module = torch.profiler
-            activities = [profiler_module.ProfilerActivity.CPU, profiler_module.ProfilerActivity.CUDA]
-            experimental_config = None
+            activities = [torch.profiler.ProfilerActivity.CUDA]
+            if self.sp_with_cpu:
+                activities.append(torch.profiler.ProfilerActivity.CPU)
+            skip_first = self.sp_start_step
+            active = self.sp_end_step - self.sp_start_step
+            self.prof = torch.profiler.profile(
+                with_stack=self.sp_with_stack,
+                record_shapes=self.sp_record_shapes,
+                profile_memory=self.sp_with_memory,
+                activities=activities,
+                schedule=torch.profiler.schedule(
+                    wait=0, warmup=0, active=active, repeat=1, skip_first=skip_first),
+                on_trace_ready=torch.profiler.tensorboard_trace_handler(self.sp_save_path),
+                experimental_config=None)
 
-        active = self.config.end_step - self.config.start_step
-
-        skip_first = self.config.start_step - 1
-        schedule = profiler_module.schedule(
-            wait=0,
-            warmup=0,
-            active=active,
-            repeat=1,
-            skip_first=skip_first,
-        )
-        base_profiler = profiler_module.profile(
-            activities=activities,
-            schedule=schedule,
-            on_trace_ready=handler_fn,
-            record_shapes=self.config.record_shapes,
-            profile_memory=self.config.with_memory,
-            with_modules=False,
-            with_stack=self.config.with_stack,
-            experimental_config=experimental_config,
-        )
-
-        return base_profiler
+    def _enable_profile(self):
+        '''
+        Determine whether to enable profile
+        '''
+        if not self.enable:
+            return False
+        if self.ranks == [-1]:
+            return True
+        if torch.distributed.get_rank() in self.ranks:
+            return True
+        return False
 
     def start(self):
-        if not self.config.enable:
-            return
-        out = self._p.start()
+        if self._enable_profile():
+            if self.profile_type == "static":
+                self.prof.start()
+            else:
+                self.prof.init(self.dp_config_path)
+
+    def step(self):
+        if self._enable_profile():
+            self.prof.step()
 
     def stop(self):
-        if not self.config.enable:
-            return
+        if self._enable_profile():
+            if self.profile_type == "static":
+                self.prof.stop()
+            else:
+                pass
 
-        if self.config.end_step == self.current_step:
-            out = self._p.stop()
 
-        if self.config.with_memory and self.current_step == self.config.end_step:
-            time = int(datetime.datetime.now().timestamp())
-            memory_file_extension = "pkl"
-            memory_file = os.path.join(self.config.save_path, f"rank{self.global_rank}_{time}.{memory_file_extension}")
-            get_torch_device().memory._dump_snapshot(memory_file)
-            logger.info(f"Profiling memory visualization saved at {memory_file}.")
-            get_torch_device().memory._record_memory_history(enabled=None)  # step recording memory snapshot
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="profile offline analysing tool")
+    parser.add_argument("--profiler-path", required=True, help="Path to the profiler data directory")
+    parser.add_argument("--max-process-number", type=int,
+                        help="Maximum process number for analysis (default: CPU cores / 2)")
+    parser.add_argument("--export-type", action="append", choices=["text", "db"],
+                        help="Export type(s) for analysis results, supports: text, db, can be specified multiple times, default: text")
+    args = parser.parse_args()
 
-    def step(self, *a, **kw):
-        if not self.config.enable:
-            return
-
-        out = self._p.step(*a, **kw)
-        self.current_step += 1
-    
-    def memory_record(self):
-        if not self.config.enable:
-            return
-        if self.current_step >= self.config.start_step and self.current_step < self.config.end_step:
-            if self.config.with_memory and self.first_step:
-                get_torch_device().memory._record_memory_history()
-                self.first_step = False
+    analyse(
+        profiler_path=args.profiler_path,
+        max_process_number=args.max_process_number,
+        export_type=args.export_type
+    )
