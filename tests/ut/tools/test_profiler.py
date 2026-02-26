@@ -33,7 +33,8 @@ class TestProfiler:
                     "start_step": 10,
                     "end_step": 11,
                     "data_simplification": True,
-                    "aic_metrics_type": "PipeUtilization"
+                    "aic_metrics_type": "PipeUtilization",
+                    "analyse_flag": True,
                 },
                 "dynamic_param": {
                     "config_path": self.profiler_path

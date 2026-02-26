@@ -46,12 +46,46 @@ Static Profile静态采集功能为执行模型训练过程中的指定的steps�
                 "start_step": 10,                             // 启动采集的步数
                 "end_step": 11,                               // 结束采集的步数
                 "data_simplification": false,                 // 是否采用简化数据
-                "aic_metrics_type": "PipeUtilization"         // 采集模式，目前支持PipeUtilization和ArithmeticUtilization两种，默认采用PipeUtilization
+                "aic_metrics_type": "PipeUtilization",        // 采集模式，目前支持PipeUtilization和ArithmeticUtilization两种，默认采用PipeUtilization
+                "analyse_flag": true                          // 是否启用在线解析
             },
             ......
         },
         ......
     }
+
+analyse_flag为false时，生成的profiling文件位于save_path路径下，需要搭配如下命令进行profiling文件的离线解析：
+
+.. code-block::
+
+    python mindspeed_mm/tools/profiler.py
+
+.. note::
+    离线解析命令支持以下参数：
+
+    .. code-block::
+
+        --mm-tool <path>               # MM工具配置文件路径，默认为./mindspeed_mm/tools/tools.json
+        --profiler-path <path>         # Profiler数据目录路径（可选，若不指定则从配置文件中读取）
+        --max-process-number <number>  # 分析的最大进程数（可选，默认：CPU核心数/2）
+        --export-type <type>           # 分析结果的导出类型，支持：text、db，可多次指定，默认：text
+
+    **示例：**
+
+    .. code-block::
+
+        # 使用配置文件中的路径进行离线解析
+        python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json
+
+        # 指定Profiler数据目录路径
+        python mindspeed_mm/tools/profiler.py --profiler-path ./npu_profiling
+
+        # 导出多种格式的分析结果（多次指定--export-type参数）
+        python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --export-type text --export-type db
+
+此命令将解析指定路径下的所有profiling数据。参考 `离线解析 <https://www.hiascend.com/document/detail/zh/canncommercial/850/devaids/Profiling/atlasprofiling_16_0034.html>`_ 。
+
+对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以节约训练时资源占用。
 
 动态采集
 ^^^^^^^^^^
@@ -87,13 +121,13 @@ Dynamic Profile动态采集功能可在执行模型训练过程中随时开启�
     {
         ......
         "memory_profile": {
-            "enable": false,                           是否开启内存采集
-            "start_step": 0,                           开始录制的步数。训练步数的起始点，0代表初始化过程
-            "end_step": 2,                             结束录制的步数。数值为训练步数的起始点，0代表初始化过程
-            "save_path": "./memory_snapshot",          快照文件保存路径
-            "dump_ranks": [0],                         录制快照的rank列表，从0开始
-            "stacks": "all",                           堆栈信息录制。可选项：python/all
-            "max_entries": null,                       最大记录数，null则无限制
+            "enable": false,                           // 是否开启内存采集
+            "start_step": 0,                           // 开始录制的步数。训练步数的起始点，0代表初始化过程
+            "end_step": 2,                             // 结束录制的步数。数值为训练步数的起始点，0代表初始化过程
+            "save_path": "./memory_snapshot",          // 快照文件保存路径
+            "dump_ranks": [0],                         // 录制快照的rank列表，从0开始
+            "stacks": "all",                           // 堆栈信息录制。可选项：python/all
+            "max_entries": null,                       // 最大记录数，null则无限制
             "mem_info":  false
         },
         ......
@@ -108,8 +142,8 @@ SoRA类模型特征提取
     {
         ......
         "sorafeature":{
-            "save_path": "./sora_features",                    保存路径
-            "extract_video_feature": false,                    是否提取视频特征
-            "extract_text_feature: false                       是否提取文本特征
+            "save_path": "./sora_features",                    // 保存路径
+            "extract_video_feature": false,                    // 是否提取视频特征
+            "extract_text_feature": false                       // 是否提取文本特征
         }
     }

@@ -58,9 +58,45 @@ prof.stop()
     --end_step                  # 设置结束采集的步数
     --data_simplification       # 采集时是否采用简化数据
     --aic_metrics_type          # 采集模式，目前支持PipeUtilization和ArithmeticUtilization两种，默认采用PipeUtilization
+    --analyse_flag              # 是否启用在线解析
     ```
 
 3. 运行模型并采集profiling文件
+
+4. 解析profiling文件
+
+`analyse_flag`为`true`时，将在模型运行过程中自动执行解析。
+
+`analyse_flag`为`false`时，生成的profiling文件位于`save_path`路径下，需要搭配如下命令触发离线解析：
+
+```shell
+    python mindspeed_mm/tools/profiler.py
+```
+
+### 离线解析命令参数说明
+
+```shell
+--mm-tool <path>               # MM工具配置文件路径，默认为./mindspeed_mm/tools/tools.json
+--profiler-path <path>         # Profiler数据目录路径（可选，若不指定则从配置文件中读取）
+--max-process-number <number>  # 分析的最大进程数（可选，默认：CPU核心数/2）
+--export-type <type>           # 分析结果的导出类型，支持：text、db，可多次指定，默认：text
+```
+
+**示例：**
+```shell
+# 使用配置文件中的路径进行离线解析
+python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json
+
+# 指定Profiler数据目录路径
+python mindspeed_mm/tools/profiler.py --profiler-path ./npu_profiling
+
+# 导出多种格式的分析结果（多次指定--export-type参数）
+python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --export-type text --export-type db
+```
+
+此命令将解析指定路径下的所有profiling数据。参考 [离线解析](https://www.hiascend.com/document/detail/zh/canncommercial/850/devaids/Profiling/atlasprofiling_16_0034.html)。
+
+对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以节约训练时资源占用。
 
 ### 动态采集
 
@@ -126,7 +162,8 @@ prof.stop()
       0
     ],
     "stacks": "all",    // 堆栈信息录制。可选项：python/all
-    "max_entries": null // 最大记录数，null则无限制
+    "max_entries": null, // 最大记录数，null则无限制
+    "mem_info": false    // 是否记录内存信息
   }
 }
 ```

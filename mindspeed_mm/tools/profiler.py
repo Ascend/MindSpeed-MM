@@ -13,8 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import os
+
 import torch
 import torch_npu
+
+from torch_npu.profiler.profiler import analyse
 
 
 class Profiler:
@@ -63,6 +68,7 @@ class Profiler:
         self.sp_start_step = config.static_param.start_step
         self.sp_end_step = config.static_param.end_step
         self.sp_data_simplification = config.static_param.data_simplification
+        self.sp_analyse_flag = config.static_param.analyse_flag
 
         self.dp_config_path = config.dynamic_param.config_path
         
@@ -103,7 +109,8 @@ class Profiler:
                 activities=activities,
                 schedule=torch_npu.profiler.schedule(
                     wait=0, warmup=0, active=active, repeat=1, skip_first=skip_first),
-                on_trace_ready=torch_npu.profiler.tensorboard_trace_handler(self.sp_save_path),
+                on_trace_ready=torch_npu.profiler.tensorboard_trace_handler(self.sp_save_path,
+                                                                            analyse_flag=self.sp_analyse_flag),
                 experimental_config=experimental_config)
 
         elif self.profile_type == "dynamic":
@@ -143,3 +150,26 @@ class Profiler:
                 self.prof.stop()
             else:
                 pass
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="profile offline analysing tool")
+    parser.add_argument("--mm-tool", help="MM tool config path", default="./mindspeed_mm/tools/tools.json")
+    parser.add_argument("--profiler-path", help="Path to the profiler data directory")
+    parser.add_argument("--max-process-number", type=int, help="Maximum process number for analysis (default: CPU cores / 2)")
+    parser.add_argument("--export-type", action="append", choices=["text", "db"],
+                        help="Export type(s) for analysis results, supports: text, db, can be specified multiple times, default: text")
+    args = parser.parse_args()
+    
+    # Determine profiler path
+    if args.profiler_path:
+        profiler_path = args.profiler_path
+    else:
+        from mindspeed_mm.configs.config import MMConfig
+        config = MMConfig({"tool": args.mm_tool})
+        profiler_path = os.path.join(config.tool.profile.static_param.save_path)
+    
+    analyse(
+        profiler_path=profiler_path,
+        max_process_number=args.max_process_number,
+        export_type=args.export_type
+    )

@@ -243,6 +243,8 @@ mm-convert WanConverter mm_to_hf \
 
   - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_usp.md)
 
+  - 注：wan2.2使用full attention，对应general，即`--attention-mask-type general`。
+
 - fsdp2
 
   - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存。
@@ -262,6 +264,12 @@ mm-convert WanConverter mm_to_hf \
     echo "release" > $convert_dir/latest_checkpointed_iteration.txt
     python -m torch.distributed.checkpoint.format_utils dcp_to_torch "$iter_dir" "$convert_dir/release/mp_rank_00/model_optim_rng.pt"
     ```
+
++ Encoder Interleaved Offload: Encoder 交替卸载
+  - 使用场景：在NPU内存瓶颈的训练场景中，可以一次性编码多步训练输入数据然后卸载编码器至cpu上，使得文本编码器无需常驻内存，减少内存占用。
+    故可在不增加内存消耗的前提下实现在线训练，避免手动离线提取特征。T2V、I2V任务均支持。
+  - 使能方式：在xxx_model.json中，设置 encoder_offload_interval > 1. 建议设置根据实际场景设置大于10，可以分摊卸载带来的性能损耗
+  - 限制条件：启用时建议调大num_worker以达最佳性能; 支持与Encoder-DP同时开启。
 
 #### 启动训练
 
