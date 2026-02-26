@@ -217,7 +217,7 @@ NODES: 一共几个节点
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 可在`xxx_config.yaml`的`model`参数中配置上述文档中的`loss_type`。
 ```shell
-bash examples/fsdp2/qwen3_5/finetune_qwen3_5.sh
+bash examples/fsdp2/qwen3_5/finetune_qwen3_5_xxB.sh
 ```
 
 

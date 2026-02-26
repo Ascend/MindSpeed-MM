@@ -26,6 +26,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributed.tensor import DTensor
+from torch.distributed.distributed_c10d import ProcessGroup
 
 from transformers import initialization as init
 from transformers.activations import ACT2FN
@@ -872,6 +873,28 @@ class Qwen3_5MoeExperts(nn.Module):
                 final_hidden_states.index_add_(0, token_idx, current_hidden_states.to(final_hidden_states.dtype))
 
             return final_hidden_states
+
+    def ep_forward(
+        self,
+        hidden_states: torch.Tensor,
+        top_k_index: torch.Tensor,
+        top_k_weights: torch.Tensor,
+        ep_group: ProcessGroup
+    ) -> torch.Tensor:
+        gate_up_proj = self.gate_up_proj.to_local().permute(0, 2, 1).contiguous() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj.permute(0, 2, 1).contiguous()
+        down_proj = self.down_proj.to_local().permute(0, 2, 1).contiguous() if isinstance(self.down_proj, DTensor) else self.down_proj.permute(0, 2, 1).contiguous()
+
+        from mindspeed_mm.fsdp.distributed.expert_parallel.fused_ep import fused_ep_forward
+        hidden_states = fused_ep_forward(
+            self.num_experts,
+            top_k_weights,
+            top_k_index,
+            hidden_states,
+            fc1_weight=gate_up_proj,
+            fc2_weight=down_proj,
+            ep_group=ep_group
+        )
+        return hidden_states
 
 
 class Qwen3_5MoeTopKRouter(nn.Module):

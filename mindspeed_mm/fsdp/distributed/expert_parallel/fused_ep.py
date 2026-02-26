@@ -195,5 +195,6 @@ def alltoall_combine(
     hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states, post_dispatch_unpermute_indices)
 
     hidden_states = all_to_all(hidden_states, ep_group, scatter_sizes=output_splits, gather_sizes=input_splits)
-    hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states, unpermute_indices, probs=routing_weights)
+    hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states.to(routing_weights.dtype), unpermute_indices,
+                                                      probs=routing_weights)
     return hidden_states

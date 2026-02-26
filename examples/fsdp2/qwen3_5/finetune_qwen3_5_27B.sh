@@ -5,7 +5,7 @@ export MULTI_STREAM_MEMORY_REUSE=2
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
-NNODES=1
+NNODES=2
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
@@ -21,5 +21,5 @@ DISTRIBUTED_ARGS="
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
 torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
-    examples/fsdp2/qwen3_5/qwen3_5_moe_config.yaml \
+    examples/fsdp2/qwen3_5/qwen3_5_27B_config.yaml \
     2>&1 | tee logs/train_${logfile}.log

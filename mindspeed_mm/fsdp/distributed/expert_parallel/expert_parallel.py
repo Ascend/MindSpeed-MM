@@ -29,8 +29,11 @@ def expert_parallelize_modules(modules: torch.nn.Module, ep_mesh: DeviceMesh, pl
         distribute_experts_module(module, ep_mesh)
 
         # replace forward with ep forward
-        experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group)
-        module.forward = types.MethodType(experts_forward_fn, module)
+        if hasattr(module, 'ep_forward') and callable(module.ep_forward):
+            module.forward = partial(module.ep_forward, ep_group=ep_group)
+        else:
+            experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group)
+            module.forward = types.MethodType(experts_forward_fn, module)
 
     return modules
 
