@@ -73,6 +73,7 @@ GPT_ARGS="
     --fsdp2-config-path examples/wan2.1/fsdp2_config.yaml \
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
+    --attention-mask-type general \
 "
 
 MM_ARGS="

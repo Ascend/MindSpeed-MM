@@ -66,6 +66,7 @@ GPT_ARGS="
     --recompute-num-layers 12 \
     --use-distributed-optimizer \
     --lora-register-forward-hook patch_embedding \
+    --attention-mask-type general \
 "
 
 LORA_ARGS="

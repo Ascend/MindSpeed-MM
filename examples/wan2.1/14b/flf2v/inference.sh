@@ -55,6 +55,7 @@ GPT_ARGS="
     --no-save-rng \
     --bf16 \
     --seed 1234 \
+    --attention-mask-type general \
     --load $LOAD_PATH \
 "
 

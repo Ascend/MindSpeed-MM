@@ -74,6 +74,7 @@ GPT_ARGS="
     --fsdp2-config-path ${FSDP_CONFIG} \
     --optimizer-selection fused_torch_adamw \
     --use-cpu-initialization \
+    --attention-mask-type general \
 "
 
 MM_ARGS="

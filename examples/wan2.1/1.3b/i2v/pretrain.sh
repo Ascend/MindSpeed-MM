@@ -73,6 +73,7 @@ GPT_ARGS="
     --overlap-grad-reduce \
     --overlap-param-gather \
     --sequence-parallel \
+    --attention-mask-type general \
 "
 
 MM_ARGS="

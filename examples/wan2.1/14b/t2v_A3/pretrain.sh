@@ -72,6 +72,7 @@ GPT_ARGS="
     --overlap-grad-reduce \
     --layerzero \
     --layerzero-config ${layerzero_config} \
+    --attention-mask-type general \
 "
 
 MM_ARGS="

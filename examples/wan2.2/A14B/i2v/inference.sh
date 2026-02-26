@@ -54,6 +54,7 @@ GPT_ARGS="
     --no-save-optim \
     --no-save-rng \
     --bf16 \
+    --attention-mask-type general \
     --load $LOAD_PATH \
     --context-parallel-algo ulysses_cp_algo \
 "

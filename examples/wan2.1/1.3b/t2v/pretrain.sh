@@ -72,6 +72,7 @@ GPT_ARGS="
     --use-distributed-optimizer \
     --overlap-grad-reduce \
     --overlap-param-gather \
+    --attention-mask-type general \
 "
 
 MM_ARGS="

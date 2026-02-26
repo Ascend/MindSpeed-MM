@@ -74,6 +74,7 @@ GPT_ARGS="
     --use-fused-rmsnorm \
     --layerzero \
     --layerzero-config ${layerzero_config} \
+    --attention-mask-type general \
 "
 
 MM_ARGS="

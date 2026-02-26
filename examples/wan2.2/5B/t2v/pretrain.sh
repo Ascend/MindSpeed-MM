@@ -72,6 +72,7 @@ GPT_ARGS="
     --fsdp2-config-path ${fsdp2_config} \
     --optimizer-selection fused_torch_adamw \
     --untie-embeddings-and-output-weights \
+    --attention-mask-type general \
 "
 
 MM_ARGS="

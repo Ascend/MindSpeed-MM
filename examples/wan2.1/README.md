@@ -182,7 +182,6 @@ mm-convert WanConverter mm_to_hf \
 | --cfg.target_path | 转换后的Hugging Face权重路径                                 | /      |
 | --cfg.hf_dir     | 原始Hugging Face权重路径，需要从该目录下获取原始Hugging Face配置文件 |    /   |
 
-
 ---
 
 ## 权重下载及在线加载
@@ -320,6 +319,8 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
   - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_usp.md)
 
   - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/fpdt.md)
+
+  - 注：wan2.1使用full attention，对应general，即`--attention-mask-type general`。
 
 - layer_zero
 
@@ -500,4 +501,3 @@ bash examples/wan2.1/{model_size}/{task}/inference.sh
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-
