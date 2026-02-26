@@ -168,6 +168,9 @@ mm-convert Qwen3VLConverter hf_to_dcp \
 
 <a id="jump4.2"></a>
 #### 2. 配置参数
+【模型类别配置】
+当前默认微调nothink模型，如果想微调qwen3-VL-thinking模型，请将配置文件`qwen3vl_full_sft_xxB.yaml`中的`template`配置为`qwen3_vl`，
+`enable_thinking`配置为`true`。
 
 【数据目录配置】
 
