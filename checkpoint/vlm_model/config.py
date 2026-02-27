@@ -5,6 +5,7 @@
 @Time    : 2025/01/14
 @Desc    : 模型相关的配置定义
 """
+import warnings
 from functools import cached_property
 from pathlib import Path
 from typing import Optional, List, Any, Tuple
@@ -48,7 +49,7 @@ class ParallelConfig(BaseModel):
     @model_validator(mode='after')
     def validate_pp_layers(self) -> "ParallelConfig":
         if len(self.vit_pp_layers) != len(self.llm_pp_layers):
-            raise ValueError("vit和llm的pp_layers配置长度一定要一致")
+            warnings.warn("The pp_layers of vit and llm are inconsistent", UserWarning)
         if len(self.vit_pp_layers) < 1:
             raise ValueError("pp layers长度至少为1")
         return self
@@ -83,6 +84,11 @@ class VppParallelConfig(BaseModel):
     def pp_size(self) -> PositiveInt:
         return len(self.llm_pp_layers[0])
 
+    @computed_field
+    @cached_property
+    def vit_pp_size(self) -> PositiveInt:
+        return len(self.vit_pp_layers[0])
+
     def is_pp(self) -> bool:
         return self.pp_size > 1
 
@@ -97,7 +103,7 @@ class VppParallelConfig(BaseModel):
     @model_validator(mode='after')
     def validate_pp_layers(self) -> "VppParallelConfig":
         if len(self.vit_pp_layers) != len(self.llm_pp_layers):
-            raise ValueError("vit和llm的pp_layers配置长度一定要一致")
+            warnings.warn("The pp_layers of vit and llm are inconsistent", UserWarning)
         if len(self.vit_pp_layers) < 1:
             raise ValueError("pp layers长度至少为1")
         return self
@@ -105,12 +111,13 @@ class VppParallelConfig(BaseModel):
     @model_validator(mode='after')
     def validate_vpp_layers(self) -> "VppParallelConfig":
         pp_size = self.pp_size
+        vit_pp_size = self.vit_pp_size
         for vpp in self.llm_pp_layers:
             if len(vpp) != pp_size:
-                raise ValueError("vit和llm的每个vpp配置长度一定要一致")
+                raise ValueError("llm的每个vpp配置长度一定要一致")
         for vpp in self.vit_pp_layers:
-            if len(vpp) != pp_size:
-                raise ValueError("vit和llm的每个vpp配置长度一定要一致")
+            if len(vpp) != vit_pp_size:
+                raise ValueError("vit的每个vpp配置长度一定要一致")
         return self
 
 
@@ -274,8 +281,7 @@ class ConvertVppMMConfig(BaseModel):
         # Validation for flattened lists
         expected_length = self.parallel_config.pp_size * self.parallel_config.vpp_size
         if len(vit_pipeline_num_layers_flat) != expected_length:
-            raise AssertionError(f'Length of vit_pipeline_num_layers_flat must be equal to pp_size * vp_size, '
-                                 f'but got {len(vit_pipeline_num_layers_flat)} and {expected_length}.')
+            warnings.warn("VIT use hetero PP layers...", UserWarning)
         if sum(vit_pipeline_num_layers_flat) != self.common_model_config.vit_num_layers:
             raise AssertionError(f'Sum of vit_pipeline_num_layers_flat must be equal to vit_num_layers, '
                                  f'but got {sum(vit_pipeline_num_layers_flat)} and {self.common_model_config.vit_num_layers}.')
@@ -292,8 +298,7 @@ class ConvertVppMMConfig(BaseModel):
                 for item in sublist
             ]
             if len(audio_pipeline_num_layers_flat) != expected_length:
-                raise AssertionError(f'Length of audio_pipeline_num_layers_flat must be equal to pp_size * vp_size, '
-                                     f'but got {len(audio_pipeline_num_layers_flat)} and {expected_length}.')
+                warnings.warn("Audio model use hetero PP layers...", UserWarning)
             if sum(audio_pipeline_num_layers_flat) != self.common_model_config.audio_num_layers:
                 raise AssertionError(f'Sum of audio_pipeline_num_layers_flat must be equal to audio_num_layers, '
                                      f'but got {sum(audio_pipeline_num_layers_flat)} and {self.common_model_config.audio_num_layers}.')
@@ -363,13 +368,3 @@ class ConvertVppHFConfig(ConvertVppMMConfig):
     """mindspeed-mm训练出来的权重转换为huggingface格式权重的配置"""
     save_hf_dir: Path
     """mm转回hf格式时保存的路径"""
-
-
-class ConvertHeteroMMConfig(BaseModel):
-    """mindspeed-mm的权重转换为适配hetero的mindspeed-mm的权重的配置"""
-
-    mm_dir: Path
-    """原mm权重的路径"""
-
-    mm_hetero_dir: Path
-    """mm_hetero权重的路径"""

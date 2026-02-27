@@ -70,13 +70,20 @@ def load_from_mm(load_dir: Path,
     import mindspeed.megatron_adaptor  # noqa
     save_iteration = load_dir.joinpath(LATEST_TXT).read_text()
     save_dir = load_dir.joinpath(f"iter_{int(save_iteration):07}" if save_iteration != "release" else save_iteration)
+
+    global_pp_size = max(
+        len(vit_pp_list), 
+        len(llm_pp_list), 
+        len(audio_pp_list) if audio_pp_list else 0
+    )
+
     state_dicts = []
     for tp_rank in range(tp_size):
         pp_state_dict = {}
-        for pp_rank in range(len(vit_pp_list)):
+        for pp_rank in range(global_pp_size):
             if ep_size > 1:
                 for ep_rank in range(ep_size):
-                    if len(vit_pp_list) > 1:
+                    if global_pp_size > 1:
                         current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(pp_rank):03}_{int(ep_rank):03}")
                     else:
                         current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(ep_rank):03}")
@@ -88,7 +95,7 @@ def load_from_mm(load_dir: Path,
                             dict_ep.update({new_key: tensor})
                     pp_state_dict.update(dict_ep)
             else:
-                if len(vit_pp_list) > 1:
+                if global_pp_size > 1:
                     current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}_{int(pp_rank):03}")
                 else:
                     current_path = save_dir.joinpath(f"mp_rank_{int(tp_rank):02}")
@@ -175,13 +182,16 @@ def rename_pp_parameter(param_name: str,
                         audio_pp_list: List[int] = None,
                         pp_index: int = 0) -> str:
     # 计算偏移量：当前分片前的总层数
-    def compute_offset(pp_list: List[int]) -> int:
-        return sum(pp_list[:pp_index]) if pp_index > 0 else 0
+    def compute_offset(pp_list: List[int], idx: int) -> int:
+        if not pp_list:
+            return 0
+        effective_idx = idx % len(pp_list)
+        return sum(pp_list[:effective_idx]) if effective_idx > 0 else 0
 
     # 计算各模态的偏移量
-    vit_offset = compute_offset(vit_pp_list)
-    llm_offset = compute_offset(llm_pp_list)
-    audio_offset = compute_offset(audio_pp_list) if audio_pp_list is not None else 0
+    vit_offset = compute_offset(vit_pp_list, pp_index)
+    llm_offset = compute_offset(llm_pp_list, pp_index)
+    audio_offset = compute_offset(audio_pp_list, pp_index) if audio_pp_list is not None else 0
 
     # 定义模式列表：正则表达式和对应的偏移量
     patterns = [

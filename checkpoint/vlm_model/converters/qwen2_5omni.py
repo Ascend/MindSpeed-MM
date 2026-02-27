@@ -2,8 +2,8 @@ from typing import Any, cast, Tuple, List
 
 from checkpoint.common.converter import Converter
 from checkpoint.common.permissions import set_directory_permissions
-from checkpoint.vlm_model import hf_to_mm, mm_to_hf, base_to_hetero
-from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig, ConvertHeteroMMConfig
+from checkpoint.vlm_model import hf_to_mm, mm_to_hf
+from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig
 from checkpoint.vlm_model.converters.qwen2_5vl import qwen2_5_vl_tp_patterns
 from checkpoint.vlm_model.hf_to_mm import vision_schema, text_schema, audio_schema
 from checkpoint.vlm_model.operator import Operator, UpGateMergeOp, QKVMergeOp, QVToQKVMergeOp, \
@@ -197,15 +197,6 @@ class Qwen2_5_OmniConverter(Converter):
         mm_to_hf.convert_mm_to_hf(cfg, ops, qwen2_5_omni_tp_patterns, merge_source=True)
         # 安全管控权限
         set_directory_permissions(cfg.save_hf_dir)
-
-    @staticmethod
-    def base_to_hetero(cfg: ConvertHeteroMMConfig):
-        """mindspeed-mm模型转换hetero模型权重"""
-        mm_dir = cfg.mm_dir
-        mm_hetero_dir = cfg.mm_hetero_dir
-        base_to_hetero.convert_base_to_hetero(mm_dir, mm_hetero_dir)
-        #安全管控权限
-        set_directory_permissions(cfg.mm_hetero_dir)
 
     @staticmethod
     def resplit(cfg: ConvertResplitConfig):

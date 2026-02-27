@@ -113,34 +113,54 @@ def partition_state_dict_by_pp(state_dict: STATE_DICT_T,
                                pp_ranges: List[PPRange],
                                stages: List[PPStageSchema]) -> List[STATE_DICT_T]:
     """For transformer structures of different modalities, use a universal PP splitting logic to split the
-    model parameter state-dict into different PP ranks and reset the corresponding layer numbers
+    model parameter state-dict into different PP ranks and reset the corresponding layer numbers. Supports
+    hetero PP sizes with dp replication(e.g., VIT PP=1, Audio model PP=2, LLM PP =4)
     """
+    global_pp_size = max(r.pp_size for r in pp_ranges)
     pp_weights = []
-    for pp_rank in range(pp_ranges[0].pp_size):
+    for pp_rank in range(global_pp_size):
         pp_weight = {}
         for weight_name, weight_value in state_dict.items():
             for modality_stage, modality_pp_range in zip(stages, pp_ranges):
+                offset = pp_rank - modality_pp_range.first_layer_rank
+                if offset < 0:
+                    continue
+                local_pp_idx = offset % modality_pp_range.pp_size
+                is_first_in_group = (local_pp_idx == modality_pp_range.first_layer_rank)
+                is_last_in_group = (local_pp_idx == modality_pp_range.last_layer_rank)
                 # 该模态首卡对应的权重
-                if modality_pp_range.first_layer_rank == pp_rank:
+                if is_first_in_group:
                     for name_start in modality_stage.firsts:
                         if weight_name.startswith(name_start):
                             pp_weight[weight_name] = weight_value
                 # 该模态尾卡对应的权重
-                if modality_pp_range.last_layer_rank == pp_rank:
+                if is_last_in_group:
                     for name_start in modality_stage.lasts:
                         if weight_name.startswith(name_start):
                             pp_weight[weight_name] = weight_value
+                # 该模态pp中间的卡对应的权重
                 if weight_name.startswith(modality_stage.middle):
+                    layer_start = modality_pp_range.start[local_pp_idx]
+                    layer_end = modality_pp_range.end[local_pp_idx]
                     raw_layer_num, *remains = weight_name.replace(modality_stage.middle, "").split(".")
-                    new_layer_num = int(raw_layer_num) - modality_pp_range.start[pp_rank]
-                    new_weight_name = ".".join([modality_stage.middle[:-1], str(new_layer_num), *remains])
-                    if int(raw_layer_num) in range(modality_pp_range.start[pp_rank], modality_pp_range.end[pp_rank]):
-                        pp_weight[new_weight_name] = weight_value
+                    try:
+                        raw_layer_num = int(raw_layer_num)
+                        if layer_start <= raw_layer_num < layer_end:
+                            new_layer_num = raw_layer_num - layer_start
+                            new_weight_name = ".".join([modality_stage.middle[:-1], str(new_layer_num), *remains])
+                            pp_weight[new_weight_name] = weight_value
+                    except ValueError as e:
+                        raise ValueError(
+                            f"Failed to parse layer number from weight name: '{weight_name}'\n"
+                            f"Modality: {modality_stage}, PP range: {modality_pp_range}\n"
+                            f"Original error: {str(e)}"
+                        ) from e
                 # 该模态所有卡都包含的权重
                 if modality_stage.all_layer:
                     for name_start in modality_stage.all_layer:
                         if weight_name.startswith(name_start):
                             pp_weight[weight_name] = weight_value
+
         pp_weights.append(pp_weight)
     return pp_weights
 
