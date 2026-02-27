@@ -123,6 +123,8 @@ def initial_modules_mpu(config, kwargs):
     for module_group in module_name:
         current_config = config_dict
         for key in module_group:
+            if current_config[key] is None:
+                continue
             try:
                 current_config = current_config[key]
             except KeyError as e:
