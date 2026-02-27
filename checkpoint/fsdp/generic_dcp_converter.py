@@ -80,6 +80,7 @@ class GenericDCPConverter(Converter):
         dcp_prefix: str = "",
         hf_prefix: str = "",
         fused_linear_names: List[str] = None,
+        trust_remote_code: bool = True
     ):
         """
         Merges torch-dcp shards and converts them back into standard Hugging Face format.
@@ -95,7 +96,7 @@ class GenericDCPConverter(Converter):
             fused_linear_names (str): Names of MoE (Mixture of Experts) expert parameters 
                 in comma-separated format. These parameters need special reshaping during conversion.
         """
-        config = AutoConfig.from_pretrained(model_assets_dir)
+        config = AutoConfig.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
         num_experts = getattr(config.text_config, "num_experts", None)
         
         def state_dict_convert_func(state_dict):

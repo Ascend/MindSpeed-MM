@@ -87,7 +87,6 @@ bash scripts/install.sh --msid eb10b92 --install-cann && bash examples/fsdp2/qwe
 mm-convert GenericDCPConverter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
 --dcp_dir ckpt/mm_path/xxxxxxx \
---tie_weight_mapping '{"lm_head.weight":"model.language_model.embed_tokens.weight"}' 
 
 # 转换后的目录结构为：
 # ———— xxxxxxx
