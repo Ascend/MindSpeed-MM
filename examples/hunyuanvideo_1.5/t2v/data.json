@@ -59,7 +59,7 @@
                 "model_max_length": 300
             },
             {
-                "autotokenizer_name": "Hunyuan15GlyphTokenizer",
+                "autotokenizer_name": "hunyuan15GlyphTokenizer",
                 "hub_backend": "hf",
                 "from_pretrained": "HunyuanVideo1.5/text_encoder/byt5-small",
                 "byt5_max_length": 256,

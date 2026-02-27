@@ -85,7 +85,7 @@
         "text_states_dim_2": null,
         "text_pool_type": null,
         "rope_theta": 256,
-        "attn_mode": "flash3",
+        "attn_mode": "flash2",
         "attn_param": {
             "win_size": [[3, 3, 3]],
             "win_type": "fixed",

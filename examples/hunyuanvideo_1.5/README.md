@@ -89,7 +89,7 @@ mkdir HunyuanVideo1.5
 hf download tencent/HunyuanVideo-1.5 --local-dir ./HunyuanVideo1.5
 ```
 离线链接：
-- [tencent/HunyuanVideo-1.5](https://huggingface.co/tencent/HunyuanVideo)
+- [tencent/HunyuanVideo-1.5](https://huggingface.co/tencent/HunyuanVideo-1.5/tree/main)
 2. 下载文本编码器
 
 ``` bash
