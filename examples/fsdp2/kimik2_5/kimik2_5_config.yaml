@@ -15,7 +15,7 @@ parallel:
   recompute: true
   recompute_plan:
       apply_modules:
-        - model.language_model.layers.{*}
+        - language_model.model.layers.{*}
   context_parallel_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 128
