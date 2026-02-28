@@ -1,0 +1,7 @@
+setuptools<=81.0.0
+onnxruntime==1.23.2
+openai-whisper==20231117
+soundfile==0.13.1
+torchaudio==2.7.1
+librosa==0.10.2
+pyworld==0.3.4

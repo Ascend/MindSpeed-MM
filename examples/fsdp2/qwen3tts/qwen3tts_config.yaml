@@ -1,0 +1,92 @@
+# 并行策略
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  recompute: false
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+
+### 数据相关配置
+data:
+  dataset_param:
+    dataset_type: qwen3tts
+
+    # 数据预处理
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH /model/Qwen3-TTS-12Hz-1.7B-Base
+
+    basic_parameters:
+      dataset_dir: &DATASET_PATH /data/train_with_codes.jsonl
+      dataset:  *DATASET_PATH
+
+  # 数据加载
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      model_name: qwen3tts
+
+# 模型配置
+model:
+  model_id: qwen3_tts
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  loss_cfg:
+    loss_type: raw
+
+# 训练配置
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 2.0e-5
+  lr_decay_style: constant
+  lr_warmup_ratio: 0
+  weight_decay: 0.01
+  train_iters: 100
+  clip_grad: 0.0
+  init_model_with_meta_device: false
+  optimizer: adamw
+  adam_fused: false
+  save_interval: 10000
+  # load: load_path
+  # save: save_path
+  use_deter_comp: false
+  allow_hf32: false
+  # 2. 模型精度
+  plugin:
+    - mindspeed_mm/fsdp/models/qwen3tts
+    - mindspeed_mm/fsdp/data/datasets/qwen3tts
+
+# 工具配置
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false

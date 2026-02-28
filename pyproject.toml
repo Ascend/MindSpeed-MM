@@ -19,6 +19,7 @@ dependencies = [
     "pandas==2.0.3",
     "torch==2.7.1",
     "torchvision",
+    "torchdata",
     "diffusers==0.30.3",
     "transformers==4.57.0",
     "accelerate==0.32.1",
@@ -32,7 +33,22 @@ dependencies = [
     "jsonargparse[all]>=4.40.0",
     "gpytorch",
     "orjson",
-    "rich"
+    "rich",
+    "pybind11",
+    "ninja",
+    "wheel",
+    "six",
+    "regex",
+    "decorator",
+    "attrs",
+    "psutil",
+    "pyyaml",
+    "protobuf",
+    "einops",
+    "scipy",
+    "pytest-mock",
+    "scikit-learn",
+    "SQLAlchemy"
 ]
 
 [build-system]

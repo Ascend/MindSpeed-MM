@@ -111,13 +111,14 @@ def merge_dcp_to_hf_sharded(
     model_assets_dir: DirectoryPath,
     select_key_convert_func: Optional[callable],
     state_dict_convert_func: Optional[callable],
+    trust_remote_code: bool = True
 ):
     """
     Load DCP weights in shards and save them as sharded checkpoints in Hugging Face (HF) format.
     """
     
-    config = AutoConfig.from_pretrained(model_assets_dir)
-    processor = AutoProcessor.from_pretrained(model_assets_dir, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
+    processor = AutoProcessor.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
     config.save_pretrained(save_dir)
     processor.save_pretrained(save_dir)
     
