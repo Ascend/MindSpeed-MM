@@ -287,7 +287,7 @@ m-convert  Qwen2_5_VLConverter lora_mm_to_hf \
 <a id="jump3.1"></a>
 #### 1. 权重下载
 
-已验证模型及其权重下载链接:
+已验证模型（目前仅支持TP切分方式加载权重）及其权重下载链接:
 
 - 模型地址: [Qwen2.5-VL-3B](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct/tree/main)；
 - 模型地址: [Qwen2.5-VL-7B](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)；
