@@ -54,6 +54,7 @@ class SoraModelConverter(Converter):
     str_replace_mapping = OrderedDict() # origin to mm, str_replace mode
     hf_to_mm_convert_mapping = OrderedDict() # hf to mm, mapping mode (recommend)
     hf_to_mm_str_replace_mapping = OrderedDict() # hf to mm, str_replace mode
+    lora_hf_to_mm_str_replace_mapping = OrderedDict() # lora hf to mm, str_replace mode
     lora_target_modules = [] # lora modules
 
     # key: TP pattern name, values: state_dict.key
@@ -101,6 +102,16 @@ class SoraModelConverter(Converter):
         set_directory_permissions(Path(cfg.target_path))
 
     @check_method_support
+    def lora_hf_to_mm(self, cfg: ConvertConfig):
+        state_dict = load_from_hf(cfg.source_path)
+        state_dict = self._replace_state_dict(
+            state_dict,
+            str_replace_mapping=self.lora_hf_to_mm_str_replace_mapping
+        )
+        state_dicts = self._mm_split(state_dict, cfg.target_parallel_config)
+        save_as_mm(cfg.target_path, state_dicts)
+
+    @check_method_support
     def resplit(self, cfg: ConvertConfig):
         state_dicts = load_from_mm(cfg.source_path)
         state_dict = self._mm_merge(state_dicts)
@@ -146,7 +157,7 @@ class SoraModelConverter(Converter):
 
         if use_npu:
             source_state_dict = {k: v.npu() if isinstance(v, torch.Tensor) else v for k, v in source_state_dict.items()}
-            lora_state_dict = {k: v.npu() if isinstance(v, torch.Tensor) else v for k, v in source_state_dict.items()}
+            lora_state_dict = {k: v.npu() if isinstance(v, torch.Tensor) else v for k, v in lora_state_dict.items()}
 
         lora_merged_state_dict = lora_merge_to_base(
             source_state_dict,

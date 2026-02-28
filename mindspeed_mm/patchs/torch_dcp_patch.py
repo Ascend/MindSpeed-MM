@@ -166,8 +166,7 @@ def _load_base_checkpoint(
                 load_planner = EPLoadPlanner(allow_partial_load=True, ep_rank=ep_rank, ep_size=ep_size, check_moe_fn=check_moe_func)
 
             if is_enable_lora():
-                new_state_dict, key_mapping = remove_base_layer_keys(state_dict.get('model', None))
-                state_dict['model'] = new_state_dict
+                key_mapping = remove_base_layer_keys(state_dict.get('model', None))
 
             torch.distributed.checkpoint.load(
                 state_dict=state_dict,
@@ -176,7 +175,7 @@ def _load_base_checkpoint(
             )
 
             if is_enable_lora():
-                state_dict['model'] = restore_base_layer_keys(state_dict['model'], key_mapping)
+                restore_base_layer_keys(state_dict.get('model', None), key_mapping)
 
             curr_keys = load_planner.state_dict.keys()
             load_keys = load_planner.metadata.state_dict_metadata.keys()
@@ -194,7 +193,7 @@ def _load_base_checkpoint(
     if args.downcast_to_bf16 and isinstance(state_dict, dict) and 'model' in state_dict:
         for k in state_dict['model']:
             if state_dict['model'][k].dtype == torch.float:
-                state_dict['model'][k] = state_dict['model'][k].bfloat16().float()
+                state_dict['model'][k].data.copy_(state_dict['model'][k].bfloat16().float())
 
     return state_dict, checkpoint_name, release, ckpt_type
 

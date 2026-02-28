@@ -21,7 +21,7 @@ class LayerIndexConverter:
 class WanConverter(SoraModelConverter):
     """Converter for Wan2.1"""
 
-    _supported_methods = ["hf_to_mm", "resplit", "mm_to_hf", "layerzero_to_mm", "merge_lora_to_base", "mm_to_dcp"]
+    _supported_methods = ["hf_to_mm", "resplit", "mm_to_hf", "lora_hf_to_mm", "layerzero_to_mm", "merge_lora_to_base", "mm_to_dcp"]
     _enable_tp = False
     _enable_pp = True
     _enable_vpp = True
@@ -72,7 +72,20 @@ class WanConverter(SoraModelConverter):
         "scale_shift_table": "modulation",
         ".norm2.": ".norm3."
     }
-    
+
+    lora_hf_to_mm_str_replace_mapping = {
+        "self_attn.q.": "self_attn.proj_q.",
+        "self_attn.k.": "self_attn.proj_k.",
+        "self_attn.v.": "self_attn.proj_v.",
+        "self_attn.o.": "self_attn.proj_out.",
+        "cross_attn.q.": "cross_attn.proj_q.",
+        "cross_attn.k.": "cross_attn.proj_k.",
+        "cross_attn.v.": "cross_attn.proj_v.",
+        "cross_attn.o.": "cross_attn.proj_out."
+    }
+
+    lora_target_modules = ["proj_q", "proj_k", "proj_v", "proj_out", "ffn.0", "ffn.2"]
+
     pre_process_weight_names = [
         "patch_embedding.weight", "patch_embedding.bias",
         "text_embedding.linear_1.weight", "text_embedding.linear_1.bias",

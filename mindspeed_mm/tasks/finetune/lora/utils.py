@@ -62,26 +62,31 @@ def modify_keys_with_dict(dictionary, exclude_words):
 
 
 def remove_base_layer_keys(state_dict):
+    if state_dict is None or not isinstance(state_dict, dict):
+        return {}
+
     key_mapping = {}
-    new_state_dict = {}
+    original_keys = list(state_dict.keys())
 
-    for key, value in state_dict.items():
-        if '.base_layer' in key:
-            new_key = key.replace('.base_layer', '')
-            new_state_dict[new_key] = value
-            key_mapping[key] = new_key
-        else:
-            new_state_dict[key] = value
+    for old_key in original_keys:
+        if '.base_layer' in old_key:
+            new_key = old_key.replace('.base_layer', '')
+            key_mapping[old_key] = new_key
+            state_dict[new_key] = state_dict.pop(old_key)
 
-    return new_state_dict, key_mapping
+    return key_mapping
 
 
 def restore_base_layer_keys(modified_state_dict, key_mapping):
+    if modified_state_dict is None or not isinstance(modified_state_dict, dict):
+        return
+    if key_mapping is None or not isinstance(key_mapping, dict):
+        return
+
     reverse_mapping = {new_key: orig_key for orig_key, new_key in key_mapping.items()}
-    original_state_dict = {}
+    modified_keys = list(modified_state_dict.keys())
 
-    for key, value in modified_state_dict.items():
+    for key in modified_keys:
         original_key = reverse_mapping.get(key, key)
-        original_state_dict[original_key] = value
-
-    return original_state_dict
+        if original_key != key:
+            modified_state_dict[original_key] = modified_state_dict.pop(key)

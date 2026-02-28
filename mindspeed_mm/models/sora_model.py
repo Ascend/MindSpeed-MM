@@ -251,9 +251,12 @@ class SoRAModel(nn.Module, FSDP2Mixin, WeightInitMixin):
             state_dict = self.state_dict_for_save_lora_checkpoint(state_dict)
         return state_dict
 
-    def state_dict(self, **kwargs):
+    def state_dict(self, destination: Optional[dict] = None, **kwargs):
         """Customized state_dict for fsdp2"""
-        return self.predictor.state_dict()
+        if destination is None:
+            destination = {}
+        destination.update(self.predictor.state_dict())
+        return destination
 
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         """Customized load."""
