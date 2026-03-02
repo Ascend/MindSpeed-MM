@@ -57,14 +57,7 @@ commit_id=c0dbe09
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
-```
-对于X86架构机器，执行如下指令：
-```bash
-bash scripts/install.sh --arch x86 --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/qwen3vl/requirements.txt
-```
-对于ARM架构机器，执行如下指令：
-```bash
-bash scripts/install.sh --arch arm --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/qwen3vl/requirements.txt
+bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/qwen3vl/requirements.txt
 ```
 
 ---
