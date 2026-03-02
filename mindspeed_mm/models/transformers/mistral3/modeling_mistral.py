@@ -13,7 +13,7 @@ from transformers.utils.generic import check_model_inputs
 
 from megatron.core import mpu
 from mindspeed_mm.models.common.communications import split_forward_gather_backward_with_cp
-from mindspeed_mm.models.transformers.qwen3vl.utils import set_seq_len
+from mindspeed_mm.models.transformers.cp_utils import set_seq_len
 
 
 @auto_docstring

@@ -306,8 +306,24 @@ dataset_param->basic_parameters->dataset
 
 如果加载大量数据遇到通信TIMEOUT，可以在`data.json`中添加`dataset_param.basic_parameters.preprocess_on_fly`字段并置为true。
 
+【序列并行配置】
+若训练数据的序列长度较长，建议将`examples/qwen3omni/finetune_qwen3omni.sh`中的TASK_QUEUE_ENABLE设置为1，并根据实际场景调整SEQ_LEN参数（示例配置为262144）
+```shell
+export TASK_QUEUE_ENABLE=1
+SEQ_LEN=262144
+```
+当前已支持Ulysses序列并行，当使用长序列训练时，需要开启CP特性，开启方式为在`examples/qwen3omni/finetune_qwen3omni.sh`CP > 1，例如
+```shell
+CP=4
+```
+脚本中默认为Ulysses序列并行
+```shell
+    --context-parallel-algo ulysses_cp_algo
+```
+注意：如果CP>1，但音频序列长度没有超过CP size，则AuT模块不支持Ulysses序列并行
+
 【Attention配置】attn_implementation 和 layout配置:
-  当前支持audio、vision和text模块选择不同的Attntion实现方式，具体为在`model.json`文件中修改`attn_implementation`字段，当前支持情况如下表。
+  当前支持audio、vision和text模块选择不同的Attention实现方式，具体为在`model.json`文件中修改`attn_implementation`字段，当前支持情况如下表。
   | 模块| 支持的FA以及layout |
   | --- | --- |
   | AuT | `flash_attention_2`: `BNSD` |

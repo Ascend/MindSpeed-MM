@@ -8,7 +8,7 @@ from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextAttention 
 from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionAttention as Qwen3VLVisionAttentionGoden
 
 from mindspeed_mm.models.transformers.qwen3vl.modules import Qwen3VLTextAttention, Qwen3VLVisionAttention
-from mindspeed_mm.models.transformers.qwen3vl.utils import set_seq_len
+from mindspeed_mm.models.transformers.cp_utils import set_seq_len
 from tests.ut.utils import judge_expression
 
 

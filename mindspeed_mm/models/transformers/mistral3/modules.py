@@ -15,7 +15,7 @@ from transformers.processing_utils import Unpack
 from transformers.utils.deprecation import deprecate_kwarg
 
 from megatron.core import mpu
-from mindspeed_mm.models.transformers.qwen3vl.utils import get_seq_len, gather_seq_scatter_heads_qkv, \
+from mindspeed_mm.models.transformers.cp_utils import get_seq_len, gather_seq_scatter_heads_qkv, \
     gather_heads_scatter_seq
 
 

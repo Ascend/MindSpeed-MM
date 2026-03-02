@@ -26,7 +26,6 @@ from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import (
     Qwen3OmniMoeVisionEncoderConfig,
 )
 from transformers.generation import GenerationMixin
-from transformers.integrations import use_kernel_forward_from_hub
 from transformers.activations import ACT2FN
 from transformers.utils import auto_docstring, can_return_tuple
 from transformers.masking_utils import create_causal_mask
@@ -37,7 +36,6 @@ from transformers.utils.generic import OutputRecorder, TransformersKwargs, check
 from transformers.processing_utils import Unpack
 from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
 from transformers.cache_utils import Cache, DynamicCache
-from transformers.modeling_layers import GradientCheckpointingLayer
 
 import numpy as np
 import torch
@@ -45,9 +43,16 @@ import torch_npu
 from torch import nn
 import torch.nn.functional as F
 
+from megatron.core import mpu
+from megatron.training import get_args
+from mindspeed_mm.models.common.communications import (
+    cal_split_sizes,
+    gather_forward_split_backward,
+    split_forward_gather_backward,
+    split_forward_gather_backward_with_cp
+)
 from mindspeed_mm.models.common.gmm import npu_group_gemm
 from mindspeed_mm.utils.async_offload import async_save_on_cpu
-from mindspeed_mm.models.transformers.qwen3vl.utils import get_seq_len, set_seq_len
 from .modules import (
     Qwen3OmniMoeAudioAttention,
     Qwen3OmniMoeVisionAttention,
@@ -56,6 +61,13 @@ from .modules import (
     Qwen3OmniLMHead,
 )
 from .modeling_outputs import Qwen3OmniMoeThinkerCausalLMOutputWithPast
+from ..cp_utils import (
+    get_seq_len,
+    gather_visual_seqs_with_cp,
+    set_seq_len,
+    split_visual_seqs_with_cp,
+    split_audio_seqs_with_cp
+)
 
 
 @auto_docstring
@@ -621,10 +633,10 @@ class Qwen3OmniMoeAudioEncoder(Qwen3OmniMoePreTrainedModel):
         # Split to chunk to avoid OOM during convolution
         padded_embeds = []
         for chunk in padded_feature.split(self.conv_chunksize, dim=0):
-            act1_out = torch_npu.npu_gelu(self.conv2d1(chunk), approximate='none')
-            act2_out = torch_npu.npu_gelu(self.conv2d2(act1_out), approximate='none')
-            act3_out = torch_npu.npu_gelu(self.conv2d3(act2_out), approximate='none')
-            padded_embeds.append(act3_out)
+            padded_embed = torch_npu.npu_gelu(self.conv2d1(chunk), approximate='none')
+            padded_embed = torch_npu.npu_gelu(self.conv2d2(padded_embed), approximate='none')
+            padded_embed = torch_npu.npu_gelu(self.conv2d3(padded_embed), approximate='none')
+            padded_embeds.append(padded_embed)
         padded_embed = torch.cat(padded_embeds, dim=0)
         b, c, f, t = padded_embed.size()
         padded_embed = self.conv_out(padded_embed.permute(0, 3, 1, 2).contiguous().view(b, t, c * f))
@@ -647,6 +659,13 @@ class Qwen3OmniMoeAudioEncoder(Qwen3OmniMoePreTrainedModel):
         cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
         cu_seqlens = tuple(cu_seqlens.cpu().numpy().tolist())
 
+        seq_len = hidden_states.shape[0]
+        set_seq_len("audio", seq_len)
+        # Split sequences across context parallel groups for distributed processing, and only do so when CP size < seq_len; reasons are as follows:
+        # 1) Data is most likely fake when CP size ≥ seq_len; 2) Splitting provides no benefit for short real sequences
+        if mpu.get_context_parallel_world_size() > 1 and mpu.get_context_parallel_world_size() < seq_len:
+            hidden_states = split_audio_seqs_with_cp(hidden_states, dim=0)
+
         for encoder_layer in self.layers:
             layer_outputs = encoder_layer(
                 hidden_states,
@@ -659,6 +678,17 @@ class Qwen3OmniMoeAudioEncoder(Qwen3OmniMoePreTrainedModel):
         hidden_states = self.proj1(hidden_states)
         hidden_states = self.act(hidden_states)
         hidden_states = self.proj2(hidden_states)
+
+        if mpu.get_context_parallel_world_size() > 1 and mpu.get_context_parallel_world_size() < seq_len:
+            gather_sizes = cal_split_sizes(get_seq_len("audio"), mpu.get_context_parallel_world_size())
+            hidden_states = gather_forward_split_backward(
+                hidden_states,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes
+            )
+
         return BaseModelOutput(last_hidden_state=hidden_states)
 
     def padded_and_mask_function(self, tensor_list, tensor_len, padding_value=0, padding_side="right"):
@@ -724,9 +754,29 @@ class Qwen3OmniMoeVisionPatchMerger(nn.Module):
         )
 
     def forward(self, hidden: torch.Tensor) -> torch.Tensor:
-        hidden = self.ln_q(hidden.view(-1, self.hidden_size) if self.use_postshuffle_norm else hidden).view(
-            -1, self.hidden_size
-        )
+        if mpu.get_context_parallel_world_size() > 1:
+            if self.use_postshuffle_norm:
+                hidden = gather_visual_seqs_with_cp(hidden, dim=0)
+                hidden = hidden.view(-1, self.hidden_size)
+                # after down_sample hidden_state, should split it again
+                split_sizes = cal_split_sizes(hidden.shape[0], mpu.get_context_parallel_world_size())
+                # Split the merged tensor back for distributed processing
+                # Since no attention computation follows, we can use simple splitting
+                hidden = split_forward_gather_backward(hidden, mpu.get_context_parallel_group(), dim=0, grad_scale="down", split_sizes=split_sizes)
+                hidden = self.ln_q(hidden)
+            else:
+                hidden = self.ln_q(hidden)
+                hidden = gather_visual_seqs_with_cp(hidden, dim=0)
+                hidden = hidden.view(-1, self.hidden_size)
+                # after down_sample hidden_state, should split it again
+                split_sizes = cal_split_sizes(hidden.shape[0], mpu.get_context_parallel_world_size())
+                # Split the merged tensor back for distributed processing
+                # Since no attention computation follows, we can use simple splitting
+                hidden = split_forward_gather_backward(hidden, mpu.get_context_parallel_group(), dim=0, grad_scale="down", split_sizes=split_sizes)
+        else:
+            hidden = self.ln_q(hidden.view(-1, self.hidden_size) if self.use_postshuffle_norm else hidden).view(
+                -1, self.hidden_size
+            )
         for layer in self.mlp:
             hidden = layer(hidden)
         return hidden
@@ -886,12 +936,14 @@ class Qwen3OmniMoeVisionEncoder(Qwen3OmniMoePreTrainedModel):
 
     def fast_pos_embed_interpolate(self, grid_thw):
         grid_ts, grid_hs, grid_ws = grid_thw[:, 0], grid_thw[:, 1], grid_thw[:, 2]
-        device = grid_thw.device
 
         idx_list = [[] for _ in range(4)]
         weight_list = [[] for _ in range(4)]
 
         for _, h, w in zip(grid_ts, grid_hs, grid_ws):
+            # Create coordinate mappings from target resolution to source grid
+            # h_idxs: float indices in [0, num_grid_per_side-1] for each pixel row
+            # for example: N=16, h=24 → h_idxs = [0, 0.652, 1.304, ..., 15]
             h_idxs = torch.linspace(0, self.num_grid_per_side - 1, h)
             w_idxs = torch.linspace(0, self.num_grid_per_side - 1, w)
 
@@ -900,48 +952,74 @@ class Qwen3OmniMoeVisionEncoder(Qwen3OmniMoePreTrainedModel):
             h_idxs_ceil = (h_idxs.int() + 1).clip(max=self.num_grid_per_side - 1)
             w_idxs_ceil = (w_idxs.int() + 1).clip(max=self.num_grid_per_side - 1)
 
-            dh = h_idxs - h_idxs_floor
+            dh = h_idxs - h_idxs_floor # dh ∈ [0,1)
             dw = w_idxs - w_idxs_floor
 
             base_h = h_idxs_floor * self.num_grid_per_side
             base_h_ceil = h_idxs_ceil * self.num_grid_per_side
 
+            # ========== Compute 4 Corner Indices ==========
+            # For bilinear interpolation, we need 4 surrounding grid points
             indices = [
-                (base_h[None].T + w_idxs_floor[None]).flatten(),
-                (base_h[None].T + w_idxs_ceil[None]).flatten(),
-                (base_h_ceil[None].T + w_idxs_floor[None]).flatten(),
-                (base_h_ceil[None].T + w_idxs_ceil[None]).flatten(),
+                (base_h[None].T + w_idxs_floor[None]).flatten(),  # top-left
+                (base_h[None].T + w_idxs_ceil[None]).flatten(),  # top-right
+                (base_h_ceil[None].T + w_idxs_floor[None]).flatten(),  # bottom-left
+                (base_h_ceil[None].T + w_idxs_ceil[None]).flatten(),  # bottom-right
             ]
-
+            # Weights are based on inverse distance from each corner
             weights = [
-                ((1 - dh)[None].T * (1 - dw)[None]).flatten(),
+                ((1 - dh)[None].T * (1 - dw)[None]).flatten(),  # top-left weight
                 ((1 - dh)[None].T * dw[None]).flatten(),
                 (dh[None].T * (1 - dw)[None]).flatten(),
                 (dh[None].T * dw[None]).flatten(),
             ]
-
+            # Accumulate indices and weights for this image into global lists
             for i in range(4):
                 idx_list[i].extend(indices[i].tolist())
                 weight_list[i].extend(weights[i].tolist())
 
-        idx_tensor = torch.tensor(idx_list, dtype=torch.long, device=device)
-        weight_tensor = torch.tensor(weight_list, dtype=self.pos_embed.weight.dtype, device=device)
-        pos_embeds = self.pos_embed(idx_tensor).to(device) * weight_tensor[:, :, None]
+        idx_tensors = torch.tensor(idx_list, dtype=torch.long, device=self.pos_embed.weight.device)  # [4, hw1+hw2+hw3...]
+        weight_tensors = torch.tensor(
+            weight_list, dtype=self.pos_embed.weight.dtype, device=self.pos_embed.weight.device
+        )  # [4, hw1+hw2+hw3...]
+
+        # ========== Per-Sample Processing ==========
+        # Split combined tensors back into per-sample tensors
+        patch_idx_tensors = idx_tensors.split([h * w for h, w in zip(grid_hs, grid_ws)], dim=1)
+        patch_weight_tensors = weight_tensors.split([h * w for h, w in zip(grid_hs, grid_ws)], dim=1)
+
+        # Initialize lists for reordered tensors (after spatial merging)
+        patch_idx_tensors_permute = []
+        patch_weight_tensors_permute = []
+        merge_size = self.config.spatial_merge_size
+        for idx_tensor, weight_tensor, t, h, w in zip(patch_idx_tensors, patch_weight_tensors, grid_ts, grid_hs, grid_ws):
+            idx_tensor = idx_tensor.repeat(1, t)  # 4, thw
+            weight_tensor = weight_tensor.repeat(1, t)
+            idx_tensor = (
+                idx_tensor.view(4, t, h // merge_size, merge_size, w // merge_size, merge_size)
+                .permute(0, 1, 2, 4, 3, 5)
+                .flatten(1, 5)
+            )  # 4, thw
+            weight_tensor = (
+                weight_tensor.view(4, t, h // merge_size, merge_size, w // merge_size, merge_size)
+                .permute(0, 1, 2, 4, 3, 5)
+                .flatten(1, 5)
+            )  # 4, thw
+            patch_idx_tensors_permute.append(idx_tensor)
+            patch_weight_tensors_permute.append(weight_tensor)
+        patch_idx_tensors_permute = torch.cat(patch_idx_tensors_permute, dim=1)  # [4, s1+s2+s3...]
+        patch_weight_tensors_permute = torch.cat(patch_weight_tensors_permute, dim=1)
+        
+        # Split tensors across context parallel ranks for distributed processing
+        if mpu.get_context_parallel_world_size() > 1:
+            patch_idx_tensors_permute = split_visual_seqs_with_cp(patch_idx_tensors_permute, dim=1)
+            patch_weight_tensors_permute = split_visual_seqs_with_cp(patch_weight_tensors_permute, dim=1)
+        
+
+        # embedding
+        pos_embeds = self.pos_embed(patch_idx_tensors_permute) * patch_weight_tensors_permute[:, :, None]  # 4, total_visual_tokens//cp_size, hidden_size
         patch_pos_embeds = pos_embeds[0] + pos_embeds[1] + pos_embeds[2] + pos_embeds[3]
 
-        patch_pos_embeds = patch_pos_embeds.split([h * w for h, w in zip(grid_hs, grid_ws)])
-
-        patch_pos_embeds_permute = []
-        merge_size = self.config.spatial_merge_size
-        for pos_embed, t, h, w in zip(patch_pos_embeds, grid_ts, grid_hs, grid_ws):
-            pos_embed = pos_embed.repeat(t, 1)
-            pos_embed = (
-                pos_embed.view(t, h // merge_size, merge_size, w // merge_size, merge_size, -1)
-                .permute(0, 1, 3, 2, 4, 5)
-                .flatten(0, 4)
-            )
-            patch_pos_embeds_permute.append(pos_embed)
-        patch_pos_embeds = torch.cat(patch_pos_embeds_permute)
         return patch_pos_embeds
 
     def forward(self, hidden_states: torch.Tensor, grid_thw: torch.Tensor, **kwargs) -> torch.Tensor:
@@ -957,14 +1035,18 @@ class Qwen3OmniMoeVisionEncoder(Qwen3OmniMoePreTrainedModel):
         """
         hidden_states = self.patch_embed(hidden_states)
 
-        pos_embeds = self.fast_pos_embed_interpolate(grid_thw)
-        hidden_states = hidden_states + pos_embeds
-
         rotary_pos_emb = self.rot_pos_emb(grid_thw)
 
         seq_len, _ = hidden_states.size()
+        set_seq_len("visual", seq_len)
         hidden_states = hidden_states.reshape(seq_len, -1)
         rotary_pos_emb = rotary_pos_emb.reshape(seq_len, -1)
+
+        # Split sequences across context parallel groups for distributed processing
+        if mpu.get_context_parallel_world_size() > 1:
+            rotary_pos_emb = split_visual_seqs_with_cp(rotary_pos_emb, dim=0)
+            hidden_states = split_visual_seqs_with_cp(hidden_states, dim=0)
+
         emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
         position_embeddings = (emb.cos(), emb.sin())
 
@@ -978,6 +1060,8 @@ class Qwen3OmniMoeVisionEncoder(Qwen3OmniMoePreTrainedModel):
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
         cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
         cu_seqlens = tuple(cu_seqlens.cpu().numpy().tolist())
+
+        hidden_states = hidden_states + self.fast_pos_embed_interpolate(grid_thw)
 
         deepstack_feature_lists = []
         for layer_num, blk in enumerate(self.blocks):
@@ -994,6 +1078,18 @@ class Qwen3OmniMoeVisionEncoder(Qwen3OmniMoePreTrainedModel):
                 deepstack_feature_lists.append(deepstack_feature)
 
         hidden_states = self.merger(hidden_states)
+
+        # Gather outputs from all context parallel ranks for the final result
+        set_seq_len("visual", seq_len // self.spatial_merge_size ** 2)
+        if mpu.get_context_parallel_world_size() > 1:
+            gather_sizes = cal_split_sizes(get_seq_len("visual"), mpu.get_context_parallel_world_size())
+            hidden_states = gather_forward_split_backward(
+                hidden_states,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes
+            )
 
         return hidden_states, deepstack_feature_lists
 
@@ -1338,6 +1434,11 @@ class Qwen3OmniMoeThinkerTextModel(Qwen3OmniMoePreTrainedModel):
                 position_ids=text_position_ids,
             )
 
+        if mpu.get_context_parallel_world_size() > 1:
+            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
+            text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
+            inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
+
         hidden_states = inputs_embeds
 
         # create position embeddings to be shared across the decoder layers
@@ -1393,10 +1494,32 @@ class Qwen3OmniMoeThinkerTextModel(Qwen3OmniMoePreTrainedModel):
     def _deepstack_process(
         self, hidden_states: torch.Tensor, visual_pos_masks: torch.Tensor, visual_embeds: torch.Tensor
     ):
+        if mpu.get_context_parallel_world_size() > 1:
+            visual_seq_len = get_seq_len("visual")
+            visual_gather_sizes = cal_split_sizes(visual_seq_len, mpu.get_context_parallel_world_size())
+            visual_embeds = gather_forward_split_backward(
+                visual_embeds,
+                mpu.get_context_parallel_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=visual_gather_sizes
+            )
         visual_pos_masks = visual_pos_masks.to(hidden_states.device)
         visual_embeds = visual_embeds.to(hidden_states.device, hidden_states.dtype)
+        if mpu.get_context_parallel_world_size() > 1:
+            megatron_args = get_args()
+            if megatron_args.context_parallel_algo == "ulysses_cp_algo":
+                gather_sizes = cal_split_sizes(get_seq_len("total"), mpu.get_context_parallel_world_size())
+                hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), dim=1, grad_scale="up", gather_sizes=gather_sizes)
+            else:
+                raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {megatron_args.context_parallel_algo}")
+
         local_this = hidden_states[visual_pos_masks, :].clone() + visual_embeds
         hidden_states[visual_pos_masks, :] = local_this
+
+        # split again
+        if mpu.get_context_parallel_world_size() > 1:
+            hidden_states = split_forward_gather_backward_with_cp(hidden_states, dim=1)
 
         return hidden_states
 

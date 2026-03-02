@@ -23,34 +23,33 @@ from mindspeed_mm.models.common.communications import cal_split_sizes, cal_split
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
 _VISUAL_PER_SEQ_LEN = None
+_AUDIO_SEQ_LEN = None
 
 
-def get_seq_len(des: str = None) -> int:
-    if des == "total":
-        global _TOTAL_SEQ_LEN
-        return _TOTAL_SEQ_LEN
-    elif des == "visual":
-        global _VISUAL_SEQ_LEN
-        return _VISUAL_SEQ_LEN
-    elif des == "per_visual":
-        global _VISUAL_PER_SEQ_LEN
-        return _VISUAL_PER_SEQ_LEN
+def get_seq_len(des: str = None) -> Optional[Union[int, List[int]]]:
+    des_to_var = {
+        "total": _TOTAL_SEQ_LEN,
+        "visual": _VISUAL_SEQ_LEN,
+        "per_visual": _VISUAL_PER_SEQ_LEN,
+        "audio": _AUDIO_SEQ_LEN
+    }
+    return des_to_var[des]
 
 
 def set_seq_len(des: str = None, seq_len: Optional[Union[int, List[int]]] = None) -> None:
-    if des == "total":
-        global _TOTAL_SEQ_LEN
-        _TOTAL_SEQ_LEN = seq_len
-    elif des == "visual":
-        global _VISUAL_SEQ_LEN
-        _VISUAL_SEQ_LEN = seq_len
-    elif des == "per_visual":
-        global _VISUAL_PER_SEQ_LEN
-        _VISUAL_PER_SEQ_LEN = seq_len
+    des_to_var_name = {
+        "total": "_TOTAL_SEQ_LEN",
+        "visual": "_VISUAL_SEQ_LEN",
+        "per_visual": "_VISUAL_PER_SEQ_LEN",
+        "audio": "_AUDIO_SEQ_LEN"
+    }
+    global _TOTAL_SEQ_LEN, _VISUAL_SEQ_LEN, _VISUAL_PER_SEQ_LEN, _AUDIO_SEQ_LEN
+    var_name = des_to_var_name[des]
+    globals()[var_name] = seq_len
 
 
 def gather_seq_scatter_heads(
-    input: Tensor,
+    input_tensor: Tensor,
     seq_dim: int,
     head_dim: int,
     gather_size: int,
@@ -58,13 +57,13 @@ def gather_seq_scatter_heads(
 ) -> Tensor:
     group = mpu.get_context_parallel_group() if group is None else group
     if not group:
-        return input
+        return input_tensor
 
-    return all_to_all(input, group, scatter_dim=head_dim, gather_dim=seq_dim, gather_size=gather_size)
+    return all_to_all(input_tensor, group, scatter_dim=head_dim, gather_dim=seq_dim, gather_size=gather_size)
 
 
 def gather_heads_scatter_seq(
-    input: Tensor, 
+    input_tensor: Tensor, 
     head_dim: int, 
     seq_dim: int, 
     gather_size: int,
@@ -72,9 +71,9 @@ def gather_heads_scatter_seq(
 ) -> Tensor:
     group = mpu.get_context_parallel_group() if group is None else group
     if not group:
-        return input
+        return input_tensor
 
-    return all_to_all(input, group, scatter_dim=seq_dim, gather_dim=head_dim, gather_size=gather_size)
+    return all_to_all(input_tensor, group, scatter_dim=seq_dim, gather_dim=head_dim, gather_size=gather_size)
 
 
 def gather_seq_scatter_heads_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, seq_dim: int, head_dim: int, gather_size: int, group: ProcessGroup = None):
@@ -195,5 +194,34 @@ def split_visual_seqs_with_cp(
         )  # [s1+s2+s3+..., h]
     else:
         raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {args.context_parallel_algo}")
+    
+    return x
+
+
+def split_audio_seqs_with_cp(
+    x: torch.Tensor,
+    dim: int = 0
+):
+    """
+    Split audio sequences across context parallel (CP) ranks during the forward pass,
+    and gather full gradients during the backward pass.
+
+    This function only supports three CP strategies now:
+      - **Ulysses CP**: Splits the entire packed sequence uniformly (or near-uniformly) across all CP ranks.
+    Args:
+        x: Concatenated sequences: s1+s2+s3+...
+    """
+    args = get_args()
+    if args.context_parallel_algo == "ulysses_cp_algo":
+        seq_len = get_seq_len("audio")
+        split_gather_sizes = cal_split_sizes(seq_len, mpu.get_context_parallel_world_size())
+        x = split_forward_gather_backward(
+            x,
+            mpu.get_context_parallel_group(),
+            dim=dim,
+            split_sizes=split_gather_sizes
+        )# [s1+s2+s3+..., h]
+    else:
+        raise NotImplementedError(f"Only support `ulysses_cp_algo`, but got {args.context_parallel_algo}")
     
     return x

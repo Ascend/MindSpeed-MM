@@ -45,7 +45,7 @@ from mindspeed_mm.utils.utils import (
     gather_forward_split_backward_with_megatron_cp
 )
 
-from .utils import get_seq_len, set_seq_len, split_visual_seqs_with_cp
+from ..cp_utils import get_seq_len, set_seq_len, split_visual_seqs_with_cp
 from .output import (
     Qwen3VLCausalLMOutputWithPast, 
     Qwen3VLModelOutputWithPast

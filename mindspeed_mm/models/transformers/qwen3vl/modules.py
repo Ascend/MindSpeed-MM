@@ -34,7 +34,7 @@ from mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel
 from mindspeed.utils import get_actual_seq_len
 
 from mindspeed_mm.models.common.communications import cal_split_sizes, cal_split_sizes_multi, gather_forward_split_backward, split_forward_gather_backward
-from .utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq, gather_visual_seqs_with_cp, set_seq_len
+from ..cp_utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq, gather_visual_seqs_with_cp, set_seq_len
 from ..attention_utils import ALL_ATTENTION_FUNCTIONS, pad_out
 
 
@@ -160,16 +160,29 @@ def apply_rotary_pos_emb_vision(
     return q_embed, k_embed
 
 
-def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
+def repeat_kv(hidden_states: torch.Tensor, n_rep: int, layout: str) -> torch.Tensor:
     """
-    This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
-    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+    This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). Adapt to different attention layouts:
+    insert expansion dim after num_key_value_heads, merge to num_attention_heads, keep other dims unchanged.
     """
-    batch, num_key_value_heads, slen, head_dim = hidden_states.shape
     if n_rep == 1:
         return hidden_states
-    hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
-    return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
+    if layout == "BNSD":
+        batch, num_key_value_heads, slen, head_dim = hidden_states.shape
+        hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
+        return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
+    elif layout == "BSND":
+        batch, slen, num_key_value_heads, head_dim = hidden_states.shape
+        hidden_states = hidden_states[:, :, :, None, :].expand(batch, slen, num_key_value_heads, n_rep, head_dim)
+        return hidden_states.reshape(batch, slen, num_key_value_heads * n_rep, head_dim)
+    elif layout == "TND":
+        token, num_key_value_heads, head_dim = hidden_states.shape
+        hidden_states = hidden_states[:, :, None, :].expand(token, num_key_value_heads, n_rep, head_dim)
+        return hidden_states.reshape(token, num_key_value_heads * n_rep, head_dim)
+    else:
+        raise NotImplementedError(
+            f"Unsupported Attention layout: {layout}, "
+            "Qwen3OmniMoeThinkerTextAttention only support ['BNSD', 'BSND', 'TND'] now.")
 
 
 def do_vit_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask=None, dropout_p=0., pse=None, pse_type=None, shapes=None):
@@ -634,8 +647,8 @@ class Qwen3VLTextAttention(nn.Module):
 
             if megatron_args.context_parallel_algo == "ulysses_cp_algo":
                 if mpu.get_context_parallel_world_size() > self.config.num_key_value_heads:
-                    key_states = repeat_kv(key_states, self.num_key_value_groups)
-                    value_states = repeat_kv(value_states, self.num_key_value_groups)
+                    key_states = repeat_kv(key_states, self.num_key_value_groups, "BSND")
+                    value_states = repeat_kv(value_states, self.num_key_value_groups, "BSND")
                     attention_kwargs["enable_gqa"] = False
                 query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
                     query_states,
@@ -673,8 +686,8 @@ class Qwen3VLTextAttention(nn.Module):
                 return attn_output
             elif megatron_args.context_parallel_algo == "hybrid_cp_algo":
                 if get_context_parallel_for_hybrid_ulysses_world_size() > self.config.num_key_value_heads:
-                    key_states = repeat_kv(key_states, self.num_key_value_groups)
-                    value_states = repeat_kv(value_states, self.num_key_value_groups)
+                    key_states = repeat_kv(key_states, self.num_key_value_groups, "BSND")
+                    value_states = repeat_kv(value_states, self.num_key_value_groups, "BSND")
 
                 if self.config.attn_layout.upper() != "BNSD":
                     raise ValueError(f"TextAttention only support layout `BNSD` when using Hybrid Attention.")

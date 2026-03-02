@@ -17,7 +17,7 @@ from mindspeed_mm.models.transformers.qwen3omni.modules import (
     Qwen3OmniMoeVisionAttention,
     Qwen3OmniMoeThinkerTextAttention,
 )
-from mindspeed_mm.models.transformers.qwen3vl.utils import set_seq_len
+from mindspeed_mm.models.transformers.cp_utils import set_seq_len
 from tests.ut.utils import judge_expression
 
 

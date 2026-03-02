@@ -28,8 +28,10 @@ from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
 from transformers.processing_utils import Unpack
 from transformers.models.qwen3_omni_moe.configuration_qwen3_omni_moe import Qwen3OmniMoeVisionEncoderConfig
 
-from mindspeed_mm.models.transformers.qwen3vl.utils import get_seq_len
+from megatron.core import mpu
+from megatron.training import get_args
 from ..attention_utils import ALL_ATTENTION_FUNCTIONS, pad_out
+from ..cp_utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq
 
 
 class Qwen3OmniMoeAudioAttention(nn.Module):
@@ -68,7 +70,7 @@ class Qwen3OmniMoeAudioAttention(nn.Module):
         """Input shape: Batch x Time x Channel"""
 
         seq_length = hidden_states.size(0) # [seq_length, d_model=1280]
-
+        total_audio_seqlen = int(cu_seqlens[-1])
         query_states = self.q_proj(hidden_states).reshape(seq_length, self.num_heads, -1) # [s,n,]
         key_states = self.k_proj(hidden_states).reshape(seq_length, self.num_heads, -1)
         value_states = self.v_proj(hidden_states).reshape(seq_length, self.num_heads, -1)
@@ -79,6 +81,7 @@ class Qwen3OmniMoeAudioAttention(nn.Module):
             "is_causal": self.is_causal,
             "layout": self.config.attn_layout,
         }
+        seq_dim, head_dim = 0, 1
         if self.config._attn_implementation == "flash_attention_2" and self.config.attn_layout == "TND":
             attention_kwargs["actual_seq_qlen"] = cu_seqlens
             attention_kwargs["actual_seq_kvlen"] = cu_seqlens
@@ -90,6 +93,7 @@ class Qwen3OmniMoeAudioAttention(nn.Module):
             key_states = key_states.transpose(0, 1).unsqueeze(0)
             value_states = value_states.transpose(0, 1).unsqueeze(0)
             attention_kwargs["attention_mask"] = attention_mask
+            seq_dim, head_dim = 2, 1
         else:
             raise NotImplementedError(
                 f"Unsupported Attention: {self.config._attn_implementation}, or layout: {self.config.attn_layout}"
@@ -97,12 +101,36 @@ class Qwen3OmniMoeAudioAttention(nn.Module):
 
         attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
+        # Support context parallel only when CP size < seq_len; reasons are as follows:
+        # 1) Data is most likely fake when CP size ≥ seq_len; 2) Splitting provides no benefit for short real sequences
+        if mpu.get_context_parallel_world_size() > 1 and mpu.get_context_parallel_world_size() < total_audio_seqlen:
+            megatron_args = get_args()
+            if megatron_args.context_parallel_algo == "ulysses_cp_algo":
+                query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
+                    query_states,
+                    key_states,
+                    value_states,
+                    seq_dim=seq_dim,
+                    head_dim=head_dim,
+                    gather_size=total_audio_seqlen
+                )
+            else:
+                raise NotImplementedError(f"Only support `ulysses_cp_algo`, but got {megatron_args.context_parallel_algo}")
+
         attn_output = attention_interface(
             query_states,
             key_states,
             value_states,
             **attention_kwargs,
         )
+
+        if mpu.get_context_parallel_world_size() > 1 and mpu.get_context_parallel_world_size() < total_audio_seqlen:
+            attn_output = gather_heads_scatter_seq(
+                attn_output,
+                seq_dim=seq_dim,
+                head_dim=head_dim,
+                gather_size=self.num_heads
+            )
 
         if self.config.attn_layout == "BNSD":
             attn_output = attn_output.transpose(1, 2)
@@ -156,6 +184,7 @@ class Qwen3OmniMoeVisionAttention(nn.Module):
         **kwargs,
     ) -> torch.Tensor:
         seq_length = hidden_states.shape[0]
+        total_visual_seqlen = int(cu_seqlens[-1])
         query_states, key_states, value_states = (
             self.qkv(hidden_states).reshape(seq_length, 3, self.num_heads, -1).permute(1, 0, 2, 3).unbind(0)
         )
@@ -189,6 +218,20 @@ class Qwen3OmniMoeVisionAttention(nn.Module):
 
         attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
+        if mpu.get_context_parallel_world_size() > 1:
+            megatron_args = get_args()
+            if megatron_args.context_parallel_algo == "ulysses_cp_algo":
+                query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
+                    query_states,
+                    key_states,
+                    value_states,
+                    seq_dim=seq_dim,
+                    head_dim=head_dim,
+                    gather_size=total_visual_seqlen
+                )
+            else:
+                raise NotImplementedError(f"Only support `ulysses_cp_algo`, but got {megatron_args.context_parallel_algo}")
+
         if self.config.attn_layout == "TND":
             attn_output = attention_interface(
                 query_states,
@@ -214,6 +257,14 @@ class Qwen3OmniMoeVisionAttention(nn.Module):
                 for q, k, v in zip(*splits)
             ]
             attn_output = torch.cat(attn_outputs, dim=seq_dim)
+
+        if mpu.get_context_parallel_world_size() > 1:
+            attn_output = gather_heads_scatter_seq(
+                attn_output,
+                seq_dim=seq_dim,
+                head_dim=head_dim,
+                gather_size=self.num_heads
+            )
 
         if self.config.attn_layout == "BNSD":
             attn_output = attn_output.transpose(1, 2)
@@ -264,6 +315,31 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
     q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
     k_embed = torch_npu.npu_rotary_mul(k, cos, sin)
     return q_embed, k_embed
+
+
+def repeat_kv(hidden_states: torch.Tensor, n_rep: int, layout: str) -> torch.Tensor:
+    """
+    This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). Adapt to different attention layouts:
+    insert expansion dim after num_key_value_heads, merge to num_attention_heads, keep other dims unchanged.
+    """
+    if n_rep == 1:
+        return hidden_states
+    if layout == "BNSD":
+        batch, num_key_value_heads, slen, head_dim = hidden_states.shape
+        hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
+        return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
+    elif layout == "BSND":
+        batch, slen, num_key_value_heads, head_dim = hidden_states.shape
+        hidden_states = hidden_states[:, :, :, None, :].expand(batch, slen, num_key_value_heads, n_rep, head_dim)
+        return hidden_states.reshape(batch, slen, num_key_value_heads * n_rep, head_dim)
+    elif layout == "TND":
+        token, num_key_value_heads, head_dim = hidden_states.shape
+        hidden_states = hidden_states[:, :, None, :].expand(token, num_key_value_heads, n_rep, head_dim)
+        return hidden_states.reshape(token, num_key_value_heads * n_rep, head_dim)
+    else:
+        raise NotImplementedError(
+            f"Unsupported Attention layout: {layout}, "
+            "Qwen3OmniMoeThinkerTextAttention only support ['BNSD', 'BSND', 'TND'] now.")
 
 
 class Qwen3OmniMoeThinkerTextAttention(nn.Module):
@@ -330,6 +406,28 @@ class Qwen3OmniMoeThinkerTextAttention(nn.Module):
             "layout": self.config.attn_layout,
             "enable_gqa": True
         }
+
+        attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
+        total_seq_len = get_seq_len("total")
+        if mpu.get_context_parallel_world_size() > 1:
+            megatron_args = get_args()
+            seq_dim, head_dim = 1, 2
+            if megatron_args.context_parallel_algo == "ulysses_cp_algo":
+                if mpu.get_context_parallel_world_size() > self.config.num_key_value_heads:
+                    key_states = repeat_kv(key_states, self.num_key_value_groups, "BSND")
+                    value_states = repeat_kv(value_states, self.num_key_value_groups, "BSND")
+                    attention_kwargs["enable_gqa"] = False
+                query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
+                    query_states,
+                    key_states,
+                    value_states,
+                    seq_dim=seq_dim,
+                    head_dim=head_dim,
+                    gather_size=total_seq_len
+                )
+            else:
+                raise NotImplementedError(f"Only support `ulysses_cp_algo`, but got {megatron_args.context_parallel_algo}")
+
         if self.config.attn_layout == "BNSD":
             query_states = query_states.transpose(1, 2)  # BNSD
             key_states = key_states.transpose(1, 2)
@@ -350,9 +448,6 @@ class Qwen3OmniMoeThinkerTextAttention(nn.Module):
                 f"Unsupported Attention layout: {self.config.attn_layout}, "
                 "Qwen3OmniMoeThinkerTextAttention only support ['BNSD', 'BSND', 'TND'] now.")
 
-        attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
-        total_seq_len = get_seq_len("total")
-
         attn_output = attention_interface(
             query_states,
             key_states,
@@ -366,6 +461,14 @@ class Qwen3OmniMoeThinkerTextAttention(nn.Module):
             # pad output, and reshape to BSND
             attn_output = pad_out(attn_output, indices, batch_size, total_seq_len)
             attn_output = attn_output.view(batch_size, total_seq_len, *attn_output.shape[1:])
+
+        if mpu.get_context_parallel_world_size() > 1:
+            attn_output = gather_heads_scatter_seq(
+                attn_output,
+                seq_dim=seq_dim,
+                head_dim=head_dim,
+                gather_size=self.config.num_attention_heads
+            )
 
         attn_output = attn_output.reshape(batch_size, seqlen, -1).contiguous()  # reshape to BSH
         attn_output = self.o_proj(attn_output)
