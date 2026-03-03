@@ -1,27 +1,11 @@
-## Motivation
+## What this PR does / why we need it?
 
-Please describe the motivation of this PR and the goal you want to achieve through this PR.
+Please describe the background and detailed changes of the PR. If it is a bugfix, please attach the related issue.
 
-## Modification
+## Does this PR introduce any user-facing change?
 
-Please briefly describe what modification is made in this PR.
+Please describe whether the PR will result in any user-facing usage changes. If there is related documentation, please specify its path.
 
-## Self-test (Optional)
+## How was this patch tested?
 
-If modifications to this PR may cause/fix function/accuracy/performance DTSs/issues, a self-inspection record needs to be attached.
-
-## BC-breaking (Optional)
-
-If there are compatibility issues, such as dependencies on cann/torch_npu versions, they need to be explained in the PR.
-
-## Checklist
-
-**Before PR**:
-
-- [ ] The new code needs to comply with the Clean Code specification.
-- [ ] The PR content is self-checked, and the expression can be clear and the writing standardized
-
-**After PR**:
-
-- [ ] CLA has been signed and all committers have signed the CLA in this PR.
-- [ ] The ci-pipeline is passed, Code Check	is passed.
+Please explain how to verify the correctness and effectiveness of this feature, as well as its usage constraints and limitations.
