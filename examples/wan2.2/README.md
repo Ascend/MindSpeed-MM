@@ -18,9 +18,13 @@
       - [准备工作](#准备工作)
       - [参数配置](#参数配置)
       - [启动训练](#启动训练)
+    - [LoRA微调](#LoRA微调)
+      - [准备工作](#准备工作-1)
+      - [参数配置](#参数配置-1)
+      - [启动微调](#启动微调)
   - [推理](#推理)
-    - [准备工作](#准备工作-1)
-    - [参数配置](#参数配置-1)
+    - [准备工作](#准备工作-2)
+    - [参数配置](#参数配置-2)
     - [启动推理](#启动推理)
   - [环境变量声明](#环境变量声明)
 
@@ -282,6 +286,90 @@ bash examples/wan2.2/{model_size}/{task}/pretrain.sh
 bash examples/wan2.2/{model_size}/{task}/pretrain_{type}.sh
 ```
 
+### LoRA微调
+
+当前已支持fsdp2场景下 Wan2.2 A14B t2v模型的lora微调，请按以下步骤进行准备：
+
+#### 准备工作
+
+数据处理、权重下载及转换同预训练章节。
+
+#### LoRA权重转换（可选）
+
+若需加载从Diffsynth保存的lora预训练权重，需要先对lora权重完成以下权重转换
+```bash
+mm-convert WanConverter lora_hf_to_mm \
+ --cfg.source_path ./weights/Wan-AI/Wan2.2-T2V-A14B-lora \
+ --cfg.target_path ./weights/Wan-AI/Wan2.2-T2V-A14B-lora-mm
+```
+
+再将权重转换为DCP格式，转换命令如下：
+
+```shell
+mm-convert WanConverter mm_to_dcp \
+ --cfg.source_path ./weights/Wan-AI/Wan2.2-T2V-A14B-lora-mm \
+ --cfg.target_path ./weights/Wan-AI/Wan2.2-T2V-A14B-lora-dcp
+```
+
+权重转换脚本的参数说明如下：
+
+| 参数              | 含义                     |
+| :---------------- | :----------------------- |
+| --cfg.source_path | 原始权重路径             |
+| --cfg.target_path | 转换或切分后权重保存路径 |
+
+#### 参数配置
+
+参数配置同训练章节，除此之外，涉及lora微调特有参数：
+
+| 配置文件                                             |        修改字段         | 修改说明                         |
+|--------------------------------------------------|:-------------------:|:-----------------------------|
+| examples/wan2.2/A14B/t2v/finetune_lora_{low/high}.sh |       lora-r        | lora更新矩阵的维度                  |
+| examples/wan2.2/A14B/t2v/finetune_lora_{low/high}.sh |     lora-alpha      | lora-alpha 调节分解后的矩阵对原矩阵的影响程度 |
+| examples/wan2.2/A14B/t2v/finetune_lora_{low/high}.sh | lora-target-modules | 应用lora的模块列表                  |
+
+#### LoRA权重加载（可选）
+
+若需加载从Diffsynth保存的lora预训练权重，需在启动脚本`examples/wan2.2/A14B/t2v/finetune_lora_{low/high}.sh`中添加转换后的LoRA预训练权重路径并修改`GPT_ARGS`，相关配置修改如下：
+
+```shell
+LOAD_PATH="./weights/Wan-AI/Wan2.2-T2V-A14B-Diffusers/transformer/"
+LORA_PATH="./weights/Wan-AI/Wan2.2-T2V-A14B-lora-dcp"
+
+# 原始的 --load $LOAD_PATH \ 需替换为 --load-base-model $LOAD_PATH \
+GPT_ARGS="
+...
+  --load-base-model $LOAD_PATH \
+  --load $LORA_PATH \
+...
+"
+```
+
+#### 启动微调
+
+```bash
+bash examples/wan2.2/A14B/t2v/finetune_lora_{low/high}.sh
+```
+
+微调完成后，需首先对保存的lora权重进行[权重后处理](#jump1)，再使用权重转换工具，将训练好的lora权重与原始权重进行合并
+
+```bash
+mm-convert WanConverter merge_lora_to_base \
+ --cfg.source_path <./converted_weights/Wan-AI/Wan2.2-T2V-14B-Diffusers/transformer*/> \
+ --cfg.target_path <./converted_weights/Wan-AI/Wan2.2-T2V-14B-Diffusers/transformer_merge/> \
+ --cfg.lora_path <lora_save_path> \
+ --lora_alpha 32 \
+ --lora_rank 32
+```
+权重合并脚本的参数说明如下：
+
+| 参数              | 含义                     |
+| :---------------- | :----------------------- |
+| --cfg.source_path | 原始权重路径             |
+| --cfg.target_path | 合并后后权重保存路径 |
+| --cfg.lora_path | lora权重保存路径 |
+| --lora_alpha | 调节分解后的矩阵对原矩阵的影响程度 |
+| --lora_rank | lora更新矩阵的维度 |
 
 ## 推理
 

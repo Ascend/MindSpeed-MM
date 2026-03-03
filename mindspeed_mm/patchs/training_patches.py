@@ -24,6 +24,8 @@ except ImportError:
     HAVE_FSDP2 = False
 
 from mindspeed_mm.utils.utils import ensure_valid
+from mindspeed_mm.tasks.finetune.lora.utils import is_enable_lora
+from mindspeed_mm.tasks.finetune.lora.lora_patch import model_provider_func_wrapper
 
 
 def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encoder_or_decoder, wrap_with_ddp=True):
@@ -34,6 +36,9 @@ def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encode
     """
     args = get_args()
     args.model_type = model_type
+
+    if is_enable_lora():
+        model_provider_func = model_provider_func_wrapper(model_provider_func)
 
     # Build model.
     def build_model():
