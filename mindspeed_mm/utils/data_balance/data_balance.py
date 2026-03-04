@@ -244,8 +244,10 @@ class GBSImageDataBalance(BaseDataBalance):
                         f"Please verify the actual purpose of this data and apply appropriate adjustments."
                     )
                 self.state_buffer[data_type]["non_balanced_data"][data_name] = value
-        for data_name in self.state_buffer[data_type]["non_balanced_data"]:
-            batch.pop(data_name)
+
+        if 'non_balanced_data' in self.state_buffer[data_type]:
+            for data_name in self.state_buffer[data_type]["non_balanced_data"]:
+                batch.pop(data_name)
 
         split_batch, split_lengths = self._split_batch_data(batch)
         balanced_datas = self._data_balance(
