@@ -1,19 +1,43 @@
+# Licensed under the TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5/blob/main/LICENSE
+#
+# Unless and only to the extent required by applicable law, the Tencent Hunyuan works and any
+# output and results therefrom are provided "AS IS" without any express or implied warranties of
+# any kind including any warranties of title, merchantability, noninfringement, course of dealing,
+# usage of trade, or fitness for a particular purpose. You are solely responsible for determining the
+# appropriateness of using, reproducing, modifying, performing, displaying or distributing any of
+# the Tencent Hunyuan works or outputs and assume any and all risks associated with your or a
+# third party's use or distribution of any of the Tencent Hunyuan works or outputs and your exercise
+# of rights and permissions under this agreement.
+# See the License for the specific language governing permissions and limitations under the License.
+
 from dataclasses import dataclass
 from typing import Optional, Tuple
-import numpy as np
 import torch
 import torch.nn as nn
-from transformers import SiglipImageProcessor, SiglipVisionModel, ModelOutput
-
+from transformers import SiglipImageProcessor, SiglipVisionModel
+from transformers.utils import ModelOutput
+import numpy as np
 
 VISION_ENCODER_PATH = {}
+PRECISION_TO_TYPE = {
+    'fp32': torch.float32,
+    'fp16': torch.float16,
+    'bf16': torch.bfloat16,
+}
+
+
+def use_default(value, default):
+    return value if value is not None else default
 
 
 def load_vision_encoder(
         vision_encoder_type,
-        vision_encoder_dtype=None,
+        vision_encoder_precision=None,
         vision_encoder_path=None,
-        logger=None,
         device=None,
 ):
     if vision_encoder_path is None:
@@ -28,8 +52,8 @@ def load_vision_encoder(
         raise ValueError(f"Unsupported vision encoder type: {vision_encoder_type}")
 
     # from_pretrained will ensure that the model is in eval mode.
-    if vision_encoder_dtype is not None:
-        vision_encoder = vision_encoder.to(dtype=vision_encoder_dtype)
+    if vision_encoder_precision is not None:
+        vision_encoder = vision_encoder.to(dtype=PRECISION_TO_TYPE[vision_encoder_precision])
 
     vision_encoder.requires_grad_(False)
 
@@ -42,7 +66,6 @@ def load_vision_encoder(
 def load_image_processor(
         processor_type,
         processor_path=None,
-        logger=None
 ):
     if processor_path is None:
         processor_path = VISION_ENCODER_PATH[processor_type]
@@ -89,7 +112,6 @@ class VisionEncoder(nn.Module):
             processor_type: Optional[str] = None,
             processor_path: Optional[str] = None,
             output_key: Optional[str] = None,
-            logger=None,
             device=None,
     ):
         super().__init__()
@@ -102,7 +124,6 @@ class VisionEncoder(nn.Module):
         self.processor_path = (
             processor_path if processor_path is not None else vision_encoder_path
         )
-        self.logger = logger
 
         if "siglip" in vision_encoder_type:
             self.output_key = output_key or "last_hidden_state"
@@ -113,7 +134,6 @@ class VisionEncoder(nn.Module):
             vision_encoder_type=self.vision_encoder_type,
             vision_encoder_precision=self.precision,
             vision_encoder_path=self.model_path,
-            logger=self.logger,
             device=device,
         )
         self.dtype = self.model.dtype
@@ -122,7 +142,6 @@ class VisionEncoder(nn.Module):
         self.processor, self.processor_path = load_image_processor(
             processor_type=self.processor_type,
             processor_path=self.processor_path,
-            logger=self.logger,
         )
 
     def __repr__(self):
@@ -150,13 +169,11 @@ class VisionEncoder(nn.Module):
         first_image = first_image.transpose(0, 2, 3, 1)
 
         if not isinstance(first_image, np.ndarray):
-            raise TypeError(f"Expected first_image to be a numpy.ndarray, but got {type(first_image).__name__}")
-
+            raise ValueError("first_image type is invalid")
         if first_image.ndim != 4 or first_image.shape[3] != 3:
-            raise ValueError(f"Expected image array of shape (B, H, W, 3), got {first_image.shape}")
-
+            raise ValueError("first_image ndim or shape is invalid")
         if first_image.dtype != np.uint8:
-            raise TypeError(f"Expected dtype uint8, got {first_image.dtype}")
+            raise ValueError("first_image dtype is invalid")
 
         return first_image
 
@@ -217,3 +234,45 @@ class VisionEncoder(nn.Module):
             VisionEncoderModelOutput with encoded features
         """
         return self.encode_images(images)
+
+
+class HunyuanVideo15I2VProcessor:
+    """
+    The I2V Processor of HunyuanVideo1.5:
+
+    """
+
+    def __init__(self, config):
+        self.vision_encoder_path = config.get("processor_path", None)
+        self.vision_encoder = VisionEncoder(
+            vision_encoder_type="siglip",
+            vision_encoder_precision="fp16",
+            vision_encoder_path=self.vision_encoder_path,
+            processor_type=None,
+            processor_path=None,
+            output_key=None,
+            device="npu",
+        )
+
+    def encode_images(self, images):
+        """Encode images to vision states (for i2v)"""
+        if self.vision_encoder is None:
+            return None
+        if images.max() > 1.0 or images.min() < -1.0:
+            raise ValueError(f"Images must be in the range [-1, 1], but got {images.min()} {images.max()}")
+        images = (images + 1) / 2 # [-1, 1] -> [0, 1]
+        images_np = (images.cpu().float().permute(0, 2, 3, 1).numpy() * 255).clip(0, 255).astype("uint8")
+        vision_states = self.vision_encoder.encode_images(images_np)
+        return vision_states.last_hidden_state.to(device="npu", dtype=torch.bfloat16)
+
+    def __call__(self, vae_model, videos, video_latents, images=None, **kwargs):
+        b, c, f, h, w = video_latents.shape
+        cond = torch.zeros([b, c + 1, f, h, w], device=video_latents.device, dtype=video_latents.dtype)
+
+        cond[:, :-1, :1] = video_latents[:, :, :1]
+        cond[:, -1, 0] = 1
+
+        # vision encode
+        first_frame = videos[:, :, 0, :, :]
+        vision_states = self.encode_images(first_frame)
+        return {"cond_latents": cond, "vision_states": vision_states}

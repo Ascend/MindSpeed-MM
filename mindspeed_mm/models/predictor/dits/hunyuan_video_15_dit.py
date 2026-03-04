@@ -379,6 +379,14 @@ class HunyuanVideo15DiT(MultiModalModule):
 
             b, c, f, h, w = noised_latents.shape
             cond_latents = torch.zeros([b, c + 1, f, h, w], device=noised_latents.device, dtype=noised_latents.dtype)
+            if self.task_type == "t2v":
+                cond_latents = cond_latents
+            elif self.task_type == "i2v":
+                cond_latents = kwargs.get("cond_latents", None)
+                if cond_latents is None:
+                    raise ValueError(f"cond_latents cannot be None")
+            else:
+                raise ValueError(f"Do not support task type:{self.task_type}")
 
             hidden_states = torch.cat([noised_latents, cond_latents], dim=1)
             vision_states = kwargs.get("vision_states", None)
