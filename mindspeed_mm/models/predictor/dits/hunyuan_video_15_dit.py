@@ -14,23 +14,23 @@
 # of rights and permissions under this agreement.
 # See the License for the specific language governing permissions and limitations under the License.
 import os
-from typing import Any, List, Tuple, Optional, Union, Dict
+from typing import List, Tuple, Optional, Union, Dict
+
 import torch
 import torch.nn as nn
 from einops import rearrange
 
 from mindspeed_mm.models.common.module import MultiModalModule
-from mindspeed_mm.models.text_encoder.hunyuan15_byt5 import ByT5Mapper
-from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import maybe_fallback_attn_mode
-from mindspeed_mm.models.predictor.dits.hunyuanvideo15.embed_layers import TimestepEmbedder, PatchEmbed, \
-    TextProjection, VisionProjection, MLP, LinearWarpforSingle, MLPEmbedder, FinalLayer, ModulateDiT, modulate, \
-    apply_gate, apply_rotary_emb, get_nd_rotary_pos_embed
 from mindspeed_mm.models.predictor.dits.hunyuanvideo15.attention import parallel_attention, get_activation_layer, \
     get_norm_layer
-from mindspeed_mm.models.predictor.dits.hunyuanvideo15.token_refiner import SingleTokenRefiner
 from mindspeed_mm.models.predictor.dits.hunyuanvideo15.communications import all_gather
-from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import get_parallel_state
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.embed_layers import TimestepEmbedder, PatchEmbed, TextProjection, \
+    VisionProjection, MLP, LinearWarpforSingle, MLPEmbedder, FinalLayer, ModulateDiT, modulate, \
+    apply_gate, apply_rotary_emb, get_nd_rotary_pos_embed
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.token_refiner import SingleTokenRefiner
 from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import get_parallel_state, sync_tensor_for_sp
+from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import maybe_fallback_attn_mode
+from mindspeed_mm.models.text_encoder.hunyuan15_byt5 import ByT5Mapper
 
 
 class HunyuanVideo15DiT(MultiModalModule):
@@ -89,7 +89,7 @@ class HunyuanVideo15DiT(MultiModalModule):
         self.rope_dim_list = rope_dim_list
         self.rope_theta = rope_theta
         # Text projection. Default to linear projection.
-        # Alternative: TokenRefiner. See more details (LI-DiT): http://arxiv.org/abs/2406.11831
+        # Alternative: TokenRefiner.
         self.use_attention_mask = use_attention_mask
         self.text_projection = text_projection
         self.attn_mode = attn_mode
@@ -377,25 +377,27 @@ class HunyuanVideo15DiT(MultiModalModule):
         with torch.autocast(device_type="npu", dtype=torch.bfloat16):
             parallel_dims = get_parallel_state()
 
-            b, c, f, h, w = noised_latents.shape
-            cond_latents = torch.zeros([b, c + 1, f, h, w], device=noised_latents.device, dtype=noised_latents.dtype)
-            if self.task_type == "t2v":
-                cond_latents = cond_latents
-            elif self.task_type == "i2v":
-                cond_latents = kwargs.get("cond_latents", None)
-                if cond_latents is None:
-                    raise ValueError(f"cond_latents cannot be None")
+            if self.training:
+                b, c, f, h, w = noised_latents.shape
+                cond_latents = torch.zeros([b, c + 1, f, h, w], device=noised_latents.device, dtype=noised_latents.dtype)
+                if self.task_type == "t2v":
+                    cond_latents = cond_latents
+                elif self.task_type == "i2v":
+                    cond_latents = kwargs.get("cond_latents", None)
+                    if cond_latents is None:
+                        raise ValueError(f"cond_latents cannot be None")
+                else:
+                    raise ValueError(f"Do not support task type:{self.task_type}")
+                hidden_states = torch.cat([noised_latents, cond_latents], dim=1)
             else:
-                raise ValueError(f"Do not support task type:{self.task_type}")
+                hidden_states = noised_latents
 
-            hidden_states = torch.cat([noised_latents, cond_latents], dim=1)
             vision_states = kwargs.get("vision_states", None)
 
             if guidance is None:
                 guidance = torch.tensor(
                     [6016.0], device=hidden_states.device, dtype=torch.bfloat16
                 )
-
             img = x = hidden_states.to(self.dtype)
             if parallel_dims.sp_enabled:
                 prompt_mask = sync_tensor_for_sp(prompt_mask, parallel_dims.sp_group)
@@ -815,7 +817,8 @@ class MMDoubleStreamBlock(nn.Module):
             if not (
                     img_qq.shape == img_q.shape and img_kk.shape == img_k.shape
             ):
-                raise AssertionError(f"img_kk: {img_qq.shape}, img_q: {img_q.shape}, img_kk: {img_kk.shape}, img_k: {img_k.shape}")
+                raise AssertionError(
+                    f"img_kk: {img_qq.shape}, img_q: {img_q.shape}, img_kk: {img_kk.shape}, img_k: {img_k.shape}")
             img_q, img_k = img_qq, img_kk
 
         txt_modulated = self.txt_norm1(txt)
@@ -949,7 +952,8 @@ class MMSingleStreamBlock(nn.Module):
         if not (
                 img_qq.shape == img_q.shape and img_kk.shape == img_k.shape
         ):
-            raise AssertionError(f"img_kk: {img_qq.shape}, img_q: {img_q.shape}, img_kk: {img_kk.shape}, img_k: {img_k.shape}")
+            raise AssertionError(
+                f"img_kk: {img_qq.shape}, img_q: {img_q.shape}, img_kk: {img_kk.shape}, img_k: {img_k.shape}")
         img_q, img_k = img_qq, img_kk
 
         if is_flash:
