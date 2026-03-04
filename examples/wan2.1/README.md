@@ -151,7 +151,7 @@ pip install decord==0.6.0
 ```shell
 mm-convert WanConverter hf_to_mm \
  --cfg.source_path <./weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/> \
- --cfg.target_path <./weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
+ --cfg.target_path <./weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/> \
  --cfg.target_parallel_config.pp_layers <pp_layers>
 ```
 
@@ -170,7 +170,7 @@ mm-convert WanConverter hf_to_mm \
 ```shell
 mm-convert WanConverter mm_to_hf \
  --cfg.source_path <path for your saved weight/> \
- --cfg.target_path <./converted_weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
+ --cfg.target_path <./converted_weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/> \
  --cfg.hf_dir <weights/Wan-AI/Wan2.1-{T2V/I2V/FLF2v}-{1.3/14}B-Diffusers/transformer/>
 ```
 
