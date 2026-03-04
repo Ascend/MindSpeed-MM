@@ -1058,12 +1058,12 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td> 语音生成 </td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/fsdp2_dev/examples/fsdp2/cosyvoice3">CosyVoice3</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/fsdp2/cosyvoice3">CosyVoice3</a></td>
       <td><a href="https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512">0.5B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
       <td> BF16 </td>
-      <td> 315.46 (SPS) </td>
+      <td> 290.91 (SPS) </td>
       <td> 326.11 (SPS) </td>
       <td> 24 </td>
       <td>【Test】</td>

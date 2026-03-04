@@ -44,7 +44,7 @@ commit_id=1822c5c
 
 ### 2. 环境搭建
 ```bash
-git clone --branch fsdp2_dev https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 
 # 安装mindspeed及依赖
 git clone https://gitcode.com/Ascend/MindSpeed.git

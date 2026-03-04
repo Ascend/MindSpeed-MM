@@ -54,6 +54,7 @@ if __name__ == "__main__":
     parser.add_argument("--dir", type=str)
     parser.add_argument("--onnx_path", type=str)
     parser.add_argument("--num_thread", type=int, default=8)
+    parser.add_argument("--intra_op_num_thread", type=int, default=64)
     args = parser.parse_args()
 
     utt2wav = {}
@@ -64,7 +65,7 @@ if __name__ == "__main__":
 
     option = onnxruntime.SessionOptions()
     option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-    option.intra_op_num_threads = 1
+    option.intra_op_num_threads = args.intra_op_num_thread
     providers = ["CPUExecutionProvider"]
     ort_session = onnxruntime.InferenceSession(args.onnx_path, sess_options=option, providers=providers)
     executor = ThreadPoolExecutor(max_workers=args.num_thread)
