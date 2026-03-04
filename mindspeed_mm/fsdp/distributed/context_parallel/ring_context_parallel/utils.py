@@ -33,13 +33,7 @@ def get_selection_indices_for_tnd_softmax_update(t, n, sub_seq_len):
 def flatten_softmax(x, sub_seq_len):
     orig_shape = x.shape 
     section_len = [s * orig_shape[1] for s in sub_seq_len]
-    try:
-        splits = x.view(-1, orig_shape[-1]).split(section_len, dim=0)
-    except Exception as e:
-        if torch.distributed.get_rank() == 0:
-            breakpoint()
-        torch.distributed.barrier()
-        print(1)
+    splits = x.view(-1, orig_shape[-1]).split(section_len, dim=0)
     merged = [item.view(orig_shape[1], -1, orig_shape[-1]).transpose(0, 1) for item in splits]
     merged = torch.cat(merged, dim=0)
     return merged
