@@ -75,7 +75,7 @@
         "head_dim": 128,
         "mlp_width_ratio": 4,
         "mlp_act_type": "gelu_tanh",
-        "mm_double_blocks_depth": 20,
+        "mm_double_blocks_depth": 54,
         "mm_single_blocks_depth": 0,
         "rope_dim_list": [16, 56, 56],
         "qkv_bias": true,
@@ -89,7 +89,7 @@
         "text_states_dim_2": null,
         "text_pool_type": null,
         "rope_theta": 256,
-        "attn_mode": "flash3",
+        "attn_mode": "flash2",
         "attn_param": {
             "win_size": [[3, 3, 3]],
             "win_type": "fixed",

@@ -71,7 +71,7 @@
         "head_dim": 128,
         "mlp_width_ratio": 4,
         "mlp_act_type": "gelu_tanh",
-        "mm_double_blocks_depth": 20,
+        "mm_double_blocks_depth": 54,
         "mm_single_blocks_depth": 0,
         "rope_dim_list": [16, 56, 56],
         "qkv_bias": true,
