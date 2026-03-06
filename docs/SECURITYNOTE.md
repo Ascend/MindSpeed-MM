@@ -83,25 +83,25 @@
 
 MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。19个入口脚本分别为:
 
-- [evaluate_gen](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/evaluate_gen.py)
-- [evaluate_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/evaluate_vlm.py)
-- [inference_qihoo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/inference_qihoo.py)
-- [inference_sora](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/inference_sora.py)
-- [inference_videoalign](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/inference_videoalign.py)
-- [inference_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/inference_vlm.py)
-- [posttrain_flux_dancegrpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_flux_dancegrpo.py)
-- [posttrain_qwen2vl_dpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_qwen2vl_dpo.py)
-- [posttrain_sora_dpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_sora_dpo.py)
-- [pretrain_ae](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_ae.py)
-- [pretrain_deepseekvl](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_deepseekvl.py)
-- [pretrain_internvl](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_internvl.py)
-- [pretrain_lumina](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_lumina.py)
-- [pretrain_qwen2vl](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_qwen2vl.py)
-- [pretrain_sora](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_sora.py)
-- [pretrain_transformers](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_transformers.py)
-- [pretrain_videoalign](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_videoalign.py)
-- [pretrain_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_vlm.py)
-- [pretrain_whisper](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_whisper.py)
+- [evaluate_gen](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/evaluate_gen.py)
+- [evaluate_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/evaluate_vlm.py)
+- [inference_qihoo](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/inference_qihoo.py)
+- [inference_sora](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/inference_sora.py)
+- [inference_videoalign](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/inference_videoalign.py)
+- [inference_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/inference_vlm.py)
+- [posttrain_flux_dancegrpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/posttrain_flux_dancegrpo.py)
+- [posttrain_qwen2vl_dpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/posttrain_qwen2vl_dpo.py)
+- [posttrain_sora_dpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/posttrain_sora_dpo.py)
+- [pretrain_ae](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_ae.py)
+- [pretrain_deepseekvl](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_deepseekvl.py)
+- [pretrain_internvl](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_internvl.py)
+- [pretrain_lumina](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_lumina.py)
+- [pretrain_qwen2vl](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_qwen2vl.py)
+- [pretrain_sora](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_sora.py)
+- [pretrain_transformers](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_transformers.py)
+- [pretrain_videoalign](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_videoalign.py)
+- [pretrain_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_vlm.py)
+- [pretrain_whisper](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/pretrain_whisper.py)
 
 ## 通信安全加固
 
@@ -120,4 +120,4 @@ MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功�
 
 ### 公网地址声明
 
-代码涉及公网地址参考 [public_address_statement.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/public_address_statement.md)
+代码涉及公网地址参考 [public_address_statement.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/public_address_statement.md)

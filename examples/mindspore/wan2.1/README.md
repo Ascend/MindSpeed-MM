@@ -238,11 +238,11 @@ mm-convert WanConverter mm_to_hf \
 
   - 默认使能方式为Ulysses序列并行。
 
-  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_ring_attention.md)
+  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/dit_ring_attention.md)
 
-  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/dit_usp.md)
+  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/dit_usp.md)
 
-  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/fpdt.md)
+  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/fpdt.md)
 
 - layer_zero
 

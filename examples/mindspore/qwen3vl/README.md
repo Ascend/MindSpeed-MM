@@ -86,7 +86,7 @@ mkdir logs
 <a id="jump2.2"></a>
 #### 2. 权重转换(hf2mm)
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)了解该工具的具体使用。**注意当前在MindSpore后端下，转换出的权重无法用于Torch后端的训练**。
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/权重转换工具.md)了解该工具的具体使用。**注意当前在MindSpore后端下，转换出的权重无法用于Torch后端的训练**。
 
 > 注：基于mindspore后端执行权重转换时,`mm-convert`执行的脚本为[convert_cli.py](../checkpoint/convert_cli.py)
 
@@ -314,7 +314,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 #### 3. 启动微调
 
 以Qwen3VL-xxB为例，启动微调训练任务。  
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/vlm_model_loss_calculate_type.md)
 
 ```shell
 bash examples/mindspore/qwen3vl/finetune_qwen3vl_xxB.sh

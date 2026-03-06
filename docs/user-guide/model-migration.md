@@ -193,7 +193,7 @@ pip install -e .
 
 #### 2. 权重转换(hf2mm)
 
-MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed-MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/权重转换工具.md)
 ```bash
 # 7b
 mm-convert  Qwen2VLConverter hf_to_mm \

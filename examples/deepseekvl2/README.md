@@ -26,7 +26,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/user-guide/installation.md)
 
 <a id="jump1.1"></a>
 
@@ -92,7 +92,7 @@ pip install -e .
 
 MindSpeed-MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed-MM权重的转换以及TP（Tensor Parallel）和EP（Expert Parallel）的权重切分。
 
-`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/权重转换工具.md)
+`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/权重转换工具.md)
 
 **注意**
 

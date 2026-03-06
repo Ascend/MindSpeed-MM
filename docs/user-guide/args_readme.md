@@ -38,9 +38,9 @@
 
 --variable-seq-lengths: store_true,启用可变序列长度。
 
---calculate-per-sample-loss：按样本粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+--calculate-per-sample-loss：按样本粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/vlm_model_loss_calculate_type.md)
 
---calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+--calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/vlm_model_loss_calculate_type.md)
 
 --ckpt-format torch_dcp: 保存时使用dcp格式。(详细介绍)[https://gitcode.com/Ascend/MindSpeed/blob/master/docs/features/torch_dcp.md]
 

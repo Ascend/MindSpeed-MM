@@ -44,7 +44,7 @@ commit_id=c0dbe09
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/user-guide/installation.md)，完成昇腾软件安装。
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
@@ -293,14 +293,14 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 #### 3. 启动微调
 
 以Qwen3VL-xxB为例，启动微调训练任务。  
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/vlm_model_loss_calculate_type.md)
 
 ```shell
 bash examples/qwen3vl/finetune_qwen3vl_xxB.sh
 ```
 **优化特性：**
 
-- ChunkLoss：可以参考文档[ChunkLoss](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/chunkloss.md)开启该特性优化长序列时的显存占用。
+- ChunkLoss：可以参考文档[ChunkLoss](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/docs/features/chunkloss.md)开启该特性优化长序列时的显存占用。
 
 ---
 
