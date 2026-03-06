@@ -54,13 +54,9 @@ cd MindSpeed-MM
 ```
 
 ### 2. 环境搭建
-对于X86架构机器，执行如下指令：
+执行如下指令：
 ```bash
-bash scripts/install.sh --arch x86 --msid d76dbddd4517d48a2fc1cd494de8b9a6cfdbfbab && pip install -r examples/hunyuanvideo_1.5/requirements.txt
-```
-对于ARM架构机器，执行如下指令：
-```bash
-bash scripts/install.sh --arch arm --msid d76dbddd4517d48a2fc1cd494de8b9a6cfdbfbab && pip install -r examples/hunyuanvideo_1.5/requirements.txt
+bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/hunyuanvideo_1.5/requirements.txt
 ```
 
 ### 3. Decord搭建
