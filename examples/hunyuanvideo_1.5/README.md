@@ -16,13 +16,17 @@
       - [准备工作](#准备工作)
       - [参数配置](#参数配置)
       - [启动训练](#启动训练)
+  - [推理](#推理)
+    - [准备工作](#准备工作-1)
+    - [参数配置](#参数配置-1)
+    - [启动推理](#启动推理)
   - [环境变量声明](#环境变量声明)
 
 ## 版本说明
 
 #### 参考实现
 
-【T2V 任务】
+【T2V 任务 & I2V 任务】
 
 ```
 url=https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5
@@ -37,8 +41,9 @@ commit_id=bf576ef1d5ddc643cf814b1dff4f4dcc9a7581c7
 ```
 
 #### 变更记录
+2026.03.06: 首次支持HunyuanVideo1.5 T2V推理、I2V训练&推理任务
 
-2026.02.12: 首次支持HunyuanVideo1.5模型
+2026.02.12: 首次发布HunyuanVideo1.5 T2V训练任务
 
 ## 环境安装
 
@@ -107,7 +112,7 @@ hf download black-forest-labs/FLUX.1-Redux-dev --local-dir ./ckpts/vision_encode
 
 4. 最终文件结构如下：
 ```bash
-HunyuanVideo1.5
+MindSpeed-MM/HunyuanVideo1.5
 ├── text_encoder
 │   ├── Glyph-SDXL-v2
 │   │   ├── assets
@@ -117,7 +122,8 @@ HunyuanVideo1.5
 │   │   └── checkpoints
 │   │       ├── byt5_model.pt
 │   │       └── ...
-│   └─  ...
+│   ├── llm
+│   └── byt5-small
 └─  scheduler
 └─  transformer
 │   ├── 720p_t2v
@@ -138,7 +144,7 @@ HunyuanVideo1.5
 将数据处理成如下格式
 
 ```bash
-</dataset>
+</your_dataset_dir>
   ├──data.json
   ├──videos
   │  ├──video0001.mp4
@@ -173,8 +179,10 @@ HunyuanVideo1.5
 ]
 ```
 
-在模型权重文件中新建`HunyuanVideo1.5/dataset/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
-
+修改文件`MindSpeed-MM/examples/hunyuanvideo_1.5/data.txt`，其中每一行表示一个数据集，包含两个参数。第一个参数表示数据文件夹的路径，即上述文件夹 </your_dataset_dir> 的绝对路径地址，第二个参数表示`data.json`文件的路径，用`,`分隔，示例如下：
+```
+/your_dataset_dir,/your_dataset_dir/data.json
+```
 ### 训练
 
 #### 准备工作
@@ -185,15 +193,19 @@ HunyuanVideo1.5
 
 检查数据集路径、模型权重路径、并行参数配置等是否完成
 
-| 配置文件                                                         |      修改字段       | 修改说明                                           |
-|--------------------------------------------------------------| :---: |:-----------------------------------------------|
-| examples/hunyuanvideo_1.5/{task}/data.json                   |  from_pretrained  | 修改为下载的tokenizer的权重所对应的路径                       |
-| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  |  from_pretrained  | 修改为下载的权重所对应路径（包括vae,  text_encoder）            |
-| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  |  byT5_ckpt_path  | 修改为下载的byt5_model.pt所对应路径                       |
-| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh |    NPUS_PER_NODE  | 每个节点的卡数                                        |
-| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |       NNODES      | 节点数量                                           |
-| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |      LOAD_PATH    | 预训练DiT权重路径,下面一级目录包含config文件                    |
-| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |      SAVE_PATH    | 训练过程中保存的权重路径                                   |
+| 配置文件                                                         |      修改字段       | 修改说明                                                        |
+|--------------------------------------------------------------| :---: |:------------------------------------------------------------|
+| examples/hunyuanvideo_1.5/{task}/data.json                   |  from_pretrained  | 修改为下载的Tokenizers: llm,byt5-small的权重所对应的路径                   |
+| examples/hunyuanvideo_1.5/{task}/data.json                   |  color_ann_path  | 修改为下载的Glyph-SDXL-v2模型中color_idx.json文件所对应的路径                |
+| examples/hunyuanvideo_1.5/{task}/data.json                   |  font_ann_path  | 修改为下载的Glyph-SDXL-v2模型中multilingual_10-lang_idx.json文件所对应的路径 |
+| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  |  from_pretrained  | 修改为下载的权重所对应路径（包括vae,  text_encoder）                         |
+| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  |  byT5_ckpt_path  | 修改为下载的byt5_model.pt所对应路径                                    |
+| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh |    NPUS_PER_NODE  | 每个节点的卡数                                                     |
+| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |       NNODES      | 节点数量                                                        |
+| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |      LOAD_PATH    | 预训练DiT权重路径,下面一级目录包含config文件                                 |
+| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |      SAVE_PATH    | 训练过程中保存的权重路径                                                |
+
+上述配置文件中{task} = i2v or t2v，请根据训练任务自主选择。
 
 **注**： 当前LOAD_PATH路径无效时，MindSpeed会对模型随机初始化从头训练。为防止加载失败，请留意日志中的warning信息，或者自行确认路径合法。
 
@@ -209,8 +221,48 @@ HunyuanVideo1.5
 【T2V 任务】
 
 ```bash
-bash examples/hunyuanvideo_1.5/{task}/pretrain_*.sh
+bash examples/hunyuanvideo_1.5/t2v/pretrain_*.sh
 ```
+【I2V 任务】
+
+```bash
+bash examples/hunyuanvideo_1.5/i2v/pretrain_*.sh
+```
+## 推理
+
+### 准备工作
+
+在开始之前，请确认环境准备、模型权重下载已完成
+
+### 参数配置
+
+检查模型权重路径、并行参数等配置是否完成
+
+| 配置文件                                                       |      修改字段       | 修改说明                                                        |
+|------------------------------------------------------------|:---------------:|:------------------------------------------------------------|
+| examples/hunyuanvideo_1.5/{task}/inference_model.json      | from_pretrained | 修改为下载的权重所对应路径，包括VAE、Tokenizer、Text Encoder、DiT、Siglip（I2V）  |
+| examples/hunyuanvideo_1.5/{task}/inference_model.json      | color_ann_path  | 修改为下载的Glyph-SDXL-v2模型中color_idx.json文件所对应的路径                |
+| examples/hunyuanvideo_1.5/{task}/inference_model.json      |  font_ann_path  | 修改为下载的Glyph-SDXL-v2模型中multilingual_10-lang_idx.json文件所对应的路径 |
+| examples/hunyuanvideo_1.5/{task}/inference_model.json      | byT5_ckpt_path  | 修改为下载的byt5_model.pt所对应路径                                    |
+| examples/hunyuanvideo_1.5/{task}/inference_model.json      |   input_size    | 生成视频的分辨率，格式为 [t, h, w], 分别是视频帧数、高、宽，常用分辨率为480p、720p (9:16)  |
+| examples/hunyuanvideo_1.5/{task}/inference_model.json      |    save_path    | 生成视频的保存路径                                                   |
+| examples/hunyuanvideo_1.5/{task}/samples_prompts.txt       |      文件内容       | 可自定义自己的prompt，一行为一个prompt                                   |
+| examples/hunyuanvideo_1.5/i2v/samples_images.txt           |       图片        | 可自定义自己的image，一行为一个图片地址                                      |
+| examples/hunyuanvideo_1.5/{task}/inference_hunyuanvideo.sh |    MM_MODEL    | 用来控制生成参数的配置文件路径                                             |
+
+上述配置文件中{task} = i2v or t2v，请根据训练任务自主选择。
+### 启动推理
+
+【T2V 任务】
+```shell
+bash examples/hunyuanvideo_1.5/t2v/inference_*.sh
+```
+
+【I2V 任务】
+```shell
+bash examples/hunyuanvideo_1.5/i2v/inference_*.sh
+```
+
 
 ## 环境变量声明
 

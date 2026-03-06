@@ -132,8 +132,8 @@
     "pipeline_config": {
         "input_size": [
             121,
-            848,
-            480
+            480,
+            848
         ],
         "guidance_scale": 6.0,
         "guidance_rescale": 0.0,
@@ -155,8 +155,8 @@
         "enable_offloading": true
     },
     "save_path": "./hunyuanvideo_i2v_samples/",
-    "prompt": "examples/hunyuanvideo_1.5/i2v/samples_i2v_prompts.txt",
-    "image": "examples/hunyuanvideo_1.5/i2v/samples_i2v_images.txt",
+    "prompt": "examples/hunyuanvideo_1.5/i2v/samples_prompts.txt",
+    "image": "examples/hunyuanvideo_1.5/i2v/samples_images.txt",
     "dtype": "bf16",
     "device": "npu",
     "pipeline_class": "HunyuanVideo15Pipeline",

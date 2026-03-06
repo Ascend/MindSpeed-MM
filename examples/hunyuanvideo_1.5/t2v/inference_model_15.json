@@ -132,8 +132,8 @@
     "pipeline_config": {
         "input_size": [
             121,
-            848,
-            480
+            480,
+            848
         ],
         "guidance_scale": 6.0,
         "guidance_rescale": 0.0,

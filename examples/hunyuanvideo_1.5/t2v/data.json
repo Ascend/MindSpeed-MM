@@ -2,7 +2,7 @@
     "dataset_param": {
         "dataset_type": "t2v",
         "basic_parameters": {
-            "data_path": "./HunyuanVideo1.5/dataset/data.txt",
+            "data_path": "./examples/hunyuanvideo_1.5/data.txt",
             "data_storage_mode": "combine"
         },
         "preprocess_parameters": {
