@@ -113,7 +113,7 @@ training:
   optimizer: adamw
   adam_fused: true
   save_interval: 10000
-  load: ./ckpt/hf_path/Qwen35-xxB
+  load: ./ckpt/hf_path/Qwen35-xxB-dcp
   save: ./save_path
   use_deter_comp: false
   plugin:
