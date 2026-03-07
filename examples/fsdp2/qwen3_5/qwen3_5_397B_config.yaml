@@ -26,7 +26,6 @@ parallel:
   ep_plan:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
-  moe_impl_type: qwen3_5
 
 ### 数据相关配置
 data:

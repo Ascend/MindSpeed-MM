@@ -20,13 +20,13 @@ parallel:
   recompute_plan:
       apply_modules:
         - model.language_model.layers.{*}
+        - model.visual.blocks.{*}
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
   ep_plan:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
-  moe_impl_type: qwen3_5
 
 ### 数据相关配置
 data:

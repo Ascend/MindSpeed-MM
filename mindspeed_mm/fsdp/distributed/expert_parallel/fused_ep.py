@@ -89,11 +89,13 @@ def fused_ep_forward(
         ep_group,
     )
 
-    intermediate_hidden_states = npu_group_gemm(hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert)
-    intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
-    hidden_states = npu_group_gemm(
-        intermediate_activations, fc2_weight, num_global_sum_tokens_per_local_expert
-    )
+    # If no tokens are assigned to the expert in the current EP shard, no computation is performed
+    if hidden_states.shape[0] > 0:
+        intermediate_hidden_states = npu_group_gemm(hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert)
+        intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
+        hidden_states = npu_group_gemm(
+            intermediate_activations, fc2_weight, num_global_sum_tokens_per_local_expert
+        )
 
     hidden_states = alltoall_combine(
         hidden_states,
@@ -161,6 +163,10 @@ def alltoall_dispatch(
     hidden_states, unpermute_indices = torch_npu.npu_moe_token_permute(hidden_states, selected_experts.to(torch.int32))
     hidden_states = all_to_all(hidden_states, ep_group, scatter_sizes=input_splits, gather_sizes=output_splits)
 
+    # No tokens have been assigned to the expert in the current EP shard
+    if hidden_states.shape[0] == 0:
+        return hidden_states, unpermute_indices, None
+
     ep_size = 1 if ep_group is None else dist.get_world_size(ep_group)
     num_local_experts = num_global_experts // ep_size
     if num_global_experts % ep_size != 0:
@@ -186,13 +192,15 @@ def alltoall_combine(
     num_global_tokens_per_local_expert: torch.Tensor,
     ep_group: Optional[dist.ProcessGroup] = None,
 ):
-    ep_size = 1 if ep_group is None else dist.get_world_size(ep_group)
-    if num_global_experts % ep_size != 0:
-        raise ValueError(
-            f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
-    )
+    # If no tokens are assigned to the expert in the current EP shard, no computation is performed
+    if hidden_states.shape[0] > 0:
+        ep_size = 1 if ep_group is None else dist.get_world_size(ep_group)
+        if num_global_experts % ep_size != 0:
+            raise ValueError(
+                f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
+        )
 
-    hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states, post_dispatch_unpermute_indices)
+        hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states, post_dispatch_unpermute_indices)
 
     hidden_states = all_to_all(hidden_states, ep_group, scatter_sizes=output_splits, gather_sizes=input_splits)
     hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states.to(routing_weights.dtype), unpermute_indices,
