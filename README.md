@@ -1194,7 +1194,7 @@ MindSpeed MM已发布版本维护策略：
 
 ## License声明
 
-Ascend MindSpeed MM提供的模型，如模型目录下存在License的，以该License为准。如模型目录下不存在License的，以Apache 2.0许可证许可，对应许可证文本可查阅Ascend MindSpeed MM根目录。
+Ascend MindSpeed MM提供的模型，如模型目录下存在License的，以该License为准。如模型目录下不存在License的，以Apache 2.0许可证许可，对应许可证文本可查阅Ascend MindSpeed MM根目录[LICENSE](./LICENSE)文件，`docs`目录下的文档适用CC-BY 4.0许可证，具体参见文档[LICENSE](./docs/LICENSE)。
 
 
 # 贡献声明
