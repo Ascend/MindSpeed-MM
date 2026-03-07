@@ -1,6 +1,11 @@
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export NON_MEGATRON=true
 export MULTI_STREAM_MEMORY_REUSE=2
+export TASK_QUEUE_ENABLE=2
+export ASCEND_LAUNCH_BLOCKING=0
+export ACLNN_CACHE_LIMIT=100000
+export CPU_AFFINITY_CONF=1
+export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
 NPUS_PER_NODE=16
 MASTER_ADDR=localhost

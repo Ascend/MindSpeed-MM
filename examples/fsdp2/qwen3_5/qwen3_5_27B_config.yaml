@@ -35,7 +35,7 @@ data:
 
     # 数据预处理
     preprocess_parameters:
-      model_name_or_path: &HF_MODEL_LOAD_PATH ./ckpt/hf_path/Qwen35-xxB
+      model_name_or_path: &HF_MODEL_LOAD_PATH ./ckpt/hf_path/Qwen35-xxB # 替换为原始hf权重
       use_fast_tokenizer: true
       split_special_tokens: false
       image_max_pixels: 262144
@@ -82,7 +82,7 @@ model:
   loss_cfg:
     loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
     router_aux_loss_coef: 0.0
-  enable_chunk_loss: false
+  enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
     chunk_size: 1024
@@ -103,7 +103,7 @@ training:
   optimizer: adamw
   adam_fused: true
   save_interval: 10000
-  load: ./ckpt/hf_path/Qwen35-xxB-dcp
+  load: ./ckpt/hf_path/Qwen35-xxB-dcp  # 替换为转换后的dcp权重
   save: ./save_path
   use_deter_comp: false
   plugin:

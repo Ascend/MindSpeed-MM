@@ -52,8 +52,9 @@ from transformers.utils.import_utils import is_causal_conv1d_available, is_flash
 from transformers.utils.output_capturing import OutputRecorder
 from transformers.models.qwen3_5_moe.configuration_qwen3_5_moe import Qwen3_5MoeConfig, Qwen3_5MoeTextConfig, Qwen3_5MoeVisionConfig
 
+from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.register import model_register
-from mindspeed_mm.fsdp.utils.utils import is_npu_available
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
 if is_causal_conv1d_available():
     from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
@@ -271,14 +272,21 @@ class Qwen3_5MoeRMSNormGated(nn.Module):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.variance_epsilon = eps
+        if IS_NPU_AVAILABLE:
+            print_rank(logger.info, "Qwen3_5MoeRMSNormGated use NPU fused ops")
 
     def forward(self, hidden_states, gate=None):
         input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        # Norm before gate
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        hidden_states = self.weight * hidden_states.to(input_dtype)
+        if IS_NPU_AVAILABLE:
+            import torch_npu
+            hidden_states = torch_npu.npu_rms_norm(hidden_states.float(), self.weight.float(), self.variance_epsilon)[0]
+        else:
+            hidden_states = hidden_states.to(torch.float32)
+            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            # Norm before gate
+            hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+            hidden_states = self.weight * hidden_states.to(input_dtype)
+
         hidden_states = hidden_states * F.silu(gate.to(torch.float32))
 
         return hidden_states.to(input_dtype)
@@ -500,8 +508,9 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
         self.use_triton_gdn = config.use_triton_gdn
 
-        if self.use_triton_gdn and is_npu_available():
+        if self.use_triton_gdn and IS_NPU_AVAILABLE:
             from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_delta_rule
+            print_rank(logger.info, "Qwen3_5MoeGatedDeltaNet use NPU fused ops")
             self.chunk_gated_delta_rule = chunk_gated_delta_rule
         else:
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
@@ -827,10 +836,12 @@ class Qwen3_5MoeExperts(nn.Module):
         self.num_experts = config.num_experts
         self.hidden_dim = config.hidden_size
         self.intermediate_dim = config.moe_intermediate_size
-        self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts, 2 * self.intermediate_dim, self.hidden_dim))
-        self.down_proj = nn.Parameter(torch.empty(self.num_experts, self.hidden_dim, self.intermediate_dim))
+        self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts, self.hidden_dim, 2 * self.intermediate_dim))
+        self.down_proj = nn.Parameter(torch.empty(self.num_experts, self.intermediate_dim, self.hidden_dim))
         self.act_fn = ACT2FN[config.hidden_act]
         self.use_grouped_expert_matmul = config.use_grouped_expert_matmul
+        if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE:
+            print_rank(logger.info, "Qwen3_5MoeExperts use NPU fused ops")
 
     def forward(
         self,
@@ -838,22 +849,23 @@ class Qwen3_5MoeExperts(nn.Module):
         top_k_index: torch.Tensor,
         top_k_weights: torch.Tensor,
     ) -> torch.Tensor:
-        if self.use_grouped_expert_matmul and is_npu_available():
+        if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE:
             import torch_npu
             from mindspeed_mm.models.common.gmm import npu_group_gemm
             selected_experts = top_k_index
             routing_weights = top_k_weights
-            gate_up_proj = self.gate_up_proj.permute(0, 2, 1).contiguous()
-            down_proj = self.down_proj.permute(0, 2, 1).contiguous()
             permuted_hidden_states, row_ids_map = torch_npu.npu_moe_token_permute(hidden_states,
                                                                                   selected_experts.to(torch.int32))
             tokens_per_expert = torch.histc(selected_experts, bins=self.num_experts, min=0, max=self.num_experts)
-            intermediate_hidden_states = npu_group_gemm(permuted_hidden_states, gate_up_proj, tokens_per_expert)
+            intermediate_hidden_states = npu_group_gemm(permuted_hidden_states, self.gate_up_proj, tokens_per_expert)
             intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
-            output = npu_group_gemm(intermediate_activations, down_proj, tokens_per_expert)
+            output = npu_group_gemm(intermediate_activations, self.down_proj, tokens_per_expert)
             final_hidden_states = torch_npu.npu_moe_token_unpermute(output.to(routing_weights.dtype), row_ids_map, probs=routing_weights)
             return final_hidden_states
         else:
+            # eager implementation of MoE block
+            gate_up_proj = self.gate_up_proj.permute(0, 2, 1).contiguous()
+            down_proj = self.down_proj.permute(0, 2, 1).contiguous()
             final_hidden_states = torch.zeros_like(hidden_states)
             with torch.no_grad():
                 expert_mask = torch.nn.functional.one_hot(top_k_index, num_classes=self.num_experts)
@@ -866,9 +878,9 @@ class Qwen3_5MoeExperts(nn.Module):
                     continue
                 top_k_pos, token_idx = torch.where(expert_mask[expert_idx])
                 current_state = hidden_states[token_idx]
-                gate, up = nn.functional.linear(current_state, self.gate_up_proj[expert_idx]).chunk(2, dim=-1)
+                gate, up = nn.functional.linear(current_state, gate_up_proj[expert_idx]).chunk(2, dim=-1)
                 current_hidden_states = self.act_fn(gate) * up
-                current_hidden_states = nn.functional.linear(current_hidden_states, self.down_proj[expert_idx])
+                current_hidden_states = nn.functional.linear(current_hidden_states, down_proj[expert_idx])
                 current_hidden_states = current_hidden_states * top_k_weights[token_idx, top_k_pos, None]
                 final_hidden_states.index_add_(0, token_idx, current_hidden_states.to(final_hidden_states.dtype))
 
@@ -881,8 +893,8 @@ class Qwen3_5MoeExperts(nn.Module):
         top_k_weights: torch.Tensor,
         ep_group: ProcessGroup
     ) -> torch.Tensor:
-        gate_up_proj = self.gate_up_proj.to_local().permute(0, 2, 1).contiguous() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj.permute(0, 2, 1).contiguous()
-        down_proj = self.down_proj.to_local().permute(0, 2, 1).contiguous() if isinstance(self.down_proj, DTensor) else self.down_proj.permute(0, 2, 1).contiguous()
+        gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
+        down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
 
         from mindspeed_mm.fsdp.distributed.expert_parallel.fused_ep import fused_ep_forward
         hidden_states = fused_ep_forward(
@@ -943,14 +955,20 @@ class Qwen3_5MoeRMSNorm(nn.Module):
         super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.zeros(dim))
+        if IS_NPU_AVAILABLE:
+            print_rank(logger.info, "Qwen3_5MoeRMSNorm use NPU fused ops")
 
     def _norm(self, x):
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
     def forward(self, x):
-        output = self._norm(x.float())
-        # Llama does x.to(float16) * w whilst Qwen3_5Moe is (x * w).to(float16)
-        output = output * (1.0 + self.weight.float())
+        if IS_NPU_AVAILABLE:
+            import torch_npu
+            output = torch_npu.npu_rms_norm(x.float(), 1.0 + self.weight.float(), self.eps)[0]
+        else:
+            output = self._norm(x.float())
+            # Llama does x.to(float16) * w whilst Qwen3_5Moe is (x * w).to(float16)
+            output = output * (1.0 + self.weight.float())
         return output.type_as(x)
 
     def extra_repr(self):

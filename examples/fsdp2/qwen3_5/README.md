@@ -84,9 +84,9 @@ bash scripts/install.sh --msid eb10b92 --install-cann && bash examples/fsdp2/qwe
 
 如果使用fsdp2的meta init初始化模型，需要先完成以下权重转换
 ```bash
-mm-convert GenericDCPConverter hf_to_dcp \
+mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
---dcp_dir ckpt/mm_path/xxxxxxx \
+--dcp_dir ckpt/dcp_path/xxxxxxx
 
 # 转换后的目录结构为：
 # ———— xxxxxxx
@@ -94,6 +94,22 @@ mm-convert GenericDCPConverter hf_to_dcp \
 #   |—— latest_checkpointed_iteration.txt
 ```
 并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
+
+
+MindSpeed MM保存权重的格式也为dcp格式。可使用如下命令将dcp权重转换回HF权重
+```bash
+# 待转换的dcp权重目录结构样例为：
+# ———— xxxxxxx
+#   |—— release
+#   |—— latest_checkpointed_iteration.txt
+
+mm-convert Qwen35Converter dcp_to_hf \
+--save_hf_dir ckpt/save_hf_path/Qwen3.5-xxB-hf-save \
+--dcp_dir ckpt/dcp_path/xxxxxxx/release \
+--origin_hf_dir ckpt/hf_path/Qwen3.5-xxB
+
+
+```
 
 ---
 <a id="jump3"></a>
