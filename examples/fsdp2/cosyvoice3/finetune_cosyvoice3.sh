@@ -27,4 +27,7 @@ torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/tasks/cosyvoice3/train.py \
     2>&1 | tee ${logfile}.log
 
 STEP_TIME=`grep "elapsed time per iteration" ${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
+GBS=`grep "global batch size" ${logfile}.log | awk -F 'global batch size:' '{print$2}' | awk -F '|' '{print$1}' | head -n 1 | awk '{print $1}'`
+SAMPLES_PER_SECOND=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
 echo "Elapsed Time Per iteration (ms): $STEP_TIME" | tee -a ${logfile}.log
+echo "Average Samples per Second: $SAMPLES_PER_SECOND" | tee -a ${logfile}.log
