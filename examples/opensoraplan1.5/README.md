@@ -90,7 +90,7 @@ Text Encoder：[t5](https://huggingface.co/google/t5-v1_1-xl) 和 [CLIP](https:/
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.5 vae_convert \
- --cfg.source_path <"./raw_ckpt/open-sora-plan/vae/checkpoint.ckpt">
+ --cfg.source_path <"./raw_ckpt/open-sora-plan/vae/checkpoint.ckpt"> \
  --cfg.target_path <"./ckpt/vae/vae.pt">
 ```
 
@@ -98,8 +98,8 @@ mm-convert OpenSoraPlanConverter --version v1.5 vae_convert \
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.5 source_to_mm \
- --cfg.source_path <"./raw_ckpt/open-sora-plan/model_ema.pt/">
- --cfg.target_path <"./ckpt/open-sora-plan/">
+ --cfg.source_path <"./raw_ckpt/open-sora-plan/model_ema.pt/"> \
+ --cfg.target_path <"./ckpt/open-sora-plan/"> \
  --cfg.target_parallel_config.tp_size <tp_size>
 ```
 
@@ -221,7 +221,7 @@ bash examples/opensoraplan1.5/inference.sh
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.5 resplit \
- --cfg.source_path <"./ckpt/open-sora-plan">
+ --cfg.source_path <"./ckpt/open-sora-plan"> \
  --cfg.target_path <"./ckpt/open-sora-plan_merge/">
 ```
 

@@ -327,7 +327,7 @@ bash examples/hunyuanvideo/feature_extract/feature_extraction.sh
     ```bash
     source /usr/local/Ascend/cann/set_env.sh
     mm-converte HunyuanVideoConverter --version t2v --layerzero_to_mm \
-    	--cfg.source_path <./save_ckpt/hunyuanvideo/>
+    	--cfg.source_path <./save_ckpt/hunyuanvideo/> \
     	--cfg.target_path <./save_ckpt/hunyuanvideo_megatron_ckpt/>
     ```
 
@@ -395,9 +395,9 @@ bash examples/hunyuanvideo/i2v/pretrain_hunyuanvideo_lora.sh
 
 ```bash
 mm-convert HunyuanVideoConverter --version i2v merge_lora_to_base \
-	--cfg.source_path <'converted_transformer'>
-	--cfg.target_path <'merged_weight_dir'>
-	--cfg.lora_path <'converterd_lora_dir'>
+	--cfg.source_path <'converted_transformer'> \
+	--cfg.target_path <'merged_weight_dir'> \
+	--cfg.lora_path <'converterd_lora_dir'> \
 	--lora-alpha 64 \
 	--lora-rank 64
 ```
