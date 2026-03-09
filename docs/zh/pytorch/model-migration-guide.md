@@ -184,7 +184,7 @@ class CustomModel(MultiModalModule, FSDP2Mixin, WeightInitMixin)：
 **步骤1：创建适配类**
 
 ```python
-# mindspeed_mm/models/hf_src/internvl3_5.py
+# mindspeed_mm/models/transformers/internvl3.5.py
 from internvl.modeling_internvl_chat import InternVLChatModel
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 
