@@ -213,7 +213,7 @@ class Qwen3VLMoeTextDecoderLayer(nn.Module):
         **kwargs: Unpack[TransformersKwargs],
     ) -> torch.Tensor:
         if self.config.synchronize_per_layer:
-            torch.npu.synchronize()
+            torch.npu.current_stream().synchronize()
 
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
