@@ -1,4 +1,4 @@
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/cann/set_env.sh
 export NON_MEGATRON=true
 export MULTI_STREAM_MEMORY_REUSE=2
 export TASK_QUEUE_ENABLE=2
