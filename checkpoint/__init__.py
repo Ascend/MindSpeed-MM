@@ -6,6 +6,7 @@ from checkpoint.vlm_model.converters.qwen2_5vl import Qwen2_5_VLConverter
 from checkpoint.vlm_model.converters.qwen2vl import Qwen2VLConverter
 from checkpoint.vlm_model.converters.qwen3vl import Qwen3VLConverter
 from checkpoint.vlm_model.converters.qwen3vl_megatron import Qwen3VLMegatronConverter
+from checkpoint.vlm_model.converters.qwen3_5 import Qwen35Converter
 from checkpoint.vlm_model.converters.videoalign import VideoAlignConverter
 from checkpoint.vlm_model.converters.glm import GlmConverter
 from checkpoint.vlm_model.converters.deepseekvl2 import DeepSeekVLConverter
