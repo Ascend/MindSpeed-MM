@@ -21,6 +21,7 @@
   - [配置参数](#jump4.2)
   - [启动微调](#jump4.3)
   - [启动推理](#jump4.4)
+- [PMCC](#jump5)
 - [环境变量声明](#jump10)
 - [注意事项](#jump11)
 
@@ -408,7 +409,48 @@ NODES: 一共几个节点
 
 ---
 
+<a id="jump5"></a>
+## PMCC（Privacy and Model Confidential Computing）
 
+PMCC是昇腾提供的一种隐私计算解决方案，用于保护模型训练过程中的模型权重和数据隐私。在微调Qwen3VL-32B模型时，若需要开启PMCC功能，首先需要在昇腾AI软件栈中安装PMCC组件。
+
+```python
+pip install ai_asset_obfuscate
+pip install opencv-python
+pip install pandas==2.3.3
+```
+
+启动pmcc权重加密和数据预处理加密处理，命令如下：
+
+```bash
+# 加密hf模型权重
+python mindspeed_mm/tools/pmcc/pmcc_qwen3vl.py \
+    --obf-type model \
+    --hf-model-path "/data/ckpt/Qwen3-VL-32B-Instruct/" \
+    --obf-seed "22222222222222222222222222222222" \
+    --model-save-path "/data/pmcc/obf_hf_ckpt/" \
+    --device-id 0 1 2 3 4 5 6 7
+
+# 加密数据集
+python mindspeed_mm/tools/pmcc/pmcc_qwen3vl.py \
+    --obf-type data \
+    --hf-model-path "/data/ckpt/Qwen3-VL-32B-Instruct/" \
+    --obf-seed "22222222222222222222222222222222" \
+    --src-json-path "/data/dataset/llava_instruct_150k.json" \
+    --src-img-dir "/data/dataset/COCO2017/train2017" \
+    --obf-json-path "/data/pmcc/obf_json_2000.json" \
+    --obf-img-dir "/data/pmcc/obf_images" \
+    --data-limit 2000
+
+# 转换加密后的hf模型权重为dcp格式
+mm-convert Qwen3VLConverter hf_to_dcp \
+    --hf_dir /data/pmcc/obf_hf_ckpt \
+    --dcp_dir /data/pmcc/obf_dcp_ckpt
+```
+
+完成模型和数据加密，加密HF权重转DCP格式后，修改`qwen3vl_full_sft_32B.yaml`文件中的`HF_MODEL_LOAD_PATH`、`MM_MODEL_LOAD_PATH`、`DATASET_PATH`、`DATASET_DIR`分别为加密后的HF权重路径、DCP权重路径、加密后的数据集json路径、数据集文件夹路径，修改`use_pmcc_data`参数为true，以开启PMCC数据加载。
+
+---
 
 <a id="jump10"></a>
 ## 环境变量声明

@@ -433,6 +433,10 @@ class DataArguments:
         default=False,
         metadata={"help": "Whether to perform async preprocess during training."},
     )
+    use_pmcc_data: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to use PMCC dataset."},
+    )
 
     def __post_init__(self):
         self.dataset = self.dataset.split(",")
@@ -589,11 +593,16 @@ class SupervisedDatasetProcessor(DatasetProcessor):
             audios: List["AudioInput"],
             tools: List[str]
     ) -> Tuple[List[int], List[int]]:
-        messages = self.template.mm_plugin.process_messages(prompt + response, images, videos, audios, self.processor)
-        input_ids, labels = self.template.mm_plugin.process_token_ids(
-            [], [], images, videos, audios, self.tokenizer, self.processor
-        )
-        encoded_pairs = self.template.encode_multiturn(self.tokenizer, messages, system, tools)
+        if hasattr(self.data_args, "use_pmcc_data") and self.data_args.use_pmcc_data:
+            it = (item['content'] for item in prompt + response)
+            input_ids, labels = [], []
+            encoded_pairs = list(zip(it, it))
+        else:
+            messages = self.template.mm_plugin.process_messages(prompt + response, images, videos, audios, self.processor)
+            input_ids, labels = self.template.mm_plugin.process_token_ids(
+                [], [], images, videos, audios, self.tokenizer, self.processor
+            )
+            encoded_pairs = self.template.encode_multiturn(self.tokenizer, messages, system, tools)
         total_length = len(input_ids) + (1 if self.template.efficient_eos else 0)
         if self.data_args.mask_history:
             encoded_pairs = encoded_pairs[::-1]  # high priority for last turns
