@@ -43,7 +43,7 @@ commit_id=fc91372
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
@@ -82,7 +82,22 @@ bash scripts/install.sh --msid eb10b92 --install-cann && bash examples/fsdp2/qwe
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
 
-如果使用fsdp2的meta init初始化模型，需要先完成以下权重转换
+如果使用fsdp2的meta init初始化模型，需要先根据模型类型完成以下权重转换：
+
+(1) 4B模型：
+```bash
+mm-convert Qwen35Converter hf_to_dcp \
+--hf_dir ckpt/hf_path/xxxxxxx \
+--dcp_dir ckpt/dcp_path/xxxxxxx \
+--tie_weight_mapping '{"lm_head.weight":"model.language_model.embed_tokens.weight"}'
+
+# 转换后的目录结构为：
+# ———— xxxxxxx
+#   |—— release
+#   |—— latest_checkpointed_iteration.txt
+```
+
+(2) 其它模型:
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
@@ -107,8 +122,6 @@ mm-convert Qwen35Converter dcp_to_hf \
 --save_hf_dir ckpt/save_hf_path/Qwen3.5-xxB-hf-save \
 --dcp_dir ckpt/dcp_path/xxxxxxx/release \
 --origin_hf_dir ckpt/hf_path/Qwen3.5-xxB
-
-
 ```
 
 ---
