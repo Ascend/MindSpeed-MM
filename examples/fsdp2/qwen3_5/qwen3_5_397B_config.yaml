@@ -112,6 +112,10 @@ training:
   optimizer: adamw
   adam_fused: true
   save_interval: 10000
+  no_load_optim: true  # Do not load optimizer state; remove if loading is needed.
+  no_load_rng: true  # Do not load RNG state; remove if loading is needed.
+  no_save_optim: true  # Do not save optimizer state; remove if saving is needed.
+  no_save_rng: true  # Do not save RNG state; remove if saving is needed.
   load: ./ckpt/hf_path/Qwen35-xxB-dcp
   save: ./save_path
   use_deter_comp: false
