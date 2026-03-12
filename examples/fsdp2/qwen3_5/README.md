@@ -193,6 +193,10 @@ data->dataset_param->basic_parameters->dataset
 注意此时`dataset`需要配置为相对路径
 **注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。
 
+【Data Packing】
+
+如需开启Data Packing，在`xxx_config.yaml`中将`packing`设置为`true`，并根据需要调整cutoff_len
+
 【模块冻结配置】
 
 当前支持自定义冻结模块，在`xxx_config.yaml`中model->freeze字段中配置需要冻结的模块即可实现相应模块冻结。

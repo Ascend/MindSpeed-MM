@@ -277,6 +277,7 @@ class DatasetAttr:
     """
 
     # basic configs
+    packing: bool = False
     ranking: bool = False
     # common columns
     system: Optional[str] = None

@@ -13,6 +13,7 @@ from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import (
     load_tokenizer,
     align_dataset,
     SupervisedDatasetProcessor,
+    PackedSupervisedDatasetProcessor,
     PairwiseDatasetProcessor,
 )
 from mindspeed_mm.fsdp.data.data_utils.func_utils.log import get_logger
@@ -91,6 +92,9 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
         # -----------------convert text to token id ----------------------------------------------------------------------
         if dataset_attr.ranking:
             dataset_processor_cls = PairwiseDatasetProcessor
+        elif dataset_attr.packing:
+            data_args.cutoff_len -= 1
+            dataset_processor_cls = PackedSupervisedDatasetProcessor
         else:
             dataset_processor_cls = SupervisedDatasetProcessor
         dataset_processor = dataset_processor_cls(template=template, tokenizer=tokenizer, processor=processor,
