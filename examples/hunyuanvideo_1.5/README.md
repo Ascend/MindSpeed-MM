@@ -194,16 +194,20 @@ MindSpeed-MM/HunyuanVideo1.5
 检查数据集路径、模型权重路径、并行参数配置等是否完成
 
 | 配置文件                                                         |      修改字段       | 修改说明                                                        |
-|--------------------------------------------------------------| :---: |:------------------------------------------------------------|
-| examples/hunyuanvideo_1.5/{task}/data.json                   |  from_pretrained  | 修改为下载的Tokenizers: llm,byt5-small的权重所对应的路径                   |
-| examples/hunyuanvideo_1.5/{task}/data.json                   |  color_ann_path  | 修改为下载的Glyph-SDXL-v2模型中color_idx.json文件所对应的路径                |
+|--------------------------------------------------------------|:---------------:|:------------------------------------------------------------|
+| examples/hunyuanvideo_1.5/{task}/data.json                   | from_pretrained | 修改为下载的Tokenizers: llm,byt5-small的权重所对应的路径                   |
+| examples/hunyuanvideo_1.5/{task}/data.json                   | color_ann_path  | 修改为下载的Glyph-SDXL-v2模型中color_idx.json文件所对应的路径                |
 | examples/hunyuanvideo_1.5/{task}/data.json                   |  font_ann_path  | 修改为下载的Glyph-SDXL-v2模型中multilingual_10-lang_idx.json文件所对应的路径 |
-| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  |  from_pretrained  | 修改为下载的权重所对应路径（包括vae,  text_encoder）                         |
-| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  |  byT5_ckpt_path  | 修改为下载的byt5_model.pt所对应路径                                    |
-| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh |    NPUS_PER_NODE  | 每个节点的卡数                                                     |
-| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |       NNODES      | 节点数量                                                        |
-| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |      LOAD_PATH    | 预训练DiT权重路径,下面一级目录包含config文件                                 |
-| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |      SAVE_PATH    | 训练过程中保存的权重路径                                                |
+| examples/hunyuanvideo_1.5/{task}/data.json                   |   num_frames    | 视频的帧数,帧数建议满足4n+1                                            |
+| examples/hunyuanvideo_1.5/{task}/data.json                   | min_num_frames  | 最小视频帧数，最小为4*1+1                                             |
+| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  | from_pretrained | 修改为下载的权重所对应路径（包括vae,  text_encoder）                         |
+| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  | byT5_ckpt_path  | 修改为下载的byt5_model.pt所对应路径                                    |
+| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  | color_ann_path  | 修改为下载的Glyph-SDXL-v2模型中color_idx.json文件所对应的路径                |
+| examples/hunyuanvideo_1.5/{task}/model_hunyuanvideo_15.json  |  font_ann_path  | 修改为下载的Glyph-SDXL-v2模型中multilingual_10-lang_idx.json文件所对应的路径 |
+| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh |  NPUS_PER_NODE  | 每个节点的卡数                                                     |
+| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |     NNODES      | 节点数量                                                        |
+| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |    LOAD_PATH    | 预训练DiT权重路径,下面一级目录包含config文件                                 |
+| examples/hunyuanvideo_1.5/{task}/pretrain_hunyuanvideo_15.sh             |    SAVE_PATH    | 训练过程中保存的权重路径                                                |
 
 上述配置文件中{task} = i2v or t2v，请根据训练任务自主选择。
 
@@ -240,12 +244,12 @@ bash examples/hunyuanvideo_1.5/i2v/pretrain_*.sh
 
 | 配置文件                                                       |      修改字段       | 修改说明                                                        |
 |------------------------------------------------------------|:---------------:|:------------------------------------------------------------|
-| examples/hunyuanvideo_1.5/{task}/inference_model.json      | from_pretrained | 修改为下载的权重所对应路径，包括VAE、Tokenizer、Text Encoder、DiT、Siglip（I2V）  |
-| examples/hunyuanvideo_1.5/{task}/inference_model.json      | color_ann_path  | 修改为下载的Glyph-SDXL-v2模型中color_idx.json文件所对应的路径                |
-| examples/hunyuanvideo_1.5/{task}/inference_model.json      |  font_ann_path  | 修改为下载的Glyph-SDXL-v2模型中multilingual_10-lang_idx.json文件所对应的路径 |
-| examples/hunyuanvideo_1.5/{task}/inference_model.json      | byT5_ckpt_path  | 修改为下载的byt5_model.pt所对应路径                                    |
-| examples/hunyuanvideo_1.5/{task}/inference_model.json      |   input_size    | 生成视频的分辨率，格式为 [t, h, w], 分别是视频帧数、高、宽，常用分辨率为480p、720p (9:16)  |
-| examples/hunyuanvideo_1.5/{task}/inference_model.json      |    save_path    | 生成视频的保存路径                                                   |
+| examples/hunyuanvideo_1.5/{task}/inference_model_15.json   | from_pretrained | 修改为下载的权重所对应路径，包括VAE、Tokenizer、Text Encoder、DiT、Siglip（I2V）  |
+| examples/hunyuanvideo_1.5/{task}/inference_model_15.json      | color_ann_path  | 修改为下载的Glyph-SDXL-v2模型中color_idx.json文件所对应的路径                |
+| examples/hunyuanvideo_1.5/{task}/inference_model_15.json      |  font_ann_path  | 修改为下载的Glyph-SDXL-v2模型中multilingual_10-lang_idx.json文件所对应的路径 |
+| examples/hunyuanvideo_1.5/{task}/inference_model_15.json      | byT5_ckpt_path  | 修改为下载的byt5_model.pt所对应路径                                    |
+| examples/hunyuanvideo_1.5/{task}/inference_model_15.json      |   input_size    | 生成视频的分辨率，格式为 [t, h, w], 分别是视频帧数、高、宽，常用分辨率为480p、720p (9:16)  |
+| examples/hunyuanvideo_1.5/{task}/inference_model_15.json      |    save_path    | 生成视频的保存路径                                                   |
 | examples/hunyuanvideo_1.5/{task}/samples_prompts.txt       |      文件内容       | 可自定义自己的prompt，一行为一个prompt                                   |
 | examples/hunyuanvideo_1.5/i2v/samples_images.txt           |       图片        | 可自定义自己的image，一行为一个图片地址                                      |
 | examples/hunyuanvideo_1.5/{task}/inference_hunyuanvideo.sh |    MM_MODEL    | 用来控制生成参数的配置文件路径                                             |
