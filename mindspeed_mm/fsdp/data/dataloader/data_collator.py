@@ -1,3 +1,5 @@
+from transformers import DataCollatorForLanguageModeling
+
 from mindspeed_mm.fsdp.data.data_utils.func_utils.collator import MultiModalDataCollatorForSeq2Seq
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import load_tokenizer, IGNORE_INDEX
 from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
@@ -20,6 +22,20 @@ class DataCollatorForQwen2vl:
     def __call__(self, *args, **kwargs):
         return self.data_collator(*args, **kwargs)
 
+
+class DataCollatorForLLMPretrain:
+    def __init__(self, dataset_param=None, **kwargs):
+        if dataset_param is None:
+            raise ValueError("dataset_param is required for DataCollatorForLLM Pretrain")
+        process_args = ProcessorArguments(**dataset_param.preprocess_parameters.to_dict())
+        tokenizer_module = load_tokenizer(process_args)
+        tokenizer = tokenizer_module.get('tokenizer')
+        self.data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+    def __call__(self, *args, **kwargs):
+        return self.data_collator(*args, **kwargs)
+
 DATA_COLLATOR = {
     "qwen3vl": DataCollatorForQwen2vl,
+    "llm_pretrain": DataCollatorForLLMPretrain,
 }

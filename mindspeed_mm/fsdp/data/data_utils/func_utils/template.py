@@ -451,6 +451,16 @@ _register_template(
 )
 
 
+_register_template(
+    name="default",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["Human: {{content}}", {"eos_token"}, "\nAssistant:"]),
+        format_assistant=StringFormatter(slots=["{{content}}", {"eos_token"}, "\n"]),
+        format_system=StringFormatter(slots=["System: {{content}}", {"eos_token"}, "\n"]),
+    ),
+)
+
+
 def get_template_and_fix_tokenizer(tokenizer: "PreTrainedTokenizer", template: str) -> "Template":
     r"""
     Gets chat template and fixes the tokenizer.

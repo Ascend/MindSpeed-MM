@@ -15,6 +15,7 @@ from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import (
     SupervisedDatasetProcessor,
     PackedSupervisedDatasetProcessor,
     PairwiseDatasetProcessor,
+    PretrainDatasetProcessor,
 )
 from mindspeed_mm.fsdp.data.data_utils.func_utils.log import get_logger
 from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
@@ -95,6 +96,10 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
         elif dataset_attr.packing:
             data_args.cutoff_len -= 1
             dataset_processor_cls = PackedSupervisedDatasetProcessor
+        elif dataset_attr.pretrain:
+            # Will automatically enable sequences packing in pre-training.
+            data_args.packing = data_args.packing if data_args.packing is not None else True
+            dataset_processor_cls = PretrainDatasetProcessor
         else:
             dataset_processor_cls = SupervisedDatasetProcessor
         dataset_processor = dataset_processor_cls(template=template, tokenizer=tokenizer, processor=processor,
