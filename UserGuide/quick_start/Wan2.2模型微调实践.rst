@@ -90,7 +90,7 @@ Step 2: 权重下载及转换
 
 1. **权重下载**
 
-从Huggingface库下载模型权重: `Wan2.2-T2V-A14B-Diffusers <https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Instruct>`_  
+从Huggingface库下载模型权重: `Wan2.2-T2V-A14B-Diffusers <https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B>`_
 保存在 ``MindSpeed-MM/ckpt/hf_path/Wan2.2-T2V-A14B-Diffusers`` 文件夹中。
 
 
