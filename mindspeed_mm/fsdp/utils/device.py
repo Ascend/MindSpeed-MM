@@ -109,7 +109,7 @@ def get_current_stream() -> Any:
 
 
 def switch_to_specified_stream(stream) -> Any:
-    return get_torch_device().Stream(stream)
+    return get_torch_device().stream(stream)
 
 
 def get_max_memory_reserved():

@@ -237,7 +237,7 @@ class async_save_on_cpu(saved_tensors_hooks):
 
             if after_block:
                 OffloadManager().del_npu_tensor("{}_".format(block_idx - 1))
-            
+
             swap_tensor = SwapTensor(tensor, key)
 
             # Only offload if not in last block (to avoid unnecessary transfer before backward)
