@@ -131,7 +131,7 @@ pip install decord==0.6.0
 
 #### VAE下载
 
-+ [VAE下载链接](https://cloud.tsinghua.edu.cn/f/fdba7608a49c463ba754/?dl=1)
++ [VAE下载链接](https://huggingface.co/zai-org/CogVideoX1.5-5B-SAT/tree/main/vae)
 
 #### transformer文件下载
 + [CogVideoX1.0-5B-t2v](https://cloud.tsinghua.edu.cn/d/fcef5b3904294a6885e5/?p=%2F&mode=list)
@@ -446,7 +446,7 @@ mm-convert CogVideoConverter --version <t2v or i2v> hf_to_mm \
 
  VAE权重下载
 
-+ [VAE下载链接](https://cloud.tsinghua.edu.cn/f/fdba7608a49c463ba754/?dl=1)
++ [VAE下载链接](https://huggingface.co/zai-org/CogVideoX1.5-5B-SAT/tree/main/vae)
 
 2. 数据集准备及处理
 

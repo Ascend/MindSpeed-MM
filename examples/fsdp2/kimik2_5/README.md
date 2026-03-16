@@ -49,7 +49,7 @@ commit_id=3367c8d
 <a id="jump1.2"></a>
 #### 2. 环境搭建
 ```bash
-git clone --branch fsdp2_dev https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 
 # 安装mindspeed及依赖
 git clone https://gitcode.com/Ascend/MindSpeed.git
