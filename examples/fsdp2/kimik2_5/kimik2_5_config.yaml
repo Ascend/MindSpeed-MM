@@ -103,6 +103,7 @@ training:
   adam_fused: true
   save_interval: 10000
   use_deter_comp: false
+  load_rank0_and_broadcast: false # 从rank0加载checkpoint并广播到其他rank
   plugin:
     - mindspeed_mm/fsdp/models/kimik2_5
     - mindspeed_mm/fsdp/data/datasets/huggingface

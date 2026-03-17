@@ -1,7 +1,7 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
 import gc
 import os
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 import logging
 
 import torch
@@ -17,6 +17,7 @@ from torch.distributed.checkpoint.state_dict import (
     set_model_state_dict,
     set_optimizer_state_dict,
 )
+from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 from torch.distributed.checkpoint.stateful import Stateful
 
 from mindspeed.fsdp.utils.log import print_rank
@@ -24,6 +25,7 @@ from ..distributed.parallel_state import get_parallel_state
 from ..utils.device import empty_cache, synchronize
 from .checkpointer import CheckpointerBase
 from .utils import get_checkpoint_name, read_metadata, get_checkpoint_tracker_filename
+from .load_utils import rank0_load_and_broadcast_weights
 
 
 logger = logging.getLogger(__name__)
@@ -167,6 +169,8 @@ class DistributedCheckpointer(CheckpointerBase):
         state: Dict[str, Any],
         process_group=None,
         storage_reader: Optional[FileSystemReader] = None,
+        load_rank0_and_broadcast: bool = False,
+        load_strict: bool = False,
     ) -> Dict[str, Any]:
         """
         load training state from distributed checkpoint
@@ -201,11 +205,18 @@ class DistributedCheckpointer(CheckpointerBase):
         if storage_reader is None:
             storage_reader = cls._create_storage_reader(checkpoint_dir)
 
-        dcp.load(
-            state_dict=load_state,
-            storage_reader=storage_reader,
-            process_group=process_group,
-        )
+        if load_rank0_and_broadcast:
+            rank0_load_and_broadcast_weights(
+                load_state=load_state,
+                storage_reader=storage_reader,
+            )
+        else:
+            dcp.load(
+                state_dict=load_state,
+                storage_reader=storage_reader,
+                process_group=process_group,
+                planner=DefaultLoadPlanner(allow_partial_load=not load_strict),
+            )
         # Note: further per-param DTensor alignment and device fixes happen inside OptimizerState.load_state_dict
 
         if not release:

@@ -182,6 +182,14 @@ class TrainingArguments:
         default=None,
         metadata={"help": "Path to load checkpoint from. Used for resuming training."},
     )
+    load_strict: bool = field(
+        default=False,
+        metadata={"help": "Whether to load checkpoint strictly."},
+    )
+    load_rank0_and_broadcast: bool = field(
+        default=False,
+        metadata={"help": "Whether to load checkpoint on rank 0 and broadcast to other ranks."},
+    )
     no_load_optim: bool = field(
         default=False,
         metadata={"help": "Do not load optimizer when loading checkpoint."},
@@ -231,7 +239,7 @@ class TrainingArguments:
 
         if self.lr < self.lr_start:
             raise ValueError(f"Learning rate {self.lr} < starting lr {self.lr_start}. Check scheduler configuration.")
-        
+
         if self.lr < self.lr_min:
             raise ValueError(f"Learning rate {self.lr} < minimum lr {self.lr_min}. Check scheduler configuration.")
 

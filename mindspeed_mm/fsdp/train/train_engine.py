@@ -32,7 +32,7 @@ class TrainEngine:
 
         # Training state tracking
         self.iteration, self.consumed_train_samples = 0, 0
-        
+
         # Load checkpoint if specified
         if args.training.load:
             self.iteration, self.consumed_train_samples = self.load()
@@ -195,12 +195,17 @@ class TrainEngine:
         """Load checkpoint and restore training state."""
         args = self.args
         iteration, consumed_train_samples = 0, 0
-        
+
         state = {"model": self.model, "extra_state": {}}  # cannot be None
         if not args.training.no_load_optim:
             state["optimizer"] = self.optimizer
 
-        release = self.checkpointer.load(path=args.training.load, state=state)
+        release = self.checkpointer.load(
+            path=args.training.load,
+            state=state,
+            load_rank0_and_broadcast=args.training.load_rank0_and_broadcast,
+            load_strict=args.training.load_strict,
+        )
 
         if not release:
             iteration = state["extra_state"]["iteration"]

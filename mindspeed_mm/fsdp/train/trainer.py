@@ -40,7 +40,7 @@ class Trainer():
     def __init__(self, args: Arguments, model_provider: Optional[Callable] = None, dataloader_provider: Optional[Callable] = None):
         """
         Initialize the trainer with configuration and optional custom providers.
-        
+
         Args:
             args: Training configuration arguments
             model_provider: Optional custom function to provide the model
@@ -120,7 +120,7 @@ class Trainer():
 
         # Initialize parallel communication groups and mesh
         init_parallel_state(**asdict(args.parallel))
-    
+
     def get_foundation_model(self):
         """Load the foundation model from the model hub."""
         args: Arguments = self.args
@@ -130,10 +130,9 @@ class Trainer():
     def get_model(self, model_provider: Optional[Callable] = None):
         """
         Build and prepare the model for training.
-        
         Args:
             model_provider: Optional custom function to provide the model
-            
+
         Returns:
             Prepared model with parallelization and features applied
         """
@@ -146,9 +145,14 @@ class Trainer():
 
         # Initialize weights on meta device if specified (for memory efficiency)
         if args.training.init_model_with_meta_device:
-            to_empty_if_needed(model, device=get_device_type())
-            init_model_weights(model)
-        
+            if args.training.load is None and args.training.load_rank0_and_broadcast:
+                raise ValueError("Must set `training.load` when `training.load_rank0_and_broadcast` is True, otherwise the model will be initialized with meta device but no weights will be loaded.")
+            elif args.training.load is None and not args.training.load_rank0_and_broadcast:
+                to_empty_if_needed(model, device=get_device_type())
+                init_model_weights(model)
+            elif not args.training.load_rank0_and_broadcast:
+                to_empty_if_needed(model, device=get_device_type())
+
         return model
 
     def get_optimizer(self):
@@ -212,7 +216,7 @@ class Trainer():
     def get_checkpointer(self):
         """Return checkpointing class (can be overridden for different checkpoint formats)."""
         return DistributedCheckpointer
-    
+
     def train(self):
         """Start the training process."""
         self.trainer.train()
