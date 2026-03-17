@@ -1192,7 +1192,7 @@ MindSpeed MM已发布版本维护策略：
 
 如果您不希望您的数据集在MindSpeed MM中的模型被提及，或希望更新MindSpeed MM中的模型关于您的数据集的描述，请在Gitcode提交issue，我们将根据您的issue要求删除或更新您的数据集描述。衷心感谢您对MindSpeed MM的理解和贡献。
 
-## License声明
+# License声明
 
 Ascend MindSpeed MM提供的模型，如模型目录下存在License的，以该License为准。如模型目录下不存在License的，以Apache 2.0许可证许可，对应许可证文本可查阅Ascend MindSpeed MM根目录[LICENSE](./LICENSE)文件，`docs`目录下的文档适用CC-BY 4.0许可证，具体参见文档[LICENSE](./docs/LICENSE)。
 
