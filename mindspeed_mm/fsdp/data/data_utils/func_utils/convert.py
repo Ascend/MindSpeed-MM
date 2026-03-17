@@ -410,6 +410,8 @@ class DataArguments:
     )
 
     def __post_init__(self):
+        if self.dataset is None:
+            return
         if not isinstance(self.dataset, list):
             self.dataset = self.dataset.split(",")
 

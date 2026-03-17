@@ -32,7 +32,7 @@ def expert_parallelize_modules(modules: torch.nn.Module, ep_mesh: DeviceMesh, pl
         if hasattr(module, 'ep_forward') and callable(module.ep_forward):
             module.forward = partial(module.ep_forward, ep_group=ep_group)
         else:
-            experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group)
+            experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group, dispatcher=plan.dispatcher)
             module.forward = types.MethodType(experts_forward_fn, module)
 
     return modules
@@ -110,22 +110,25 @@ def apply_grad_division_hook(module, ep_size):
             grad_acc.register_hook(get_grad_division_hook(param, ep_size))
 
 
-def get_experts_forward_fn_for_qwen(ep_group, fused=True):
-    from .fused_ep import fused_ep_forward
+def get_experts_forward_fn_for_qwen(ep_group, dispatcher="fused"):
+    from .ep_dispatcher import ep_forward
 
     def experts_forward(self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor):
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
-        hidden_states = fused_ep_forward(
+
+        fused = False if dispatcher == "eager" else True
+        hidden_states = ep_forward(
             self.num_experts,
             routing_weights,
             router_indices,
             hidden_states,
             fc1_weight=gate_up_proj,
             fc2_weight=down_proj,
-            ep_group=ep_group
+            ep_group=ep_group,
+            fused=fused,
         )
         hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
         return hidden_states

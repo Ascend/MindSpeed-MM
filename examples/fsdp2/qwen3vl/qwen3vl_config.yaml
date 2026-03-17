@@ -116,8 +116,8 @@ training:
   optimizer: adamw
   adam_fused: true
   save_interval: 10000
-  load: load_path
-  save: save_path
+  # load: load_path
+  # save: save_path
   use_deter_comp: false
   plugin:
     - mindspeed_mm/fsdp/models/qwen3vl

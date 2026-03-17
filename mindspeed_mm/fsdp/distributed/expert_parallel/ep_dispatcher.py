@@ -1,25 +1,13 @@
-# Copyright 2025 Bytedance Ltd. and/or its affiliates
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-
 from typing import List, Optional
 
 import torch
 import torch.distributed as dist
-import torch_npu
 
 from mindspeed.fsdp.distributed.dist_ops import all_to_all as _all_to_all
+from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
+from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
+from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
+from mindspeed_mm.fsdp.ops.swiglu import swiglu
 
 
 def all_to_all(
@@ -33,37 +21,7 @@ def all_to_all(
     return _all_to_all(process_group, input_, gather_sizes, scatter_sizes)
 
 
-class GmmFunction(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x, weight, group_list):
-        ctx.save_for_backward(x, weight)
-        ctx.group_list = group_list
-
-        fwd_output = torch_npu.npu_grouped_matmul([x], [weight], bias=None, group_list=group_list,
-                                                  split_item=2, group_type=0, group_list_type=1)[0]
-        return fwd_output
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        input_tensor, weight = ctx.saved_tensors
-        group_list = ctx.group_list
-
-        weight = torch.transpose(weight, 1, 2)
-        grad_input = torch_npu.npu_grouped_matmul([grad_output], [weight], bias=None, group_list=group_list,
-                                                  split_item=2, group_type=0, group_list_type=1)[0]
-
-        grad_weight = torch_npu.npu_grouped_matmul([input_tensor.T], [grad_output], bias=None, group_list=group_list,
-                                                   split_item=3, group_type=2, group_list_type=1)[0]
-
-        return grad_input, grad_weight, None
-
-
-def npu_group_gemm(x, weight, group_list):
-    output = GmmFunction.apply(x, weight, group_list)
-    return output
-
-
-def fused_ep_forward(
+def ep_forward(
     num_experts: int,
     routing_weights: torch.Tensor,
     selected_experts: torch.Tensor,
@@ -71,6 +29,7 @@ def fused_ep_forward(
     fc1_weight: torch.Tensor,
     fc2_weight: torch.Tensor,
     ep_group: Optional[dist.ProcessGroup] = None,
+    fused: bool = True,
 ) -> torch.Tensor:
     if routing_weights.size() != selected_experts.size():
         routing_weights = routing_weights.gather(1, selected_experts)
@@ -87,14 +46,15 @@ def fused_ep_forward(
         num_experts,
         num_global_tokens_per_local_expert,
         ep_group,
+        fused=fused,
     )
 
     # If no tokens are assigned to the expert in the current EP shard, no computation is performed
     if hidden_states.shape[0] > 0:
-        intermediate_hidden_states = npu_group_gemm(hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert)
-        intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
-        hidden_states = npu_group_gemm(
-            intermediate_activations, fc2_weight, num_global_sum_tokens_per_local_expert
+        intermediate_hidden_states = grouped_matmul(hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert, fused=fused)
+        intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+        hidden_states = grouped_matmul(
+            intermediate_activations, fc2_weight, num_global_sum_tokens_per_local_expert, fused=fused
         )
 
     hidden_states = alltoall_combine(
@@ -159,8 +119,9 @@ def alltoall_dispatch(
     num_global_experts: int,
     num_global_tokens_per_local_expert: torch.Tensor,
     ep_group: Optional[dist.ProcessGroup] = None,
+    fused: bool = True,
 ):
-    hidden_states, unpermute_indices = torch_npu.npu_moe_token_permute(hidden_states, selected_experts.to(torch.int32))
+    hidden_states, unpermute_indices = permute(hidden_states, selected_experts.to(torch.int32), fused=fused)
     hidden_states = all_to_all(hidden_states, ep_group, scatter_sizes=input_splits, gather_sizes=output_splits)
 
     # No tokens have been assigned to the expert in the current EP shard
@@ -176,7 +137,7 @@ def alltoall_dispatch(
 
     _expert_ids_per_ep_rank = torch.arange(num_global_experts, dtype=torch.int32, device=hidden_states.device) % num_local_experts
     global_input_tokens_local_experts_indices = torch.repeat_interleave(_expert_ids_per_ep_rank, num_global_tokens_per_local_expert.ravel())
-    hidden_states, post_dispatch_unpermute_indices = torch_npu.npu_moe_token_permute(hidden_states, global_input_tokens_local_experts_indices)
+    hidden_states, post_dispatch_unpermute_indices = permute(hidden_states, global_input_tokens_local_experts_indices, fused=fused)
 
     return hidden_states, unpermute_indices, post_dispatch_unpermute_indices
 
@@ -191,6 +152,7 @@ def alltoall_combine(
     num_global_experts: int,
     num_global_tokens_per_local_expert: torch.Tensor,
     ep_group: Optional[dist.ProcessGroup] = None,
+    fused: bool = True,
 ):
     # If no tokens are assigned to the expert in the current EP shard, no computation is performed
     if hidden_states.shape[0] > 0:
@@ -200,9 +162,9 @@ def alltoall_combine(
                 f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
         )
 
-        hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states, post_dispatch_unpermute_indices)
+        hidden_states = unpermute(hidden_states, post_dispatch_unpermute_indices, fused=fused)
 
     hidden_states = all_to_all(hidden_states, ep_group, scatter_sizes=output_splits, gather_sizes=input_splits)
-    hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states.to(routing_weights.dtype), unpermute_indices,
-                                                      probs=routing_weights)
+    hidden_states = unpermute(hidden_states.to(routing_weights.dtype), unpermute_indices,
+                                                      probs=routing_weights, fused=fused)
     return hidden_states

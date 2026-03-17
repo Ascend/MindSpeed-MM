@@ -1,7 +1,12 @@
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export NON_MEGATRON=true
+export HCCL_CONNECT_TIMEOUT=1200
+export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+export MULTI_STREAM_MEMORY_REUSE=2
+export TASK_QUEUE_ENABLE=1
+export CPU_AFFINITY_CONF=1
 
-NPUS_PER_NODE=8
+NPUS_PER_NODE=16
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1

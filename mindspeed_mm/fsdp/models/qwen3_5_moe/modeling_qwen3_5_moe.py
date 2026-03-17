@@ -896,8 +896,8 @@ class Qwen3_5MoeExperts(nn.Module):
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
 
-        from mindspeed_mm.fsdp.distributed.expert_parallel.fused_ep import fused_ep_forward
-        hidden_states = fused_ep_forward(
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward
+        hidden_states = ep_forward(
             self.num_experts,
             top_k_weights,
             top_k_index,
