@@ -1,0 +1,7 @@
+torchaudio==2.7.1
+transformers==4.57.0
+zhconv==1.4.3
+whisper_normalizer==0.1.12
+pyopenjtalk-plus
+compute-wer==0.2.3
+openai-whisper==20250625

@@ -1,0 +1,185 @@
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: 1
+  fsdp_plan:
+    param_dtype: bf16
+    reduce_dtype: fp32
+    reshard_after_forward: false
+    apply_modules: 
+      - llm
+      - llm.model.embed_tokens
+    pregather: true
+  recompute: false
+  context_parallel_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+
+data:
+  train_data_set_list: ./examples/fsdp2/funasr/train_example_local.jsonl
+  valid_data_set_list: ./examples/fsdp2/funasr/val_example_local.jsonl
+  dataset_param:
+    dataset_type: "FunASR"
+    is_training: true
+    dataset_conf:
+      index_ds: "FunASR"
+      batch_sampler: "BatchSampler"
+      batch_size: 6000
+      sort_size: 1024
+      batch_size_scale_ratio_max: 2
+      batch_type: "token"
+      num_workers: 8
+      audio_adaptor_downsample_rate: 1
+      audio_encoder_downsample_rate: 6
+      data_split_num: 1
+      batch_size_sample_max: 10
+      retry: 2000
+      max_source_length: 12000
+      max_target_length: 2048
+      max_token_length: 3500
+      batch_size_token_max: 6000
+      shuffle: true
+      min_source_length: 10
+      batch_size_scale_threshold: 3000
+      prompt_classes: MultiContextPrompt
+      prompt_conf:
+        max_neg_hotwords_num: 0
+        min_neg_hotwords_num: 0
+        use_hist: false
+        use_one_pass_result: true
+        use_hotwords: true
+        use_asr_hotwords: true
+        chinese_hotwords_list: null
+        english_hotwords_list: null
+      use_dynamic_output_ratio: 0.0
+      
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: false
+    sampler_type: BaseRandomBatchSampler
+    collate_param:
+      model_name: funasr
+
+model:
+  model_id: funasr
+  model_name_or_path: "<local_path>/Fun-ASR-Nano-2512"  # 权重路径
+  trust_remote_code: false
+  audio_encoder_conf:
+    output_size: 512
+    attention_heads: 4
+    linear_units: 2048
+    num_blocks: 50
+    tp_blocks: 20
+    dropout_rate: 0.1
+    positional_dropout_rate: 0.1
+    attention_dropout_rate: 0.1
+    input_layer: pe
+    pos_enc_class: SinusoidalPositionEncoder
+    normalize_before: true
+    kernel_size: 11
+    sanm_shfit: 0
+    selfattention_layer_type: sanm
+    freeze_layer_num: -1
+    feat_permute: true
+    freeze: true  
+  audio_adaptor_conf:
+    downsample_rate: 1
+    use_low_frame_rate: true
+    ffn_dim: 2048
+    llm_dim: 1024
+    encoder_dim: 512
+    n_layer: 2
+    freeze: true  
+  llm_conf:
+    freeze: false
+    llm_dtype: bf16
+    use_lora: false
+  length_normalized_loss: true
+  lsm_weight: 0.1
+  frontend_conf:
+    lfr_m: 7
+    lfr_n: 6
+    fs: 16000
+    window: "hamming"
+    n_mels: 80
+    frame_length: 25
+    frame_shift: 10
+    cmvn_file: null 
+  detach_ctc_decoder: true
+  ctc_decoder_conf:
+    downsample_rate: 1
+    ffn_dim: 2048
+    llm_dim: 512
+    encoder_dim: 512
+    n_layer: 5
+    freeze: false
+  ctc_weight: 1.0
+  ctc_conf:
+    dropout_rate: 0.0
+    ctc_type: builtin
+    reduce: true
+    ignore_nan_grad: true
+
+
+training:
+  seed: 0
+  micro_batch_size: 1
+  global_batch_size: 6000
+  gradient_accumulation_steps: 1
+  train_iters: 5000
+  log_interval: 1
+  optimizer: adamw
+  adam_fused: false
+  lr: 2.0e-6
+  lr_warmup_ratio: 0 
+  lr_decay_style: constant
+  init_model_with_meta_device: false
+  weight_decay: 0.0
+  max_epochs: 5000
+  lr_start: 2.0e-6
+  clip_grad: 1.0
+  clip_norm_type: 2.0
+  clip_grad_foreach: true
+  resume: false
+  validate_interval: 2000
+  save_interval: 5000
+  allow_hf32: true
+  use_deter_comp: false
+  scheduler: warmuplr
+  scheduler_conf:
+    warmup_steps: 10
+  # Save and load checkpoints
+  save: null  # Path to save checkpoints
+  load: null  # Path to load checkpoints
+  plugin:
+    - mindspeed_mm/fsdp/models/funasr
+    - mindspeed_mm/fsdp/data/datasets/funasr
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0,1,2,3]
+    static_param:
+      level: level1
+      with_stack: true
+      with_memory: true
+      record_shapes: true
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 2
+      end_step: 3
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+      analyse_flag: true
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false

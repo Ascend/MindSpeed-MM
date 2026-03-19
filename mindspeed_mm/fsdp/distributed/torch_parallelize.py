@@ -17,6 +17,7 @@ class ParallelApplier:
 
     def apply_fsdp_modules(self, model):
         model = fully_shard_parallel_modules(model, self.parallel_state.get_fsdp_device_mesh(), self.config.fsdp_plan)
+        return model
 
     def apply_tp_modules(self, model):
         if self.config.tensor_parallel_size == 1:
@@ -43,5 +44,5 @@ class ParallelApplier:
         self.apply_tp_modules(model=model)
         self.apply_ep_modules(model=model)
         self.apply_recompute_modules(model=model)
-        self.apply_fsdp_modules(model=model)
-
+        model = self.apply_fsdp_modules(model=model)
+        return model

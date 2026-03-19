@@ -1,4 +1,5 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
+import torch
 import torch_npu
 
 
@@ -35,3 +36,9 @@ def apply_transformers_vision_rope_half_npu(q, k, cos, sin, position_ids=None, u
     q_embed = q_embed.reshape(orig_q_shape)
     k_embed = k_embed.reshape(orig_k_shape)
     return q_embed, k_embed
+
+
+def silu_forward_npu(self, hidden_states):
+    """NPU optimized implementation for SiLU in 'forward' func in MLP layer."""
+    gate_up = torch.cat([self.gate_proj(hidden_states), self.up_proj(hidden_states)], dim=-1)
+    return self.down_proj(torch_npu.npu_swiglu(gate_up, dim=-1))

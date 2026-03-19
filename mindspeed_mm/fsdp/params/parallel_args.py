@@ -28,6 +28,9 @@ class FSDPPlanConfig:
     num_to_forward_prefetch: Optional[int] = 0
     num_to_backward_prefetch: Optional[int] = 0
 
+    # pregather settings
+    pregather: bool = False
+
 
 @dataclass
 class TPPlanConfig:

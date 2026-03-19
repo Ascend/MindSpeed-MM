@@ -140,7 +140,7 @@ class Trainer():
         model = self.get_foundation_model() if model_provider is None else model_provider()
 
         # Apply parallelization strategy and model features
-        self.model_parallel_applier(model)
+        model = self.model_parallel_applier(model)
         self.model_features_applier(model)
 
         # Initialize weights on meta device if specified (for memory efficiency)

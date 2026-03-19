@@ -1,18 +1,39 @@
 # Copyright (c) 2025, Huawei Technologies Co., Ltd. All rights reserved.
 import logging
-from typing import Set, Any
-
+from typing import Any, Set
 import torch
-from torch.distributed.fsdp import fully_shard, MixedPrecisionPolicy
 from torch.distributed.device_mesh import DeviceMesh
+from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
+from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
+from mindspeed_mm.fsdp.utils.device import get_torch_device
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 
-from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
 
 logger = logging.getLogger(__name__)
+
+
+def pregather_fsdp_params(model: torch.nn.Module):
+    """
+    Pre-gather FSDP2 parameters before forward pass.
+    This ensures all ranks have parameters ready before timed computation,
+    reducing straggler effects caused by uneven allGather times.
+    
+    Args:
+        model: The model with FSDP2 applied modules.
+    """
+    for name, module in model.named_modules():
+        if hasattr(module, 'unshard') and callable(getattr(module, 'unshard')):
+            try:
+                module.unshard()
+            except Exception as e:
+                logging.debug("Failed to unshard module %s: %s", name, e)
+    get_torch_device().synchronize()
 
 
 def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, fsdp_plan: FSDPPlanConfig, **kwargs):
@@ -28,8 +49,25 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
     Returns:
         The model with FSDP applied to specified modules.
     """
-    # User-defined parallel strategy (highest priority)
-    # Check if model has a custom fully_shard method
+    
+    ps = get_parallel_state()
+    args = parse_args(Arguments)
+
+    if ps.fully_shard_parallel_size == 1 and not args.training.init_model_with_meta_device:
+
+        # wrap model in DDP
+        dp_group = ps.get_dp_group()
+        model = DDP(
+            model, 
+            process_group=dp_group, 
+            find_unused_parameters=True,
+            device_ids=[get_torch_device()],
+        )
+
+        print_rank(logger.info,
+                   "DDP mode is enabled (fully_shard_parallel_size=1) instead of FSDP wrapping")
+        return model
+    
     if hasattr(model, 'fully_shard') and callable(getattr(model, 'fully_shard')):
         execute_result = model.fully_shard(fsdp_plan=fsdp_plan)
         if execute_result:
