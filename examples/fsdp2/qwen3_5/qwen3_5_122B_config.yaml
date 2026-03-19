@@ -20,8 +20,7 @@ parallel:
   recompute_plan:
       apply_modules:
         - model.language_model.layers.{*}
-  ring_attention_size: 1
-  ulysses_parallel_size: 1
+  ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
   expert_parallel_size: 8
   ep_plan:
     apply_modules:

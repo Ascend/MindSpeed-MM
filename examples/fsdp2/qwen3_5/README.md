@@ -211,6 +211,12 @@ data->dataset_param->basic_parameters->dataset
 根据实际情况配置`xxx_config.yaml`的`training`参数，包括保存路径以及保存间隔`save`、`save_interval`
 根据实际情况配置`xxx_config.yaml`中的`init_from_hf_path`参数，该参数表示初始权重的加载路径。
 
+【ulysses-cp并行配置】
+
+根据实际情况配置`xxx_config.yaml`中的`ulysses_parallel_size`以调整ulysses-cp的并行度。（`ulysses_parallel_size`为1时不开启ulysses-cp）
+
+**注意在开启ulysses-cp时，请将`xxx_config.yaml`中的`attn_implementation`配置为`flash_attention_2`**
+
 【单机运行配置】
 以qwen3_5模型为例：
 配置`examples/fsdp2/qwen3_5/finetune_qwen3_5.sh`参数如下

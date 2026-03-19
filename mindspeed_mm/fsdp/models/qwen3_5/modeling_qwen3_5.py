@@ -20,7 +20,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Union, List
 
 import torch
 import torch.nn.functional as F
@@ -44,12 +44,61 @@ from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_u
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs, auto_docstring, can_return_tuple, logging, torch_compilable_check
-from transformers.utils.generic import check_model_inputs, is_flash_attention_requested, maybe_autocast
+from transformers.utils.generic import check_model_inputs, maybe_autocast
 from transformers.utils.import_utils import is_causal_conv1d_available, is_flash_linear_attention_available
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5Config, Qwen3_5TextConfig, Qwen3_5VisionConfig
 
 from mindspeed_mm.fsdp.utils.register import model_register
-from mindspeed_mm.fsdp.utils.utils import is_npu_available
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+    split_forward_gather_backward,
+    gather_forward_split_backward,
+    split_forward_gather_backward_with_cp,
+    gather_forward_split_backward_with_cp,
+    packed_data_split_forward_gather_backward_with_cp,
+    packed_data_gather_forward_split_backward_with_cp
+)
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
+
+_TOTAL_SEQ_LEN = None
+_VISUAL_SEQ_LEN = None
+_VISUAL_PER_SEQ_LEN = None
+IGNORE_INDEX = -100
+
+
+def get_seq_len(seq_type: str = None) -> int:
+    if seq_type == "total":
+        global _TOTAL_SEQ_LEN
+        return _TOTAL_SEQ_LEN
+    elif seq_type == "visual":
+        global _VISUAL_SEQ_LEN
+        return _VISUAL_SEQ_LEN
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        return _VISUAL_PER_SEQ_LEN
+    else:
+        raise ValueError(
+            f"Invalid sequence type: '{seq_type}'. Expected 'total' or 'visual'."
+        )
+
+
+def set_seq_len(seq_type: str = None, seq_len: Optional[Union[int, List[int]]] = None) -> None:
+    if seq_type == "total":
+        global _TOTAL_SEQ_LEN
+        _TOTAL_SEQ_LEN = seq_len
+    elif seq_type == "visual":
+        global _VISUAL_SEQ_LEN
+        _VISUAL_SEQ_LEN = seq_len
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        _VISUAL_PER_SEQ_LEN = seq_len
+    else:
+        raise ValueError(
+            f"Invalid sequence type: '{seq_type}'. Expected 'total' or 'visual'."
+        )
 
 
 if is_causal_conv1d_available():
@@ -497,7 +546,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
 
         self.use_triton_gdn = config.use_triton_gdn
-        if self.use_triton_gdn and is_npu_available():
+        if self.use_triton_gdn and IS_NPU_AVAILABLE:
             from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_delta_rule
             self.chunk_gated_delta_rule = chunk_gated_delta_rule
         else:
@@ -523,6 +572,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         cache_position: torch.LongTensor | None = None,
         attention_mask: torch.Tensor | None = None,
     ):
+        hidden_states = gather_forward_split_backward_with_cp(hidden_states, 1, get_seq_len("total"))  # [b,s,h]
         hidden_states = apply_mask_to_padding_states(hidden_states, attention_mask)
 
         # Set up dimensions for reshapes later
@@ -630,7 +680,8 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         core_attn_out = self.norm(core_attn_out, z)
         core_attn_out = core_attn_out.reshape(batch_size, seq_len, -1)
 
-        output = self.out_proj(core_attn_out)
+        output = self.out_proj(core_attn_out)  # [b,s,h]
+        output = split_forward_gather_backward_with_cp(output, 1)  # [b,s/cp_size,h]
         return output
 
 
@@ -778,7 +829,11 @@ class Qwen3_5Attention(nn.Module):
         attention_interface: Callable = ALL_ATTENTION_FUNCTIONS.get_interface(
             self.config._attn_implementation, eager_attention_forward
         )
-
+        # CP Modification: add total_seq_len for Attention
+        total_seq_len = get_seq_len("total")
+        if get_parallel_state().get_ulysses_group_size() > self.config.num_key_value_heads:
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -787,6 +842,9 @@ class Qwen3_5Attention(nn.Module):
             attention_mask,
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
+            is_causal=True,
+            total_seq_len=total_seq_len,
+            seq_split_lens=None,
             **kwargs,
         )
 
@@ -963,8 +1021,30 @@ class Qwen3_5VisionPatchMerger(nn.Module):
         self.linear_fc2 = nn.Linear(self.hidden_size, config.out_hidden_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.norm(x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x).view(-1, self.hidden_size)
-        x = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
+        ps = get_parallel_state()
+        if ps.is_cp_enable():
+            if self.use_postshuffle_norm:
+                x = packed_data_gather_forward_split_backward_with_cp(x, dim=0, seq_lens=get_seq_len("per_visual"))
+                x = x.view(-1, self.hidden_size)
+                # after down_sample hidden_state, should split it again
+                split_sizes = cal_split_sizes(x.shape[0], ps.get_ulysses_group_size())
+                # Split the merged tensor back for distributed processing
+                # Since no attention computation follows, we can use simple splitting
+                x = split_forward_gather_backward(x, ps.get_ulysses_group(), dim=0, grad_scale="down", split_sizes=split_sizes)
+                x = self.norm(x)
+            else:
+                x = self.norm(x)
+                x = packed_data_gather_forward_split_backward_with_cp(x, dim=0, seq_lens=get_seq_len("per_visual"))
+                x = x.view(-1, self.hidden_size)
+                # after down_sample hidden_state, should split it again
+                split_sizes = cal_split_sizes(x.shape[0], ps.get_ulysses_group_size())
+                # Split the merged tensor back for distributed processing
+                # Since no attention computation follows, we can use simple splitting
+                x = split_forward_gather_backward(x, ps.get_ulysses_group(), dim=0, grad_scale="down", split_sizes=split_sizes)
+            x = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
+        else:
+            x = self.norm(x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x).view(-1, self.hidden_size)
+            x = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
         return x
 
 
@@ -1019,8 +1099,9 @@ class Qwen3_5VisionAttention(nn.Module):
             self.config._attn_implementation, eager_attention_forward
         )
 
-        if is_flash_attention_requested(self.config):
-            # Flash Attention: Use cu_seqlens for variable length attention
+        # Modification: pass total_visual_seqlen
+        if self.config._attn_implementation == "flash_attention_2":
+            # Flash Attention 2: Use cu_seqlens for variable length attention
             max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
             attn_output, _ = attention_interface(
                 self,
@@ -1035,6 +1116,7 @@ class Qwen3_5VisionAttention(nn.Module):
                 max_length_q=max_seqlen,
                 max_length_k=max_seqlen,
                 is_causal=False,
+                total_seq_len=get_seq_len("visual"),
                 **kwargs,
             )
         else:
@@ -1247,8 +1329,6 @@ class Qwen3_5VisionModel(Qwen3_5PreTrainedModel):
         seq_len, _ = hidden_states.size()
         hidden_states = hidden_states.reshape(seq_len, -1)
         rotary_pos_emb = rotary_pos_emb.reshape(seq_len, -1)
-        emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
-        position_embeddings = (emb.cos(), emb.sin())
 
         cu_seqlens = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cumsum(
             dim=0,
@@ -1257,8 +1337,23 @@ class Qwen3_5VisionModel(Qwen3_5PreTrainedModel):
             #  - torch.onnx.export requires that cu_seqlens_q must have same dtype as grid_thw
             dtype=grid_thw.dtype if torch.jit.is_tracing() else torch.int32,
         )
+        # Modification: cu_seqlens move to cpu, in case of cpu-gpu synchronizing on NPU
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
+        if IS_NPU_AVAILABLE:
+            cu_seqlens = cu_seqlens.cpu()
 
+        # Modification: slice rotary_pos_emb and hidden_states if using cp
+        # Set global sequence length variables for cp
+        sequence_lengths = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cpu()
+        set_seq_len("visual", seq_len) # s
+        set_seq_len("per_visual", sequence_lengths) # s
+        ps = get_parallel_state()
+        # Split sequences across context parallel groups for distributed processing
+        if ps.is_cp_enable():
+            rotary_pos_emb = packed_data_split_forward_gather_backward_with_cp(rotary_pos_emb, dim=0, seq_lens=sequence_lengths)
+            hidden_states = packed_data_split_forward_gather_backward_with_cp(hidden_states, dim=0, seq_lens=sequence_lengths)
+        emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
+        position_embeddings = (emb.cos(), emb.sin())
         for blk in self.blocks:
             hidden_states = blk(
                 hidden_states,
@@ -1269,6 +1364,18 @@ class Qwen3_5VisionModel(Qwen3_5PreTrainedModel):
 
         merged_hidden_states = self.merger(hidden_states)
 
+        # Modification: Gather outputs from all context parallel ranks for the final result
+        set_seq_len("visual", seq_len // self.spatial_merge_size ** 2)
+        if ps.is_cp_enable():
+            gather_sizes = cal_split_sizes(get_seq_len("visual"), ps.get_ulysses_group_size())
+            merged_hidden_states = gather_forward_split_backward(
+                merged_hidden_states,
+                ps.get_ulysses_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes,
+            )
+        set_seq_len("visual", seq_len) # for recompute
         return BaseModelOutputWithPooling(
             last_hidden_state=hidden_states,
             pooler_output=merged_hidden_states,
@@ -1361,6 +1468,18 @@ class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
             position_ids=text_position_ids,
         )
         linear_attn_mask = self._update_linear_attn_mask(attention_mask, cache_position)
+        # Modification: For Ulysses, cu_seq_len needs to be calculated before position_ids split
+        ps = get_parallel_state()
+        if ps.is_ulysses_enable():
+            kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
+
+        # Modification: sequence parallel patch
+        total_seq_len = inputs_embeds.shape[1]
+        set_seq_len("total", total_seq_len)
+        if self.training and ps.is_ulysses_enable():
+            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
+            text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
+            inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
 
         hidden_states = inputs_embeds
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
@@ -1977,6 +2096,12 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
             loss = None
             if labels is not None:
                 loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
+
+        # Modification: all gather loss in all cp ranks for scaling up the grad.
+        ps = get_parallel_state()
+        if ps.is_cp_enable():
+            loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0)
+            loss = loss.sum()
 
         return Qwen3_5CausalLMOutputWithPast(
             loss=loss,
