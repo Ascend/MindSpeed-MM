@@ -1,22 +1,10 @@
 # MindSpeed MM 工具库使用指南
 
-<p align="left">
-        <b>简体中文</b> |
-</p>
-
-- [MindSpeed MM 工具库使用指南](#mindspeed-mm-工具库使用指南)
-  - [Profiling采集工具](#profiling采集工具)
-    - [静态采集](#静态采集)
-    - [动态采集](#动态采集)
-  - [Sora类模型特征提取](#sora类模型特征提取)
-  - [内存快照提取](#内存快照提取)
-  - [Tensorboard使用](#tensorboard使用)
-
-## <a id="jump1"></a>Profiling采集工具
+## Profiling采集工具  
 
 套件集成了昇腾[profiling采集工具](../../mindspeed_mm/tools/profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件即可生效。
 
-【若新增模型，请先适配如下设置】
++ 若新增模型，请先适配如下设置
 
 ```python
 from mindspeed_mm.tools.profiler import Profiler
@@ -29,7 +17,7 @@ while train:
 prof.stop()
 ```
 
-【通用的模型config设置】
++ 通用的模型config设置
 
 ```bash
 --enable                  # 指开启profiling采集
@@ -37,7 +25,7 @@ prof.stop()
 --ranks                   # 指profiling采集的rank, default 为-1， 指采集全部rank
 ```
 
-### 静态采集
+### 静态采集  
 
 `Static Profile`静态采集功能为执行模型训练过程中的指定的steps区间进行采集, 操作步骤如下：
 
@@ -83,6 +71,7 @@ prof.stop()
 ```
 
 **示例：**
+
 ```shell
 # 使用配置文件中的路径进行离线解析
 python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json
@@ -98,7 +87,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 
 对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以节约训练时资源占用。
 
-### 动态采集
+### 动态采集  
 
 `Dynamic Profile`动态采集功能可在执行模型训练过程中随时开启采集进程，操作步骤如下：
 
@@ -126,7 +115,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 
 动态采集的具体参数、入参表、及具体操作步骤等请[参考链接](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)
 
-## <a id="sorafeature"></a>Sora类模型特征提取
+## Sora类模型特征提取  
 
 [feature_extraction](../../mindspeed_mm/tools/feature_extraction)目录下工具可用于提取视频和文本特征并保存，目前支持单batch静态数据集特征提取。按需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件。
 
@@ -145,11 +134,11 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 
 配置完成后，调用[feature_extraction_t2v.sh](./feature_extraction/feature_extraction_t2v.sh)即可提取数据特征。
 
-## <a id="memory"></a>内存快照提取
+## 内存快照提取
 
 套件集成了昇腾[内存快照采集工具](../../mindspeed_mm/tools/mem_profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件即可生效。
 
-对复用[训练流程](../../mindspeed_mm/training.py)的模型，同样仅需修改配置。支持的配置项如下。
++ 对复用[训练流程](../../mindspeed_mm/training.py)的模型，同样仅需修改配置。支持的配置项如下。
 
 ```json5
 {
@@ -168,7 +157,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 }
 ```
 
-对独立的训练流程，可参考下列代码，对训练脚本做适配以使用profiler特性。参数配置同上。
++ 对独立的训练流程，可参考下列代码，对训练脚本做适配以使用profiler特性。参数配置同上。
 
 ```python
 from megatron.training import get_args
@@ -183,7 +172,7 @@ while iteration < args.train_iters:                 # 训练主循环
 memory_profiler.stop()                              # 停止采集
 ```
 
-对于不具备典型训练结构的脚本，或者局部的手动调试，可直接调用基础函数。(不推荐)
++ 对于不具备典型训练结构的脚本，或者局部的手动调试，可直接调用基础函数。(不推荐)
 
 ```python
 code_not_record()
@@ -192,7 +181,7 @@ _record()
 code_to_record()
 ```
 
-dump与开始录制可以在不同文件内。
++ dump与开始录制可以在不同文件内。
 
 ```python
 code_to_record()
@@ -203,7 +192,7 @@ _stop()
 
 dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件，可以在[torch页面](https://pytorch.org/memory_viz)可视化查看内存快照。
 
-## <a id="Tensorboard使用"></a>Tensorboard使用
+## Tensorboard使用  
 
 1. 若使用tensorboard，需进行安装：
 
