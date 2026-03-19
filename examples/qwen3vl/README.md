@@ -54,6 +54,8 @@ commit_id=c0dbe09
 
 <a id="jump1.2"></a>
 #### 2. 环境搭建
+⚠️如果您之前已经使用过MindSpeed-MM其他模型，这里强烈建议您切换至新的工作目录以及构建新的Conda环境，用以规避可能存在的部分第三方库版本不一致导致的风险。
+
 拉取MindSpeed MM代码仓，并进入代码仓根目录：
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
