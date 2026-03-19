@@ -44,7 +44,7 @@ commit_id=fc91372
 【模型开发时推荐使用配套的环境版本】
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
-> Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
+> Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本，CANN推荐使用8.5.1版本；
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
@@ -60,10 +60,6 @@ cd MindSpeed-MM
 执行如下指令一键安装：
 ```bash
 bash scripts/install.sh --msid eb10b92 && bash examples/fsdp2/qwen3_5/install_extensions.sh
-```
-如果您希望同时安装CANN，可以执行如下一键命令，除了安装mm依赖环境外，还会自动安装CANN：
-```bash
-bash scripts/install.sh --msid eb10b92 --install-cann && bash examples/fsdp2/qwen3_5/install_extensions.sh
 ```
 
 ---
@@ -205,10 +201,6 @@ data->dataset_param->basic_parameters->dataset
 `dataset`配置为./data/video_data_path.json
 注意此时`dataset`需要配置为相对路径
 **注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。
-
-【Data Packing】
-
-如需开启Data Packing，在`xxx_config.yaml`中将`packing`设置为`true`，并根据需要调整cutoff_len
 
 【模块冻结配置】
 
