@@ -16,8 +16,8 @@ parallel:
     reduce_dtype: fp32
   recompute: true
   recompute_plan:
-      apply_modules:
-        - model.language_model.layers.{*}
+    apply_modules:
+      - model.language_model.layers.{*}
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
@@ -62,8 +62,8 @@ data:
       train_on_prompt: false
       mask_history: false
       # tool_format: null
-      dataset_dir: LLaMA-Factory/data/
-      dataset: &DATASET_PATH LLaMA-Factory/data/mllm_format_llava_instruct_data.json
+      dataset_dir: /home/usr/data/
+      dataset: &DATASET_PATH /home/usr/data/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false
       preprocessing_batch_size: 1000
@@ -91,7 +91,7 @@ model:
   freeze:
     - model.visual
   loss_cfg:
-    loss_type: default   # If you want custom loss in model, loss_type can be set to "custom".
+    loss_type: default # If you want custom loss in model, loss_type can be set to "custom".
     router_aux_loss_coef: 0.0
   enable_chunk_loss: false
   chunkloss_plan:
@@ -141,11 +141,11 @@ tools:
       data_simplification: false
       aic_metrics_type: PipeUtilization
   memory_profile:
-      enable: false
-      start_step: 1
-      end_step: 2
-      save_path: ./memory_snapshot
-      dump_ranks: [0]
-      stacks: all
-      max_entries: null
-      mem_info: false
+    enable: false
+    start_step: 1
+    end_step: 2
+    save_path: ./memory_snapshot
+    dump_ranks: [0]
+    stacks: all
+    max_entries: null
+    mem_info: false

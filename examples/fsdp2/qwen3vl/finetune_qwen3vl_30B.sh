@@ -21,4 +21,4 @@ DISTRIBUTED_ARGS="
     --master_port $MASTER_PORT
 "
 torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
-    examples/fsdp2/qwen3vl/qwen3vl_config.yaml
+    examples/fsdp2/qwen3vl/qwen3vl_30B_config.yaml
