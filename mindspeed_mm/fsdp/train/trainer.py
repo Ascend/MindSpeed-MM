@@ -30,6 +30,15 @@ from mindspeed_mm.fsdp.utils.register import import_plugin
 from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.train.train_engine import TrainEngine
+from mindspeed_mm.fsdp.utils.lora_utils import (
+    add_lora_to_model,
+    freeze_parameters,
+    match_target_modules,
+    validate_lora_config,
+    get_lora_trainable_params,
+    print_lora_config,
+)
+from mindspeed_mm.fsdp.utils.lora_weight_manager import LoraWeightManager
 
 
 logger = logging.getLogger(__name__)
@@ -56,20 +65,22 @@ class Trainer():
 
         # Reset memory profiler
         memory_profiler.reset(args.tools.memory_profile)
-
+        self.lora_weight_manager = None
         # Build core training components
         self.model = self.get_model(model_provider)
         self.optimizer = self.get_optimizer()
         self.lr_scheduler = self.get_scheduler()
         self.train_dataloader = self.get_dataloader() if dataloader_provider is None else dataloader_provider(args)
         self.checkpointer = self.get_checkpointer()
-
+        
+        
         # Validate and calculate training iterations
         self._validate_and_set_train_iters(args)
 
         # Create the training engine
         self.trainer = TrainEngine(
-            args, self.train_dataloader, self.model, self.optimizer, self.lr_scheduler, self.checkpointer
+            args, self.train_dataloader, self.model, self.optimizer, self.lr_scheduler, self.checkpointer,
+            lora_weight_manager=self.lora_weight_manager
         )
 
     def _validate_and_set_train_iters(self, args: Arguments):
@@ -139,6 +150,10 @@ class Trainer():
         args = self.args
         model = self.get_foundation_model() if model_provider is None else model_provider()
 
+        # Apply LoRA adapters before FSDP2 sharding (if enabled)
+        if args.training.lora.enable:
+            model = self.enable_lora(model)
+
         # Apply parallelization strategy and model features
         model = self.model_parallel_applier(model)
         self.model_features_applier(model)
@@ -153,6 +168,89 @@ class Trainer():
             elif not args.training.load_rank0_and_broadcast:
                 to_empty_if_needed(model, device=get_device_type())
 
+        return model
+
+    def enable_lora(self, model: torch.nn.Module) -> torch.nn.Module:
+        """
+        Enable LoRA fine-tuning by injecting LoRA adapters into model.
+        
+        This method should be called before FSDP2 sharding to ensure
+        LoRA parameters are properly distributed across GPUs.
+        
+        Args:
+            model: The PyTorch model to inject LoRA adapters into.
+            
+        Returns:
+            The model with LoRA adapters injected.
+            
+        Raises:
+            ImportError: If PEFT library is not installed.
+            ValueError: If LoRA configuration is invalid.
+        """
+        lora_config = self.args.training.lora
+        
+        print_rank(logger.info, "Enabling LoRA fine-tuning...")
+        
+        # Validate LoRA configuration
+        try:
+            validate_lora_config(
+                rank=lora_config.rank,
+                alpha=lora_config.alpha,
+                target_modules=lora_config.target_modules,
+                dropout=lora_config.dropout,
+                init_lora_weights=lora_config.init_lora_weights,
+            )
+        except ValueError as e:
+            raise ValueError(f"Invalid LoRA configuration: {e}") from e
+        
+        # Match target modules using wildcard patterns
+        matched_modules = match_target_modules(model, lora_config.target_modules)
+        
+        if not matched_modules:
+            raise ValueError(
+                f"No modules matched target_modules: {lora_config.target_modules}. "
+                f"Please check your model architecture and target_modules configuration."
+            )
+        
+        print_rank(logger.info, f"Matched {len(matched_modules)} modules for LoRA:")
+        for module_name in matched_modules[:5]:
+            print_rank(logger.info, f"  - {module_name}")
+        if len(matched_modules) > 5:
+            print_rank(logger.info, f"  ... and {len(matched_modules) - 5} more")
+        
+        # Freeze base model parameters
+        freeze_parameters(model)
+        
+        # Inject LoRA adapters
+        model = add_lora_to_model(
+            model=model,
+            lora_rank=lora_config.rank,
+            lora_alpha=lora_config.alpha,
+            lora_target_modules=matched_modules,
+            lora_dropout=lora_config.dropout,
+            init_lora_weights=lora_config.init_lora_weights,
+            pretrained_lora_path=lora_config.pretrained_lora_path,
+            lora_target_modules_support=lora_config.lora_target_modules_support,
+        )
+        
+        # Get LoRA parameter statistics
+        trainable_params, total_params, stats_dict = get_lora_trainable_params(model)
+        
+        # Print LoRA configuration summary
+        print_lora_config(
+            rank=lora_config.rank,
+            alpha=lora_config.alpha,
+            target_modules=matched_modules,
+            dropout=lora_config.dropout,
+            init_lora_weights=lora_config.init_lora_weights,
+            trainable_params=trainable_params,
+            total_params=total_params,
+        )
+        self.lora_weight_manager = LoraWeightManager(model)
+        self.lora_weight_manager.verify_lora_weights()
+        
+        print_rank(logger.info, "LoRA fine-tuning enabled successfully")
+        
         return model
 
     def get_optimizer(self):

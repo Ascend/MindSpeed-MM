@@ -5,6 +5,7 @@ import logging
 import os
 
 from mindspeed_mm.fsdp.params.utils import allow_extra_fields
+from mindspeed_mm.fsdp.params.lora_args import LoraArguments
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ class Profiler:
 @dataclass
 class TrainingArguments:
     profile: Profiler = field(default_factory=Profiler)
+    lora: LoraArguments = field(default_factory=LoraArguments)
     lr: float = field(
         default=5e-5,
         metadata={"help": "Maximum learning rate or defult learning rate, or init learning rate for warmup."},

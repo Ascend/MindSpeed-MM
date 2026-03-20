@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class TrainEngine:
     """Training engine that manages the main training loop and operations."""
-    def __init__(self, args: Arguments, train_dataloader, model, optimizer, scheduler, checkpointer, **kwargs):
+    def __init__(self, args: Arguments, train_dataloader, model, optimizer, scheduler, checkpointer, lora_weight_manager=None, **kwargs):
         self.args = args
 
         self.model = model
@@ -29,6 +29,7 @@ class TrainEngine:
         self.optimizer = optimizer
         self.lr_scheduler = scheduler
         self.checkpointer = checkpointer
+        self.lora_weight_manager = lora_weight_manager
 
         # Training state tracking
         self.iteration, self.consumed_train_samples = 0, 0
@@ -227,6 +228,22 @@ class TrainEngine:
     def save(self, iteration, consumed_train_samples):
         """Save checkpoint with model, optimizer, and training state."""
         args = self.args
+        
+        # Handle LoRA save modes
+        if args.training.lora.enable:
+            if args.training.lora.save_mode == "lora_only":
+                # Save only LoRA adapter weights
+                if self.lora_weight_manager is not None:
+                    self.lora_weight_manager.save_lora_only(
+                        save_path=args.training.save,
+                        iteration=iteration,
+                    )
+                return
+            elif args.training.lora.save_mode == "full_model":
+                # Save full model with LoRA (default behavior)
+                pass
+        
+        # Default save behavior (full model)
         state = {
             "model": self.model,
             "extra_state": {
