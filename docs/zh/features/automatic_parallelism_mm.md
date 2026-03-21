@@ -13,7 +13,7 @@
 - 并行策略调优：
 根据集群的资源和模型支持的并行策略，构建全量的并行策略搜索空间；针对每种并行策略，将PP非均匀层最优切分问题转化为整数规划问题，联合考虑PP流水调度、内存限制和重计算策略，优化目标为端到端时间最短。遍历所有可行的并行策略，得到最优的并行方案；
 
-![1](../../sources/images/auto_parallel_mm/auto_parallel_mm_1.png)
+![1](../../../sources/images/auto_parallel_mm/auto_parallel_mm_1.png)
 
 
 ## 适配版本
@@ -168,7 +168,7 @@ find $SAVE_PATH -type f -exec chmod 640 {} \;
 
 ## 调优效果
 
-![2](../../sources/images/auto_parallel_mm/auto_parallel_mm_2.png)
+![2](../../../sources/images/auto_parallel_mm/auto_parallel_mm_2.png)
 
 
 ## 搜索结果说明

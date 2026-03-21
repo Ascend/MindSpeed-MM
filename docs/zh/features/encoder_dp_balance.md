@@ -7,7 +7,7 @@
 ## 解决方案
 
 Alltoall通信，多patch的DP传给少patch的DP，实现encoder的负载均衡。
-![alt text](../../sources/images/encoder_dp_balance/encoder_dp_balance.png)
+![alt text](../../../sources/images/encoder_dp_balance/encoder_dp_balance.png)
 
 ## 使用方法
 

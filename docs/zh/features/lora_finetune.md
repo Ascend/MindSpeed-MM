@@ -11,7 +11,7 @@ $
 W' = W + A \cdot B
 $
 
-![alt text](../../sources/images/lora_finetune/lora_model.png)
+![alt text](../../../sources/images/lora_finetune/lora_model.png)
 
    其中，$W'$ 是更新后的权重，$W$ 是原始权重，$A$ 和 $B$ 是需要学习的低秩矩阵。
 

@@ -18,7 +18,7 @@
 - **步骤 2**：在梯度累积维度上求均值  
 - **步骤 3**：在数据并行（DP）域上求均值  
 
-![默认方式](../../sources/images/vlm_model_loss_calculate_type/default.png)
+![默认方式](../../../sources/images/vlm_model_loss_calculate_type/default.png)
 
 ### 2. 按样本粒度计算 Loss（Calculate Per Sample Loss）
 
@@ -29,7 +29,7 @@
 - **步骤 3**：在梯度累积维度上求均值  
 - **步骤 4**：在数据并行（DP）域上求均值  
 
-![按样本计算](../../sources/images/vlm_model_loss_calculate_type/sample_level.png)
+![按样本计算](../../../sources/images/vlm_model_loss_calculate_type/sample_level.png)
 
 ### 3. 按 Token 粒度计算 Loss（Calculate Per Token Loss）
 
@@ -38,7 +38,7 @@
 - 直接累加全局批次中所有有效 token 的交叉熵损失  
 - 最终结果除以全局批次中的有效 token 总数  
 
-![按Token计算](../../sources/images/vlm_model_loss_calculate_type/token_level.png)
+![按Token计算](../../../sources/images/vlm_model_loss_calculate_type/token_level.png)
 
 ## 使用方法
 
