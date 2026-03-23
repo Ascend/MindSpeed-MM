@@ -16,6 +16,7 @@
   <tr>
     <td>昇腾NPU驱动</td>
     <td rowspan="2">在研版本</td>
+  </tr>
   <tr>
     <td>昇腾NPU固件</td>
   </tr>

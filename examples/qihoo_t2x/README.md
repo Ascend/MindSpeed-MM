@@ -11,11 +11,11 @@
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
   <tr>
       <td>
-          <img src="2.png" width="800"></img>
+          <img src="2.png" width="800">
           <p>Prompt: Close-up of a man's face wearing glasses against a colorful background.</p>
       </td>
       <td>
-          <img src="1.png" width="800"></img>
+          <img src="1.png" width="800">
           <p>Prompt: A dog wearing virtual reality goggles in sunset, 4k, high resolution.</p>
       </td>
   </tr>

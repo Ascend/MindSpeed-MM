@@ -114,7 +114,7 @@ export CPU_AFFINITY_CONF=<mode>,npu<value1>:<value2>-<value3>
 
 - `npu<value1>:<value2>-<value3>`：可选参数，表示自定义NPU业务绑核区间。
   - 自定义NPU业务绑核区间仅在开启绑核特性时生效，即mode配置为1或2时生效。
-  - npu<value1>:<value2>-<value3>表示第“value1”张卡绑定在“value2”到“value3”的闭区间CPU核上。例如，“npu0:0-2”表示NPU卡0的业务线程的绑核区间为[0,2]。
+  - `npu<value1>:<value2>-<value3>`表示第“value1”张卡绑定在“value2”到“value3”的闭区间CPU核上。例如，“npu0:0-2”表示NPU卡0的业务线程的绑核区间为[0,2]。
 
   - 支持修改部分NPU卡的业务绑核区间。例如，设置环境变量CPU_AFFINITY_CONF=1,npu0:0-0时，NPU卡0的业务绑核区间修改为[0,0]，而NPU卡1则保持原来的业务绑核区间。
 
@@ -139,7 +139,7 @@ export CPU_AFFINITY_CONF=<mode>,npu<value1>:<value2>-<value3>
 - [Swap-attention](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/swap_attention.md)
 - [Norm重计算](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/norm-recompute.md)
 
-### 通信优化          
+### 通信优化
 当前主要支持DP域的计算通信并行掩盖：
 [Megatron 权重更新通信隐藏](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/async-ddp-param-gather.md)。
 

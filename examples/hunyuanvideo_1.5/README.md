@@ -179,7 +179,7 @@ MindSpeed-MM/HunyuanVideo1.5
 ]
 ```
 
-修改文件`MindSpeed-MM/examples/hunyuanvideo_1.5/data.txt`，其中每一行表示一个数据集，包含两个参数。第一个参数表示数据文件夹的路径，即上述文件夹 </your_dataset_dir> 的绝对路径地址，第二个参数表示`data.json`文件的路径，用`,`分隔，示例如下：
+修改文件`MindSpeed-MM/examples/hunyuanvideo_1.5/data.txt`，其中每一行表示一个数据集，包含两个参数。第一个参数表示数据文件夹的路径，即上述文件夹 `</your_dataset_dir>` 的绝对路径地址，第二个参数表示`data.json`文件的路径，用`,`分隔，示例如下：
 ```
 /your_dataset_dir,/your_dataset_dir/data.json
 ```
