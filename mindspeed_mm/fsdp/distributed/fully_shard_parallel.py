@@ -1,6 +1,7 @@
 # Copyright (c) 2025, Huawei Technologies Co., Ltd. All rights reserved.
 import logging
-from typing import Any, Set
+from typing import Set, List, Any, Optional
+
 import torch
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard
@@ -77,13 +78,16 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
     ignored_modules, ignored_params = get_ignored_modules(model, fsdp_plan)
     # Get modules that should have FSDP applied
     fsdp_modules = get_fsdp_modules(model, fsdp_plan, ignored_modules)
+    # Get modules that FSDP hook add
+    hook_modules = get_fsdp_hook_modules(model, fsdp_plan)
 
     # Configure mixed precision if enabled
     config = {'mesh': fsdp_mesh, 'ignored_params': ignored_params, "reshard_after_forward": fsdp_plan.reshard_after_forward}
     config["mp_policy"] = get_mixprecision_policy(fsdp_plan)
     # Apply FSDP to specific child modules first
     for module in fsdp_modules:
-        fully_shard(module, **config)
+        hook_module = find_hook_module(module, hook_modules)
+        fully_shard(module, hook_module=hook_module, **config)
     # Apply FSDP to the entire model
     fully_shard(model, **config)
 
@@ -125,7 +129,7 @@ def _post_order_traverse(model: torch.nn.Module, parent_path: str = ""):
     yield parent_path, model
 
 
-def get_fsdp_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig, ignored_modules: Set[str]) -> dict[Any, Any]:
+def get_fsdp_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig, ignored_modules: Set[str]) -> List[Any]:
     fsdp_modules = []
     if fsdp_plan.apply_modules is None:
         return fsdp_modules
@@ -141,6 +145,34 @@ def get_fsdp_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig, ignored_
         if len(fsdp_modules) == 0:
             raise RuntimeError(f'[FSDP2] No module named {fsdp_plan.apply_modules}.')
     return fsdp_modules
+
+
+def get_fsdp_hook_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig) -> List[Any]:
+    fsdp_hook_modules = []
+    if fsdp_plan.apply_modules is None:
+        return fsdp_hook_modules
+    
+    # Traverse all modules in the model
+    if fsdp_plan.hook_modules:
+        for name, module in _post_order_traverse(model):
+            # Check if module matches any pattern in the FSDP plan
+            for pattern in fsdp_plan.hook_modules:
+                if module_name_match(pattern, name):
+                    print_rank(logger.debug, f'[FSDP2]: Apply fsdp2 hook to hook_module <{name}>')
+                    fsdp_hook_modules.append(module)
+        # Ensure at least one module matches the FSDP plan
+        if len(fsdp_hook_modules) == 0:
+            raise RuntimeError(f'[FSDP2] No module named {fsdp_plan.hook_modules}.')
+    
+    return fsdp_hook_modules
+
+
+def find_hook_module(target_module: torch.nn.Module, hook_module_list: List[torch.nn.Module]) -> Optional[torch.nn.Module]:
+    for hook_module in hook_module_list:
+        for _, sub_mod in hook_module.named_modules():
+            if sub_mod is target_module:
+                return hook_module
+    return None
 
 
 def get_ignored_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig):

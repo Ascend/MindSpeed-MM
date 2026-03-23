@@ -14,6 +14,8 @@ parallel:
       - model.language_model.rotary_emb
       - model.language_model
       - lm_head
+    hook_modules:
+      - model.language_model.layers.{*}
     param_dtype: bf16
     reduce_dtype: fp32
   recompute: true

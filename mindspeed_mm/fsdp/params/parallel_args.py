@@ -30,6 +30,9 @@ class FSDPPlanConfig:
 
     # pregather settings
     pregather: bool = False
+    
+    # fsdp2 hook manager
+    hook_modules: Optional[List[str]] = None
 
 
 @dataclass

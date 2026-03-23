@@ -9,25 +9,32 @@ from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
-from mindspeed_mm.fsdp.distributed.fully_shard_parallel import get_mixprecision_policy
+from mindspeed_mm.fsdp.distributed.fully_shard_parallel import (
+    get_mixprecision_policy,
+    get_fsdp_hook_modules,
+    find_hook_module
+)
 
 logger = logging.getLogger(__name__)
 
 
 def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, ep_plan: EPPlanConfig, fsdp_plan: FSDPPlanConfig) -> torch.nn.Module:
     efsdp_modules = get_efsdp_modules(model, ep_plan)
+    efsdp_hook_modules = get_fsdp_hook_modules(model, fsdp_plan)
+    
     config = {'mesh': efsdp_mesh,
               'mp_policy': get_mixprecision_policy(fsdp_plan),
               'shard_placement_fn': lambda x: Shard(1)}
 
     apply_hccl_premul_sum_patch()
     for experts in efsdp_modules:
+        hook_module = find_hook_module(experts, efsdp_hook_modules)
         if isinstance(experts, torch.nn.ModuleList):
             for expert in experts:
-                fully_shard(expert, **config)
+                fully_shard(expert, hook_module=hook_module, **config)
                 set_gradient_divide_factor(expert, ep_plan._gradient_divide_factor)
         else:
-            fully_shard(experts, **config)
+            fully_shard(experts, hook_module=hook_module, **config)
             set_gradient_divide_factor(experts, ep_plan._gradient_divide_factor)
 
     return model
