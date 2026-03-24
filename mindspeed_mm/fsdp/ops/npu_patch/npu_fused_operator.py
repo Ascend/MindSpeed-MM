@@ -1,6 +1,10 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
 import torch
 import torch_npu
+from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
+from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
+from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
+from mindspeed_mm.fsdp.ops.swiglu import swiglu
 
 
 # This api can improve performance on ASCEND NPU
@@ -42,3 +46,20 @@ def silu_forward_npu(self, hidden_states):
     """NPU optimized implementation for SiLU in 'forward' func in MLP layer."""
     gate_up = torch.cat([self.gate_proj(hidden_states), self.up_proj(hidden_states)], dim=-1)
     return self.down_proj(torch_npu.npu_swiglu(gate_up, dim=-1))
+
+
+def fused_moe_forward_npu(
+    self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor
+) -> torch.Tensor:
+    if routing_weights.size() != router_indices.size():
+        routing_weights = routing_weights.gather(1, router_indices)
+    batch_size = hidden_states.shape[0]
+    hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
+    permuted_hidden_states, row_ids_map = permute(hidden_states, router_indices.to(torch.int32), fused=True)
+    tokens_per_expert = torch.histc(router_indices, bins=self.num_experts, min=0, max=self.num_experts)
+    intermediate_hidden_states = grouped_matmul(permuted_hidden_states, self.gate_up_proj, tokens_per_expert, fused=True)
+    intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=True)
+    output = grouped_matmul(intermediate_activations, self.down_proj, tokens_per_expert, fused=True)
+    next_states = unpermute(output, row_ids_map, probs=routing_weights, fused=True)
+    next_states = next_states.view(batch_size, -1, self.hidden_size)
+    return next_states
