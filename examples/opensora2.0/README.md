@@ -88,6 +88,10 @@ cd ..
 
 # 安装其余依赖库
 pip install -e .
+
+# 指定av版本
+pip install av==16.1.0
+
 ```
 
 ---
