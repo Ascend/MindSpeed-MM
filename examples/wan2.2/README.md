@@ -226,7 +226,9 @@ mm-convert WanConverter mm_to_hf \
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |      SAVE_PATH    | 训练过程中保存的权重路径                            |
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |        CP         | 训练时的CP size（建议根据训练时设定的分辨率调整）   |
 
-**注**： 当前LOAD_PATH路径无效时，MindSpeed会对模型随机初始化从头训练。为防止加载失败，请留意日志中的warning信息，或者自行确认路径合法。
+**注**： 
+1. 当前LOAD_PATH路径无效时，MindSpeed会对模型随机初始化从头训练。为防止加载失败，请留意日志中的warning信息，或者自行确认路径合法。
+2. 使用断点续训功能时，需删去'--downcast-to-bf16'、'--no-load-optim'、'--no-load-rng'、'--no-save-optim'、'--no-save-rng'几项配置
 
 【并行化配置参数说明】：
 
