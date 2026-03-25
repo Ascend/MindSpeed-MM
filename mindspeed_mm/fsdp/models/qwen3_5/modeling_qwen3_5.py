@@ -1476,7 +1476,7 @@ class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
         # Modification: sequence parallel patch
         total_seq_len = inputs_embeds.shape[1]
         set_seq_len("total", total_seq_len)
-        if self.training and ps.is_ulysses_enable():
+        if ps.is_ulysses_enable():
             position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
             text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
             inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
@@ -2099,7 +2099,7 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
 
         # Modification: all gather loss in all cp ranks for scaling up the grad.
         ps = get_parallel_state()
-        if ps.is_cp_enable():
+        if loss is not None and ps.is_cp_enable():
             loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0)
             loss = loss.sum()
 
