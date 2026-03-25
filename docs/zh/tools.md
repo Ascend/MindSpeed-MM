@@ -4,7 +4,7 @@
 
 套件集成了昇腾[profiling采集工具](../../mindspeed_mm/tools/profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件即可生效。
 
-+ 若新增模型，请先适配如下设置
++ 若新增模型，请先适配如下设置：
 
 ```python
 from mindspeed_mm.tools.profiler import Profiler
@@ -17,7 +17,7 @@ while train:
 prof.stop()
 ```
 
-+ 通用的模型config设置
++ 通用的模型config设置：
 
 ```bash
 --enable                  # 指开启profiling采集
@@ -29,9 +29,9 @@ prof.stop()
 
 `Static Profile`静态采集功能为执行模型训练过程中的指定的steps区间进行采集, 操作步骤如下：
 
-1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 static, 设置 `ranks`
+1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 static, 设置 `ranks`。
 
-2. 配置静态采集的相关参数
+2. 配置静态采集的相关参数：
 
     【静态采集的参数设置/`static_param`】
 
@@ -49,17 +49,17 @@ prof.stop()
     --analyse_flag              # 是否启用在线解析
     ```
 
-3. 运行模型并采集profiling文件
+3. 运行模型并采集profiling文件。
 
-4. 解析profiling文件
+4. 解析profiling文件：
 
-`analyse_flag`为`true`时，将在模型运行过程中自动执行解析。
+    `analyse_flag`为`true`时，将在模型运行过程中自动执行解析。
 
-`analyse_flag`为`false`时，生成的profiling文件位于`save_path`路径下，需要搭配如下命令触发离线解析：
+    `analyse_flag`为`false`时，生成的profiling文件位于`save_path`路径下，需要搭配如下命令触发离线解析：
 
-```shell
-    python mindspeed_mm/tools/profiler.py
-```
+    ```shell
+        python mindspeed_mm/tools/profiler.py
+    ```
 
 ### 离线解析命令参数说明
 
@@ -83,7 +83,7 @@ python mindspeed_mm/tools/profiler.py --profiler-path ./npu_profiling
 python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --export-type text --export-type db
 ```
 
-此命令将解析指定路径下的所有profiling数据。参考 [离线解析](https://www.hiascend.com/document/detail/zh/canncommercial/850/devaids/Profiling/atlasprofiling_16_0034.html)。
+此命令将解析指定路径下的所有profiling数据。参考《[离线解析](https://www.hiascend.com/document/detail/zh/canncommercial/850/devaids/Profiling/atlasprofiling_16_0034.html)》。
 
 对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以节约训练时资源占用。
 
@@ -91,9 +91,9 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 
 `Dynamic Profile`动态采集功能可在执行模型训练过程中随时开启采集进程，操作步骤如下：
 
-1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 dynamic, 设置 `ranks`
+1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 dynamic, 设置 `ranks`。
 
-2. 配置动态采集的相关参数
+2. 配置动态采集的相关参数：
 
     【动态采集的参数设置`dynamic_param`】
 
@@ -104,16 +104,16 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
     - `config_path`指向空文件夹并自动生成`profiler_config.json`文件
     - `config_path`指已有动态配置文件`profiler_config.json`的路径
 
-3. 运行模型
+3. 运行模型。
 
-4. 在模型运行过程中，随时修改`profiler_config.json`文件配置，profiling采集会在下一个step生效并开启
+4. 在模型运行过程中，随时修改`profiler_config.json`文件配置，profiling采集会在下一个step生效并开启：
 
     【动态采集的实现方式】
 
     - 动态采集通过识别`profiler_config.json`文件的状态判断文件是否被修改，若感知到`profiler_config.json`文件被修改，`dynamic_profile`会在下一个step时开启Profiling任务
     - `config_path`目录下会自动记录`dynamic_profile`的维测日志
 
-动态采集的具体参数、入参表、及具体操作步骤等请[参考链接](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)
+动态采集的具体参数、入参表、及具体操作步骤等请参考《[Ascend PyTorch Profiler接口采集](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)》。
 
 ## Sora类模型特征提取  
 
@@ -125,14 +125,14 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 --save_path             # 特征数据存储路径
 ```
 
-使用前按需修改[feature_extraction_t2v.sh](./feature_extraction/feature_extraction_t2v.sh)文件中对应模型数据集和配置文件（VAE、T5）路径。
+使用前按需修改[feature_extraction_t2v.sh](../../examples/cogvideox/feature_extract/feature_extraction_t2v.sh)文件中对应模型数据集和配置文件（VAE、T5）路径。
 
 ```bash
 --MM_DATA       # 数据配置文件路径(.json)
 --MM_MODEL      # 模型配置文件路径(.json)
 ```
 
-配置完成后，调用[feature_extraction_t2v.sh](./feature_extraction/feature_extraction_t2v.sh)即可提取数据特征。
+配置完成后，调用[feature_extraction_t2v.sh](../../examples/cogvideox/feature_extract/feature_extraction_t2v.sh)即可提取数据特征。
 
 ## 内存快照提取
 
@@ -218,7 +218,7 @@ dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件
     "
     ```
 
-3. 打开tensorboard进行查看，`./tensorboard_dir/`为step2中的保存路径，按需修改
+3. 打开tensorboard进行查看，`./tensorboard_dir/`为step2中的保存路径，按需修改：
 
     ```shell
     tensorboard --logdir ./tensorboard_dir/
