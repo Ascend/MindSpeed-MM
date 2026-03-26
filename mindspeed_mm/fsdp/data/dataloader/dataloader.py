@@ -43,6 +43,7 @@ def prepare_sampler_dataloader(
     sampler_type="stateful_distributed_sampler",
     collate_param=None,
     dataset_param=None,
+    model=None,
 ):
     """
     Prepare a dataloader for distributed training. The dataloader will be wrapped by
@@ -89,7 +90,7 @@ def prepare_sampler_dataloader(
             if hasattr(dataset, 'collate_fn') and callable(getattr(dataset, 'collate_fn')):
                 collate_fn = dataset.collate_fn
             else:
-                collate_fn = DATA_COLLATOR[data_collate_type](**collate_param, dataset_param=dataset_param)
+                collate_fn = DATA_COLLATOR[data_collate_type](**collate_param, dataset_param=dataset_param, model=model)
 
         return StatefulDataLoader(
             dataset,
@@ -132,7 +133,7 @@ class PrefetchGradAccDataLoader:
         # Start a new iteration (reset state)
         self._current_iterator = self._generate_batches()
         return self  # Return self as the iterator
-        
+
     def __len__(self):
         if hasattr(self.base_dataloader, "__len__"):
             return len(self.base_dataloader)

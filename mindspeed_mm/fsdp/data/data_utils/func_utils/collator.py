@@ -15,22 +15,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 from dataclasses import dataclass
 from typing import Optional, Sequence, Dict, Any
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
+from peft import PeftModel
 from transformers import DataCollatorForSeq2Seq, ProcessorMixin
 from .mm_plugin import IGNORE_INDEX, IMAGE_PLACEHOLDER, AUDIO_PLACEHOLDER
 from .template import Template
+
+
+def postprocess_position_ids(new_postion_ids, packed_postion_ids):
+    result = []
+    for row_id, flat_tensor in enumerate(packed_postion_ids.unbind(0)):
+        row_position_ids = new_postion_ids[0, row_id, ...]
+        shift_mask = torch.zeros_like(row_position_ids)
+
+        zero_indices = torch.where(flat_tensor == 0)[0]
+        if len(zero_indices) == 0:
+            raise ValueError("There should be at least one example in each packed data.")
+        end_idx = zero_indices[-1]
+        for i in range(len(zero_indices) - 1):
+            start_idx, end_idx = zero_indices[i], zero_indices[i + 1]
+            shift_mask[start_idx:end_idx] = row_position_ids[start_idx]
+        shift_mask[end_idx:] = row_position_ids[end_idx]
+        result.append(new_postion_ids[:, row_id, :] - shift_mask)
+    return torch.stack(result).transpose(0, 1)
 
 
 @dataclass
 class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
     r"""Data collator that supports VLMs.
 
-    Features should contain input_ids, attention_mask, labels and images.
+    Features should contain input_ids, attention_mask, labels, and optionally contain images, videos and audios.
     """
 
     template: Optional["Template"] = None
@@ -40,7 +61,17 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
         if self.template is None:
             raise ValueError("Template is required for MultiModalDataCollator.")
 
-    def __call__(self, features: Sequence[Dict[str, Any]]) -> Dict[str, "torch.Tensor"]:
+        if isinstance(self.model, PeftModel):
+            self.model = self.model.base_model.model
+
+        if self.model is not None and hasattr(self.model, "get_rope_index"):  # for qwen2vl mrope
+            self.get_rope_func = self.model.get_rope_index  # transformers < 4.52.0 or qwen2.5 omni
+        elif self.model is not None and hasattr(self.model, "model") and hasattr(self.model.model, "get_rope_index"):
+            self.get_rope_func = self.model.model.get_rope_index  # transformers >= 4.52.0
+        else:
+            self.get_rope_func = None
+
+    def __call__(self, features: list[dict[str, Any]]) -> dict[str, "torch.Tensor"]:
         batch_images, batch_videos, batch_audios = [], [], []
         batch_imglens, batch_vidlens, batch_audlens, batch_input_ids = [], [], [], []
         for feature in features:
@@ -54,9 +85,10 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             batch_vidlens.append(len(videos))
             batch_audlens.append(len(audios))
             batch_input_ids.append(feature["input_ids"])
+
         fake_input_ids = []
         if (
-                self.template.mm_plugin.image_token is not None and sum(batch_imglens) == 0 and sum(batch_vidlens) == 0
+            self.template.mm_plugin.image_token is not None and sum(batch_imglens) == 0 and sum(batch_vidlens) == 0
         ):  # avoid process hanging in zero3/fsdp case
             fake_messages = [{"role": "user", "content": IMAGE_PLACEHOLDER}]
             fake_images = [Image.new("RGB", (64, 64), (255, 255, 255))]
@@ -72,7 +104,7 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             batch_imglens[0] = 1
 
         if (
-                self.template.mm_plugin.audio_token is not None and sum(batch_audlens) == 0
+            self.template.mm_plugin.audio_token is not None and sum(batch_audlens) == 0
         ):  # avoid process hanging in zero3/fsdp case
             fake_messages = [{"role": "user", "content": AUDIO_PLACEHOLDER}]
             fake_audios = [np.zeros(1600)]
@@ -114,38 +146,94 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             for i, feature in enumerate(features):
                 feature["token_type_ids"] = token_type_ids[i]
 
-        features: Dict[str, "torch.Tensor"] = super().__call__(features)
+        features: dict[str, torch.Tensor] = super().__call__(features)
 
-        if self.model is not None and hasattr(self.model, "get_rope_index"):  # for qwen2vl mrope
+        packed_postion_ids = None
+        if "position_ids" in features:
+            pad_size = features["input_ids"].shape[1] - features["position_ids"].shape[1]
+            if pad_size == 0:
+                packed_postion_ids = features["position_ids"]
+            elif pad_size < 0:
+                raise ValueError("Position ids length should not be greater than input ids length.")
+            elif self.tokenizer.padding_side == "right":
+                packed_postion_ids = F.pad(
+                    features["position_ids"], (0, pad_size), mode="constant", value=0)
+            else:
+                packed_postion_ids = F.pad(
+                    features["position_ids"], (pad_size, 0), mode="constant", value=0)
+
+        if self.get_rope_func is not None:
             rope_index_kwargs = {
                 "input_ids": features["input_ids"],
                 "image_grid_thw": mm_inputs.get("image_grid_thw"),
                 "video_grid_thw": mm_inputs.get("video_grid_thw"),
-                "attention_mask": features["attention_mask"],
+                "attention_mask": (features["attention_mask"] >= 1).float(),
             }
+            if "mm_token_type_ids" in inspect.signature(self.get_rope_func).parameters:
+                image_token_id = getattr(self.model.config, "image_token_id", None)
+                video_token_id = getattr(self.model.config, "video_token_id", None)
+                if image_token_id is not None or video_token_id is not None:
+                    mm_token_type_ids = torch.zeros_like(features["input_ids"])
+                    if image_token_id is not None:
+                        mm_token_type_ids[features["input_ids"] == image_token_id] = 1
+                    if video_token_id is not None:
+                        mm_token_type_ids[features["input_ids"] == video_token_id] = 2
+                    rope_index_kwargs["mm_token_type_ids"] = mm_token_type_ids
             if "second_per_grid_ts" in mm_inputs:  # for qwen2vl
                 rope_index_kwargs["second_per_grid_ts"] = mm_inputs.get("second_per_grid_ts")
-            if "video_second_per_grid" in mm_inputs:  # for qwen2omni
+            elif "video_second_per_grid" in mm_inputs:  # for qwen2.5 omni
                 rope_index_kwargs["second_per_grids"] = mm_inputs.get("video_second_per_grid")
-            if getattr(self.model.config, "model_type", None) == "qwen2_5_omni_thinker":  # for qwen2omni
+
+            if getattr(self.model.config, "model_type", None) in ["qwen2_5_omni_thinker", "qwen3_omni_moe_thinker"]:
                 rope_index_kwargs["use_audio_in_video"] = getattr(self.processor, "use_audio_in_video", False)
                 feature_attention_mask = mm_inputs.get("feature_attention_mask", None)
-                if feature_attention_mask is not None:
-                    audio_feature_lengths = torch.sum(
-                        feature_attention_mask, dim=1
-                    )
+                if feature_attention_mask is not None:  # refer llamafactory: need to get video image lengths
+                    audio_feature_lengths = torch.sum(feature_attention_mask, dim=1)
                     rope_index_kwargs["audio_seqlens"] = audio_feature_lengths  # prepare for input
 
-                delta0 = (1 - rope_index_kwargs["attention_mask"]).sum(dim=-1).unsqueeze(1)
-                # avoid conflict
-                new_position_ids, rope_deltas = self.model.get_rope_index(**rope_index_kwargs)
-                features["position_ids"], features["rope_deltas"] = (
-                    new_position_ids.clone(),
-                    rope_deltas - delta0,
-                )  # avoid inplace operation FIXME
-            else:  # for qwen2vl
-                features["position_ids"], features["rope_deltas"] = self.model.get_rope_index(**rope_index_kwargs)
+                features["position_ids"], rope_deltas = self.get_rope_func(**rope_index_kwargs)
+                features["rope_deltas"] = rope_deltas - (1 - rope_index_kwargs["attention_mask"]).sum(
+                    dim=-1
+                ).unsqueeze(-1)
+            else:  # for qwen vl
+                features["position_ids"], features["rope_deltas"] = self.get_rope_func(**rope_index_kwargs)
+
+            # remove shift offset for postion ids
+            if packed_postion_ids is not None:
+                features["position_ids"] = postprocess_position_ids(features["position_ids"], packed_postion_ids)
+
+        if (
+            self.model is not None
+            and getattr(self.model.config, "model_type", None)
+            in [
+                "glm4v",
+                "glm_ocr",
+                "Keye",
+                "qwen2_vl",
+                "qwen2_5_vl",
+                "qwen2_5_omni_thinker",
+                "qwen3_omni_moe_thinker",
+                "qwen3_5",
+                "qwen3_vl",
+                "qwen3_vl_moe",
+            ]
+            and ("position_ids" not in features or features["position_ids"].dim() != 3)
+        ):
+            raise ValueError(f"{self.model.config.model_type} requires 3D position ids for mrope.")
+
+        if "cross_attention_mask" in mm_inputs:  # for mllama inputs when pad_to_multiple_of is enabled
+            cross_attention_mask = mm_inputs.pop("cross_attention_mask")
+            seq_len = features["input_ids"].size(1)
+            orig_len = cross_attention_mask.size(1)
+            mm_inputs["cross_attention_mask"] = F.pad(cross_attention_mask, (0, 0, 0, 0, 0, seq_len - orig_len))
+
         features.update(mm_inputs)
+
+        if "image_bound" in features:  # for minicpmv inputs
+            bsz, seq_length = features["input_ids"].shape
+            features["position_ids"] = torch.arange(seq_length).long().repeat(bsz, 1)
+            return {"data": features, "input_ids": features["input_ids"], "labels": features["labels"]}
+
         return features
 
 

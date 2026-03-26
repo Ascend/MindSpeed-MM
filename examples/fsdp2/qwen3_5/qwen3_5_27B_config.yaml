@@ -30,7 +30,6 @@ data:
       content_tag: content
       user_tag: user
       assistant_tag: assistant
-      packing: false
 
     # 数据预处理
     preprocess_parameters:

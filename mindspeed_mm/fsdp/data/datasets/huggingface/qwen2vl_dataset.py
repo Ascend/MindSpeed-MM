@@ -91,17 +91,18 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
             val_dataset = align_dataset(val_dataset, dataset_attr, data_args)
 
         # -----------------convert text to token id ----------------------------------------------------------------------
-        if dataset_attr.ranking:
+        if data_args.stage == "rm":
             dataset_processor_cls = PairwiseDatasetProcessor
-        elif dataset_attr.packing:
-            data_args.cutoff_len -= 1
-            dataset_processor_cls = PackedSupervisedDatasetProcessor
-        elif dataset_attr.pretrain:
+        elif data_args.stage == "pretrain":
             # Will automatically enable sequences packing in pre-training.
             data_args.packing = data_args.packing if data_args.packing is not None else True
             dataset_processor_cls = PretrainDatasetProcessor
-        else:
-            dataset_processor_cls = SupervisedDatasetProcessor
+        elif data_args.stage == "sft":
+            if data_args.packing:
+                data_args.cutoff_len -= 1
+                dataset_processor_cls = PackedSupervisedDatasetProcessor
+            else:
+                dataset_processor_cls = SupervisedDatasetProcessor
         dataset_processor = dataset_processor_cls(template=template, tokenizer=tokenizer, processor=processor,
                                                 data_args=data_args)
         preprocess_func = dataset_processor.preprocess_dataset

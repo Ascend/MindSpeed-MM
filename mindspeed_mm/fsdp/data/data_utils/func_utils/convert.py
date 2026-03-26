@@ -276,11 +276,8 @@ class DatasetAttr:
     r"""
     Dataset attributes.
     """
-
     # basic configs
-    packing: bool = False
     ranking: bool = False
-    pretrain: bool = False
     # common columns
     system: Optional[str] = None
     images: Optional[str] = None
@@ -408,11 +405,21 @@ class DataArguments:
         default=False,
         metadata={"help": "Whether to perform preprocess during training."},
     )
+    stage: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Name of the validation dataset."},
+    )
 
     def __post_init__(self):
-        if self.dataset is None:
-            return
-        if not isinstance(self.dataset, list):
+        if self.neat_packing:
+            self.packing = True
+        if self.stage is None:
+            self.stage = "sft"
+        if self.stage not in ["sft", "pretrain", "rm"]:
+            raise ValueError(f"not support stage: {self.stage}")
+
+        if self.dataset and not isinstance(self.dataset, list):
             self.dataset = self.dataset.split(",")
 
     def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:

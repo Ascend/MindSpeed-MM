@@ -301,7 +301,8 @@ class Trainer():
             build_mm_dataloader,
             dataloader_param=dataloader_param,
             process_group=ps.get_dp_group(),
-            dataset_param=data_config.dataset_param
+            dataset_param=data_config.dataset_param,
+            model=self.model,
         )
         train_dataloader = build_dataloader(datasets)
 

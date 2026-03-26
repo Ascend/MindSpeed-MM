@@ -37,6 +37,10 @@ class CollateArguments:
         default=False,
         metadata={"help": ""}
     )
+    pad_to_multiple_of: int = field(
+        default=8,
+        metadata={"help": "Pad sequences to a multiple of this value for efficient processing."}
+    )
 
 
 @allow_extra_fields

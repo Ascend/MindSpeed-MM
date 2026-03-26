@@ -29,7 +29,13 @@ def build_mm_dataset(dataset_param):
     )
 
 
-def build_mm_dataloader(dataset, dataloader_param, process_group=None, dataset_param=None):
+def build_mm_dataloader(
+        dataset,
+        dataloader_param,
+        process_group=None,
+        dataset_param=None,
+        model=None,
+    ):
     """
     Build a multimodal dataloader based on different tasks
 
@@ -51,7 +57,10 @@ def build_mm_dataloader(dataset, dataloader_param, process_group=None, dataset_p
 
     if dataloader_mode == "sampler":
         data_loader = prepare_sampler_dataloader(
-            dataset, **dataloader_param, process_group=process_group, dataset_param=dataset_param
+            dataset, **dataloader_param,
+            process_group=process_group,
+            dataset_param=dataset_param,
+            model=model,
         )
         return data_loader
     else:

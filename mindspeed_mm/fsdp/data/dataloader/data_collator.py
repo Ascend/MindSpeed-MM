@@ -4,6 +4,7 @@ from mindspeed_mm.fsdp.data.data_utils.func_utils.collator import MultiModalData
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import load_tokenizer, IGNORE_INDEX
 from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
 from mindspeed_mm.fsdp.data.data_utils.func_utils.template import get_template_and_fix_tokenizer
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 
 
 class DataCollatorForQwen2vl:
@@ -14,10 +15,18 @@ class DataCollatorForQwen2vl:
         template = get_template_and_fix_tokenizer(tokenizer, dataset_param.basic_parameters.template)
         self.data_collator = MultiModalDataCollatorForSeq2Seq(
             template=template,
-            pad_to_multiple_of=8,  # for shift short attention
+            model=kwargs.get("model", None),
+            pad_to_multiple_of=kwargs.get("pad_to_multiple_of", 8),  # for shift short attention
             label_pad_token_id=IGNORE_INDEX if ignore_pad_token_for_loss else tokenizer.pad_token_id,
             **tokenizer_module,
         )
+        ps = get_parallel_state()
+        cp_size = ps.get_cp_group_size()
+        pad_to_multiple_of = self.data_collator.pad_to_multiple_of
+        if pad_to_multiple_of % cp_size != 0:
+            raise ValueError(f"pad_to_multiple_of {pad_to_multiple_of} must be divisible by context parallel size {cp_size}.")
+        if ps.ring_attention_size > 1 and pad_to_multiple_of % (2 * cp_size) != 0:
+            raise ValueError(f"pad_to_multiple_of {pad_to_multiple_of} must be divisible by context parallel size {cp_size} * 2 when using ring CP.")
 
     def __call__(self, *args, **kwargs):
         return self.data_collator(*args, **kwargs)
