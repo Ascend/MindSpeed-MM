@@ -43,7 +43,7 @@ class FunasrTrainer(Trainer):
     def setup_funasr_training(self):
         """Setup training for FunASR models using official FunASR dataloader logic."""
         self.checkpointer = self.get_checkpointer()
-        self.model_parallel_applier = ParallelApplier(self.args.parallel)
+        self.model_parallel_applier = ParallelApplier(self.args.parallel, self.args.training)
         
         # Get model FIRST to extract tokenizer/frontend
         self.model, self.tokenizer, self.frontend = get_funasr_model(self.args.model, self.model_parallel_applier)

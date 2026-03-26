@@ -8,15 +8,18 @@ from .expert_parallel.expert_fully_shard_parallel import expert_fully_shard_modu
 from .fully_shard_parallel import fully_shard_parallel_modules
 from .parallel_state import get_parallel_state
 from ..params.parallel_args import ParallelArguments
+from ..params.training_args import TrainingArguments
 
 
 class ParallelApplier:
-    def __init__(self, parallel_config: ParallelArguments):
+    def __init__(self, parallel_config: ParallelArguments, training_config: TrainingArguments):
         self.config = parallel_config
+        self.training_config = training_config
         self.parallel_state = get_parallel_state()
 
-    def apply_fsdp_modules(self, model):
-        model = fully_shard_parallel_modules(model, self.parallel_state.get_fsdp_device_mesh(), self.config.fsdp_plan)
+    def apply_fsdp_modules(self, model, training_config):
+        model = fully_shard_parallel_modules(model, self.parallel_state.get_fsdp_device_mesh(), self.config.fsdp_plan,
+                                             training_config)
         return model
 
     def apply_tp_modules(self, model):
@@ -44,5 +47,5 @@ class ParallelApplier:
         self.apply_tp_modules(model=model)
         self.apply_ep_modules(model=model)
         self.apply_recompute_modules(model=model)
-        model = self.apply_fsdp_modules(model=model)
+        model = self.apply_fsdp_modules(model=model, training_config=self.training_config)
         return model

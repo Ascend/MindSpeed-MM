@@ -14,6 +14,7 @@ from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
 from mindspeed_mm.fsdp.utils.device import get_torch_device, get_device_type
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
+from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ def pregather_fsdp_params(model: torch.nn.Module):
     get_torch_device().synchronize()
 
 
-def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, fsdp_plan: FSDPPlanConfig, **kwargs):
+def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, fsdp_plan: FSDPPlanConfig, training_config: TrainingArguments, **kwargs):
     """
     Apply Fully Sharded Data Parallelism (FSDP) to specified modules in the model.
     
@@ -52,9 +53,8 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
     """
     
     ps = get_parallel_state()
-    args = parse_args(Arguments)
 
-    if ps.fully_shard_parallel_size == 1 and not args.training.init_model_with_meta_device:
+    if ps.fully_shard_parallel_size == 1 and not training_config.init_model_with_meta_device:
 
         # wrap model in DDP
         dp_group = ps.get_dp_group()
