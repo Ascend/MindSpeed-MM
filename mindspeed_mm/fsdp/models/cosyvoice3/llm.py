@@ -150,14 +150,14 @@ class CosyVoice3LM(torch.nn.Module, BaseModel):
         instruct_token_len=None
         ):
         lm_target, lm_input = [], []
-        text_token = unpad_sequence(text_token, text_token_len.cpu(), batch_first=True)
-        speech_token = unpad_sequence(speech_token, speech_token_len.cpu(), batch_first=True)
-        text_token_emb = unpad_sequence(text_token_emb, text_token_len.cpu(), batch_first=True)
-        speech_token_emb = unpad_sequence(speech_token_emb, speech_token_len.cpu(), batch_first=True)
+        text_token = unpad_sequence(text_token, text_token_len, batch_first=True)
+        speech_token = unpad_sequence(speech_token, speech_token_len, batch_first=True)
+        text_token_emb = unpad_sequence(text_token_emb, text_token_len, batch_first=True)
+        speech_token_emb = unpad_sequence(speech_token_emb, speech_token_len, batch_first=True)
         # NOTE add instruct_token in CosyVoice3
         if instruct_token is not None and instruct_token_emb is not None and instruct_token_len is not None:
-            instruct_token = unpad_sequence(instruct_token, instruct_token_len.cpu(), batch_first=True)
-            instruct_token_emb = unpad_sequence(instruct_token_emb, instruct_token_len.cpu(), batch_first=True)
+            instruct_token = unpad_sequence(instruct_token, instruct_token_len, batch_first=True)
+            instruct_token_emb = unpad_sequence(instruct_token_emb, instruct_token_len, batch_first=True)
         else:
             instruct_token = [torch.empty(0).to(text_token[0])] * len(text_token)
             instruct_token_emb = [torch.empty(0, 896).to(text_token_emb[0])] * len(text_token)

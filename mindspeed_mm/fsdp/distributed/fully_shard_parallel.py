@@ -12,7 +12,7 @@ from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
-from mindspeed_mm.fsdp.utils.device import get_torch_device
+from mindspeed_mm.fsdp.utils.device import get_torch_device, get_device_type
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 
 
@@ -59,7 +59,7 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
         # wrap model in DDP
         dp_group = ps.get_dp_group()
         model = DDP(
-            model, 
+            model.to(get_device_type()), 
             process_group=dp_group, 
             find_unused_parameters=True,
             device_ids=[get_torch_device()],

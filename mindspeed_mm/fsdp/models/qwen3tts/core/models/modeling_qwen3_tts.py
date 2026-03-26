@@ -42,6 +42,7 @@ from transformers.modeling_utils import (ALL_ATTENTION_FUNCTIONS,
 from transformers.processing_utils import Unpack
 from transformers.utils import can_return_tuple, logging
 from transformers.utils.hub import cached_file
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from mindspeed_mm.fsdp.utils.register import model_register
 from .configuration_qwen3_tts import (Qwen3TTSConfig,
                                       Qwen3TTSSpeakerEncoderConfig,
@@ -710,24 +711,14 @@ def apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, mrope_interle
 
         dim = cos.shape[-1]
         modality_num = len(mrope_section)
-        cos = torch.cat([apply_interleaved_rope(cos[..., : dim // 2], modality_num)] * 2, dim=-1).unsqueeze(
-            unsqueeze_dim
-        )
-        sin = torch.cat([apply_interleaved_rope(sin[..., : dim // 2], modality_num)] * 2, dim=-1).unsqueeze(
-            unsqueeze_dim
-        )
+        cos = torch.cat([apply_interleaved_rope(cos[..., : dim // 2], modality_num)] * 2, dim=-1)
+        sin = torch.cat([apply_interleaved_rope(sin[..., : dim // 2], modality_num)] * 2, dim=-1)
     else:
         mrope_section = mrope_section * 2
-        cos = torch.cat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
-            unsqueeze_dim
-        )
-        sin = torch.cat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
-            unsqueeze_dim
-        )
+        cos = torch.cat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1)
+        sin = torch.cat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1)
 
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
-    return q_embed, k_embed
+    return apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=unsqueeze_dim)
 
 
 class Qwen3TTSTalkerAttention(nn.Module):
@@ -2358,3 +2349,8 @@ __all__ = [
     "Qwen3TTSPreTrainedModel",
     "Qwen3TTSTalkerModel",
 ]
+
+
+if IS_NPU_AVAILABLE:
+    from mindspeed_mm.fsdp.models.qwen3tts.npu_patch import apply_qwen3tts_npu_patch
+    apply_qwen3tts_npu_patch()

@@ -2,6 +2,10 @@
 parallel:
   tensor_parallel_size: 1
   fully_shard_parallel_size: auto
+  pregather: true
+  fsdp_plan:
+    param_dtype: bf16
+    reduce_dtype: fp32
   recompute: false
   ring_attention_size: 1
   ulysses_parallel_size: 1
@@ -49,8 +53,8 @@ training:
   lr_decay_style: constant
   lr_warmup_ratio: 0
   weight_decay: 0.01
-  train_iters: 100
-  clip_grad: 0.0
+  train_iters: 200
+  clip_grad: 1.0
   init_model_with_meta_device: false
   optimizer: adamw
   adam_fused: false

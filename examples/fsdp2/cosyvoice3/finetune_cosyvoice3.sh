@@ -1,6 +1,7 @@
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 export NON_MEGATRON=true
+export TASK_QUEUE_ENABLE=2
 export CPU_AFFINITY_CONF=1
 export MULTI_STREAM_MEMORY_REUSE=2
 export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"

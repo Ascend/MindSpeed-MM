@@ -19,8 +19,12 @@ def apply_transformers_rope_half_npu(q, k, cos, sin, position_ids=None, unsqueez
     """NPU optimized implementation for RoPE(half mode)."""
     cos = cos.unsqueeze(unsqueeze_dim)
     sin = sin.unsqueeze(unsqueeze_dim)
-    q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
-    k_embed = torch_npu.npu_rotary_mul(k, cos, sin)
+    if q.shape[0] * q.shape[1] <= 128:
+        q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
+        k_embed = torch_npu.npu_rotary_mul(k, cos, sin)
+    else:
+        q_embed = (q * cos) + (_rotate_half(q) * sin)
+        k_embed = (k * cos) + (_rotate_half(k) * sin)
     return q_embed.to(q.dtype), k_embed.to(k.dtype)
 
 
@@ -63,3 +67,10 @@ def fused_moe_forward_npu(
     next_states = unpermute(output, row_ids_map, probs=routing_weights, fused=True)
     next_states = next_states.view(batch_size, -1, self.hidden_size)
     return next_states
+
+
+def _rotate_half(x):
+    """Rotates half the hidden dims of the input."""
+    x1 = x[..., : x.shape[-1] // 2]
+    x2 = x[..., x.shape[-1] // 2:]
+    return torch.cat((-x2, x1), dim=-1)

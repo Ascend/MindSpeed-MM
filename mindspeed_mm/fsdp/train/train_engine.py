@@ -6,6 +6,7 @@ import torch
 from mindspeed.fsdp.utils.log import print_rank
 
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
+from mindspeed_mm.fsdp.distributed.fully_shard_parallel import pregather_fsdp_params
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
@@ -122,6 +123,9 @@ class TrainEngine:
             # Record memory usage if enabled
             memory_profiler.step()
             start_time = get_time(barrier=True)
+
+            if self.args.parallel.fsdp_plan.pregather:
+                pregather_fsdp_params(self.model)
 
             loss = self.train_step(train_dataloader_iter)
 
