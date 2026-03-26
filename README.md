@@ -219,7 +219,7 @@ MindSpeed MM具体的安装请参考[安装指南](https://gitcode.com/Ascend/Mi
 
 ---
 
-MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者快速上手预置模型在昇腾NPU上的高效运行。具体的操作请参考[快速上手](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/getting_start.md#%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B)。
+MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者快速上手预置模型在昇腾NPU上的高效运行。具体的操作请参考[快速上手](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/getting_start.md#%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B)。
 
 # 特性/模型介绍
 
@@ -1085,7 +1085,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 
 # 常用参数解释说明
 
-针对MindSpeed MM套件中运行所使用的参数做解释说明，具体见[README](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/args_readme.md)
+针对MindSpeed MM套件中运行所使用的参数做解释说明，具体见[README](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/args_readme.md)
 
 # 特性规划
 
