@@ -21,13 +21,12 @@ DISTRIBUTED_ARGS="
     --master_port $MASTER_PORT
 "
 
-LOG_DIR=./outputs/ltx2_av_lora_av/logs
+LOG_DIR=./logs/ltx2_t2av
 mkdir -p "$LOG_DIR"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="$LOG_DIR/mm_train_av_${TIMESTAMP}.log"
 
-echo "AV Training log will be saved to: $LOG_FILE"
+echo "Training log will be saved to: $LOG_FILE"
 
 stdbuf -oL -eL torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
     examples/fsdp2/ltx2/ltx2_config_t2av.yaml 2>&1 | tee "$LOG_FILE"
-

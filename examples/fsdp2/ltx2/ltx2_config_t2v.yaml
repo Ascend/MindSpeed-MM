@@ -1,0 +1,125 @@
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - transformer.patchify_proj
+      - transformer.caption_projection
+      - transformer.transformer_blocks.{*}
+      - transformer.proj_out
+    param_dtype: bf16
+    reduce_dtype: fp32
+  recompute: false
+  recompute_plan:
+    apply_modules:
+      - transformer.transformer_blocks.{*}
+  context_parallel_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+
+ltx2_dataset_custom: &LTX2_DATASET_CUSTOM
+  latents_dir: latents
+  conditions_dir: conditions
+  with_audio: false
+  audio_latents_dir: audio_latents
+  audio_channels: 8
+  audio_mel_bins: 16
+  audio_prompt_key: audio_prompt_embeds
+  fps: 24.0
+  first_frame_conditioning_p: 0.0
+  timestep_sampling_mode: shifted_logit_normal
+  seed: 42
+  timestep_sampling_params:
+    std: 1.0
+    min_tokens: 1024
+    max_tokens: 4096
+    min_shift: 0.95
+    max_shift: 2.05
+
+data:
+  dataset_param:
+    dataset_type: ltx2_precomputed
+    preprocess_parameters: {}
+    ltx2_dataset_custom: *LTX2_DATASET_CUSTOM
+    basic_parameters:
+      dataset_dir: /home/data/FineVideo_LTX2/.precomputed
+      dataset: ltx2_precomputed
+      max_samples: 10000
+  dataloader_param:
+    pin_memory: true
+    shuffle: false
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 0
+    collate_param:
+      model_name: ltx2
+      ignore_pad_token_for_loss: false
+
+model:
+  model_id: ltx2
+  model_name_or_path: &LTX2_CHECKPOINT /home/data/LTX_2/ltx-2-19b-dev.safetensors
+  checkpoint_path: *LTX2_CHECKPOINT
+  transformer:
+    num_attention_heads: 32
+    attention_head_dim: 128
+    in_channels: 128
+    out_channels: 128
+    num_layers: 48
+    cross_attention_dim: 4096
+    caption_channels: 4096
+    positional_embedding_max_pos: [20, 2048, 2048]
+    timestep_scale_multiplier: 1000
+    rope_type: interleaved
+  text_encoder_path: /home/data/gemma-3-12b-it-qat-q4_0-unquantized
+  enable_gradient_checkpointing: true
+  loss_cfg:
+    loss_type: raw
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr:  1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.1
+  lr_min: 1.0e-5
+  weight_decay: 0.01
+  train_iters: 200
+  clip_grad: 1.0
+  init_model_with_meta_device: false
+  optimizer: adamw
+  adam_fused: false
+  save: outputs/ltx2_v/checkpoints
+  save_interval: 250
+  use_deter_comp: false
+  plugin:
+    - mindspeed_mm/fsdp/models/ltx2/ltx2_fsdp2
+    - mindspeed_mm/fsdp/data/datasets/ltx2
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+    enable: false
+    start_step: 1
+    end_step: 2
+    save_path: ./memory_snapshot
+    dump_ranks: [0]
+    stacks: all
+    max_entries: null
+    mem_info: false

@@ -21,7 +21,7 @@ DISTRIBUTED_ARGS="
     --master_port $MASTER_PORT
 "
 
-LOG_DIR=./outputs/ltx2_v/logs
+LOG_DIR=./logs/ltx2_av_t2v
 mkdir -p "$LOG_DIR"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="$LOG_DIR/mm_train_${TIMESTAMP}.log"
