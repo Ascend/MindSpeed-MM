@@ -25,6 +25,7 @@ GBS=$(($WORLD_SIZE*$MBS/$CP))
 MM_DATA="./examples/whisper/data.json"
 MM_MODEL="./examples/whisper/model.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
+SAVE_PATH="save_dir"
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $GPUS_PER_NODE \
@@ -81,6 +82,7 @@ OUTPUT_ARGS="
     --save-interval 10000 \
     --eval-interval 10000 \
     --eval-iters 10 \
+    --save $SAVE_PATH \
 "
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs

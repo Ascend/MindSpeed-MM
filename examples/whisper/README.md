@@ -75,7 +75,7 @@
     cd ..
 
     # 安装其余依赖库
-    pip install librosa
+    pip install librosa datasets==3.6.0
     conda install -c conda-forge libsndfile
     pip install -e .
 ```
