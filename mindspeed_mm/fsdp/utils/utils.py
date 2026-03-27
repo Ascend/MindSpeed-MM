@@ -16,14 +16,31 @@ def to_empty_if_needed(model, device: torch.device | str | int | None, recurse: 
         device: The desired device of the parameters and buffers in the module. If `None`, the default device is used.
         recurse: Whether parameters and buffers of submodules should be recursively moved to the specified device.
 
-    Returns:
-        The (maybe) moved module.
+    Behavior Scenarios:
+        Scenario 1: Meta initialization + CPU offload (e.g., FSDP2 with offload_to_cpu=True)
+        -------------------------------------------------------------------------
+          - Parameters:               Meta => CPU
+          - Buffers:                  CUDA => CUDA
+          - Tensors(eg. inv_freq):    CPU => CUDA
+        
+        Scenario 2: Meta initialization only (no CPU offload)
+        -------------------------------------------------------------------------
+          - Parameters:               Meta => CUDA
+          - Buffers:                  CUDA => CUDA
+          - Tensors(eg. inv_freq):    CPU => CUDA
     """
     device = torch.empty((), device=device).device
-    return model._apply(
-        lambda t: torch.empty_like(t, device=device) if t.device != device else t,
-        recurse=recurse,
-    )
+        
+    def _replace_tensor(t):
+        # Case 1: This is a trainable parameter (subclass of torch.Tensor with requires_grad)
+        if isinstance(t, torch.nn.Parameter):# meta or cpu
+            return torch.empty_like(t, device=device) if t.device != device else t
+        else:
+            # Case 2: This is a buffer or regular tensor (non-parameter)
+            # we do not offload buffer to cpu when enable FSDP2 offload_to_cpu function.
+            return t.to(device=get_device_type()) if t.device == torch.device('cpu') else t
+
+    return model._apply(_replace_tensor, recurse=recurse)
 
 
 def tensor_to_dtensor(t: torch.Tensor, device_mesh, placements):

@@ -4,7 +4,7 @@ from typing import Set, List, Any, Optional
 
 import torch
 from torch.distributed.device_mesh import DeviceMesh
-from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard
+from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard, CPUOffloadPolicy
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from mindspeed.fsdp.utils.log import print_rank
@@ -82,7 +82,10 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
     hook_modules = get_fsdp_hook_modules(model, fsdp_plan)
 
     # Configure mixed precision if enabled
-    config = {'mesh': fsdp_mesh, 'ignored_params': ignored_params, "reshard_after_forward": fsdp_plan.reshard_after_forward}
+    cpu_offload = None
+    if fsdp_plan.cpu_offload:
+        cpu_offload = CPUOffloadPolicy(pin_memory=True)
+    config = {'mesh': fsdp_mesh, 'ignored_params': ignored_params, "reshard_after_forward": fsdp_plan.reshard_after_forward, "offload_policy": cpu_offload}
     config["mp_policy"] = get_mixprecision_policy(fsdp_plan)
     # Apply FSDP to specific child modules first
     for module in fsdp_modules:

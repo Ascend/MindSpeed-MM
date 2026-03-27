@@ -46,8 +46,13 @@ def set_accelerator_compatible(fallback_module=None):
     sys.modules['torch.accelerator'] = accelerator_module
 
 
-def get_dist_comm_backend() -> str:
+def get_dist_comm_backend(cpu: bool = False) -> str:
     """Return distributed communication backend type based on device type."""
+    if cpu:
+        if IS_CUDA_AVAILABLE:
+            return "cpu:gloo,cuda:nccl"
+        elif IS_NPU_AVAILABLE:
+            return "cpu:gloo,npu:hccl"
     if IS_CUDA_AVAILABLE:
         return "nccl"
     elif IS_NPU_AVAILABLE:

@@ -34,6 +34,8 @@ class FSDPPlanConfig:
     # fsdp2 hook manager
     hook_modules: Optional[List[str]] = None
 
+    cpu_offload: bool = False
+
 
 @dataclass
 class TPPlanConfig:

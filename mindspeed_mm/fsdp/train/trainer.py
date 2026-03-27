@@ -127,7 +127,7 @@ class Trainer():
 
         # Initialize process group for distributed training
         if not torch.distributed.is_initialized():
-            torch.distributed.init_process_group(backend=get_dist_comm_backend())
+            torch.distributed.init_process_group(backend=get_dist_comm_backend(cpu=args.parallel.fsdp_plan.cpu_offload))
 
         # Initialize parallel communication groups and mesh
         init_parallel_state(**asdict(args.parallel))
@@ -160,13 +160,18 @@ class Trainer():
 
         # Initialize weights on meta device if specified (for memory efficiency)
         if args.training.init_model_with_meta_device:
+            if args.parallel.fsdp_plan.cpu_offload:
+                device = "cpu"
+            else:
+                device = get_device_type()
+
             if args.training.load is None and args.training.load_rank0_and_broadcast:
                 raise ValueError("Must set `training.load` when `training.load_rank0_and_broadcast` is True, otherwise the model will be initialized with meta device but no weights will be loaded.")
             elif args.training.load is None and not args.training.load_rank0_and_broadcast:
-                to_empty_if_needed(model, device=get_device_type())
+                to_empty_if_needed(model, device=device)
                 init_model_weights(model)
-            elif not args.training.load_rank0_and_broadcast:
-                to_empty_if_needed(model, device=get_device_type())
+            else: # load is not None
+                to_empty_if_needed(model, device=device)
 
         return model
 

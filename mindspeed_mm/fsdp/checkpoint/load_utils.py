@@ -42,7 +42,6 @@ def rank0_load_and_broadcast_weights(load_state, storage_reader):
     OPTIMIZER = "optimizer"
 
     model = load_state[MODEL].model
-    to_empty_if_needed(model, device=get_device_type())
 
     model_state_dict = load_state[MODEL].state_dict()
     params_to_load = set(model_state_dict.keys())
