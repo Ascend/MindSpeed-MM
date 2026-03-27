@@ -81,7 +81,8 @@ class Qwen3VLConverter(Converter):
         self, 
         load_dir: str = "mm_save_dir/release",     # Input: Directory containing DCP shards
         save_dir: Path = "Qwen3-VL-xxB-hf",         # Output: Directory to save merged HF model
-        model_assets_dir: str = "Qwen3-VL-xxB"     # Reference: Original HF model dir (for config/tokenizer)
+        model_assets_dir: str = "Qwen3-VL-xxB",     # Reference: Original HF model dir (for config/tokenizer)
+        to_bf16: bool = False,
     ):
         """
         Merges torch-dcp shards and converts them back into standard Hugging Face format.
@@ -102,6 +103,10 @@ class Qwen3VLConverter(Converter):
                 value = state_dict.pop(key)
                 new_key = key.replace(self.dcp_prefix, self.hf_prefix, 1) if key.startswith(self.dcp_prefix) else key
                 state_dict[new_key] = value
+
+                # Optionally convert the weights to BF16
+                if to_bf16:
+                    state_dict[new_key] = state_dict[new_key].to(dtype=torch.bfloat16)
             
             return state_dict
 

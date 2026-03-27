@@ -385,8 +385,9 @@ mm-convert Qwen3VLConverter dcp_to_hf \
   --load_dir save_dir/iter_000xx/ \
   --save_dir save_dir/iter_000xx_hf/ \
   --model_assets_dir ./ckpt/Qwen3-VL-xxB-Instruct \
+  --to_bf16 False \
 ```
-其中，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径，`--model_assets_dir`原始huggingface权重的路径。
+其中，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径，`--model_assets_dir`原始huggingface权重的路径，`--to_bf16`表示权重数据类型是否从fp32转换成bf16。
 
 完成权重转换之后，即可参考如下教程使用transformers库进行推理。
 ```
