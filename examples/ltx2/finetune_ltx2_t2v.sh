@@ -29,4 +29,4 @@ LOG_FILE="$LOG_DIR/mm_train_${TIMESTAMP}.log"
 echo "Training log will be saved to: $LOG_FILE"
 
 stdbuf -oL -eL torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
-    examples/fsdp2/ltx2/ltx2_config_t2v.yaml 2>&1 | tee "$LOG_FILE"
+    examples/ltx2/ltx2_config_t2v.yaml 2>&1 | tee "$LOG_FILE"

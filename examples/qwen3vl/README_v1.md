@@ -92,7 +92,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
 #   |—— release
 #   |—— latest_checkpointed_iteration.txt
 ```
-并在`qwen3vl_30B_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
+并在`qwen3vl_30B_config_v1.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 
 
 ---
@@ -133,7 +133,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 【数据目录配置】
 
-根据实际情况修改`qwen3vl_30B_config.yaml`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段，建议均配置为绝对路径。
+根据实际情况修改`qwen3vl_30B_config_v1.yaml`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段，建议均配置为绝对路径。
 
 示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/video_data_path.json，此时配置如下：
 `dataset_dir`配置为/home/user/data/;
@@ -143,15 +143,15 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 【模块冻结配置】
 
-当前支持自定义冻结模块，在`qwen3vl_30B_config.yaml`中model->freeze字段中配置需要冻结的模块即可实现相应模块冻结。
+当前支持自定义冻结模块，在`qwen3vl_30B_config_v1.yaml`中model->freeze字段中配置需要冻结的模块即可实现相应模块冻结。
 
 【模型保存加载及日志信息配置】
 
-根据实际情况配置`qwen3vl_30B_config.yaml`的`training`参数，包括保存路径以及保存间隔`save`、`save_interval`。
+根据实际情况配置`qwen3vl_30B_config_v1.yaml`的`training`参数，包括保存路径以及保存间隔`save`、`save_interval`。
 
 【单机运行配置】
 以Qwen3-VL-30B模型为例：
-配置`examples/fsdp2/qwen3vl/finetune_qwen3vl_30B.sh`参数如下
+配置`examples/qwen3vl/finetune_qwen3vl_30B_v1.sh`参数如下
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
@@ -178,9 +178,9 @@ NNODES: 一共几个节点
 <a id="jump4.3"></a>
 #### 3. 启动微调
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
-可在`qwen3vl_30B_config.yaml`的`model`参数中配置上述文档中的`loss_type`。
+可在`qwen3vl_30B_config_v1.yaml`的`model`参数中配置上述文档中的`loss_type`。
 ```shell
-bash examples/fsdp2/qwen3vl/finetune_qwen3vl_30B.sh
+bash examples/qwen3vl/finetune_qwen3vl_30B_v1.sh
 ```
 
 

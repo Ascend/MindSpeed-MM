@@ -173,7 +173,7 @@ NODE_RANK: 当前节点序号
 在 `kimik2_5_config.yaml` 文件中配置好数据集路径后，使用如下命令，即可实现Kimi-K2.5的训练：
 
 ```shell
-bash examples/fsdp2/kimik2_5/finetune_kimik2_5.sh
+bash examples/kimik2_5/finetune_kimik2_5.sh
 ```
 
 <a id="jump4"></a>

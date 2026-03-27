@@ -89,7 +89,7 @@ cd FunASR
 git checkout 42b6d3b
 pip install -e .
 cd ..
-pip install -r examples/fsdp2/funasr/requirements.txt
+pip install -r examples/funasr/requirements.txt
 ```
 
 ---
@@ -129,9 +129,9 @@ git clone https://www.modelscope.cn/datasets/FunAudioLLM/funasr-demo.git
 # input_dir # Fun-ASR的data路径
 # output_file  # 保存路径
 # local_prefix # funasr-demo路径
-python examples/fsdp2/funasr/data_conversion.py \
+python examples/funasr/data_conversion.py \
     --input_dir "./Fun-ASR/data" \
-    --output_dir "./examples/fsdp2/funasr" \
+    --output_dir "./examples/funasr" \
     --remote_prefix '!https://modelscope.cn/datasets/FunAudioLLM/funasr-demo/resolve/master' \
     --local_prefix "./funasr-demo"
 ```
@@ -144,7 +144,7 @@ python examples/fsdp2/funasr/data_conversion.py \
 
 ### 2. 启动微调
 
-在 `examples/fsdp2/funasr/funasr_config.yaml` 文件中配置好数据集和权重路径:
+在 `examples/funasr/funasr_config.yaml` 文件中配置好数据集和权重路径:
 
 1. 将`model_name_or_path`修改为本地权重所在目录
 2. 将`train_data_set_list`，`val_data_set_list`修改为数据转换后后保存的jsonl路径
@@ -152,7 +152,7 @@ python examples/fsdp2/funasr/data_conversion.py \
 使用如下命令，启动FunASR的微调任务：
 
 ```shell
-bash examples/fsdp2/funasr/finetune_funasr.sh
+bash examples/funasr/finetune_funasr.sh
 ```
 
 ## 环境变量声明
