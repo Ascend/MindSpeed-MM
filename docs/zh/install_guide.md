@@ -2,7 +2,7 @@
 
   本文主要向用户介绍如何快速基于PyTorch框架以及MindSpore框架完成MindSpeed MM（多模态模型套件）的安装。
 
-## 硬件支持度
+## 硬件配套和支持的操作系统
 
 **表 1**  产品硬件支持列表
 
@@ -21,7 +21,7 @@
 
 ## 安装前准备
 
-根据[版本说明](RELEASENOTE.md)获取配套的版本软件。
+根据[版本说明](./release_notes.md)获取配套的版本软件。
 
 ### 驱动固件安装
 
@@ -36,18 +36,16 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
 ### CANN安装
 
-下载[CANN](https://www.hiascend.com/developer/download/community/result?module=cann)，请根据系统选择`aarch64`或`x86_64`对应版本的`cann-toolkit`、`cann-ops`和`cann-nnal`。参考[CANN安装](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850alpha001/softwareinst/instg/instg_0008.html?OS=Debian&Software=cannToolKit)或执行以下命令安装：
+获取[CANN](https://www.hiascend.com/cann/download)，安装配套版本的Toolkit、ops和NNAL并配置CANN环境变量。具体请参考《[CANN 软件安装指南](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0000.html)》（商用版）或《[CANN 软件安装指南](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/softwareinst/instg/instg_0000.html)》（社区版）。
 
 ```shell
-# 因为版本迭代，包名存在出入，根据实际修改
-chmod +x Ascend-cann-toolkit_<version>_linux-<arch>.run
-./Ascend-cann-toolkit_<version>_linux-<arch>.run --install
-chmod +x Ascend-cann-<chip_type>-ops_<version>_linux-<arch>.run
-./Ascend-cann-<chip_type>-ops_<version>_linux-<arch>.run --install
+#基于PyTorch框架设置环境变量
 source /usr/local/Ascend/cann/set_env.sh # 修改为实际安装的Toolkit包路径
-chmod +x Ascend-cann-nnal_<version>_linux-<arch>.run
-./Ascend-cann-nnal_<version>_linux-<arch>.run --install
-# 设置环境变量
+source /usr/local/Ascend/nnal/atb/set_env.sh # 修改为实际安装的nnal包路径
+```
+
+```shell
+#基于MindSpore框架设置环境变量
 source /usr/local/Ascend/cann/set_env.sh # 修改为实际安装的Toolkit包路径
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0 # 修改为实际安装的nnal包路径
 ```
@@ -73,8 +71,8 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
 
 安装MindSpeed MM有如下两种方式：
 
-  - 一键安装：快速安装最新配套的第三方依赖及MindSpeed MM版本
-  - 手动安装：灵活指定需要使用的第三方依赖及MindSpeed MM版本
+  - 一键安装：快速安装最新配套的第三方依赖及MindSpeed MM
+  - 手动安装：灵活指定需要使用的第三方依赖及MindSpeed MM
 
  **一键安装**
 
@@ -89,6 +87,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
       ```bash
         git clone https://gitcode.com/Ascend/MindSpeed-MM.git
         cd MindSpeed-MM
+        git checkout master
       ```
 
   2. 执行如下指令一键安装：
@@ -112,7 +111,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
 
   |参数名称|说明|是否必选|取值范围|
   |--|--|--|:-:|
-  |-t, --torchversion|表示当前使用的torch版本|否|2.6.0~2.7.1|
+  |-t, --torchversion|表示当前使用的torch版本|否|2.6.0或2.7.1|
   |-m, --msid|表示当前基于源码安装的MindSpeed加速库的commit id|是|MindSpeed最新商发分支commit id|
   |-y, --yes|确认所有软件重新安装|否|-|
   |-n, --no|自动跳过第三依赖安装|否|-|
@@ -131,13 +130,11 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
 
   表示检测到环境中已经安装了2.6.0版本的PyTorch和torch_npu。如果您希望安装新版本的torch和torch_npu，请输入`y`；如果希望保持已安装的PyTorch和torch_npu，请输入`n`。
 
-  在安装完成之后，若控制台打印如下信息：
+  在安装完成之后，若控制台打印如下信息，说明安装成功：
 
   ```text
     mindspeed mm successfully installed！
   ```
-
-  说明安装成功。
 
  **手动安装**
 
@@ -164,13 +161,13 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
           # 根据需要切换到特定的分支或commitid
           cd MindSpeed
           git checkout 93c45456c7044bacddebc5072316c01006c938f9
-          #安装加速库
+          # 安装加速库
           pip install -r requirements.txt 
           pip install -e .
           cd ..
       ```
 
-  3. 安装Mindpseed MM相关依赖，可通过[pyptoject.toml](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pyproject.toml)配置第三方依赖清单。
+  3. 安装Mindpseed MM及其相关依赖，可通过[pyptoject.toml](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pyproject.toml)配置第三方依赖清单。
   
       ```shell
         pip install -e .
