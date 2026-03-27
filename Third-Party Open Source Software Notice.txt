@@ -1,21 +1,21 @@
                               OPEN SOURCE SOFTWARE NOTICE
 
-The open source software notice for the third-party open source software that may be used in 
-the project is provided in this document. The license for the open source software is granted 
-by the respective right holders under corresponding open source software license. With regard 
-to the respective open source software contained in the project, the applicable open source 
+The open source software notice for the third-party open source software that may be used in
+the project is provided in this document. The license for the open source software is granted
+by the respective right holders under corresponding open source software license. With regard
+to the respective open source software contained in the project, the applicable open source
 software license will prevail other license agreement, in case of any conflicts.
 
 Warranty Disclaimer
-THE OPEN SOURCE SOFTWARE IN THIS PROJECT IS PROVIDED IN THE HOPE THAT IT WILL BE USEFUL, 
-BUT WITHOUT ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OF FITNESS 
+THE OPEN SOURCE SOFTWARE IN THIS PROJECT IS PROVIDED IN THE HOPE THAT IT WILL BE USEFUL,
+BUT WITHOUT ANY WARRANTY, WITHOUT EVEN THE IMPLIED WARRANTY OF MERCHANTABILITY OF FITNESS
 FOR A PARTICULAR PURPOSE. SEE THE APPLICABLE LICENSES FOR MORE DETIALS.
 
 Software Notice
 Software Transformers
 
 License: Apache License 2.0
-                                 Apache License        
+                                 Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
 
@@ -217,7 +217,7 @@ License: Apache License 2.0
    See the License for the specific language governing permissions and
    limitations under the License.
 
-Copyright Notice included in the software: 
+Copyright Notice included in the software:
 Copyright 2018- The Hugging Face team. All rights reserved.
 
 
@@ -226,7 +226,7 @@ Software Diffusers
 License: Apache License 2.0
 For the full text of the license, please go to the above.
 
-Copyright Notice included in the software: 
+Copyright Notice included in the software:
 Copyright 2022- The HuggingFace Team. All rights reserved.
 
 
@@ -235,14 +235,14 @@ Software Open-Sora
 License: Apache License 2.0
 For the full text of the license, please go to the above.
 
-Copyright Notice included in the software: 
+Copyright Notice included in the software:
 Copyright 2024 HPC-AI Technology Inc. All rights reserved.
 
 
 Software Notice
 Software Megatron
 
-License: 
+License:
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
@@ -267,7 +267,7 @@ License:
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Copyright Notice included in the software: 
+Copyright Notice included in the software:
 Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 
 
@@ -293,7 +293,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-Copyright Notice included in the software: 
+Copyright Notice included in the software:
 Copyright (c) 2021 OpenAI
 
 
@@ -309,7 +309,7 @@ License: MIT License
 For the full text of the license, please go to the above.
 
 
-Copyright Notice included in the software: 
+Copyright Notice included in the software:
 Copyright Copyright (c) 2021 OpenAI
 
 
@@ -367,7 +367,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Copyright Notice included in the software: 
+Copyright Notice included in the software:
 Copyright (c) 2022, the respective contributors, as shown by the AUTHORS file. All rights reserved.
 
 Software Notice
@@ -396,7 +396,7 @@ h.	“Output” shall mean the information and/or content output of Tencent Huny
 i.	“Tencent,” “We” or “Us” shall mean THL A29 Limited.
 j.	“Tencent Hunyuan” shall mean the large language models, text/image/video/audio/3D generation models, and multimodal large language models and their software and algorithms, including trained model weights, parameters (including optimizer states), machine-learning model code, inference-enabling code, training-enabling code, fine-tuning enabling code and other elements of the foregoing made publicly available by Us, including, without limitation to, Tencent HunyuanVideo released at [https://github.com/Tencent/HunyuanVideo].
 k.	“Tencent Hunyuan Works” shall mean: (i) the Materials; (ii) Model Derivatives; and (iii) all derivative works thereof.
-l.	“Territory” shall mean the worldwide territory, excluding the territory of the European Union, United Kingdom and South Korea. 
+l.	“Territory” shall mean the worldwide territory, excluding the territory of the European Union, United Kingdom and South Korea.
 m.	“Third Party” or “Third Parties” shall mean individuals or legal entities that are not under common control with Us or You.
 n.	“including” shall mean including but not limited to.
 2.	GRANT OF RIGHTS.
@@ -440,7 +440,7 @@ Tencent endeavors to promote safe and fair use of its tools and features, includ
 1.	Outside the Territory;
 2.	In any way that violates any applicable national, federal, state, local, international or any other law or regulation;
 3.	To harm Yourself or others;
-4.	To repurpose or distribute output from Tencent Hunyuan or any Model Derivatives to harm Yourself or others; 
+4.	To repurpose or distribute output from Tencent Hunyuan or any Model Derivatives to harm Yourself or others;
 5.	To override or circumvent the safety guardrails and safeguards We have put in place;
 6.	For the purpose of exploiting, harming or attempting to exploit or harm minors in any way;
 7.	To generate or disseminate verifiably false information and/or content with the purpose of harming others or influencing elections;
@@ -599,7 +599,7 @@ i.	“Tencent,” “We” or “Us” shall mean the applicable entity or entit
 j.	“Tencent Hunyuan” shall mean the large language models, text/image/video/audio/3D generation models, and multimodal large language models and their software and algorithms, including trained model weights, parameters (including optimizer states), machine-learning model code, inference-enabling code, training-enabling code, fine-tuning enabling code and other elements of the foregoing made publicly available by Us, including, without limitation to, Tencent Hunyuan Image 2.1 released at [
 https://github.com/Tencent-Hunyuan/HunyuanImage-3.0;https://huggingface.co/tencent/HunyuanImage-3.0;https://huggingface.co/tencent/HunyuanImage-3.0-Instruct;https://modelscope.cn/models/Tencent-Hunyuan HunyuanImage-3.0/;https://ai.gitcode.com/tencent_hunyuan/HunyuanImage-3.0].
 k.	“Tencent Hunyuan Works” shall mean: (i) the Materials; (ii) Model Derivatives; and (iii) all derivative works thereof.
-l.	“Territory” shall mean the worldwide territory, excluding the territory of the European Union, United Kingdom and South Korea. 
+l.	“Territory” shall mean the worldwide territory, excluding the territory of the European Union, United Kingdom and South Korea.
 m.	“Third Party” or “Third Parties” shall mean individuals or legal entities that are not under common control with Us or You.
 n.	“including” shall mean including but not limited to.
 2.	GRANT OF RIGHTS.
@@ -611,7 +611,7 @@ b.	You must cause any modified files to carry prominent notices stating that You
 c.	You are encouraged to: (i) publish at least one technology introduction blogpost or one public statement expressing Your experience of using the Tencent Hunyuan Works; and (ii) mark the products or services developed by using the Tencent Hunyuan Works to indicate that the product/service is “Powered by Tencent Hunyuan”; and
 d.	All distributions to Third Parties (other than through a Hosted Service) must be accompanied by a “Notice” text file that contains the following notice: “Tencent Hunyuan is licensed under the Tencent Hunyuan Community License Agreement, Copyright © 2025 Tencent. All Rights Reserved. The trademark rights of “Tencent Hunyuan” are owned by Tencent or its affiliate.”
 You may add Your own copyright statement to Your modifications and, except as set forth in this Section and in Section 5, may provide additional or different license terms and conditions for use, reproduction, or distribution of Your modifications, or for any such Model Derivatives as a whole, provided Your use, reproduction, modification, distribution, performance and display of the work otherwise complies with the terms and conditions of this Agreement (including as regards the Territory). If You receive Tencent Hunyuan Works from a Licensee as part of an integrated end user product, then this Section 3 of this Agreement will not apply to You.
-e.  In the event that You use, integrate, implement, or otherwise deploy the Tencent Hunyuan Works, in whole or in part, to provide, enable, or support any service, product, or functionality to third parties, You shall clearly, accurately, and prominently disclose to all end users the full legal name and entity of the actual provider of such service, product, or functionality. You shall expressly and conspicuously state that Tencent is not affiliated with, associated with, sponsoring, or endorsing any such service, product, or functionality. You shall not use or display any name, logo, trademark, trade name, or other indicia of Tencent in any manner that could be construed as, or be likely to create, confusion, deception, or a false impression regarding any relationship, affiliation, sponsorship, or endorsement by Tencent. 
+e.  In the event that You use, integrate, implement, or otherwise deploy the Tencent Hunyuan Works, in whole or in part, to provide, enable, or support any service, product, or functionality to third parties, You shall clearly, accurately, and prominently disclose to all end users the full legal name and entity of the actual provider of such service, product, or functionality. You shall expressly and conspicuously state that Tencent is not affiliated with, associated with, sponsoring, or endorsing any such service, product, or functionality. You shall not use or display any name, logo, trademark, trade name, or other indicia of Tencent in any manner that could be construed as, or be likely to create, confusion, deception, or a false impression regarding any relationship, affiliation, sponsorship, or endorsement by Tencent.
 
 4.	ADDITIONAL COMMERCIAL TERMS.
 If, on the Tencent Hunyuan version release date, the monthly active users of all products or services made available by or for Licensee is greater than 100 million monthly active users in the preceding calendar month, You must request a license from Tencent, which Tencent may grant to You in its sole discretion, and You are not authorized to exercise any of the rights under this Agreement unless or until Tencent otherwise expressly grants You such rights.
@@ -645,7 +645,7 @@ Tencent endeavors to promote safe and fair use of its tools and features, includ
 1.	Outside the Territory;
 2.	In any way that violates any applicable national, federal, state, local, international or any other law or regulation;
 3.	To harm Yourself or others;
-4.	To repurpose or distribute output from Tencent Hunyuan or any Model Derivatives to harm Yourself or others; 
+4.	To repurpose or distribute output from Tencent Hunyuan or any Model Derivatives to harm Yourself or others;
 5.	To override or circumvent the safety guardrails and safeguards We have put in place;
 6.	For the purpose of exploiting, harming or attempting to exploit or harm minors in any way;
 7.	To generate or disseminate verifiably false information and/or content with the purpose of harming others or influencing elections;
@@ -757,3 +757,94 @@ For the full text of the license, please go to the above.
 Copyright Notice included in the software:
 Copyright 2025 QwenLM/Qwen3-Omni
 Copyright 2026 QwenLM/Qwen3-TTS
+
+===========================================================================================
+
+Software Notice
+Software pytorch v2.7.1
+From PyTorch:
+
+Copyright (c) 2016-     Facebook, Inc            (Adam Paszke)
+Copyright (c) 2014-     Facebook, Inc            (Soumith Chintala)
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+
+From Caffe2:
+
+Copyright (c) 2016-present, Facebook Inc. All rights reserved.
+
+All contributions by Facebook:
+Copyright (c) 2016 Facebook Inc.
+
+All contributions by Google:
+Copyright (c) 2015 Google Inc.
+All rights reserved.
+
+All contributions by Yangqing Jia:
+Copyright (c) 2015 Yangqing Jia
+All rights reserved.
+
+All contributions by Kakao Brain:
+Copyright 2019-2020 Kakao Brain
+
+All contributions by Cruise LLC:
+Copyright (c) 2022 Cruise LLC.
+All rights reserved.
+
+All contributions by Tri Dao:
+Copyright (c) 2024 Tri Dao.
+All rights reserved.
+
+All contributions by Arm:
+Copyright (c) 2021, 2023-2024 Arm Limited and/or its affiliates
+
+All contributions from Caffe:
+Copyright(c) 2013, 2014, 2015, the respective contributors
+All rights reserved.
+
+All other contributions:
+Copyright(c) 2015, 2016 the respective contributors
+All rights reserved.
+
+Caffe2 uses a copyright model similar to Caffe: each contributor holds
+copyright over their contributions to Caffe2. The project versioning records
+all such contribution and copyright details. If a contributor wants to further
+mark their specific copyright on a particular contribution, they should
+indicate their copyright solely in the commit message of the change when it is
+committed.
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+3. Neither the names of Facebook, Deepmind Technologies, NYU, NEC Laboratories America
+   and IDIAP Research Institute nor the names of its contributors may be
+   used to endorse or promote products derived from this software without
+   specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+===========================================================================================
