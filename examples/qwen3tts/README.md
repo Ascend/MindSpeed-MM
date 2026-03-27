@@ -60,7 +60,7 @@ cd ../MindSpeed-MM
 pip install -e .
 
 # 安装其它依赖
-pip install -r examples/fsdp2/qwen3tts/requirements.txt
+pip install -r examples/qwen3tts/requirements.txt
 ```
 
 ---
@@ -98,7 +98,7 @@ unzip -o opentts_data.zip -d opentts_data
 
 ```
 # 执行数据格式转换脚本
-python examples/fsdp2/qwen3tts/process_data.py \
+python examples/qwen3tts/process_data.py \
   --opentts_data_path opentts_data \
   --output_jsonl_path train_raw.jsonl \
   --ref_audio_path ref_audio.wav \
@@ -140,7 +140,7 @@ export NON_MEGATRON=true
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 # 执行数据提取脚本
-python examples/fsdp2/qwen3tts/prepare_data.py \
+python examples/qwen3tts/prepare_data.py \
   --device npu:0 \
   --tokenizer_model_path /Qwen3-TTS-Tokenizer-12Hz \
   --input_jsonl train_raw.jsonl \
@@ -174,7 +174,7 @@ python examples/fsdp2/qwen3tts/prepare_data.py \
 在 `qwen3tts_config.yaml` 文件中配置好数据集和权重路径后，使用如下命令，即可实现Qwen3-TTS的微调：
 
 ```shell
-bash examples/fsdp2/qwen3tts/finetune_qwen3tts.sh
+bash examples/qwen3tts/finetune_qwen3tts.sh
 ```
 
 <a id="jump10"></a>

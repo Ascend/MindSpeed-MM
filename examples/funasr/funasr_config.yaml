@@ -16,8 +16,8 @@ parallel:
   expert_fully_shard_parallel_size: 1
 
 data:
-  train_data_set_list: ./examples/fsdp2/funasr/train_example_local.jsonl
-  valid_data_set_list: ./examples/fsdp2/funasr/val_example_local.jsonl
+  train_data_set_list: ./examples/funasr/train_example_local.jsonl
+  valid_data_set_list: ./examples/funasr/val_example_local.jsonl
   dataset_param:
     dataset_type: "FunASR"
     is_training: true

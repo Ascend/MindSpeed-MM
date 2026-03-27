@@ -28,7 +28,7 @@ DISTRIBUTED_ARGS="
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
 torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/tasks/funasr/trainer.py \
-    examples/fsdp2/funasr/funasr_config.yaml \
+    examples/funasr/funasr_config.yaml \
     2>&1 | tee logs/train_${logfile}.log
 
 STEP_TIME=`grep "elapsed time per iteration" ${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`

@@ -59,7 +59,7 @@ cd MindSpeed-MM
 ```
 执行如下指令一键安装：
 ```bash
-bash scripts/install.sh --msid eb10b92 && bash examples/fsdp2/qwen3_5/install_extensions.sh
+bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensions.sh
 ```
 
 ---
@@ -219,7 +219,7 @@ data->dataset_param->basic_parameters->dataset
 
 【单机运行配置】
 以qwen3_5模型为例：
-配置`examples/fsdp2/qwen3_5/finetune_qwen3_5.sh`参数如下
+配置`examples/qwen3_5/finetune_qwen3_5.sh`参数如下
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
@@ -247,7 +247,7 @@ NODES: 一共几个节点
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 可在`xxx_config.yaml`的`model`参数中配置上述文档中的`loss_type`。
 ```shell
-bash examples/fsdp2/qwen3_5/finetune_qwen3_5_xxB.sh
+bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 ```
 
 

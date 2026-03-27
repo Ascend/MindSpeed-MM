@@ -1,8 +1,7 @@
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-
 export NON_MEGATRON=true
 export TASK_QUEUE_ENABLE=2
-export CPU_AFFINITY_CONF=1
+export CPU_AFFINITY_CONF=2
 export MULTI_STREAM_MEMORY_REUSE=2
 export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"
 
@@ -20,11 +19,11 @@ DISTRIBUTED_ARGS="
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT
 "
-logdir=logs/cosyvoice3
+logdir=logs/qwen3tts
 mkdir -p $logdir
-logfile=${logdir}/finetune_cosyvoice3_$(date +%Y%m%d)_$(date +%H%M%S)
-torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/tasks/cosyvoice3/train.py \
-    examples/fsdp2/cosyvoice3/cosyvoice3_config.yaml \
+logfile=${logdir}/finetune_qwen3tts_$(date +%Y%m%d)_$(date +%H%M%S)
+torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
+    examples/qwen3tts/qwen3tts_config.yaml \
     2>&1 | tee ${logfile}.log
 
 STEP_TIME=`grep "elapsed time per iteration" ${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`

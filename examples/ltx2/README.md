@@ -239,13 +239,13 @@ output_dir: "outputs/my_training_run"
 t2v（text-to-video）：
 
 ```bash
-bash examples/fsdp2/ltx2/finetune_ltx2_t2v.sh
+bash examples/ltx2/finetune_ltx2_t2v.sh
 ```
 
 t2av（text-to-audio-video）：
 
 ```bash
-bash examples/fsdp2/ltx2/finetune_ltx2_t2av.sh
+bash examples/ltx2/finetune_ltx2_t2av.sh
 ```
 
 ---
