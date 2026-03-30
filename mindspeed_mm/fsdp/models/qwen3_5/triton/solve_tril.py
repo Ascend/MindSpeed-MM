@@ -48,7 +48,7 @@ def solve_tril_16x16_kernel(
     m_A = o_i_fp32[:, None] > o_i_fp32[None, :]
     m_I = o_i_fp32[:, None] == o_i_fp32[None, :]
 
-    A  = A  + (bos * H + i_h) * BT
+    A = A + (bos * H + i_h) * BT
     Ai = Ai + (bos * H + i_h) * BT
 
     for tpp in tl.static_range(0, TPP):

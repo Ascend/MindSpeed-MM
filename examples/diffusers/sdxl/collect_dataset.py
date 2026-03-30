@@ -242,7 +242,6 @@ class BucketManager:
             self.reso_to_id[reso] = bucket_id
             self.resos.append(reso)
             self.buckets.append([])
-            # print(reso, bucket_id, len(self.buckets))
 
     def round_to_steps(self, x):
         x = int(x + 0.5)
@@ -273,7 +272,6 @@ class BucketManager:
                 int(image_width * scale + 0.5),
                 int(image_height * scale + 0.5),
             )
-            # print("use predef", image_width, image_height, reso, resized_size)
         else:
             # 縮小のみを行う
             if image_width * image_height > self.max_area:
@@ -293,9 +291,6 @@ class BucketManager:
                 b_width_in_hr = self.round_to_steps(b_height_rounded * aspect_ratio)
                 ar_height_rounded = b_width_in_hr / b_height_rounded
 
-                # print(b_width_rounded, b_height_in_wr, ar_width_rounded)
-                # print(b_width_in_hr, b_height_rounded, ar_height_rounded)
-
                 if abs(ar_width_rounded - aspect_ratio) < abs(
                     ar_height_rounded - aspect_ratio
                 ):
@@ -308,14 +303,12 @@ class BucketManager:
                         int(b_height_rounded * aspect_ratio + 0.5),
                         b_height_rounded,
                     )
-                # print(resized_size)
             else:
                 resized_size = (image_width, image_height)  # リサイズは不要
 
             # 画像のサイズ未満をbucketのサイズとする（paddingせずにcroppingする）
             bucket_width = resized_size[0] - resized_size[0] % self.reso_steps
             bucket_height = resized_size[1] - resized_size[1] % self.reso_steps
-            # print("use arbitrary", image_width, image_height, resized_size, bucket_width, bucket_height)
 
             reso = (bucket_width, bucket_height)
 
@@ -798,7 +791,6 @@ class BaseDataset(torch.utils.data.Dataset):
                     self.bucket_manager.select_bucket(image_width, image_height)
                 )
 
-                # print(image_info.image_key, image_info.bucket_reso)
                 img_ar_errors.append(abs(ar_error))
 
             self.bucket_manager.sort()
@@ -970,7 +962,6 @@ class BaseDataset(torch.utils.data.Dataset):
         print("checking cache existence...")
         image_infos_to_cache = []
         for info in tqdm(image_infos):
-            # subset = self.image_to_subset[info.image_key]
             if cache_to_disk:
                 te_out_npz = (
                     os.path.splitext(info.absolute_path)[0]
@@ -2102,7 +2093,6 @@ class ConfigSanitizer:
     def __merge_dict(*dict_list: dict) -> dict:
         merged = {}
         for schema in dict_list:
-            # merged |= schema
             for k, v in schema.items():
                 merged[k] = v
         return merged
@@ -2245,7 +2235,6 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
         dataset = dataset_klass(subsets=subsets, **asdict(dataset_blueprint.params))
         datasets.append(dataset)
 
-    # print info
     info = ""
     for i, dataset in enumerate(datasets):
         is_dreambooth = isinstance(dataset, DreamBoothDataset)

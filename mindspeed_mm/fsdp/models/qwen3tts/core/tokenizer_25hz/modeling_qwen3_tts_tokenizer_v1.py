@@ -550,7 +550,6 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
     """
 
     def rotate_half_codec(x):
-        # x = rearrange(x, "... (d r) -> ... d r", r=2)
         x = x.reshape(*x.shape[:-1], -1, 2)
         x1, x2 = x.unbind(dim=-1)
         x = torch.stack((-x2, x1), dim=-1)

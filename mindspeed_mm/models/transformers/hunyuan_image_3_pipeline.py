@@ -691,7 +691,7 @@ class HunyuanImage3Text2ImagePipeline(DiffusionPipeline):
         callback_on_step_end: Optional[
             Union[Callable[[int, int, Dict], None], PipelineCallback, MultiPipelineCallbacks]
         ] = None,
-        callback_on_step_end_tensor_inputs: tuple[str] = ["latents"],
+        callback_on_step_end_tensor_inputs: tuple[str] = ("latents"),
         model_kwargs: Dict[str, Any] = None,
         **kwargs,
     ):
