@@ -30,7 +30,7 @@
 
 <a id="jump1.1"></a>
 
-#### 1. 仓库拉取
+### 1. 仓库拉取
 
 ```shell
     git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
@@ -44,7 +44,7 @@
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 ```bash
     # python3.10
@@ -76,7 +76,7 @@
 
 <a id="jump1.3"></a>
 
-#### 3. Decord搭建
+### 3. Decord搭建
 
 【X86版安装】
 
@@ -98,7 +98,7 @@ pip install decord==0.6.0
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载与保存
+### 1. 权重下载与保存
 
 下载预训练**视觉感知**模型
 
@@ -114,11 +114,11 @@ pip install decord==0.6.0
 
 <a id="jump3.1"></a>
 
-#### 1. 数据集下载
+### 1. 数据集下载
 
 用户需自行获取并解压[pixabay_v2](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/tree/main/pixabay_v2_tar)数据集，获取数据结构如下：
 
-   ```
+   ```shell
    $pixabay_v2
    ├── folder_01
    ├── ├── video0.mp4
@@ -136,13 +136,13 @@ pip install decord==0.6.0
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及保存**、**数据集准备**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
 
-#### 2. 配置参数
+### 2. 配置参数
 
 需根据实际情况修改`model.json`和`data.json`中的权重和数据集路径，包括`from_pretrained`、`perceptual_from_pretrained`、`video_folder`字段。
 
@@ -171,7 +171,7 @@ pip install decord==0.6.0
 
 <a id="jump4.3"></a>
 
-#### 3. 启动预训练
+### 3. 启动预训练
 
 ```shell
     bash examples/vae/pretrain_vae.sh
@@ -204,4 +204,3 @@ pip install decord==0.6.0
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-

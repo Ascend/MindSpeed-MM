@@ -37,23 +37,23 @@
 
 ## 版本说明
 
-#### 参考实现
+### 参考实现
 
 T2V I2V LoRA微调任务
 
-```
+```shell
 url=https://github.com/modelscope/DiffSynth-Studio.git
 commit_id=03ea278
 ```
 
 FLF2V推理
 
-```
+```shell
 url=https://github.com/huggingface/diffusers.git
 commit_id=f8d4a1e
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.03.27: 首次支持Wan2.1模型
 
@@ -414,7 +414,7 @@ bash examples/wan2.1/{model_size}/{task}/pretrain.sh
 
 或
 
-```
+```shell
 bash examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh
 ```
 

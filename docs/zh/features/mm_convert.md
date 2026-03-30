@@ -73,7 +73,7 @@ mm-convert  Qwen2VLConverter hf_to_mm \
 
 ## yaml文件
 
-1.   yaml配置文件可自动生成基础版本，然后手动修改必要的配置
+1. yaml配置文件可自动生成基础版本，然后手动修改必要的配置
 
      ```bash
       mm-convert  Qwen2VLConverter hf_to_mm --print_config=comments > hf_to_mm.yaml
@@ -109,7 +109,7 @@ mm-convert  Qwen2VLConverter hf_to_mm \
          hf_dir:
      ```
 
-2.   修改配置文件中的内容
+2. 修改配置文件中的内容
 
      ```yaml
      # huggingface模型转换mindspeed-mm模型权重
@@ -139,7 +139,7 @@ mm-convert  Qwen2VLConverter hf_to_mm \
          hf_dir: "hf/Qwen2-VL-7B-Instruct"
      ```
 
-3.   执行转换脚本
+3. 执行转换脚本
 
      ```bash
      mm-convert  Qwen2VLConverter hf_to_mm --config hf_to_mm.yaml
@@ -147,19 +147,19 @@ mm-convert  Qwen2VLConverter hf_to_mm \
 
 ## 环境变量
 
-1.   环境变量模式当前默认未开启，如需开启可以使用配置环境变量
+1. 环境变量模式当前默认未开启，如需开启可以使用配置环境变量
 
      ```bash
       export JSONARGPARSE_DEFAULT_ENV=true
      ```
 
-2.   使用`-h`命令可以查看每个配置对应的环境变量
+2. 使用`-h`命令可以查看每个配置对应的环境变量
 
      ```bash
      mm-convert  Qwen2VLConverter hf_to_mm -h
      ```
 
-3.   配置环境变量
+3. 配置环境变量
 
      ```bash
      export MM_CONVERT_QWEN2VLCONVERTER__HF_TO_MM__CFG__PARALLEL_CONFIG__LLM_PP_LAYERS="[[1,10,10,7]]"
@@ -169,7 +169,7 @@ mm-convert  Qwen2VLConverter hf_to_mm \
      export MM_CONVERT_QWEN2VLCONVERTER__HF_TO_MM__CFG__MM_DIR="hf/Qwen2-VL-7B-Instruct"
      ```
 
-4.   执行
+4. 执行
 
      ```bash
      mm-convert  Qwen2VLConverter hf_to_mm
@@ -182,5 +182,3 @@ mm-convert  Qwen2VLConverter hf_to_mm \
 > **为什么需要下载最新权重？**
 > 
 > 权重转换过程中会调用transformers的相关API（如`AutoConfig`）。随着transformers版本的升级，旧版本权重文件可能与新版本的transformers不兼容，因此建议使用最新权重以确保转换成功。
-
-     

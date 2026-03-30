@@ -26,22 +26,26 @@
 - [注意事项](#jump11)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/huggingface/transformers.git
 commit_id=7a833d1
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.11.13: 首次支持Qwen3-Omni模型
 
 ---
 <a id="jump1"></a>
+
 ## 环境安装
 
 <a id="jump1.1"></a>
-#### 1. 环境准备
+
+### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
@@ -54,7 +58,9 @@ commit_id=7a833d1
 - [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0004.html)
 
 <a id="jump1.2"></a>
-#### 2. 环境搭建
+
+### 2. 环境搭建
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
@@ -93,7 +99,7 @@ pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Hugging Face库下载对应的模型权重:
 
@@ -107,7 +113,7 @@ pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
 <a id="jump2.2"></a>
 
-#### 2. 权重转换
+### 2. 权重转换
 
 当前用多卡微调时，会遇到梯度通信问题，MindSpeed-MM修改了transformers中MOE实现方式，需对原始预训练权重进行转换：
 
@@ -116,9 +122,11 @@ mm-convert ExpertMergeDcpConverter hf_to_dcp \
   --hf_dir "ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct" \
   --save_dir "ckpt/convert_path/Qwen3-Omni-30B-A3B-Instruct"
 ```
+
 并在examples/qwen3omni/finetune_qwen3omni.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数。
 
 训练完成之后，支持将保存在`SAVE_PATH`目录下的权重转换成huggingface格式：
+
 ```shell
 mm-convert ExpertMergeDcpConverter dcp_to_hf \
   --hf_dir "ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct" \
@@ -130,10 +138,12 @@ mm-convert ExpertMergeDcpConverter dcp_to_hf \
 
  ---
 <a id="jump3"></a>
+
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载（以COCO2017数据集为例）
+
+### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
@@ -141,7 +151,7 @@ mm-convert ExpertMergeDcpConverter dcp_to_hf \
 
 (3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── COCO2017
@@ -160,7 +170,8 @@ dataset_param->basic_parameters->dataset
 同时注意`data.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
 
 <a id="jump3.2"></a>
-#### 2.混合数据集处理(以LLaVA-Instruct-150K为例)
+
+### 2.混合数据集处理(以LLaVA-Instruct-150K为例)
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
 
@@ -190,15 +201,18 @@ dataset_param->basic_parameters->dataset
 ```
 
 <a id="jump4"></a>
+
 ## 微调
 
 <a id="jump4.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
-#### 2. 配置参数
+
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -235,6 +249,7 @@ dataset_param->basic_parameters->dataset
 ```
 
 如果需要加载大批量数据，可使用流式加载，修改`data.json`中的`sampler_type`字段，增加`streaming`字段。（注意：使用流式加载后当前仅支持`num_workers=0`，单进程处理数据，会有性能波动，并且不支持断点续训功能。）
+
 ```json
 {
     "dataset_param": {
@@ -282,6 +297,7 @@ dataset_param->basic_parameters->dataset
 ```
 
 如果需要支持语音、视频数据，并进行跨模态融合，可以将`use_audio_in_video`设置为true.
+
 ```json
 {
     "dataset_param": {
@@ -308,22 +324,29 @@ dataset_param->basic_parameters->dataset
 
 【序列并行配置】
 若训练数据的序列长度较长，建议将`examples/qwen3omni/finetune_qwen3omni.sh`中的TASK_QUEUE_ENABLE设置为1，并根据实际场景调整SEQ_LEN参数（示例配置为262144）
+
 ```shell
 export TASK_QUEUE_ENABLE=1
 SEQ_LEN=262144
 ```
+
 当前已支持Ulysses序列并行，当使用长序列训练时，需要开启CP特性，开启方式为在`examples/qwen3omni/finetune_qwen3omni.sh`CP > 1，例如
+
 ```shell
 CP=4
 ```
+
 脚本中默认为Ulysses序列并行
+
 ```shell
     --context-parallel-algo ulysses_cp_algo
 ```
+
 注意：如果CP>1，但音频序列长度没有超过CP size，则AuT模块不支持Ulysses序列并行
 
 【Attention配置】attn_implementation 和 layout配置:
   当前支持audio、vision和text模块选择不同的Attention实现方式，具体为在`model.json`文件中修改`attn_implementation`字段，当前支持情况如下表。
+
   | 模块| 支持的FA以及layout |
   | --- | --- |
   | AuT | `flash_attention_2`: `BNSD` |
@@ -419,17 +442,23 @@ WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 ```
 
 <a id="jump4.3"></a>
-#### 3. 启动微调
+
+### 3. 启动微调
 
 以Qwen3-Omni为例，启动微调训练任务。  
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
+
 ```shell
 cd MindSpeed-MM/
 bash examples/qwen3omni/finetune_qwen3omni.sh
 ```
+
 <a id="jump4.5"></a>
-#### 4.支持工具调用数据的微调
+
+### 4.支持工具调用数据的微调
+
 - 数据组织格式：
+
 ```json
 {
 'messages': [
@@ -459,6 +488,7 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
  <font color='red'>请注意 tools的数据类型是list[str]</font>
 
 - 修改data.json
+
 ```json
 {
     "dataset_param": {
@@ -479,6 +509,7 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
 ---
 
 <a id="jump10"></a>
+
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
@@ -503,4 +534,5 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
 <a id="jump11"></a>
 
 ## 注意事项
+
 ‼️当前用多卡微调时，会遇到梯度通信问题，需要在transformers中对MOE实现方式改写，需要转换权重的改写方式可以有更好的性能，其他改写方式（比如，让所有专家参与前向运算）的性能较差

@@ -25,22 +25,26 @@
 - [注意事项](#jump11)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/huggingface/transformers.git
 commit_id=8cb5963
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.11.29: 首次支持Glm4.5v模型
 
 ---
 <a id="jump1"></a>
+
 ## 环境安装
 
 <a id="jump1.1"></a>
-#### 1. 环境准备
+
+### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
@@ -48,11 +52,14 @@ commit_id=8cb5963
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
+
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler&Software=cannToolKit)
 - [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0004.html)
 
 <a id="jump1.2"></a>
-#### 2. 环境搭建
+
+### 2. 环境搭建
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
@@ -89,7 +96,7 @@ pip install -e .
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Hugging Face库下载对应的模型权重:
 
@@ -98,19 +105,23 @@ pip install -e .
  将下载的模型权重保存到本地的`ckpt/hf_path/GLM-4.5V`目录下。(*表示对应的尺寸)
 
 为了使网络能够流畅运行，MindSpeed MM修改了moe中专家的结构名称，需对原始预训练权重进行转换：
+
 ```bash
 mm-convert ExpertMergeDcpConverter hf_to_dcp --hf_dir "ckpt/hf_path/GLM-4.5V" --save_dir "ckpt/mm_path/GLM-4.5V"
 ```
+
 由于glm4.5v参数量较大, 必须使用meta init初始化加载权重；
 需要在examples/glm4.5v/finetune_glm4_5v106B.sh的`GPT_ARGS`中加入`--init-model-with-meta-device`参数. 默认脚本中已添加。
 此外，使用meta init初始化加载权重时，需要将examples/glm4.5v/finetune_glm4_5v106B.sh中LOAD_PATH设置为上述权重转换完后保存的路径"ckpt/mm_path/GLM-4.5V"。
 
 ---
 <a id="jump3"></a>
+
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载（以COCO2017数据集为例）
+
+### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
@@ -118,7 +129,7 @@ mm-convert ExpertMergeDcpConverter hf_to_dcp --hf_dir "ckpt/hf_path/GLM-4.5V" --
 
 (3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── COCO2017
@@ -137,7 +148,8 @@ dataset_param->basic_parameters->dataset
 同时注意`data_106B.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
 
 <a id="jump3.2"></a>
-#### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
+
+### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
 
@@ -167,15 +179,18 @@ dataset_param->basic_parameters->dataset
 ```
 
 <a id="jump4"></a>
+
 ## 微调
 
 <a id="jump4.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
-#### 2. 配置参数
+
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -213,7 +228,6 @@ dataset_param->basic_parameters->dataset
 
 如果需要加载大批量数据，可使用流式加载，修改`data_106B.json`中的`sampler_type`字段，增加`streaming`字段。（注意：使用流式加载后当前仅支持`num_workers=0`，单进程处理数据，会有性能波动，并且不支持断点续训功能。）
 
-
 ```json
 {
     "dataset_param": {
@@ -233,6 +247,7 @@ dataset_param->basic_parameters->dataset
 }
 
 ```
+
 【模块冻结配置】
 
 当前支持vison encoder、vision projector、text decoder及lm head模块的冻结，其中，vison encoder、vision projector默认训练时为冻结状态，
@@ -303,7 +318,8 @@ WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
 ```
 
 <a id="jump4.3"></a>
-#### 3. 启动微调
+
+### 3. 启动微调
 
 启动微调训练任务需要确认loss计算方式。  
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
@@ -314,16 +330,20 @@ bash examples/glm4.5v/model_106B.sh
 
 <a id="jump4.4"></a>
 
-#### 4. hf权重转换
+### 4. hf权重转换
+
 训练完成之后，将保存在`save_dir`目录下的权重转换成huggingface格式
+
 ```shell
 mm-convert ExpertMergeDcpConverter dcp_to_hf --hf_dir "ckpt/hf_path/GLM-4.5V" --dcp_dir "save_dir/iter_000xx" --save_dir "ckpt/dcp_to_hf/GLM-4.5V"
 ```
+
 其中，`--hf_dir`表示原始huggingface权重的路径，`--dcp_dir`表示微调后的权重保存路径，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径。
 
 完成权重转换之后，即可使用相关库进行推理。
 
 <a id="jump10"></a>
+
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
@@ -345,4 +365,5 @@ mm-convert ExpertMergeDcpConverter dcp_to_hf --hf_dir "ckpt/hf_path/GLM-4.5V" --
 
 ---
 <a id="jump11"></a>
+
 ## 注意事项

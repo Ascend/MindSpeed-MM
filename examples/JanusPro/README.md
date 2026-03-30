@@ -9,7 +9,7 @@
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
-#### 1. 仓库拉取
+### 1. 仓库拉取
 
 ```shell
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
@@ -21,7 +21,7 @@ cd ..
 cp -r ./Janus ./MindSpeed-MM/examples/JanusPro
 ```
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 对./examples/JanusPro/Janus中的pyproject.toml文件的dependencies做如下修改：
 
@@ -50,7 +50,7 @@ cd ..
 
 ## 权重下载
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Hugging Face库下载对应的模型权重:
 
@@ -61,11 +61,11 @@ cd ..
 
 ## 图像理解
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载**，详情可查看对应章节。
 
-#### 2. 配置参数
+### 2. 配置参数
 
 在multimodal_understanding.sh中修改需要传入的参数，model_path, image_path与question，分别表示模型权重保存位置，图片位置与针对传入图片的问题。
 同时还需要修改"trust_remote_code"为true。为保证代码安全，配置trust_remote_code默认为False，用户需要设置为True，并且确保自己下载的模型和数据的安全性。
@@ -76,7 +76,7 @@ cd ..
     source /usr/local/Ascend/cann/set_env.sh
 ```
 
-#### 3. 启动脚本
+### 3. 启动脚本
 
 ```bash
   cd ./examples/JanusPro/

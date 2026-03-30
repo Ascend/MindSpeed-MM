@@ -24,23 +24,24 @@
 
 ## 版本说明
 
-#### 参考实现
+### 参考实现
 
 【T2V 任务 & I2V 任务】
 
-```
+```shell
 url=https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5
 commit_id=bf576ef1d5ddc643cf814b1dff4f4dcc9a7581c7
 ```
 
 【推理】
 
-```
+```shell
 url=https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5
 commit_id=bf576ef1d5ddc643cf814b1dff4f4dcc9a7581c7
 ```
 
-#### 变更记录
+### 变更记录
+
 2026.03.06: 首次支持HunyuanVideo1.5 T2V推理、I2V训练&推理任务
 
 2026.02.12: 首次发布HunyuanVideo1.5 T2V训练任务
@@ -52,14 +53,18 @@ commit_id=bf576ef1d5ddc643cf814b1dff4f4dcc9a7581c7
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 ### 1. 仓库拉取
+
 拉取MindSpeed MM代码仓，并进入代码仓根目录：
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
 
 ### 2. 环境搭建
+
 执行如下指令：
+
 ```bash
 bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/hunyuanvideo_1.5/requirements.txt
 ```
@@ -80,17 +85,19 @@ pip install decord==0.6.0
 
 ---
 
-
-
 ## 权重下载
 
 1. 下载预训练的DiT和VAE权重
+
 ``` bash
 mkdir HunyuanVideo1.5
 hf download tencent/HunyuanVideo-1.5 --local-dir ./HunyuanVideo1.5
 ```
+
 离线链接：
+
 - [tencent/HunyuanVideo-1.5](https://huggingface.co/tencent/HunyuanVideo-1.5/tree/main)
+
 2. 下载文本编码器
 
 ``` bash
@@ -98,19 +105,25 @@ hf download Qwen/Qwen2.5-VL-7B-Instruct --local-dir ./HunyuanVideo1.5/text_encod
 hf download google/byt5-small --local-dir ./HunyuanVideo1.5/text_encoder/byt5-small
 modelscope download --model AI-ModelScope/Glyph-SDXL-v2 --local_dir ./HunyuanVideo1.5/text_encoder/Glyph-SDXL-v2
 ```
+
 离线链接：
+
 - [Qwen/Qwen2.5-VL-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)
 - [google/byt5-small](https://huggingface.co/google/byt5-small/tree/main)
 - [AI-ModelScope/Glyph-SDXL-v2](https://modelscope.cn/models/AI-ModelScope/Glyph-SDXL-v2/files)
 
 3. 下载视觉编码器
+
 ```bash
 hf download black-forest-labs/FLUX.1-Redux-dev --local-dir ./ckpts/vision_encoder/siglip --token <your_hf_token>
 ```
+
 离线链接：
+
 - [black-forest-labs/FLUX.1-Redux-dev](https://huggingface.co/black-forest-labs/FLUX.1-Redux-dev/tree/main)
 
 4. 最终文件结构如下：
+
 ```bash
 MindSpeed-MM/HunyuanVideo1.5
 ├── text_encoder
@@ -180,9 +193,11 @@ MindSpeed-MM/HunyuanVideo1.5
 ```
 
 修改文件`MindSpeed-MM/examples/hunyuanvideo_1.5/data.txt`，其中每一行表示一个数据集，包含两个参数。第一个参数表示数据文件夹的路径，即上述文件夹 `</your_dataset_dir>` 的绝对路径地址，第二个参数表示`data.json`文件的路径，用`,`分隔，示例如下：
-```
+
+```shell
 /your_dataset_dir,/your_dataset_dir/data.json
 ```
+
 ### 训练
 
 #### 准备工作
@@ -214,12 +229,14 @@ MindSpeed-MM/HunyuanVideo1.5
 **注**： 当前LOAD_PATH路径无效时，MindSpeed会对模型随机初始化从头训练。为防止加载失败，请留意日志中的warning信息，或者自行确认路径合法。
 
 【并行化配置参数说明】：
+
 - fsdp2
 
   - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存，默认开启。
   
   - 使能方式：`examples/hunyuanvideo_1.5/{task}/pretrain_*.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dcp`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
   <a id="jump1"></a>
+
 #### 启动训练
 
 【T2V 任务】
@@ -227,11 +244,13 @@ MindSpeed-MM/HunyuanVideo1.5
 ```bash
 bash examples/hunyuanvideo_1.5/t2v/pretrain_*.sh
 ```
+
 【I2V 任务】
 
 ```bash
 bash examples/hunyuanvideo_1.5/i2v/pretrain_*.sh
 ```
+
 ## 推理
 
 ### 准备工作
@@ -255,18 +274,20 @@ bash examples/hunyuanvideo_1.5/i2v/pretrain_*.sh
 | examples/hunyuanvideo_1.5/{task}/inference_hunyuanvideo.sh |    MM_MODEL    | 用来控制生成参数的配置文件路径                                             |
 
 上述配置文件中{task} = i2v or t2v，请根据训练任务自主选择。
+
 ### 启动推理
 
 【T2V 任务】
+
 ```shell
 bash examples/hunyuanvideo_1.5/t2v/inference_*.sh
 ```
 
 【I2V 任务】
+
 ```shell
 bash examples/hunyuanvideo_1.5/i2v/inference_*.sh
 ```
-
 
 ## 环境变量声明
 
@@ -286,4 +307,3 @@ bash examples/hunyuanvideo_1.5/i2v/inference_*.sh
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-

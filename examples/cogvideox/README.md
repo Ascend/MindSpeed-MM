@@ -4,6 +4,7 @@
 </p>
 
 ## 目录
+
 - [CogVideoX 使用指南](#cogvideox-使用指南)
   - [目录](#目录)
   - [版本说明](#版本说明)
@@ -36,24 +37,29 @@
       - [模型参数修改](#模型参数修改)
       - [启动脚本修改](#启动脚本修改)
   - [环境变量声明](#环境变量声明)
+
 ---
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/THUDM/CogVideo.git
 commit_id=806a7f6
 ```
 
 参考实现为SAT官方开源版本，由于源仓默认配置在竞品无法实现训练，参考实现调整了如下配置：
+
 - 序列长度调整为6976
 - 优化器调整为AdamW
 
-#### 变更记录
+### 变更记录
 
 2025.01.24: 首次发布CogVideoX 1.5
 
 ## 支持任务列表
+
 支持以下模型任务类型
 
 |      模型      | 任务类型 | 任务列表 | 是否支持 |
@@ -69,7 +75,7 @@ commit_id=806a7f6
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
-#### 仓库拉取
+### 仓库拉取
 
 ```shell
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
@@ -81,7 +87,7 @@ cd ..
 cd MindSpeed-MM
 ```
 
-#### 环境搭建
+### 环境搭建
 
 ```bash
 # python3.10
@@ -111,7 +117,7 @@ cd ..
 pip install -e .
 ```
 
-#### Decord搭建
+### Decord搭建
 
 【X86版安装】
 
@@ -129,21 +135,24 @@ pip install decord==0.6.0
 
 ## 权重下载及转换
 
-#### VAE下载
+### VAE下载
 
 + [VAE下载链接](https://huggingface.co/zai-org/CogVideoX1.5-5B-SAT/tree/main/vae)
 
-#### transformer文件下载
+### transformer文件下载
+
 + [CogVideoX1.0-5B-t2v](https://cloud.tsinghua.edu.cn/d/fcef5b3904294a6885e5/?p=%2F&mode=list)
 + [CogVideoX1.0-5B-i2v](https://cloud.tsinghua.edu.cn/d/5cc62a2d6e7d45c0a2f6/?p=%2F1&mode=list)
 + [CogVideoX1.5-5B-t2v](https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT/tree/main/transformer_t2v)
 + [CogVideoX1.5-5B-i2v](https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT/tree/main/transformer_i2v)
 
-#### T5模型下载
+### T5模型下载
+
 仅需下载tokenizer和text_encoder目录的内容：[下载链接](https://huggingface.co/THUDM/CogVideoX-5b/tree/main)
 
 预训练权重结构如下：
-   ```
+
+   ```shell
    CogVideoX-5B
    ├── text_encoder
    │   ├── config.json
@@ -163,8 +172,10 @@ pip install decord==0.6.0
        └── 3d-vae.pt
    ```
 
-#### 权重转换
+### 权重转换
+
 权重转换source_path参数请配置transformer权重文件的路径：
+
 ```bash
 mm-convert CogVideoConverter --version <t2v or i2v> source_to_mm \
   --cfg.source_path <your source path> \
@@ -172,21 +183,25 @@ mm-convert CogVideoConverter --version <t2v or i2v> source_to_mm \
   --cfg.target_parallel_config.tp_size <tp_size> \
   --cfg.target_parallel_config.pp_layers <pp_layers> \
 ```
+
 其中tp_size为实际的tp切分策略， --version的值为t2v或i2v，
 当开启PP时，--pp_layers参数值个数与PP的数值相等，并且参数之和与num_layers参数相等，举例：num_layers=42, 当PP=4, pp_layers可以设置为[10,11,11,10]
 
 转换后的权重结构如下：
 
 TP=1,PP=1时：
-```
+
+```shell
 CogVideoX-5B-Converted
 ├── release
 │   └──mp_rank_00
 │      └──model_optim_rng.pt
 └──latest_checkpointed_iterations.txt
 ```
+
 TP=2,PP=1, TP>2的情况依此类推：
-```
+
+```shell
 CogVideoX-5B-Converted
 ├── release
 │   ├──mp_rank_00
@@ -195,8 +210,10 @@ CogVideoX-5B-Converted
 │      └──model_optim_rng.pt
 └──latest_checkpointed_iterations.txt
 ```
+
 TP=1,PP=4, PP>1及TP>1的情况依此类推：
-```
+
+```shell
 CogVideoX-5B-Converted
 ├── release
 │   ├──mp_rank_00_000
@@ -215,7 +232,8 @@ CogVideoX-5B-Converted
 ## 数据集准备及处理
 
 数据集格式应该如下：
-```
+
+```shell
 .
 ├── data.jsonl
 ├── labels
@@ -227,10 +245,12 @@ CogVideoX-5B-Converted
     ├── 2.mp4
     ├── ...
 ```
+
 每个 txt 与视频同名，为视频的标签。视频与标签应该一一对应。
 
 data.jsonl文件内容如下示例：
-```
+
+```shell
 {"file": "dataPath/1.mp4", "captions": "Content from 1.txt"}
 {...}
 ...
@@ -240,17 +260,21 @@ data.jsonl文件内容如下示例：
 
 ## 预训练
 
-#### 准备工作
+### 准备工作
+
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
-#### 配置参数
+### 配置参数
+
 CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
+
 |            | I2V | T2V |
 |:------------:|:----:|:----:|
 | 1.0 |  pretrain_cogvideox_i2v.sh |pretrain_cogvideox_t2v.sh  |
 | 1.5 | pretrain_cogvideox_i2v_1.5.sh |pretrain_cogvideox_t2v_1.5.sh |
 
 模型参数的配置文件如下：
+
 |            | I2V | T2V |
 |:------------:|:----:|:----:|
 | 1.0 |  model_cogvideox_i2v.json |model_cogvideox_t2v.json  |
@@ -288,11 +312,14 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
 
 * 当开启分层Zero时，需要在[pretrain_cogvideox_t2v_1.5.sh](t2v_1.5/pretrain_cogvideox_t2v_1.5.sh)或者[pretrain_cogvideox_i2v_1.5.sh](i2v_1.5/pretrain_cogvideox_i2v_1.5.sh)里面添加下面的参数。
   注意：不兼容Encoder-DP特性、TP场景、PP场景，与VAE-CP效果未验证。
+
   ```shell
   --layerzero \
   --layerzero-config ./zero_config.yaml \
   ```
+
   参数里面的yaml文件如下面所示:
+
   ```yaml
   zero3_size: 8  
   transformer_layers:
@@ -323,6 +350,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
 模型参数配置文件中的`head_dim`字段原模型默认配置为64。此字段调整为128会更加亲和昇腾。
 
 在sh启动脚本中可以修改运行卡数(NNODES为节点数，GPUS_PER_NODE为每个节点的卡数，相乘即为总运行卡数)：
+
 ```shell
 GPUS_PER_NODE=8
 MASTER_ADDR=localhost
@@ -332,41 +360,51 @@ NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
 ```
 
-#### 启动预训练
+### 启动预训练
 
 t2v 1.0版本任务启动预训练
+
 ```shell
 bash examples/cogvideox/t2v_1.0/pretrain_cogvideox_t2v.sh
 ```
+
 t2v 1.5版本任务启动预训练
+
 ```shell
 bash examples/cogvideox/t2v_1.5/pretrain_cogvideox_t2v_1.5.sh
 ```
+
 i2v 1.0版本任务启动预训练
+
 ```shell
 bash examples/cogvideox/i2v_1.0/pretrain_cogvideox_i2v.sh
 ```
+
 i2v 1.5版本任务启动预训练
+
 ```shell
 bash examples/cogvideox/i2v_1.5/pretrain_cogvideox_i2v_1.5.sh
 ```
+
 ---
 
 ## 推理
 
-#### 准备工作
+### 准备工作
 
 在开始之前，请确认环境准备、模型权重下载已完成
 
-#### 配置参数
+### 配置参数
 
 CogvideoX推理启动文件为shell脚本，主要分为如下4个：
+
 |            | I2V | T2V |
 |:------------:|:----:|:----:|
 | 1.0 |  inference_cogvideox_i2v.sh |inference_cogvideox_t2v.sh  |
 | 1.5 | inference_cogvideox_i2v_1.5.sh |inference_cogvideox_t2v_1.5.sh |
 
 模型参数的配置文件如下：
+
 |            | I2V | T2V |
 |:------------:|:----:|:----:|
 | 1.0 |  inference_model_i2v.json |inference_model_t2v.json  |
@@ -386,14 +424,13 @@ CogvideoX推理启动文件为shell脚本，主要分为如下4个：
 |----------------------------------------|:--------------------------------:|:-----------------------------------:|
 | examples/cogvideox/samples_prompts.txt |               文件内容               |      自定义prompt      |
 
-
 | i2v prompts配置文件                                   |               修改字段               |       修改说明       |
 |--------------------------------------------|:--------------------------------:|:----------------:|
 | examples/cogvideox/samples_i2v_images.txt  |               文件内容               |       图片路径       |
 | examples/cogvideox/samples_i2v_prompts.txt |               文件内容               |    自定义prompt     |
 
-
 如果使用训练后保存的权重改变模型切分策略进行推理，需要使用命令进行转换，权重转换source_path参数请配置训练时的保存路径
+
 ```bash
 mm-convert CogVideoConverter --version <t2v or i2v> resplit \
   --cfg.source_path <your source path> \
@@ -402,32 +439,38 @@ mm-convert CogVideoConverter --version <t2v or i2v> resplit \
   --cfg.target_parallel_config.pp_layers <pp_layers> \
 ```
 
-#### 启动推理
+### 启动推理
+
 t2v 1.0版本启动推理脚本
 
 ```bash
 bash examples/cogvideox/t2v_1.0/inference_cogvideox_t2v.sh
 ```
+
 t2v 1.5版本启动推理脚本
 
 ```bash
 bash examples/cogvideox/t2v_1.5/inference_cogvideox_t2v_1.5.sh
 ```
+
 i2v 1.0版本启动推理脚本
 
 ```bash
 bash examples/cogvideox/i2v_1.0/inference_cogvideox_i2v.sh
 ```
+
 i2v 1.5版本启动推理脚本
 
 ```bash
 bash examples/cogvideox/i2v_1.5/inference_cogvideox_i2v_1.5.sh
 ```
+
 ---
 
 ## lora微调
 
-#### 准备工作
+### 准备工作
+
 配置脚本前请确认环境准备已完成。
 
 1. 权重下载及转换
@@ -438,6 +481,7 @@ bash examples/cogvideox/i2v_1.5/inference_cogvideox_i2v_1.5.sh
  + [i2v下载链接](https://huggingface.co/THUDM/CogVideoX1.5-5B-I2V/tree/main)
   
   lora微调功能的权重转换使用`mm-convert`命令。
+
 ```bash
 mm-convert CogVideoConverter --version <t2v or i2v> hf_to_mm \
   --cfg.source_path <your source path> \
@@ -455,17 +499,21 @@ mm-convert CogVideoConverter --version <t2v or i2v> hf_to_mm \
 原始数据集不包含MM套件所需的data.jsonl文件形式，需要将原始数据集中prompt.txt和videos.txt合并生成data.jsonl文件。
   
 推荐使用提供的`cogvideox_lora_dataset_convert.py`脚本完成转换:
+
 ```bash
 python examples/cogvideox/cogvideox_lora_dataset_convert.py --video_path '/data_path/videos.txt' --prompt_path '/data_path/prompt.txt' --output_path '/data_path/data.jsonl'
 ```
 
-#### 配置参数
+### 配置参数
+
 CogvideoX lora微调阶段的启动文件为shell脚本，主要分为如下2个：
+
 |            | I2V | T2V |
 |:------------:|:----:|:----:|
 | 1.5 | finetune_cogvideox_lora_i2v_1.5.sh |finetune_cogvideox_lora_t2v_1.5.sh |
 
 模型参数的配置文件如下：
+
 |            | I2V | T2V |
 |:------------:|:----:|:----:|
 | 1.5 | model_cogvideox_i2v_1.5.json |model_cogvideox_t2v_1.5.json |
@@ -491,15 +539,16 @@ CogvideoX lora微调阶段的启动文件为shell脚本，主要分为如下2个
 
   请参考预训练相同章节
 
-#### 启动lora微调
-
+### 启动lora微调
 
 t2v 1.5版本任务启动微调
+
 ```shell
 bash examples/cogvideox/t2v_1.5/finetune_cogvideox_lora_t2v_1.5.sh
 ```
 
 i2v 1.5版本任务启动微调
+
 ```shell
 bash examples/cogvideox/i2v_1.5/finetune_cogvideox_lora_i2v_1.5.sh
 ```
@@ -519,10 +568,11 @@ mm-convert CogVideoConverter --version <t2v or i2v> merge_lora_to_base \
 
 ## 预训练模型扩参示例(15B)
 
-#### 模型参数修改
+### 模型参数修改
+
 通过增加扩散模型层数等配置可以模拟15B参数量，如下所示，修改模型参数配置文件（`model_cogvideox_i2v.json`）中`"predictor"`下的`"num_layers"`、`"num_heads"`和`"head_dim"`的值
 
-```
+```shell
 "predictor": {
     "num_layers": 64,
     "num_heads": 32,
@@ -531,7 +581,7 @@ mm-convert CogVideoConverter --version <t2v or i2v> merge_lora_to_base \
 }
 ```
 
-#### 启动脚本修改
+### 启动脚本修改
 
 修改GPT_ARGS参数如下，根据实际分辨率、帧数调整启动脚本中的分布式配置（单机16卡CP4效果较佳）：
 

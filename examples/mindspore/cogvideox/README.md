@@ -4,6 +4,7 @@
 </p>
 
 ## 目录
+
 - [CogVideoX (MindSpore后端) 使用指南](#cogvideox-mindspore后端-使用指南)
   - [目录](#目录)
   - [支持任务列表](#支持任务列表)
@@ -24,16 +25,17 @@
     - [模型参数修改](#模型参数修改)
     - [启动脚本修改](#启动脚本修改)
   - [环境变量声明](#环境变量声明)
+
 ---
 
 ## 支持任务列表
+
 支持以下模型任务类型
 
 |      模型      | 任务类型 | 任务列表 | 是否支持 |
 |:------------:|:----:|:----:|:-----:|
 | CogVideoX-5B | t2v  |预训练  | ✔ |
 | CogVideoX-5B | i2v  |预训练  | ✔ |
-
 
 ## 环境安装
 
@@ -46,12 +48,11 @@ MindSpeed MM MindSpore后端的依赖配套如下表，安装步骤参考[基础
 | MindSpore        | [2.7.0](https://www.mindspore.cn/install/)         |
 | Python           | >=3.9                                                        |                                          |
 
-
 ### 仓库拉取及环境搭建
 
 针对MindSpeed MindSpore后端，昇腾社区提供了一键转换工具MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在华为MindSpore+CANN环境下一键拉起模型训练。在进行一键转换前，用户需要拉取相关的代码仓以及进行环境搭建：
 
-```
+```shell
 # 创建conda环境
 conda create -n test python=3.10
 conda activate test
@@ -77,6 +78,7 @@ mkdir logs
 ```
 
 ---
+
 ### Decord搭建
 
 【X86版安装】
@@ -95,24 +97,24 @@ pip install decord==0.6.0
 
 ## 权重下载及转换
 
-
 ### VAE下载
 
 + [VAE下载链接](https://cloud.tsinghua.edu.cn/f/fdba7608a49c463ba754/?dl=1)
 
-
 ### transformer文件下载
+
 + [CogVideoX1.0-5B-t2v](https://cloud.tsinghua.edu.cn/d/fcef5b3904294a6885e5/?p=%2F&mode=list)
 + [CogVideoX1.0-5B-i2v](https://cloud.tsinghua.edu.cn/d/5cc62a2d6e7d45c0a2f6/?p=%2F1&mode=list)
 + [CogVideoX1.5-5B-t2v](https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT/tree/main/transformer_t2v)
 + [CogVideoX1.5-5B-i2v](https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT/tree/main/transformer_i2v)
 
-
 ### T5模型下载
+
 仅需下载tokenizer和text_encoder目录的内容：[下载链接](https://huggingface.co/THUDM/CogVideoX-5b/tree/main)
 
 预训练权重结构如下：
-   ```
+
+   ```shell
    CogVideoX-5B
    ├── text_encoder
    │   ├── config.json
@@ -133,7 +135,9 @@ pip install decord==0.6.0
    ```
 
 ### 权重转换
+
 权重转换source_path参数请配置transformer权重文件的路径：
+
 ```bash
 python examples/cogvideox/cogvideox_sat_convert_to_mm_ckpt.py \
     --source_path <your source path> \
@@ -144,21 +148,25 @@ python examples/cogvideox/cogvideox_sat_convert_to_mm_ckpt.py \
     --num_layers 42 \
     --mode split
 ```
+
 其中--tp_size 后为实际的tp切分策略， --task 的值为t2v或i2v，
 当开启PP时，--pp_size 后参数值个数与PP的数值相等，并且参数之和与--num_layers 参数相等，举例：当PP=4, --num_layers 4, --pp_size 1 1 1 1; 当PP=4, --num_layers 42, --pp_size 10 11 11 10 
 
 转换后的权重结构如下：
 
 TP=1,PP=1时：
-```
+
+```shell
 CogVideoX-5B-Converted
 ├── release
 │   └──mp_rank_00
 │      └──model_optim_rng.pt
 └──latest_checkpointed_iterations.txt
 ```
+
 TP=2,PP=1, TP>2的情况依此类推：
-```
+
+```shell
 CogVideoX-5B-Converted
 ├── release
 │   ├──mp_rank_00
@@ -167,8 +175,10 @@ CogVideoX-5B-Converted
 │      └──model_optim_rng.pt
 └──latest_checkpointed_iterations.txt
 ```
+
 TP=1,PP=4, PP>1及TP>1的情况依此类推：
-```
+
+```shell
 CogVideoX-5B-Converted
 ├── release
 │   ├──mp_rank_00_000
@@ -184,10 +194,12 @@ CogVideoX-5B-Converted
 
 ---
 <a id="jump4"></a>
+
 ## 数据集准备及处理
 
 数据集格式应该如下：
-```
+
+```shell
 .
 ├── data.jsonl
 ├── labels
@@ -199,10 +211,12 @@ CogVideoX-5B-Converted
     ├── 2.mp4
     ├── ...
 ```
+
 每个 txt 与视频同名，为视频的标签。视频与标签应该一一对应。
 
 data.jsonl文件内容如下示例：
-```
+
+```shell
 {"file": "dataPath/1.mp4", "captions": "Content from 1.txt"}
 {...}
 ...
@@ -212,20 +226,21 @@ data.jsonl文件内容如下示例：
 
 ## 预训练
 
-
 ### 准备工作
-配置脚本前需要完成前置准备工作，包括：**[环境安装](#环境安装)**、**[权重下载及转换](#权重下载及转换)**、**[数据集准备及处理](#数据集准备及处理)**，详情可查看对应章节。
 
+配置脚本前需要完成前置准备工作，包括：**[环境安装](#环境安装)**、**[权重下载及转换](#权重下载及转换)**、**[数据集准备及处理](#数据集准备及处理)**，详情可查看对应章节。
 
 ### 配置参数
 
 CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：`
+
 |版本         | I2V | T2V |
 |:------------:|:----:|:----:|
 | 1.0 |  pretrain_cogvideox_i2v.sh |pretrain_cogvideox_t2v.sh  |
 | 1.5 | pretrain_cogvideox_i2v_1.5.sh |pretrain_cogvideox_t2v_1.5.sh |
 
 模型参数的配置文件如下：
+
 |版本         | I2V | T2V |
 |:------------:|:----:|:----:|
 | 1.0 |  model_cogvideox_i2v.json |model_cogvideox_t2v.json  |
@@ -263,11 +278,14 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：`
 
 * 当开启分层Zero时，需要在[pretrain_cogvideox_t2v_1.5.sh](t2v_1.5/pretrain_cogvideox_t2v_1.5.sh)或者[pretrain_cogvideox_i2v_1.5.sh](i2v_1.5/pretrain_cogvideox_i2v_1.5.sh)里面添加下面的参数。
   注意：不兼容Encoder-DP特性、TP场景、PP场景，与VAE-CP效果未验证。
+
   ```shell
   --layerzero \
   --layerzero-config ./zero_config.yaml \
   ```
+
   参数里面的yaml文件如下面所示:
+
   ```yaml
   zero3_size: 8  
   transformer_layers:
@@ -296,6 +314,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：`
 模型参数配置文件中的`head_dim`字段原模型默认配置为64。此字段调整为128会更加亲和昇腾。
 
 在sh启动脚本中可以修改运行卡数(NNODES为节点数，GPUS_PER_NODE为每个节点的卡数，相乘即为总运行卡数)：
+
 ```shell
 GPUS_PER_NODE=8
 MASTER_ADDR=localhost
@@ -308,31 +327,38 @@ WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
 ### 启动预训练
 
 t2v 1.0版本任务启动预训练
+
 ```shell
 bash examples/mindspore/cogvideox/t2v_1.0/pretrain_cogvideox_t2v.sh
 ```
+
 t2v 1.5版本任务启动预训练
+
 ```shell
 bash examples/mindspore/cogvideox/t2v_1.5/pretrain_cogvideox_t2v_1.5.sh
 ```
+
 i2v 1.0版本任务启动预训练
+
 ```shell
 bash examples/mindspore/cogvideox/i2v_1.0/pretrain_cogvideox_i2v.sh
 ```
+
 i2v 1.5版本任务启动预训练
+
 ```shell
 bash examples/mindspore/cogvideox/i2v_1.5/pretrain_cogvideox_i2v_1.5.sh
 ```
----
 
+---
 
 ## 预训练模型扩参示例(15B)
 
-
 ### 模型参数修改
+
 通过增加扩散模型层数等配置可以模拟15B参数量，如下所示，修改模型参数配置文件（`model_cogvideox_i2v.json`）中`"predictor"`下的`"num_layers"`、`"num_heads"`和`"head_dim"`的值
 
-```
+```shell
 "predictor": {
     "num_layers": 64,
     "num_heads": 32,
@@ -340,7 +366,6 @@ bash examples/mindspore/cogvideox/i2v_1.5/pretrain_cogvideox_i2v_1.5.sh
     ...
 }
 ```
-
 
 ### 启动脚本修改
 
@@ -370,6 +395,7 @@ GPT_ARGS="
 ```
 
 ## 环境变量声明
+
 ASCEND_RT_VISIBLE_DEVICES： 指定NPU设备的索引值
 
 ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏

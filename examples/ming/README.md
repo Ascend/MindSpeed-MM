@@ -22,14 +22,14 @@
 
 [Ming-Lite-Omni v1.5](https://github.com/inclusionAI/Ming) 是对 [Ming-lite-omni](https://github.com/inclusionAI/Ming/tree/v1.0) 的全模态能力的全面升级。它在图像文本理解、文档理解、视频理解、语音理解和合成以及图像生成和编辑等任务中的性能显著提升。基于 [Ling-lite-1.5](https://github.com/inclusionAI/Ling)，Ming-lite-omni v1.5 总共有 203 亿个参数，其 MoE（专家混合）部分有 30 亿个活跃参数。与行业领先的模型相比，它在各种模态基准测试中展示了高度竞争的结果。
 
-#### 参考实现
+### 参考实现
 
 ```shell
 url=https://github.com/inclusionAI/Ming
 commit_id=d97e2f31467298674426539915a146d88a814925
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.07.30: 支持 Ming-Lite-Omni v1.5 图文理解任务训练。
 
@@ -45,7 +45,7 @@ commit_id=d97e2f31467298674426539915a146d88a814925
 
 <a id="jump1.1"></a>
 
-#### 1. 仓库拉取
+### 1. 仓库拉取
 
 ```shell
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
@@ -60,7 +60,7 @@ cd ..
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 ```bash
 # python3.10
@@ -117,13 +117,13 @@ pip install -r MindSpeed-MM/examples/ming/requirements.txt
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
 
-#### 2. 启动训练
+### 2. 启动训练
 
 1. 以图文理解的微调任务为例，可根据实际情况修改[启动脚本](../../examples/ming/finetune_vl.sh)的配置，以下配置必须修改：
 
@@ -165,4 +165,3 @@ bash finetune_vl.sh
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-

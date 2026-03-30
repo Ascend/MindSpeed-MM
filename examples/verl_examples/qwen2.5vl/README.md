@@ -29,16 +29,16 @@
 
 <a id="jump0.1"></a>
 
-#### 参考实现
+### 参考实现
 
-```
+```shell
 url=https://github.com/volcengine/verl
 commit_id=97b65c63c729c61ca607315cf7084012aabc6bba
 ```
 
 <a id="jump0.2"></a>
 
-#### 变更记录
+### 变更记录
 
 2025.09.03: 首次支持Qwen2.5-VL 7B/32B GRPO训练
 
@@ -54,7 +54,7 @@ commit_id=97b65c63c729c61ca607315cf7084012aabc6bba
 
 <a id="jump1.1"></a>
 
-#### 1. 环境依赖
+### 1. 环境依赖
 
 | PyTorch版本 | torch_npu版本 | Python版本 |
 |-----------|-------------| ---------- |
@@ -62,7 +62,7 @@ commit_id=97b65c63c729c61ca607315cf7084012aabc6bba
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 ```bash
 # python3.11
@@ -111,7 +111,7 @@ pip install torch_npu-2.5.1*.manylinux2014_*.whl
 
 <a id="jump1.3"></a>
 
-#### 3. 安装插件
+### 3. 安装插件
 
 ```bash
 # 请确保 vllm 已正确安装并且之后不会做覆盖
@@ -162,13 +162,13 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
 
-#### 2. 启动训练
+### 2. 启动训练
 
 以 Qwen2.5VL 7B 模型为例,在启动训练之前，需要修改[启动脚本](train_qwen2_5_vl_7b_grpo_full.sh)的配置：
 
@@ -275,7 +275,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 <a id="jump4.3"></a>
 
-#### 3. 日志打点指标说明
+### 3. 日志打点指标说明
 
 **时间相关指标说明**
 

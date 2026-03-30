@@ -19,16 +19,17 @@
 <a id="jump0"></a>
 
 ## 简介
+
 [DeepSeek-OCR-2](https://github.com/deepseek-ai/DeepSeek-OCR-2) 是 DeepSeek 团队推出的视觉语言模型，专注于通过光学压缩技术高效处理长文本内容。该模型创新性的引入基于LLM的图像因果推理编码器 DeepEncoder V2 ，搭配解码器 DeepSeek3B-MoE ，实现视觉token的高效利用，在复杂布局（公式 / 表格）任务上具表现优异，在 OmniDocBench v1.5 识别准确率高达 91% ，相比 DeepSeek-OCR 提升 3.73% 。
 
-#### 参考实现
+### 参考实现
 
 ```shell
 url=https://github.com/deepseek-ai/DeepSeek-OCR-2/
 commit_id=c548f2e60d409fc1d92208472c0f2389998af632
 ```
 
-#### 变更记录
+### 变更记录
 
 2026.01.31: 打通 DeepSeekOCR2 固定size图片训练流程。
 
@@ -44,7 +45,7 @@ commit_id=c548f2e60d409fc1d92208472c0f2389998af632
 
 <a id="jump1.1"></a>
 
-#### 1. 仓库拉取
+### 1. 仓库拉取
 
 ```shell
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
@@ -54,7 +55,7 @@ cd MindSpeed-MM
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 ```bash
 # 安装MindSPeed MM依赖
@@ -95,7 +96,9 @@ DeepSeekOCR2未开源数据集，这里以[CC-OCR数据集](https://huggingface.
 }
     ... ...
    ```
+
 数据路径参考如下：
+
 ```json
 $playground
 |--data
@@ -105,19 +108,20 @@ $playground
       ···
   |--output.jsonl
 ```
+
 <a id="jump4"></a>
 
 ## 训练
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
 
-#### 2. 启动训练
+### 2. 启动训练
 
 1. 以图文理解的微调任务为例，可根据实际情况修改[启动脚本](../../examples/deepseekocr/finetune_ocr.sh)的配置，以下配置必须修改：
 
@@ -157,4 +161,3 @@ bash examples/deepseekocr2/finetune_ocr2.sh
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-

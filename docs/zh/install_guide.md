@@ -93,7 +93,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
   2. 执行如下指令一键安装：
 
       ```bash
-        bash scripts/install.sh --msid eb10b92 && bash examples/fsdp2/ qwen3_5/install_extensions.sh
+        bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensions.sh
       ```
 
    scripts/install.sh提供了如下选项供使用：
@@ -154,7 +154,6 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
         
   2. 获取MindSpeed加速库源码并安装。
       
-
       ```shell
           # 获取源码
           git clone https://gitcode.com/Ascend/MindSpeed.git

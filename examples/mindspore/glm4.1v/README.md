@@ -25,6 +25,7 @@
 
 ---
 <a id="jump1"></a>
+
 ## 环境安装
 
 【模型开发时推荐使用配套的环境版本】
@@ -32,7 +33,8 @@
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 <a id="jump1.1"></a>
-#### 1. 仓库拉取
+
+### 1. 仓库拉取
 
 ```shell
 # 安装MindSpeed-Core-MS一键拉起部署
@@ -55,21 +57,22 @@ mkdir ckpt
 ```
 
 <a id="jump2"></a>
+
 ## 权重下载及转换
 
 <a id="jump2.1"></a>
-#### 1. 权重下载
+
+### 1. 权重下载
 
 从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [GLM4.1V-9B](https://huggingface.co/THUDM/GLM-4.1V-9B-Thinking)；
 
-
-
  将下载的模型权重保存到本地的`ckpt/hf_path/GLM4.1V-9B-Instruct`目录下。
 
 <a id="jump2.2"></a>
-#### 2. 权重转换(hf2mm)
+
+### 2. 权重转换(hf2mm)
 
 MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)
 
@@ -99,14 +102,13 @@ mm-convert GlmConverter hf_to_mm \
 # tp_size: tp并行数量，注意要和微调启动脚本中的配置一致
 ```
 
-
-
 <a id="jump3"></a>
+
 ## 数据集准备及处理
 
-
 <a id="jump3.1"></a>
-#### 1. 数据集下载（以COCO2017数据集为例）
+
+### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
 
@@ -114,7 +116,7 @@ mm-convert GlmConverter hf_to_mm \
 
 (3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py;
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── COCO2017
@@ -137,12 +139,14 @@ dataset_param->basic_parameters->dataset
 **由于当前官仓还未开源微调代码和脚本，当前是基于qwen2.5vl的参考实现，正式版的微调功能后续跟进上线；**
 
 <a id="jump4.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
-#### 2. 配置参数
+
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -204,7 +208,7 @@ OUTPUT_ARGS="
 若需要加载指定迭代次数的权重、优化器等状态，需将加载路径`LOAD_PATH`设置为保存文件夹路径`LOAD_PATH="save_dir"`，并修改`latest_checkpointed_iteration.txt`文件内容为指定迭代次数
 (此功能coming soon)
 
-```
+```shell
 $save_dir
    ├── latest_checkpointed_iteration.txt
    ├── ...
@@ -224,6 +228,7 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```
+
 注意，当开启PP时，`model.json`中配置的`vision_encoder`和`text_decoder`的`pipeline_num_layer`参数控制了各自的PP切分策略。对于流水线并行，要先处理`vision_encoder`再处理`text_decoder`。
 
 比如9b默认的值`[24,0,0,0]`、`[5,12,12,11]`，其含义为PP域内第一张卡先放24层`vision_encoder`再放5层`text_decoder`、第二张卡放`text_decoder`接着的12层、第三张卡放`text_decoder`接着的12层、第四张卡放`text_decoder`接着的11层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[22,2,0,0]`、`[5,12,12,11]`的配置是错的）
@@ -231,16 +236,19 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[5,12,12,11]`），需要在`finetune_glm4.1v_9b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dummy_optimizer.md)。
 
 <a id="jump4.3"></a>
-#### 3. 启动微调
+
+### 3. 启动微调
 
 以GLM4.1V-9B为例，启动微调训练任务。  
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
+
 ```shell
 bash examples/experimental/glm4.1v/finetune_glm4.1v_9b.sh
 ```
 
 ---
 <a id="jump6"></a>
+
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
@@ -260,9 +268,9 @@ bash examples/experimental/glm4.1v/finetune_glm4.1v_9b.sh
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
-
 ---
 <a id="jump7"></a>
+
 ## 注意事项
 
 1. 在 `finetune_xx.sh`里，与模型结构相关的参数并不生效，以`examples/glm4.1v/model_xb.json`里同名参数配置为准，非模型结构的训练相关参数在 `finetune_xx.sh`修改。

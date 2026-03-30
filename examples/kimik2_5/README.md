@@ -21,33 +21,39 @@
 - [注意事项](#jump5)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://huggingface.co/moonshotai/Kimi-K2.5/tree/main
 commit_id=3367c8d
 ```
 
-#### 变更记录
+### 变更记录
 
 2026.02.13: 首次支持Kimi-K2.5模型
 
 ---
 <a id="jump1"></a>
+
 ## 环境安装
 
 <a id="jump1.1"></a>
-#### 1. 环境准备
+
+### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/installation.md)，完成昇腾软件安装。
 
 ‼️ 部分特性依赖较新版本的CANN，请使用 8.5.0 以上版本:
+
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
 
-
 <a id="jump1.2"></a>
-#### 2. 环境搭建
+
+### 2. 环境搭建
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 
@@ -72,7 +78,7 @@ pip install tiktoken==0.12.0
 
 <a id="jump2.1"></a>
 
-#### 1. 数据集下载（以COCO2017数据集为例）
+### 1. 数据集下载（以COCO2017数据集为例）
 
 (1) 用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
@@ -80,7 +86,7 @@ pip install tiktoken==0.12.0
 
 (3) 运行数据转换脚本`python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py`，转换后参考数据目录结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── COCO2017
@@ -97,7 +103,8 @@ pip install tiktoken==0.12.0
 同时注意`kimik2_5_config.yaml`中`data->dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。正式训练时，可以把该参数去掉以读取全部的数据。
 
 <a id="jump2.2"></a>
-#### 2.纯文本或有图无图混合训练数据 (以LLaVA-Instruct-150K为例)
+
+### 2.纯文本或有图无图混合训练数据 (以LLaVA-Instruct-150K为例)
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
 
@@ -125,15 +132,19 @@ pip install tiktoken==0.12.0
   ],
 }
 ```
+
 ---
 
 <a id="jump3"></a>
+
 ## 训练
 
 <a id="jump3.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 从Huggingface库 （[Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)） 下载下列文件并放置于本地`mindspeed_mm/fsdp/models/kimik2_5`路径下；
+
 ```shell
 # HF_PATH配置为HuggingFace库下载文件的存放路径
 HF_PATH="/download/Kimi-K2.5"
@@ -159,6 +170,7 @@ cd ${MM_PATH}
 ```
 
 Kimi-K2.5模型需要配置多机训练，如需拉起多机训练，请修改启动脚本下的 `MASTER_ADDR`、`NNODES` 以及 `NODE_RANK` 变量：
+
 ``` shell
 MASTER_ADDR: 主节点IP地址
 NNODES: 总节点数量
@@ -168,7 +180,8 @@ NODE_RANK: 当前节点序号
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump3.2"></a>
-#### 2. 启动训练
+
+### 2. 启动训练
 
 在 `kimik2_5_config.yaml` 文件中配置好数据集路径后，使用如下命令，即可实现Kimi-K2.5的训练：
 
@@ -177,6 +190,7 @@ bash examples/kimik2_5/finetune_kimik2_5.sh
 ```
 
 <a id="jump4"></a>
+
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
@@ -190,4 +204,5 @@ bash examples/kimik2_5/finetune_kimik2_5.sh
 ---
 
 <a id="jump5"></a>
+
 ## 注意事项

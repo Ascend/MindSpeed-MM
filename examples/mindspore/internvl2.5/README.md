@@ -34,7 +34,8 @@ MindSpeed MM MindSpore后端的依赖配套如下表，安装步骤参考[基础
 
 <a id="jump1.1"></a>
 
-#### 1. 仓库拉取与环境搭建
+### 1. 仓库拉取与环境搭建
+
 模型一键拉起部署MindSpeed-Core-MS，自动拉取相关代码仓并对torch代码进行一键适配。一键拉起前，用户需拉取相关的代码仓以及进行环境搭建：
 
 ```shell
@@ -58,25 +59,24 @@ mkdir ckpt
 mkdir data
 mkdir logs
 ```
+
 ## 权重下载及转换
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Hugging Face等网站下载开源模型权重
 
-- [
-InternVL2_5-4B](https://huggingface.co/OpenGVLab/InternVL2_5-4B)；
+- [InternVL2_5-4B](https://huggingface.co/OpenGVLab/InternVL2_5-4B)；
 
-- [
-InternVL2_5-78B](https://huggingface.co/OpenGVLab/InternVL2_5-78B)；
+- [InternVL2_5-78B](https://huggingface.co/OpenGVLab/InternVL2_5-78B)；
 
 将模型权重保存在`raw_ckpt`目录下，例如`raw_ckpt/InternVL2_5-78B`。
 
 <a id="jump2.2"></a>
 
-#### 2. 权重转换
+### 2. 权重转换
 
 MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的转换以及PP（Pipeline Parallel）的权重切分。
 
@@ -126,13 +126,13 @@ LOAD_PATH="pretrained/InternVL2_5-78B"
 
 <a id="jump3.1"></a>
 
-#### 1. 数据集下载
+### 1. 数据集下载
 
 【图片数据】
 
 用户需自行获取并解压[InternVL-Finetune](https://huggingface.co/datasets/OpenGVLab/InternVL-Chat-V1-2-SFT-Data)数据集到`dataset/playground`目录下，以数据集ai2d为例，解压后的数据结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── ai2d
@@ -166,13 +166,13 @@ pip install decord==0.6.0
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
 
-#### 2. 配置参数
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -230,7 +230,7 @@ OUTPUT_ARGS="
 
 若需要加载指定迭代次数的权重、优化器等状态，需将加载路径`LOAD_PATH`设置为保存文件夹路径`LOAD_PATH="save_dir"`，并修改`latest_checkpointed_iteration.txt`文件内容为指定迭代次数
 
-```
+```shell
 $save_dir
    ├── latest_checkpointed_iteration.txt
    ├── ...
@@ -253,7 +253,7 @@ $save_dir
 
 <a id="jump4.3"></a>
 
-#### 3. 启动微调
+### 3. 启动微调
 
 以InternVL2_5-78B为例，启动微调训练任务。
 
@@ -281,7 +281,6 @@ bash examples/mindspore/internvl2.5/finetune_internvl2.5_78B.sh
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-
 
 <a id="jump6"></a>
 

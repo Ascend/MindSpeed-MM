@@ -30,31 +30,31 @@
 
 ## 版本说明
 
-#### 参考实现
+### 参考实现
 
 【预训练任务】
 
 5B:
 
-```
+```shell
 url=https://github.com/modelscope/DiffSynth-Studio.git
 commit_id=f0ea049
 ```
 
 A14B:
 
-```
+```shell
 url=https://github.com/modelscope/DiffSynth-Studio.git
 commit_id=833ba1e
 ```
 
 【推理】
 
-```
+```shell
 url=https://github.com/huggingface/diffusers/tree/v0.35.1
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.10.11: 首次支持Wan2.2模型
 
@@ -74,13 +74,16 @@ url=https://github.com/huggingface/diffusers/tree/v0.35.1
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 ### 仓库拉取
+
 拉取MindSpeed MM代码仓，并进入代码仓根目录：
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
 
 ### 环境搭建
+
 执行如下指令：
 
 ```bash
@@ -227,6 +230,7 @@ mm-convert WanConverter mm_to_hf \
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |        CP         | 训练时的CP size（建议根据训练时设定的分辨率调整）   |
 
 **注**： 
+
 1. 当前LOAD_PATH路径无效时，MindSpeed会对模型随机初始化从头训练。为防止加载失败，请留意日志中的warning信息，或者自行确认路径合法。
 2. 使用断点续训功能时，需删去'--downcast-to-bf16'、'--no-load-optim'、'--no-load-rng'、'--no-save-optim'、'--no-save-rng'几项配置
 
@@ -299,6 +303,7 @@ bash examples/wan2.2/{model_size}/{task}/pretrain_{type}.sh
 #### LoRA权重转换（可选）
 
 若需加载从Diffsynth保存的lora预训练权重，需要先对lora权重完成以下权重转换
+
 ```bash
 mm-convert WanConverter lora_hf_to_mm \
  --cfg.source_path ./weights/Wan-AI/Wan2.2-T2V-A14B-lora \
@@ -363,6 +368,7 @@ mm-convert WanConverter merge_lora_to_base \
  --lora_alpha 32 \
  --lora_rank 32
 ```
+
 权重合并脚本的参数说明如下：
 
 | 参数              | 含义                     |
@@ -418,4 +424,3 @@ bash examples/wan2.2/{model_size}/{task}/inference.sh
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-

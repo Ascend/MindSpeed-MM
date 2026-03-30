@@ -25,16 +25,17 @@
 - [环境变量声明](#jump6)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/hiyouga/LLaMAFactory
 commit_id=68119e5
 ```
 
-#### 变更记录
+### 变更记录
 
 2026.1.19: 首次支持Magistral-Small-2509模型
-
 
 ---
 <a id="jump1"></a>
@@ -42,7 +43,8 @@ commit_id=68119e5
 ## 环境安装
 
 <a id="jump1.1"></a>
-#### 1. 环境准备
+
+### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
@@ -51,7 +53,8 @@ commit_id=68119e5
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
@@ -90,7 +93,6 @@ pip install -e .
 
 将模型权重保存在`ckpt/hf_path/`目录下，例如`ckpt/hf_path/Magistral-Small-2509`。
 
-
 <a id="jump2.2"></a>
 
 ### 权重转换
@@ -106,7 +108,8 @@ mm-convert Mistral3Converter hf_to_dcp --hf_dir "ckpt/hf_path/Magistral-Small-25
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载（以COCO2017数据集为例）
+
+### 1. 数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
@@ -114,7 +117,7 @@ mm-convert Mistral3Converter hf_to_dcp --hf_dir "ckpt/hf_path/Magistral-Small-25
 
 (3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── COCO2017
@@ -125,19 +128,17 @@ mm-convert Mistral3Converter hf_to_dcp --hf_dir "ckpt/hf_path/Magistral-Small-25
        ...
    ```
 
-
-
 ## 微调
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载** 、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
 
-#### 2. 配置参数
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -148,7 +149,6 @@ model_name_or_path为原始模型路径
 
 根据实际情况修改`model.json`中的权重路径，包括`init_from_hf_path`
 init_from_hf_path为原始模型路径
-
 
 【模型保存加载及日志信息配置】
 
@@ -179,7 +179,7 @@ OUTPUT_ARGS="
 "
 ```
 
-```
+```shell
 $save_dir
    ├── latest_checkpointed_iteration.txt
    ├── ...
@@ -215,13 +215,13 @@ $save_dir
   NODE_RANK="current node id"  # 当前节点的RANK，多个节点不能重复，主节点为0, 其他节点可以是1,2..
   WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
 ```
+
 【Data Packing】（可选）
 如需开启Data Packing，在`data.json`中将`packing`设置为`true`，并根据需要调整`finetune_magistral_2509.sh`中的SEQ_LEN
 
-
 <a id="jump4.3"></a>
 
-#### 3. 启动微调
+### 3. 启动微调
 
 以Magistral-Small-2509为例，启动微调训练任务。
 
@@ -231,8 +231,10 @@ bash examples/magistral-2509/finetune_magistral_2509.sh
 
 <a id="jump4.4"></a>
 
-#### 4. 启动推理
+### 4. 启动推理
+
 训练完成之后，将保存在`SAVE_PATH`目录下的权重转换成huggingface格式
+
 ```shell
 mm-convert Mistral3Converter dcp_to_hf  \
   --load_dir "Magistral-Small-2509_finetune_result/iter_000xx" \
@@ -245,15 +247,19 @@ mm-convert Mistral3Converter dcp_to_hf  \
 完成权重转换之后，即可使用transformers库进行推理。
 
 <a id="jump5"></a>
+
 ## lora微调
 
 与模型微调一样，需进行权重转换与脚本配置
+
 ### lora权重转换
 
 ```shell
 mm-convert Mistral3Converter hf_to_dcp --hf_dir "ckpt/hf_path/Magistral-Small-2509" --dcp_dir "ckpt/convert_path/Magistral-Small-2509-lora-base" --is_lora_base true
 ```
+
 ### 配置参数
+
 lora微调使用finetune_magistral_2509_lora.sh脚本，数据、模型路径等配置与微调一致
 
 首次lora微调，需将finetune_magistral_2509_lora.sh中的LOAD_PATH设置为转换后的权重路径，如ckpt/convert_path/Magistral-Small-2509-lora-base
@@ -261,11 +267,13 @@ lora微调使用finetune_magistral_2509_lora.sh脚本，数据、模型路径等
 --load-base-model配置为lora权重转换部分得到的权重，LOAD_PATH配置为上一次lora保存的权重
 
 ### 启动lora微调
+
 ```shell
 bash examples/magistral-2509/finetune_magistral_2509_lora.sh
 ```
 
 ### lora微调后权重合并
+
 ```shell
 mm-convert Mistral3Converter merge_mm_lora_dcp_weight_to_base_hf \
   --base_hf_dir ckpt/hf_path/Magistral-Small-2509 \ # 原始权重路径
@@ -274,12 +282,10 @@ mm-convert Mistral3Converter merge_mm_lora_dcp_weight_to_base_hf \
   --save_merged_hf_dir /path/to/save  # 合并后保存路径
 ```
 
-
-
-
 <a id="jump6"></a>
 
 ## 环境变量声明
+
 以下列出常见的环境变量，详细的命令参数请见[详细变量声明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/user-guide/args_readme.md)
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |

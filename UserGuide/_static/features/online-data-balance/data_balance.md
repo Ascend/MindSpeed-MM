@@ -48,6 +48,7 @@ flowchart TD
 ### 3.1 启用配置
 
 在Qwen 2.5 Omni模型训练命令中添加：
+
 ```bash
 --use-data-balance
 ```
@@ -55,6 +56,7 @@ flowchart TD
 ### 3.2 核心 API
 
 #### 3.2.1 DataBalance 初始化
+
 ```python
 from mindspeed_mm.utils.data_balance.data_balance import DataBalance
 
@@ -68,6 +70,7 @@ data_balancer = DataBalance(
 ```
 
 #### 3.2.2 创建负载均衡数据迭代器
+
 ```python
 batch_generator = data_balancer.build_balanced_train_data_iterator(
     is_vit_last_stage=is_vit_last_stage,

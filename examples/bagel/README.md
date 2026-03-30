@@ -22,15 +22,18 @@
 
 ## 版本说明
 
-#### 参考实现
+### 参考实现
+
 【训练】
-```
+
+```shell
 url=https://github.com/bytedance-seed/BAGEL
 commit_id = 57c390
 ```
 
 ---
 <a id="jump1"></a>
+
 ## 环境安装
 
 【模型开发时推荐使用配套的环境版本】
@@ -39,17 +42,24 @@ commit_id = 57c390
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
 
 <a id="jump1.1"></a>
-#### 1. 环境搭建
+
+### 1. 环境搭建
+
 拉取MindSpeed MM代码仓，并进入代码仓根目录：
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
+
 对于X86架构机器，执行如下指令：
+
 ```bash
 bash scripts/install.sh --arch x86 --msid 93c45456c7044bacddebc5072316c01006c938f9
 ```
+
 对于ARM架构机器，执行如下指令：
+
 ```bash
 bash scripts/install.sh --arch arm --msid 93c45456c7044bacddebc5072316c01006c938f9
 
@@ -58,7 +68,7 @@ bash scripts/install.sh --arch arm --msid 93c45456c7044bacddebc5072316c01006c938
 ## 权重下载及转换
 
 <a id="jump2.1"></a>
-#### 1. 权重下载
+### 1. 权重下载
 
 从Huggingface库下载对应的模型权重:
 - 模型地址: [BAGEL-7B-MoT](https://huggingface.co/ByteDance-Seed/BAGEL-7B-MoT/tree/main)；
@@ -66,15 +76,18 @@ bash scripts/install.sh --arch arm --msid 93c45456c7044bacddebc5072316c01006c938
  将下载的模型权重保存到本地的`ckpt/hf_path/BAGEL-7B-MoT`目录下。
 
  <a id="jump2.2"></a>
-#### 2. 权重转换(hf2mm)
+### 2. 权重转换(hf2mm)
 
 Bagel模型需要对下载后的权重进行权重转换，运行权重转换脚本：
-```shell
+```
+
 # Bagel
+
 mm-convert BagelConverter hf_to_mm \
  --cfg.source_path <./ckpt/hf_path/BAGEL-7B-MoT/> \
  --cfg.target_path <./ckpt/mm_path/BAGEL-7B-MoT/> \
-```
+
+```shell
 
 权重转换脚本的参数说明如下：
 
@@ -85,39 +98,46 @@ mm-convert BagelConverter hf_to_mm \
 
 ---
 <a id="jump3"></a>
+
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载
 
-```bash
-https://lf3-static.bytednsdoc.com/obj/eden-cn/nuhojubrps/bagel_example.zip
+### 1. 数据集下载
+
 ```
+
+<https://lf3-static.bytednsdoc.com/obj/eden-cn/nuhojubrps/bagel_example.zip>
+
+```shell
 
 将数据处理成如下格式
 
-```bash
+```
+
 </dataset>
 bagel_example
 ├── t2i/                           # text-to-image (parquet)
 └── vlm/
     ├── images/                    # JPEG / PNG frames
     └── llava_ov_si.jsonl          # vision‑language SFT conversations
-```
+```shell
 
 若需要自行添加数据集，请将数据处理成与上述数据统一格式
 
 <a id="jump4"></a>
+
 ## 微调
 
 <a id="jump4.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
-
 <a id="jump4.2"></a>
-#### 2. 配置参数
+
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -136,7 +156,7 @@ bagel_example
       "num_total_samples": 2000
     },
     ......
-```
+```shell
 
 【权重路径配置】
 
@@ -147,7 +167,8 @@ bagel_example
 
 
 <a id="jump4.3"></a>
-#### 3. 启动微调
+
+### 3. 启动微调
 
 在开始之前，请确认环境准备、模型权重下载与转换已完成。
 
@@ -161,9 +182,11 @@ bagel_example
 
 启动训练
 
-```bash
-bash examples/bagel/finetune_bagel.sh
 ```
+
+bash examples/bagel/finetune_bagel.sh
+
+```shell
 
 ## 环境变量声明
 

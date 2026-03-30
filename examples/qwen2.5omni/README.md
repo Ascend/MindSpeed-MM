@@ -32,8 +32,10 @@
 - [注意事项](#jump9)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/hiyouga/LLaMA-Factory.git
 commit_id=52f2565
 # transformers版本
@@ -41,32 +43,40 @@ url=https://github.com/huggingface/transformers.git
 commit_id=7bb619d
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.06.05: 首次支持Qwen2.5-Omni模型
 
 ---
+
 ## 模型介绍
+
 Qwen 2.5-Omni是一个端到端的多模态大语言模型，旨在感知包括文本、图像、音频和视频在内的多种模态，同时以流式的方式生成文本和自然语音响应。
 
 **参考实现**
+
 ```bash
 https://github.com/hiyouga/LLaMA-Factory
 commit id: 52f25651a2016ddede2283be17cf40c2c1b906ed
 ```
+
 ---
 <a id="jump1"></a>
+
 ## 环境安装
 
 <a id="jump1.1"></a>
-#### 1. 环境准备
+
+### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
-#### 2. 环境搭建
+
+### 2. 环境搭建
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
@@ -93,20 +103,22 @@ pip install librosa
 
 ---
 <a id="jump2"></a>
+
 ## 权重下载及转换
 
 <a id="jump2.1"></a>
-#### 1. 权重下载
+
+### 1. 权重下载
 
 从Hugging Face库下载对应的模型权重:
 
 - 模型地址: [Qwen2.5-Omni-7B](https://huggingface.co/Qwen/Qwen2.5-Omni-7B/tree/main)；
 
-
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-Omni-7B`目录下。
 
 <a id="jump2.2"></a>
-#### 2. 权重转换(hf2mm)
+
+### 2. 权重转换(hf2mm)
 
 MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)
 
@@ -131,7 +143,8 @@ mm-convert  Qwen2_5_OmniConverter hf_to_mm \
 ```
 
 <a id="jump2.3"></a>
-#### 3. 权重转换(mm2hf)
+
+### 3. 权重转换(mm2hf)
 
 MindSpeed MM修改了部分原始网络的结构名称，在微调后，如果需要将权重转回huggingface格式，可使用`mm-convert`权重转换工具对微调后的权重进行转换，将权重名称修改为与原始网络一致。
 
@@ -161,21 +174,22 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-Omni-7B"
 ```
 
 <a id="jump3"></a>
+
 ## 数据集准备及处理
 
-
 <a id="jump3.1"></a>
-#### 1.视频音频数据集
 
-数据集中的视频数据集取自llamafactory，https://github.com/hiyouga/LLaMA-Factory/tree/main/data
+### 1.视频音频数据集
+
+数据集中的视频数据集取自llamafactory，<https://github.com/hiyouga/LLaMA-Factory/tree/main/data>
 
 视频取自mllm_video_demo，使用时需要将该数据放到自己的data文件夹中去，同时将llamafactory上的mllm_video_audio_demo.json也放到自己的data文件夹中
 
-
 <a id="jump3.2"></a>
-#### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
 
-##### 1) 图文数据集下载（以COCO2017数据集为例）
+### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
+
+#### 1) 图文数据集下载（以COCO2017数据集为例）
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中
 
@@ -183,7 +197,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-Omni-7B"
 
 (3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py;
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── COCO2017
@@ -227,7 +241,9 @@ dataset_param->basic_parameters->dataset
   ],
 }
 ```
-##### 2）加载图文数据集
+
+#### 2）加载图文数据集
+
 之后根据实际情况修改 `data.json` 中的数据集路径，包括 `model_name_or_path` 、 `dataset_dir` 、 `dataset` 字段，并修改"attr"中  `images` 、 `videos` 、`audios`字段，修改结果参考下图。
 
 ```json
@@ -258,28 +274,29 @@ dataset_param->basic_parameters->dataset
 }
 ```
 
-##### 3）修改模型配置
+#### 3）修改模型配置
 
 在model.json中，修改`img_context_token_id`为下图所示：
-```
+
+```shell
 "img_context_token_id": 151655
 ```
+
 注意， `image_token_id` 和 `img_context_token_id`两个参数作用不一样。前者是固定的，是标识图片的 token ID，在qwen2_5_omni_get_rope_index中用于计算图文输入情况下序列中的图片数量。后者是标识视觉内容的 token ID，用于在forward中标记视觉token的位置，所以需要根据输入做相应修改。
 
-
-
-
-
 <a id="jump4"></a>
+
 ## 微调
 
 <a id="jump4.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
-#### 2. 配置参数
+
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -341,7 +358,7 @@ OUTPUT_ARGS="
 若需要加载指定迭代次数的权重、优化器等状态，需将加载路径`LOAD_PATH`设置为保存文件夹路径`LOAD_PATH="save_dir"`，并修改`latest_checkpointed_iteration.txt`文件内容为指定迭代次数
 (此功能coming soon)
 
-```
+```shell
 $save_dir
    ├── latest_checkpointed_iteration.txt
    ├── ...
@@ -361,6 +378,7 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```
+
 注意，当开启PP时，`model.json`中配置的`vision_encoder`和`text_decoder`的`pipeline_num_layer`参数控制了各自的PP切分策略。对于流水线并行，要先处理`vision_encoder`再处理`text_decoder`。
 比如7b默认的值`[32,0,0,0]`、`[1,10,10,7]`，其含义为PP域内第一张卡先放32层`vision_encoder`再放1层`text_decoder`、第二张卡放`text_decoder`接着的10层、第三张卡放`text_decoder`接着的10层、第四张卡放`text_decoder`接着的7层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[30,2,0,0]`、`[1,10,10,7]`的配置是错的）
 
@@ -384,21 +402,24 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 }
 ```
 
-
 <a id="jump4.3"></a>
-#### 3. 启动微调
+
+### 3. 启动微调
 
 以Qwen2.5Omni-7B为例，启动微调训练任务。  
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
+
 ```shell
 bash examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh
 ```
 
 <a id="jump5"></a>
+
 ## 异构并行微调
 
 <a id="jump5.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
@@ -428,7 +449,9 @@ mm-convert  Qwen2_5_OmniConverter hf_to_mm \
 ```
 
 <a id="jump5.2"></a>
-#### 2. 配置参数
+
+### 2. 配置参数
+
 参考**微调**章节进行数据目录配置和模型保存加载等配置，同时在配置`examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh`时需增加`--hetero-parallel`开启异构并行训练；
 
 llm，vit和audio的并行配置都在model_7b.json文件中定义，并且examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh中的并行配置需要全部设置为1；vit和audio以及llm三者的gbs是一致的，需要关注llm的MBS配置；
@@ -471,7 +494,8 @@ GPT_ARGS="
 ```
 
 <a id="jump5.3"></a>
-#### 3. 启动异构并行微调
+
+### 3. 启动异构并行微调
 
 以Qwen2.5Omni-7B为例，启动异构并行微调训练任务。
 
@@ -481,13 +505,17 @@ bash examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh
 
 ---
 <a id="jump7"></a>
+
 ## 特性使用介绍
 
 <a id="jump7.1"></a>
+
 ### lora微调
+
 LoRA为框架通用能力，当前功能已支持，可参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md)。
 
 <a id="jump8"></a>
+
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
@@ -507,9 +535,9 @@ LoRA为框架通用能力，当前功能已支持，可参考[LoRA特性文档](
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
-
 ---
 <a id="jump9"></a>
+
 ## 注意事项
 
 1. 在 `finetune_xx.sh`里，与模型结构相关的参数并不生效，以`examples/qwen2.5omni/model_xb.json`里同名参数配置为准，非模型结构的训练相关参数在 `finetune_xx.sh`修改。

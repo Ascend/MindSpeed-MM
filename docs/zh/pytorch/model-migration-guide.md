@@ -167,7 +167,7 @@ from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 
 class CustomModel(MultiModalModule, FSDP2Mixin, WeightInitMixin)：
-	"""您的自定义模型类"""
+ """您的自定义模型类"""
     ...
 ```
 
@@ -189,7 +189,7 @@ from internvl.modeling_internvl_chat import InternVLChatModel
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 
 class InternVLChatModelGeneration(InternVLChatModel, FSDP2Mixin, WeightInitMixin):
-	"""InternVL 模型的 FSDP2 适配版本"""
+ """InternVL 模型的 FSDP2 适配版本"""
     def __init__(self, config, vision_model=None, language_model=None, use_flash_attn=True):
         super().__init__(config)
 ```
@@ -202,9 +202,9 @@ class InternVLChatModelGeneration(InternVLChatModel, FSDP2Mixin, WeightInitMixin
 from mindspeed_mm.models.transformers.internvl3_5 import InternVLChatModelGeneration
 
 class ModelHub:
-	MODEL_MAPPINGS = {
-		'internvl': InternVLChatModelGeneration,
-	}
+    MODEL_MAPPINGS = {
+        'internvl': InternVLChatModelGeneration,
+    }
 ```
 
 **步骤 3：通过标准接口使用**
@@ -214,12 +214,12 @@ class ModelHub:
 from mindspeed_mm.models.transformers_model import TransformersModel
 
 def model_provider(*args, **kwargs):
-	"""Builds the model."""
-	args = get_args()
-	vlm_config = deepcopy(args.mm.model)
-	model = TransformersModel(vlm_config)
+ """Builds the model."""
+ args = get_args()
+ vlm_config = deepcopy(args.mm.model)
+ model = TransformersModel(vlm_config)
 
-	return model
+ return model
 ```
 
 #### FSDP2配置文件驱动训练（推荐）
@@ -356,20 +356,20 @@ MindSpeed MM 支持通过 YAML 配置文件灵活管理 FSDP2 训练策略，实
 配置示例如下，`fsdp2_config.yaml`
 
 ```yaml
-sharding_size: auto	
-sub_modules_to_wrap:	
-  - "text_decoder.output_layer"	
-  - "text_decoder.embedding"	
-  - "text_decoder.rotary_pos_emb"	
-  - "text_decoder.decoder.layers.{*}"	
-param_dtype: "bf16"	
-reduce_dtype: "fp32"	
-cast_forward_inputs: True	
-ignored_modules:	
-  - "image_encoder"	
-recompute_modules:	
-  - "text_decoder.decoder.layers.{*}"	
-num_to_forward_prefetch: 2	
+sharding_size: auto 
+sub_modules_to_wrap: 
+  - "text_decoder.output_layer" 
+  - "text_decoder.embedding" 
+  - "text_decoder.rotary_pos_emb" 
+  - "text_decoder.decoder.layers.{*}" 
+param_dtype: "bf16" 
+reduce_dtype: "fp32" 
+cast_forward_inputs: True 
+ignored_modules: 
+  - "image_encoder" 
+recompute_modules: 
+  - "text_decoder.decoder.layers.{*}" 
+num_to_forward_prefetch: 2 
 num_to_backward_prefetch: 2
 offload_to_cpu: False
 ```

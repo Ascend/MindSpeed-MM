@@ -16,7 +16,7 @@
 
 - 参考实现：
 
-  ```
+  ```shell
   url=https://github.com/Kwai-Kolors/Kolors
   commit_id=0fafa56a76b7acf1e147b153d1e7b8fd65f9055b
   ```
@@ -64,13 +64,10 @@
 3. 运行推理的脚本
 
     ```shell
-
-# 将下面环境变量路径修改为真实路径，下面为参考路径
-
-   source /usr/local/Ascend/cann/set_env.sh
-   python infer_kolors_fp16.py
-
-   ```
+    # 将下面环境变量路径修改为真实路径，下面为参考路径
+    source /usr/local/Ascend/cann/set_env.sh
+    python infer_kolors_fp16.py
+    ```
 
 <a id="jump1"></a>
 

@@ -24,22 +24,26 @@
 - [注意事项](#jump11)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/huggingface/transformers.git
 commit_id=fc91372
 ```
 
-#### 变更记录
+### 变更记录
 
 2026.02.10: 首次支持Qwen3_5模型
 
 ---
 <a id="jump1"></a>
+
 ## 环境安装
 
 <a id="jump1.1"></a>
-#### 1. 环境准备
+
+### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
@@ -47,17 +51,23 @@ commit_id=fc91372
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本，CANN推荐使用8.5.1版本；
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
+
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
 - [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/docs/zh/installation_guide/installation_description.md)
 
 <a id="jump1.2"></a>
-#### 2. 环境搭建
+
+### 2. 环境搭建
+
 拉取MindSpeed MM代码仓，并进入代码仓根目录：
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
+
 执行如下指令一键安装：
+
 ```bash
 bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensions.sh
 ```
@@ -70,7 +80,7 @@ bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensio
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Huggingface库下载对应的模型权重:
 
@@ -81,6 +91,7 @@ bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensio
 如果使用fsdp2的meta init初始化模型，需要先根据模型类型完成以下权重转换：
 
 (1) 4B模型：
+
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
@@ -94,6 +105,7 @@ mm-convert Qwen35Converter hf_to_dcp \
 ```
 
 (2) 其它模型:
+
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
@@ -104,10 +116,11 @@ mm-convert Qwen35Converter hf_to_dcp \
 #   |—— release
 #   |—— latest_checkpointed_iteration.txt
 ```
+
 并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 
-
 MindSpeed MM保存权重的格式也为dcp格式。可使用如下命令将dcp权重转换回HF权重
+
 ```bash
 # 待转换的dcp权重目录结构样例为：
 # ———— xxxxxxx
@@ -122,10 +135,12 @@ mm-convert Qwen35Converter dcp_to_hf \
 
 ---
 <a id="jump3"></a>
+
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载(以coco2017数据集为例)
+
+### 1. 数据集下载(以coco2017数据集为例)
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
@@ -133,7 +148,7 @@ mm-convert Qwen35Converter dcp_to_hf \
 
 (3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── COCO2017
@@ -152,7 +167,8 @@ data->dataset_param->basic_parameters->dataset
 同时注意`data->dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
 
 <a id="jump3.2"></a>
-#### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
+
+### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
 
@@ -182,15 +198,18 @@ data->dataset_param->basic_parameters->dataset
 ```
 
 <a id="jump4"></a>
+
 ## 微调
 
 <a id="jump4.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
-#### 2. 配置参数
+
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -234,24 +253,29 @@ WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 【多机运行配置】
 如需拉起多机训练，修改启动脚本下 MASTER_ADDR、NODE_ADDR、NODES以及NODE_RANK变量
+
 ``` shell
 MASTER_ADDR: 主节点IP地址
 NODE_ADDR: 本机IP地址
 NODE_RANK: 第几个节点
 NODES: 一共几个节点
 ```
+
 ---
 
 <a id="jump4.3"></a>
-#### 3. 启动微调
+
+### 3. 启动微调
+
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 可在`xxx_config.yaml`的`model`参数中配置上述文档中的`loss_type`。
+
 ```shell
 bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 ```
 
-
 <a id="jump10"></a>
+
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
@@ -273,4 +297,3 @@ bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 
 ---
 <a id="jump11"></a>
-## 注意事项

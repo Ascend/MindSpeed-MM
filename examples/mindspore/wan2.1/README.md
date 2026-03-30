@@ -23,15 +23,14 @@
 
 ## 版本说明
 
-#### 参考实现
+### 参考实现
 
 T2V I2V LoRA微调任务
  
-```
+```shell
 url=https://github.com/modelscope/DiffSynth-Studio.git
 commit_id=03ea278
 ```
-
 
 ## 任务支持列表
 
@@ -53,12 +52,12 @@ MindSpeed-MM MindSpore后端的依赖配套如下表，安装步骤参考[基础
 |mindspore_op_plugin | [在研版本](https://gitee.com/mindspore/mindspore_op_plugin) |
 
 <a id="jump1.1"></a>
+
 ### 仓库拉取及环境搭建
 
 针对MindSpeed MindSpore后端，昇腾社区提供了一键拉起工具MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在华为MindSpore+CANN环境下一键拉起模型训练。在进行一键拉起前，用户需要拉取相关的代码仓以及进行环境搭建：
 
-
-```
+```shell
 # 创建conda环境
 conda create -n test python=3.10
 conda activate test
@@ -92,9 +91,8 @@ mkdir logs
 ```
 
 > 注：[mindspore_op_plugin](https://gitee.com/mindspore/mindspore_op_plugin) 是 MindSpore 的算子插件库，通过直接调用 libtorch 中的 ATen 算子，快速补齐 CPU/GPU 算子功能。目前为 **实验特性**，仅在该模型 **受限使用**
-
+>
 > 注：op_plugin使用教程请参考[op_plugin CPU 算子开发指南](https://gitee.com/mindspore/mindspore_op_plugin/wikis/op_plugin%20CPU%E7%AE%97%E5%AD%90%E5%BC%80%E5%8F%91%E6%8C%87%E5%8D%97)
-
 
 ### Decord搭建
 
@@ -204,7 +202,6 @@ mm-convert WanConverter mm_to_hf \
 
 修改`examples/mindsporewan2.1/feature_extract/data.txt`文件，其中每一行表示个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔
 
-
 ### 训练
 
 #### 准备工作
@@ -301,7 +298,6 @@ mm-convert WanConverter mm_to_hf \
     ”
     ```
 
-
 ## lora 微调
 
 ### 准备工作
@@ -335,7 +331,6 @@ mm-convert WanConverter merge_lora_to_base \
  --lora_rank 64
 ```
 
-
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
@@ -354,4 +349,3 @@ mm-convert WanConverter merge_lora_to_base \
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-
