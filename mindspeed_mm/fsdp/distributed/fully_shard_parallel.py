@@ -90,7 +90,10 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
     # Apply FSDP to specific child modules first
     for module in fsdp_modules:
         hook_module = find_hook_module(module, hook_modules)
-        fully_shard(module, hook_module=hook_module, **config)
+        if hook_module is None:
+            fully_shard(module, **config)
+        else:
+            fully_shard(module, hook_module=hook_module, **config)
     # Apply FSDP to the entire model
     fully_shard(model, **config)
 
