@@ -24,13 +24,15 @@
 - [注意事项](#jump7)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/OpenGVLab/InternVL.git
 commit_id=d779db3
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.04.15: 首次支持InternVL3模型在线推理
 2025.07.09：支持InternVL3-78B、InternVL3-8B模型微调
@@ -46,7 +48,7 @@ commit_id=d779db3
 
 <a id="jump1.1"></a>
 
-#### 1. 仓库拉取
+### 1. 仓库拉取
 
 ```shell
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
@@ -63,7 +65,7 @@ mkdir ckpt
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 ```bash
 # python3.10
@@ -93,24 +95,22 @@ pip install -e .
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Hugging Face等网站下载开源模型权重
 
 - [InternVL3-8B](https://huggingface.co/OpenGVLab/InternVL3-8B)；
 - [InternVL3-78B](https://huggingface.co/OpenGVLab/InternVL3-78B)；
 
-
 将模型权重保存在`raw_ckpt`目录下，例如`raw_ckpt/InternVL3-8B`。
 
 <a id="jump2.2"></a>
 
-#### 2. 权重转换
+### 2. 权重转换
 
 MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的转换以及PP（Pipeline Parallel）的权重切分。
 
 `mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)。
-
 
 ```bash
 # 根据实际情况修改 ascend-toolkit 路径
@@ -144,6 +144,7 @@ mm-convert InternVLConverter hf_to_mm \
 同步修改`examples/internvl3/finetune_internvl3_*b.sh`中的`LOAD_PATH`参数，该路径为转换后或者切分后的权重，注意与原始权重`raw_ckpt/InternVL3-*B`进行区分。
 
 以`InternVL3-8B`为例
+
 ```shell
 LOAD_PATH="pretrained/InternVL3-8B"
 ```
@@ -156,13 +157,13 @@ LOAD_PATH="pretrained/InternVL3-8B"
 
 <a id="jump3.1"></a>
 
-#### 1. 数据集下载
+### 1. 数据集下载
 
 【图片数据】
 
 用户需自行获取并解压[InternVL-Finetune](https://huggingface.co/datasets/OpenGVLab/InternVL-Chat-V1-2-SFT-Data)数据集到`dataset/playground`目录下，解压后的数据结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── ai2d
@@ -204,13 +205,13 @@ pip install decord==0.6.0
 
 ## 微调
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
 
-#### 2. 配置参数
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -268,7 +269,7 @@ OUTPUT_ARGS="
 
 若需要加载指定迭代次数的权重、优化器等状态，需将加载路径`LOAD_PATH`设置为保存文件夹路径`LOAD_PATH="save_dir"`，并修改`latest_checkpointed_iteration.txt`文件内容为指定迭代次数
 
-```
+```shell
 $save_dir
    ├── latest_checkpointed_iteration.txt
    ├── ...
@@ -292,36 +293,43 @@ $save_dir
 【模型并行配置】
 
 InternVL涉及非对齐TP切分，若开启TP切分需要添加以下参数，特性说明[参考](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/unaligned_linear.md)
+
 ```shell
 --unaligned-linear \
 ```
+
 开启TP-SP需要添加以下参数：
+
 ```shell
 --unaligned-linear \
 --sequence-parallel \
 ```
 
 开启CP需要添加以下参数:
+
 ```shell
 --context-parallel-algo megatron_cp_algo \
 ```
 
 开启PP需要添加以下参数：
+
 ```shell
 --variable-seq-lengths \
 ```
 
 开启VPP需要添加以下参数（N为VPP切分数），特性说明[参考](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/virtual_pipeline_parallel.md)：
+
 ```shell
 --virtual-pipeline-model-parallel-size N \
 ```
 
 <a id="jump4.3"></a>
 
-#### 3. 启动微调
+### 3. 启动微调
 
 以InternVL3-8B为例，启动微调训练任务。  
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
+
 ```shell
 bash examples/internvl3/finetune_internvl3_8B.sh
 ```
@@ -332,7 +340,7 @@ bash examples/internvl3/finetune_internvl3_8B.sh
 
 <a id="jump5.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：环境安装、权重下载及转换，详情可查看对应章节。（当前支持8B单卡推理）
 
@@ -351,9 +359,10 @@ mm-convert InternVLConverter hf_to_mm \
   --cfg.trust_remote_code True
 # trust_remote_code: 为保证代码安全，配置trust_remote_code默认为False，用户需要设置为True，并且确保自己下载的模型和数据的安全性
 ```
+
 <a id="jump5.2"></a>
 
-#### 2. 配置参数
+### 2. 配置参数
 
 【参数配置】
 
@@ -414,9 +423,10 @@ source /usr/local/Ascend/cann/set_env.sh
 ...
 MM_MODEL="./examples/internvl3/inference_8B.json"
 ```
+
 <a id="jump5.3"></a>
 
-#### 3. 启动推理
+### 3. 启动推理
 
 ```shell
 bash examples/internvl3/inference_internvl.sh
@@ -443,8 +453,8 @@ bash examples/internvl3/inference_internvl.sh
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
-
 <a id="jump7"></a>
 
 ## 注意事项
+
 1. 在使用流水线并行策略进行多机训练可能会出现卡住现象，可参考[此处](https://gitcode.com/Ascend/MindSpeed/pulls/1627/files)修改。

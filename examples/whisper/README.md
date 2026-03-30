@@ -34,7 +34,7 @@
 
 <a id="jump1.1"></a>
 
-#### 1. 仓库拉取
+### 1. 仓库拉取
 
 ```shell
     git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
@@ -48,7 +48,7 @@
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 ```bash
     # python3.10
@@ -86,7 +86,7 @@
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Hugging Face等网站下载开源模型权重
 
@@ -94,7 +94,7 @@
 
 获取权重结构如下：
 
-   ```
+   ```shell
    $whisper-large-v3
    ├── config.json
    ├── pytorch_model.bin
@@ -104,7 +104,7 @@
 
 <a id="jump2.2"></a>
 
-#### 2. 权重转换
+### 2. 权重转换
 
 MindSpeed MM修改了部分原始网络的结构名称，因此需要使用如下脚本代码对下载的预训练权重进行转换。
 
@@ -131,12 +131,12 @@ torch.save(new_checkpoint, "whisper.pth")
 
 <a id="jump3.1"></a>
 
-#### 1. 数据集下载
+### 1. 数据集下载
 
 用户需自行获取mozilla-foundation/common_voice_11_0数据集，
 获取数据结构如下：
 
-   ```
+   ```shell
    $common_voice_11_0
    ├── audio
    ├── ├── hi
@@ -166,13 +166,13 @@ torch.save(new_checkpoint, "whisper.pth")
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备**等，详情可查看对应章节
 
 <a id="jump4.2"></a>
 
-#### 2. 配置参数
+### 2. 配置参数
 
 需根据实际情况修改`model.json`和`data.json`中的权重和数据集路径，包括`ckpt_path`、`dataset_name_or_path`、`processor_name_or_path`等字段
 
@@ -201,7 +201,7 @@ torch.save(new_checkpoint, "whisper.pth")
 
 <a id="jump4.3"></a>
 
-#### 3. 启动预训练
+### 3. 启动预训练
 
 ```shell
     bash examples/whisper/pretrain_whisper.sh
@@ -214,7 +214,7 @@ torch.save(new_checkpoint, "whisper.pth")
 
 <a id="jump5"></a>
 
-#### 4. 模型推理与权重转换
+### 4. 模型推理与权重转换
 
 当前MindSpeed-MM未提供whisper模型的推理代码，需要将训练后模型转回huggingface格式自行推理
 转回脚本代码示例如下：
@@ -263,4 +263,3 @@ torch.save(new_checkpoint, "whisper_hf.bin")
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
-

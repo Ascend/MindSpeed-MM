@@ -12,7 +12,9 @@
   - [环境变量参数解释](#环境变量参数解释)
 
 ## GPT_ARGS下参数注释
+
 ### 一般参数
+
 --micro-batch-size：
 取值来自\${MBS},单个GPU在一次前向/反向传播中直接处理的样本数量，适应单个NPU内的内存限制。直接影响GPU显存容量。
 
@@ -51,7 +53,9 @@
 --init-model-with-meta-device: 使用fsdp2的meta初始化模型，目前仅qwen3vl模型支持，详细使用请参考examples下具体模型readme.md界面。
 
 ---
+
 ### 显存优化
+
 --tensor-model-parallel-size: 非0整数，默认为1。取值来自\${TP}。张量并行数量设置，把模型权重切分多份放到不同卡上去运算，减少单卡显存占用，但会带来额外的通信时间。
 
 --pipeline-model-parallel-size: 非0整数，默认为1。取值来自\${PP}。流水线并行参数设置，把整个模型按阶段分到多张卡上去计算，减少单卡内存占用，但会增加通信时间，同时会引起部分卡闲时等待现象。
@@ -67,6 +71,7 @@
 ---
 
 #### 重计算
+
 [详细介绍](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/pytorch/features/recompute_relative.md)
 
 --recompute-granularity: 目前仅支持配置full用于开启全量重计算。
@@ -76,7 +81,9 @@
 --recompute-num-layers: 整型，使用影响如上。
 
 ---
+
 #### FSDP2
+
 注:启用FSDP2时，megatron各种切分策略及重计算配置均需关闭。
 
 --fsdp2-config-path: fsdp2相关配置文件路径。
@@ -84,7 +91,9 @@
 --use-cpu-initialization: 使用CPU初始化权重，需开启。
 
 ---
+
 ### 加速特性
+
 --use-fused-swiglu: 使能相关融合算子，仅在使用swiglu时有效。
 
 --use-fused-rmsnorm: 使能相关融合算子，仅在使用rmsnorm时有效。
@@ -92,13 +101,17 @@
 --overlap-grad-reduce 与 --overlap-param-gather: 权重更新通信掩盖，仅在使能--use-distributed-optimizer时有效。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/async-ddp-param-gather.md)
 
 ---
+
 ## MOE_ARGS下参数解释
+
 --moe-token-dispatcher-type: moe网络中分发token到通信方式选择，默认为allgather,如果开启了专家并行，推荐使用alltoall。
 
 --moe-permute-fusion: 使能permute和unpermute融合算子，加速计算。
 
 ---
+
 ## OUTPUT_ARGS下参数解释说明
+
 --save : 取值来自SAVE_PATH,权重保存路径。
 注：仅有该值配置时才会进行权重保存
 
@@ -108,7 +121,9 @@
 2、OUTPUT_ARGS下设置--ckpt-format为torch_dcp与GPT_ARGS下使能--ckpt-format torch_dcp二者作用相同，择一即可。
 
 ---
+
 ## 环境变量参数解释
+
 所有环境变量具体解释均可在[Ascend官网](https://www.hiascend.com/)搜索查询到详细信息，以下仅展示MM套件中常用的。
 
 | 环境初始化脚本 | 描述 | 

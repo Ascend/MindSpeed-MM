@@ -26,7 +26,7 @@
 
 ### 参考实现
 
-```
+```shell
 url=https://github.com/FunAudioLLM/Fun-ASR
 commit_id=d9ba359
 url=https://github.com/modelscope/FunASR

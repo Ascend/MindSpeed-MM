@@ -11,7 +11,8 @@ PyTorch的完全分片数据并行（FSDP）旨在提供一个高性能的即时
 ## 使用方法
 
 在mindspeed中FSDP2的入口是一个配置文件，通过生成配置文件，传入命令行参数即可使用该特性。
-```
+
+```shell
 export CUDA_DEVICE_MAX_CONNECTIONS=2 # 设置不能为1
 --use-torch-fsdp2 \
 --fsdp2-config-path ./fsdp2_config.yaml \
@@ -19,6 +20,7 @@ export CUDA_DEVICE_MAX_CONNECTIONS=2 # 设置不能为1
 --untie-embeddings-and-output-weights \
 # 注意不能打开分布式优化器
 ```
+
 ### 参数详解
 
 fsdp2_config.yaml的配置项如下：
@@ -71,7 +73,6 @@ fsdp2_config.yaml的配置项如下：
   - 描述：指定前向输出的数据类型
   - 取值：`"bf16"`，`"fp16"`，`"fp32"`
 
-
 - **`cast_forward_inputs`**
   - 描述：控制前向传播输入的自动类型转换
   - 取值：`True`或`False`
@@ -91,7 +92,8 @@ fsdp2_config.yaml的配置项如下：
   - 取值：`True`或`False`
 
 ### 配置实例
-```
+
+```shell
 sharding_size: auto
 sub_modules_to_wrap:
   - "text_decoder.output_layer"
@@ -111,9 +113,11 @@ offload_to_cpu: False
 ```
 
 ## 使用效果
+
 针对Llama-7B，FSDP2相比FSDP1实现了更高的MFU，峰值内存降低7%，且保持相同的损失曲线。
 
 ## 注意事项
+
 1、当开启fsdp2训练时，需关闭分布式优化器及其相关配置
 
 2、当开启fsdp2训练时，模型权重的保存格式`ckpt-format`仅支持`torch_dist`或`torch_dcp`

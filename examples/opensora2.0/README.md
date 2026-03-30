@@ -24,13 +24,15 @@
   - [环境变量声明](#环境变量声明)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/hpcaitech/Open-sora.git
 commit_id=d0cd5ac
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.06.25: 首次支持Open-sora 2.0 T2V
 
@@ -46,7 +48,7 @@ commit_id=d0cd5ac
 
 <a id="jump1.1"></a>
 
-#### 1. 仓库拉取
+### 1. 仓库拉取
 
 ```shell
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
@@ -60,7 +62,7 @@ cd MindSpeed-MM
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 ```bash
 # python3.10
@@ -102,7 +104,7 @@ pip install av==16.1.0
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Hugging Face网站下载开源模型权重
 
@@ -113,15 +115,15 @@ pip install av==16.1.0
 
 <a id="jump2.2"></a>
 
-#### 2. 权重转换
+### 2. 权重转换
 
 需要对[OpenSoraV2模型]模型进行权重转换，运行权重转换脚本：
+
 ```shell
 mm-convert OpenSoraConverter hf_to_mm \
   --cfg.source_path <OpenSoraV2模型> \
   --cfg.target_path <OpenSoraV2模型转化后路径>
 ```
-
 
 ---
 
@@ -133,7 +135,7 @@ mm-convert OpenSoraConverter hf_to_mm \
 
 数据集数据结构如下：
 
-   ```
+   ```shell
    train_data.csv
    datasets
    ├── video1990_scene-4.mp4
@@ -144,10 +146,11 @@ mm-convert OpenSoraConverter hf_to_mm \
 
 csv文件内容格式如下：
 
-   ```
+   ```shell
    path,text,num_frames,height,width,aspect_ratio,resolution,fps
    ./datasets/pexels_45k/popular_3/853857_scene-0_cut-border.mp4,"an aerial view of a large...",330.0,1036.0,1102.0,0.94010889292196,1141672.0,30.0
    ```
+
    注意: csv文件的path字段需要填充切片视频的相对路径或绝对路径，如果是相对路径需要在data.json文件中的`data_folder`字段补充父路径
 
 ---
@@ -158,13 +161,13 @@ csv文件内容格式如下：
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节
 
 <a id="jump4.2"></a>
 
-#### 2. 配置参数
+### 2. 配置参数
 
 默认的配置已经经过测试，用户可按照自身环境修改如下内容：
 
@@ -183,6 +186,7 @@ csv文件内容格式如下：
 bucket_config（dict）：一个包含bucket配置的字典。
 
 词典应采用以下格式：
+
 ```json
 "bucket_config": {
     "256px": {"1": [1.0, 3], "125": [1.0, 2], "129": [1.0, 1]},
@@ -223,10 +227,9 @@ bucket_config（dict）：一个包含bucket配置的字典。
       --cfg.target_path <./save_ckpt/opensora2_megatron_ckpt/>
   ```
 
-
 <a id="jump4.3"></a>
 
-#### 3. 启动预训练
+### 3. 启动预训练
 
 ```shell
 bash examples/opensora2.0/pretrain_opensora2_0.sh
@@ -234,6 +237,7 @@ bash examples/opensora2.0/pretrain_opensora2_0.sh
 
 ---
 <a id="jump5"></a>
+
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |

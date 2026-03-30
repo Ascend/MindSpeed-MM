@@ -30,7 +30,7 @@
 
 - 参考实现：
 
-  ```
+  ```shell
   url=https://github.com/huggingface/diffusers
   commit_id=5956b68a6927126daffc2c5a6d1a9a189defe288
   ```
@@ -294,7 +294,7 @@ SDXL 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 >
    fill50k数据集格式如下:
 
-   ```
+   ```shell
    fill50k
    ├── images
    ├── conditioning_images
@@ -472,7 +472,6 @@ SDXL 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 | `ACLNN_CACHE_LIMIT`           | 配置单算子执行API在Host侧缓存的算子信息条目个数                                  | 需要配置为整数，取值范围`[1, 10,000,000]`，默认值为`10000`                                                     |
 | `TOKENIZERS_PARALLELISM`      | 用于控制Hugging Face的transformers库中的分词器（tokenizer）在多线程环境下的行为    | `False`: 禁用并行分词<br>`True`: 开启并行分词                                                        |
 | `OMP_NUM_THREADS`             | 设置执行期间使用的线程数    |      需要配置为整数                                                  |
-
 
 ## 引用
 

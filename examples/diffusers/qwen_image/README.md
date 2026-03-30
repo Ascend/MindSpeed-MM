@@ -285,7 +285,6 @@ vim ./examples/dreambooth/infer_qwen_image_text2img_bf16.py # 进入运行推理
 | `TOKENIZERS_PARALLELISM`      | 用于控制Hugging Face的transformers库中的分词器（tokenizer）在多线程环境下的行为    | `False`: 禁用并行分词<br>`True`: 开启并行分词                                                        |
 | `OMP_NUM_THREADS`             | 设置执行期间使用的线程数    |      需要配置为整数                                                  |
 
-
 ## 引用
 
 ### 公网地址说明

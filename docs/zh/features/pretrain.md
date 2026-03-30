@@ -15,6 +15,7 @@
 
 1.纯fsdp2后端
 在xx_config.yaml文件中,配置预训练相关的参数
+
 ```yaml
 ### 数据相关配置
 data:
@@ -34,6 +35,7 @@ data:
 
 2.含megatron后端
 在data.json文件中，配置预训练相关的参数
+
 ```json
 {
     "dataset_param": {
@@ -76,6 +78,7 @@ data:
     - `false`：手动指定
 
 ## 注意事项
+
 1.packing开启（默认）的场景下，需要保证`max_samples`个短文本拼接成长序列的总长度不小于cutoff_len，否则会报错
 
 - **`cutoff_len`**

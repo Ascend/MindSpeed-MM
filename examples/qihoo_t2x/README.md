@@ -37,7 +37,7 @@
 
 <a id="jump1.1"></a>
 
-#### 1. 仓库拉取
+### 1. 仓库拉取
 
 ```shell
     git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
@@ -52,7 +52,7 @@
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
@@ -82,7 +82,7 @@
 
 <a id="jump1.3"></a>
 
-#### 3. 权重下载
+### 3. 权重下载
 
 从Hugging Face库下载对应的模型权重:
 
@@ -104,7 +104,7 @@
 
 <a id="jump2.1"></a>
 
-#### 1. 配置参数
+### 1. 配置参数
 
 - 将准备好的权重传入到`examples/qihoo_t2x/inference_model_image.json`中，更改其中的路径，包括from_pretrained。
 
@@ -112,7 +112,7 @@
 
 <a id="jump2.2"></a>
 
-#### 2. 启动推理
+### 2. 启动推理
 
 i2v 启动推理脚本
 
@@ -129,7 +129,7 @@ NPUS_PER_NODE： 配置一个计算节点上使用的NPU数量
 
 ## 文献引用
 
-```
+```shell
 @article{wang2024qihoo,
   title={Qihoo-T2X: An Efficient Proxy-Tokenized Diffusion Transformer for Text-to-Any-Task},
   author={Wang, Jing and Ma, Ao and Feng, Jiasong and Leng, Dawei and Yin, Yuhui and Liang, Xiaodan},

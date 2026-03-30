@@ -23,7 +23,8 @@ MindSpeed MM LoRA微调使能方法：
 
 在模型shell脚本中增加 LoRA 微调参数。
 例如，可在`Qwen2-VL`的微调任务脚本中增加`--lora-target-modules`参数，使能 LoRA。
-```
+
+```shell
 --lora-target-modules linear_qkv linear_proj linear_fc1 linear_fc2
 ```
 
@@ -33,6 +34,7 @@ LoRA权重和原始权重合并方法：
 例如，可在`Qwen2-VL`的合并脚本`merge_lora`中设置参数执行合并，其中`base_save_dir`,`lora_save_dir`,`merge_save_dir`分别设置为原始权重目录，LoRA权重目录，合并权重保存目录，`use_npu`设置是否启用npu加速。
 
 #### 参数说明
+
 - **`--load`**
   若不指定该参数加载权重，模型会随机初始化权重。
 
@@ -57,8 +59,8 @@ LoRA权重和原始权重合并方法：
 - **`--save`**
   模型权重保存路径，开启 LoRA 微调的情况下，只保存微调模块的权重。
 
-
 ### 注意事项
+
 - **冻结模块**：多模态模型中可能存在部分模块参数冻结的情况，冻结的模块不会参与 LoRA 微调。
 
 ## 参考文献

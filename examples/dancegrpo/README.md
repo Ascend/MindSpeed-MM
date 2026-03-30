@@ -28,7 +28,7 @@
 
 DanceGRPO开源代码仓以及对应commit id如下：
 
-```
+```shell
 url=https://github.com/XueZeyue/DanceGRPO
 commit_id=2149f36f22db601f9dbf70472fea11576f62a0f6
 ```
@@ -42,7 +42,6 @@ commit_id=2149f36f22db601f9dbf70472fea11576f62a0f6
 请参考[安装指南](../../docs/zh/pytorch/installation.md)
 
 > DanceGRPO场景下，Python版本推荐3.10
-
 
 <a id="jump1.1"></a>
 
@@ -109,11 +108,12 @@ pip install decord==0.6.0
 
 `yum`方式安装请[参考脚本](https://github.com/dmlc/decord/blob/master/tools/build_manylinux2010.sh)
 
-
 <a id="jump2"></a>
 
 ## 权重下载
+
 创建保存权重的目录：
+
 ```bash
 cd MindSpeed-MM
 mkdir ckpt/flux
@@ -137,12 +137,14 @@ cd ..
 下载FLUX DanceGRPO使用的[提示词数据集](https://github.com/XueZeyue/DanceGRPO/blob/main/assets/prompts.txt)。在文件页面点击download
 raw file下载文件至MindSpeed MM工程根目录的data目录下。
 
-数据集下载完成后要对数据进行预处理，在启动预处理之前，可以根据自身训练配置需要修改[ 数据预处理脚本 ](./preprocess_flux_rl_embeddings.sh)的配置，以FLUX模型为例：
+数据集下载完成后要对数据进行预处理，在启动预处理之前，可以根据自身训练配置需要修改[数据预处理脚本](./preprocess_flux_rl_embeddings.sh)的配置，以FLUX模型为例：
+
 1. vae模型权重所在路径为`LOAD_PATH`，默认为ckpt/flux；
 2. 预处理后的数据集存放路径为`OUTPUT_DIR`，默认为data/rl_embeddings；
 3. 提示词文件路径为`PROMPT_DIR`，默认为data/prompts.txt。
 
 上述注意点修改完毕后，可启动脚本进行数据预处理：
+
 ```bash
 cd MindSpeed-MM
 bash examples/dancegrpo/preprocess_flux_rl_embeddings.sh
@@ -163,17 +165,22 @@ bash examples/dancegrpo/preprocess_flux_rl_embeddings.sh
 <a id="jump4.2"></a>
 
 ### 2. 三方库修改
+
 找到使用的Python环境的根目录，对于使用conda安装的环境，可以使用如下指令找到：
+
 ```bash
 echo $(conda info --envs | grep test) | awk '{print $NF}'
 ```
 
 1. 将文件`lib/python3.10/site-packages/diffusers/models/embeddings.py`中`FluxPosEmbed`类的`forward`函数的如下代码：
+
 ```python
 is_mps = ids.device.type == "mps"
 freqs_dtype = torch.float32 if is_mps else torch.float64
 ```
+
 修改为：
+
 ```python
 is_mps = ids.device.type == "mps"
 is_npu = ids.device.type == "npu"
@@ -181,23 +188,29 @@ freqs_dtype = torch.float32 if is_mps or is_npu else torch.float64
 ```
 
 2. 将文件`lib/python3.10/site-packages/diffusers/models/embeddings.py`中的`get_1d_rotary_pos_embed`函数的如下代码：
+
 ```python
 freqs_cos = freqs.cos().repeat_interleave(2, dim=1).float()  # [S, D]
 freqs_sin = freqs.sin().repeat_interleave(2, dim=1).float()  # [S, D]
 ```
+
 修改为：
+
 ```python
 freqs_cos = freqs.cos().T.repeat_interleave(2, dim=0).T.contiguous().float()
 freqs_sin = freqs.sin().T.repeat_interleave(2, dim=0).T.contiguous().float()
 ```
 
 3. 将文件`lib/python3.10/site-packages/diffusers/models/attention_processor.py`中`Attention`类的`__init__`函数的如下代码：
+
 ```python
 elif qk_norm == "rms_norm":
     self.norm_q = RMSNorm(dim_head, eps=eps)
     self.norm_k = RMSNorm(dim_head, eps=eps)
 ```
+
 修改为：
+
 ```python
 elif qk_norm == "rms_norm":
     self.norm_q = NpuFusedRMSNorm(dim_head, eps=eps)
@@ -205,6 +218,7 @@ elif qk_norm == "rms_norm":
 ```
 
 增加如下类：
+
 ```python
 class NpuFusedRMSNorm(torch.nn.Module):
     def __init__(self, hidden_size, eps=1e-6):
@@ -218,7 +232,7 @@ class NpuFusedRMSNorm(torch.nn.Module):
 
 ### 3. 启动训练
 
-以 FLUX 模型为例，在启动训练之前，可根据自身训练配置需要修改[ 启动脚本 ](./posttrain_flux_dancegrpo.sh)的配置：
+以 FLUX 模型为例，在启动训练之前，可根据自身训练配置需要修改[启动脚本](./posttrain_flux_dancegrpo.sh)的配置：
 
 1. 根据使用机器的情况，修改`NNODES`、`NPUS_PER_NODE`配置， 例如单机8卡 可设置`NNODES`为 1 、`NPUS_PER_NODE`为8；
 2. 如果为多机训练，需要保证各个节点的`MASTER_ADDR`一致，且为其中一台节点的IP；各节点的`MASTER_PORT`
@@ -230,13 +244,15 @@ class NpuFusedRMSNorm(torch.nn.Module):
 7. 模型训练过程的reward值保存文件的路径为`HPS_REWARD_SAVE_PATH`，默认为./hps_reward.txt。
 
 在启动训练前，可根据自身训练配置需要修改数据集配置[data_dancegrpo.json](./data_dancegrpo.json)：
+
 1. dataset_param.basic_parameters.data_path表示预处理数据中的元数据文件videos2caption.json的路径。
 
 在启动训练前，可根据自身训练配置需要修改模型配置[model_dancegrpo.json](./model_dancegrpo.json)：
+
 1. reward.ckpt_dir表示奖励模型预训练权重的路径。
 
-
 上述注意点修改完毕后，可启动脚本开启训练：
+
 ```bash
 bash examples/dancegrpo/posttrain_flux_dancegrpo.sh
 ```
@@ -246,6 +262,7 @@ bash examples/dancegrpo/posttrain_flux_dancegrpo.sh
 训练完成后，会在logs目录中生成运行日志文件，生成训练reward记录文件。
 
 ---
+
 ## 性能数据
 
 | 模型                 | 机器型号             | 集群 | 任务 | GBS | 端到端 SPS |
@@ -259,4 +276,5 @@ bash examples/dancegrpo/posttrain_flux_dancegrpo.sh
 <a id="jump5"></a>
 
 ## FAQ
+
 1. 对于CPU型号为x86的设备，建议使用torchvision版本为`0.22.1+cpu`，若遇到有关torchvision的导包问题，建议优先检查环境中的torchvision版本是否为`+cpu`版本。

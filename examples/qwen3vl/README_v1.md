@@ -24,22 +24,26 @@
 - [注意事项](#jump11)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/huggingface/transformers.git
 commit_id=c0dbe09
 ```
 
-#### 变更记录
+### 变更记录
 
 2026.03.16：首次基于FSDP2后端支持Qwen3-VL模型。
 
 ---
 <a id="jump1"></a>
+
 ## 环境安装
 
 <a id="jump1.1"></a>
-#### 1. 环境准备
+
+### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
@@ -47,11 +51,14 @@ commit_id=c0dbe09
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
+
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
 - [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/docs/zh/installation_guide/installation_description.md)
 
 <a id="jump1.2"></a>
-#### 2. 环境搭建
+
+### 2. 环境搭建
+
 ```bash
 # 拉取MindSpeed MM代码仓，并进入代码仓根目录：
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
@@ -65,6 +72,7 @@ cp -r mindspeed ../MindSpeed-MM/
 cd ../MindSpeed-MM
 pip install -e .
 ```
+
 ---
 
 <a id="jump2"></a>
@@ -73,7 +81,7 @@ pip install -e .
 
 <a id="jump2.1"></a>
 
-#### 1. 权重下载
+### 1. 权重下载
 
 从Hugging Face库下载对应的模型权重:
 
@@ -82,6 +90,7 @@ pip install -e .
  将下载的模型权重保存到本地的`ckpt/Qwen3-VL-*B-Instruct`目录下。(*表示对应的尺寸)
 
 如果使用fsdp2的meta init初始化模型，需要先完成以下权重转换
+
 ```bash
 mm-convert GenericDCPConverter hf_to_dcp \
 --hf_dir ckpt/Qwen3-VL-30B-Instruct \
@@ -92,15 +101,17 @@ mm-convert GenericDCPConverter hf_to_dcp \
 #   |—— release
 #   |—— latest_checkpointed_iteration.txt
 ```
-并在`qwen3vl_30B_config_v1.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 
+并在`qwen3vl_30B_config_v1.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 
 ---
 <a id="jump3"></a>
+
 ## 数据集准备及处理
 
 <a id="jump3.1"></a>
-#### 1. 数据集下载(以coco2017数据集为例)
+
+### 1. 数据集下载(以coco2017数据集为例)
 
 (1) 用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
 
@@ -108,7 +119,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 (3) 运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── COCO2017
@@ -119,17 +130,19 @@ mm-convert GenericDCPConverter hf_to_dcp \
        ...
    ```
 
-
 <a id="jump4"></a>
+
 ## 微调
 
 <a id="jump4.1"></a>
-#### 1. 准备工作
+
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
-#### 2. 配置参数
+
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -166,6 +179,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 【多机运行配置】
 如需拉起多机训练，修改启动脚本下 MASTER_ADDR、NODE_ADDR、NODES以及NODE_RANK变量
+
 ``` shell
 MASTER_ADDR: 主节点IP地址
 NODE_ADDR: 本机IP地址
@@ -176,15 +190,18 @@ NNODES: 一共几个节点
 ---
 
 <a id="jump4.3"></a>
-#### 3. 启动微调
+
+### 3. 启动微调
+
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
 可在`qwen3vl_30B_config_v1.yaml`的`model`参数中配置上述文档中的`loss_type`。
+
 ```shell
 bash examples/qwen3vl/finetune_qwen3vl_30B_v1.sh
 ```
 
-
 <a id="jump10"></a>
+
 ## 环境变量声明
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |

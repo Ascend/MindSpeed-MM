@@ -29,14 +29,18 @@
 
 ## 版本说明
 
-#### 参考实现
+### 参考实现
+
 【数据处理】
-```
+
+```shell
 uel=https://github.com/ali-vilab/VACE
 commit_id=0897c6d
 ```
+
 【训练】
-```
+
+```shell
 url=https://github.com/modelscope/DiffSynth-Studio.git
 commit_id=8332ece
 ```
@@ -136,9 +140,11 @@ pip install decord==0.6.0
 | Wan2.2-VACE-A14B | <https://huggingface.co/alibaba-pai/Wan2.2-VACE-Fun-A14B>  |
 
 目前MM仓只支持Diffusers格式的VAE和TextEncoder，因此需要额外下载[Wan2.1-VACE-1.3B-diffusers](https://huggingface.co/Wan-AI/Wan2.1-VACE-1.3B-diffusers)的VAE和TextEncoder来使用
+
 ### 权重转换
 
 VACE模型需要对下载后的权重进行权重转换，运行权重转换脚本：
+
 ```shell
 # Wan2.1-VACE
 mm-convert VACEConverter hf_to_mm \
@@ -146,6 +152,7 @@ mm-convert VACEConverter hf_to_mm \
  --cfg.target_path <./weights/Wam-AI/Wan2.1-VACE-{model_type}/> \
  --cfg.target_parallel_config.pp_layers <pp_layers>
 ```
+
 ```shell
 # Wan2.2-VACE
 mm-convert VACEConverter hf_to_mm \
@@ -153,6 +160,7 @@ mm-convert VACEConverter hf_to_mm \
  --cfg.target_path <./weights/alibaba-pai/Wan2.2-VACE-Fun-A14B/{{high/low}_noise_model}/> \
  --cfg.target_parallel_config.pp_layers <pp_layers>
 ```
+
 权重转换脚本的参数说明如下：
 
 | 参数              | 含义                     | 默认值                                                       |
@@ -161,26 +169,29 @@ mm-convert VACEConverter hf_to_mm \
 | --cfg.target_path | 转换或切分后权重保存路径 | /                                                            |
 | --pp_layers   | PP/VPP层数               | 开启PP时, 使用PP和VPP需要指定各stage的层数并转换, 默认为`[]`，即不使用 |
 
-
 VACE模型如需转回Hugging Face格式，需运行权重转换脚本：
+
 ```shell
 # Wan2.1-VACE
 mm-convert VACEConverter mm_to_hf \
  --cfg.source_path <path for your saved weight/> \
  --cfg.target_path <./converted_weights/Wan-AI/Wan2.1-VACE-{model_type}/post_train.pt/>
 ```
+
 ```shell
 # Wan2.2-VACE
 mm-convert VACEConverter mm_to_hf \
  --cfg.source_path <path for your saved weight/> \
  --cfg.target_path <./converted_weights/alibaba-pai/Wan2.2-VACE-Fun-A14B/{{high/low}_noise_model}/post_train.pt/>
 ```
+
 权重转换脚本的参数说明如下：
 
 |参数| 含义 | 默认值 |
 |:------------|:----|:----|
 | --cfg.source_path | MindSpeed MM保存的权重路径                                   | /      |
 | --cfg.target_path | 转换后的Hugging Face权重路径                                 | /      |
+
 ---
 
 ## 预训练
@@ -295,6 +306,7 @@ bash examples/vace/feature_extract/feature_extraction.sh
     echo "release" > $convert_dir/latest_checkpointed_iteration.txt
     python -m torch.distributed.checkpoint.format_utils dcp_to_torch "$iter_dir" "$convert_dir/release/mp_rank_00/model_optim_rng.pt"
     ```
+
 #### 启动训练
 
 ```bash
@@ -315,10 +327,10 @@ bash examples/vace/{model_type}/pretrain_fsdp.sh
  1. model_paths中的vae和text_encoder需要使用[非diffusers版](https://huggingface.co/Wan-AI/Wan2.1-VACE-1.3B)的huggingface权重
  2. model_paths中的transformer如果想使用训练中保存的权重，需要提前运行权重转换脚本`mm-convert VACEConverter mm_to_hf`将MM格式权重转换为Hugging Face格式
 
-
-
 ### 准备工作
+
 1. 【下载DiffSynth-Studio】
+
 ```shell
 cd examples/vace
 git clone https://github.com/modelscope/DiffSynth-Studio.git
@@ -326,21 +338,27 @@ cd DiffSynth-Studio
 git checkout 8332ece
 cp ../inference/Wan-VACE-Inference.py examples/wanvideo/model_inference
 ```
+
 2. 【npu适配】
+
  ```shell
 vim diffsynth/utils/__init__.py
   ```
+
 将131行的`torch.cuda.mem_get_info(self.device)[1] / (1024 ** 3)`
 改为`torch.npu.mem_get_info()[1] / (1024 ** 3)`
+
 ```shell
 vim diffsynth/vram_management/layers.py
   ```
+
 将16行的`torch.cuda.mem_get_info(self.computation_device)`
 改为`torch.npu.mem_get_info()`
 
 ```shell
 vim diffsynth/models/wan_video_dit.py
   ```
+
 将96行的`freqs`
 改为`freqs.to(torch.complex64)`
 

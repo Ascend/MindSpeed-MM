@@ -1,9 +1,11 @@
 ## Automatic Parallelism For Multi-Modal
 
 ## 问题分析
+
 当前多模态大模型的并行训练方法越来越丰富，主要有TP\PP\DP\CP\VPP等，每种并行方法在计算、内存、通信上均有不同的优势。在当前的生产过程中，主要是使用基于专家经验的人工调优，一般需要数天甚至数周的时间。相似模型或者一个模型的不同训练阶段，最优的并行配置也并不相同。随着并行方法的不断丰富，并行搜索空间不断变大，使用人工调优的方法变得越来越不可行。因此需要构建一个面向多模态大模型的并行配置自动调优算法，可以自动化地根据集群资源、模型结构得出最优的并行方法。
 
 ## 解决方案
+
 针对多模态大模型结构丰富，训练阶段多样的特点，我们将网络进行切分和子图归并，然后使用基于黑盒Profiling的方法对多种并行配置采样，最后使用基于整数规划的方法进行非均匀的网络层切分：
 
 - 采样性能：
@@ -15,12 +17,12 @@
 
 ![1](../../../sources/images/auto_parallel_mm/auto_parallel_mm_1.png)
 
-
 ## 适配版本
+
 MindSpeed-Core branch: core_r0.8.0
 
-
 ## 使用方法
+
 在使用多维自动并行特性时，**需使用python作为脚本启动器，在所有的节点上拉起脚本**，并配置多维自动并行相关的参数。相关参数及其函数如下表所示：
 
 | 参数名                      | 参数含义                                            |
@@ -35,6 +37,7 @@ MindSpeed-Core branch: core_r0.8.0
 | --simulated-nproc-per-node  | 待训练集群每个节点的设备数                           |
 
 下面是基于Qwen2VL-72B模型的配置示例：
+
 ```shell
 #!/bin/bash
 export ASCEND_SLOG_PRINT_TO_STDOUT=0
@@ -170,7 +173,6 @@ find $SAVE_PATH -type f -exec chmod 640 {} \;
 
 ![2](../../../sources/images/auto_parallel_mm/auto_parallel_mm_2.png)
 
-
 ## 搜索结果说明
 
 - 当前已支持多模态理解模型PP/TP/DP/MBS维度以及PP非均匀层切分维度的最优搜索
@@ -185,6 +187,7 @@ find $SAVE_PATH -type f -exec chmod 640 {} \;
 | throughput                  | 仿真的模型吞吐率                                    |
 
 - 以下是Qwen2VL-72B模型的最优并行策略搜索结果示例：
+
 ```json
 {
     "parallel_config": {

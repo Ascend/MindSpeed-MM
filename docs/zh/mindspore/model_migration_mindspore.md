@@ -7,7 +7,6 @@
 
 本指南侧重提供MindSpeed MM MindSpore后端的迁移开发指导，帮助用户快速地将大模型训练从PyTorch后端迁移至MindSpore后端。在介绍迁移开发前，先简要介绍MindSpore动态图和API适配工具MSAdapter，供用户了解MindSpore后端和PyTorch后端的差异，以启发用户在模型迁移开发遇到问题时进行问题排查。
 
-
 >[!NOTICE]
 >建议用户先参照《[MindSpeed MM迁移调优指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/docs/user-guide/model-migration.md)》进行基于torch生态的代码开发，之后根据本指南迁移至MindSpore后端运行来获取更优>的?模型训练推理性能。
 
@@ -33,7 +32,7 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
 
 [MSAdapter](https://openi.pcl.ac.cn/OpenI/MSAdapter.git)是一款MindSpore生态适配工具，在不改变用户原有使用习惯下，将PyTorch/JAX等三方框架代码快速迁移到MindSpore生态上，帮助用户高效使用昇腾算力。该工具的基本原理是使用MindSpore动态图算子来实现PyTorch API接口，由于框架的差异性，部分接口仍存在差异或者不支持，具体支持列表详见[torch接口支持列表](https://openi.pcl.ac.cn/OpenI/MSAdapter/src/branch/master/doc/readthedocs/source_zh/docs/SupportedList.md)。
 
-##  软件安装
+## 软件安装
 
 为了便于用户理解和选择合适的MindSpeed版本，我们提供了详细的版本配套表，如表1所示。
 该表详细列出了MindSpeed版本与对应的MindSpore版本及CANN版本之间的匹配关系，确保用户能够根据自身软件环境准确选择相匹配的版本，以实现最优的性能与功能支持。
@@ -202,6 +201,3 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
 - 确认PyTorch shell脚本中的特性开关所对应的特性在MindSpore后端已支持。若MindSpore后端未支持，我们建议在启动脚本中关闭这些特性。
 
 完成上述启动shell脚本适配后，用户即可尝试使用脚本拉起模型任务。
-
-
-

@@ -27,16 +27,17 @@
   - [环境变量声明](#环境变量声明)
 
 ## 版本说明
-#### 参考实现
-```
+
+### 参考实现
+
+```shell
 url=https://github.com/OpenGVLab/InternVL.git
 commit_id=2410d1db
 ```
 
-#### 变更记录
+### 变更记录
 
 2025.10.21: 首次支持InternVL3_5--30B-A3B-Instruct模型
-
 
 ---
 <a id="jump1"></a>
@@ -48,7 +49,8 @@ commit_id=2410d1db
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
 
 <a id="jump1.1"></a>
-#### 1. 环境准备
+
+### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
@@ -57,7 +59,8 @@ commit_id=2410d1db
 
 <a id="jump1.2"></a>
 
-#### 2. 环境搭建
+### 2. 环境搭建
+
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
@@ -121,6 +124,7 @@ pip install -e .
 <a id="jump2.2"></a>
 
 ### 权重转换
+
 MindSpeed MM修改了moe部分原始网络的结构名称，需对原始预训练权重进行转换：
 
 ```shell
@@ -136,13 +140,13 @@ mm-convert ExpertMergeDcpConverter hf_to_dcp --hf_dir "ckpt/hf_path/InternVL3_5-
 
 <a id="jump3.1"></a>
 
-#### 1. 数据集下载
+### 1. 数据集下载
 
 【图片数据】
 
 用户需自行获取并解压[InternVL-Finetune](https://huggingface.co/datasets/OpenGVLab/InternVL-Chat-V1-2-SFT-Data)数据集到`dataset/playground`目录下，解压后的数据结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── ai2d
@@ -186,13 +190,13 @@ pip install decord==0.6.0
 
 <a id="jump4.1"></a>
 
-#### 1. 准备工作
+### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载** 、**数据集准备及处理**，详情可查看对应章节。
 
 <a id="jump4.2"></a>
 
-#### 2. 配置参数
+### 2. 配置参数
 
 【数据目录配置】
 
@@ -264,7 +268,7 @@ OUTPUT_ARGS="
 "
 ```
 
-```
+```shell
 $save_dir
    ├── latest_checkpointed_iteration.txt
    ├── ...
@@ -303,7 +307,7 @@ $save_dir
 
 <a id="jump4.3"></a>
 
-#### 3. 启动微调
+### 3. 启动微调
 
 以InternVL3_5-30B-A3B-Instruct为例，启动微调训练任务。
 
@@ -313,8 +317,10 @@ bash examples/internvl3.5/finetune_internvl3_5.sh
 
 <a id="jump4.4"></a>
 
-#### 4. 启动推理
+### 4. 启动推理
+
 训练完成之后，将保存在`SAVE_PATH`目录下的权重转换成huggingface格式
+
 ```shell
 mm-convert ExpertMergeDcpConverter dcp_to_hf --hf_dir "ckpt/hf_path/InternVL3_5-30B-A3B-Instruct" --dcp_dir "internvl35_finetune_result/iter_000xx" --save_dir "ckpt/dcp_to_hf/InternVL3_5-30B-A3B-Instruct"
 ```
@@ -322,7 +328,6 @@ mm-convert ExpertMergeDcpConverter dcp_to_hf --hf_dir "ckpt/hf_path/InternVL3_5-
 其中，`--hf_dir`表示原始huggingface权重的路径，`--dcp_dir`表示微调后的权重保存路径，`iter_000xx`表示保存的第xx步的权重，`--save_dir`表示转换后的权重保存路径。
 
 完成权重转换之后，即可使用transformers库进行推理。
-
 
 <a id="jump6"></a>
 

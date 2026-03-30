@@ -109,7 +109,7 @@ pip install -e .
 
 ### 1. 数据格式（ltx2_precomputed）
 
-#### 1.1 数据集数据格式 <a id="jump2.1.2"></a>
+### 1.1 数据集数据格式 <a id="jump2.1.2"></a>
 
 **`dataset.json` JSON 格式示例：**
 
@@ -137,7 +137,7 @@ pip install -e .
 
 预处理脚本位于源仓 `LTX-2/packages/ltx-trainer/scripts/` 目录下。本框架依赖源仓脚本进行预处理。
 
-#### 2.1 基本预处理（仅视频，t2v）
+### 2.1 基本预处理（仅视频，t2v）
 
 ```bash
 cd /path/to/LTX-2/packages/ltx-trainer
@@ -147,7 +147,7 @@ uv run python scripts/process_dataset.py dataset.json \
     --text-encoder-path /path/to/gemma-model
 ```
 
-#### 2.2 带音频的预处理（t2av）
+### 2.2 带音频的预处理（t2av）
 
 ```bash
 cd /path/to/LTX-2/packages/ltx-trainer
@@ -170,7 +170,7 @@ uv run python scripts/process_dataset.py dataset.json \
 | `--lora-trigger` | LoRA 触发词（推理时需包含） |
 | `--decode` | 解码验证（生成视频预览） |
 
-#### 2.3 预处理目录结构 <a id="jump2.1.1"></a>
+### 2.3 预处理目录结构 <a id="jump2.1.1"></a>
 
 `ltx2_precomputed` 默认读取 `preprocessed_data_root` 下的 `.precomputed` 子目录：
 

@@ -58,7 +58,7 @@
 
 3. 下载权重
 
-    ```
+    ```shell
     huggingface-cli download Wan-AI/Wan2.1-T2V-1.3B --local-dir-use-symlinks False --local-dir wan_models/Wan2.1-T2V-1.3B
     huggingface-cli download gdhe17/Self-Forcing checkpoints/self_forcing_dmd.pt --local-dir .
     huggingface-cli download gdhe17/Self-Forcing checkpoints/ode_init.pt --local-dir .
@@ -105,7 +105,6 @@
 | `ACLNN_CACHE_LIMIT`           | 配置单算子执行API在Host侧缓存的算子信息条目个数                                  | 需要配置为整数，取值范围`[1, 10,000,000]`，默认值为`10000`                                                     |
 | `TOKENIZERS_PARALLELISM`      | 用于控制Hugging Face的transformers库中的分词器（tokenizer）在多线程环境下的行为    | `False`: 禁用并行分词<br>`True`: 开启并行分词                                                        |
 | `OMP_NUM_THREADS`             | 设置执行期间使用的线程数    |      需要配置为整数                                                  |
-
 
 # 引用
 

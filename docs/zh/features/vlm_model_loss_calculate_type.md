@@ -46,14 +46,14 @@
 
 争对入口为`pretrain_vlm.py`的模型，使能方式如下：
 
-#### 1. 默认计算方式
+### 1. 默认计算方式
 
 在模型训练脚本中**不启用**以下任一参数：
 
 - `--calculate-per-sample-loss` 按样本粒度计算 loss
 - `--calculate-per-token-loss` 按 token 粒度计算 loss
 
-#### 2. 按样本粒度计算 Loss
+### 2. 按样本粒度计算 Loss
 
 在模型训练脚本中启用参数：
 
@@ -64,7 +64,7 @@ GPT_ARGS="
 "
 ```
 
-#### 3. 按 Token 粒度计算 Loss
+### 3. 按 Token 粒度计算 Loss
 
 在模型训练脚本中启用参数：
 

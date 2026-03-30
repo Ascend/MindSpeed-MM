@@ -33,14 +33,11 @@
 | MindSpore        | [2.7.1](https://www.mindspore.cn/install/)         |
 | Python           | >=3.9                                                        |                                          |
 
-
 ### 仓库拉取及环境搭建
-
 
 针对MindSpeed MindSpore后端，昇腾社区提供了一键转换工具MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在华为MindSpore+CANN环境下一键拉起模型训练。在进行一键转换前，用户需要拉取相关的代码仓以及进行环境搭建：
 
-
-```
+```shell
 # 创建conda环境
 conda create -n test python=3.10
 conda activate test
@@ -66,7 +63,6 @@ mkdir logs
 ```
 
 ## 权重下载及转换
-
 
 ### 权重下载
 
@@ -96,7 +92,6 @@ torch.configs.set_pyboost(False)
 ```
 
 以InternVL2-8B为例，使用命令如下
-
 
 ```bash
 # 根据实际情况修改 ascend-toolkit 路径
@@ -134,6 +129,7 @@ mm-convert  InternVLConverter hf_to_mm \
   --cfg.trust_remote_code True
 
 ```
+
 - 其中：
 - mm_dir: 转换后保存目录
 - hf_dir: huggingface权重目录
@@ -143,9 +139,7 @@ mm-convert  InternVLConverter hf_to_mm \
 
 ---
 
-
 ## 数据集准备及处理
-
 
 ### 数据集下载
 
@@ -153,7 +147,7 @@ mm-convert  InternVLConverter hf_to_mm \
 
 用户需自行获取并解压[InternVL-Finetune](https://huggingface.co/datasets/OpenGVLab/InternVL-Chat-V1-2-SFT-Data)数据集到`dataset/playground`目录下，以数据集ai2d为例，解压后的数据结构如下：
 
-   ```
+   ```shell
    $playground
    ├── data
        ├── ai2d
@@ -169,14 +163,11 @@ mm-convert  InternVLConverter hf_to_mm \
 
 ---
 
-
 ## 微调
-
 
 ### 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**[环境安装](#环境安装)**、**[权重下载及转换](#权重下载及转换)**、**[数据集准备及处理](#数据集准备及处理)**，详情可查看对应章节。
-
 
 ### 配置参数
 
@@ -228,6 +219,7 @@ mm-convert  InternVLConverter hf_to_mm \
 ```
 
 如果需要计算validation loss，还需要设置以下参数：
+
 - 在shell脚本中设置`eval-interval`和`eval-iters`参数；
 - 在`data.json`中的`basic_parameters`内增加字段：
   - 对于非流式数据有两种方式：①根据实际情况增加`val_dataset`验证集路径，②增加`val_rate`字段对训练集进行切分；    
@@ -280,12 +272,11 @@ OUTPUT_ARGS="
 
 若需要加载指定迭代次数的权重、优化器等状态，需将加载路径`LOAD_PATH`设置为保存文件夹路径`LOAD_PATH="save_dir"`，并修改`latest_checkpointed_iteration.txt`文件内容为指定迭代次数
 
-```
+```shell
 $save_dir
    ├── latest_checkpointed_iteration.txt
    ├── ...
 ```
-
 
 【日志信息配置】
 
@@ -298,7 +289,6 @@ OUTPUT_ARGS="
     ...
 "
 ```
-
 
 【单机运行配置】
 
@@ -315,7 +305,6 @@ OUTPUT_ARGS="
   WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ```
 
-
 ### 启动微调
 
 以InternVL2-8B为例，启动微调训练任务。
@@ -324,10 +313,10 @@ OUTPUT_ARGS="
 bash examples/mindspore/internvl2/finetune_internvl2_8B.sh
 ```
 
-
 ---
 
 ## 环境变量声明
+
 ASCEND_RT_VISIBLE_DEVICES： 指定NPU设备的索引值
 
 ASCEND_SLOG_PRINT_TO_STDOUT： 是否开启日志打印， 0：关闭日志打屏，1：开启日志打屏

@@ -4,7 +4,7 @@
 
 1. 建议用户在系统中配置开启ASLR（级别2），又称**全随机地址空间布局随机化**，可参考以下方式进行配置：
 
-    ```
+    ```shell
     echo 2 > /proc/sys/kernel/randomize_va_space
     ```
 
@@ -69,9 +69,9 @@
    
 5. 参考链接
    
-   torch.load()文档：https://pytorch.org/docs/main/generated/torch.load.html#torch.load(包含 weights_only参数说明及其风险)
+   torch.load()文档：<https://pytorch.org/docs/main/generated/torch.load.html#torch.load>(包含weights_only参数说明及其风险)
    
-   PyTorch 分布式通信说明：https://pytorch.org/docs/main/distributed.html#collective-functions
+   PyTorch 分布式通信说明：<https://pytorch.org/docs/main/distributed.html#collective-functions>
 
 ### 运行安全声明
 
