@@ -196,7 +196,7 @@ def moe_expert(style: Literal["merge", "split"], hf_dir: DirectoryPath, save_dir
 
 class ExpertMergeDcpConverter(DcpConverter):
     @staticmethod
-    def hf_to_dcp(hf_dir: DirectoryPath, save_dir: Path):
+    def hf_to_dcp(hf_dir: DirectoryPath, save_dir: Path, dcp_prefix: str = "model.", hf_prefix: str = ""):
         num_experts, num_hidden_layers, weight_path, expert_start_layer = get_expert_config_from_pretrained(hf_dir)
         state_dict = load_from_hf(hf_dir)
         config_type = get_config_type_from_class_name(hf_dir)
@@ -206,19 +206,27 @@ class ExpertMergeDcpConverter(DcpConverter):
             weight_names = list(state_dict.keys())
             for weight_name in weight_names:
                 state_dict[weight_name.removeprefix("thinker.")] = state_dict.pop(weight_name)
-        weight_names = list(state_dict.keys())
-        for weight_name in weight_names:
-            state_dict[f"model.{weight_name}"] = state_dict.pop(weight_name)
+        if len(hf_prefix) > 0 or len(dcp_prefix) > 0:
+            ori_keys = list(state_dict.keys())
+            for ori_key in ori_keys:
+                value = state_dict.pop(ori_key)
+                new_key = ori_key.replace(hf_prefix, dcp_prefix, 1) if len(hf_prefix) > 0 else f"{dcp_prefix}{ori_key}"
+                state_dict[new_key] = value
+
         save_by_dcp(state_dict, save_dir)
         set_directory_permissions(save_dir)
 
     @staticmethod
-    def dcp_to_hf(hf_dir: DirectoryPath, dcp_dir: DirectoryPath, save_dir: Path):
+    def dcp_to_hf(hf_dir: DirectoryPath, dcp_dir: DirectoryPath, save_dir: Path, dcp_prefix: str = "model.", hf_prefix: str = ""):
         copy_files_except_suffix(hf_dir, save_dir, except_suffix='.safetensors')
         state_dict = load_dcp_state_dict(dcp_dir)
-        weight_names = list(state_dict.keys())
-        for weight_name in weight_names:
-            state_dict[weight_name.removeprefix("model.")] = state_dict.pop(weight_name)
+        if len(hf_prefix) > 0 or len(dcp_prefix) > 0:
+            state_dict_keys = list(state_dict.keys())
+            for key in state_dict_keys:
+                value = state_dict.pop(key)
+                new_key = key.replace(dcp_prefix, hf_prefix, 1) if key.startswith(dcp_prefix) else key
+                state_dict[new_key] = value
+
         config_type = get_config_type_from_class_name(hf_dir)
         if config_type == ConfigType.QWEN3_OMNI: # support qwen3-omni
             weight_names = list(state_dict.keys())

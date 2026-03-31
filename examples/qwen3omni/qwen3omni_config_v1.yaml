@@ -1,0 +1,157 @@
+# 并行策略
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - audio_tower.positional_embedding
+      - audio_tower.layers.{*}
+      - visual.blocks.{*}
+      - visual.merger
+      - visual.merger_list.{*}
+      - visual
+      - model.embed_tokens
+      - model.layers.{*}
+      - model
+      - lm_head
+    param_dtype: bf16
+    reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+  recompute: true
+  recompute_plan:
+      apply_modules:
+        - model.layers.{*}
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+
+### 数据相关配置
+data:
+  dataset_param:
+    dataset_type: huggingface
+    #数据集属性
+    attr:
+      # audios: audios
+      images: images
+      # videos: videos
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+
+    # 数据预处理
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      use_audio_in_video: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 256
+      video_fps: 2.0
+      video_maxlen: 128
+      audio_sampling_rate: 16000
+
+    basic_parameters:
+      cutoff_len: 262144
+      template: qwen3_omni
+      enable_thinking: false
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: ./data
+      dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
+      cache_dir: ./cache_dir/
+      overwrite_cache: false
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+
+  # 数据加载
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      model_name: qwen3omni
+      ignore_pad_token_for_loss: true
+
+# 模型配置
+model:
+  model_id: qwen3_omni_moe
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  attn_implementation: flash_attention_2
+  freeze:
+    - visual.patch_embed
+    - visual.blocks
+    - visual.merger_list
+    - visual.pos_embed
+    - visual.merger
+    - audio_tower
+  loss_cfg:
+    loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
+    router_aux_loss_coef: 0.0
+  enable_chunk_loss: true  # If loss_type is set to "raw", enable_chunk_loss must be set to false.
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 1024
+  use_grouped_expert_matmul: true
+
+# 训练配置
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.1
+  weight_decay: 0
+  train_iters: 200
+  clip_grad: 0.0
+  init_model_with_meta_device: true
+  optimizer: adamw
+  adam_fused: true
+  save_interval: 10000
+  load: ./ckpt/convert_path/Qwen3-Omni-30B-A3B-Instruct
+  save: ./save_path
+  use_deter_comp: false
+  plugin:
+    - mindspeed_mm/fsdp/models/qwen3omni
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+  no_load_optim: true
+  no_load_rng: true
+  no_save_optim: true
+  no_save_rng: true
+
+# 工具配置
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false

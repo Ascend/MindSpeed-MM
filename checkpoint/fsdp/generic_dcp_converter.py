@@ -97,8 +97,17 @@ class GenericDCPConverter(Converter):
                 in comma-separated format. These parameters need special reshaping during conversion.
         """
         config = AutoConfig.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
-        num_experts = getattr(config.text_config, "num_experts", None)
 
+        def get_text_config(config):
+            if hasattr(config, "text_config"):
+                return config.text_config
+            elif hasattr(config, "thinker_config") and hasattr(config.thinker_config, "text_config"): # support qwen3-omni
+                return config.thinker_config.text_config
+            return config
+
+        text_config = get_text_config(config)
+        num_experts = getattr(text_config, "num_experts", None)
+        
         def state_dict_convert_func(state_dict):
             state_dict_keys = list(state_dict.keys())
 
@@ -117,7 +126,7 @@ class GenericDCPConverter(Converter):
             load_dir=Path(load_dir),
             save_dir=Path(save_dir),
             model_assets_dir=Path(model_assets_dir),
-            select_key_convert_func=lambda key: f"model.{dcp_prefix}" + key,
+            select_key_convert_func=lambda key: f"model.{dcp_prefix}" + key.removeprefix(hf_prefix),
             state_dict_convert_func=state_dict_convert_func
         )
     
