@@ -74,8 +74,6 @@ def pool_workaround(
     # find index for EOS token
 
     # Following code is not working if one of the input_ids has multiple EOS tokens (very odd case)
-    # eos_token_index = torch.where(input_ids == eos_token_id)[1]
-    # eos_token_index = eos_token_index.to(device=last_hidden_state.device)
 
     # Create a mask where the EOS tokens are
     eos_token_mask = (input_ids == eos_token_id).int()
@@ -126,7 +124,6 @@ def get_hidden_states_sdxl(
     enc_out = text_encoder2(input_ids2, output_hidden_states=True, return_dict=True)
     hidden_states2 = enc_out["hidden_states"][-2]  # penuultimate layer
 
-    # pool2 = enc_out["text_embeds"]
     pool2 = pool_workaround(
         text_encoder2, enc_out["last_hidden_state"], input_ids2, tokenizer2.eos_token_id
     )

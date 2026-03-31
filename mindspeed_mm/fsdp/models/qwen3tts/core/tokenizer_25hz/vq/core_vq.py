@@ -297,7 +297,6 @@ class VectorQuantization(nn.Module):
         return self._codebook.embed
 
     def encode(self, x, buffers):
-        # x = rearrange(x, "b d n -> b n d")
         x = self.project_in(x)
         embed_in = self._codebook.encode(x, buffers)
         return embed_in
@@ -310,7 +309,6 @@ class VectorQuantization(nn.Module):
 
     def forward(self, x, buffers):
         device = x.device
-        # x = rearrange(x, "b d n -> b n d")
         x = self.project_in(x)
 
         quantize, embed_ind = self._codebook(x, buffers)
@@ -326,7 +324,6 @@ class VectorQuantization(nn.Module):
                 loss = loss + commit_loss * self.commitment_weight
 
         quantize = self.project_out(quantize)
-        # quantize = rearrange(quantize, "b n d -> b d n")
         return quantize, embed_ind, loss
 
 
