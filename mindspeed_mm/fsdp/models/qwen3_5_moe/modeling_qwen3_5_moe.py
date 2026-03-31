@@ -33,7 +33,7 @@ from transformers import initialization as init
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache
 from transformers.generation import GenerationMixin
-from transformers.integrations import use_experts_implementation, use_kernelized_func
+from transformers.integrations import use_kernelized_func
 from transformers.masking_utils import create_causal_mask
 from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
 from transformers.modeling_layers import GradientCheckpointingLayer
@@ -48,7 +48,7 @@ from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_u
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs, auto_docstring, can_return_tuple, logging, torch_compilable_check
-from transformers.utils.generic import check_model_inputs, maybe_autocast
+from transformers.utils.generic import maybe_autocast
 from transformers.utils.import_utils import is_causal_conv1d_available, is_flash_linear_attention_available
 from transformers.utils.output_capturing import OutputRecorder
 from transformers.models.qwen3_5_moe.configuration_qwen3_5_moe import Qwen3_5MoeConfig, Qwen3_5MoeTextConfig, Qwen3_5MoeVisionConfig
@@ -884,7 +884,6 @@ class Qwen3_5MoeMLP(nn.Module):
         return down_proj
 
 
-@use_experts_implementation
 class Qwen3_5MoeExperts(nn.Module):
     """Collection of expert weights stored as 3D tensors."""
 
@@ -1458,7 +1457,6 @@ class Qwen3_5MoeVisionModel(Qwen3_5MoePreTrainedModel):
         patch_pos_embeds = torch.cat(patch_pos_embeds_permute)
         return patch_pos_embeds
 
-    @check_model_inputs
     def forward(self, hidden_states: torch.Tensor, grid_thw: torch.Tensor, **kwargs) -> torch.Tensor:
         """
         Args:
@@ -1601,7 +1599,6 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @check_model_inputs
     @auto_docstring
     def forward(
         self,
