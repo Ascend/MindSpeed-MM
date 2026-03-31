@@ -14,6 +14,10 @@ class ChunkLossPlanConfig:
         default=1024,
         metadata={"help": "Size of each chunk loss"},
     )
+    total_chunk_size: int = field(
+        default=4096,
+        metadata={"help": "Size of total chunk loss"},
+    )
 
 
 @dataclass
@@ -63,5 +67,9 @@ class ModelArguments:
     enable_chunk_loss: bool = field(
         default=False,
         metadata={"help": "Whether apply chunkloss for loss compute"},
+    )
+    enable_dynamic_chunk_loss: bool = field(
+        default=False,
+        metadata={"help": "Whether apply dynamic chunkloss for loss compute"},
     )
     chunkloss_plan: ChunkLossPlanConfig = field(default_factory=ChunkLossPlanConfig)

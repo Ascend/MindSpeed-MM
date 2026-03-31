@@ -1,10 +1,32 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
 import torch
 import torch_npu
+import torch.nn.functional as F
 from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
 from mindspeed_mm.fsdp.ops.swiglu import swiglu
+
+
+_orig_gelu = F.gelu
+
+
+def apply_gelu_npu(input_tensor, approximate='none'):
+    """
+    Wrap npu_gelu to match the F.gelu interface
+    """
+    device_type = input_tensor.device.type if hasattr(input_tensor, 'device') else 'cpu'
+
+    valid_approximates = ['none', 'tanh']
+    if approximate not in valid_approximates:
+        import warnings
+        warnings.warn(f"NPU GELU does not support approximate='{approximate}'. "f"Using approximate='none' instead.")
+        approximate = 'none'
+
+    if device_type == 'npu':
+        return torch_npu.npu_gelu(input_tensor, approximate=approximate)
+    else:
+        return _orig_gelu(input_tensor, approximate=approximate)
 
 
 # This api can improve performance on ASCEND NPU

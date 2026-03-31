@@ -19,7 +19,7 @@
             "dataset_dir": "./data",
             "dataset": "./data/mllm_format_llava_instruct_data.json",
             "cache_dir": "./data/cache_dir",
-            "overwrite_cache": true,
+            "overwrite_cache": false,
             "train_on_prompt": false,
             "mask_history": false,
             "preprocessing_batch_size": 1000,

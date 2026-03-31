@@ -1014,7 +1014,7 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
                 video_maxlen=getattr(processor, "video_maxlen", 128),
             )
             video_processor = get_video_processor(processor, False)
-            mm_inputs.update(video_processor(images=None, videos=video_dict["videos"], return_tensors="pt"))
+            mm_inputs.update(video_processor(videos=video_dict["videos"], return_tensors="pt"))
             temporal_patch_size: int = getattr(image_processor, "temporal_patch_size", 2)
             mm_inputs["video_second_per_grid"] = torch.tensor(
                 [temporal_patch_size / fps for fps in video_dict["fps_per_video"]]
@@ -1025,10 +1025,18 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
                 audios,
                 sampling_rate=getattr(processor, "audio_sampling_rate", 16000),
             )["audios"]
+            if getattr(processor, "audio_sampling_rate", 16000) != feature_extractor.sampling_rate:
+                import librosa
+                resampled_audios = []
+                for audio in audios:
+                    resampled_audio = librosa.resample(audio, orig_sr=getattr(processor, "audio_sampling_rate", 16000), target_sr=feature_extractor.sampling_rate)
+                    resampled_audios.append(resampled_audio)
+                audios = resampled_audios
+
             mm_inputs.update(
                 feature_extractor(
                     audios,
-                    sampling_rate=getattr(processor, "audio_sampling_rate", 16000),
+                    sampling_rate=feature_extractor.sampling_rate,
                     return_attention_mask=True,
                     padding="max_length",
                     return_tensors="pt",
@@ -1060,8 +1068,10 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
             image_grid_thw = mm_inputs.get("image_grid_thw", [])
             video_grid_thw = mm_inputs.get("video_grid_thw", [])
             if "feature_attention_mask" in mm_inputs:
-                input_lengths = (mm_inputs["feature_attention_mask"].sum(-1).numpy() - 1) // 2 + 1
-                audio_lengths = (input_lengths - 2) // 2 + 1
+                input_lengths = mm_inputs["feature_attention_mask"].sum(-1)
+                input_lengths_leave = input_lengths % 100
+                feature_lengths = (input_lengths_leave - 1) // 2 + 1
+                audio_lengths = ((feature_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
         else:
             mm_inputs = {}
             image_grid_thw = [None] * len(images)
@@ -1105,7 +1115,7 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
                                 video_grid_thw[num_video_tokens][2] // image_processor.merge_size,
                             )
                             .flatten()
-                            * mm_inputs.get("video_second_per_grid").get(num_video_tokens)
+                            * mm_inputs.get("video_second_per_grid")[num_video_tokens]
                             * 25
                     ).long()
                     t_ntoken_per_chunk = 50

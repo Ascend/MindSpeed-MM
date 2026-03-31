@@ -1,10 +1,51 @@
+import logging
+
 import torch
 import torch.nn.functional as F
 
+from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.memory.chunk_loss.chunk_loss import chunk_loss, calculate_lm_loss, fixed_cross_entropy
 from mindspeed_mm.fsdp.utils.constants import AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import split_forward_gather_backward_with_cp
+
+
+logger = logging.getLogger(__name__)
+
+
+def calculate_chunk_size(batch_size: int, total_size: int) -> int:
+    """
+    Calculate dynamic Chunk Size to ensure batch_size * chunk_size ≤ total size, 
+    where chunk_size is the largest power of two not exceeding the theoretical maximum value.
+
+    Args:
+        batch_size (int): Input batch size
+
+        total_size (int): Upper limit of total tokens (batch_size * chunk_size),
+            typically configured as the maximum token capacity of the device (e.g., 4096/8192 tokens).
+
+    Returns:
+        int: Dynamic Chunk Size that meets the requirements, returns 1 by default (when input is invalid)
+    """
+    if batch_size <= 0 or total_size <= 0:
+        print_rank(logger.info, f'Batch size={batch_size} or total size={total_size} must be a positive integer!')
+        return 1
+    if batch_size >= total_size:
+        print_rank(logger.info, f'Batch size={batch_size} exceeds total size={total_size}!')
+        return 1
+
+    max_possible_chunk_size = total_size // batch_size
+
+    if max_possible_chunk_size == 0:
+        print_rank(logger.info, f'No valid Chunk Size for batch size batch_size={batch_size}!')
+        return 1
+
+    max_power_of_two_chunk_size = 1 << (max_possible_chunk_size.bit_length() - 1)
+
+    if max_power_of_two_chunk_size > max_possible_chunk_size:
+        max_power_of_two_chunk_size = max_power_of_two_chunk_size >> 1  # Right shift by 1 bit = divide by 2
+
+    return max_power_of_two_chunk_size
 
 
 def build_loss_func(
@@ -17,6 +58,9 @@ def build_loss_func(
     if labels is None:
         raise ValueError("labels are missing.")
     bs = labels.shape[0]
+    total_chunk_size = kwargs.get('total_chunk_size', None)
+    if total_chunk_size:
+        chunk_size = calculate_chunk_size(bs, total_chunk_size)
     labels = F.pad(labels, (0, 1), value=ignore_index)
     # Shift labels to match the input sequence for next-token prediction.
     shift_labels = labels[..., 1:].contiguous()

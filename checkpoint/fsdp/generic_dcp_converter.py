@@ -98,7 +98,7 @@ class GenericDCPConverter(Converter):
         """
         config = AutoConfig.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
         num_experts = getattr(config.text_config, "num_experts", None)
-        
+
         def state_dict_convert_func(state_dict):
             state_dict_keys = list(state_dict.keys())
 
