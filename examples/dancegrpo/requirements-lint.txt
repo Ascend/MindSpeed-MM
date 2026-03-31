@@ -24,7 +24,6 @@ tokenizers==0.21.2
 albumentations==1.4.20
 av==13.1.0
 einops==0.8.0
-fastapi==0.115.3
 gdown==5.2.0
 h5py==3.12.1
 idna==3.7
