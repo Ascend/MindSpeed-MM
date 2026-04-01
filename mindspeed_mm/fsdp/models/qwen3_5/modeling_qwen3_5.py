@@ -108,7 +108,7 @@ else:
 
 if is_flash_linear_attention_available():
     from fla.modules import FusedRMSNormGated
-    from fla.ops.gated_delta_rule import chunk_gated_delta_rule, fused_recurrent_gated_delta_rule
+    from fla.ops.gated_delta_rule import chunk_gated_delta_rule as fla_chunk_gated_delta_rule, fused_recurrent_gated_delta_rule
 else:
     chunk_gated_delta_rule, fused_recurrent_gated_delta_rule = None, None
     FusedRMSNormGated = None
@@ -343,7 +343,7 @@ def apply_mask_to_padding_states(hidden_states, attention_mask):
 
 
 is_fast_path_available = all(
-    (causal_conv1d_fn, causal_conv1d_update, chunk_gated_delta_rule, fused_recurrent_gated_delta_rule)
+    (causal_conv1d_fn, causal_conv1d_update, fla_chunk_gated_delta_rule, fused_recurrent_gated_delta_rule)
 )
 
 
@@ -549,6 +549,8 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         if self.use_triton_gdn and IS_NPU_AVAILABLE:
             from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_delta_rule
             self.chunk_gated_delta_rule = chunk_gated_delta_rule
+        elif self.use_triton_gdn and is_flash_linear_attention_available():
+            self.chunk_gated_delta_rule = fla_chunk_gated_delta_rule
         else:
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
 

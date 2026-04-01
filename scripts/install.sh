@@ -35,9 +35,9 @@ EOF
 # Default values
 TORCH_VERSION="2.7.1"
 MINDSPEED_COMMIT_ID=""
-AUTO_CONFIRM=""  # 自动确认模式: "", "yes", "no"
-INSTALL_MEGATRON=false  # 是否安装Megatron-LM
-INSTALL_CANN=false  # 是否安装CANN
+AUTO_CONFIRM=""  # Auto confirm mode: "", "yes", "no"
+INSTALL_MEGATRON=false  # Whether to install Megatron-LM
+INSTALL_CANN=false  # Whether to install CANN
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -70,6 +70,67 @@ echo "Install Megatron-LM: $INSTALL_MEGATRON"
 echo "Install CANN: $INSTALL_CANN"
 echo "========================================"
 echo ""
+
+detect_device() {
+    if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
+        echo "gpu"
+        return 0
+    fi
+
+    if command -v npu-smi &> /dev/null && npu-smi info &> /dev/null; then
+        echo "npu"
+        return 0
+    fi
+
+    echo "Error: No GPU or NPU detected. This script requires GPU or NPU for installation."
+    echo "Supported devices: NVIDIA GPU (nvidia-smi) or NPU (npu-smi)"
+    exit 1
+}
+
+# Function to detect CUDA version
+detect_cuda_version() {
+    if command -v nvcc &> /dev/null; then
+        nvcc --version | grep "release" | awk '{print $6}' | cut -c2-
+    elif [ -f /usr/local/cuda/version.txt ]; then
+        cat /usr/local/cuda/version.txt | awk '{print $3}'
+    elif [ -f /usr/local/cuda/version.json ]; then
+        grep -o '"cuda_version":[^,]*' /usr/local/cuda/version.json | cut -d'"' -f4
+    else
+        echo ""
+    fi
+}
+
+get_cuda_index_url() {
+    local cuda_version=$1
+
+    # Select corresponding index URL based on CUDA version
+    case $cuda_version in
+        12.4|12.5|12.6|12.*)
+            echo "https://download.pytorch.org/whl/cu124"
+            ;;
+        12.1|12.2|12.3)
+            echo "https://download.pytorch.org/whl/cu121"
+            ;;
+        12.0)
+            echo "https://download.pytorch.org/whl/cu120"
+            ;;
+        11.8)
+            echo "https://download.pytorch.org/whl/cu118"
+            ;;
+        11.7)
+            echo "https://download.pytorch.org/whl/cu117"
+            ;;
+        11.6)
+            echo "https://download.pytorch.org/whl/cu116"
+            ;;
+        10.2)
+            echo "https://download.pytorch.org/whl/cu102"
+            ;;
+        *)
+            echo "https://download.pytorch.org/whl/cu121"
+            ;;
+    esac
+}
 
 # Function to detect CPU architecture
 detect_architecture() {
@@ -116,27 +177,53 @@ fi
 
 echo "Detected CPU architecture: $ARCH"
 
-# 定义CANN安装脚本路径变量
+DEVICE_TYPE=$(detect_device)
+echo "Detected device type: $DEVICE_TYPE"
+
+# If GPU device is detected, detect CUDA version
+if [ "$DEVICE_TYPE" = "gpu" ]; then
+    CUDA_VERSION=$(detect_cuda_version)
+    echo "Detected CUDA version: $CUDA_VERSION"
+
+    # Get corresponding PyTorch index URL
+    CUDA_INDEX_URL=$(get_cuda_index_url "$CUDA_VERSION")
+    echo "PyTorch index URL for CUDA $CUDA_VERSION: $CUDA_INDEX_URL"
+fi
+
+get_target_torch_version() {
+    local target_version="$TORCH_VERSION"
+    if [ "$DEVICE_TYPE" = "gpu" ]; then
+        echo "GPU device, target version set to: $target_version (will use CUDA version)" >&2
+    elif [ "$DEVICE_TYPE" = "npu" ]; then
+        echo "NPU device, target version set to: $target_version" >&2
+    fi
+    echo "$target_version"
+}
+
+TARGET_TORCH_VERSION=$(get_target_torch_version)
+echo "Final target Torch version: $TARGET_TORCH_VERSION"
+echo ""
+
 CANN_INSTALL_SCRIPT="scripts/install_cann.sh"
 
-# 只有在指定了--install-cann参数时才执行CANN安装
+# Only execute CANN installation when --install-cann parameter is specified
 if [ "$INSTALL_CANN" = true ]; then
-    # 检查install_cann.sh是否存在
+    # Check if install_cann.sh exists
     if [ ! -f "$CANN_INSTALL_SCRIPT" ]; then
         echo "Error: $CANN_INSTALL_SCRIPT not found in current directory"
         echo "Please ensure install_cann.sh exists in $(pwd)"
         exit 1
     fi
 
-    # 检查install_cann.sh是否有执行权限
+    # Check if install_cann.sh has execute permission
     if [ ! -x "$CANN_INSTALL_SCRIPT" ]; then
         echo "Setting execute permission for install_cann.sh..."
         chmod +x "$CANN_INSTALL_SCRIPT"
     fi
 
-    # 调用install_cann.sh并传入ARCH参数
+    # Call install_cann.sh and pass ARCH parameter
     echo "Calling install_cann.sh with architecture: $ARCH"
-    # 执行CANN安装脚本
+    # Execute CANN installation script
     if ! "$CANN_INSTALL_SCRIPT" "$ARCH"; then
         cann_exit_code=$?
         echo "Error: CANN installation failed with exit code: $cann_exit_code"
@@ -144,12 +231,12 @@ if [ "$INSTALL_CANN" = true ]; then
         exit 1
     fi
 
-    # 验证CANN安装是否成功
+    # Validate CANN installation
     echo "Validating CANN installation..."
 
     if [ -f "/usr/local/Ascend/ascend-toolkit/set_env.sh" ]; then
         source /usr/local/Ascend/ascend-toolkit/set_env.sh
-        # 验证能否导入acl模块
+        # Verify if acl module can be imported
         if python3 -c "import acl; print(acl.get_soc_name())" 2>/dev/null | grep -qi ascend; then
             echo "CANN installation successful"
         else
@@ -164,7 +251,6 @@ else
     echo "Skipping CANN Installation ..."
     echo "  (Use --install-cann flag to install CANN)"
 fi
-
 
 # Function to check if package is installed
 is_package_installed() {
@@ -227,22 +313,24 @@ check_existing_versions() {
 
     echo "Auto confirm mode: ${AUTO_CONFIRM:-"interactive (no auto confirm)"}"
 
+    local target_torch_version="$TARGET_TORCH_VERSION"
+
     # Check if torch is already installed
     if is_package_installed "torch"; then
         local current_torch_version
         current_torch_version=$(get_torch_version)
 
-        if [ "$current_torch_version" != "$TORCH_VERSION" ]; then
+        if [ "$current_torch_version" != "$target_torch_version" ]; then
             message+="\n=== PyTorch Version Mismatch ===\n"
             message+="Currently installed torch version: $current_torch_version\n"
-            message+="Target version: $TORCH_VERSION\n"
+            message+="Target version: $target_torch_version\n"
             message+="y: Reinstall PyTorch to target version\n"
             message+="n: Skip PyTorch installation, continue with other components\n"
 
             echo "Version check results:"
             echo -e "$message"
 
-            # 处理自动确认逻辑
+            # Process auto confirm
             if [ "$AUTO_CONFIRM" = "yes" ]; then
                 echo "Auto confirming: Will reinstall PyTorch (--yes flag detected)"
                 install_torch=true
@@ -250,7 +338,7 @@ check_existing_versions() {
                 echo "Auto skipping: Will skip PyTorch installation (--no flag detected)"
                 install_torch=false
             else
-                # 交互式模式
+                # Interactive mode
                 while true; do
                     echo "torch version mismatch detected. Reinstall PyTorch? (y/n)"
                     read -r user_input
@@ -266,68 +354,93 @@ check_existing_versions() {
                             install_torch=false
                             break
                             ;;
-                        ▪ )
-
+                        * )
                             echo "Invalid input. Please enter y or n"
                             ;;
                     esac
                 done
             fi
         else
-            echo "Current torch version matches target version: $TORCH_VERSION"
+            echo "Current torch version matches target version: $target_torch_version"
             install_torch=false
         fi
     else
-        echo "torch not detected, will install new version: $TORCH_VERSION"
+        echo "torch not detected, will install new version: $target_torch_version"
     fi
 
+    # Determine whether to check torch_npu based on device type
+    if [ "$DEVICE_TYPE" != "npu" ]; then
+        echo "NPU environment not detected, skipping torch_npu installation"
+        install_torch_npu=false
+
+        # Return values
+        echo "install_torch=$install_torch" > /tmp/install_flags
+        echo "install_torch_npu=$install_torch_npu" >> /tmp/install_flags
+        return 0
+    fi
+
+    # NPU environment detected, continue processing torch_npu
+    echo "NPU environment detected, will check torch_npu version"
+    install_torch_npu=true
+
     # Check if torch_npu is already installed
-    if is_package_installed "torch_npu"; then
-        local current_torch_npu_version
-        current_torch_npu_version=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
-
-        if [ "$current_torch_npu_version" != "$TORCH_VERSION" ]; then
-            echo -e "\n=== torch_npu Version Mismatch ==="
-            echo "Currently installed torch_npu version: $current_torch_npu_version"
-            echo "Target version: $TORCH_VERSION"
-
-            # 处理自动确认逻辑
-            if [ "$AUTO_CONFIRM" = "yes" ]; then
-                echo "Auto confirming: Will reinstall torch_npu (--yes flag detected)"
-                install_torch_npu=true
-            elif [ "$AUTO_CONFIRM" = "no" ]; then
-                echo "Auto skipping: Will skip torch_npu installation (--no flag detected)"
-                install_torch_npu=false
-            else
-                # 交互式模式
-                while true; do
-                    echo "Reinstall torch_npu to match PyTorch version? (y/n)"
-                    read -r user_input
-
-                    case $user_input in
-                        [Yy]* )
-                            echo "Will reinstall torch_npu..."
-                            install_torch_npu=true
-                            break
-                            ;;
-                        [Nn]* )
-                            echo "Will skip torch_npu installation..."
-                            install_torch_npu=false
-                            break
-                            ;;
-                        ▪ )
-
-                            echo "Invalid input. Please enter y or n"
-                            ;;
-                    esac
-                done
-            fi
-        else
-            echo "Current torch_npu version matches target version: $TORCH_VERSION"
-            install_torch_npu=false
-        fi
-    else
+    if ! is_package_installed "torch_npu"; then
         echo "torch_npu not detected, will install new version: $TORCH_VERSION"
+
+        # Return values
+        echo "install_torch=$install_torch" > /tmp/install_flags
+        echo "install_torch_npu=$install_torch_npu" >> /tmp/install_flags
+        return 0
+    fi
+
+    # Already installed torch_npu, check if version matches
+    local current_torch_npu_version
+    current_torch_npu_version=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
+
+    if [ "$current_torch_npu_version" = "$TORCH_VERSION" ]; then
+        echo "Current torch_npu version matches target version: $TORCH_VERSION"
+        install_torch_npu=false
+
+        # Return values
+        echo "install_torch=$install_torch" > /tmp/install_flags
+        echo "install_torch_npu=$install_torch_npu" >> /tmp/install_flags
+        return 0
+    fi
+
+    # Version mismatch, need user confirmation
+    echo -e "\n=== torch_npu Version Mismatch ==="
+    echo "Currently installed torch_npu version: $current_torch_npu_version"
+    echo "Target version: $TORCH_VERSION"
+
+    # Process auto confirm logic
+    if [ "$AUTO_CONFIRM" = "yes" ]; then
+        echo "Auto confirming: Will reinstall torch_npu (--yes flag detected)"
+        install_torch_npu=true
+    elif [ "$AUTO_CONFIRM" = "no" ]; then
+        echo "Auto skipping: Will skip torch_npu installation (--no flag detected)"
+        install_torch_npu=false
+    else
+        # Interactive mode
+        while true; do
+            echo "Reinstall torch_npu to match PyTorch version? (y/n)"
+            read -r user_input
+
+            case $user_input in
+                [Yy]* )
+                    echo "Will reinstall torch_npu..."
+                    install_torch_npu=true
+                    break
+                    ;;
+                [Nn]* )
+                    echo "Will skip torch_npu installation..."
+                    install_torch_npu=false
+                    break
+                    ;;
+                * )
+                    echo "Invalid input. Please enter y or n"
+                    ;;
+            esac
+        done
     fi
 
     # Return values
@@ -349,6 +462,8 @@ echo ""
 echo "Installation plan:"
 echo "- Install torch: $install_torch"
 echo "- Install torch_npu: $install_torch_npu"
+echo "- Device type: $DEVICE_TYPE"
+echo "- Target torch version: $TARGET_TORCH_VERSION"
 echo ""
 
 # Install PyTorch components
@@ -356,69 +471,71 @@ echo "Starting PyTorch components installation..."
 
 # Install PyTorch if needed
 if [ "$install_torch" = true ]; then
-    echo "Installing PyTorch $TORCH_VERSION..."
-
-    if [ "$ARCH" = "x86" ]; then
-        echo "Installing x86 version of PyTorch $TORCH_VERSION..."
-        pip3 install "torch==$TORCH_VERSION+cpu" "torchvision" "torchaudio" --index-url https://download.pytorch.org/whl/cpu
-    elif [ "$ARCH" = "arm" ]; then
-        echo "Installing ARM version of PyTorch $TORCH_VERSION..."
-        pip3 install "torch==$TORCH_VERSION" "torchvision" "torchaudio"
+    echo "Installing PyTorch $TARGET_TORCH_VERSION..."
+    if [ "$ARCH" = "x86" ] && [ "$DEVICE_TYPE" = "gpu" ]; then
+        echo "Installing x86 GPU version of PyTorch $TARGET_TORCH_VERSION..."
+        echo "Using CUDA index URL: $CUDA_INDEX_URL"
+        pip3 install "torch==$TARGET_TORCH_VERSION" "torchvision" "torchaudio" --index-url "$CUDA_INDEX_URL"
+    elif [ "$ARCH" = "x86" ] && [ "$DEVICE_TYPE" = "npu" ]; then
+        echo "Installing x86 NPU version of PyTorch $TARGET_TORCH_VERSION..."
+        pip3 install "torch" "torchvision" "torchaudio" --index-url "https://download.pytorch.org/whl/cpu"
+    elif [ "$ARCH" = "arm" ] && [ "$DEVICE_TYPE" = "npu" ]; then
+        echo "Installing ARM NPU version of PyTorch $TARGET_TORCH_VERSION..."
+        pip3 install "torch==$TARGET_TORCH_VERSION" "torchvision" "torchaudio"
     else
-        echo "Error: Unsupported architecture '$ARCH'"
+        echo "Error: Unsupported combination: architecture='$ARCH', device='$DEVICE_TYPE'"
+        echo "Supported combinations:"
+        echo "  - x86 + gpu"
+        echo "  - x86 + npu"
+        echo "  - arm + npu"
         show_help
         exit 1
     fi
 
     if is_package_installed "torch"; then
         installed_torch=$(get_torch_version)
-        echo "torch version: $installed_torch successfully installed！"
+        echo "torch version: $installed_torch successfully installed!"
     else
         echo "[ERROR] Installation failed! Reason: torch installation error."
     fi
 else
-    # 用户选择不重新安装torch，安装与当前torch版本兼容的torchvision和torchaudio
-    if is_package_installed "torch"; then
-        current_torch_version=$(get_torch_version)
-        echo "Using existing torch version: $current_torch_version"
-        echo "Installing torchvision and torchaudio compatible with torch $current_torch_version..."
+    current_torch_version=$(get_torch_version)
+    echo "Using existing torch version: $current_torch_version"
+    echo "Installing torchvision and torchaudio compatible with torch $current_torch_version..."
 
-        if [ "$ARCH" = "x86" ]; then
-            echo "Installing x86 compatible packages..."
-            pip3 install "torch==$current_torch_version+cpu" "torchvision" "torchaudio" --index-url https://download.pytorch.org/whl/cpu
-        elif [ "$ARCH" = "arm" ]; then
-            echo "Installing ARM compatible packages..."
-            pip3 install "torch==$current_torch_version" "torchvision" "torchaudio"
+    if [ "$ARCH" = "x86" ] && [ "$DEVICE_TYPE" = "gpu" ]; then
+        echo "Installing x86 GPU compatible packages..."
+        if [ -n "$CUDA_INDEX_URL" ]; then
+            pip3 install "torch==$current_torch_version" "torchvision" "torchaudio" --index-url "$CUDA_INDEX_URL"
+        else
+            pip3 install "torch==$current_torch_version" "torchvision" "torchaudio" --index-url "https://download.pytorch.org/whl/cu121"
         fi
-    else
-        echo "torch not installed, installing default versions..."
-        if [ "$ARCH" = "x86" ]; then
-            pip3 install "torch" "torchvision" "torchaudio" --index-url https://download.pytorch.org/whl/cpu
-        elif [ "$ARCH" = "arm" ]; then
-            pip3 install "torch" "torchvision" "torchaudio"
-        fi
+    elif [ "$ARCH" = "x86" ] && [ "$DEVICE_TYPE" = "npu" ]; then
+        echo "Installing x86 NPU compatible packages..."
+        pip3 install "torch==$current_torch_version" "torchvision" "torchaudio"
+    elif [ "$ARCH" = "arm" ] && [ "$DEVICE_TYPE" = "npu" ]; then
+        echo "Installing ARM NPU compatible packages..."
+        pip3 install "torch==$current_torch_version" "torchvision" "torchaudio"
     fi
 fi
 
-# Install torch_npu if needed
+# Only install torch_npu when needed
 if [ "$install_torch_npu" = true ]; then
     echo "Installing torch_npu $TORCH_VERSION..."
     pip3 install torch-npu=="$TORCH_VERSION"
 
     if is_package_installed "torch_npu"; then
         installed_npu=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
-        echo "torch_npu version: $installed_npu successfully installed！"
+        echo "torch_npu version: $installed_npu successfully installed!"
     else
         echo "[ERROR] Installation failed! Reason: torch_npu installation error."
     fi
-else
-    if is_package_installed "torch_npu"; then
-        current_torch_npu_version=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
-        echo "Using existing torch_npu version: $current_torch_npu_version"
-    fi
+elif is_package_installed "torch_npu"; then
+    current_torch_npu_version=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
+    echo "Using existing torch_npu version: $current_torch_npu_version"
 fi
 
-# Install megatron (仅当指定了-mt或--megatron参数时)
+# Install megatron (only when -mt or --megatron parameter is specified)
 if [ "$INSTALL_MEGATRON" = true ]; then
     echo "[INFO] Installing Megatron-LM..."
     cd ..
