@@ -5,6 +5,7 @@ from tqdm import tqdm
 from checkpoint.common.converter import Converter
 from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.vlm_model import hf_to_mm, mm_to_hf
+from checkpoint.vlm_model.hf_to_mm_ldt import convert_hf_to_mm_ldt
 from checkpoint.vlm_model.config import ConvertVppMMConfig, ConvertHFConfig, ConvertResplitConfig, ConvertTorchDCPConfig, \
     HfConfig, ConvertHFLoRAConfig
 from checkpoint.vlm_model.converters.qwen2vl import create_qwen2vl_ops, qwen2vl_tp_patterns, canonical_qwen2vl_tp_patterns, \
@@ -256,3 +257,15 @@ class Qwen2_5_VLConverter(Converter):
                         tp_rank=tp_rank)
         # 安全管控权限
         set_directory_permissions(cfg.target_dir)
+
+    @staticmethod
+    def hf_to_mm_ldt(cfg: ConvertVppMMConfigQwen2_5):
+        """huggingface模型转换mindspeed-mm模型权重,配合特性`layerwise_disaggregated_training`使用,支持U形布局"""
+        ops = Qwen2_5_VLConverter._create_ops(cfg.hf_config.config, cfg.common_model_config)
+        if cfg.common_model_config.enable_canonical_hf_struct:
+            qwen2_5_vl_tp_patterns_indeed = canonical_qwen2_5_vl_tp_patterns
+        else:
+            qwen2_5_vl_tp_patterns_indeed = qwen2_5_vl_tp_patterns
+        convert_hf_to_mm_ldt(cfg, ops, qwen2_5_vl_tp_patterns_indeed, [vision_schema, text_schema])
+        # 安全管控权限
+        set_directory_permissions(cfg.mm_dir)

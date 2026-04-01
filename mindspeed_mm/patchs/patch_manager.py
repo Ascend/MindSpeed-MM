@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from megatron.training import get_args
+from megatron.training.utils import print_rank_0
 from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 
 from mindspeed_mm.patchs import (
@@ -23,6 +24,11 @@ from mindspeed_mm.patchs import (
     fsdp2_patches,
     optimizer_patch,
     bridge_patch
+)
+from mindspeed_mm.patchs.layerwise_disaggregated_training import (
+    schedules_patch,
+    u_shaped_split_learning_patch,
+    vlm_model_patch
 )
 
 
@@ -60,7 +66,14 @@ class PatchesManager:
             ("megatron.core.optimizer._get_param_groups", optimizer_patch._get_param_groups),
             ("megatron.core.optimizer._get_param_groups_and_buffers", optimizer_patch._get_param_groups_and_buffers),
             ("megatron.core.optimizer._get_megatron_optimizer_based_on_param_groups", optimizer_patch._get_megatron_optimizer_based_on_param_groups)
-        ]
+        ],
+        "layerwise_disaggregated_training": [
+            ("megatron.core.pipeline_parallel.schedules.get_forward_backward_func", schedules_patch.get_forward_backward_func),
+            ("megatron.core.pipeline_parallel.schedules.forward_backward_pipelining_without_interleaving", schedules_patch.forward_backward_pipelining_without_interleaving),
+            ("megatron.training.training.build_train_valid_test_datasets", u_shaped_split_learning_patch.build_train_valid_test_datasets_wrapper),
+            ("megatron.training.training.setup_model_and_optimizer", vlm_model_patch.setup_model_and_optimizer),
+            ("megatron.training.utils.print_rank_last", print_rank_0),
+        ],
     }
 
     @staticmethod
