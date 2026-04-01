@@ -2,6 +2,8 @@
 """Pretrain Lumina."""
 from typing import Dict
 
+import os
+os.environ["USE_TF"] = "FALSE"
 import torch
 
 import mindspeed.megatron_adaptor

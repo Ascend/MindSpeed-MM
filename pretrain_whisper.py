@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Pretrain Whisper."""
+import os
+os.environ["USE_TF"] = "FALSE"
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 

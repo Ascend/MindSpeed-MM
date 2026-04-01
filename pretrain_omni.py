@@ -1,4 +1,5 @@
 import os
+os.environ["USE_TF"] = "FALSE"
 from copy import deepcopy
 from typing import Any, Dict
 

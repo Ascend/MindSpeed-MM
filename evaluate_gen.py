@@ -1,3 +1,5 @@
+import os
+os.environ["USE_TF"] = "FALSE"
 import mindspeed.megatron_adaptor
 import torch
 from megatron.training import get_args

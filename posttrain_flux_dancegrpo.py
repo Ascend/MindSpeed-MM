@@ -1,4 +1,6 @@
 # Copyright (c) 2025, HUAWEI CORPORATION.  All rights reserved.
+import os
+os.environ["USE_TF"] = "FALSE"
 
 import mindspeed.megatron_adaptor
 from mindspeed_mm.tasks.rl.soragrpo.dataset.latent_flux_rl_datasets import LatentDataset

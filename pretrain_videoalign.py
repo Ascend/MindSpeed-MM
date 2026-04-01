@@ -1,7 +1,8 @@
 # Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 # Copyright (c) 2025, HUAWEI CORPORATION. All rights reserved.
 """Pretrain VideoAlign."""
-
+import os
+os.environ["USE_TF"] = "FALSE"
 import mindspeed.megatron_adaptor
 import torch
 

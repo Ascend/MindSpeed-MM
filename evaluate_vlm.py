@@ -1,3 +1,5 @@
+import os
+os.environ["USE_TF"] = "FALSE"
 import mindspeed.megatron_adaptor
 from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.training import get_args

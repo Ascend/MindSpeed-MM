@@ -1,5 +1,7 @@
 # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 """Pretrain VLLM (ViT+MLP+LLM) MODEL."""
+import os
+os.environ["USE_TF"] = "FALSE"
 from copy import deepcopy
 
 import mindspeed.megatron_adaptor

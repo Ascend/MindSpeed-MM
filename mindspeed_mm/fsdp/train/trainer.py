@@ -2,6 +2,7 @@ from dataclasses import MISSING, asdict, dataclass, field, fields
 from typing import Any, Callable, Dict, List, Literal, Optional, TypeVar, Union, get_type_hints
 import logging
 import os
+os.environ["USE_TF"] = "FALSE"
 from functools import partial
 
 import torch

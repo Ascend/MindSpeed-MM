@@ -1,7 +1,8 @@
 # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 """Pretrain SoRA."""
 from collections import defaultdict
-
+import os
+os.environ["USE_TF"] = "FALSE"
 import torch
 import torch_npu
 

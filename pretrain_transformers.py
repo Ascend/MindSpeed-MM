@@ -1,5 +1,7 @@
 # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 """Pretrain VLM (ViT+MLP+LLM) MODEL."""
+import os
+os.environ["USE_TF"] = "FALSE"
 from copy import deepcopy
 from functools import partial
 from typing import Dict, Any

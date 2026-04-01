@@ -1,4 +1,5 @@
 import os
+os.environ["USE_TF"] = "FALSE"
 import json
 
 import torch

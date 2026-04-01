@@ -1,6 +1,8 @@
 # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 # Copyright (c) 2024, HUAWEI CORPORATION.  All rights reserved.
 """Posttrain SoraModel DPO."""
+import os
+os.environ["USE_TF"] = "FALSE"
 import torch
 import mindspeed.megatron_adaptor
 

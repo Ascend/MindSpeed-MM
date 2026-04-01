@@ -1,5 +1,7 @@
 # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 """Pretrain AE."""
+import os
+os.environ["USE_TF"] = "FALSE"
 
 import torch
 

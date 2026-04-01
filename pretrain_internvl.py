@@ -3,6 +3,7 @@
 
 from copy import deepcopy
 import os
+os.environ["USE_TF"] = "FALSE"
 import torch
 import torch.distributed
 import mindspeed.megatron_adaptor
