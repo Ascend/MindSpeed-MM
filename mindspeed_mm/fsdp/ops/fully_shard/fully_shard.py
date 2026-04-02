@@ -470,7 +470,7 @@ def param_group_wait_for_unshard(self):
     self._all_gather_result = None  # free unless saved in `all_gather_state`
 
 
-def param_group_post_backward(self, *unused: Any):
+def param_group_post_backward_pt27(self, *unused: Any):
     """
     Custom post-backward logic for gradient reduction and resharding.
     
@@ -579,10 +579,120 @@ def param_group_post_backward(self, *unused: Any):
             )
 
 
+def param_group_post_backward_pt29(self, *unused: Any):
+    """
+    Custom post-backward logic for gradient reduction and resharding.
+    
+    Ensures that the current stream waits for Reduce-Scatter events from 
+    OTHER communication contexts (different hook_modules) before starting 
+    its own reduction. This maintains correctness in multi-stream setups.
+    """
+    
+    if not compiled_autograd_enabled():
+        logger.debug("%s", self._with_fqn("FSDP::post_backward"))
+    self._training_state = TrainingState.POST_BACKWARD
+    with record_function(self._with_fqn("FSDP::post_backward_accumulate")):
+        for fsdp_param in self.fsdp_params:
+            fsdp_param.accumulate_unsharded_grad_if_needed()
+            
+    with record_function(self._with_fqn("FSDP::post_backward_reshard")):
+        if not self.reduce_grads:
+            if self.reshard_after_backward:
+                self.reshard()
+            for fsdp_param in self.fsdp_params:
+                fsdp_param.to_accumulated_grad_if_needed()
+            return
+        # Save the autograd-computed gradients before resharding to only
+        # access the unsharded parameters when their data is present
+        fsdp_params_with_grad: list[FSDPParam] = []
+        unsharded_grads: list[torch.Tensor] = []
+        for fsdp_param in self.fsdp_params:
+            if not hasattr(fsdp_param, "_unsharded_param"):
+                continue
+            # May have an accumulated gradient of the reduce dtype if the
+            # previous backward did not reduce-scatter
+            if fsdp_param.unsharded_accumulated_grad is not None:
+                fsdp_params_with_grad.append(fsdp_param)
+                unsharded_grads.append(fsdp_param.unsharded_accumulated_grad_data)
+                fsdp_param.unsharded_accumulated_grad = None
+            elif fsdp_param.unsharded_param.grad is not None:
+                fsdp_params_with_grad.append(fsdp_param)
+                unsharded_grads.append(fsdp_param.unsharded_grad_data)
+                fsdp_param.unsharded_param.grad = None
+        if self.reshard_after_backward:
+            self.reshard()
+
+    if len(fsdp_params_with_grad) == 0:
+        return
+
+    with record_function(self._with_fqn("FSDP::post_backward_reduce")):
+        # Wait for local context reduce-scatter
+        if self.comm_ctx.reduce_scatter_state is not None and self.comm_ctx.reduce_scatter_state.event is not None:
+            self.device_handle.current_stream().wait_event(
+                self.comm_ctx.reduce_scatter_state.event
+            )
+            self.comm_ctx.reduce_scatter_state = None
+        
+        # Wait for GLOBAL context reduce-scatters from DIFFERENT hook modules
+        for comm_ctx in self.global_comm_ctx:
+            if comm_ctx.reduce_scatter_state and comm_ctx.reduce_scatter_state.hook_module != self.hook_module:
+                self.device_handle.current_stream().wait_event(comm_ctx.reduce_scatter_state.event)
+                comm_ctx.reduce_scatter_state = None
+
+        all_reduce_pg = self._all_reduce_process_group if self._is_hsdp else None
+        all_reduce_stream: torch.cuda.Stream
+        if all_reduce_pg is None and self._all_reduce_hook_stream is not None:
+            # this means the native HSDP is not enabled,
+            # but user may want to have a custom HSDP setup
+            if self._all_reduce_hook is None:
+                raise AssertionError(
+                    "all reduce hook stream is specified but hook itself is missing."
+                )
+            all_reduce_stream = self._all_reduce_hook_stream
+        else:
+            all_reduce_stream = self.comm_ctx.all_reduce_stream
+
+        self._wait_for_post_backward()
+        (
+            reduce_scatter_input,
+            reduce_scatter_event,
+            self._post_reduce_event,
+            all_reduce_input,
+            all_reduce_event,
+            self._partial_reduce_output,
+        ) = foreach_reduce(
+            fsdp_params_with_grad,
+            unsharded_grads,
+            self._reduce_scatter_process_group,
+            self.comm_ctx.reduce_scatter_stream,
+            self._reduce_scatter_comm,
+            self._orig_dtype,
+            self._reduce_dtype,
+            self.device,
+            self.gradient_divide_factor,
+            self._all_reduce_process_group if self._is_hsdp else None,
+            all_reduce_stream,
+            self.all_reduce_grads,
+            self._partial_reduce_output,
+            self._all_reduce_hook,
+            self.force_sum_reduction_for_comms,
+        )
+        
+        # Record the new reduce-scatter state
+        self.comm_ctx.reduce_scatter_state = ReduceScatterState(
+            reduce_scatter_input, reduce_scatter_event, self.hook_module
+        )
+        if all_reduce_input is not None:
+            if self.device.type != "cpu":
+                raise AssertionError("all_reduce_event cannot be None.")
+            self._all_reduce_state = AllReduceState(
+                all_reduce_input, all_reduce_event
+            )
+
+
 # -----------------------------------------------------------------------------
 # Patch Application
 # ----
-
 def apply_fully_shard_patch() -> None:
     """
     Applies all custom patches to the FSDPState and FSDPParamGroup classes.
@@ -596,7 +706,12 @@ def apply_fully_shard_patch() -> None:
 
     # Patch FSDPParamGroup methods
     FSDPParamGroup.wait_for_unshard = param_group_wait_for_unshard
-    FSDPParamGroup.post_backward = param_group_post_backward
+    if "2.7.1" in torch.__version__:
+        FSDPParamGroup.post_backward = param_group_post_backward_pt27
+    elif "2.9.0" in torch.__version__:
+        FSDPParamGroup.post_backward = param_group_post_backward_pt29
+    else:
+        raise ValueError(f"The torch{torch.__version__} is not supported now.")
 
     # Override the public fully_shard API
     from torch.distributed import fsdp

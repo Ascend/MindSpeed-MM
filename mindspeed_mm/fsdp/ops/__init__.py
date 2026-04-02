@@ -14,6 +14,5 @@ def apply_ops_patch():
     print_rank(logger.info, "✅ MindSpeed-MM ops patch applied.")
 
     # apply modify fully_shard patch
-    if "2.7.1" in torch.__version__:
-        apply_fully_shard_patch()
-        print_rank(logger.info, "✅ MindSpeed-MM fully_shard patch applied.")
+    apply_fully_shard_patch()
+    print_rank(logger.info, "✅ MindSpeed-MM fully_shard patch applied.")
