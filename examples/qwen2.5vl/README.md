@@ -8,39 +8,39 @@
 - [版本说明](#版本说明)
   - [参考实现](#参考实现)
   - [变更记录](#变更记录)
-- [环境安装](#jump1)
-  - [环境准备](#jump1.1)
-  - [环境搭建](#jump1.2)
-- [权重下载及离线转换](#jump2)
-  - [权重下载](#jump2.1)
-  - [权重转换hf2mm](#jump2.2)
-  - [权重转换mm2hf](#jump2.3)
-  - [权重重切分](#jump2.4)
-- [权重下载及在线加载](#jump3)
-  - [权重下载](#jump3.1)
-  - [权重加载](#jump3.2)
-- [数据集准备及处理](#jump4)
-  - [数据集下载](#jump4.1)
-  - [混合数据集处理](#jump4.2)
-- [微调](#jump5)
+- [环境安装](#环境安装)
+  - [环境准备](#1-环境准备)
+  - [环境搭建](#2-环境搭建)
+- [权重下载及离线转换](#权重下载及离线转换)
+  - [权重下载](#1-权重下载)
+  - [权重转换hf2mm](#2-权重转换hf2mm)
+  - [权重转换mm2hf](#3-权重转换mm2hf)
+  - [权重重切分](#4-训练后重新切分权重)
+- [权重下载及在线加载](#权重下载及在线加载)
+  - [权重下载](#1-权重下载-1)
+  - [权重加载](#2-在线加载)
+- [数据集准备及处理](#数据集准备及处理)
+  - [数据集下载](#1-数据集下载)
+  - [混合数据集处理](#2纯文本或有图无图混合训练数据以llava-instruct-150k为例)
+- [微调](#微调)
   - [长序列支持](#长序列支持)
-  - [准备工作](#jump5.1)
-  - [配置参数](#jump5.2)
-  - [启动微调](#jump5.3)
-  - [支持FSDP2训练](#jump5.4)
-- [推理](#jump6)
-  - [准备工作](#jump6.1)
-  - [启动推理](#jump6.2)
-- [视频理解](#jump7)
-  - [加载数据集](#jump7.1)
-  - [配置参数](#jump7.2)
-  - [启动微调](#jump7.3)
-- [评测](#jump8)
-  - [数据集准备](#jump8.1)
-  - [配置参数](#jump8.2)
-  - [启动评测](#jump8.3)
-- [环境变量声明](#jump9)
-- [注意事项](#jump10)
+  - [准备工作](#1-准备工作)
+  - [配置参数](#2-配置参数)
+  - [启动微调](#3-启动微调)
+  - [支持FSDP2训练](#4-支持FSDP2训练)
+- [推理](#推理)
+  - [准备工作](#1准备工作)
+  - [启动推理](#2启动推理)
+- [视频理解](#qwen25vl支持视频理解)
+  - [加载数据集](#1加载视频数据集)
+  - [配置参数](#2修改模型配置)
+  - [启动微调](#3启动微调)
+- [评测](#评测)
+  - [数据集准备](#数据集准备)
+  - [配置参数](#参数配置)
+  - [启动评测](#启动评测)
+- [环境变量声明](#环境变量声明)
+- [注意事项](#注意事项)
 
 ## 版本说明
 
@@ -530,46 +530,46 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 1. full模式
 
-TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重计算，此时可以配置重计算的层数。
+    TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重计算，此时可以配置重计算的层数。
 
-- `recompute_method`: 控制重计算层数计算的方法，可选值为`uniform`（均匀重计算）或`block`（按块重计算）。
-- `recompute_num_layers`: 控制重计算的层数，指定需要重计算的层数量。
+    - `recompute_method`: 控制重计算层数计算的方法，可选值为`uniform`（均匀重计算）或`block`（按块重计算）。
+    - `recompute_num_layers`: 控制重计算的层数，指定需要重计算的层数量。
 
-示例配置如下：
+    示例配置如下：
 
-```json
-{
-  "model_id": "qwen2_5vl",
-  "img_context_token_id": 151655,
-  "vision_start_token_id": 151652,
-  "image_encoder": {
-    "vision_encoder": {
-      "recompute_granularity": "full",
-      "recompute_method": "uniform",
-      "recompute_num_layers": 1
+    ```json
+    {
+      "model_id": "qwen2_5vl",
+      "img_context_token_id": 151655,
+      "vision_start_token_id": 151652,
+      "image_encoder": {
+        "vision_encoder": {
+          "recompute_granularity": "full",
+          "recompute_method": "uniform",
+          "recompute_num_layers": 1
+        }
+      }
     }
-  }
-}
-```
+    ```
 
 2. selective模式
 
-仅对TransformerLayer中attention的core_attention组件进行重计算。
+    仅对TransformerLayer中attention的core_attention组件进行重计算。
 
-示例配置如下：
+    示例配置如下：
 
-```json
-{
-  "model_id": "qwen2_5vl",
-  "img_context_token_id": 151655,
-  "vision_start_token_id": 151652,
-  "image_encoder": {
-    "vision_encoder": {
-      "recompute_granularity": "selective"
+    ```json
+    {
+      "model_id": "qwen2_5vl",
+      "img_context_token_id": 151655,
+      "vision_start_token_id": 151652,
+      "image_encoder": {
+        "vision_encoder": {
+          "recompute_granularity": "selective"
+        }
+      }
     }
-  }
-}
-```
+    ```
 
 【huggingface等价模型结构配置（可选）】
 
@@ -728,7 +728,7 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_72b_fsdp.sh
 
 （2）shell文件中的LOAD_PATH的路径为经过权重转换后的模型路径（可PP切分）。
 
-<a id="6.2"></a>
+<a id="jump6.2"></a>
 
 ### 2、启动推理
 

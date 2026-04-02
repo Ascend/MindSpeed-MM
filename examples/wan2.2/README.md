@@ -143,7 +143,7 @@ mm-convert WanConverter mm_to_dcp \
 
 如需转回Hugging Face格式，需运行权重转换脚本：
 
-**注**： wan2.2使用fsdp2进行训练，需首先进行其[训练权重后处理](#jump1)，再进行如下操作：
+**注**： wan2.2使用fsdp2进行训练，需首先进行其[训练权重后处理](#训练权重后处理)，再进行如下操作：
 
 ```shell
 mm-convert WanConverter mm_to_hf \
@@ -358,7 +358,7 @@ GPT_ARGS="
 bash examples/wan2.2/A14B/t2v/finetune_lora_{low/high}.sh
 ```
 
-微调完成后，需首先对保存的lora权重进行[权重后处理](#jump1)，再使用权重转换工具，将训练好的lora权重与原始权重进行合并
+微调完成后，需首先对保存的lora权重进行[权重后处理](#训练权重后处理)，再使用权重转换工具，将训练好的lora权重与原始权重进行合并
 
 ```bash
 mm-convert WanConverter merge_lora_to_base \

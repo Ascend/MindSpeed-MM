@@ -8,22 +8,22 @@
 - [版本说明](#版本说明)
   - [参考实现](#参考实现)
   - [变更记录](#变更记录)
-- [环境安装](#jump1)
-  - [环境准备](#jump1.1)
-  - [环境搭建](#jump1.2)
-- [权重下载及转换](#jump2)
-  - [权重下载](#jump2.1)
-- [数据集准备及处理](#jump3)
-  - [数据集下载](#jump3.1)
-  - [混合数据集处理](#jump3.2)
-- [微调](#jump4)
-  - [准备工作](#jump4.1)
-  - [配置参数](#jump4.2)
-  - [启动微调](#jump4.3)
-  - [启动推理](#jump4.4)
-- [PMCC](#jump5)
-- [环境变量声明](#jump10)
-- [注意事项](#jump11)
+- [环境安装](#环境安装)
+  - [环境准备](#1-环境准备)
+  - [环境搭建](#2-环境搭建)
+- [权重下载及转换](#权重下载及转换)
+  - [权重下载](#1-权重下载)
+- [数据集准备及处理](#数据集准备及处理)
+  - [数据集下载](#1-数据集下载以coco2017数据集为例)
+  - [混合数据集处理](#2纯文本或有图无图混合训练数据以llava-instruct-150k为例)
+- [微调](#微调)
+  - [准备工作](#1-准备工作)
+  - [配置参数](#2-配置参数)
+  - [启动微调](#3-启动微调)
+  - [启动推理](#4-启动推理)
+- [PMCC](#pmccprivacy-and-model-confidential-computing)
+- [环境变量声明](#环境变量声明)
+- [注意事项](#注意事项)
 
 ## 版本说明
 
@@ -234,7 +234,7 @@ data:
 
 开启MoE融合可以提升模型训练性能，开启方式为将`qwen3vl_full_sft_xxB.yaml`文件中修改`use_npu_fused_moe`字段为`true`
 
-注意：FusedMoE特性依赖较新版本，新版本的下载链接和安装方式参考[【环境准备】](#jump1.1)章节。
+注意：FusedMoE特性依赖较新版本，新版本的下载链接和安装方式参考[【环境准备】](#1-环境准备)章节。
 
 【MoE 专家并行配置】
 
@@ -335,7 +335,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 【LoRA微调（可选）】
 
-LoRA为框架通用能力，当前已支持30B模型的语言模块LoRA微调，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/lora_finetune.md)。
+LoRA为框架通用能力，当前已支持30B模型的语言模块LoRA微调，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md)。
 
 LoRA微调场景下，需要先对原始权重完成以下权重转换
 

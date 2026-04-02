@@ -252,19 +252,19 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：`
 
 1. 权重配置
 
-  需根据实际任务情况在启动脚本文件（如`pretrain_cogvideox_i2v.sh`）中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./CogVideoX-5B-Converted"`,其中`./CogVideoX-5B-Converted`为转换后的权重的实际路径，其文件夹内容结构如权重转换一节所示。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
+    需根据实际任务情况在启动脚本文件（如`pretrain_cogvideox_i2v.sh`）中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./CogVideoX-5B-Converted"`,其中`./CogVideoX-5B-Converted`为转换后的权重的实际路径，其文件夹内容结构如权重转换一节所示。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
 
-根据需要填写`SAVE_PATH`变量中的路径，用以保存训练后的权重。
+    根据需要填写`SAVE_PATH`变量中的路径，用以保存训练后的权重。
 
 2. 数据集路径配置
 
-  根据实际情况修改`data.json`中的数据集路径，分别为`"data_path":"/your_data_path/data.jsonl"`、`"data_folder":"/your_data_path/"`，替换`"/your_data_path/"`为实际的数据集路径。
+    根据实际情况修改`data.json`中的数据集路径，分别为`"data_path":"/your_data_path/data.jsonl"`、`"data_folder":"/your_data_path/"`，替换`"/your_data_path/"`为实际的数据集路径。
 
 3. VAE及T5模型路径配置
 
-  根据实际情况修改模型参数配置文件（如`model_cogvideox_i2v.json`）以及`data.json`文件中VAE及T5模型文件的实际路径。其中，T5文件的路径字段为`"from_pretrained": "5b-cogvideo/tokenizer"`及`"from_pretrained": "5b-cogvideo"`，替换`5b-cogvideo`为实际的路径；VAE模型文件的路径字段为`"from_pretrained": "3d-vae.pt"`，替换`3d-vae.pt`为实际的路径。
+    根据实际情况修改模型参数配置文件（如`model_cogvideox_i2v.json`）以及`data.json`文件中VAE及T5模型文件的实际路径。其中，T5文件的路径字段为`"from_pretrained": "5b-cogvideo/tokenizer"`及`"from_pretrained": "5b-cogvideo"`，替换`5b-cogvideo`为实际的路径；VAE模型文件的路径字段为`"from_pretrained": "3d-vae.pt"`，替换`3d-vae.pt`为实际的路径。
 
-  当需要卸载VAE和T5时，将模型参数配置文件中的`"load_video_features": false`及`"load_text_features": false`字段中的值分别改为`true`。将`data.json`中的`"use_feature_data"`字段的值改为`true`。
+    当需要卸载VAE和T5时，将模型参数配置文件中的`"load_video_features": false`及`"load_text_features": false`字段中的值分别改为`true`。将`data.json`中的`"use_feature_data"`字段的值改为`true`。
 
 4. 切分策略配置
 
@@ -287,7 +287,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：`
   参数里面的yaml文件如下面所示:
 
   ```yaml
-  zero3_size: 8  
+  zero3_size: 8
   transformer_layers:
     - mindspeed_mm.models.predictor.dits.sat_dit.VideoDiTBlock
   backward_prefetch: 'BACKWARD_PRE'
@@ -299,17 +299,17 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：`
     - ae
     - text_encoder
   ```
-  
+
   该特性和TP不能兼容，开启时TP必须设置为1，使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
-  
-      ```bash
-      source /usr/local/Ascend/cann/set_env.sh
-      # your_mindspeed_path和your_megatron_path分别替换为之前通过MindSpeed-Core-MS一键脚本拉取的mindspeed和megatron仓库的具体路径。这两个路径通常位于MindSpeed-Core-MS目录的相应子目录中。
-      export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
-      export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
-      # input_folder为layerzero训练保存权重的路径，output_folder为输出的megatron格式权重的路径
-      python <your_mindspeed_path>/mindspeed/core/distributed/layerzero/state/scripts/convert_to_megatron.py --input_folder ./save_ckpt/hunyuanvideo/iter_000xxxx/ --output_folder ./save_ckpt/hunyuanvideo_megatron_ckpt/iter_000xxxx/ --prefix predictor
-      ```
+
+    ```bash
+    source /usr/local/Ascend/cann/set_env.sh
+    # your_mindspeed_path和your_megatron_path分别替换为之前通过MindSpeed-Core-MS一键脚本拉取的mindspeed和megatron仓库的具体路径。这两个路径通常位于MindSpeed-Core-MS目录的相应子目录中。
+    export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
+    export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
+    # input_folder为layerzero训练保存权重的路径，output_folder为输出的megatron格式权重的路径
+    python <your_mindspeed_path>/mindspeed/core/distributed/layerzero/state/scripts/convert_to_megatron.py --input_folder ./save_ckpt/hunyuanvideo/iter_000xxxx/ --output_folder ./save_ckpt/hunyuanvideo_megatron_ckpt/iter_000xxxx/ --prefix predictor
+    ```
 
 模型参数配置文件中的`head_dim`字段原模型默认配置为64。此字段调整为128会更加亲和昇腾。
 
