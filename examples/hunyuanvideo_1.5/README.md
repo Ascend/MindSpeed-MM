@@ -89,64 +89,64 @@ pip install decord==0.6.0
 
 1. 下载预训练的DiT和VAE权重
 
-``` bash
-mkdir HunyuanVideo1.5
-hf download tencent/HunyuanVideo-1.5 --local-dir ./HunyuanVideo1.5
-```
+    ``` bash
+    mkdir HunyuanVideo1.5
+    hf download tencent/HunyuanVideo-1.5 --local-dir ./HunyuanVideo1.5
+    ```
 
-离线链接：
+    离线链接：
 
-- [tencent/HunyuanVideo-1.5](https://huggingface.co/tencent/HunyuanVideo-1.5/tree/main)
+    - [tencent/HunyuanVideo-1.5](https://huggingface.co/tencent/HunyuanVideo-1.5/tree/main)
 
 2. 下载文本编码器
 
-``` bash
-hf download Qwen/Qwen2.5-VL-7B-Instruct --local-dir ./HunyuanVideo1.5/text_encoder/llm
-hf download google/byt5-small --local-dir ./HunyuanVideo1.5/text_encoder/byt5-small
-modelscope download --model AI-ModelScope/Glyph-SDXL-v2 --local_dir ./HunyuanVideo1.5/text_encoder/Glyph-SDXL-v2
-```
+    ``` bash
+    hf download Qwen/Qwen2.5-VL-7B-Instruct --local-dir ./HunyuanVideo1.5/text_encoder/llm
+    hf download google/byt5-small --local-dir ./HunyuanVideo1.5/text_encoder/byt5-small
+    modelscope download --model AI-ModelScope/Glyph-SDXL-v2 --local_dir ./HunyuanVideo1.5/text_encoder/Glyph-SDXL-v2
+    ```
 
-离线链接：
+    离线链接：
 
-- [Qwen/Qwen2.5-VL-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)
-- [google/byt5-small](https://huggingface.co/google/byt5-small/tree/main)
-- [AI-ModelScope/Glyph-SDXL-v2](https://modelscope.cn/models/AI-ModelScope/Glyph-SDXL-v2/files)
+    - [Qwen/Qwen2.5-VL-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)
+    - [google/byt5-small](https://huggingface.co/google/byt5-small/tree/main)
+    - [AI-ModelScope/Glyph-SDXL-v2](https://modelscope.cn/models/AI-ModelScope/Glyph-SDXL-v2/files)
 
 3. 下载视觉编码器
 
-```bash
-hf download black-forest-labs/FLUX.1-Redux-dev --local-dir ./ckpts/vision_encoder/siglip --token <your_hf_token>
-```
+    ```bash
+    hf download black-forest-labs/FLUX.1-Redux-dev --local-dir ./ckpts/vision_encoder/siglip --token <your_hf_token>
+    ```
 
-离线链接：
+    离线链接：
 
-- [black-forest-labs/FLUX.1-Redux-dev](https://huggingface.co/black-forest-labs/FLUX.1-Redux-dev/tree/main)
+    - [black-forest-labs/FLUX.1-Redux-dev](https://huggingface.co/black-forest-labs/FLUX.1-Redux-dev/tree/main)
 
 4. 最终文件结构如下：
 
-```bash
-MindSpeed-MM/HunyuanVideo1.5
-├── text_encoder
-│   ├── Glyph-SDXL-v2
-│   │   ├── assets
-│   │   │   ├── color_idx.json
-│   │   │   ├── multilingual_10-lang_idx.json
-│   │   │   └── ...
-│   │   └── checkpoints
-│   │       ├── byt5_model.pt
-│   │       └── ...
-│   ├── llm
-│   └── byt5-small
-└─  scheduler
-└─  transformer
-│   ├── 720p_t2v
-│   │   ├── config.json
-│   │   ├── diffusion_pytorch_model.safetensors
-└─  vae
-└─  scheduler
-└─  vision_encoder
-└─  upsampler
-```
+    ```bash
+    MindSpeed-MM/HunyuanVideo1.5
+    ├── text_encoder
+    │   ├── Glyph-SDXL-v2
+    │   │   ├── assets
+    │   │   │   ├── color_idx.json
+    │   │   │   ├── multilingual_10-lang_idx.json
+    │   │   │   └── ...
+    │   │   └── checkpoints
+    │   │       ├── byt5_model.pt
+    │   │       └── ...
+    │   ├── llm
+    │   └── byt5-small
+    └─  scheduler
+    └─  transformer
+    │   ├── 720p_t2v
+    │   │   ├── config.json
+    │   │   ├── diffusion_pytorch_model.safetensors
+    └─  vae
+    └─  scheduler
+    └─  vision_encoder
+    └─  upsampler
+    ```
 
 ---
 

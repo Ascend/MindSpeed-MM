@@ -286,19 +286,19 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
 
 1. 权重配置
 
-  需根据实际任务情况在启动脚本文件（如`pretrain_cogvideox_i2v.sh`）中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./CogVideoX-5B-Converted"`,其中`./CogVideoX-5B-Converted`为转换后的权重的实际路径，其文件夹内容结构如权重转换一节所示。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
+    需根据实际任务情况在启动脚本文件（如`pretrain_cogvideox_i2v.sh`）中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./CogVideoX-5B-Converted"`,其中`./CogVideoX-5B-Converted`为转换后的权重的实际路径，其文件夹内容结构如权重转换一节所示。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
 
-根据需要填写`SAVE_PATH`变量中的路径，用以保存训练后的权重。
+    根据需要填写`SAVE_PATH`变量中的路径，用以保存训练后的权重。
 
 2. 数据集路径配置
 
-  根据实际情况修改`data.json`中的数据集路径，分别为`"data_path":"/data_path/data.jsonl"`、`"data_folder":"/data_path/"`，替换`"/data_path/"`为实际的数据集路径。
+    根据实际情况修改`data.json`中的数据集路径，分别为`"data_path":"/data_path/data.jsonl"`、`"data_folder":"/data_path/"`，替换`"/data_path/"`为实际的数据集路径。
 
 3. VAE及T5模型路径配置
 
-  根据实际情况修改模型参数配置文件（如`model_cogvideox_i2v.json`）以及`data.json`文件中VAE及T5模型文件的实际路径。其中，T5文件的路径字段为`"from_pretrained": "5b-cogvideo/tokenizer"`及`"from_pretrained": "5b-cogvideo"`，替换`5b-cogvideo`为实际的路径；VAE模型文件的路径字段为`"from_pretrained": "3d-vae.pt"`，替换`3d-vae.pt`为实际的路径。
+    根据实际情况修改模型参数配置文件（如`model_cogvideox_i2v.json`）以及`data.json`文件中VAE及T5模型文件的实际路径。其中，T5文件的路径字段为`"from_pretrained": "5b-cogvideo/tokenizer"`及`"from_pretrained": "5b-cogvideo"`，替换`5b-cogvideo`为实际的路径；VAE模型文件的路径字段为`"from_pretrained": "3d-vae.pt"`，替换`3d-vae.pt`为实际的路径。
 
-  当需要卸载VAE和T5时，将模型参数配置文件中的`"load_video_features": false`及`"load_text_features": false`字段中的值分别改为`true`。将`data.json`中的`"use_feature_data"`字段的值改为`true`。
+    当需要卸载VAE和T5时，将模型参数配置文件中的`"load_video_features": false`及`"load_text_features": false`字段中的值分别改为`true`。将`data.json`中的`"use_feature_data"`字段的值改为`true`。
 
 4. 切分策略配置
 
@@ -311,54 +311,54 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
 * 当开启Encoder-DP时，需要将[model_cogvideox_i2v_1.5.json](i2v_1.5/model_cogvideox_i2v_1.5.json) 或者[model_cogvideox_t2v_1.5.json](t2v_1.5/model_cogvideox_t2v_1.5.json)中的`enable_encoder_dp`选项改为`true`。注意:需要在开启CP/TP，并且`load_video_features`为`false`及`load_text_features`为`false`才能启用，不兼容PP场景、VAE-CP、分层Zero。
 
 * 当开启分层Zero时，需要在[pretrain_cogvideox_t2v_1.5.sh](t2v_1.5/pretrain_cogvideox_t2v_1.5.sh)或者[pretrain_cogvideox_i2v_1.5.sh](i2v_1.5/pretrain_cogvideox_i2v_1.5.sh)里面添加下面的参数。
-  注意：不兼容Encoder-DP特性、TP场景、PP场景，与VAE-CP效果未验证。
+    注意：不兼容Encoder-DP特性、TP场景、PP场景，与VAE-CP效果未验证。
 
-  ```shell
-  --layerzero \
-  --layerzero-config ./zero_config.yaml \
-  ```
+    ```shell
+    --layerzero \
+    --layerzero-config ./zero_config.yaml \
+    ```
 
-  参数里面的yaml文件如下面所示:
+    参数里面的yaml文件如下面所示:
 
-  ```yaml
-  zero3_size: 8  
-  transformer_layers:
+    ```yaml
+    zero3_size: 8
+    transformer_layers:
     - mindspeed_mm.models.predictor.dits.sat_dit.VideoDiTBlock
-  backward_prefetch: 'BACKWARD_PRE'
-  param_dtype: "bf16"
-  reduce_dtype: "fp32"
-  forward_prefetch: True
-  limit_all_gathers: True
-  ignored_modules:
+    backward_prefetch: 'BACKWARD_PRE'
+    param_dtype: "bf16"
+    reduce_dtype: "fp32"
+    forward_prefetch: True
+    limit_all_gathers: True
+    ignored_modules:
     - ae
     - text_encoder
-  ```
-  
-  该特性和TP不能兼容，开启时TP必须设置为1，使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
-  
-      ```bash
-      source /usr/local/Ascend/cann/set_env.sh
-      # your_mindspeed_path和your_megatron_path分别替换为之前下载的mindspeed和megatron的路径
-      export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
-      export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
-      # cfg.source_path为layerzero训练保存权重的路径，cfg.target_path为输出的megatron格式权重的路径
-      mm-convert CogVideoConverter layerzero_to_mm \
+    ```
+
+    该特性和TP不能兼容，开启时TP必须设置为1，使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
+    
+    ```bash
+    source /usr/local/Ascend/cann/set_env.sh
+    # your_mindspeed_path和your_megatron_path分别替换为之前下载的mindspeed和megatron的路径
+    export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
+    export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
+    # cfg.source_path为layerzero训练保存权重的路径，cfg.target_path为输出的megatron格式权重的路径
+    mm-convert CogVideoConverter layerzero_to_mm \
         --cfg.source_path ./save_ckpt/cogvideo/ \
         --cfg.target_path ./save_ckpt/cogvideo_megatron_ckpt/
-      ```
+    ```
 
 模型参数配置文件中的`head_dim`字段原模型默认配置为64。此字段调整为128会更加亲和昇腾。
 
 在sh启动脚本中可以修改运行卡数(NNODES为节点数，GPUS_PER_NODE为每个节点的卡数，相乘即为总运行卡数)：
 
-```shell
-GPUS_PER_NODE=8
-MASTER_ADDR=localhost
-MASTER_PORT=29501
-NNODES=1  
-NODE_RANK=0  
-WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
-```
+    ```shell
+    GPUS_PER_NODE=8
+    MASTER_ADDR=localhost
+    MASTER_PORT=29501
+    NNODES=1  
+    NODE_RANK=0  
+    WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
+    ```
 
 ### 启动预训练
 
@@ -412,22 +412,22 @@ CogvideoX推理启动文件为shell脚本，主要分为如下4个：
 
 1. 权重配置
 
-  需根据实际任务情况在启动脚本文件（如`inference_cogvideox_i2v.sh`）中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./CogVideoX-5B-Converted"`,其中`./CogVideoX-5B-Converted`为转换后的权重的实际路径，其文件夹内容结构如权重转换一节所示。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
+    需根据实际任务情况在启动脚本文件（如`inference_cogvideox_i2v.sh`）中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./CogVideoX-5B-Converted"`,其中`./CogVideoX-5B-Converted`为转换后的权重的实际路径，其文件夹内容结构如权重转换一节所示。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
 
 2. VAE及T5模型路径配置
 
-  根据实际情况修改模型参数配置文件（如`inference_model_i2v.json`）中VAE及T5模型文件的实际路径。其中，T5文件的路径字段为`"from_pretrained": "5b-cogvideo"`，替换`5b-cogvideo`为实际的路径；VAE模型文件的路径字段为`"from_pretrained": "3d-vae.pt"`，替换`3d-vae.pt`为实际的路径。
+    根据实际情况修改模型参数配置文件（如`inference_model_i2v.json`）中VAE及T5模型文件的实际路径。其中，T5文件的路径字段为`"from_pretrained": "5b-cogvideo"`，替换`5b-cogvideo`为实际的路径；VAE模型文件的路径字段为`"from_pretrained": "3d-vae.pt"`，替换`3d-vae.pt`为实际的路径。
 
 3. prompts配置
 
-| t2v prompts配置文件                               |               修改字段               |                修改说明                 |
-|----------------------------------------|:--------------------------------:|:-----------------------------------:|
-| examples/cogvideox/samples_prompts.txt |               文件内容               |      自定义prompt      |
+    | t2v prompts配置文件                               |               修改字段               |                修改说明                 |
+    |----------------------------------------|:--------------------------------:|:-----------------------------------:|
+    | examples/cogvideox/samples_prompts.txt |               文件内容               |      自定义prompt      |
 
-| i2v prompts配置文件                                   |               修改字段               |       修改说明       |
-|--------------------------------------------|:--------------------------------:|:----------------:|
-| examples/cogvideox/samples_i2v_images.txt  |               文件内容               |       图片路径       |
-| examples/cogvideox/samples_i2v_prompts.txt |               文件内容               |    自定义prompt     |
+    | i2v prompts配置文件                                   |               修改字段               |       修改说明       |
+    |--------------------------------------------|:--------------------------------:|:----------------:|
+    | examples/cogvideox/samples_i2v_images.txt  |               文件内容               |       图片路径       |
+    | examples/cogvideox/samples_i2v_prompts.txt |               文件内容               |    自定义prompt     |
 
 如果使用训练后保存的权重改变模型切分策略进行推理，需要使用命令进行转换，权重转换source_path参数请配置训练时的保存路径
 
@@ -475,34 +475,34 @@ bash examples/cogvideox/i2v_1.5/inference_cogvideox_i2v_1.5.sh
 
 1. 权重下载及转换
 
- 模型权重下载链接(链接下包含模型权重以及tokenizer和text_encoder):
+    模型权重下载链接(链接下包含模型权重以及tokenizer和text_encoder):
 
- + [t2v下载链接](https://huggingface.co/THUDM/CogVideoX1.5-5B/tree/main)
- + [i2v下载链接](https://huggingface.co/THUDM/CogVideoX1.5-5B-I2V/tree/main)
-  
-  lora微调功能的权重转换使用`mm-convert`命令。
+    + [t2v下载链接](https://huggingface.co/THUDM/CogVideoX1.5-5B/tree/main)
+    + [i2v下载链接](https://huggingface.co/THUDM/CogVideoX1.5-5B-I2V/tree/main)
 
-```bash
-mm-convert CogVideoConverter --version <t2v or i2v> hf_to_mm \
-  --cfg.source_path <your source path> \
-  --cfg.target_path <target path>
-```
+    lora微调功能的权重转换使用`mm-convert`命令。
 
- VAE权重下载
+    ```bash
+    mm-convert CogVideoConverter --version <t2v or i2v> hf_to_mm \
+      --cfg.source_path <your source path> \
+      --cfg.target_path <target path>
+    ```
 
-+ [VAE下载链接](https://huggingface.co/zai-org/CogVideoX1.5-5B-SAT/tree/main/vae)
+    VAE权重下载
+
+    + [VAE下载链接](https://huggingface.co/zai-org/CogVideoX1.5-5B-SAT/tree/main/vae)
 
 2. 数据集准备及处理
 
-[lora数据集下载链接](https://huggingface.co/datasets/Wild-Heart/Disney-VideoGeneration-Dataset)
-  
-原始数据集不包含MM套件所需的data.jsonl文件形式，需要将原始数据集中prompt.txt和videos.txt合并生成data.jsonl文件。
-  
-推荐使用提供的`cogvideox_lora_dataset_convert.py`脚本完成转换:
+    [lora数据集下载链接](https://huggingface.co/datasets/Wild-Heart/Disney-VideoGeneration-Dataset)
 
-```bash
-python examples/cogvideox/cogvideox_lora_dataset_convert.py --video_path '/data_path/videos.txt' --prompt_path '/data_path/prompt.txt' --output_path '/data_path/data.jsonl'
-```
+    原始数据集不包含MM套件所需的data.jsonl文件形式，需要将原始数据集中prompt.txt和videos.txt合并生成data.jsonl文件。
+
+    推荐使用提供的`cogvideox_lora_dataset_convert.py`脚本完成转换:
+
+    ```bash
+    python examples/cogvideox/cogvideox_lora_dataset_convert.py --video_path '/data_path/videos.txt' --prompt_path '/data_path/prompt.txt' --output_path '/data_path/data.jsonl'
+    ```
 
 ### 配置参数
 
@@ -524,20 +524,20 @@ CogvideoX lora微调阶段的启动文件为shell脚本，主要分为如下2个
 
 1. 权重配置
 
-  权重转换完成后根据实际任务情况在启动脚本文件（如`finetune_cogvideox_lora_i2v_1.5.sh`）中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./CogVideoX-5B-Converted"`,其中`./CogVideoX-5B-Converted`为转换后的权重的实际路径，其文件夹内容结构如权重转换一节所示。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
-  根据需要填写`SAVE_PATH`变量中的路径，用以保存训练后的lora权重。
+    权重转换完成后根据实际任务情况在启动脚本文件（如`finetune_cogvideox_lora_i2v_1.5.sh`）中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./CogVideoX-5B-Converted"`,其中`./CogVideoX-5B-Converted`为转换后的权重的实际路径，其文件夹内容结构如权重转换一节所示。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
+    根据需要填写`SAVE_PATH`变量中的路径，用以保存训练后的lora权重。
 
 2. 数据集路径配置
-  
-  准备好数据集后，根据实际情况修改`data.json`中的数据集路径，分别为`"data_path":"/data_path/data.jsonl"`、`"data_folder":"/data_path/"`，替换`"/data_path/"`为实际的数据集路径。
+
+    准备好数据集后，根据实际情况修改`data.json`中的数据集路径，分别为`"data_path":"/data_path/data.jsonl"`、`"data_folder":"/data_path/"`，替换`"/data_path/"`为实际的数据集路径。
 
 3. VAE及T5模型路径配置
 
-  请参考预训练相同章节
-  
+    请参考预训练相同章节
+
 4. 切分策略配置
 
-  请参考预训练相同章节
+    请参考预训练相同章节
 
 ### 启动lora微调
 

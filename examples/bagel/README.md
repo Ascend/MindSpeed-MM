@@ -7,18 +7,18 @@
 
 - [版本说明](#版本说明)
   - [参考实现](#参考实现)
-- [环境安装](#jump1)
-  - [环境搭建](#jump1.1)
-- [权重下载及转换](#jump2)
-  - [权重下载](#jump2.1)
-  - [权重转换](#jump2.2)
-- [数据集准备及处理](#jump3)
-  - [数据集下载](#jump3.1)
-- [微调](#jump4)
-  - [准备工作](#jump4.1)
-  - [配置参数](#jump4.2)
-  - [启动微调](#jump4.3)
-- [环境变量声明](#jump10)
+- [环境安装](#环境安装)
+  - [环境搭建](#1-环境搭建)
+- [权重下载及转换](#权重下载及转换)
+  - [权重下载](#1-权重下载)
+  - [权重转换](#2-权重转换hf2mm)
+- [数据集准备及处理](#数据集准备及处理)
+  - [数据集下载](#1-数据集下载)
+- [微调](#微调)
+  - [准备工作](#1-准备工作)
+  - [配置参数](#2-配置参数)
+  - [启动微调](#3-启动微调)
+- [环境变量声明](#环境变量声明)
 
 ## 版本说明
 
@@ -26,7 +26,7 @@
 
 【训练】
 
-```shell
+```bash
 url=https://github.com/bytedance-seed/BAGEL
 commit_id = 57c390
 ```
@@ -62,32 +62,35 @@ bash scripts/install.sh --arch x86 --msid 93c45456c7044bacddebc5072316c01006c938
 
 ```bash
 bash scripts/install.sh --arch arm --msid 93c45456c7044bacddebc5072316c01006c938f9
+```
 
 ---
 <a id="jump2"></a>
+
 ## 权重下载及转换
 
 <a id="jump2.1"></a>
+
 ### 1. 权重下载
 
 从Huggingface库下载对应的模型权重:
+
 - 模型地址: [BAGEL-7B-MoT](https://huggingface.co/ByteDance-Seed/BAGEL-7B-MoT/tree/main)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/BAGEL-7B-MoT`目录下。
 
- <a id="jump2.2"></a>
+<a id="jump2.2"></a>
+
 ### 2. 权重转换(hf2mm)
 
 Bagel模型需要对下载后的权重进行权重转换，运行权重转换脚本：
-```
 
+```bash
 # Bagel
-
 mm-convert BagelConverter hf_to_mm \
  --cfg.source_path <./ckpt/hf_path/BAGEL-7B-MoT/> \
  --cfg.target_path <./ckpt/mm_path/BAGEL-7B-MoT/> \
-
-```shell
+```
 
 权重转换脚本的参数说明如下：
 
@@ -105,15 +108,15 @@ mm-convert BagelConverter hf_to_mm \
 
 ### 1. 数据集下载
 
-```
+```bash
 
 <https://lf3-static.bytednsdoc.com/obj/eden-cn/nuhojubrps/bagel_example.zip>
 
-```shell
+```
 
 将数据处理成如下格式
 
-```
+```bash
 
 </dataset>
 bagel_example
@@ -121,7 +124,7 @@ bagel_example
 └── vlm/
     ├── images/                    # JPEG / PNG frames
     └── llava_ov_si.jsonl          # vision‑language SFT conversations
-```shell
+```
 
 若需要自行添加数据集，请将数据处理成与上述数据统一格式
 
@@ -156,15 +159,14 @@ bagel_example
       "num_total_samples": 2000
     },
     ......
-```shell
+```
 
 【权重路径配置】
 
 | 配置文件                                                |   修改字段  | 修改说明                                |
 |-----------------------------------------------------| :---: |:------------------------------------|
 | examples/bagel/data.json             |      model_path       | 修改为下载的tokenizer的权重所对应的路径           |
-| examples/bagel/model.json             | from_pretrained | 修改为权重转换后的权重路径              |
-
+| examples/bagel/model.json             | from_pretrained | 修改为权重转换后的权重路径             |
 
 <a id="jump4.3"></a>
 
@@ -182,11 +184,9 @@ bagel_example
 
 启动训练
 
-```
-
-bash examples/bagel/finetune_bagel.sh
-
-```shell
+ ```bash 
+ bash examples/bagel/finetune_bagel.sh 
+ ```
 
 ## 环境变量声明
 

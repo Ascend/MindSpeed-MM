@@ -48,7 +48,7 @@
 
 --calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](  https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
 
---ckpt-format torch_dcp: 保存时使用dcp格式。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/torch_dcp.md)
+--ckpt-format torch_dcp: 保存时使用dcp格式。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
 
 --init-model-with-meta-device: 使用fsdp2的meta初始化模型，目前仅qwen3vl模型支持，详细使用请参考examples下具体模型readme.md界面。
 
@@ -72,7 +72,7 @@
 
 #### 重计算
 
-[详细介绍](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/pytorch/features/recompute_relative.md)
+[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md)
 
 --recompute-granularity: 目前仅支持配置full用于开启全量重计算。
 
@@ -115,7 +115,7 @@
 --save : 取值来自SAVE_PATH,权重保存路径。
 注：仅有该值配置时才会进行权重保存
 
---ckpt-format: 支持配置列表[torch，torch_dcp],权重保存方式。推荐优先使用[torch_dcp](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/torch_dcp.md)。
+--ckpt-format: 支持配置列表[torch，torch_dcp],权重保存方式。推荐优先使用[torch_dcp](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)。
 
 注:1、当在使用fsdp2进行模型训练时，仅支持使用torch_dcp配置。
 2、OUTPUT_ARGS下设置--ckpt-format为torch_dcp与GPT_ARGS下使能--ckpt-format torch_dcp二者作用相同，择一即可。

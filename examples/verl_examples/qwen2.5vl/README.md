@@ -5,21 +5,21 @@
 
 ## 目录
 
-- [简介](#jump0)
-  - [参考实现](#jump0.1)
-  - [变更记录](#jump0.2)
-- [环境安装](#jump1)
-  - [环境依赖](#jump1.1)
-  - [环境搭建](#jump1.2)
-  - [安装插件](#jump1.3)
-- [权重下载及转换](#jump2)
-- [数据集准备及处理](#jump3)
-- [训练](#jump4)
-  - [准备工作](#jump4.1)
-  - [启动训练](#jump4.2)
-  - [日志打点指标说明](#jump4.3)
-- [注意事项](#jump5)
-- [性能数据](#jump6)
+- [简介](#简介)
+  - [参考实现](#参考实现)
+  - [变更记录](#变更记录)
+- [环境安装](#环境安装)
+  - [环境依赖](#1-环境依赖)
+  - [环境搭建](#2-环境搭建)
+  - [安装插件](#3-安装插件)
+- [权重下载及转换](#权重下载)
+- [数据集准备及处理](#数据集准备及处理)
+- [训练](#训练)
+  - [准备工作](#1-准备工作)
+  - [启动训练](#2-启动训练)
+  - [日志打点指标说明](#3-日志打点指标说明)
+- [注意事项](#注意事项)
+- [性能数据](#性能数据)
 
 <a id="jump0"></a>
 
@@ -325,14 +325,14 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 
 1. 容器内启动时可能会遇到不存在`ip`命令的错误，可使用如下命令进行安装：
 
-```shell
-sudo apt-get install iproute2
-```
+    ```shell
+    sudo apt-get install iproute2
+    ```
 
 2. 如果安装vllm ascend失败，提示`fatal error: 'cstdint' file not found`，可能是gcc版本问题，可参考[此处](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha003/softwareinst/instg/instg_0086.html?Mode=PmIns&OS=Ubuntu&Software=cannToolKit)解决。更多vllm ascend问题可以向[社区](https://github.com/vllm-project/vllm-ascend)求助。
 
 3. 可以使用[Ray Debugger](https://docs.ray.io/en/latest/ray-observability/ray-distributed-debugger.html)对代码进行调试，在安装完插件后，需要在环境中安装依赖：
 
-```shell
-pip install "ray[default]" debugpy
-```
+    ```shell
+    pip install "ray[default]" debugpy
+    ```

@@ -30,7 +30,7 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
 
 + MSAdapter工具介绍
 
-[MSAdapter](https://openi.pcl.ac.cn/OpenI/MSAdapter.git)是一款MindSpore生态适配工具，在不改变用户原有使用习惯下，将PyTorch/JAX等三方框架代码快速迁移到MindSpore生态上，帮助用户高效使用昇腾算力。该工具的基本原理是使用MindSpore动态图算子来实现PyTorch API接口，由于框架的差异性，部分接口仍存在差异或者不支持，具体支持列表详见[torch接口支持列表](https://openi.pcl.ac.cn/OpenI/MSAdapter/src/branch/master/doc/readthedocs/source_zh/docs/SupportedList.md)。
+[MSAdapter](https://openi.pcl.ac.cn/OpenI/MSAdapter.git)是一款MindSpore生态适配工具，在不改变用户原有使用习惯下，将PyTorch/JAX等三方框架代码快速迁移到MindSpore生态上，帮助用户高效使用昇腾算力。
 
 ## 软件安装
 

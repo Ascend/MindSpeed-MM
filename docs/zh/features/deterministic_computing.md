@@ -36,7 +36,7 @@
 
 2. **使用msprobe工具**  
    通过MindStudio Training Tools工具链中的msprobe包启用确定性计算。  
-   使用说明请参考：[msprobe文档](https://gitcode.com/Ascend/mstt/blob/master/debug/accuracy_tools/msprobe/docs/05.data_dump_PyTorch.md#18-seed_all)
+   使用说明请参考：[msprobe文档](https://gitcode.com/Ascend/mstt/blob/master/debug/accuracy_tools/msprobe/docs/zh/dump/pytorch_data_dump_instruct.md#18-seed_all)
 
 ## 必需的环境变量配置
 

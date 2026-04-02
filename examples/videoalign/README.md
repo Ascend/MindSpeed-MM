@@ -5,30 +5,30 @@
 - [版本说明](#版本说明)
   - [参考实现](#参考实现)
   - [变更记录](#变更记录)
-- [环境安装](#jump1)
-  - [仓库拉取](#jump1.1)
-  - [环境搭建](#jump1.2)
-- [权重下载及转换](#jump2)
-  - [权重下载](#jump2.1)
-  - [权重转换hf2mm](#jump2.2)
-- [数据集准备及处理](#jump3)
-  - [数据集下载](#jump3.1)
-- [微调](#jump4)
-  - [准备工作](#jump4.1)
-  - [配置参数](#jump4.2)
-  - [启动微调](#jump4.3)
-- [推理](#jump5)
-  - [准备工作](#jump5.1)
-  - [配置参数](#jump5.2)
-  - [启动推理](#jump5.3)
-- [评测](#jump6)
-  - [准备工作](#jump6.1)
-  - [配置参数](#jump6.2)
-  - [启动评测](#jump6.3)
-- [特性使用介绍](#jump7)
-  - [lora微调](#jump7.1)
-- [环境变量声明](#jump8)
-- [注意事项](#jump9)
+- [环境安装](#环境安装)
+  - [仓库拉取](#1-仓库拉取)
+  - [环境搭建](#2-环境搭建)
+- [权重下载及转换](#权重下载及转换)
+  - [权重下载](#1-权重下载)
+  - [权重转换hf2mm](#2-权重转换hf2mm)
+- [数据集准备及处理](#数据集准备及处理)
+  - [数据集下载](#数据集下载以rewardbench数据集为例)
+- [微调](#微调)
+  - [准备工作](#1-准备工作)
+  - [配置参数](#2-配置参数)
+  - [启动微调](#3-启动微调)
+- [推理](#推理)
+  - [准备工作](#1准备工作以微调环境为基础包括环境安装权重下载及转换)
+  - [配置参数](#2配置参数)
+  - [启动推理](#3启动推理)
+- [评测](#评测)
+  - [准备工作](#1准备工作以微调环境为基础包括环境安装权重下载及转换)
+  - [配置参数](#2配置参数)
+  - [启动评测](#3启动评测)
+- [特性使用介绍](#特性使用介绍)
+  - [lora微调](#lora微调)
+- [环境变量声明](#环境变量声明)
+- [注意事项](#注意事项)
 
 ## 版本说明
 
@@ -277,54 +277,54 @@ LOAD_PATH="ckpt/mm_path/VideoReward"
 
 1. full模式
 
-TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重计算，此时可以配置重计算的层数。
+    TransformerLayer中的所有组件（layernorm、attention、mlp）都进行重计算，此时可以配置重计算的层数。
 
-- `recompute_method`: 控制重计算层数计算的方法，可选值为`uniform`（均匀重计算）或`block`（按块重计算）。
-- `recompute_num_layers`: 控制重计算的层数，指定需要重计算的层数量。
+    - `recompute_method`: 控制重计算层数计算的方法，可选值为`uniform`（均匀重计算）或`block`（按块重计算）。
+    - `recompute_num_layers`: 控制重计算的层数，指定需要重计算的层数量。
 
-示例配置如下：
+    示例配置如下：
 
-```json
-{
-  "model_id": "videoalign",
-  "img_context_token_id": 151656,
-  "video_token_id": 151656,
-  "vision_start_token_id": 151652,
-  ...
-  "image_encoder": {
-    "vision_encoder": {
+    ```json
+    {
+      "model_id": "videoalign",
+      "img_context_token_id": 151656,
+      "video_token_id": 151656,
+      "vision_start_token_id": 151652,
       ...
-      "recompute_granularity": "full",
-      "recompute_method": "uniform",
-      "recompute_num_layers": 1
+      "image_encoder": {
+        "vision_encoder": {
+          ...
+          "recompute_granularity": "full",
+          "recompute_method": "uniform",
+          "recompute_num_layers": 1
+        }
+      },
+      ...
     }
-  },
-  ...
-}
-```
+    ```
 
 2. selective模式
 
-仅对TransformerLayer中attention的core_attention组件进行重计算。注意：lora场景无法使用。
+    仅对TransformerLayer中attention的core_attention组件进行重计算。注意：lora场景无法使用。
+    
+    示例配置如下：
 
-示例配置如下：
-
-```json
-{
-  "model_id": "videoalign",
-  "img_context_token_id": 151656,
-  "video_token_id": 151656,
-  "vision_start_token_id": 151652,
-  ...
-  "image_encoder": {
-    "vision_encoder": {
+    ```json
+    {
+      "model_id": "videoalign",
+      "img_context_token_id": 151656,
+      "video_token_id": 151656,
+      "vision_start_token_id": 151652,
       ...
-      "recompute_granularity": "selective"
+      "image_encoder": {
+        "vision_encoder": {
+          ...
+          "recompute_granularity": "selective"
+        }
+      },
+      ...
     }
-  },
-  ...
-}
-```
+    ```
 
 【模型保存加载及日志信息配置】
 
@@ -359,8 +359,8 @@ OUTPUT_ARGS="
 
 ```shell
 $save_dir
-   ├── latest_checkpointed_iteration.txt
-   ├── ...
+  ├── latest_checkpointed_iteration.txt
+  ├── ...
 ```
 
 若开启lora混合训练，保存权重包含lora权重和非lora权重，需要通过转换脚本进行拆分后分别加载。(此功能coming soon)

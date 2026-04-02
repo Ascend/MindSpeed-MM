@@ -3,14 +3,14 @@
 <p align="left">
 </p>
 
-- [Qwen Image Edit](#jump1)
+- [Qwen Image Edit](#qwen-image-edit)
   - [模型介绍](#模型介绍)
   - [版本说明](#版本说明)
     - [参考实现](#参考实现)
     - [变更记录](#变更记录)
   - [微调](#微调)
     - [环境搭建](#环境搭建)
-    - [微调](#jump2)
+    - [微调](#微调-1)
   - [推理](#推理)
     - [环境搭建及运行](#环境搭建及运行)
   - [环境变量声明](#环境变量声明)
@@ -243,11 +243,11 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
 【Qwen Image Edit模型推理】
 
-  ```shell
-  vim ./examples/qwen_image/model_inference/inference_qwen_image_edit_bf16.py # 进入运行推理的Python文件
-  ```
+    ```shell
+    vim ./examples/qwen_image/model_inference/inference_qwen_image_edit_bf16.py # 进入运行推理的Python文件
+    ```
 
-  1. 修改路径
+1. 修改路径
 
     ```python
     transformer_path = "Qwen/Qwen-Image-Edit/transformer"
@@ -268,41 +268,42 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
     ```python
     transformer_path = "Qwen/Qwen-Image-Edit/transformer"
     transformer_files = [
-              "${transformer_path}/diffusion_pytorch_model-00001-of-00005.safetensors",
-              "${transformer_path}/diffusion_pytorch_model-00002-of-00005.safetensors",
-              "${transformer_path}/diffusion_pytorch_model-00003-of-00005.safetensors",
-              "${transformer_path}/diffusion_pytorch_model-00004-of-00005.safetensors",
-              "${transformer_path}/diffusion_pytorch_model-00005-of-00005.safetensors"
-          ]
+                "${transformer_path}/diffusion_pytorch_model-00001-of-00005.safetensors",
+                "${transformer_path}/diffusion_pytorch_model-00002-of-00005.safetensors",
+                "${transformer_path}/diffusion_pytorch_model-00003-of-00005.safetensors",
+                "${transformer_path}/diffusion_pytorch_model-00004-of-00005.safetensors",
+                "${transformer_path}/diffusion_pytorch_model-00005-of-00005.safetensors"
+            ]
 
     text_encoder_path = "Qwen/Qwen-Image-Edit/text_encoder"
     text_encoder_files = [
-              "${text_encoder_path}/model-00001-of-00004.safetensors",
-              "${text_encoder_path}/model-00002-of-00004.safetensors",
-              "${text_encoder_path}/model-00003-of-00004.safetensors",
-              "${text_encoder_path}/model-00004-of-00004.safetensors"
-          ]
+                "${text_encoder_path}/model-00001-of-00004.safetensors",
+                "${text_encoder_path}/model-00002-of-00004.safetensors",
+                "${text_encoder_path}/model-00003-of-00004.safetensors",
+                "${text_encoder_path}/model-00004-of-00004.safetensors"
+            ]
     ```
 
-  2. 创建推理结果路径
-      ```shell
-      mkdir -p inference
-      ```
+2. 创建推理结果路径
 
-  3. 运行代码
+    ```shell
+    mkdir -p inference
+    ```
 
-      ```shell
-      source /usr/local/Ascend/cann/set_env.sh
-      python examples/qwen_image/model_inference/inference_qwen_image_edit_bf16.py
-      ```
+3. 运行代码
+
+    ```shell
+    source /usr/local/Ascend/cann/set_env.sh
+    python examples/qwen_image/model_inference/inference_qwen_image_edit_bf16.py
+    ```
 
 【lora微调Qwen Image Edit模型推理】
 
-  ```shell
-  vim ./examples/qwen_image/model_inference/inference_qwen_image_edit_lora_bf16.py
-  ```
+    ```shell
+    vim ./examples/qwen_image/model_inference/inference_qwen_image_edit_lora_bf16.py
+    ```
 
-  1. 修改路径
+1. 修改路径
 
     ```python
     transformer_path = "Qwen/Qwen-Image-Edit/transformer"
@@ -322,17 +323,18 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
     `lora_path`是存放 lora 权重的绝对路径，其他权重同上
 
-  2. 创建推理结果路径
-      ```shell
-      mkdir -p inference
-      ```
+2. 创建推理结果路径
 
-  3. 运行代码
+    ```shell
+    mkdir -p inference
+    ```
 
-      ```shell
-      source /usr/local/Ascend/cann/set_env.sh
-      python examples/qwen_image/model_inference/inference_qwen_image_edit_lora_bf16.py
-      ```
+3. 运行代码
+
+    ```shell
+    source /usr/local/Ascend/cann/set_env.sh
+    python examples/qwen_image/model_inference/inference_qwen_image_edit_lora_bf16.py
+    ```
   
 <a id="jump3"></a>
 

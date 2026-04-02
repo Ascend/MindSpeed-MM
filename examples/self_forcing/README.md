@@ -3,7 +3,7 @@
 <p align="left">
 </p>
 
-- [self-forcing](#jump1)
+- [self-forcing](#self-forcing)
   - [模型介绍](#模型介绍)
   - [版本说明](#版本说明)
     - [参考实现](#参考实现)

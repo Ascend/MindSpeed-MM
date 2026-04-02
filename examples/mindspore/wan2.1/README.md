@@ -139,7 +139,7 @@ mm-convert WanConverter hf_to_mm \
 
 如需转回Hugging Face格式，需运行权重转换脚本：
 
-**注**： 如进行layer zero进行训练，则需首先进行其[训练权重后处理](#jump1)，再进行如下操作：
+**注**： 如进行layer zero进行训练，则需首先进行其[训练权重后处理](#训练权重后处理)，再进行如下操作：
 
 ```shell
 mm-convert WanConverter mm_to_hf \

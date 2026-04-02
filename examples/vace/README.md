@@ -331,36 +331,36 @@ bash examples/vace/{model_type}/pretrain_fsdp.sh
 
 1. 【下载DiffSynth-Studio】
 
-```shell
-cd examples/vace
-git clone https://github.com/modelscope/DiffSynth-Studio.git
-cd DiffSynth-Studio
-git checkout 8332ece
-cp ../inference/Wan-VACE-Inference.py examples/wanvideo/model_inference
-```
+    ```shell
+    cd examples/vace
+    git clone https://github.com/modelscope/DiffSynth-Studio.git
+    cd DiffSynth-Studio
+    git checkout 8332ece
+    cp ../inference/Wan-VACE-Inference.py examples/wanvideo/model_inference
+    ```
 
 2. 【npu适配】
 
- ```shell
-vim diffsynth/utils/__init__.py
-  ```
+    ```shell
+    vim diffsynth/utils/__init__.py
+      ```
 
-将131行的`torch.cuda.mem_get_info(self.device)[1] / (1024 ** 3)`
-改为`torch.npu.mem_get_info()[1] / (1024 ** 3)`
+    将131行的`torch.cuda.mem_get_info(self.device)[1] / (1024 ** 3)`
+    改为`torch.npu.mem_get_info()[1] / (1024 ** 3)`
 
-```shell
-vim diffsynth/vram_management/layers.py
-  ```
+    ```shell
+    vim diffsynth/vram_management/layers.py
+      ```
 
-将16行的`torch.cuda.mem_get_info(self.computation_device)`
-改为`torch.npu.mem_get_info()`
+    将16行的`torch.cuda.mem_get_info(self.computation_device)`
+    改为`torch.npu.mem_get_info()`
 
-```shell
-vim diffsynth/models/wan_video_dit.py
-  ```
+    ```shell
+    vim diffsynth/models/wan_video_dit.py
+      ```
 
-将96行的`freqs`
-改为`freqs.to(torch.complex64)`
+    将96行的`freqs`
+    改为`freqs.to(torch.complex64)`
 
 ### 启动推理
 

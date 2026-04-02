@@ -5,16 +5,16 @@
 
 ## 目录
 
-- [简介](#jump0)
-- [环境安装](#jump1)
-  - [仓库拉取](#jump1.1)
-  - [环境搭建](#jump1.2)
-- [权重下载](#jump2)
-- [数据集准备及处理](#jump3)
-- [训练](#jump4)
-  - [准备工作](#jump4.1)
-  - [启动训练](#jump4.2)
-- [注意事项](#jump6)
+- [简介](#简介)
+- [环境安装](#环境安装)
+  - [仓库拉取](#1-仓库拉取)
+  - [环境搭建](#2-环境搭建)
+- [权重下载](#权重下载)
+- [数据集准备及处理](#数据集准备及处理)
+- [训练](#训练)
+  - [准备工作](#1-准备工作)
+  - [启动训练](#2-启动训练)
+- [注意事项](#环境变量声明)
 
 <a id="jump0"></a>
 
@@ -127,12 +127,12 @@ pip install -r MindSpeed-MM/examples/ming/requirements.txt
 
 1. 以图文理解的微调任务为例，可根据实际情况修改[启动脚本](../../examples/ming/finetune_vl.sh)的配置，以下配置必须修改：
 
-``` shell
-DATA_PATH="./data/mllm_format_llava_instruct_data.json" # 数据集的文件
-DATA_DIR="./data" # 数据集依赖图文等文件的目录
-PROCESSOR_PATH="." # Ming代码仓路径，默认是当前目录（即 Ming 目录）
-LOAD_PATH="./ckpt/Ming-Lite-Omni-1.5" # huggingface下载的权重路径
-```
+    ``` shell
+    DATA_PATH="./data/mllm_format_llava_instruct_data.json" # 数据集的文件
+    DATA_DIR="./data" # 数据集依赖图文等文件的目录
+    PROCESSOR_PATH="." # Ming代码仓路径，默认是当前目录（即 Ming 目录）
+    LOAD_PATH="./ckpt/Ming-Lite-Omni-1.5" # huggingface下载的权重路径
+    ```
 
 2. 根据使用机器的情况，修改`NNODES`、`NPUS_PER_NODE`配置， 例如单机 A2 可设置`NNODES`为 1 、`NPUS_PER_NODE`为8；
 
@@ -140,10 +140,10 @@ LOAD_PATH="./ckpt/Ming-Lite-Omni-1.5" # huggingface下载的权重路径
 
 4. 上述注意点修改完毕后，可启动脚本开启训练：
 
-```bash
-cd Ming
-bash finetune_vl.sh
-```
+    ```bash
+    cd Ming
+    bash finetune_vl.sh
+    ```
 
 <a id="jump6"></a>
 

@@ -1,4 +1,4 @@
-## Automatic Parallelism For Multi-Modal
+# Automatic Parallelism For Multi-Modal
 
 ## 问题分析
 
