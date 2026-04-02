@@ -110,7 +110,7 @@ if is_flash_linear_attention_available():
     from fla.modules import FusedRMSNormGated
     from fla.ops.gated_delta_rule import chunk_gated_delta_rule as fla_chunk_gated_delta_rule, fused_recurrent_gated_delta_rule
 else:
-    chunk_gated_delta_rule, fused_recurrent_gated_delta_rule = None, None
+    fla_chunk_gated_delta_rule, fused_recurrent_gated_delta_rule = None, None
     FusedRMSNormGated = None
 
 logger = logging.get_logger(__name__)
