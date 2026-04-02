@@ -170,7 +170,7 @@ T2V任务需要对`llava-llama3-8b`模型进行权重转换，运行权重转换
 ```shell
 mm-convert HunyuanVideoConverter --version t2v t2v_text_encoder \
  --cfg.source_path <llava-llama-3-8b> \
- --cfg.target_path <llava-llama-3-8b-text-encoder-tokenizer> \
+ --cfg.target_path <llava-llama-3-8b-text-encoder-tokenizer>
 ```
 
 需要分别对hunyuanvideo-t2v和i2v的transformer部分进行权重转换，运行权重转换脚本：
@@ -185,7 +185,7 @@ mm-convert HunyuanVideoConverter --version t2v source_to_mm \
 ```bash
 mm-convert HunyuanVideoConverter --version i2v source_to_mm \
  --cfg.source_path <hunyuan-video-i2v-720p/transformers/mp_rank_00/model_states.pt> \
- --cfg.target_path <./ckpt/hunyuanvideo> \
+ --cfg.target_path <./ckpt/hunyuanvideo>
 ```
 
 需要对hunyuanvideo-i2v的lora权重转换，运行权重转换脚本：
@@ -340,7 +340,7 @@ bash examples/hunyuanvideo/feature_extract/feature_extraction.sh
 
     ```bash
     source /usr/local/Ascend/cann/set_env.sh
-    mm-converte HunyuanVideoConverter --version t2v --layerzero_to_mm \
+    mm-convert HunyuanVideoConverter --version t2v --layerzero_to_mm \
      --cfg.source_path <./save_ckpt/hunyuanvideo/> \
      --cfg.target_path <./save_ckpt/hunyuanvideo_megatron_ckpt/>
     ```
@@ -353,7 +353,7 @@ bash examples/hunyuanvideo/feature_extract/feature_extraction.sh
 
   - 在`examples/hunyuanvideo/{task_name}/model_hunyuanvideo.json`中，`double_stream_full_recompute_layers`和`single_stream_full_recompute_layers`表示该模型的double_stream_block和single_stream_block进行全重计算的层数，可以逐步减小这两个参数，直至显存打满
 
-> ⚠️**hunyuanvideo i2v目前未适配CP与TPSP**
+> ⚠️**hunyuanvideo i2v目前未适配CP与TP-SP**
 
 #### 启动训练
 

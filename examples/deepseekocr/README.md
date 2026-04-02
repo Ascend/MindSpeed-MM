@@ -14,7 +14,7 @@
 - [训练](#jump4)
   - [准备工作](#jump4.1)
   - [启动训练](#jump4.2)
-- [注意事项](#jump6)
+- [环境变量声明](#jump6)
 
 <a id="jump0"></a>
 
@@ -66,7 +66,7 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310-*.whl
 pip install torch_npu-2.7.1*.manylinux2014_aarch64.whl
 
-# 安装MindSPeed MM依赖
+# 安装MindSpeed MM依赖
 pip install -r examples/deepseekocr/requirements.txt
 
 ```

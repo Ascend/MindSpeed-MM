@@ -1,6 +1,6 @@
 # 本文档为MindSpeed MM套件中对于运行脚本常用命令参数做解释说明
 
-- [本文档为MindSpeed MM套件中对于运行脚本常用命令参数做解释说明](#本文档为Mindspeed MM套件中对于运行脚本常用命令参数做解释说明)
+- [本文档为MindSpeed MM套件中对于运行脚本常用命令参数做解释说明](#本文档为MindSpeed MM套件中对于运行脚本常用命令参数做解释说明)
   - [GPT\_ARGS下参数注释](#gpt_args下参数注释)
     - [一般参数](#一般参数)
     - [显存优化](#显存优化)
@@ -16,7 +16,7 @@
 ### 一般参数
 
 --micro-batch-size：
-取值来自\${MBS},单个GPU在一次前向/反向传播中直接处理的样本数量，适应单个NPU内的内存限制。直接影响GPU显存容量。
+取值来自\${MBS}，表示单个GPU在一次前向/反向传播中直接处理的样本数量，适应单个NPU内的内存限制。直接影响GPU显存容量。
 
 --global-batch-size：取值来自\${GBS}，模型进行一次参数更新所使用的所有设备上的总样本数。
 
@@ -78,7 +78,7 @@
 
 --recompute-method: [block, uniform]。重计算模式配置。uniform:将transformer层均匀划分组，每组大小（--recompute-num-layers）,按组存入输入和激活值。block: 前--recompute-num-layers个transformer层使用重计算，剩余层跳过。
 
---recompute-num-layers: 整型，使用影响如上。
+--recompute-num-layers: 整型，其使用影响如上。
 
 ---
 

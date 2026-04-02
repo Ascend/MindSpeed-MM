@@ -86,7 +86,7 @@ VAE和DiT： [opensoraplan1.5](https://huggingface.co/LanguageBind/Open-Sora-Pla
 
 Text Encoder：[t5](https://huggingface.co/google/t5-v1_1-xl) 和 [CLIP](https://huggingface.co/laion/CLIP-ViT-bigG-14-laion2B-39B-b160k)
 
-需要对下载后的opensoraplan1.5模型 `vae`部分进行权重转换，运行权重转换脚本
+需要对下载后的OpenSoraPlan1.5模型 `vae`部分进行权重转换，运行权重转换脚本
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.5 vae_convert \
@@ -94,7 +94,7 @@ mm-convert OpenSoraPlanConverter --version v1.5 vae_convert \
  --cfg.target_path <"./ckpt/vae/vae.pt">
 ```
 
-需要对下载后的opensoraplan1.5模型 `DiT`部分进行权重转换，运行权重转换脚本
+需要对下载后的OpenSoraPlan1.5模型 `DiT`部分进行权重转换，运行权重转换脚本
 
 ```bash
 mm-convert OpenSoraPlanConverter --version v1.5 source_to_mm \

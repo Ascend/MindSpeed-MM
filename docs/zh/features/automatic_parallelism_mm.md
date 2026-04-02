@@ -23,7 +23,7 @@ MindSpeed-Core branch: core_r0.8.0
 
 ## 使用方法
 
-在使用多维自动并行特性时，**需使用python作为脚本启动器，在所有的节点上拉起脚本**，并配置多维自动并行相关的参数。相关参数及其函数如下表所示：
+在使用多维自动并行特性时，**需使用bash作为脚本启动器，在所有的节点上拉起脚本**，并配置多维自动并行相关的参数。相关参数及其函数如下表所示：
 
 | 参数名                      | 参数含义                                            |
 | --------------------------- | -------------------------------------------------- |
@@ -60,7 +60,7 @@ NODE_RANK=0
 NNODES=1
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 echo $MASTER_ADDR
-echo $NODE_ADDR
+echo $MASTER_PORT
 echo $NODE_RANK
 echo $NNODES
 

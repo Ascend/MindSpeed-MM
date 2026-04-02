@@ -181,7 +181,7 @@ mm-convert CogVideoConverter --version <t2v or i2v> source_to_mm \
   --cfg.source_path <your source path> \
   --cfg.target_path <your target path> \
   --cfg.target_parallel_config.tp_size <tp_size> \
-  --cfg.target_parallel_config.pp_layers <pp_layers> \
+  --cfg.target_parallel_config.pp_layers <pp_layers>
 ```
 
 其中tp_size为实际的tp切分策略， --version的值为t2v或i2v，
@@ -343,7 +343,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
       export PYTHONPATH=$PYTHONPATH:<your_megatron_path>
       # cfg.source_path为layerzero训练保存权重的路径，cfg.target_path为输出的megatron格式权重的路径
       mm-convert CogVideoConverter layerzero_to_mm \
-        --cfg.source_path ./save_ckpt/cogvideo/
+        --cfg.source_path ./save_ckpt/cogvideo/ \
         --cfg.target_path ./save_ckpt/cogvideo_megatron_ckpt/
       ```
 
@@ -436,7 +436,7 @@ mm-convert CogVideoConverter --version <t2v or i2v> resplit \
   --cfg.source_path <your source path> \
   --cfg.target_path <your target path> \
   --cfg.target_parallel_config.tp_size <tp_size> \
-  --cfg.target_parallel_config.pp_layers <pp_layers> \
+  --cfg.target_parallel_config.pp_layers <pp_layers>
 ```
 
 ### 启动推理
@@ -561,7 +561,7 @@ mm-convert CogVideoConverter --version <t2v or i2v> merge_lora_to_base \
   --cfg.lora_path "./my_ckpt" \
   --cfg.target_path "./merge_base_lora_target" \
   --lora_rank 128 \
-  --lora_alpha 64 \
+  --lora_alpha 64
 ```
 
 ---

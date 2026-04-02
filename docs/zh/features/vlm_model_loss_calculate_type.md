@@ -44,7 +44,7 @@
 
 ### megatron后端
 
-争对入口为`pretrain_vlm.py`的模型，使能方式如下：
+针对入口为`pretrain_vlm.py`的模型，使能方式如下：
 
 ### 1. 默认计算方式
 

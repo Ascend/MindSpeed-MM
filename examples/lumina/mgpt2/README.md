@@ -147,11 +147,11 @@ mm-convert LuminaConverter hf_to_mm \
 [
     {
         "file": "images/image0001.jpg",
-        "prompt": "Image discrimination1.",
+        "prompt": "Image discrimination1."
     },
     {
         "file": "images/image0002.jpg",
-        "prompt": "Image discrimination2.",
+        "prompt": "Image discrimination2."
     },
     ......
 ]

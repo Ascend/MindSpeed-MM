@@ -2,7 +2,7 @@
 
 ## 问题分析
 
-以Internvl为例，DP大于1时，DP间处理的图片patch数不同，vit和mlp计算量差异大，导致训练时在梯度allreduce处快卡等慢卡。
+以InternVL为例，DP大于1时，DP间处理的图片patch数不同，vit和mlp计算量差异大，导致训练时在梯度allreduce处快卡等慢卡。
 
 ## 解决方案
 

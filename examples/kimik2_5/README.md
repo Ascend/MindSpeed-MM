@@ -100,7 +100,7 @@ pip install tiktoken==0.12.0
 ---
 当前支持读取多个以`,`（注意不要加空格）分隔的数据集，配置方式为将`kimik2_5_config.yaml`中的`DATASET_PATH`参数从`/data/mllm_format_llava_instruct_data.json`修改为`/data/mllm_format_llava_instruct_data.json,/data/mllm_format_llava_instruct_data2.json`
 
-同时注意`kimik2_5_config.yaml`中`data->dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。正式训练时，可以把该参数去掉以读取全部的数据。
+同时注意`kimik2_5_config.yaml`中`data->dataset_param->basic_parameters->max_samples`的配置，会限制数据只读取`max_samples`条，这样可以快速验证功能。正式训练时，可以把该参数去掉以读取全部的数据。
 
 <a id="jump2.2"></a>
 

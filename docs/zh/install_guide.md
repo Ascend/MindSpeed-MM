@@ -166,7 +166,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
           cd ..
       ```
 
-  3. 安装Mindpseed MM及其相关依赖，可通过[pyptoject.toml](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pyproject.toml)配置第三方依赖清单。
+  3. 安装Mindspeed MM及其相关依赖，可通过[pyptoject.toml](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pyproject.toml)配置第三方依赖清单。
   
       ```shell
         pip install -e .
