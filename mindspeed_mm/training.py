@@ -814,7 +814,17 @@ def train_step(
     if args.empty_unused_memory_level >= 2:
         torch.cuda.empty_cache()
 
-    if mpu.is_pipeline_last_stage(ignore_virtual=True):
+    loss_is_needed = mpu.is_pipeline_last_stage(ignore_virtual=True)
+    # Loss will be output from the pipeline first stage if patch 
+    # `layerwise_disaggregated_training` is enabled.
+    cfg = args.mm.model
+    if hasattr(cfg, "patch"):
+        cfg = cfg.patch.to_dict()
+        if "layerwise_disaggregated_training" in cfg.keys():
+            if cfg.get("layerwise_disaggregated_training"):
+                loss_is_needed = mpu.is_pipeline_first_stage(ignore_virtual=True)
+        
+    if loss_is_needed:
         # Average loss across microbatches.
         loss_reduced = {}
         if not config.calculate_per_token_loss:

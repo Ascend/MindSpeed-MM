@@ -57,8 +57,6 @@ try:
 except Exception:
     has_nvidia_modelopt = False
 
-from mindspeed_mm.models.vlm_model import VLMModel
-from mindspeed_mm.utils.hetero_parallel import apply_hetero_parallel_hooks, change_parallel_state, hetero_align_config
 from mindspeed_mm.utils.transformer_model_config import get_model_config
 from mindspeed_mm.models.common.mm_gpt_model import MMGPTModel
 from mindspeed_mm.models.common.module_spec.get_layer_spec import get_llm_layer_spec
@@ -532,38 +530,81 @@ def model_provider(pre_process=True, post_process=True, modules=None):
 
     _configure_modules(vlm_config, modules)
 
-    model = LDTVLMModel(vlm_config)
+    from mindspeed_mm.models.vlm_model import VLMModel
 
-    if args.hetero_parallel:
-        print_rank_0("apply hetero parallel ...")
-        apply_hetero_parallel_hooks(model)
+    class LDTVLMModel(VLMModel):
+        def __init__(self, config):
+            super().__init__(config)
 
-    _apply_freezing(model, vlm_config)
-
-    return model
-
-
-class LDTVLMModel(VLMModel):
-    def __init__(self, config):
-        super().__init__(config)
-
-    def _build_text_decoder_model(self, config):
-        if get_args().hetero_parallel:
-            change_parallel_state('text_decoder')
-            self.pre_process = mpu.is_pipeline_first_stage()
-            self.post_process = mpu.is_pipeline_last_stage()
-            self.pp_size = mpu.get_pipeline_model_parallel_world_size()
-            self.enable_vp = mpu.get_virtual_pipeline_model_parallel_world_size() is not None
+        def _build_text_decoder_model(self, config):
+            if self.pp_size <= 1:
+                return MMGPTModel(
+                    config=config,
+                    transformer_layer_spec=get_llm_layer_spec(config),
+                    vocab_size=config.vocab_size,
+                    max_sequence_length=config.max_position_embeddings,
+                    parallel_output=config.parallel_output,
+                    position_embedding_type=config.position_embedding_type,
+                    share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
+                    rotary_base=config.rope_theta if getattr(config, 'rope_theta', None) else config.rotary_base,
+                    pre_process=self.pre_process,
+                    post_process=self.post_process,
+                    reward_process=self.reward_process
+                )
             if self.enable_vp:
-                self.vp_rank = mpu.get_virtual_pipeline_model_parallel_rank()
-                self.vp_size = mpu.get_virtual_pipeline_model_parallel_world_size()
-            self.pp_rank = mpu.get_pipeline_model_parallel_rank()
-            print_rank_0(f'initial: text_decoder pp size is {self.pp_size}')
-            print_rank_0(f'initial: text_decoder tp size is {mpu.get_tensor_model_parallel_world_size()}')
-            print_rank_0(f'initial: text_decoder cp size is {mpu.get_context_parallel_world_size()}')
-            print_rank_0(f'initial: text_decoder dp size is {mpu.get_data_parallel_world_size()}')
+                if self.pp_size * self.vp_size != len(config.pipeline_num_layers) * len(config.pipeline_num_layers[0]):
+                    raise ValueError(
+                        f"The product of pipeline-model-parallel-size and vpp-size must equal to the total number of stage in pipeline_num_layers, "
+                        f"but got pipeline-model-parallel-size: {self.pp_size}, vpp-size: {self.vp_size}, "
+                        f"and total number of stage in pipeline_num_layers: {len(config.pipeline_num_layers) * len(config.pipeline_num_layers[0])}.")
+            elif self.pp_size != len(config.pipeline_num_layers):
+                raise ValueError(f"length of pipeline_num_layers must equal to pipeline-model-parallel-size, "
+                                f"but got pipeline_num_layers length:{len(config.pipeline_num_layers)} "
+                                f"and pipeline-model-parallel-size:{self.pp_size}.")
 
-        if self.pp_size <= 1:
+            if self.enable_vp:
+                local_num_layers = config.pipeline_num_layers[self.vp_rank][self.pp_rank]
+            else:
+                local_num_layers = config.pipeline_num_layers[self.pp_rank]
+
+            if local_num_layers == 0 and not mpu.is_pipeline_first_stage(ignore_virtual=True):
+                self.add_text_decoder = False
+                return None
+
+            if self.enable_vp:
+                pipeline_start_index = sum(
+                    sum(vp_layer) for vp_layer in config.pipeline_num_layers[:self.vp_rank]) + sum(
+                    config.pipeline_num_layers[self.vp_rank][:self.pp_rank])
+                pipeline_end_index = sum(sum(vp_layer) for vp_layer in config.pipeline_num_layers[:self.vp_rank]) + sum(
+                    config.pipeline_num_layers[self.vp_rank][:self.pp_rank + 1])
+            else:
+                pipeline_start_index = sum(config.pipeline_num_layers[:self.pp_rank])
+                pipeline_end_index = sum(config.pipeline_num_layers[:self.pp_rank + 1])
+
+            pre_process = pipeline_start_index == 0
+            post_process = pipeline_end_index == config.num_layers
+
+            if mpu.is_pipeline_first_stage(ignore_virtual=True):
+                if mpu.get_virtual_pipeline_model_parallel_rank() == 0:
+                    pre_process = True
+                    post_process = False
+                else:
+                    pre_process = False
+                    post_process = True
+            else:
+                pre_process = post_process = False
+
+            print(
+                f"text decoder pipeline config:\
+                pp_rank:{self.pp_rank},\
+                pre_process:{pre_process},\
+                post_process:{post_process},\
+                local_num_layers:{local_num_layers}"
+            )
+            # num_layers will be divided by pp_size in TransformerBlock from megatron.core
+            config.num_layers = self.pp_size * local_num_layers
+            if self.enable_vp:
+                config.num_layers *= self.vp_size
             return MMGPTModel(
                 config=config,
                 transformer_layer_spec=get_llm_layer_spec(config),
@@ -573,77 +614,16 @@ class LDTVLMModel(VLMModel):
                 position_embedding_type=config.position_embedding_type,
                 share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
                 rotary_base=config.rope_theta if getattr(config, 'rope_theta', None) else config.rotary_base,
-                pre_process=self.pre_process,
-                post_process=self.post_process,
+                pre_process=pre_process,
+                post_process=post_process,
                 reward_process=self.reward_process
             )
-        if self.enable_vp:
-            if self.pp_size * self.vp_size != len(config.pipeline_num_layers) * len(config.pipeline_num_layers[0]):
-                raise ValueError(
-                    f"The product of pipeline-model-parallel-size and vpp-size must equal to the total number of stage in pipeline_num_layers, "
-                    f"but got pipeline-model-parallel-size: {self.pp_size}, vpp-size: {self.vp_size}, "
-                    f"and total number of stage in pipeline_num_layers: {len(config.pipeline_num_layers) * len(config.pipeline_num_layers[0])}.")
-        elif self.pp_size != len(config.pipeline_num_layers):
-            raise ValueError(f"length of pipeline_num_layers must equal to pipeline-model-parallel-size, "
-                             f"but got pipeline_num_layers length:{len(config.pipeline_num_layers)} "
-                             f"and pipeline-model-parallel-size:{self.pp_size}.")
 
-        if self.enable_vp:
-            local_num_layers = config.pipeline_num_layers[self.vp_rank][self.pp_rank]
-        else:
-            local_num_layers = config.pipeline_num_layers[self.pp_rank]
+    model = LDTVLMModel(vlm_config)
 
-        if local_num_layers == 0 and not mpu.is_pipeline_first_stage(ignore_virtual=True):
-            self.add_text_decoder = False
-            return None
+    _apply_freezing(model, vlm_config)
 
-        if self.enable_vp:
-            pipeline_start_index = sum(
-                sum(vp_layer) for vp_layer in config.pipeline_num_layers[:self.vp_rank]) + sum(
-                config.pipeline_num_layers[self.vp_rank][:self.pp_rank])
-            pipeline_end_index = sum(sum(vp_layer) for vp_layer in config.pipeline_num_layers[:self.vp_rank]) + sum(
-                config.pipeline_num_layers[self.vp_rank][:self.pp_rank + 1])
-        else:
-            pipeline_start_index = sum(config.pipeline_num_layers[:self.pp_rank])
-            pipeline_end_index = sum(config.pipeline_num_layers[:self.pp_rank + 1])
-
-        pre_process = pipeline_start_index == 0
-        post_process = pipeline_end_index == config.num_layers
-
-        if mpu.is_pipeline_first_stage(ignore_virtual=True):
-            if mpu.get_virtual_pipeline_model_parallel_rank() == 0:
-                pre_process = True
-                post_process = False
-            else:
-                pre_process = False
-                post_process = True
-        else:
-            pre_process = post_process = False
-
-        print(
-            f"text decoder pipeline config:\
-            pp_rank:{self.pp_rank},\
-            pre_process:{pre_process},\
-            post_process:{post_process},\
-            local_num_layers:{local_num_layers}"
-        )
-        # num_layers will be divided by pp_size in TransformerBlock from megatron.core
-        config.num_layers = self.pp_size * local_num_layers
-        if self.enable_vp:
-            config.num_layers *= self.vp_size
-        return MMGPTModel(
-            config=config,
-            transformer_layer_spec=get_llm_layer_spec(config),
-            vocab_size=config.vocab_size,
-            max_sequence_length=config.max_position_embeddings,
-            parallel_output=config.parallel_output,
-            position_embedding_type=config.position_embedding_type,
-            share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
-            rotary_base=config.rope_theta if getattr(config, 'rope_theta', None) else config.rotary_base,
-            pre_process=pre_process,
-            post_process=post_process,
-            reward_process=self.reward_process
-        )
+    return model
     
 
 # copy from: pretrain_vlm.py
@@ -665,9 +645,6 @@ def _configure_modules(vlm_config, modules):
 # copy from: pretrain_vlm.py
 def _configure_image_encoder(vlm_config):
     """Configure image encoder module."""
-    if get_args().hetero_parallel:
-        hetero_align_config(vlm_config.image_encoder.vision_encoder, vlm_config.image_encoder)
-        hetero_align_config(vlm_config.image_encoder.vision_projector, vlm_config.image_encoder)
 
     # MindSpeed needs to validate the CP configuration; the attention head must be divisible by the CP sizes.
     # However, since the vision projector does not have an attention head, special handling is required.
@@ -681,8 +658,6 @@ def _configure_image_encoder(vlm_config):
 # copy from: pretrain_vlm.py
 def _configure_audio_encoder(vlm_config):
     """Configure audio encoder module."""
-    if get_args().hetero_parallel:
-        hetero_align_config(vlm_config.audio_encoder.audio_encoder, vlm_config.audio_encoder)
 
     vlm_config.audio_encoder.audio_encoder = get_model_config(vlm_config.audio_encoder.audio_encoder)
 
@@ -690,8 +665,6 @@ def _configure_audio_encoder(vlm_config):
 # copy from: pretrain_vlm.py
 def _configure_text_decoder(vlm_config):
     """Configure text decoder module."""
-    if get_args().hetero_parallel:
-        hetero_align_config(vlm_config.text_decoder, vlm_config.text_decoder)
         
     vlm_config.text_decoder = get_model_config(vlm_config.text_decoder)
 
