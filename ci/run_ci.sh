@@ -26,6 +26,12 @@ else
     pip install -e .[test]
     pip install --upgrade build
     python -m build
+    if command -v npu-smi &> /dev/null && npu-smi info &> /dev/null; then
+        pip install triton-ascend==3.2.0
+    fi
+    if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
+        pip install flash-linear-attention
+    fi
     exit ${PIPESTATUS[0]}
 fi
 echo "start test"

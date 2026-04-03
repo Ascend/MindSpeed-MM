@@ -352,9 +352,9 @@ def chunk_gated_delta_rule(
         # Counteract verl's autocast promotion (bf16 -> fp32) by restoring original dtype
         return (x * inv_norm).to(original_dtype)
 
-    q = l2norm(q, dim=-1, eps=1e-6)
-    k = l2norm(k, dim=-1, eps=1e-6)
-    use_qk_l2norm_in_kernel = False
+    if use_qk_l2norm_in_kernel:
+        q = l2norm(q, dim=-1, eps=1e-6)
+        k = l2norm(k, dim=-1, eps=1e-6)
 
     o, final_state = ChunkGatedDeltaRuleFunction.apply(
         q,
@@ -366,7 +366,7 @@ def chunk_gated_delta_rule(
         initial_state,
         output_final_state,
         cu_seqlens,
-        use_qk_l2norm_in_kernel,
+        False,
         chunk_size
     )
     return o, final_state
