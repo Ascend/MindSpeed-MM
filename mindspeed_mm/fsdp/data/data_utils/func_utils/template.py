@@ -346,6 +346,21 @@ _register_template(
     template_class=ReasoningTemplate,
 )
 
+tools_slot = '''
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{{content}}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>'''
 
 # copied from qwen template
 _register_template(
@@ -358,7 +373,9 @@ _register_template(
             slots=["<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
         ),
         stop_words=["<|im_end|>"],
-        replace_eos=True),
+        replace_eos=True,
+        tool_prompt=StringFormatter(slots=[tools_slot])
+    ),
     mm_plugin=get_mm_plugin(name="qwen3_vl", image_token="<|image_pad|>", video_token="<|video_pad|>"),
 )
 
@@ -401,21 +418,6 @@ _register_template(
     template_class=ReasoningTemplate
 )
 
-tools_slot = '''
-
-# Tools
-
-You may call one or more functions to assist with the user query.
-
-You are provided with function signatures within <tools></tools> XML tags:
-<tools>
-{{content}}
-</tools>
-
-For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
-<tool_call>
-{"name": <function-name>, "arguments": <args-json-object>}
-</tool_call>'''
 
 _register_template(
     name="qwen3_omni_nothink",

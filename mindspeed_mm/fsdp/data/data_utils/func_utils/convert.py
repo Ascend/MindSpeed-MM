@@ -336,7 +336,7 @@ class DatasetAttr:
     # rlhf columns
     chosen: Optional[str] = None
     rejected: Optional[str] = None
-    formatting: Literal["alpaca", "sharegpt"] = "sharegpt"
+    formatting: Literal["alpaca", "sharegpt", "multimodal_tool"] = "sharegpt"
 
     def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
         result = asdict(self)
