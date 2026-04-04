@@ -36,7 +36,7 @@
 ### 1. 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -262,14 +262,14 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 比如9b默认的值`[24,0,0,0]`、`[5,12,12,11]`，其含义为PP域内第一张卡先放24层`vision_encoder`再放5层`text_decoder`、第二张卡放`text_decoder`接着的12层、第三张卡放`text_decoder`接着的12层、第四张卡放`text_decoder`接着的11层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[22,2,0,0]`、`[5,12,12,11]`的配置是错的）
 
-同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[5,12,12,11]`），需要在`finetune_glm4.1v_9b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dummy_optimizer.md)。
+同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[24,0,0,0]`、`[5,12,12,11]`），需要在`finetune_glm4.1v_9b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](../../docs/zh/features/dummy_optimizer.md)。
 
 <a id="jump4.3"></a>
 
 ### 3. 启动微调
 
 以GLM4.1V-9B为例，启动微调训练任务。  
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 
 ```shell
 bash examples/glm4.1v/finetune_glm4.1v_9b.sh

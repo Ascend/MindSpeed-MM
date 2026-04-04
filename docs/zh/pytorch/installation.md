@@ -135,7 +135,7 @@ pip install torch_npu-2.7.1*-cp310-cp310*.whl
 
 拉取MindSpeed MM仓库并安装Megatron
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1

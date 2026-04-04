@@ -77,10 +77,10 @@ upstream=LTX2/packages/ltx-trainer
 
 ```bash
 # 1. 克隆 MindSpeed-MM
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 
 # 2. 安装 mindspeed 及依赖（如已集成可跳过）
-git clone https://gitcode.com/Ascend/MindSpeed.git
+git clone --branch 26.0.0_core_r0.12.1 https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 cp -r mindspeed ../MindSpeed-MM/
 cd ../MindSpeed-MM

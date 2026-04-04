@@ -43,7 +43,7 @@
 1. 在工作目录执行下列命令
 
     ```shell
-    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+    git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
     cd MindSpeed-MM
     git clone https://github.com/guandeh17/Self-Forcing.git
     bash examples/self_forcing/replace_npu_patch.sh
@@ -110,4 +110,4 @@
 
 ## 公网地址说明
 
-代码涉及公网地址参考 [公网地址](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/public_address_statement.md)
+代码涉及公网地址参考 [公网地址](../../docs/zh/public_address_statement.md)

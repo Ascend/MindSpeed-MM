@@ -70,7 +70,7 @@ commit_id=2766232ceaafeb680ca32fe0a7e9735c04b561d4
 ### 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git 
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -306,8 +306,8 @@ bash examples/hunyuanvideo/feature_extract/feature_extraction.sh
   - 使用场景：在视频序列（分辨率X帧数）较大时，可以开启来降低内存占用。
   - 使能方式：在启动脚本中设置 CP > 1，如：CP=2；
     - 默认为Ulysses序列并行
-    - RingAttention序列并行请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_ring_attention.md)
-    - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dit_usp.md)
+    - RingAttention序列并行请[参考文档](../../docs/zh/features/dit_ring_attention.md)
+    - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](../../docs/zh/features/dit_usp.md)
   - 限制条件：
     - 使用Ulysses序列并行时，head 数量需要能够被TP*CP整除（在`examples/hunyuanvideo/{task_name}/model_hunyuanvideo.json`中配置，默认为24）
     - 使用RingAttention或者USP序列并行时，CP不能大于单个计算节点上的NPU数量`NPUS_PER_NODE`

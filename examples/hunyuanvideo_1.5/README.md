@@ -57,7 +57,7 @@ commit_id=bf576ef1d5ddc643cf814b1dff4f4dcc9a7581c7
 拉取MindSpeed MM代码仓，并进入代码仓根目录：
 
 ```bash
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
 

@@ -78,7 +78,7 @@ commit id: 52f25651a2016ddede2283be17cf40c2c1b906ed
 ### 2. 环境搭建
 
 ```bash
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -120,7 +120,7 @@ pip install librosa
 
 ### 2. 权重转换(hf2mm)
 
-MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)
+MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](../../docs/zh/features/mm_convert.md)
 
 ```bash
   
@@ -382,7 +382,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 注意，当开启PP时，`model.json`中配置的`vision_encoder`和`text_decoder`的`pipeline_num_layer`参数控制了各自的PP切分策略。对于流水线并行，要先处理`vision_encoder`再处理`text_decoder`。
 比如7b默认的值`[32,0,0,0]`、`[1,10,10,7]`，其含义为PP域内第一张卡先放32层`vision_encoder`再放1层`text_decoder`、第二张卡放`text_decoder`接着的10层、第三张卡放`text_decoder`接着的10层、第四张卡放`text_decoder`接着的7层，`vision_encoder`没有放完时不能先放`text_decoder`（比如`[30,2,0,0]`、`[1,10,10,7]`的配置是错的）
 
-同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[30,2,0,0]`、`[0,11,10,7]`），需要在`finetune_qwen2_5_omni_7b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/dummy_optimizer.md)。
+同时注意，如果某张卡上的参数全部冻结时会导致没有梯度（比如`vision_encoder`冻结时PP配置`[30,2,0,0]`、`[0,11,10,7]`），需要在`finetune_qwen2_5_omni_7b.sh`中`GPT_ARGS`参数中增加`--enable-dummy-optimizer`，参考[dummy_optimizer特性文档](../../docs/zh/features/dummy_optimizer.md)。
 
 【重计算配置（可选）】
 若要开启vit重计算，需在model.json中的vision_encoder部分添加下面三个重计算相关参数
@@ -407,7 +407,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 ### 3. 启动微调
 
 以Qwen2.5Omni-7B为例，启动微调训练任务。  
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 
 ```shell
 bash examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh
@@ -512,7 +512,7 @@ bash examples/qwen2.5omni/finetune_qwen2_5_omni_7b.sh
 
 ### lora微调
 
-LoRA为框架通用能力，当前功能已支持，可参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md)。
+LoRA为框架通用能力，当前功能已支持，可参考[LoRA特性文档](../../docs/zh/features/lora_finetune.md)。
 
 <a id="jump8"></a>
 

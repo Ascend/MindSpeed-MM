@@ -46,7 +46,7 @@ pip install triton-ascend==3.2.0rc4
 # 确保transformers已安装并且版本为4.57.6
 pip install transformers==4.57.6
 
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
 

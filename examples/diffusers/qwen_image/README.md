@@ -58,7 +58,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
 2. 克隆仓库到本地服务器
 
     ```shell
-    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+    git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
     ```
 
 3. 模型搭建
@@ -289,4 +289,4 @@ vim ./examples/dreambooth/infer_qwen_image_text2img_bf16.py # 进入运行推理
 
 ### 公网地址说明
 
-代码涉及公网地址参考 [公网地址](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/public_address_statement.md)
+代码涉及公网地址参考 [公网地址](../../../docs/zh/public_address_statement.md)

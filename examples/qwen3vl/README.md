@@ -66,7 +66,7 @@ commit_id=c0dbe09
 拉取MindSpeed MM代码仓，并进入代码仓根目录：
 
 ```bash
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/qwen3vl/requirements.txt
 ```
@@ -288,7 +288,7 @@ gpt_args:
 开启该功能时，同时需要在`qwen3vl_full_sft_xxB.yaml`文件中`gpt_args`配置项里配置`distributed_backend: npu:hccl,cpu:gloo`，以开启双通信后端。
 
 【chunkloss 配置】
-参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/chunkloss.md)
+参考[chunk loss文档](../../docs/zh/features/chunkloss.md)
 
 【负载均衡损失配置】
 支持自定义moe模型中专家负载均衡的aux_loss的系数，在`qwen3vl_full_sft_xxB.yaml`中的`router_aux_loss_coef`，默认为0.0，即不计算该损失。
@@ -335,7 +335,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 【LoRA微调（可选）】
 
-LoRA为框架通用能力，当前已支持30B模型的语言模块LoRA微调，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md)。
+LoRA为框架通用能力，当前已支持30B模型的语言模块LoRA微调，参数介绍请参考[LoRA特性文档](../../docs/zh/features/lora_finetune.md)。
 
 LoRA微调场景下，需要先对原始权重完成以下权重转换
 
@@ -388,7 +388,7 @@ bash examples/qwen3vl/finetune_lora_qwen3vl_30B.sh
 ### 3. 启动微调
 
 以Qwen3VL-xxB为例，启动微调训练任务。
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 通过修改`qwen3vl_full_sft_xxB.yaml`文件中的`loss_type`字段可以在不同的loss计算方式中切换。
 
 ```shell
@@ -397,7 +397,7 @@ bash examples/qwen3vl/finetune_qwen3vl_xxB.sh
 
 **优化特性：**
 
-- ChunkLoss：可以参考文档[ChunkLoss](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/chunkloss.md)开启该特性优化长序列时的显存占用。
+- ChunkLoss：可以参考文档[ChunkLoss](../../docs/zh/features/chunkloss.md)开启该特性优化长序列时的显存占用。
 
 ---
 

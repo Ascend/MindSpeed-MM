@@ -48,7 +48,7 @@ commit_id=c548f2e60d409fc1d92208472c0f2389998af632
 ### 1. 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 
 cd MindSpeed-MM
 ```

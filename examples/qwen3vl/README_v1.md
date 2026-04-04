@@ -60,10 +60,10 @@ commit_id=c0dbe09
 
 ```bash
 # 拉取MindSpeed MM代码仓，并进入代码仓根目录：
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 
 # 安装mindspeed及依赖
-git clone https://gitcode.com/Ascend/MindSpeed.git
+git clone --branch 26.0.0_core_r0.12.1 https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 cp -r mindspeed ../MindSpeed-MM/
 
@@ -192,7 +192,7 @@ NNODES: 一共几个节点
 
 ### 3. 启动微调
 
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 可在`qwen3vl_30B_config_v1.yaml`的`model`参数中配置上述文档中的`loss_type`。
 
 ```shell

@@ -56,7 +56,7 @@ commit_id=2d57e21
 ### 1. 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -116,7 +116,7 @@ pip install -e .
 
 MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的转换以及PP（Pipeline Parallel）的权重切分。
 
-`mm-convert`工具详细用法参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)。
+`mm-convert`工具详细用法参考[权重转换工具](../../docs/zh/features/mm_convert.md)。
 
 ```bash
 # 根据实际情况修改 ascend-toolkit 路径

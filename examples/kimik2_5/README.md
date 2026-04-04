@@ -55,7 +55,7 @@ commit_id=3367c8d
 ### 2. 环境搭建
 
 ```bash
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 
 # 安装mindspeed及依赖
 git clone https://gitcode.com/Ascend/MindSpeed.git

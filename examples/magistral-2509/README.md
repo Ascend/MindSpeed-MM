@@ -56,7 +56,7 @@ commit_id=68119e5
 ### 2. 环境搭建
 
 ```bash
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -286,7 +286,7 @@ mm-convert Mistral3Converter merge_mm_lora_dcp_weight_to_base_hf \
 
 ## 环境变量声明
 
-以下列出常见的环境变量，详细的命令参数请见[详细变量声明](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/args_readme.md)
+以下列出常见的环境变量，详细的命令参数请见[详细变量声明](../../docs/zh/pytorch/args_readme.md)
 
 | 环境变量                      | 描述                                                                 | 取值说明                                                                                         |
 |-------------------------------|--------------------------------------------------------------------|----------------------------------------------------------------------------------------------|

@@ -21,7 +21,7 @@
 
 ## 安装前准备
 
-根据[版本说明](RELEASENOTE.md)获取配套的版本软件。
+根据[版本说明](release_notes.md)获取配套的版本软件。
 
 ### 驱动固件安装
 
@@ -78,7 +78,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
 
  **一键安装**
 
-  目前Qwen3-VL、Wan2.2等模型已支持一键安装，具体支持情况可以查看具体模型的[README](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples)。
+  目前Qwen3-VL、Wan2.2等模型已支持一键安装，具体支持情况可以查看具体模型的[README](../../examples)。
 
   一键式命令会依次安装`PyTorch`、`torch_npu`、`Megatron-LM`、`MindSpeed`、`MindSpeed MM`。由于Megatron-LM对于`pip install`安装方式适配性待提升，采用源码拷贝方式进行使用。
 
@@ -87,7 +87,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
   1. 获取取MindSpeed MM代码仓，并进入代码仓根目录：
 
       ```bash
-        git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+        git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
         cd MindSpeed-MM
       ```
 
@@ -146,7 +146,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
   1. 获取MindSpeed MM和Megatron-LM源码。
 
       ```shell
-        git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+        git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git 
         git clone https://github.com/NVIDIA/Megatron-LM.git
         cd Megatron-LM
         git checkout core_v0.12.1
@@ -169,7 +169,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
           cd ..
       ```
 
-  3. 安装Mindpseed MM相关依赖，可通过[pyptoject.toml](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pyproject.toml)配置第三方依赖清单。
+  3. 安装Mindpseed MM相关依赖，可通过[pyptoject.toml](../../pyproject.toml)配置第三方依赖清单。
   
       ```shell
         pip install -e .

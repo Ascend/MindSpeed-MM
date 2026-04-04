@@ -40,7 +40,7 @@
 ### 1. 仓库拉取
 
 ```shell
-    git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+    git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git 
     git clone https://github.com/NVIDIA/Megatron-LM.git
     cd Megatron-LM
     git checkout core_r0.8.0

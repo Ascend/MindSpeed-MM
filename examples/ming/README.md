@@ -48,7 +48,7 @@ commit_id=d97e2f31467298674426539915a146d88a814925
 ### 1. 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/inclusionAI/Ming.git
 
 cd Ming
@@ -88,7 +88,7 @@ pip install -r MindSpeed-MM/examples/ming/requirements.txt
 
 ## 数据集准备及处理
 
-以coco2017数据集为例，可以参考[此处](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/qwen2.5vl#数据集准备及处理) 下载和预处理数据集，预处理完后，数据格式如下：
+以coco2017数据集为例，可以参考[此处](../qwen2.5vl/README.md#数据集准备及处理) 下载和预处理数据集，预处理完后，数据格式如下：
 
    ```json
    [

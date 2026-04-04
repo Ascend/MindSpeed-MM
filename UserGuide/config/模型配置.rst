@@ -1,7 +1,7 @@
 模型配置
 ===========================
 
-以 `examples/wan2.2/A14B/t2v/pretrain_model_high.json <https://gitcode.com/Ascend/MindSpeed-MM/blob/master/examples/wan2.2/A14B/t2v/pretrain_model_high.json>`_ 为例
+以 `examples/wan2.2/A14B/t2v/pretrain_model_high.json <https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/examples/wan2.2/A14B/t2v/pretrain_model_high.json>`_ 为例
 
 .. code:: json
 

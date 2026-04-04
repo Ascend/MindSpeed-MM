@@ -50,7 +50,7 @@ Step 1: 搭建开发环境
 
 .. code:: bash
 
-    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+    git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
     cd MindSpeed-MM
 
 对于X86架构机器，执行如下指令：
