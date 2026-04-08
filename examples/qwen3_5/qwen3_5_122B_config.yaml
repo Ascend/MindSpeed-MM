@@ -3,16 +3,14 @@ parallel:
   tensor_parallel_size: 1
   fully_shard_parallel_size: auto
   fsdp_plan:
-    apply_modules:
-      - model.visual.blocks.{*}
+    apply_modules: # 如果要开prefetch的话，请不要随意修改apply_modules的顺序
       - model.visual
-      - model.language_model.layers.{*}.linear_attn
-      - model.language_model.layers.{*}.mlp
-      - model.language_model.layers.{*}
-      - model.language_model.embed_tokens
-      - model.language_model.norm
-      - model.language_model.rotary_emb
+      - model.visual.blocks.{*}
       - model.language_model
+      - model.language_model.embed_tokens
+      - model.language_model.layers.{*}
+      - model.language_model.layers.{*}.linear_attn
+      - model.language_model.layers.{*}.mlp.experts
       - lm_head
     hook_modules:
       - model.language_model.layers.{*}

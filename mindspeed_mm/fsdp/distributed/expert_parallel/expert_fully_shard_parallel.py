@@ -12,7 +12,8 @@ from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import (
     get_mixprecision_policy,
     get_fsdp_hook_modules,
-    find_hook_module
+    find_hook_module,
+    get_efsdp_modules,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,18 +39,6 @@ def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, ep_plan: EPPl
             set_gradient_divide_factor(experts, ep_plan._gradient_divide_factor)
 
     return model
-
-
-def get_efsdp_modules(modules: torch.nn.Module, plan: EPPlanConfig):
-    efsdp_modules = []
-    for plan_name in plan.apply_efsdp_modules:
-        for name, module in modules.named_modules():
-            if module_name_match(plan_name, name):
-                print_rank(logger.debug, f'[Expert Fully Shard]: Apply efsdp to module <{name}>')
-                efsdp_modules.append(module)
-    if len(efsdp_modules) == 0:
-        raise RuntimeError(f'[Expert Fully Shard] No module named {plan} or not be ModuleList')
-    return efsdp_modules
 
 
 def set_gradient_divide_factor(module, factor):
