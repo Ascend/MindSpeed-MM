@@ -2,7 +2,7 @@
 
 ## 概述
 
-MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件，同时支持多模态生成及多模态理解，旨在为华为 昇腾芯片 提供端到端的多模态训练解决方案, 包含预置业界主流模型，数据工程，分布式训练及加速，预训练、微调、在线推理任务等特性。
+MindSpeed MM是面向大规模分布式训练的昇腾多模态大模型套件，同时支持多模态生成及多模态理解。它旨在为华为昇腾芯片提供端到端的多模态训练解决方案，并包含预置业界主流模型，数据工程，分布式训练及加速，预训练、微调、在线推理任务等特性。
 
 ## MindSpeed MM架构
 
@@ -17,7 +17,7 @@ MindSpeed MM架构关系如图所示
 
 图1 MindSpeed MM架构图
 
-![alt text](../../sources/images/introdution_2.png)
+![alt text](../../sources/images/architecture_mindspeed_mm.png)
 
 ## 功能特性
 

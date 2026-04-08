@@ -21,8 +21,8 @@ prof.stop()
 
 ```bash
 --enable                  # 指开启profiling采集
---profile_type            # 指动态或静态的profiling采集类型, static / dynamic
---ranks                   # 指profiling采集的rank, default 为-1， 指采集全部rank
+--profile_type            # 指动态或静态的profiling采集类型，static / dynamic
+--ranks                   # 指profiling采集的rank，default为-1，指采集全部rank
 ```
 
 ### 静态采集  
@@ -57,9 +57,9 @@ prof.stop()
 
     + `analyse_flag`为`false`时，生成的profiling文件位于`save_path`路径下，需要搭配如下命令触发离线解析：
 
-    ```shell
+        ```shell
         python mindspeed_mm/tools/profiler.py
-    ```
+        ```
 
 ### 动态采集  
 
@@ -151,7 +151,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
   "memory_profile": {
     "enable": false,    // 内存采集功能开关
     "start_step": 0,    // 开始录制的步数。数值为训练步数的起始点，0代表开始采集的步数
-    "end_step": 2,      // 结束录制的步数。数值为训练步数的终止点，2代表结束采集的步数
+    "end_step": 2,      // 结束录制的步数。数值为训练步数的终止点点，2代表结束采集的步数
     "save_path": "./memory_snapshot",  // 快照文件保存路径
     "dump_ranks": [     // 录制快照的rank列表，从0开始
       0
@@ -178,7 +178,7 @@ while iteration < args.train_iters:                 # 训练主循环
 memory_profiler.stop()                              # 停止采集
 ```
 
-+ (不推荐)对于不具备典型训练结构的脚本，或者局部的手动调试，可直接调用基础函数。
++ 对于不具备典型训练结构的脚本，或者局部的手动调试，可直接调用基础函数，根据自定义需求修改。
 
 ```python
 code_not_record()

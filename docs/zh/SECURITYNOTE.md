@@ -1,10 +1,11 @@
+
 # 安全声明
 
 ## 系统安全加固
 
 1. 建议用户在系统中配置开启ASLR（级别2），又称**全随机地址空间布局随机化**，可参考以下方式进行配置：
 
-    ```shell
+    ```bash
     echo 2 > /proc/sys/kernel/randomize_va_space
     ```
 
@@ -69,55 +70,55 @@
    
 5. 参考链接
    
-   torch.load()文档：<https://pytorch.org/docs/main/generated/torch.load.html#torch.load>(包含weights_only参数说明及其风险)
+   torch.load()文档：https://pytorch.org/docs/main/generated/torch.load.html#torch.load(包含 weights_only参数说明及其风险)
    
-   PyTorch 分布式通信说明：<https://pytorch.org/docs/main/distributed.html#collective-functions>
+   PyTorch 分布式通信说明：https://pytorch.org/docs/main/distributed.html#collective-functions
 
-### 运行安全声明
+## 运行安全声明
 
 1. 建议用户结合运行资源状况编写对应训练脚本。若训练脚本与资源状况不匹配，如数据集加载内存大小超出内存容量限制、训练脚本在本地生成数据超过磁盘空间大小等情况，可能引发错误并导致进程意外退出。
-2. MindSpeed MM内部用到了Pytorch和torch_npu,可能会因为版本不匹配导致运行错误，具体可参考Pytorch及torch_npu[安全声明](https://gitcode.com/Ascend/pytorch/blob/master/SECURITYNOTE.md)。
+2. MindSpeed MM内部用到了Pytorch和torch_npu,可能会因为版本不匹配导致运行错误，具体可参考PyTorch及torch_npu[安全声明](https://gitcode.com/Ascend/pytorch/blob/master/SECURITYNOTE.md)。
 3. MindSpeed MM的依赖库transformers和datasets在使用from_pretrained方法时，存在配置trust_remote_code=True的情况。此设置会直接执行从远程仓库下载的代码，可能包含恶意逻辑或后门程序，导致系统面临代码注入攻击等安全威胁。用户需要确保自己下载的模型和数据的安全性。
 
-# 公开接口声明
+## 公开接口声明
 
 MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。19个入口脚本分别为:
 
-- [evaluate_gen](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/evaluate_gen.py)
-- [evaluate_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/evaluate_vlm.py)
-- [inference_qihoo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/inference_qihoo.py)
-- [inference_sora](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/inference_sora.py)
-- [inference_videoalign](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/inference_videoalign.py)
-- [inference_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/inference_vlm.py)
-- [posttrain_flux_dancegrpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_flux_dancegrpo.py)
-- [posttrain_qwen2vl_dpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_qwen2vl_dpo.py)
-- [posttrain_sora_dpo](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/posttrain_sora_dpo.py)
-- [pretrain_ae](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_ae.py)
-- [pretrain_deepseekvl](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_deepseekvl.py)
-- [pretrain_internvl](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_internvl.py)
-- [pretrain_lumina](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_lumina.py)
-- [pretrain_qwen2vl](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_qwen2vl.py)
-- [pretrain_sora](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_sora.py)
-- [pretrain_transformers](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_transformers.py)
-- [pretrain_videoalign](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_videoalign.py)
-- [pretrain_vlm](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_vlm.py)
-- [pretrain_whisper](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/pretrain_whisper.py)
+- [evaluate_gen](../../evaluate_gen.py)
+- [evaluate_vlm](../../evaluate_vlm.py)
+- [inference_qihoo](../../inference_qihoo.py)
+- [inference_sora](../../inference_sora.py)
+- [inference_videoalign](../../inference_videoalign.py)
+- [inference_vlm](../../inference_vlm.py)
+- [posttrain_flux_dancegrpo](../../posttrain_flux_dancegrpo.py)
+- [posttrain_qwen2vl_dpo](../../posttrain_qwen2vl_dpo.py)
+- [posttrain_sora_dpo](../../posttrain_sora_dpo.py)
+- [pretrain_ae](../../pretrain_ae.py)
+- [pretrain_deepseekvl](../../pretrain_deepseekvl.py)
+- [pretrain_internvl](../../pretrain_internvl.py)
+- [pretrain_lumina](../../pretrain_lumina.py)
+- [pretrain_qwen2vl](../../pretrain_qwen2vl.py)
+- [pretrain_sora](../../pretrain_sora.py)
+- [pretrain_transformers](../../pretrain_transformers.py)
+- [pretrain_videoalign](../../pretrain_videoalign.py)
+- [pretrain_vlm](../../pretrain_vlm.py)
+- [pretrain_whisper](../../pretrain_whisper.py)
 
-# 通信安全加固
+## 通信安全加固
 
 [通信安全加固说明](https://gitcode.com/Ascend/pytorch/blob/master/SECURITYNOTE.md#%E9%80%9A%E4%BF%A1%E5%AE%89%E5%85%A8%E5%8A%A0%E5%9B%BA
 )
 
-# 通信矩阵
+## 通信矩阵
 
 [通信矩阵说明](https://gitcode.com/Ascend/pytorch/blob/master/SECURITYNOTE.md#%E9%80%9A%E4%BF%A1%E7%9F%A9%E9%98%B5%E4%BF%A1%E6%81%AF)
 
-# 特殊场景
+## 特殊场景
 
 | 场景                                                                             | 使用方法                                                                                                        | 端口           | 可能的风险                                                   |
 |--------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------| -------------- | ------------------------------------------------------------ |
-| 使用MindSpeed MM进行训练任务时，在Megatron后端场景下每次初始化模型并行组时，默认新增（3 * NPU数量）个随机端口，开启多个分布式优化器时再额外新增（分布式优化器数量 * NPU数量）个随机端口，同时配置1个master-port端口（该端口与torch_npu的master-port端口一致） | MindSpeed MM 调用 Megatron 原生函数 `mpu.initialize_model_parallel` 来初始化模型并行组，并通过使用 PyTorch 分布式训练相关的 API 来启动任意任务。 | [1024,65520]内 | 网络配置错误可能引发端口冲突或连接问题，影响训练效率。|
+| 使用MindSpeed MM进行训练任务时，在Megatron后端场景下每次初始化模型并行组时，默认新增（3 * NPU数量）个随机端口，开启多个分布式优化器时再额外新增（分布式优化器数量 * NPU数量）个随机端口，同时配置1个master-port端口（该端口与torch_npu的master-port端口一致） | MindSpeed MM 调用 Megatron 原生函数 `mpu.initialize_model_parallel` 来初始化模型并行组，并通过使用 PyTorch 分布式训练相关的 API 来启动任意任务。 | [1024,65520]内 | 网络配置错误可能引发端口冲突或连接问题，影响训练效率。       |
 
-## 公网地址声明
+### 公网地址声明
 
-代码涉及公网地址参考 [public_address_statement.md](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/public_address_statement.md)
+代码涉及公网地址参考 [public_address_statement.md](./public_address_statement.md)
