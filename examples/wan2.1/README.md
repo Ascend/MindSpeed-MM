@@ -29,6 +29,12 @@
     - [准备工作](#准备工作-2)
     - [参数配置](#参数配置-2)
     - [启动微调](#启动微调)
+  - [DPO训练](#dpo训练)
+    - [环境准备](#环境准备)
+    - [生成视频样本](#生成视频样本)
+    - [生成偏好数据集](#生成偏好数据集)
+    - [训练参数配置](#训练参数配置)
+    - [启动DPO训练](#启动dpo训练)
   - [推理](#推理)
     - [准备工作](#准备工作-3)
     - [参数配置](#参数配置-3)
@@ -449,6 +455,106 @@ mm-convert WanConverter merge_lora_to_base \
  --cfg.lora_path <lora_save_path> \
  --lora_alpha 64 \
  --lora_rank 64
+```
+
+## DPO训练
+
+目前仅支持i2v任务的DPO基础训练，更多功能待后续完善。
+
+### 环境准备
+
+1. 参考docs/zh/features/vbench-evaluate.md中的环境安装指导完成vbench及依赖三方件的安装
+2. 将VBench的 [t2v json](https://github.com/Vchitect/VBench/blob/master/vbench/VBench_full_info.json) 下载到MM代码根路径"./vbench/VBench_full_info.json"
+
+### 生成视频样本
+
+1. 修改推理配置文件：
+
+| 参数配置文件                                                 |               修改字段               | 修改说明                          |
+|------------------------------------------------------------|:--------------------------------:|:----------------------------------|
+| examples/wan2.1/14b/i2v/inference_model.json      |         from_pretrained          | 修改为下载的权重所对应路径（包括vae、tokenizer、text_encoder） |
+| examples/wan2.1/14b/i2v/inference_model.json      |  num_inference_videos_per_sample | 每个prompt生成的视频样本数量，建议至少大于2         |
+| examples/wan2.1/14b/i2v/inference_model.json        |  save_path | 生成视频的保存路径                         |
+| examples/wan2.1/14b/i2v/inference.sh              |   LOAD_PATH | 转换之后的transformer部分权重路径              |
+
+| i2v prompts配置文件                                   |               修改字段               |       修改说明       |
+|--------------------------------------------|:--------------------------------:|:----------------:|
+| examples/wan2.1/samples_i2v_images.txt  |               文件内容               |       图片路径       |
+| examples/wan2.1/samples_i2v_prompts.txt |               文件内容               |    自定义prompt     |
+
+2. 启动推理流程生成视频样本：
+
+```shell
+bash examples/wan2.1/14b/i2v/inference.sh
+```
+
+3. 删除视频样本保存路径下的video_grid.mp4，最终视频样本数量为：prompt条数 * $num_inference_videos_per_sample
+
+### 生成偏好数据集
+
+执行如下命令，为生成的视频样本打分，并生成偏好数据文件
+
+```bash
+python examples/stepvideo/histogram_generator.py --prompt_file <prompt文件路径> --videos_path <视频样本路径> --num_inference_videos_per_sample <每个prompt生成的视频样本数量>
+```
+
+生成偏好数据集脚本的参数说明如下：
+
+|参数| 含义 | 如何配置 |
+|:------------|:----|:----|
+| --prompt_file | prompt文件路径 | 与生成视频样本时，推理配置文件中的prompt字段值一致 |
+| --videos_path | 视频样本路径 | 与生成视频样本时，推理配置文件中的save_path字段值一致 |
+| --num_inference_videos_per_sample | 每个prompt生成的视频样本数量 | 与生成视频样本时，推理配置文件中的num_inference_videos_per_sample字段值一致 |
+
+执行脚本后，会生成偏好数据集文件"data.jsonl"和评分概率直方图文件"video_score_histogram.json"，默认与视频样本目录平级
+
+data.jsonl中包含成对的视频偏好数据和文本信息，具体示例如下：
+
+```json
+[
+    {
+        "file": "video_0.mp4",
+        "file_rejected": "video_2.mp4",
+        "captions": "prompt1",
+        "score": 0.646468401,
+        "score_rejected": 0.5799660087
+    },
+    {
+        "file": "video_4.mp4",
+        "file_rejected": "video_5.mp4",
+        "captions": "prompt2",
+        "score": 0.7914018631,
+        "score_rejected": 0.69968328357
+    },
+    ......
+]
+```
+
+### 训练参数配置
+
+在开始之前，请确认环境准备、模型权重准备、偏好数据准备已完成。
+
+1. 权重配置
+
+  需根据实际任务情况在启动脚本文件`posttrain.sh`中的`LOAD_PATH="your_converted_dit_ckpt_dir"`变量中添加转换后的权重的实际路径，如`LOAD_PATH="./weights/Wan-AI/Wan2.1-I2V-14B-Diffusers/transformer/"`,其中`./weights/Wan-AI/Wan2.1-I2V-14B-Diffusers/transformer/`为转换后的权重的实际路径。`LOAD_PATH`变量中填写的完整路径一定要正确，填写错误的话会导致权重无法加载但运行并不会提示报错。
+根据需要填写`SAVE_PATH`变量中的路径，用以保存训练后的权重。
+
+2. 偏好数据集路径配置
+
+  根据实际情况修改`feature_data.json`中的偏好数据集路径，分别为`"data_path": "./sora_features/data.jsonl"`替换为实际的data.jsonl所在路径,`"data_folder": "./sora_features/"`替换`"/data_path/"`为实际的视频样本所在路径。
+
+3. VAE及text_encoder、tokenizer路径配置
+
+  根据实际情况修改`inference_model.json`文件中`from_pretrained`字段配置vae、text_encoder、tokenizer路径。
+
+4. dpo参数配置
+
+  根据实际情况修改`posttrain_model.json`中的直方图文件路径，即将`histogram_path`的值配置为执行生成偏好数据集脚本后，生成的"video_score_histogram.json"文件路径
+
+### 启动DPO训练
+
+```bash
+bash examples/wan2.1/14b/i2v/posttrain.sh
 ```
 
 ## 推理
