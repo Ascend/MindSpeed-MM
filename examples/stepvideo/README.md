@@ -165,7 +165,7 @@ mm-convert StepVideoConverter hf_to_mm \
   --cfg.source_path <your source path> \
   --cfg.target_path <your target path> \
   --cfg.target_parallel_config.tp_size <tp_size> \
-  --cfg.target_parallel_config.pp_layers <pp_layers> \
+  --cfg.target_parallel_config.pp_layers <pp_layers>
 ```
 
 其中`tp_size`表示TP切分数，`pp_layers`表示pp切分后每个stage的层数，如`48`表示不切分，`[24,24]`表示PP=2，每个PP stage 24层。
@@ -242,7 +242,7 @@ data.jsonl文件内容如下示例：
 | examples/stepvideo/feature_extract/data.json              |      basic_parameters   | 数据集路径，`data_path`和`data_folder`分别配置data.jsonl的文件路径和目录 |
 | examples/stepvideo/feature_extract/data.json              |      num_frames        | 最大的帧数，超过则随机选取其中的num_frames帧, 其中i2v配置102,t2v配置136 |
 | examples/stepvideo/feature_extract/data.json              |      tokenizer_config  | tokenizer分词器选择，配置两种分词器的路径`"from_pretrained": "/model_path/step_llm/step1_chat_tokenizer.model"` 及`"from_pretrained": "/model_path/hunyuan_clip/tokenizer"` |
-| examples/stepvideo/feature_extract/model_stepvideo.json   |      text_encoder    | 配置两种文本编译器路径`"from_pretrained": "./weights/step_llm/"`及`"from_pretrained": "./weights/hunyuan_clip/clip_text_encoder"` |
+| examples/stepvideo/feature_extract/model_stepvideo.json   |      text_encoder    | 配置两种文本编码器路径`"from_pretrained": "./weights/step_llm/"`及`"from_pretrained": "./weights/hunyuan_clip/clip_text_encoder"` |
 | examples/stepvideo/feature_extract/model_stepvideo.json   |      ae              | 配置VAE模型路径`"from_pretrained": "./weights/vae/vae_v2.safetensors"` |
 | mindspeed_mm/tools/tools.json                             |      save_path       | 提取后的特征保存路径                                |
 
@@ -251,7 +251,7 @@ data.jsonl文件内容如下示例：
 | examples/stepvideo/feature_extract/data_i2v.json              |      basic_parameters   | 数据集路径，`data_path`和`data_folder`分别配置data.jsonl的文件路径和目录 |
 | examples/stepvideo/feature_extract/data_i2v.json              |      num_frames        | 最大的帧数，超过则随机选取其中的num_frames帧, 其中i2v配置102,t2v配置136 |
 | examples/stepvideo/feature_extract/data_i2v.json              |      tokenizer_config  | tokenizer分词器选择，配置两种分词器的路径`"from_pretrained": "/model_path/step_llm/step1_chat_tokenizer.model"` 及`"from_pretrained": "/model_path/hunyuan_clip/tokenizer"` |
-| examples/stepvideo/feature_extract/model_stepvideo_i2v.json   |      text_encoder    | 配置两种文本编译器路径`"from_pretrained": "./weights/step_llm/"`及`"from_pretrained": "./weights/hunyuan_clip/clip_text_encoder"` |
+| examples/stepvideo/feature_extract/model_stepvideo_i2v.json   |      text_encoder    | 配置两种文本编码器路径`"from_pretrained": "./weights/step_llm/"`及`"from_pretrained": "./weights/hunyuan_clip/clip_text_encoder"` |
 | examples/stepvideo/feature_extract/model_stepvideo_i2v.json   |      ae              | 配置VAE模型路径`"from_pretrained": "./weights/vae/vae_v2.safetensors"` |
 | mindspeed_mm/tools/tools.json                                 |      save_path       | 提取后的特征保存路径                                |
 

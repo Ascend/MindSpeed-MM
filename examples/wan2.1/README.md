@@ -354,7 +354,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
     --optimization-level 2 \
     --use-multiparameter-pipeline-model-parallel \  #使用PP或者VPP功能必须要开启
     --variable-seq-lengths \  #按需开启，动态shape训练需要加此配置，静态shape不要加此配置
-    “
+    "
     ```
 
 - VP: 虚拟流水线并行
@@ -363,20 +363,20 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   - 使用场景：对流水线并行进行进一步切分，通过虚拟化流水线，降低空泡
   - 使能方式:
-    - 如果想要使用虚拟流水线并行，将pretrain_model.json文件中的"pipeline_num_layers"一维数组改造为两维，其中第一维表示虚拟并行的数量，二维表示流水线并行的数量，例如[[3, 4, 4, 4], [3, 4, 4, 4]]其中第一维两个数组表示vp为2, 第二维的stage个数为4表示流水线数量pp为3或4。
+    - 如果想要使用虚拟流水线并行，请将pretrain_model.json文件中的"pipeline_num_layers"一维数组改造为两维，其中第一维表示虚拟并行的数量，二维表示流水线并行的数量，例如：[[3, 4, 4, 4], [3, 4, 4, 4]]，其中第一维两个数组表示vp为2, 第二维的stage个数为4表示流水线数量pp为3或4。
     - 需要在pretrain.sh当中修改如下变量，需要注意的是，VP仅在PP大于1的情况下生效:
 
     ```shell
     PP=4
     VP=2
-    
+
     GPT_ARGS="
       --pipeline-model-parallel-size ${PP} \
       --virtual-pipeline-model-parallel-size ${VP} \
       --optimization-level 2 \
       --use-multiparameter-pipeline-model-parallel \  #使用PP或者VPP功能必须要开启
       --variable-seq-lengths \  #按需开启，动态shape训练需要加此配置，静态shape不要加此配置
-    ”
+    "
     ```
 
 - 选择性重计算 + FA激活值offload

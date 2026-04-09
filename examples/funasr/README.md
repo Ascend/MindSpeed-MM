@@ -146,7 +146,7 @@ python examples/funasr/data_conversion.py \
 在 `examples/funasr/funasr_config.yaml` 文件中配置好数据集和权重路径:
 
 1. 将`model_name_or_path`修改为本地权重所在目录
-2. 将`train_data_set_list`，`val_data_set_list`修改为数据转换后后保存的jsonl路径
+2. 将`train_data_set_list`，`val_data_set_list`修改为数据转换后保存的jsonl路径
 
 使用如下命令，启动FunASR的微调任务：
 

@@ -111,7 +111,7 @@ unzip -o opentts_data.zip -d opentts_data
 python examples/qwen3tts/process_data.py \
   --opentts_data_path opentts_data \
   --output_jsonl_path train_raw.jsonl \
-  --ref_audio_path ref_audio.wav \
+  --ref_audio_path ref_audio.wav
 
 # 其中：
 # opentts_data_path: 数据集路径
@@ -157,7 +157,7 @@ python examples/qwen3tts/prepare_data.py \
   --device npu:0 \
   --tokenizer_model_path /Qwen3-TTS-Tokenizer-12Hz \
   --input_jsonl train_raw.jsonl \
-  --output_jsonl train_with_codes.jsonl \
+  --output_jsonl train_with_codes.jsonl
 
 # 其中：
 # device：数据提取的设备

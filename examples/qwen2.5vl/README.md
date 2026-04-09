@@ -277,7 +277,7 @@ MindSpeed-MM修改了LoRA网络的结构名称，在微调后，如果需要将L
 
 ```bash
 # 7b 采用huggingface一致的模型结构的LoRA权重转换
-m-convert  Qwen2_5_VLConverter lora_mm_to_hf \
+mm-convert  Qwen2_5_VLConverter lora_mm_to_hf \
   --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-VL-7B-Instruct-lora/" \
   --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct-lora/" \
   --cfg.parallel_config.llm_pp_layers [1,10,10,7] \

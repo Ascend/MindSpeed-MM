@@ -99,7 +99,7 @@ mkdir logs
 
 MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/mm_convert.md)了解该工具的具体使用。**注意当前在MindSpore后端下，转换出的权重无法用于Torch后端的训练**。
 
-> 注：权重准换依赖[mindspore_op_plugin](https://gitee.com/mindspore/mindspore_op_plugin)，请确保已安装该软件，使用教程请参考[op_plugin CPU 算子开发指南](https://gitee.com/mindspore/mindspore_op_plugin/wikis/op_plugin%20CPU%E7%AE%97%E5%AD%90%E5%BC%80%E5%8F%91%E6%8C%87%E5%8D%97)
+> 注：权重转换依赖[mindspore_op_plugin](https://gitee.com/mindspore/mindspore_op_plugin)，请确保已安装该软件，使用教程请参考[op_plugin CPU 算子开发指南](https://gitee.com/mindspore/mindspore_op_plugin/wikis/op_plugin%20CPU%E7%AE%97%E5%AD%90%E5%BC%80%E5%8F%91%E6%8C%87%E5%8D%97)
 
 ```bash
   

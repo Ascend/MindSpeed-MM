@@ -29,6 +29,7 @@ GPT_ARGS="
     --megatron-cp-in-bnsd \
     --attention-mask-type [str] \
 ...
+"
 ```
 
 - ```--use-cp-send-recv-overlap```为可选参数，建议开启，开启后支持send receive overlap功能

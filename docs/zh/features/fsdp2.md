@@ -88,7 +88,7 @@ fsdp2_config.yaml的配置项如下：
   - 取值：`True`或`False`，默认为`False`
 
 - **`pin_memory`**
-  - 描述：是否锁定CPU内存以提高数据传输效率，只有当开始`offload_to_cpu`才生效
+  - 描述：是否锁定CPU内存以提高数据传输效率，只有在开启`offload_to_cpu`才生效
   - 取值：`True`或`False`
 
 ### 配置实例

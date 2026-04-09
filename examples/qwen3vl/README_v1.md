@@ -149,7 +149,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/video_data_path.json，此时配置如下：
 `dataset_dir`配置为/home/user/data/;
-`dataset`配置为/home/user/data//video_data_path.json
+`dataset`配置为/home/user/data/video_data_path.json
 
 **注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。
 

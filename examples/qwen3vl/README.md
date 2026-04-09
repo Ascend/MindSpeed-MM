@@ -219,14 +219,14 @@ data:
 data:
   dataset_param:
     basic_parameters:
-      streaming": true
+      streaming: true
   dataloader_param:
-      sampler_type": stateful_distributed_sampler
+      sampler_type: stateful_distributed_sampler
 ```
 
 【模块冻结配置】
 
-当前支持vison encoder、vision projector、text decoder及lm head模块的冻结，其中，vison encoder、vision projector默认训练时为冻结状态，
+当前支持vision encoder、vision projector、text decoder及lm head模块的冻结，其中，vision encoder、vision projector默认训练时为冻结状态，
 
 通过配置`qwen3vl_full_sft_xxB.yaml`文件中`model`字段下各个模块的`freeze`字段，来修改各个模块的冻结与否。
 

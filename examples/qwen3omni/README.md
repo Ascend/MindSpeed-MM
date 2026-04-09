@@ -461,28 +461,82 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
 
 ```json
 {
-'messages': [
-{'role': 'system', 'content': '你是一名专业、高效的AI智能客服。当前对话的时间为: 2024年06月15日 14时30分00秒 (今天是星期六)。'}, 
-{'role': 'user', 'content': '您好，在不在'}, 
-{'role': 'assistant', 'content': '"您好，请问是杜女士吗？'}, 
-{'role': 'user', 'content': '您好，是的，我是杜女士。'}, 
-{'role': 'assistant', 'content': '杜女士，感谢您的确认。我是疾控中心的工作人员。我们注意到您还没有接种新型流感疫苗。为了您的健康和公共卫生安全，我们建议您尽快接种。'},
-{'role': 'user', 'content': '我现在身体状况挺好的，暂时不想接种疫苗。'}, 
-{'role': 'assistant', 'content': '理解您的顾虑，但接种疫苗不仅能有效预防感染，还能保护您和周围人的健康。特别是在当前疫情环境下，接种疫苗是非常重要的。'},
-{'role': 'user', 'content': '我担心接种后会有不良反应，真的安全吗？'}, 
-{'role': 'assistant', 'content': '您的担忧是可以理解的。新型流感疫苗经过严格的安全性测试，具有较高的安全性。接种后可能会有轻微的不适，但大多数人都能顺利度过。此外，接种后我们会要求您留观30分钟，以确保及时处理任何不良反应。'},
-{'role': 'user', 'content': '好吧，听您这么说，我同意接种疫苗。'}, 
-{'role': 'assistant', 'content': '非常感谢您的理解和支持。我们提供的接种时间是周一到周六，每天早上九点到十二点，下午两点到晚上九点。您可以选择一个方便的时间来接种。'},
-{'role': 'user', 'content': '那我选择周三下午三点可以吗？'}, 
-{'role': 'tool_call', 'content': '<tool_call>\n{"name": "register_vaccine_appointment", "arguments": {"appointment_time": "周三下午三点"}}\n</tool_call>'}, 
-{'role': 'tool_response', 'content': '{"status": "success", "message": "预约成功"}'}, 
-{'role': 'assistant', 'content': '好的，已经为您登记了周三下午三点的接种时间。请您携带有效身份证件按时前往指定接种点。感谢您对疫情防控工作的支持。'},
-{'role': 'user', 'content': '谢谢您，辛苦了。'}, 
-{'role': 'assistant', 'content': '不客气，这是我们的职责。祝您健康，再见。", "id": "客服.礼貌结束"}'}, 
-], 
-
-'audios': '/speeches/7_Katerina.wav',
-'tools': ['{"type": "function", "function": {"name": "register_vaccine_appointment", "description": "登记用户的疫苗接种预约", "parameters": {"type": "object", "properties": {"appointment_time": {"type": "string", "description": "用户选择的接种时间"}}, "required": ["appointment_time"]}}}']}
+    "messages": [
+        {
+            "role": "system",
+            "content": "你是一名专业、高效的AI智能客服。当前对话的时间为: 2024年06月15日 14时30分00秒 (今天是星期六)。"
+        },
+        {
+            "role": "user",
+            "content": "您好，在不在"
+        },
+        {
+            "role": "assistant",
+            "content": "您好，请问是杜女士吗？"
+        },
+        {
+            "role": "user",
+            "content": "您好，是的，我是杜女士。"
+        },
+        {
+            "role": "assistant",
+            "content": "杜女士，感谢您的确认。我是疾控中心的工作人员。我们注意到您还没有接种新型流感疫苗。为了您的健康和公共卫生安全，我们建议您尽快接种。"
+        },
+        {
+            "role": "user",
+            "content": "我现在身体状况挺好的，暂时不想接种疫苗。"
+        },
+        {
+            "role": "assistant",
+            "content": "理解您的顾虑，但接种疫苗不仅能有效预防感染，还能保护您和周围人的健康。特别是在当前疫情环境下，接种疫苗是非常重要的。"
+        },
+        {
+            "role": "user",
+            "content": "我担心接种后会有不良反应，真的安全吗？"
+        },
+        {
+            "role": "assistant",
+            "content": "您的担忧是可以理解的。新型流感疫苗经过严格的安全性测试，具有较高的安全性。接种后可能会有轻微的不适，但大多数人都能顺利度过。此外，接种后我们会要求您留观30分钟，以确保及时处理任何不良反应。"
+        },
+        {
+            "role": "user",
+            "content": "好吧，听您这么说，我同意接种疫苗。"
+        },
+        {
+            "role": "assistant",
+            "content": "非常感谢您的理解和支持。我们提供的接种时间是周一到周六，每天早上九点到十二点，下午两点到晚上九点。您可以选择一个方便的时间来接种。"
+        },
+        {
+            "role": "user",
+            "content": "那我选择周三下午三点可以吗？"
+        },
+        {
+            "role": "tool_call",
+            "content": "<tool_call>\n{\"name\": \"register_vaccine_appointment\", \"arguments\": {\"appointment_time\": \"周三下午三点\"}}\n</tool_call>"
+        },
+        {
+            "role": "tool_response",
+            "content": "{\"status\": \"success\", \"message\": \"预约成功\"}"
+        },
+        {
+            "role": "assistant",
+            "content": "好的，已经为您登记了周三下午三点的接种时间。请您携带有效身份证件按时前往指定接种点。感谢您对疫情防控工作的支持。"
+        },
+        {
+            "role": "user",
+            "content": "谢谢您，辛苦了。"
+        },
+        {
+            "role": "assistant",
+            "content": "不客气，这是我们的职责。祝您健康，再见。",
+            "id": "客服.礼貌结束"
+        }
+    ],
+    "audios": "/speeches/7_Katerina.wav",
+    "tools": [
+        "{\"type\": \"function\", \"function\": {\"name\": \"register_vaccine_appointment\", \"description\": \"登记用户的疫苗接种预约\", \"parameters\": {\"type\": \"object\", \"properties\": {\"appointment_time\": {\"type\": \"string\", \"description\": \"用户选择的接种时间\"}}, \"required\": [\"appointment_time\"]}}}"
+    ]
+}
 ```
 
  <font color='red'>请注意 tools的数据类型是list[str]</font>

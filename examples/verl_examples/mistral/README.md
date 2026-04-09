@@ -16,11 +16,13 @@ source /home/cann/nnal/atb/set_env.sh
 # 安装vllm
 git clone https://github.com/vllm-project/vllm.git
 git checkout d7de043d55d1dd629554467e23874097e1c48993
+cd vllm
 VLLM_TARGET_DEVICE=empty pip install -e .
 cd ..
 
 # 安装vllm-ascend
 git clone https://github.com/vllm-project/vllm-ascend
+cd vllm-ascend
 git checkout 52d4acfa51fb868823d1070b81cbd2d97e9e4696
 pip install -e .
 cd ..
