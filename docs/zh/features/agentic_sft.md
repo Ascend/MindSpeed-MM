@@ -47,7 +47,6 @@ Agentic SFT数据采用JSON格式，每条数据包含以下关键字段：
 | `tool_call` | 工具调用 | 模型发起的工具调用请求，使用特殊格式 |
 | `tool_response` | 工具响应 | 外部工具返回的结果 |
 
-
 ### tool_call 和 tool_response 的顺序约束
 
 **重要规则：**

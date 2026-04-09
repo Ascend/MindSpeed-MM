@@ -1103,7 +1103,6 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   <tbody>
     <tr>
       <td rowspan="108"> 稠密模型 </td>
-      </tr>
       <td rowspan="1"><a href="https://huggingface.co/collections/BAAI/aquila-6698657124de09d10cd7a83f">Aquila</a></td>
       <td><a href="https://huggingface.co/BAAI/Aquila-7B/tree/main">7B</a></td>
       <td><a href="https://gitcode.com/ascend/MindSpeed-LLM/tree/2.0.0/examples/legacy/aquila">aquila</a></td>
@@ -2111,7 +2110,6 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td rowspan="30"> 稀疏模型 </td>
-      </tr>
       <td rowspan="4"> <a href="https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f">Qwen3</a> </td>
       <td rowspan="2"><a href="https://huggingface.co/Qwen/Qwen3-30B-A3B-Base">30B-A3B</a></td>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/qwen3_moe">qwen3_moe</a></td>
@@ -2417,7 +2415,6 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td rowspan="5"> 状态空间模型 </td>
-      </tr>
       <td rowspan="2">Mamba2</td>
       <td><a href="https://huggingface.co/state-spaces/mamba2-2.7b/tree/main">2.7B</a></td>
       <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/mamba2">mamba2</a></td>

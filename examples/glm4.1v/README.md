@@ -261,6 +261,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 注意，当开启PP时，`model.json`中配置的`vision_encoder`和`text_decoder`的`pipeline_num_layer`参数控制了各自的PP切分策略。对于流水线并行，要先处理`vision_encoder`再处理`text_decoder`。
 
 比如9b默认的值`[24,0,0,0]`、`[5,12,12,11]`，其含义为：
+
 - PP域内第一张卡先放24层`vision_encoder`，再放5层`text_decoder`；
 - 第二张卡放`text_decoder`接着的12层；
 - 第三张卡放`text_decoder`接着的12层；
