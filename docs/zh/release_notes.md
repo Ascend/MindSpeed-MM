@@ -107,8 +107,8 @@
 |文档名称|内容简介|更新说明|
 |--|--|--|
 |《[MindSpeed MM安装指导](../zh/install_guide.md)》|指导如何在NPU上基于PyTorch和MindSpore框架完成MindSpeed MM的安装，内容涵盖硬件与操作系统兼容性说明、驱动固件及CANN基础软件安装，以及两种框架下的完整安装流程，帮助用户快速搭建多模态模型训练环境。|-|
-|《[MindSpeed MM快速入门（基于PyTorch）](../zh/pytorch/getting_start.md)》|以Wan2.1和Qwen2.5VL为例，指导开发者在PyTorch框架下完成Wan2.1和Qwe2.5VL模型的微调，帮助用户快速上手多模态模型训练。|-|
-|《[MindSpeed MM快速入门（基于MindSpore）](../zh/mindspore/getting_start.md)》|以Qwen2.5VL为例，指导开发者在MindSpore框架下完成Qwe2.5VL模型的微调，帮助用户快速上手多模态模型训练。|-|
+|《[MindSpeed MM快速入门（基于PyTorch）](../zh/pytorch/getting_start.md)》|以Wan2.1和Qwen2.5-VL为例，指导开发者在PyTorch框架下完成Wan2.1和Qwen2.5-VL模型的微调，帮助用户快速上手多模态模型训练。|-|
+|《[MindSpeed MM快速入门（基于MindSpore）](../zh/mindspore/getting_start.md)》|以Qwen2.5-VL为例，指导开发者在MindSpore框架下完成Qwen2.5-VL模型的微调，帮助用户快速上手多模态模型训练。|-|
 
 ## 病毒扫描及漏洞修补列表
 

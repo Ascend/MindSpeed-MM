@@ -77,12 +77,12 @@
 ## 运行安全声明
 
 1. 建议用户结合运行资源状况编写对应训练脚本。若训练脚本与资源状况不匹配，如数据集加载内存大小超出内存容量限制、训练脚本在本地生成数据超过磁盘空间大小等情况，可能引发错误并导致进程意外退出。
-2. MindSpeed MM内部用到了Pytorch和torch_npu,可能会因为版本不匹配导致运行错误，具体可参考PyTorch及torch_npu[安全声明](https://gitcode.com/Ascend/pytorch/blob/v2.7.1-26.0.0/docs/zh/SECURITYNOTE.md)。
+2. MindSpeed MM内部用到了PyTorch和torch_npu,可能会因为版本不匹配导致运行错误，具体可参考PyTorch及torch_npu[安全声明](https://gitcode.com/Ascend/pytorch/blob/v2.7.1-26.0.0/docs/zh/SECURITYNOTE.md)。
 3. MindSpeed MM的依赖库transformers和datasets在使用from_pretrained方法时，存在配置trust_remote_code=True的情况。此设置会直接执行从远程仓库下载的代码，可能包含恶意逻辑或后门程序，导致系统面临代码注入攻击等安全威胁。用户需要确保自己下载的模型和数据的安全性。
 
 ## 公开接口声明
 
-MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。19个入口脚本分别为:
+MindSpeed MM 暂时未发布Wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。19个入口脚本分别为:
 
 - [evaluate_gen](../../evaluate_gen.py)
 - [evaluate_vlm](../../evaluate_vlm.py)

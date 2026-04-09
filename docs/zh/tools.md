@@ -11,7 +11,7 @@ from mindspeed_mm.tools.profiler import Profiler
 
 prof = Profiler(prof_config)
 prof.start()
-while train:
+while train():
     train_one_step
     prof.step()
 prof.stop()
@@ -151,7 +151,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
   "memory_profile": {
     "enable": false,    // 内存采集功能开关
     "start_step": 0,    // 开始录制的步数。数值为训练步数的起始点，0代表开始采集的步数
-    "end_step": 2,      // 结束录制的步数。数值为训练步数的终止点点，2代表结束采集的步数
+    "end_step": 2,      // 结束录制的步数。数值为训练步数的终止点，2代表结束采集的步数
     "save_path": "./memory_snapshot",  // 快照文件保存路径
     "dump_ranks": [     // 录制快照的rank列表，从0开始
       0
@@ -229,3 +229,4 @@ dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件
     ```shell
     tensorboard --logdir ./tensorboard_dir/
     ```
+    

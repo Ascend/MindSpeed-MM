@@ -82,7 +82,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
  
  **一键安装**
 
-  目前[Qwen3-VL](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/examples/qwen3vl/README.md)、[qwen3.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qwen3_5)模型已支持一键安装。
+  目前[Qwen3-VL](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/examples/qwen3vl/README.md)、[Qwen3.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qwen3_5)模型已支持一键安装。
 
   一键式命令会依次安装`PyTorch`、`torch_npu`、`Megatron-LM`、`MindSpeed`、`MindSpeed MM`。由于Megatron-LM对于`pip install`安装方式适配性待提升，采用源码拷贝方式进行使用。
 
@@ -109,7 +109,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
         |-t, --torchversion|表示当前使用的torch版本|否|2.6.0或2.7.1|
         |-m, --msid|表示当前基于源码安装的MindSpeed加速库的commit id|是|MindSpeed最新商用分支commit id|
         |-y, --yes|确认所有软件重新安装|否|-|
-        |-n, --no|自动跳过第三依赖安装|否|-|
+        |-n, --no|自动跳过第三方依赖库安装|否|-|
         |-mt, --megatron|安装Megatron-LM|否|默认安装版本Megatron-LM 0.12.0|
         |-ic, --install-cann |安装CANN|否|默认安装版本CANN 8.5.0|
         |-h, --help|显示安装帮助|否|-|
