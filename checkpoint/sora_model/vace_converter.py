@@ -12,8 +12,8 @@ class VACEConverter(SoraModelConverter):
 
     _supported_methods = ["hf_to_mm", "mm_to_hf", "hf_diffusers_to_mm", "mm_to_hf_diffusers"]
     _enable_tp = False
-    _enable_pp = False
-    _enable_vpp = False
+    _enable_pp = True
+    _enable_vpp = True
 
     def __init__(self) -> None:
         super().__init__()

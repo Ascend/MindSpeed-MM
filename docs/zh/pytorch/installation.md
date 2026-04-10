@@ -161,6 +161,6 @@ cd ..
 
 **4.安装其它依赖**
 ```shell
-# 安装mindpseed mm其它依赖
+# 安装MindSpeed MM其它依赖
 pip install -e .
 ```

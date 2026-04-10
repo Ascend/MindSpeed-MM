@@ -174,6 +174,10 @@ class Trainer():
             else: # load is not None
                 to_empty_if_needed(model, device=device)
 
+        if args.training.lora.enable:
+            self.lora_weight_manager = LoraWeightManager(model)
+            self.lora_weight_manager.verify_lora_weights()
+
         return model
 
     def enable_lora(self, model: torch.nn.Module) -> torch.nn.Module:
@@ -252,11 +256,9 @@ class Trainer():
             trainable_params=trainable_params,
             total_params=total_params,
         )
-        self.lora_weight_manager = LoraWeightManager(model)
-        self.lora_weight_manager.verify_lora_weights()
-        
+
         print_rank(logger.info, "LoRA fine-tuning enabled successfully")
-        
+
         return model
 
     def get_optimizer(self):
