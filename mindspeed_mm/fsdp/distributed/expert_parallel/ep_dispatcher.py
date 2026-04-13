@@ -56,6 +56,11 @@ def ep_forward(
         hidden_states = grouped_matmul(
             intermediate_activations, fc2_weight, num_global_sum_tokens_per_local_expert, fused=fused
         )
+    else:
+        # empty operation to avoid no grads for experts' weights
+        intermediate_hidden_states = hidden_states @ fc1_weight.sum(0)
+        gate_output, down_output = torch.chunk(intermediate_hidden_states, 2, dim=-1)
+        hidden_states = (gate_output + down_output) @ fc2_weight.sum(0) * 0.
 
     hidden_states = alltoall_combine(
         hidden_states,

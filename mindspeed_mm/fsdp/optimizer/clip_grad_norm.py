@@ -23,14 +23,14 @@ def clip_grad_norm(
 ) -> torch.Tensor:
     """
     Clip gradients by their norm for distributed training with support for Expert Parallelism (EP).
-    
+
     Args:
         model: The model containing parameters to clip.
         max_norm: Maximum norm of gradients. If 0, only compute norm without clipping.
         norm_type: Type of norm to compute (p-norm). Default is 2.0 (L2 norm).
         error_if_nonfinite: If True, raise error when gradients are non-finite.
         foreach: Whether to use foreach implementation for gradient clipping.
-    
+
     Returns:
         Total norm of gradients before clipping (or after clipping if max_norm > 0).
     """
@@ -45,34 +45,24 @@ def clip_grad_norm(
             error_if_nonfinite=error_if_nonfinite,
             foreach=foreach,
         )
-    # Special case: max_norm = 0 means only compute gradient norm without clipping
-    if max_norm == 0.:
-        ps = get_parallel_state()
-        fsdp_group = ps.get_fsdp_group()
-        params: List[torch.nn.Parameter] = [p for p in model.parameters() if p.grad is not None]
-        # Compute and reduce non-EP
-        total_norm = _fsdp2_reduce_group(
-            params=params,
-            norm_type=norm_type,
-            reduce_groups=[("fsdp", fsdp_group)],
-        )
-        if math.isinf(norm_type):
-            total_norm = total_norm
-        else:
-            total_norm = total_norm ** (1.0 / float(norm_type))
-        return total_norm
 
-    # Standard gradient clipping path (max_norm > 0)
-    grad_norm = torch.nn.utils.clip_grad_norm_(
-        model.parameters(),
-        max_norm,
+    ps = get_parallel_state()
+    fsdp_group = ps.get_fsdp_group()
+    params: List[torch.nn.Parameter] = [p for p in model.parameters() if p.grad is not None]
+    # Compute and reduce non-EP
+    total_norm = _fsdp2_reduce_group(
+        params=params,
         norm_type=norm_type,
-        error_if_nonfinite=error_if_nonfinite,
-        foreach=foreach,
+        reduce_groups=[("fsdp", fsdp_group)],
     )
-    if isinstance(grad_norm, DTensor):
-        grad_norm = grad_norm.full_tensor()
-    return grad_norm
+    if math.isinf(norm_type):
+        total_norm = total_norm
+    else:
+        total_norm = total_norm ** (1.0 / float(norm_type))
+    # Special case: max_norm = 0 means only compute gradient norm without clipping
+    if max_norm > 0.:
+        torch.nn.utils.clip_grads_with_norm_(params, max_norm, total_norm, foreach=foreach)
+    return total_norm
 
 
 @torch.no_grad()
