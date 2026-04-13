@@ -33,15 +33,15 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 ### 已支持特性概览
 
-|       模型 \ 特性       | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/sequence-parallel.md) | [VPP](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/pipeline-parallel.md) | CP | EP |  [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md) | [LoRA](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md) |
-|:-------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:-------:|:------:|:------:|:------:|
-|   CogVideoX系列-T2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
-|   CogVideoX系列-I2V   | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
-|    Qwen2.5VL-7B     | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
-|    Qwen2.5VL-72B    | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
-|    Qwen25Omni-7B    |  |  |  |                                            ✔                                            |  |   | ✔ |  |  |
-|    Qwen3vl-8B    |  | ✔ |  |                                            ✔                                            |  |   | ✔ |  |  |
-|    Qwen3vl-30B    |  | ✔ |  |                                            ✔                                            |  | ✔ | ✔ |  |
+|     模型 \ 特性     | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/sequence-parallel.md) | [VPP](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/pipeline-parallel.md) | CP | EP |  [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md) | [LoRA](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md) |
+|:---------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:-------:|:------:|:------:|:------:|
+| CogVideoX系列-T2V | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
+| CogVideoX系列-I2V | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
+|  Qwen2.5VL-7B   | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
+|  Qwen2.5VL-72B  | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
+| Qwen2.5Omni-7B  |  |  |  |                                            ✔                                            |  |   | ✔ |  |  |
+|   Qwen3VL-8B    |  | ✔ |  |                                            ✔                                            |  |   | ✔ |  |  |
+|   Qwen3VL-30B   |  | ✔ |  |                                            ✔                                            |  | ✔ | ✔ |  |
 
 备注：
 
