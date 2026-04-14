@@ -9,6 +9,23 @@ from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_
 from tests.ut.utils import judge_expression
 
 
+def varlen_to_nonvarlen(cu_seqlens, *inputs):
+    B = len(cu_seqlens) - 1  # batch size
+    max_len = max(cu_seqlens[i + 1] - cu_seqlens[i] for i in range(B))  # 最长序列长度
+    
+    nonvarlens = [torch.zeros(B, max_len, *v.shape[2:], device=v.device, dtype=v.dtype) for v in inputs]
+    
+    for i in range(B):
+        start = cu_seqlens[i]
+        end = cu_seqlens[i + 1]
+        seq_len = end - start
+        if seq_len > 0:
+            for nonvarlen, var in zip(nonvarlens, inputs):
+                nonvarlen[i, :seq_len] = var[0, start:end]
+    
+    return nonvarlens
+
+
 def l2norm(x: torch.FloatTensor, dim: int = -1, eps: float = 1e-6):
     """This function is intended to align with the l2norm implementation in the FLA library."""
     inv_norm = torch.rsqrt((x * x).sum(dim=dim, keepdim=True) + eps)
@@ -92,15 +109,16 @@ def ref_torch_chunk_gated_delta_rule(
     return core_attn_out, last_recurrent_state
 
 
-TEST_PARAM_NAMES = ('B', 'T', 'H', 'K', 'V', 'chunk_size', 'use_qk_l2norm_in_kernel')
+TEST_PARAM_NAMES = ('B', 'T', 'H', 'K', 'V', 'chunk_size', 'use_qk_l2norm_in_kernel', 'cu_seqlens')
 
 TEST_CASES = [
-    (1, 128, 4, 64, 64, 64, False),
-    (2, 256, 4, 64, 64, 64, False),
-    (1, 128, 8, 128, 128, 64, False),
-    (1, 128, 8, 128, 128, 64, True),
-    (21, 195, 32, 128, 128, 64, True),
-    (1, 360, 32, 128, 128, 64, True),
+    (1, 128, 4, 64, 64, 64, False, None),
+    (2, 256, 4, 64, 64, 64, False, None),
+    (1, 128, 8, 128, 128, 64, False, None),
+    (1, 128, 8, 128, 128, 64, True, None),
+    (1, 360, 32, 128, 128, 64, True, None),
+    (1, 1121, 32, 128, 128, 64, True, [0, 112, 209, 240, 281, 489, 523, 566, 689, 721, 785, 837, 985, 1071, 1121]),
+    (21, 195, 32, 128, 128, 64, True, None),
 ]
 
 
@@ -119,7 +137,8 @@ class TestChunkGatedDeltaRule:
         TEST_PARAM_NAMES,
         _make_test_params()
     )
-    def test_chunk_gated_delta_rule_forward_backward(self, B, T, H, K, V, chunk_size, use_qk_l2norm_in_kernel):
+    def test_chunk_gated_delta_rule_forward_backward(self, B, T, H, K, V, chunk_size, use_qk_l2norm_in_kernel, cu_seqlens):
+        torch.manual_seed(42)
         if torch.cuda.is_available():
             device = torch.device("cuda")
         elif torch.npu.is_available():
@@ -137,36 +156,75 @@ class TestChunkGatedDeltaRule:
         beta = torch.rand(B, T, H, dtype=dtype, device=device).sigmoid().requires_grad_(True)
         g = F.logsigmoid(torch.rand(B, T, H, dtype=dtype, device=device)).requires_grad_(True)
 
+        if cu_seqlens is not None:
+            cu_seqlens = torch.LongTensor(cu_seqlens).to(device)
+        o_triton, _ = triton_chunk_gated_delta_rule(
+            q=q, k=k, v=v, g=g, beta=beta, chunk_size=chunk_size,
+            use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel, cu_seqlens=cu_seqlens
+        )
+        do = torch.randn_like(o_triton)
+        o_triton.backward(do)
+
+        # ==== torch ====
         q_ref = q.detach().clone().requires_grad_(True)
         k_ref = k.detach().clone().requires_grad_(True)
         v_ref = v.detach().clone().requires_grad_(True)
         beta_ref = beta.detach().clone().requires_grad_(True)
         g_ref = g.detach().clone().requires_grad_(True)
-
-        o_triton, _ = triton_chunk_gated_delta_rule(
-            q=q, k=k, v=v, g=g, beta=beta, chunk_size=chunk_size,
-            use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel
-        )
+        if cu_seqlens is not None:
+            q_ref, k_ref, v_ref, beta_ref, g_ref = varlen_to_nonvarlen(cu_seqlens, q_ref, k_ref, v_ref, beta_ref, g_ref)
+        q_ref.retain_grad()
+        k_ref.retain_grad()
+        v_ref.retain_grad()
+        beta_ref.retain_grad()
+        g_ref.retain_grad()
         o_ref, _ = ref_torch_chunk_gated_delta_rule(
             query=q_ref, key=k_ref, value=v_ref, g=g_ref, beta=beta_ref, chunk_size=chunk_size,
             use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel
         )
+        if cu_seqlens is not None:
+            do_ref = varlen_to_nonvarlen(cu_seqlens, do)
+        else:
+            do_ref = do
+        o_ref.backward(do_ref)
 
-        forward_close = torch.allclose(o_triton.float(), o_ref.float(), rtol=1e-2, atol=1e-2)
+        # ==== bsnd triton ====
+        if cu_seqlens is not None:
+            q_tt_sbh = q_ref.detach().clone().requires_grad_(True)
+            k_tt_sbh = k_ref.detach().clone().requires_grad_(True)
+            v_tt_sbh = v_ref.detach().clone().requires_grad_(True)
+            beta_tt_sbh = beta_ref.detach().clone().requires_grad_(True)
+            g_tt_sbh = g_ref.detach().clone().requires_grad_(True)
+
+            o_tt_sbh, _ = triton_chunk_gated_delta_rule(
+                q=q_tt_sbh, k=k_tt_sbh, v=v_tt_sbh, g=g_tt_sbh, beta=beta_tt_sbh, chunk_size=chunk_size,
+                use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel
+            )
+            o_tt_sbh.backward(do_ref)
+
+        if cu_seqlens is not None:
+            o_tt, q_g, k_g, v_g, beta_g, g_g = varlen_to_nonvarlen(cu_seqlens, o_triton, q.grad, k.grad, v.grad, beta.grad, g.grad)
+        else:
+            o_tt, q_g, k_g, v_g, beta_g, g_g = o_triton, q.grad, k.grad, v.grad, beta.grad, g.grad
+
+        # ==== accuracy ====
+        if cu_seqlens is not None:
+            torch.testing.assert_close(o_tt, o_tt_sbh, rtol=1e-2, atol=1e-2)
+            torch.testing.assert_close(q_g, q_tt_sbh.grad, rtol=1e-2, atol=1e-2)
+            torch.testing.assert_close(k_g, k_tt_sbh.grad, rtol=0.01, atol=0.01)
+            torch.testing.assert_close(v_g, v_tt_sbh.grad, rtol=0.01, atol=0.01)
+            torch.testing.assert_close(beta_g, beta_tt_sbh.grad, rtol=0.01, atol=0.01)
+            torch.testing.assert_close(g_g, g_tt_sbh.grad, rtol=0.01, atol=0.01)
+        forward_close = torch.allclose(o_tt.float(), o_ref.float(), rtol=1e-2, atol=1e-2)
         judge_expression(forward_close)
-
-        do = torch.randn_like(o_triton)
-        o_triton.backward(do)
-        o_ref.backward(do)
-
-        backward_close = torch.allclose(q.grad.float(), q_ref.grad.float(), rtol=1e-2, atol=1e-2)
+        backward_close = torch.allclose(q_g.float(), q_ref.grad.float(), rtol=1e-2, atol=1e-2)
         judge_expression(backward_close)
-        backward_close = torch.allclose(k.grad.float(), k_ref.grad.float(), rtol=1e-2, atol=1e-2)
+        backward_close = torch.allclose(k_g.float(), k_ref.grad.float(), rtol=1e-2, atol=1e-2)
         judge_expression(backward_close)
-        backward_close = torch.allclose(v.grad.float(), v_ref.grad.float(), rtol=1e-2, atol=1e-2)
+        backward_close = torch.allclose(v_g.float(), v_ref.grad.float(), rtol=1e-2, atol=1e-2)
         judge_expression(backward_close)
-        backward_close = torch.allclose(beta.grad.float(), beta_ref.grad.float(), rtol=1e-2, atol=1e-2)
+        backward_close = torch.allclose(beta_g.float(), beta_ref.grad.float(), rtol=1e-2, atol=1e-2)
         judge_expression(backward_close)
-        backward_close = torch.allclose(g.grad.float(), g_ref.grad.float(), rtol=1e-2, atol=1e-2)
+        backward_close = torch.allclose(g_g.float(), g_ref.grad.float(), rtol=1e-2, atol=1e-2)
         judge_expression(backward_close)
 

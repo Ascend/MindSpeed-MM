@@ -7,7 +7,7 @@ import torch
 import triton
 import triton.language as tl
 
-from .utils import prepare_chunk_indices, exp, check_shared_mem, prepare_chunk_offsets
+from .utils import prepare_chunk_indices, exp, prepare_chunk_offsets
 
 
 @triton.heuristics({
@@ -47,6 +47,7 @@ def chunk_bwd_kernel_dqkwg(
     USE_G_GAMMA: tl.constexpr,
     USE_DW: tl.constexpr,
     IS_VARLEN: tl.constexpr,
+    gdiff,
 ):
     i_t, i_b = tl.program_id(0), tl.program_id(1)
     T_max = T
@@ -77,7 +78,6 @@ def chunk_bwd_kernel_dqkwg(
             dq_h = dq + (bos * H + i_h) * K
             dk_h = dk + (bos * H + i_h) * K
 
-            # for delta rule only
             if USE_DW:
                 w_h = w + (bos * H + i_h) * K
                 dw_h = dw + (bos * H + i_h) * K
@@ -145,20 +145,26 @@ def chunk_bwd_kernel_dqkwg(
 
             if USE_G:
                 b_dg = tl.zeros([BT, ], dtype=tl.float32)
-
                 p_g = tl.make_block_ptr(g_h, (T,), (1,), (i_t * BT,), (BT,), (0,))
                 b_g = tl.load(p_g, boundary_check=(0,))
                 b_g_last = tl.load(g_h + (min(i_t * BT + BT, T) - 1) * 1)
-                b_dg_last *= exp(b_g_last)
+                b_dg_last *= tl.exp(b_g_last)
 
-                b_dq = b_dq * exp(b_g)[:, None] * scale
+                b_dq = b_dq * tl.exp(b_g)[:, None] * scale
                 b_dg += tl.sum(b_dq * b_q, axis=1)
 
-                b_dk = b_dk * tl.where(m_t, exp(-b_g + b_g_last), 0)[:, None]
+                b_dk = b_dk * tl.where(m_t, tl.exp(-b_g + b_g_last), 0)[:, None]
                 b_dg -= tl.sum(b_k * b_dk, axis=1)
                 b_dg_last += tl.sum(b_dk * b_k)
 
-                b_ds = tl.where(m_A, b_ds * exp(b_g[:, None] - b_g[None, :]), 0) * scale
+                if IS_VARLEN:
+                    b_ds = tl.where(m_A, b_ds * exp(b_g[:, None] - b_g[None, :]), 0) * scale
+                else:
+                    p_gdiff = tl.make_block_ptr(gdiff + i_b * H * NT * BT * BT + i_h * NT * BT * BT + i_t * BT * BT,
+                                                (BT, BT), (BT, 1), (0, 0), (BT, BT), (1, 0))
+                    gdiff_ = tl.load(p_gdiff)
+                    b_ds = b_ds * gdiff_ * scale
+
                 b_ds2 = b_ds * tl.dot(b_q, tl.trans(b_k))
                 b_dg += tl.sum(b_ds2, axis=1)
                 b_dg -= tl.sum(b_ds2, axis=0)
@@ -323,7 +329,6 @@ def chunk_fwd_kernel_o(
                 NT = tl.cdiv(T, BT)
                 boh = i_n * NT
 
-
             core_id = tl.program_id(0)
             total_cores = tl.num_programs(0)
             base_chunks_per_pid = NT // total_cores
@@ -335,7 +340,6 @@ def chunk_fwd_kernel_o(
             else:
                 chunks_this_pid = base_chunks_per_pid
                 start_idx = core_id * base_chunks_per_pid + remainder
-
 
             # offset calculation
             for i_h in range(0, H):
@@ -369,7 +373,10 @@ def chunk_fwd_kernel_o(
                         b_A += tl.dot(b_q, b_k)
 
                     if USE_G:
-                        p_g = tl.make_block_ptr(g + bos * H + i_h * T_max, (T,), (1,), (i_t * BT,), (BT,), (0,))
+                        if IS_VARLEN:
+                            p_g = tl.make_block_ptr(g + bos + i_h * T_max, (T,), (1,), (i_t * BT,), (BT,), (0,))
+                        else:
+                            p_g = tl.make_block_ptr(g + bos * H + i_h * T_max, (T,), (1,), (i_t * BT,), (BT,), (0,))
                         b_g = tl.load(p_g, boundary_check=(0,))
                         b_o = b_o * exp(b_g)[:, None]
                         b_A = b_A * exp(b_g[:, None] - b_g[None, :])
@@ -410,13 +417,12 @@ def chunk_bwd_dqkwg(
     chunk_size: int = 64,
     scale: float = 1.0,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-
     B, T, H, K, V = *k.shape, v.shape[-1]
     BT = min(chunk_size, max(16, triton.next_power_of_2(T)))
     chunk_indices = prepare_chunk_indices(cu_seqlens, BT) if cu_seqlens is not None else None
     NT = triton.cdiv(T, BT) if cu_seqlens is None else len(chunk_indices)
 
-    BK = 64
+    BK = 128 if cu_seqlens is None else 64
     BV = 64
     NK = triton.cdiv(K, BK)
     dq = torch.empty_like(q)
@@ -425,6 +431,27 @@ def chunk_bwd_dqkwg(
     dg = torch.empty(NK, *g.shape, dtype=torch.float32, device=g.device) if g is not None else None
     dw = torch.empty_like(w) if w is not None else None
     grid = (NT, B)
+
+    if cu_seqlens is None:
+        if NT * BT == T:
+            g_ = g.reshape(B, H, NT, BT)
+            g_diff = g_[:, :, :, :, None] - g_[:, :, :, None, :]
+            g_diff = g_diff.clamp(-60, 60).exp()
+            g_diff[:, :, :] *= torch.tril(torch.ones(BT, BT), diagonal=0).to(g.device)
+        else:
+            diff = NT * BT - T
+            g_ = torch.cat((g, torch.zeros(B, H, diff).to(g.device)), dim=-1).reshape(B, H, NT, BT)
+            g_diff = g_[:, :, :, :, None] - g_[:, :, :, None, :]
+            g_diff = g_diff.clamp(-60, 60).exp()
+            g_diff[:, :, :] *= torch.tril(torch.ones(BT, BT), diagonal=0).to(g.device)
+            bias = torch.arange(0, BT).to(g.device)
+            o_t = (NT - 1) * BT + bias
+            m_t = o_t < T
+            m_A = (m_t[:, None] & m_t)
+            g_diff[:, :, -1] *= m_A
+    else:
+        g_diff = None
+
     chunk_bwd_kernel_dqkwg[grid](
         q=q,
         k=k,
@@ -451,6 +478,7 @@ def chunk_bwd_dqkwg(
         BT=BT,
         BK=BK,
         BV=BV,
+        gdiff=g_diff,
     )
 
     if dg is not None:

@@ -24,36 +24,48 @@ def chunk_local_cumsum_scalar_kernel(
     T,
     B: tl.constexpr,
     H: tl.constexpr,
-    BT: tl.constexpr,
+    BLOCK_T: tl.constexpr,
     REVERSE: tl.constexpr,
     HAS_SCALE: tl.constexpr,
     IS_VARLEN: tl.constexpr,
     HEAD_FIRST: tl.constexpr,
+    CHUNK_SIZE: tl.constexpr = 64,
 ):
-    i_t, i_b = tl.program_id(0), tl.program_id(1)
+    i_block, i_b = tl.program_id(0), tl.program_id(1)
+    N_CHUNKS: tl.constexpr = BLOCK_T // CHUNK_SIZE
+
     if IS_VARLEN:
-        i_n, i_t = tl.load(chunk_indices + i_t * 2).to(tl.int32), tl.load(chunk_indices + i_t * 2 + 1).to(tl.int32)
-        bos, eos = tl.load(cu_seqlens + i_n).to(tl.int32), tl.load(cu_seqlens + i_n + 1).to(tl.int32)
+        i_s, i_block = tl.load(chunk_indices + i_block * 2).to(tl.int32), tl.load(
+            chunk_indices + i_block * 2 + 1
+        ).to(tl.int32)
+
+        bos, eos = tl.load(cu_seqlens + i_s).to(tl.int32), tl.load(
+            cu_seqlens + i_s + 1
+        ).to(tl.int32)
         T = eos - bos
     else:
         bos, eos = i_b * T, i_b * T + T
 
-    for i_h in range(0, H):
-        if HEAD_FIRST:
-            p_s = tl.make_block_ptr(s + bos * H + i_h * T, (T,), (1,), (i_t * BT,), (BT,), (0,))
-            p_o = tl.make_block_ptr(o + bos * H + i_h * T, (T,), (1,), (i_t * BT,), (BT,), (0,))
-        else:
-            p_s = tl.make_block_ptr(s + bos * H + i_h, (T,), (H,), (i_t * BT,), (BT,), (0,))
-            p_o = tl.make_block_ptr(o + bos * H + i_h, (T,), (H,), (i_t * BT,), (BT,), (0,))
+    ptr_s = tl.make_block_ptr(
+        s + bos * H, (T, H), (H, 1), (i_block * BLOCK_T, 0), (BLOCK_T, H), (1, 0)
+    )
+    ptr_o = tl.make_block_ptr(
+        o + bos * H, (T, H), (H, 1), (i_block * BLOCK_T, 0), (BLOCK_T, H), (1, 0)
+    )
+    b_s = tl.load(ptr_s, boundary_check=(0,)).to(tl.float32)
+    b_s = tl.reshape(b_s, (N_CHUNKS, CHUNK_SIZE, H))
+    b_s = tl.trans(b_s, (1, 0, 2))
+    b_o = tl.cumsum(b_s, axis=0)
+    if REVERSE:
+        b_z = tl.sum(b_s, axis=0)
+        b_o = -b_o + b_z[None] + b_s
+    if HAS_SCALE:
+        b_o *= scale
+    b_o = tl.trans(b_o, (1, 0, 2))
+    b_o = tl.reshape(b_o, (BLOCK_T, H))
 
-        b_s = tl.load(p_s, boundary_check=(0,)).to(tl.float32)
-        b_o = tl.cumsum(b_s, axis=0)
-        if REVERSE:
-            b_z = tl.sum(b_s, axis=0)
-            b_o = -b_o + b_z[None] + b_s
-        if HAS_SCALE:
-            b_o *= scale
-        tl.store(p_o, b_o.to(p_o.dtype.element_ty), boundary_check=(0,))
+    tl.store(ptr_o, b_o.to(ptr_o.dtype.element_ty), boundary_check=(0,))
+    return
 
 
 def chunk_local_cumsum_scalar(
@@ -65,16 +77,13 @@ def chunk_local_cumsum_scalar(
     head_first: bool = False,
     output_dtype: Optional[torch.dtype] = torch.float
 ) -> torch.Tensor:
-    if head_first:
-        g = g.transpose(1, 2).contiguous()
-        B, H, T = g.shape
-    else:
-        B, T, H = g.shape
+    
+    B, T, H = g.shape
     if chunk_size != 2 ** (chunk_size.bit_length() - 1):
         raise ValueError(
             f"chunk_size must be a power of 2, chunk_size is{chunk_size}"
         )
-    BT = chunk_size
+    BT = triton.next_power_of_2((1 << 17) // (H * chunk_size))
     chunk_indices = prepare_chunk_indices(cu_seqlens, BT) if cu_seqlens is not None else None
     NT = triton.cdiv(T, BT) if cu_seqlens is None else len(chunk_indices)
     g_org, g = g, torch.empty_like(g, dtype=output_dtype or g.dtype)
@@ -88,12 +97,11 @@ def chunk_local_cumsum_scalar(
         T=T,
         B=B,
         H=H,
-        BT=BT,
+        BLOCK_T=BT,
         HEAD_FIRST=head_first,
-        REVERSE=reverse
+        REVERSE=reverse,
+        CHUNK_SIZE=chunk_size,
     )
-    if head_first:
-        g = g.transpose(1, 2).contiguous()
     return g
 
 

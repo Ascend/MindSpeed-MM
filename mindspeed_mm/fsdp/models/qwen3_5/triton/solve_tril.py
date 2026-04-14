@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2023-2025, Songlin Yang, Yu Zhang
+# Copyright (c) 2026, Huawei Technologies Co., Ltd. All rights reserved.
 
 import os
 from typing import Optional
@@ -166,7 +167,7 @@ def merge_16x16_to_32x32_inverse_kernel(
 
 
 @triton.heuristics({"IS_VARLEN": lambda args: args["cu_seqlens"] is not None})
-@triton.jit(do_not_specialize=["T", "TPP"])
+@triton.jit(do_not_specialize=['T'])
 def solve_tril_64x64_kernel(
     A,
     Ai,
@@ -175,69 +176,43 @@ def solve_tril_64x64_kernel(
     T,
     H: tl.constexpr,
     BT: tl.constexpr,
-    TPP: tl.constexpr,
     USE_TMA: tl.constexpr,
     IS_VARLEN: tl.constexpr,
     DOT_PRECISION: tl.constexpr
 ):
-    pid_t, pid_bh = tl.program_id(0), tl.program_id(1)
-    i_b, i_h = pid_bh // H, pid_bh % H
-
-    base_t = pid_t * TPP
-
+    i_t, i_bh = tl.program_id(0), tl.program_id(1)
+    i_b, i_h = i_bh // H, i_bh % H
     if IS_VARLEN:
-        i_n = tl.load(chunk_indices + base_t * 2).to(tl.int32)
-        bos = tl.load(cu_seqlens + i_n).to(tl.int32)
-        eos = tl.load(cu_seqlens + i_n + 1).to(tl.int32)
-        T_eff = eos - bos
+        i_n, i_t = tl.load(chunk_indices + i_t * 2).to(tl.int32), tl.load(chunk_indices + i_t * 2 + 1).to(tl.int32)
+        bos, eos = tl.load(cu_seqlens + i_n).to(tl.int32), tl.load(cu_seqlens + i_n + 1).to(tl.int32)
+        T = eos - bos
     else:
         bos, eos = i_b * T, i_b * T + T
-        T_eff = T
-
-    o_i_fp32 = tl.arange(0, 64).to(tl.float32)
-    m_A = o_i_fp32[:, None] > o_i_fp32[None, :]
-    m_I = o_i_fp32[:, None] == o_i_fp32[None, :]
+    o_i = tl.arange(0, 64)
+    m_I = o_i[:, None] == o_i[None, :]
 
     A = A + (bos * H + i_h) * BT
-    Ai = Ai + (bos * H + i_h) * BT
+    Ai = Ai + (bos * H + i_h) * 64
 
-    for tpp in tl.static_range(0, TPP):
-        tile_t = base_t + tpp
-        tile_row = tile_t * 64
+    offset = (i_t * 64) % BT
+    if not USE_TMA:
+        p_A = tl.make_block_ptr(A, (T, BT), (H * BT, 1), (i_t * 64, offset), (64, 64), (1, 0))
+        b_A = -tl.load(p_A, boundary_check=(0, 1)).to(tl.float32)
+    else:
+        desc = make_tensor_descriptor(A, [T, BT], [H * BT, 1], [64, 64])
+        desc_o = make_tensor_descriptor(Ai, [T, 64], [H * 64, 1], [64, 64])
+        b_A = -desc.load([i_t * 64, offset]).to(tl.float32)
 
-        offset = (tile_t * 64) % BT
-
-        if not USE_TMA:
-            p_A = tl.make_block_ptr(
-                A, (T_eff, BT), (H * BT, 1), (tile_row, offset), (64, 64), (1, 0)
-            )
-            b_A_raw = tl.load(p_A, boundary_check=(0, 1)).to(tl.float32)
-        else:
-            desc = make_tensor_descriptor(A, [T_eff, BT], [H * BT, 1], [64, 64])
-            desc_o = make_tensor_descriptor(Ai, [T_eff, 64], [H * 64, 1], [64, 64])
-            b_A_raw = desc.load([tile_row, offset]).to(tl.float32)
-
-        b_A_neg = -b_A_raw
-        b_A = b_A_neg * m_A
-
-        # Fully On-Chip
-        limit = min(64, T_eff - tile_row)
-        for i in range(2, limit):
-            slice_res = tl.extract_slice(b_A_neg, [i, 0], [1, 64], [1, 1])
-            b_a_val = tl.reshape(slice_res, (64,), can_reorder=True)
-            dot_prod = tl.sum(b_a_val[:, None] * b_A, 0)
-            b_a_update = b_a_val + dot_prod
-            b_A = tl.where((o_i_fp32 == i)[:, None], b_a_update, b_A)
-
-        b_A += m_I
-
-        if not USE_TMA:
-            p_Ai = tl.make_block_ptr(
-                Ai, (T_eff, 64), (H * 64, 1), (tile_row, 0), (64, 64), (1, 0)
-            )
-            tl.store(p_Ai, b_A.to(p_Ai.dtype.element_ty, fp_downcast_rounding="rtne"), boundary_check=(0, 1))
-        else:
-            desc_o.store([tile_row, 0], b_A.to(desc_o.dtype, fp_downcast_rounding="rtne"))
+    for i in range(2, min(64, T - i_t * 64)):
+        b_a = -tl.load(A + (i_t * 64 + i) * H * BT + o_i + offset)
+        b_a = b_a + tl.sum(b_a[:, None] * b_A, 0)
+        b_A = tl.where((o_i == i)[:, None], b_a, b_A)
+    b_A += m_I
+    if not USE_TMA:
+        p_Ai = tl.make_block_ptr(Ai, (T, 64), (H * 64, 1), (i_t * 64, 0), (64, 64), (1, 0))
+        tl.store(p_Ai, b_A.to(p_Ai.dtype.element_ty, fp_downcast_rounding="rtne"), boundary_check=(0, 1))
+    else:
+        desc_o.store([i_t * 64, 0], b_A.to(desc_o.dtype, fp_downcast_rounding="rtne"))
 
 
 @input_guard
@@ -275,19 +250,13 @@ def solve_tril(
     Ai = torch.zeros_like(A, dtype=output_dtype)
 
     if BT == 16:
-        TPP = 4
-        grid0 = (NT + TPP - 1) // TPP
         merge_fn = solve_tril_16x16_kernel
     elif BT == 32:
-        TPP = 4
-        grid0 = NT
         merge_fn = merge_16x16_to_32x32_inverse_kernel
     elif BT == 64:
-        TPP = 22
-        grid0 = (NT + TPP - 1) // TPP
         merge_fn = solve_tril_64x64_kernel
 
-    merge_fn[grid0, B * H](
+    merge_fn[NT, B * H](
         A=A,
         Ai=Ai,
         cu_seqlens=cu_seqlens,
@@ -295,7 +264,6 @@ def solve_tril(
         T=T,
         H=H,
         BT=BT,
-        TPP=TPP,
         USE_TMA=False,
         DOT_PRECISION=FLA_TRIL_PRECISION,
     )
