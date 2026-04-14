@@ -6,7 +6,7 @@ MindSpeed MM已支持接入华为自研AI套件MindSpore，旨在提供华为全
 
 ## 🔥🔥🔥Latest News
 
-🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../../examples/mindspore/cogvideox/)、[Qwen2.5VL](../../../examples/mindspore/qwen2.5vl/README.md)、[Qwen25Omni](../../../examples/mindspore/qwen2.5omni/README.md)、[Qwen3VL](../../../examples/mindspore/qwen3vl/README.md)模型。
+🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../../examples/mindspore/cogvideox)、[Qwen2.5VL](../../../examples/mindspore/qwen2.5vl/README.md)、[Qwen25Omni](../../../examples/mindspore/qwen2.5omni/README.md)、[Qwen3VL](../../../examples/mindspore/qwen3vl/README.md)模型。
 
 ## 版本配套
 
@@ -25,7 +25,7 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 ## 快速上手
 
-快速上手操作请查看[快速上手文档](./getting_start.md)。
+快速上手操作请查看[快速上手文档](./quickstart_ms.md)。
 
 ---
 

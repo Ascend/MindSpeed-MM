@@ -23,7 +23,6 @@
   - [启动推理](#4-启动推理)
 - [PMCC](#pmccprivacy-and-model-confidential-computing)
 - [环境变量声明](#环境变量声明)
-- [注意事项](#注意事项)
 
 ## 版本说明
 

@@ -1,77 +1,69 @@
-# MindSpeed MM MindSpore后端安装指导
+# 安装指导
 
-## 版本配套
+  本文主要向用户介绍如何快速基于MindSpore框架完成MindSpeed MM（多模态模型套件）的安装。
 
-<table border="0">
-  <tr>
-    <th>软件</th>
-    <th>版本</th>
-    <th>安装指南</th>
-  </tr>
-  <tr>
-    <td> Python </td>
-    <td> >= 3.10 </td>
-    <td>  </td>
-  </tr>
-  <tr>
-    <td> Driver </td>
-    <td> AscendHDK 25.0.RC1 </td>
-    <td rowspan="2">《<a href="https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/softwareinst/instg/instg_0005.html?Mode=PmIns&OS=Ubuntu&Software=cannToolKit">驱动固件安装指南</a> 》</td>
-  </tr>
-  <tr>
-    <td> Firmware </td>
-    <td> AscendHDK 25.0.RC1 </td>
-  </tr>
-  <tr>
-    <td> CANN </td>
-    <td> CANN 8.5 </td>
-    <td>《<a href="https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/softwareinst/instg/instg_0008.html">CANN 软件安装指南</a> 》</td>
-  </tr>
-  <tr>
-    <td> MindSpore </td>
-    <td> 2.7.2 </td>
-    <td> 《<a href="https://www.mindspore.cn/install/">MindSpore安装</a>》</td>
-  </tr>
-</table>
+## 硬件配套和支持的操作系统
 
-## 驱动固件安装
+**表 1**  产品硬件支持列表
 
-下载[驱动固件](https://www.hiascend.com/hardware/firmware-drivers/community?product=4&model=26&cann=8.0.RC3.beta1&driver=1.0.27.alpha)，请根据系统和硬件产品型号选择对应版本的 `driver`和 `firmware`。参考[安装NPU驱动固件](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)或执行以下命令安装：
+|产品|是否支持（训练场景）|
+|--|:-:|
+|<term>Atlas A3 训练系列产品</term>|√|
+|<term>Atlas A3 推理系列产品</term>|x|
+|<term>Atlas A2 训练系列产品</term>|√|
+|<term>Atlas A2 推理系列产品</term>|x|
+|<term>Atlas 200I/500 A2 推理产品</term>|x|
+|<term>Atlas 推理系列产品</term>|x|
+|<term>Atlas 训练系列产品</term>|x|
+
+> [!NOTE]  
+> 本节表格中“√”代表支持，“x”代表不支持。
+
+- 各硬件产品对应物理机部署场景支持的操作系统请参考[兼容性查询助手](https://www.hiascend.com/hardware/compatibility)。
+
+- 各硬件产品对应虚拟机部署场景支持的操作系统请参考《CANN 软件安装指南》的“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0101.html?Mode=VmIns&InstallType=local&OS=openEuler)”章节（商用版）或“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/softwareinst/instg/instg_0101.html?Mode=VmIns&InstallType=local&OS=openEuler)”章节（社区版）。
+
+- 各硬件产品对应容器部署场景支持的操作系统请参考《CANN 软件安装指南》的“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0101.html?Mode=DockerIns&InstallType=local&OS=openEuler)”章节（商用版）或“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/softwareinst/instg/instg_0101.html?Mode=DockerIns&InstallType=local&OS=openEuler)”章节（社区版）。
+
+## 安装前准备
+
+请参见《版本说明》中的“[相关产品版本配套说明](../release_notes.md#相关产品版本配套说明)”章节，下载安装对应的软件版本。
+
+### 安装驱动固件
+
+下载[驱动固件](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850alpha001/softwareinst/instg/instg_0003.html?Mode=PmIns&OS=Debian&Software=cannToolKit)，请根据系统和硬件产品型号选择对应版本的`driver`和`firmware`。参考[安装NPU驱动固件](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850alpha001/softwareinst/instg/instg_0005.html?Mode=PmIns&OS=Debian&Software=cannToolKit)或执行以下命令安装：
 
 ```shell
-bash Ascend-hdk-*-npu-firmware_*.run --full
-bash Ascend-hdk-*-npu-driver_*.run --full --force
+chmod +x Ascend-hdk-<chip_type>-npu-driver_<version>_linux-<arch>.run
+chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
+./Ascend-hdk-<chip_type>-npu-driver_<version>_linux-<arch>.run --full --force
+./Ascend-hdk-<chip_type>-npu-firmware_<version>.run --full
 ```
 
-## CANN安装
+### 安装CANN
 
-下载[CANN](https://www.hiascend.com/developer/download/community/result?module=cann)，请根据系统选择 `aarch64`或 `x86_64`对应版本的 `cann-toolkit`、`cann-kernel`和 `cann-nnal`。参考[CANN安装](https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/softwareinst/instg/instg_0008.html)或执行以下命令安装：
+获取[CANN](https://www.hiascend.com/cann/download)，安装配套版本的Toolkit、ops和NNAL并配置CANN环境变量。具体请参考《[CANN 软件安装指南](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0000.html)》（商用版）或《[CANN 软件安装指南](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/softwareinst/instg/instg_0000.html)》（社区版）。
 
 ```shell
-bash Ascend-cann-toolkit_8.5.0_linux-aarch64.run --install
-source /usr/local/Ascend/cann/set_env.sh
-
-bash Ascend-cann-kernels-*_8.5.0_linux-aarch64.run --install
-bash Ascend-cann-nnal_8.5.0_linux-aarch64.run --install
 # 设置环境变量
-source /usr/local/Ascend/nnal/asdsip/set_env.sh
-source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
+source /usr/local/Ascend/cann/set_env.sh # 修改为实际安装的Toolkit包路径
+source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0 # 修改为实际安装的nnal包路径
 ```
 
-## MindSpore安装
+> [!NOTICE]  
+> 建议使用非root用户安装运行torch\_npu，且建议对安装程序的目录文件做好权限管控：文件夹权限设置为750，文件权限设置为640。可以通过设置umask控制安装后文件的权限，如设置umask为0027。
+> 更多安全相关内容请参见《[安全声明](../SECURITYNOTE.md)》中各组件关于“文件权限控制”的说明。
 
-参考[MindSpore官方安装指导](https://www.mindspore.cn/install)，根据系统类型、CANN版本及Python版本选择相应的安装命令进行安装，安装前请确保网络畅通。或执行以下命令安装：
+### 安装MindSpore
+
+参考[MindSpore官方安装指导](https://www.mindspore.cn/install)，根据系统类型、CANN版本及Python版本获取相应的安装命令以安装MindSpore 2.9.0，安装前请确保网络畅通。
+
+## 一键式适配MindSpeed MM
+
+针对MindSpore框架，我们提供了一键转换工具MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在MindSpore+CANN环境下一键拉起模型训练。
 
 ```shell
-pip install mindspore==2.7.2
-```
-
-## 代码一键适配
-
-MindSpeed-Core-MS提供了代码、环境的一键适配功能，执行以下命令完成一键适配后，用户即可开启基于MindSpore AI套件的多模态模型之旅。
-
-```shell
-git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b r0.5.0
+git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b master 
 cd MindSpeed-Core-MS
 pip install -r requirements.txt
 source auto_convert.sh mm

@@ -1,6 +1,6 @@
-# 安装说明
+# MindSpeed MM安装指导
 
-  本文主要向用户介绍如何快速基于PyTorch框架以及MindSpore框架完成MindSpeed MM（多模态模型套件）的安装。
+  本文主要向用户介绍如何快速基于PyTorch框架完成MindSpeed MM（多模态模型套件）的安装。
 
 ## 硬件配套和支持的操作系统
 
@@ -14,7 +14,7 @@
 |<term>Atlas A2 推理系列产品</term>|x|
 |<term>Atlas 200I/500 A2 推理产品</term>|x|
 |<term>Atlas 推理系列产品</term>|x|
-|<term>Atlas 训练系列产品</term>|√|
+|<term>Atlas 训练系列产品</term>|x|
 
 > [!NOTE]  
 > 本节表格中“√”代表支持，“x”代表不支持。
@@ -27,7 +27,7 @@
 
 ## 安装前准备
 
-请参见《版本说明》中的“[相关产品版本配套说明](./release_notes.md#相关产品版本配套说明)”章节，下载安装对应的软件版本。
+请参见《版本说明》中的“[相关产品版本配套说明](../release_notes.md#相关产品版本配套说明)”章节，下载安装对应的软件版本。
 
 ### 安装驱动固件
 
@@ -45,22 +45,14 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 获取[CANN](https://www.hiascend.com/cann/download)，安装配套版本的Toolkit、ops和NNAL并配置CANN环境变量。具体请参考《[CANN 软件安装指南](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0000.html)》（商用版）或《[CANN 软件安装指南](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/softwareinst/instg/instg_0000.html)》（社区版）。
 
 ```shell
-#基于PyTorch框架设置环境变量
+#设置环境变量
 source /usr/local/Ascend/cann/set_env.sh # 修改为实际安装的Toolkit包路径
 source /usr/local/Ascend/nnal/atb/set_env.sh # 修改为实际安装的nnal包路径
 ```
 
-```shell
-#基于MindSpore框架设置环境变量
-source /usr/local/Ascend/cann/set_env.sh # 修改为实际安装的Toolkit包路径
-source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0 # 修改为实际安装的nnal包路径
-```
-
 > [!NOTICE]  
 > 建议使用非root用户安装运行torch\_npu，且建议对安装程序的目录文件做好权限管控：文件夹权限设置为750，文件权限设置为640。可以通过设置umask控制安装后文件的权限，如设置umask为0027。
-> 更多安全相关内容请参见《[安全声明](SECURITYNOTE.md)》中各组件关于“文件权限控制”的说明。
-
-## 基于PyTorch框架
+> 更多安全相关内容请参见《[安全声明](../SECURITYNOTE.md)》中各组件关于“文件权限控制”的说明。
 
 ### 安装PyTorch以及torch_npu
 
@@ -73,14 +65,14 @@ pip3 install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
 ```
 
-### 安装MindSpeed MM
+## 安装MindSpeed MM
 
 安装MindSpeed MM有如下两种方式：
 
   - 手动安装：灵活指定需要使用的第三方依赖及MindSpeed MM。
   - 一键安装：快速安装最新配套的第三方依赖及MindSpeed MM，当前只有qwen3,qwen3.5模型支持，请按照实际需求选择。
  
- **一键安装**
+### 一键安装
 
   目前[Qwen3-VL](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/examples/qwen3vl/README.md)、[Qwen3.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qwen3_5)模型已支持一键安装。
 
@@ -131,7 +123,7 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
       mindspeed mm successfully installed!
       ```
 
- **手动安装**
+### 手动安装
 
   该方法适用于单独安装PyTorch和其他第三方库进行开发调试的用户使用。
 
@@ -169,26 +161,8 @@ pip3 install torch_npu-2.7.1rc1-cp310-cp310-manylinux_2_28_aarch64.whl
           cd ..
       ```
 
-  4. 安装MindSpeed MM及其相关依赖，可通过[pyproject.toml](../../pyproject.toml)配置第三方依赖清单。
+  4. 安装MindSpeed MM及其相关依赖，可通过[pyproject.toml](../../../pyproject.toml)配置第三方依赖清单。
   
       ```shell
         pip install -e .
       ```
-
-## 基于MindSpore框架
-
-### 安装MindSpore
-
-参考[MindSpore官方安装指导](https://www.mindspore.cn/install)，根据系统类型、CANN版本及Python版本获取相应的安装命令以安装MindSpore 2.9.0，安装前请确保网络畅通。
-
-### 一键式适配MindSpeed MM
-
-针对MindSpore框架，我们提供了一键转换工具MindSpeed-Core-MS，旨在帮助用户自动拉取相关代码仓并对torch代码进行一键适配，进而使用户无需再额外手动开发适配即可在MindSpore+CANN环境下一键拉起模型训练。
-
-```shell
-git clone https://gitcode.com/Ascend/MindSpeed-Core-MS.git -b master 
-cd MindSpeed-Core-MS
-pip install -r requirements.txt
-source auto_convert.sh mm
-cd MindSpeed-MM
-```
