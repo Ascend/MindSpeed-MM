@@ -1,7 +1,7 @@
 hetero-parallel
 ===============
 
-Last updated: 12/08/2025. Author: Shangda-Yang
+Last updated: 04/07/2026. Author: Shangda-Yang
 
 1. 技术背景与挑战
 --------------------
@@ -172,39 +172,58 @@ Hetero Parallel（异构并行）是 MindSpeed-MM 中用于多模态模型的一
 6.1 权重切分
 :::::::::::::::::
 
-xP（encoders） + TP（text decoder） 切分
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+xP（encoders） + TP2（text decoder） + PP2（text decoder） 切分
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: bash
 
-    # 7b
+    # qwen2.5omni 7b(hf2mm)
     mm-convert  Qwen2_5_OmniConverter hf_to_mm \
       --cfg.mm_dir "ckpt/mm_path/Qwen2.5-Omni-7B" \
       --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-Omni-7B" \
-      --cfg.parallel_config.llm_pp_layers [[28]] \
+      --cfg.parallel_config.llm_pp_layers [[14,14]] \
       --cfg.parallel_config.vit_pp_layers [[32]] \
       --cfg.parallel_config.audio_pp_layers [[32]] \
-      --cfg.parallel_config.tp_size 4 \
+      --cfg.parallel_config.tp_size 2 \
       --cfg.parallel_config.vit_tp_size 1 \
       --cfg.parallel_config.audio_tp_size 1
+    
+    # qwen2.5vl 7b(hf2mm)
+    mm-convert  Qwen2_5_VLConverter hf_to_mm \
+      --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
+      --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-7B-Instruct" \
+      --cfg.parallel_config.llm_pp_layers [[12,16]] \
+      --cfg.parallel_config.vit_pp_layers [[32]] \
+      --cfg.parallel_config.tp_size 2 \
+      --cfg.parallel_config.vit_tp_size 1
 
-xP（encoders）+ PP（text decoder） 切分
+对应的权重逆转换
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: bash
 
-    # 7b
-    mm-convert  Qwen2_5_OmniConverter hf_to_mm \
+    # qwen2.5omni 7b(mm2hf)
+    mm-convert  Qwen2_5_OmniConverter mm_to_hf \
+      --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-Omni-7B" \
       --cfg.mm_dir "ckpt/mm_path/Qwen2.5-Omni-7B" \
       --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-Omni-7B" \
-      --cfg.parallel_config.llm_pp_layers [[12, 16]] \
-      --cfg.parallel_config.vit_pp_layers [[32, 0]] \
-      --cfg.parallel_config.audio_pp_layers [[32, 0]] \
-      --cfg.parallel_config.tp_size 1 \
+      --cfg.parallel_config.llm_pp_layers [14,14] \
+      --cfg.parallel_config.vit_pp_layers [32] \
+      --cfg.parallel_config.audio_pp_layers [32] \
+      --cfg.parallel_config.tp_size 2 \
+      --cfg.parallel_config.vit_tp_size 1 \
+      --cfg.parallel_config.audio_tp_size 1
 
-    mm-convert  Qwen2_5_OmniConverter base_to_hetero \
-      --cfg.mm_dir "ckpt/mm_path/Qwen2.5-Omni-7B" \
-      --cfg.mm_heterp_dir "ckpt/mm_heterp_dir/Qwen2.5-Omni-7B" \
+    # qwen2.5vl 7b(mm2hf)
+    mm-convert  Qwen2_5_VLConverter mm_to_hf \
+      --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-VL-7B-Instruct" \
+      --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
+      --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-7B-Instruct" \
+      --cfg.parallel_config.llm_pp_layers [12,16] \
+      --cfg.parallel_config.vit_pp_layers [32] \
+      --cfg.parallel_config.tp_size 2 \
+      --cfg.parallel_config.vit_tp_size 1
+
 
 6.2 异构并行启用方式
 ::::::::::::::::::::::::
@@ -217,10 +236,15 @@ xP（encoders）+ PP（text decoder） 切分
 
 6.3 模块并行配置
 :::::::::::::::::::::
+**训练脚本配置**：训练脚本中的并行配置全改为1
 
-**text decoder并行配置**：复用默认配置方式 - 通过启动脚本（xx.sh）中GPT_ARGS下的参数配置，开启PP时需额外在model_xx.json中配置切分方式，具体参照PP配置文档（TODO：**xxxxxx**）。
+.. code:: bash
 
-**模态编码器并行配置**：（model_xx.json）中为不同编码器设置独立的并行参数（默认示例为全DP配置）：
+    TP=1
+    PP=1
+    CP=1
+
+**model并行配置**：（model_xx.json）中为不同编码器、解码器设置独立的并行参数（默认示例为全DP配置）：
 
 .. code:: json
 
@@ -245,6 +269,15 @@ xP（encoders）+ PP（text decoder） 切分
         "pp": 1, # 当前只支持pp为1
         "cp": 1 
       }
+      "text_decoder": {
+        ...,
+        "pipeline_num_layers": [11, 17],
+        ...,
+        "tp":1,
+        "pp":1,
+        "cp":1
+      },
+      ...
     }
 
 6.4 编码器超量计算
@@ -265,12 +298,11 @@ xP（encoders）+ PP（text decoder） 切分
 2. **灵活的扩展性**：支持为新模块添加独立的并行配置
 3. **性能提升**：通过异构并行和流水线优化，提高多模态模型的训练效率
 4. **兼容性好**：与现有并行框架无缝集成，易于使用
-5. **场景收益**：特性在Qwen 2.5 Omni模型，典型场景下端到端性能收益20%以上（与整网共并行策略相比）。
+5. **场景收益**：特性在Qwen2.5omni模型，典型场景下端到端性能收益20%以上（与整网共并行策略相比）。
 
 8. 应用场景
 ---------------
 
-- **大规模多模态模型训练**：当前特性已支持Qwen 2.5 Omni模型
+- **大规模多模态模型训练**：当前特性已支持Qwen2.5omni、Qwen2.5vl模型
 - **资源受限环境**：需要灵活分配计算资源的场景
 - **性能优化**：针对特定模块进行并行策略优化
-
