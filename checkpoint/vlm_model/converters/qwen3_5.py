@@ -1,6 +1,7 @@
 from typing import List, Dict
 from pathlib import Path
 import re
+import torch
 from transformers import AutoConfig, AutoProcessor
 
 from checkpoint.common.converter import Converter
@@ -25,13 +26,13 @@ class Qwen35Converter(Converter):
     ]
 
     def hf_to_dcp(
-            self,
-            hf_dir: str = "",
-            dcp_dir: str = "",
-            dcp_prefix: str = "",
-            hf_prefix: str = "",
-            tie_weight_mapping: Dict[str, str] = None,
-            fused_linear_names: List[str] = None,
+        self,
+        hf_dir: str = "",
+        dcp_dir: str = "",
+        dcp_prefix: str = "",
+        hf_prefix: str = "",
+        tie_weight_mapping: Dict[str, str] = None,
+        fused_linear_names: List[str] = None,
     ):
         """
         Converts a Hugging Face formatted model checkpoint to torch-dcp format.
@@ -88,14 +89,15 @@ class Qwen35Converter(Converter):
         )
 
     def dcp_to_hf(
-            self,
-            dcp_dir: str = "",
-            save_hf_dir: Path = "",
-            origin_hf_dir: str = "",
-            dcp_prefix: str = "",
-            hf_prefix: str = "",
-            fused_linear_names: List[str] = None,
-            trust_remote_code: bool = True
+        self,
+        dcp_dir: str = "",
+        save_hf_dir: Path = "",
+        origin_hf_dir: str = "",
+        dcp_prefix: str = "",
+        hf_prefix: str = "",
+        fused_linear_names: List[str] = None,
+        trust_remote_code: bool = True,
+        to_bf16: bool = False
     ):
         """
         Merges torch-dcp shards and converts them back into standard Hugging Face format.
@@ -133,6 +135,10 @@ class Qwen35Converter(Converter):
                         value = value.permute(0, 2, 1).contiguous()
 
                 state_dict[new_key] = value
+
+                # Optionally convert the weights to BF16
+                if to_bf16:
+                    state_dict[new_key] = state_dict[new_key].to(dtype=torch.bfloat16)
 
             return state_dict
 

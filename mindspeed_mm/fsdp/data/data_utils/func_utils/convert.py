@@ -534,6 +534,10 @@ class SupervisedDatasetProcessor(DatasetProcessor):
 
         for turn_idx, (source_ids, target_ids) in enumerate(encoded_pairs):
             if total_length >= self.data_args.cutoff_len:
+                logger.info(
+                    f"Maximum sequence length {self.data_args.cutoff_len} reached. "
+                    f"Please increase seq_len or cutoff_len in config."
+                )
                 break
 
             source_len, target_len = infer_seqlen(
