@@ -20,6 +20,7 @@
   - [准备工作](#1-准备工作)
   - [配置参数](#2-配置参数)
   - [启动微调](#3-启动微调)
+  - [LoRA微调](#lora微调)
 - [环境变量声明](#环境变量声明)
 - [注意事项](#注意事项)
 
@@ -269,6 +270,101 @@ NODES: 一共几个节点
 
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 可在`xxx_config.yaml`的`model`参数中配置上述文档中的`loss_type`。
+
+```shell
+bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
+```
+
+<a id="jump4.4"></a>
+
+### LoRA微调【实验特性】
+
+> **状态**：【实验特性】
+> LoRA为框架通用能力，当前已支持Qwen3.5模型的LoRA微调，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md)。
+
+#### 参数配置
+
+在`xxx_config.yaml`的`training`字段下添加`lora`配置，示例如下：
+
+```yaml
+training:
+  ...
+  lora:
+    enable: true
+    rank: 8
+    alpha: 16
+    target_modules:
+      - "model.language_model.layers.{*}.self_attn.q_proj"
+      - "model.language_model.layers.{*}.self_attn.k_proj"
+      - "model.language_model.layers.{*}.self_attn.v_proj"
+      - "model.language_model.layers.{*}.self_attn.o_proj"
+      - "model.language_model.layers.{*}.mlp.gate_proj"
+      - "model.language_model.layers.{*}.mlp.up_proj"
+      - "model.language_model.layers.{*}.mlp.down_proj"
+    dropout: 0.0
+    init_lora_weights: "true"
+    pretrained_lora_path: null
+    save_mode: "lora_only"
+```
+
+主要参数说明：
+
+| 参数 | 含义 | 示例 |
+| :---------------- | :----------------------- | :----------------------- |
+| enable | 是否开启LoRA微调 | `true` / `false` |
+| rank | LoRA更新矩阵的维度 | `8` |
+| alpha | 调节分解后的矩阵对原矩阵的影响程度 | `16` |
+| target_modules | 应用LoRA的模块列表 | 见下方说明 |
+| dropout | LoRA层的dropout率 | `0.0` |
+| init_lora_weights | 权重初始化方式 | `"true"` / `"gaussian"` / `"kaiming"` |
+| pretrained_lora_path | 预训练LoRA权重路径（可选） | `null` 或权重路径 |
+| save_mode | 权重保存模式 | `"lora_only"` / `"full_model"` |
+
+其中，`target_modules`参数需根据模型结构进行选择，Qwen3.5模型推荐使用通配符模式配置：
+
+- **仅对Attention模块进行LoRA微调**：
+  ```yaml
+  target_modules:
+    - "model.language_model.layers.{*}.self_attn.q_proj"
+    - "model.language_model.layers.{*}.self_attn.k_proj"
+    - "model.language_model.layers.{*}.self_attn.v_proj"
+    - "model.language_model.layers.{*}.self_attn.o_proj"
+  ```
+
+- **仅对MLP模块进行LoRA微调**：
+  ```yaml
+  target_modules:
+    - "model.language_model.layers.{*}.mlp.gate_proj"
+    - "model.language_model.layers.{*}.mlp.up_proj"
+    - "model.language_model.layers.{*}.mlp.down_proj"
+  ```
+
+- **同时对Attention和MLP模块进行LoRA微调**：
+  ```yaml
+  target_modules:
+    - "model.language_model.layers.{*}.self_attn.q_proj"
+    - "model.language_model.layers.{*}.self_attn.k_proj"
+    - "model.language_model.layers.{*}.self_attn.v_proj"
+    - "model.language_model.layers.{*}.self_attn.o_proj"
+    - "model.language_model.layers.{*}.mlp.gate_proj"
+    - "model.language_model.layers.{*}.mlp.up_proj"
+    - "model.language_model.layers.{*}.mlp.down_proj"
+  ```
+
+#### LoRA权重加载（可选）
+
+若需加载预训练LoRA权重，需在配置文件中添加`pretrained_lora_path`路径，相关配置修改如下：
+
+```yaml
+training:
+  lora:
+    enable: true
+    pretrained_lora_path: ./save_path/iter_xxx  # 替换为LoRA权重保存路径
+```
+
+#### 启动微调
+
+配置完成后，使用与全量微调相同的启动脚本即可：
 
 ```shell
 bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
