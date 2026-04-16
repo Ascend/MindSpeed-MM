@@ -68,6 +68,7 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
@@ -348,8 +349,12 @@ def apply_mask_to_padding_states(hidden_states, attention_mask):
     Tunes out the hidden states for padding tokens
     """
     # NOTE: attention mask is a 2D boolean tensor
+    ps = get_parallel_state()
     if attention_mask is not None and attention_mask.shape[1] > 1 and attention_mask.shape[0] > 1:
         dtype = hidden_states.dtype
+        if ps.is_ulysses_enable():
+            split_sizes = cal_split_sizes(attention_mask.shape[1], world_size=ps.get_ulysses_group_size())
+            attention_mask = torch.split(attention_mask, split_sizes, dim=1)[ps.get_ulysses_rank()]
         hidden_states = (hidden_states * attention_mask[:, :, None]).to(dtype)
 
     return hidden_states
@@ -581,6 +586,21 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         self.in_proj_b = nn.Linear(self.hidden_size, self.num_v_heads, bias=False)
         self.in_proj_a = nn.Linear(self.hidden_size, self.num_v_heads, bias=False)
 
+    def _get_local_conv1d_weight(self, ulysses_rank: int, local_key_dim: int, local_value_dim: int) -> torch.Tensor:
+        # Modification: shard depthwise conv1d weights to match head-sharded mixed_qkv channels.
+        w_full = self.conv1d.weight
+        if w_full.shape[0] != self.key_dim * 2 + self.value_dim:
+            raise ValueError(
+                f"conv1d weight dim ({w_full.shape[0]}) must match "
+                f"(2 * key_dim + value_dim) ({self.key_dim * 2 + self.value_dim})"
+            )
+        k_off = ulysses_rank * local_key_dim
+        v_off = ulysses_rank * local_value_dim
+        w_q = w_full[k_off: k_off + local_key_dim]
+        w_k = w_full[self.key_dim + k_off: self.key_dim + k_off + local_key_dim]
+        w_v = w_full[2 * self.key_dim + v_off: 2 * self.key_dim + v_off + local_value_dim]
+        return torch.cat([w_q, w_k, w_v], dim=0)
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -588,7 +608,6 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         cache_position: torch.LongTensor | None = None,
         attention_mask: torch.Tensor | None = None,
     ):
-        hidden_states = gather_forward_split_backward_with_cp(hidden_states, 1, get_seq_len("total"))  # [b,s,h]
         hidden_states = apply_mask_to_padding_states(hidden_states, attention_mask)
 
         # Set up dimensions for reshapes later
@@ -606,14 +625,54 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
             conv_state = cache_params.conv_states[self.layer_idx]
             recurrent_state = cache_params.recurrent_states[self.layer_idx]
 
-        mixed_qkv = self.in_proj_qkv(hidden_states)
-        mixed_qkv = mixed_qkv.transpose(1, 2)
+        mixed_qkv = self.in_proj_qkv(hidden_states) # b s h
+        # Modification(removed): No need to transpose here as it's handled later in conv path
+        # mixed_qkv = mixed_qkv.transpose(1, 2)# b h s
 
         z = self.in_proj_z(hidden_states)
         z = z.reshape(batch_size, seq_len, -1, self.head_v_dim)
 
         b = self.in_proj_b(hidden_states)
         a = self.in_proj_a(hidden_states)
+
+        # Modification: Ulysses SP all-to-all for linear attention heads.
+        ps = get_parallel_state()
+        if ps.is_ulysses_enable():
+            ulysses_group = ps.get_ulysses_group()
+            ulysses_size = ps.get_ulysses_group_size()
+            ulysses_rank = ps.get_ulysses_rank()
+            if self.num_k_heads % ulysses_size != 0 or self.num_v_heads % ulysses_size != 0:
+                raise ValueError(
+                    f"SP size ({ulysses_size}) must divide num_k_heads ({self.num_k_heads}) "
+                    f"and num_v_heads ({self.num_v_heads}) for gated deltanet LASP"
+                )
+
+            local_num_k_heads = self.num_k_heads // ulysses_size
+            local_num_v_heads = self.num_v_heads // ulysses_size
+            local_key_dim = self.head_k_dim * local_num_k_heads
+            local_value_dim = self.head_v_dim * local_num_v_heads
+
+            # Reshape mixed_qkv to head layout for all-to-all: [B, S_local, D] -> split+reshape to heads
+            q_proj, k_proj, v_proj = torch.split(mixed_qkv, [self.key_dim, self.key_dim, self.value_dim], dim=-1)
+
+            # All-to-all: gather full sequence, scatter heads -> [B, S_full, local_dim]
+            q_proj = all_to_all(q_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
+            k_proj = all_to_all(k_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
+            v_proj = all_to_all(v_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
+
+            b = b.reshape(batch_size, seq_len, self.num_v_heads)
+            a = a.reshape(batch_size, seq_len, self.num_v_heads)
+            b = all_to_all(b, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
+            a = all_to_all(a, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
+
+            # Concat for conv1d: [B, S_full, local_dim]
+            mixed_qkv = torch.cat((q_proj, k_proj, v_proj), dim=-1)
+        else:
+            local_num_k_heads = self.num_k_heads
+            local_num_v_heads = self.num_v_heads
+            local_key_dim = self.key_dim
+            local_value_dim = self.value_dim
+
 
         if use_precomputed_states:
             # 2. Convolution sequence transformation
@@ -627,37 +686,57 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
             )
         else:
             if cache_params is not None:
-                conv_state = F.pad(mixed_qkv, (self.conv_kernel_size - mixed_qkv.shape[-1], 0))
+                # Modification: Transpose for conv state padding and update cache
+                mixed_qkv_t = mixed_qkv.transpose(1, 2)
+                conv_state = F.pad(mixed_qkv_t, (self.conv_kernel_size - mixed_qkv_t.shape[-1], 0))
                 cache_params.conv_states[self.layer_idx] = conv_state
+            # Modification: shard conv1d weights per Ulysses rank to match head-sharded channels.
+            if ps.is_ulysses_enable():
+                conv_weight = self._get_local_conv1d_weight(
+                    ulysses_rank=ulysses_rank,
+                    local_key_dim=local_key_dim,
+                    local_value_dim=local_value_dim,
+                )
+            else:
+                conv_weight = self.conv1d.weight
+
             if self.causal_conv1d_fn is not None:
+                conv_weight = conv_weight.squeeze(1)
                 mixed_qkv = self.causal_conv1d_fn(
                     x=mixed_qkv,
-                    weight=self.conv1d.weight.squeeze(1),
+                    weight=conv_weight,
                     bias=self.conv1d.bias,
                     activation=self.activation,
                     seq_idx=None,
                 )
             else:
-                mixed_qkv = F.silu(self.conv1d(mixed_qkv)[:, :, :seq_len])
+                mixed_qkv = mixed_qkv.transpose(1, 2)
+                mixed_qkv = F.silu(F.conv1d(mixed_qkv, weight=conv_weight, bias=self.conv1d.bias, padding=self.conv_kernel_size - 1, groups=local_key_dim * 2 + local_value_dim)[:, :, :mixed_qkv.shape[-1]])
 
         mixed_qkv = mixed_qkv.transpose(1, 2)
         query, key, value = torch.split(
             mixed_qkv,
             [
-                self.key_dim,
-                self.key_dim,
-                self.value_dim,
+                local_key_dim,
+                local_key_dim,
+                local_value_dim,
             ],
             dim=-1,
         )
 
-        query = query.reshape(batch_size, seq_len, -1, self.head_k_dim)
-        key = key.reshape(batch_size, seq_len, -1, self.head_k_dim)
-        value = value.reshape(batch_size, seq_len, -1, self.head_v_dim)
+        query = query.reshape(query.shape[0], query.shape[1], local_num_k_heads, self.head_k_dim)
+        key = key.reshape(key.shape[0], key.shape[1], local_num_k_heads, self.head_k_dim)
+        value = value.reshape(value.shape[0], value.shape[1], local_num_v_heads, self.head_v_dim)
 
         beta = b.sigmoid()
         # If the model is loaded in fp16, without the .float() here, A might be -inf
-        g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
+        # Modification: slice A_log/dt_bias for local V-heads under Ulysses SP.
+        if ps.is_ulysses_enable():
+            v_head_offset = ulysses_rank * local_num_v_heads
+            v_head_slice = slice(v_head_offset, v_head_offset + local_num_v_heads)
+            g = -self.A_log[v_head_slice].float().exp() * F.softplus(a.float() + self.dt_bias[v_head_slice])
+        else:
+            g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
         if self.num_v_heads // self.num_k_heads > 1:
             query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
             key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
@@ -690,6 +769,10 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         if cache_params is not None:
             cache_params.recurrent_states[self.layer_idx] = last_recurrent_state
 
+        # Modification: gather attention output back to sequence-sharded layout before gated norm.
+        if ps.is_ulysses_enable():
+            core_attn_out = all_to_all(core_attn_out, process_group=ulysses_group, scatter_dim=1, gather_dim=2)
+
         # reshape input data into 2D tensor
         core_attn_out = core_attn_out.reshape(-1, self.head_v_dim)
         z = z.reshape(-1, self.head_v_dim)
@@ -697,7 +780,6 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         core_attn_out = core_attn_out.reshape(batch_size, seq_len, -1)
 
         output = self.out_proj(core_attn_out)  # [b,s,h]
-        output = split_forward_gather_backward_with_cp(output, 1)  # [b,s/cp_size,h]
         return output
 
 
