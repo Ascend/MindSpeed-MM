@@ -82,6 +82,7 @@ class TrainEngine:
         """Perform a single training step with gradient accumulation."""
         args = self.args
         total_loss = 0
+        total_aux_loss = None
         # Gradient accumulation
         for _ in range(args.training.gradient_accumulation_steps):
             # Get current batch data
@@ -101,11 +102,14 @@ class TrainEngine:
             loss.backward()
 
             total_loss += loss
+            if getattr(output, 'aux_loss', None) is not None:
+                aux_loss = output.aux_loss / args.training.gradient_accumulation_steps
+                total_aux_loss = aux_loss if total_aux_loss is None else total_aux_loss + aux_loss
 
         # Average loss across data parallel group
         total_loss = self.average_losses_across_data_parallel_group([total_loss])
 
-        return total_loss
+        return total_loss, total_aux_loss
 
     def train(self):
         """Main training loop."""
@@ -125,7 +129,7 @@ class TrainEngine:
             if self.args.parallel.fsdp_plan.pregather:
                 pregather_fsdp_params(self.model)
 
-            loss = self.train_step(train_dataloader_iter)
+            loss, aux_loss = self.train_step(train_dataloader_iter)
 
             # Clip gradients when clip_grad>0 and get total grad_norm
             grad_norm = clip_grad_norm(self.model, max_norm=args.training.clip_grad, foreach=args.training.clip_grad_foreach)
@@ -153,6 +157,7 @@ class TrainEngine:
                     curr_step_lr,
                     self.consumed_train_samples,
                     loss,
+                    aux_loss,
                     grad_norm
                 )
 
@@ -176,6 +181,7 @@ class TrainEngine:
         curr_step_lr,
         consumed_train_samples,
         loss,
+        aux_loss,
         grad_norm
     ):
         args = self.args
@@ -189,6 +195,10 @@ class TrainEngine:
         log_string += ' learning rate: {:.6E} |'.format(curr_step_lr)
         log_string += ' global batch size: {:5d} |'.format(args.training.global_batch_size)
         log_string += ' loss: {:.6E} |'.format(loss.item())
+
+        if aux_loss is not None:
+            log_string += ' aux loss: {:.6E} |'.format(aux_loss.item())
+
         if grad_norm is not None:
             log_string += ' grad norm: {:.3f} |'.format(grad_norm)
 

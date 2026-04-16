@@ -137,7 +137,8 @@ class TransformersModel(MultiModalModule):
                 
         if hasattr(outputs, "aux_loss") and self.router_aux_loss_coef > 0:
             loss_dict["loss"] += self.router_aux_loss_coef * outputs.aux_loss
-            
+            loss_dict["aux_loss"] = outputs.aux_loss
+
         return loss_dict
 
     def fully_shard(

@@ -118,6 +118,8 @@ def loss_func(output_tensor):
     )
     averaged_loss *= mpu.get_context_parallel_world_size()
     loss_dir["loss"] = averaged_loss[0]
+    if 'aux_loss' in output_tensor:
+        loss_dir['aux_loss'] = output_tensor['aux_loss']
     loss = loss.unsqueeze(0).clone()
     return loss, loss_dir
 
