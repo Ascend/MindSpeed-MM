@@ -225,7 +225,8 @@ class TrainEngine:
             consumed_train_samples = state["extra_state"]["consumed_train_samples"]
 
             self.lr_scheduler.load_state_dict(state["extra_state"]["lr_scheduler"])
-            self.train_dataloader.load_state_dict(state["extra_state"]["train_dataloader"])
+            if self.train_dataloader is not None:
+                self.train_dataloader.load_state_dict(state["extra_state"]["train_dataloader"])
             if not args.training.no_load_rng:
                 if "torch_rng_state" not in state["extra_state"]:
                     print_rank(logger.warning, f"No RNG state found in checkpoint, skipping RNG loading")
