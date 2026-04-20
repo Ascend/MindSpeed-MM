@@ -295,4 +295,3 @@ bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
 ---
-<a id="jump11"></a>

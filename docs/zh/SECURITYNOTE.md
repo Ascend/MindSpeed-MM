@@ -70,9 +70,9 @@
    
 5. 参考链接
    
-   torch.load()文档：https://pytorch.org/docs/main/generated/torch.load.html#torch.load(包含 weights_only参数说明及其风险)
+   torch.load()文档：<https://pytorch.org/docs/main/generated/torch.load.html#torch.load>(包含 weights_only参数说明及其风险)
    
-   PyTorch 分布式通信说明：https://pytorch.org/docs/main/distributed.html#collective-functions
+   PyTorch 分布式通信说明：<https://pytorch.org/docs/main/distributed.html#collective-functions>
 
 ## 运行安全声明
 
