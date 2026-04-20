@@ -23,7 +23,6 @@
   - [启动推理](#4-启动推理)
 - [PMCC](#pmccprivacy-and-model-confidential-computing)
 - [环境变量声明](#环境变量声明)
-- [注意事项](#注意事项)
 
 ## 版本说明
 
@@ -508,4 +507,3 @@ mm-convert Qwen3VLConverter hf_to_dcp \
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
 ---
-<a id="jump11"></a>

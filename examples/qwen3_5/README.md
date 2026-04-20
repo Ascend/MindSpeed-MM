@@ -22,7 +22,6 @@
   - [启动微调](#3-启动微调)
   - [LoRA微调](#lora微调)
 - [环境变量声明](#环境变量声明)
-- [注意事项](#注意事项)
 
 ## 版本说明
 
@@ -280,7 +279,7 @@ bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 
 <a id="jump4.4"></a>
 
-### LoRA微调【实验特性】
+### LoRA微调
 
 > **状态**：【实验特性】
 > LoRA为框架通用能力，当前已支持Qwen3.5模型的LoRA微调，参数介绍请参考[LoRA特性文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md)。
@@ -326,6 +325,7 @@ training:
 其中，`target_modules`参数需根据模型结构进行选择，Qwen3.5模型推荐使用通配符模式配置：
 
 - **仅对Attention模块进行LoRA微调**：
+
   ```yaml
   target_modules:
     - "model.language_model.layers.{*}.self_attn.q_proj"
@@ -335,6 +335,7 @@ training:
   ```
 
 - **仅对MLP模块进行LoRA微调**：
+
   ```yaml
   target_modules:
     - "model.language_model.layers.{*}.mlp.gate_proj"
@@ -343,6 +344,7 @@ training:
   ```
 
 - **同时对Attention和MLP模块进行LoRA微调**：
+
   ```yaml
   target_modules:
     - "model.language_model.layers.{*}.self_attn.q_proj"
@@ -395,4 +397,3 @@ bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
 ---
-<a id="jump11"></a>
