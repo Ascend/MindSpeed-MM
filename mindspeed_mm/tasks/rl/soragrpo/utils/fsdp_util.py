@@ -25,8 +25,13 @@ def apply_fsdp_checkpointing(model, no_split_modules, p=1):
     block_idx = 0
     cut_off = 1 / 2
     # when passing p as a fraction number (e.g. 1/3), it will be interpreted
-    # as a string in argv, thus we need eval("1/3") here for fractions.
-    p = eval(p) if isinstance(p, str) else p
+    # as a string in argv, parse it safely instead of using eval()
+    if isinstance(p, str):
+        if '/' in p:
+            numerator, denominator = p.split('/')
+            p = float(numerator) / float(denominator)
+        else:
+            p = float(p)
 
     def selective_checkpointing(submodule):
         nonlocal block_idx

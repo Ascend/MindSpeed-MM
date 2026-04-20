@@ -486,14 +486,21 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         # 3. Sample level (calculate_per_sample_loss=True):
         #    Calculate per-sample average loss by first computing the average loss of valid tokens within each sample, then averaging across all samples
         if args.calculate_per_sample_loss:
-            batch_mean_loss = total_loss.sum(dim=1) / token_nums
+            # Avoid division by zero
+            token_nums_safe = torch.clamp(token_nums, min=1.0)
+            batch_mean_loss = total_loss.sum(dim=1) / token_nums_safe
             total_loss = batch_mean_loss.mean()
             token_nums = token_nums.mean()
         elif args.calculate_per_token_loss:
             pass
         else:
-            token_nums = torch.sum(token_nums)
-            total_loss = total_loss.sum() / token_nums
+            token_nums_sum = torch.sum(token_nums)
+            # Avoid division by zero
+            if token_nums_sum == 0:
+                total_loss = torch.tensor(0.0, device=total_loss.device, dtype=total_loss.dtype)
+            else:
+                total_loss = total_loss.sum() / token_nums_sum
+            token_nums = token_nums_sum
 
         return total_loss, token_nums
 

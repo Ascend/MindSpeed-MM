@@ -215,23 +215,32 @@ class JsonLoader:
             shm = shared_memory.SharedMemory(create=True, size=size)
             shm_objects.append(shm)
             shm_size.append(size)
-        with ProcessPoolExecutor(max_workers=num_processes) as executor:
-            future_to_task = {}
-            for i in range(num_processes):
-                task = (self.json_path[i], shm_objects[i].name)
-                future = executor.submit(self._share_memory_process_func, *task)
-                future_to_task[future] = task
-            for future in as_completed(future_to_task):
+        try:
+            with ProcessPoolExecutor(max_workers=num_processes) as executor:
+                future_to_task = {}
+                for i in range(num_processes):
+                    task = (self.json_path[i], shm_objects[i].name)
+                    future = executor.submit(self._share_memory_process_func, *task)
+                    future_to_task[future] = task
+                for future in as_completed(future_to_task):
+                    try:
+                        shm_name = future.result()
+                        existing_shm = shared_memory.SharedMemory(name=shm_name)
+                        data_len = int.from_bytes(bytes(existing_shm.buf[:8]), 'big')
+                        content = existing_shm.buf[8:8 + data_len]
+                        content = bytes(content)
+                        total_contents += orjson.loads(content)
+                        existing_shm.close()
+                    except Exception as error:
+                        print(f"Process {future_to_task[future][1]} file failed when using multiprocess: {error}")
+        finally:
+            # Clean up shared memory to prevent resource leak
+            for shm in shm_objects:
                 try:
-                    shm_name = future.result()
-                    existing_shm = shared_memory.SharedMemory(name=shm_name)
-                    data_len = int.from_bytes(bytes(existing_shm.buf[:8]), 'big')
-                    content = existing_shm.buf[8:8 + data_len]
-                    content = bytes(content)
-                    total_contents += orjson.loads(content)
-                    existing_shm.close()
+                    shm.close()
+                    shm.unlink()
                 except Exception as error:
-                    print(f"Process {future_to_task[future][1]} file failed when using multiprocess: {error}")
+                    print(f"Process {future_to_task[future][1]} file failed when clean shm: {error}")
         return total_contents
 
     def _share_memory_process_func(self, path, shm_name):

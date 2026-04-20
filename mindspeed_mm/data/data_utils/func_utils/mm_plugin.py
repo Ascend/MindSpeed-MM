@@ -1167,7 +1167,12 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
 def _get_package_version(name: str) -> "Version":
     try:
         return version.parse(importlib.metadata.version(name))
-    except Exception:
+    except importlib.metadata.PackageNotFoundError:
+        # Package not installed, return default version
+        return version.parse("0.0.0")
+    except Exception as e:
+        # Log unexpected errors but don't crash
+        print(f"Warning: Failed to get version for package '{name}': {e}")
         return version.parse("0.0.0")
 
 
