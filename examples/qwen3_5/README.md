@@ -89,9 +89,9 @@ bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensio
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
 
-如果使用fsdp2的meta init初始化模型，需要先根据模型类型完成以下权重转换：
+如果使用fsdp2的meta init初始化模型，需要先根据模型配置完成以下权重转换：
 
-(1) 4B模型：
+(1) 模型配置文件config.json中的`tie_word_embeddings`字段为`true`时（例如0.8B，2B，4B模型），使用以下转换脚本：
 
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
@@ -105,7 +105,7 @@ mm-convert Qwen35Converter hf_to_dcp \
 #   |—— latest_checkpointed_iteration.txt
 ```
 
-(2) 其它模型:
+(2) 其它场景:
 
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
@@ -120,7 +120,7 @@ mm-convert Qwen35Converter hf_to_dcp \
 
 并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 
-MindSpeed MM保存权重的格式也为dcp格式。可使用如下命令将dcp权重转换回HF权重
+MindSpeed MM保存权重的格式也为dcp格式，可使用如下命令将dcp权重转换回HF权重：
 
 ```bash
 # 待转换的dcp权重目录结构样例为：
@@ -256,7 +256,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 ```
 
 【多机运行配置】
-如需拉起多机训练，修改启动脚本下 MASTER_ADDR、NODE_ADDR、NODES以及NODE_RANK变量
+如需拉起多机训练，修改启动脚本下 MASTER_ADDR、NODE_ADDR、NNODES以及NODE_RANK变量
 
 ``` shell
 MASTER_ADDR: 主节点IP地址
