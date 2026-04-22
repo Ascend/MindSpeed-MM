@@ -32,6 +32,14 @@ class LossArguments:
     )
 
 
+@dataclass
+class ActivationOffloadPlanConfig:
+    apply_modules: str = field(
+        default=None,
+        metadata={"help": "module that applied activation offload"}
+    )
+
+
 @allow_extra_fields
 @dataclass
 class ModelArguments:
@@ -73,3 +81,9 @@ class ModelArguments:
         metadata={"help": "Whether apply dynamic chunkloss for loss compute"},
     )
     chunkloss_plan: ChunkLossPlanConfig = field(default_factory=ChunkLossPlanConfig)
+    
+    enable_activation_offload: bool = field(
+        default=False,
+        metadata={"help": "Whether apply activation offload"}
+    )
+    activation_offload_plan: ActivationOffloadPlanConfig = field(default_factory=ActivationOffloadPlanConfig)

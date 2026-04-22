@@ -1187,7 +1187,7 @@ class Qwen3_5MoePreTrainedModel(PreTrainedModel):
     _supports_sdpa = True
     _keys_to_ignore_on_load_unexpected = [r"^mtp.*"]
     _can_record_outputs = {
-        "router_logits": OutputRecorder(Qwen3_5MoeSparseMoeBlock, index=1),
+        "router_logits": OutputRecorder(Qwen3_5MoeTopKRouter, index=0),
         "hidden_states": Qwen3_5MoeDecoderLayer,
         "attentions": Qwen3_5MoeAttention,
     }
@@ -2309,6 +2309,7 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         transformer_config.text_config.use_triton_gdn = use_triton_gdn
         use_grouped_expert_matmul = getattr(model_args, "use_grouped_expert_matmul", False)
         transformer_config.text_config.use_grouped_expert_matmul = use_grouped_expert_matmul
+        transformer_config.text_config.router_aux_loss_coef = model_args.loss_cfg.router_aux_loss_coef
         return transformer_config
 
     def get_input_embeddings(self):

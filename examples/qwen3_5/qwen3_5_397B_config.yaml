@@ -85,13 +85,21 @@ model:
   attn_implementation: sdpa
   freeze:
     - model.visual
+  # loss 配置
   loss_cfg:
     loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
     router_aux_loss_coef: 0.0
+  # chunkloss配置
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
     chunk_size: 1024
+  # activation offload 配置
+  enable_activation_offload: false
+  activation_offload_plan:
+    apply_modules:
+     - model.language_model.layers.{*}
+  # 融合算子配置
   use_triton_gdn: true
   use_grouped_expert_matmul: true
 

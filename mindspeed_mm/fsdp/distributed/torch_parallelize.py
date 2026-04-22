@@ -45,7 +45,8 @@ class ParallelApplier:
         
     def set_modules_to_prefetch(self, model):          
         if self.config.fsdp_plan.num_to_forward_prefetch > 0 or self.config.fsdp_plan.num_to_backward_prefetch > 0:
-            set_modules_to_prefetch(model, fsdp_plan=self.config.fsdp_plan, ep_plan=self.config.ep_plan)
+            ep_plan = self.config.ep_plan if self.config.expert_parallel_size > 1 and self.config.ep_plan.apply_modules else None
+            set_modules_to_prefetch(model, fsdp_plan=self.config.fsdp_plan, ep_plan=ep_plan)
         return model
 
     def __call__(self, model):

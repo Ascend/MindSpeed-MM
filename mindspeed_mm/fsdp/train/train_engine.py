@@ -95,7 +95,7 @@ class TrainEngine:
             self.set_loss_func(batch_data)
 
             # forward step
-            output = self.model(**batch_data)
+            output = self.model(**batch_data, use_cache=False)
             loss = output.loss / args.training.gradient_accumulation_steps
 
             # Backward
