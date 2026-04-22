@@ -58,7 +58,7 @@ class TestValidateLoraConfig:
             alpha=16,
             target_modules=["q_proj", "k_proj"],
             dropout=0.05,
-            init_lora_weights="kaiming",
+            init_lora_weights=True,
         )
 
     def test_invalid_rank_zero(self) -> None:
@@ -69,7 +69,7 @@ class TestValidateLoraConfig:
                 alpha=16,
                 target_modules=["q_proj"],
                 dropout=0.05,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_invalid_rank_negative(self) -> None:
@@ -80,7 +80,7 @@ class TestValidateLoraConfig:
                 alpha=16,
                 target_modules=["q_proj"],
                 dropout=0.05,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_invalid_alpha_zero(self) -> None:
@@ -91,7 +91,7 @@ class TestValidateLoraConfig:
                 alpha=0,
                 target_modules=["q_proj"],
                 dropout=0.05,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_invalid_alpha_negative(self) -> None:
@@ -102,7 +102,7 @@ class TestValidateLoraConfig:
                 alpha=-1,
                 target_modules=["q_proj"],
                 dropout=0.05,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_invalid_target_modules_empty(self) -> None:
@@ -113,7 +113,7 @@ class TestValidateLoraConfig:
                 alpha=16,
                 target_modules=[],
                 dropout=0.05,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_invalid_dropout_negative(self) -> None:
@@ -124,7 +124,7 @@ class TestValidateLoraConfig:
                 alpha=16,
                 target_modules=["q_proj"],
                 dropout=-0.1,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_invalid_dropout_too_high(self) -> None:
@@ -135,12 +135,12 @@ class TestValidateLoraConfig:
                 alpha=16,
                 target_modules=["q_proj"],
                 dropout=1.0,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_invalid_init_method(self) -> None:
         """Test validation fails with invalid init method."""
-        with pytest.raises(ValueError, match="init_lora_weights must be one of"):
+        with pytest.raises(ValueError, match="init_lora_weights must be True, False, one of"):
             validate_lora_config(
                 rank=8,
                 alpha=16,
@@ -148,6 +148,58 @@ class TestValidateLoraConfig:
                 dropout=0.05,
                 init_lora_weights="invalid_method",
             )
+
+    def test_valid_init_methods(self) -> None:
+        """Test validation passes with all valid init methods."""
+        valid_methods = ["gaussian", "eva", "olora", "pissa", "corda", "loftq", "orthogonal"]
+        for method in valid_methods:
+            validate_lora_config(
+                rank=8,
+                alpha=16,
+                target_modules=["q_proj"],
+                dropout=0.05,
+                init_lora_weights=method,
+            )
+        
+        # Test pissa_niter_[number] format
+        pissa_niter_values = ["pissa_niter_0", "pissa_niter_5", "pissa_niter_10", "pissa_niter_100"]
+        for value in pissa_niter_values:
+            validate_lora_config(
+                rank=8,
+                alpha=16,
+                target_modules=["q_proj"],
+                dropout=0.05,
+                init_lora_weights=value,
+            )
+        
+        # Test bool values
+        validate_lora_config(
+            rank=8,
+            alpha=16,
+            target_modules=["q_proj"],
+            dropout=0.05,
+            init_lora_weights=True,
+        )
+        validate_lora_config(
+            rank=8,
+            alpha=16,
+            target_modules=["q_proj"],
+            dropout=0.05,
+            init_lora_weights=False,
+        )
+
+    def test_invalid_pissa_niter_format(self) -> None:
+        """Test validation fails with invalid pissa_niter format."""
+        invalid_pissa_values = ["pissa_niter_", "pissa_niter_abc", "pissa_niter_-1", "pissa_niter_1.5"]
+        for value in invalid_pissa_values:
+            with pytest.raises(ValueError, match="init_lora_weights must be True, False, one of"):
+                validate_lora_config(
+                    rank=8,
+                    alpha=16,
+                    target_modules=["q_proj"],
+                    dropout=0.05,
+                    init_lora_weights=value,
+                )
 
 
 class TestIsPatternMatch:
@@ -338,7 +390,7 @@ class TestLoraUtilsIntegration:
             alpha=16,
             target_modules=["linear1", "linear2"],
             dropout=0.05,
-            init_lora_weights="kaiming",
+            init_lora_weights=True,
         )
 
         # Step 2: Match target modules

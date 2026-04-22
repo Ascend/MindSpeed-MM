@@ -1,4 +1,5 @@
 # Copyright 2025 Huawei Technologies Co., Ltd. All rights reserved.
+# Copyright 2025 Bytedance Ltd. and/or its affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@ with FSDP2 distributed training, including:
 
 import fnmatch
 import logging
+import re
 from typing import List, Optional, Set, Tuple, Dict, Any
 
 import torch
@@ -96,7 +98,7 @@ def validate_lora_config(
     alpha: int,
     target_modules: List[str],
     dropout: float,
-    init_lora_weights: str,
+    init_lora_weights: bool | str,
 ) -> None:
     """Validate LoRA configuration parameters.
     
@@ -105,7 +107,7 @@ def validate_lora_config(
         alpha: LoRA alpha scaling factor.
         target_modules: List of target module patterns.
         dropout: Dropout rate.
-        init_lora_weights: Weight initialization method.
+        init_lora_weights: Weight initialization method (True, False, or str).
         
     Raises:
         ValueError: If any configuration parameter is invalid.
@@ -122,11 +124,21 @@ def validate_lora_config(
     if not 0.0 <= dropout < 1.0:
         raise ValueError(f"LoRA dropout must be in [0, 1), got {dropout}")
     
-    valid_init_methods = ["true", "false", "gaussian", "kaiming", "loftq"]
-    if init_lora_weights.lower() not in valid_init_methods:
+    valid_init_methods = [
+        "gaussian", "eva", "olora", "pissa", "corda", "loftq", "orthogonal"
+    ]
+    pissa_niter_pattern = re.compile(r"^pissa_niter_\d+$")
+    if isinstance(init_lora_weights, str):
+        init_val = init_lora_weights.lower()
+        if init_val not in valid_init_methods and not pissa_niter_pattern.match(init_val):
+            raise ValueError(
+                f"init_lora_weights must be True, False, one of {valid_init_methods}, "
+                f"or 'pissa_niter_[number of iters]' (e.g., 'pissa_niter_5'), "
+                f"got {init_lora_weights}"
+            )
+    elif not isinstance(init_lora_weights, bool):
         raise ValueError(
-            f"init_lora_weights must be one of {valid_init_methods}, "
-            f"got {init_lora_weights}"
+            f"init_lora_weights must be bool or str, got {type(init_lora_weights)}"
         )
 
 
@@ -175,7 +187,7 @@ def add_lora_to_model(
     lora_alpha: int = 16,
     lora_target_modules: Optional[List[str]] = None,
     lora_dropout: float = 0.05,
-    init_lora_weights: str = "kaiming",
+    init_lora_weights: bool | str = True,
     pretrained_lora_path: Optional[str] = None,
     lora_target_modules_support: Optional[List[str]] = None,
 ) -> nn.Module:
@@ -190,7 +202,7 @@ def add_lora_to_model(
         lora_alpha: LoRA alpha scaling factor.
         lora_target_modules: List of target module names/patterns.
         lora_dropout: Dropout rate for LoRA layers.
-        init_lora_weights: Weight initialization method.
+        init_lora_weights: Weight initialization method (True, False, or str).
         pretrained_lora_path: Path to pretrained LoRA weights (optional).
         lora_target_modules_support: List of supported module types for validation.
         
@@ -210,9 +222,6 @@ def add_lora_to_model(
         ) from e
     
     model.lora_alpha = lora_alpha
-    
-    if init_lora_weights == "kaiming":
-        init_lora_weights = True
     
     lora_config = LoraConfig(
         r=lora_rank,
@@ -329,7 +338,7 @@ def print_lora_config(
     alpha: int,
     target_modules: List[str],
     dropout: float,
-    init_lora_weights: str,
+    init_lora_weights: bool | str,
     trainable_params: int,
     total_params: int,
 ) -> None:
@@ -340,7 +349,7 @@ def print_lora_config(
         alpha: LoRA alpha.
         target_modules: List of target modules.
         dropout: Dropout rate.
-        init_lora_weights: Initialization method.
+        init_lora_weights: Initialization method (True, False, or str).
         trainable_params: Number of trainable parameters.
         total_params: Total number of parameters.
     """

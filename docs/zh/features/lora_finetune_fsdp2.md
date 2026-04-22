@@ -50,23 +50,23 @@ training:
       - "model.language_model.layers.{*}.mlp.up_proj"
       - "model.language_model.layers.{*}.mlp.down_proj"
     dropout: 0.0
-    init_lora_weights: "true"
+    init_lora_weights: true
     pretrained_lora_path: null
     save_mode: "lora_only"
 ```
 
 ### 参数说明
 
-| 参数 | 类型 | 默认值 | 说明 |
-| :--- | :--- | :--- | :--- |
-| `enable` | bool | `false` | 是否开启 LoRA 微调 |
-| `rank` | int | `8` | LoRA 低秩矩阵的维度。较低的 rank 值会使用更少的参数更新，减少计算量和内存消耗 |
-| `alpha` | int | `16` | 控制 LoRA 权重对原始权重的影响比例，数值越高影响越大。一般保持 `α/r` 为 2 |
-| `target_modules` | List[str] | `["q_proj", "k_proj", "v_proj"]` | 需要添加 LoRA 的模块名称或通配符模式 |
-| `dropout` | float | `0.0` | LoRA 层的 dropout 比例，取值范围 `[0, 1)` |
-| `init_lora_weights` | str | `"kaiming"` | 权重初始化方式，可选值：`"true"`, `"false"`, `"gaussian"`, `"kaiming"`, `"loftq"` |
-| `pretrained_lora_path` | str | `null` | 预训练 LoRA 权重路径（可选），支持 `.safetensors` 和 `.pt/.bin` 格式 |
-| `save_mode` | str | `"lora_only"` | 权重保存模式：`"lora_only"` 仅保存 LoRA 权重，`"full_model"` 保存完整模型 |
+| 参数 | 类型 | 默认值 | 说明                                                                                                                                                               |
+| :--- | :--- | :--- |:-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `enable` | bool | `false` | 是否开启 LoRA 微调                                                                                                                                                     |
+| `rank` | int | `8` | LoRA 低秩矩阵的维度。较低的 rank 值会使用更少的参数更新，减少计算量和内存消耗                                                                                                                     |
+| `alpha` | int | `16` | 控制 LoRA 权重对原始权重的影响比例，数值越高影响越大。一般保持 `α/r` 为 2                                                                                                                     |
+| `target_modules` | List[str] | `["q_proj", "k_proj", "v_proj"]` | 需要添加 LoRA 的模块名称或通配符模式                                                                                                                                            |
+| `dropout` | float | `0.0` | LoRA 层的 dropout 比例，取值范围 `[0, 1)`                                                                                                                                 |
+| `init_lora_weights` | bool \| str | `True` | 权重初始化方式。`True`；`False`；或选择以下字符串值：`"gaussian"`, `"eva"`, `"olora"`, `"pissa"`, `"pissa_niter_[number of iters]"`, `"corda"`, `"loftq"`, `"orthogonal"` |
+| `pretrained_lora_path` | str | `null` | 预训练 LoRA 权重路径（可选），支持 `.safetensors` 和 `.pt/.bin` 格式                                                                                                              |
+| `save_mode` | str | `"lora_only"` | 权重保存模式：`"lora_only"` 仅保存 LoRA 权重，`"full_model"` 保存完整模型                                                                                                           |
 
 ### target_modules 配置说明
 

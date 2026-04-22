@@ -64,7 +64,7 @@ class TestLoraUtils:
             alpha=16,
             target_modules=["q_proj", "k_proj"],
             dropout=0.05,
-            init_lora_weights="kaiming",
+            init_lora_weights=True,
         )
 
     def test_validate_lora_config_invalid_rank(self) -> None:
@@ -75,7 +75,7 @@ class TestLoraUtils:
                 alpha=16,
                 target_modules=["q_proj"],
                 dropout=0.05,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_validate_lora_config_invalid_alpha(self) -> None:
@@ -86,7 +86,7 @@ class TestLoraUtils:
                 alpha=0,
                 target_modules=["q_proj"],
                 dropout=0.05,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_validate_lora_config_invalid_dropout(self) -> None:
@@ -97,7 +97,7 @@ class TestLoraUtils:
                 alpha=16,
                 target_modules=["q_proj"],
                 dropout=1.5,
-                init_lora_weights="kaiming",
+                init_lora_weights=True,
             )
 
     def test_match_target_modules_exact(self) -> None:
@@ -263,7 +263,7 @@ training:
       - "linear1"
       - "linear2"
     dropout: 0.0
-    init_lora_weights: "kaiming"
+    init_lora_weights: true
     pretrained_lora_path: null
     save_mode: "lora_only"
 
