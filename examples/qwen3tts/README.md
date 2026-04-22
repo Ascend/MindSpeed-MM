@@ -19,6 +19,7 @@
 - [微调](#微调)
   - [准备工作](#1-准备工作)
   - [启动微调](#2-启动微调)
+  - [权重还原](#3-权重还原)
 - [环境变量声明](#环境变量声明)
 
 ## 版本说明
@@ -192,6 +193,32 @@ python examples/qwen3tts/prepare_data.py \
 
 ```shell
 bash examples/qwen3tts/finetune_qwen3tts.sh
+```
+
+### 3. 权重还原
+
+通过Speaker微调保存的权重为distcp分布式格式，为了方便部署到推理框架中，需要将其转换回hf格式
+
+```shell
+source /usr/local/Ascend/cann/set_env.sh
+export NON_MEGATRON=true
+mm-convert Qwen3TTSConverter dcp_to_hf \
+    --load_dir save_dir/iter_000xxxx/ \
+    --save_dir save_dir/Qwen3-TTS-12Hz-1.7B-Custom/ \
+    --model_assets_dir ckpt/Qwen3-TTS-12Hz-1.7B-Base/ \
+    --speaker_name speaker_ref \
+    --speaker_audio_path ref_audio.wav
+```
+
+若仅需转换为原始hf格式，使用以下命令将distcp格式权重转换为原始hf格式
+
+```shell
+source /usr/local/Ascend/cann/set_env.sh
+export NON_MEGATRON=true
+mm-convert Qwen3TTSConverter dcp_to_hf \
+    --load_dir save_dir/iter_000xxxx/ \
+    --save_dir save_dir/Qwen3-TTS-12Hz-1.7B-Custom/ \
+    --model_assets_dir ckpt/Qwen3-TTS-12Hz-1.7B-Base/
 ```
 
 <a id="jump10"></a>

@@ -25,3 +25,4 @@ from checkpoint.sora_model.bagel_converter import BagelConverter
 
 # generic dcp converter
 from checkpoint.fsdp.generic_dcp_converter import GenericDCPConverter
+from checkpoint.fsdp.custom_model_converter.qwen3tts import Qwen3TTSConverter
