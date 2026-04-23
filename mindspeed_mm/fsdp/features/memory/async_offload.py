@@ -271,6 +271,7 @@ class async_save_on_cpu(saved_tensors_hooks):
 
 def get_offload_modules(modules, plan):
     matched_submodules = []
+    offload_layers = 0
     for plan_name in plan:
         if '{*}' in plan_name:
             prefix = plan_name.split("{*}")[0].rstrip(".")
@@ -283,22 +284,28 @@ def get_offload_modules(modules, plan):
                 depth = len(parent_module)
                 for layer_idx, module in enumerate(parent_module):
                     full_module_name = f"{prefix}.{layer_idx}"
-                    matched_submodules.append((full_module_name, module, layer_idx, depth))
+                    matched_submodules.append([full_module_name, module, offload_layers, depth])
+                    offload_layers += 1
             except AttributeError as e:
                 print_rank(f"Skip plan {plan_name}: Attribute error - {e}")
         else:
-            layer_idx = 0
             depth = 1
             for name, module in modules.named_modules():
                 if module_name_match(plan_name, name):
                     if not any(item[0] == name for item in matched_submodules):
-                        matched_submodules.append((name, module, layer_idx, depth))
+                        matched_submodules.append([name, module, offload_layers, depth])
+                        offload_layers += 1
+                        
+    # finally, update depth
+    for matched_submodule in matched_submodules:
+        matched_submodule[-1] = offload_layers
+        
     return matched_submodules
 
 
 def async_offload_modules(modules):
     for name, module, layer_idx, depth in modules:
-        print_rank(logger.info, f'Applying activation offload to module: {name}')
+        print_rank(logger.info, f'Applying activation offload to module: {name}, offload idx: {layer_idx}, offload_layers_num: {depth}')
         module.forward = with_async_save_on_cpu(name, layer_idx, depth)(module.forward)
 
 

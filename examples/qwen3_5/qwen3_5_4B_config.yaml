@@ -89,6 +89,7 @@ model:
   enable_activation_offload: false
   activation_offload_plan:
     apply_modules:
+     - model.visual.blocks.{*}
      - model.language_model.layers.{*}
   # 融合算子配置
   use_triton_gdn: true
