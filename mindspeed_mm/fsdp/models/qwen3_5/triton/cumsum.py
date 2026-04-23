@@ -83,7 +83,7 @@ def chunk_local_cumsum_scalar(
         raise ValueError(
             f"chunk_size must be a power of 2, chunk_size is{chunk_size}"
         )
-    BT = triton.next_power_of_2((1 << 17) // (H * chunk_size))
+    BT = triton.next_power_of_2((1 << 18) // (H * chunk_size))
     chunk_indices = prepare_chunk_indices(cu_seqlens, BT) if cu_seqlens is not None else None
     NT = triton.cdiv(T, BT) if cu_seqlens is None else len(chunk_indices)
     g_org, g = g, torch.empty_like(g, dtype=output_dtype or g.dtype)
