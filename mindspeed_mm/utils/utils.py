@@ -25,6 +25,100 @@ import numpy as np
 
 from megatron.core import mpu
 from megatron.training import get_args
+from megatron.core.packed_seq_params import PackedSeqParams
+
+from mindspeed.utils import get_actual_seq_len
+
+
+def _ceil_div(x: int, y: int) -> int:
+    return (x + y - 1) // y
+
+
+def build_padded_lens_from_cu_seqlens(
+    actual_seq_len: torch.Tensor,
+    cp_size: int,
+    pad_multiple: int = None,
+):
+    """
+    input:
+        actual_seq_len: cumulative seqlens, eg [4, 9, 15]
+    output:
+        raw_lens:    [4, 5, 6]
+        padded_lens: Length after padding to pad_multiple.
+    """
+    if pad_multiple is None:
+        pad_multiple = 2 * cp_size
+
+    actual_seq_len = actual_seq_len.to(torch.int64)
+    device = actual_seq_len.device
+
+    starts = torch.cat([
+        torch.zeros(1, dtype=torch.int64, device=device),
+        actual_seq_len[:-1]
+    ])
+    raw_lens = actual_seq_len - starts
+
+    padded_lens = torch.tensor(
+        [_ceil_div(int(x.item()), pad_multiple) * pad_multiple for x in raw_lens],
+        dtype=torch.int64,
+        device=device,
+    )
+    return raw_lens, padded_lens
+
+
+def get_packed_seq_len(actual_seq_len, cp_size):
+    pad_multiple = 2 * cp_size
+    _, padded_lens = build_padded_lens_from_cu_seqlens(
+        actual_seq_len=actual_seq_len,
+        cp_size=cp_size,
+        pad_multiple=pad_multiple,
+    )
+    cu_seqlens_padded = torch.cumsum(padded_lens, dim=0)
+    return cu_seqlens_padded[-1]
+
+
+def get_packed_seq_params(
+    actual_seq_len: torch.Tensor,
+    cp_size: int,
+    pad_multiple: int = None,
+):
+    """Constructs PackedSeqParams and shapes for ringattn_context_parallel (TND)."""
+    if pad_multiple is None:
+        pad_multiple = 2 * cp_size
+    
+    packed_seq_params = PackedSeqParams(
+        qkv_format='thd',
+        cu_seqlens_q=actual_seq_len,
+        cu_seqlens_kv=actual_seq_len
+    )
+
+    raw_lens, padded_lens = build_padded_lens_from_cu_seqlens(
+        actual_seq_len=actual_seq_len,
+        cp_size=cp_size,
+        pad_multiple=pad_multiple,
+    )
+
+    cu_seqlens_padded = torch.cumsum(padded_lens, dim=0)
+
+    packed_seq_params = PackedSeqParams(
+        qkv_format='thd',
+        cu_seqlens_q=actual_seq_len,
+        cu_seqlens_kv=actual_seq_len,
+    )
+
+    packed_seq_params.cu_seqlens_q_padded = cu_seqlens_padded
+    packed_seq_params.cu_seqlens_kv_padded = cu_seqlens_padded
+
+    packed_seq_params.max_seqlen_q = int(raw_lens.max().item()) if raw_lens.numel() > 0 else 0
+    packed_seq_params.max_seqlen_kv = int(raw_lens.max().item()) if raw_lens.numel() > 0 else 0
+
+    packed_seq_params.q_index = None
+    packed_seq_params.kv_index = None
+
+    local_total_len = int((padded_lens // cp_size).sum().item())
+    shapes = [local_total_len for _ in range(cp_size)]
+
+    return packed_seq_params, shapes
 
 
 class Registry:
@@ -547,7 +641,9 @@ class _GatherForwardSplitBackWardWithMegatronCP(torch.autograd.Function):
     It will be implemented in Mindspeed in the future.
     '''
     @staticmethod
-    def forward(ctx, val, cp_rank, cp_size, seq_dim, cp_group=None):
+    def forward(ctx, val, seq_dim, cp_group=None):
+        cp_rank = torch.distributed.get_rank(group=cp_group)
+        cp_size = torch.distributed.get_world_size(group=cp_group)
         # Step 1: All-gather shards from all CP ranks along the sequence dimension
         val = _gather(val, cp_group, dim=seq_dim)
         # Step 2: Reorder the gathered tensor
@@ -582,18 +678,242 @@ class _GatherForwardSplitBackWardWithMegatronCP(torch.autograd.Function):
         # Collapse the two selected chunks back into a single contiguous local sequence
         grad_input = grad_output.view(*grad_output.shape[0:seq_dim], -1, *grad_output.shape[(seq_dim + 2):])
         
-        return grad_input, None, None, None, None
+        return grad_input, None, None
 
 
 def gather_forward_split_backward_with_megatron_cp(
     input_: torch.Tensor,
     process_group: torch.distributed.ProcessGroup,
-    dim: int = 0
+    dim: int = 0,
+    pad_multiple=None
 ) -> torch.Tensor:
-    cp_size = torch.distributed.get_world_size(group=process_group)
-    cp_rank = torch.distributed.get_rank(group=process_group)
+    actual_seq_len = get_actual_seq_len()
+    if actual_seq_len is not None:
+        return _GatherForwardSplitBackwardWithMegatronCPTND.apply(input_, dim, actual_seq_len, pad_multiple, process_group)
+    return _GatherForwardSplitBackWardWithMegatronCP.apply(input_, dim, process_group)
 
-    return _GatherForwardSplitBackWardWithMegatronCP.apply(input_, cp_rank, cp_size, dim, process_group)
+
+def get_index(actual_seq_len_cpu, cp_rank, cp_size):
+    """
+    Parameters:
+        actual_seq_len_cpu: 1D tensor, cumulative end positions.
+            For example, [4, 9, 15] indicates three segments:
+                [0, 4), [4, 9), [9, 15)
+        cp_rank: current rank
+        cp_size: context parallel size
+    Returns: index (1D tensor) corresponding to the current rank.
+    """
+    starts = torch.cat([torch.tensor([0]), actual_seq_len_cpu[:-1]])
+    ends = actual_seq_len_cpu
+    chunk_sizes = (ends - starts) // (2 * cp_size)
+
+    first_starts = starts + cp_rank * chunk_sizes
+    first_ends = first_starts + chunk_sizes
+    second_starts = ends - (cp_rank + 1) * chunk_sizes
+    second_ends = ends - cp_rank * chunk_sizes
+
+    all_indices = []
+    for i in range(actual_seq_len_cpu.shape[0]):
+        all_indices.append(torch.arange(first_starts[i], first_ends[i]))
+        all_indices.append(torch.arange(second_starts[i], second_ends[i]))
+    index = torch.cat(all_indices)
+
+    return index.to('npu')
+
+
+def pad_input(input, raw_lens, padded_lens, dim=0, pad_val=0):
+    out_shape = list(input.shape)
+    out_shape[dim] = sum(padded_lens)
+
+    output = input.new_full(out_shape, pad_val)
+
+    in_start = 0
+    out_start = 0
+
+    for raw_len, padded_len in zip(raw_lens, padded_lens):
+        in_slices = [slice(None)] * input.dim()
+        out_slices = [slice(None)] * input.dim()
+
+        in_slices[dim] = slice(in_start, in_start + raw_len)
+        out_slices[dim] = slice(out_start, out_start + raw_len)
+
+        output[tuple(out_slices)] = input[tuple(in_slices)]
+
+        in_start += raw_len
+        out_start += padded_len
+
+    return output
+
+
+def unpad_input(input, raw_lens, padded_lens, dim=0):
+    out_shape = list(input.shape)
+    out_shape[dim] = sum(raw_lens)
+    output = input.new_zeros(out_shape)
+
+    in_start = 0
+    out_start = 0
+
+    for raw_len, padded_len in zip(raw_lens, padded_lens):
+        in_slices = [slice(None)] * input.dim()
+        out_slices = [slice(None)] * input.dim()
+
+        in_slices[dim] = slice(in_start, in_start + raw_len)
+        out_slices[dim] = slice(out_start, out_start + raw_len)
+
+        output[tuple(out_slices)] = input[tuple(in_slices)]
+
+        in_start += padded_len
+        out_start += raw_len
+
+    return output
+
+
+class _SplitForwardGatherBackWardWithMegatronCPTND(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, val, seq_dim, actual_seq_len, pad_multiple=None, pad_val=0, cp_group=None):
+        cp_rank = torch.distributed.get_rank(group=cp_group)
+        cp_size = torch.distributed.get_world_size(group=cp_group)
+
+        if pad_multiple is None:
+            pad_multiple = 2 * cp_size
+
+        raw_lens, padded_lens = build_padded_lens_from_cu_seqlens(
+            actual_seq_len=actual_seq_len,
+            cp_size=cp_size,
+            pad_multiple=pad_multiple,
+        )
+
+        padded_val = pad_input(val, raw_lens, padded_lens, seq_dim, pad_val=pad_val)
+
+        padded_cu_seqlens = torch.cumsum(
+            torch.tensor(
+                padded_lens,
+                device=actual_seq_len.device,
+                dtype=actual_seq_len.dtype,
+            ),
+            dim=0
+        )
+        index = get_index(padded_cu_seqlens.cpu(), cp_rank, cp_size)
+
+        ctx.seq_dim = seq_dim
+        ctx.cp_group = cp_group
+        ctx.input_shape = val.shape
+        ctx.raw_lens = raw_lens
+        ctx.padded_lens = padded_lens
+        ctx.padded_shape = padded_val.shape
+        ctx.save_for_backward(index)
+
+        out = torch.index_select(padded_val, seq_dim, index)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (index,) = ctx.saved_tensors
+        seq_dim = ctx.seq_dim
+        input_shape = ctx.input_shape
+        raw_lens = ctx.raw_lens
+        padded_lens = ctx.padded_lens
+        padded_shape = ctx.padded_shape
+
+        # 1. 先把 grad_output scatter 回 padded tensor
+        grad_padded = grad_output.new_zeros(padded_shape)
+        grad_padded.index_add_(seq_dim, index, grad_output)
+
+        # 2. 再把 padding 去掉，还原成原始输入梯度
+        grad_val = unpad_input(grad_padded, raw_lens, padded_lens, seq_dim)
+
+        grad_val = grad_val.view(input_shape)
+
+        return grad_val, None, None, None, None, None
+
+
+def split_forward_gather_backward_with_megatron_cp_tnd(
+    input_: torch.Tensor,
+    process_group: torch.distributed.ProcessGroup,
+    dim: int = 0,
+    actual_seq_len: torch.Tensor = None,
+    pad_multiple: int = None,
+    pad_val: float = 0
+) -> torch.Tensor:
+    """
+    From the full packed token stream, the local contiguous blocks of the current rank are obtained according to the rules compatible with the ring TND CP,
+    and the padding is added to the part of each subsequence that is less than local_len.
+    Rules:
+        - Length of each subsequence: raw_len
+        - Padding to padded_len = ceil(raw_len / pad_multiple) * pad_multiple
+        - Each rank should have local_len = padded_len // cp_size in the subsequence.
+        - To balance the ring CP load, the current rank obtains [rank * local_len : rank * local_len + local_len/cp, (rank + 1) * local - local_len/cp, (rank + 1) * local].
+        - If the actual token is less than local_len, pad_value is added locally to ensure that the output length of all ranks is the same.
+    The output length of all ranks is strictly the same.
+    """
+
+    return _SplitForwardGatherBackWardWithMegatronCPTND.apply(input_, dim, actual_seq_len, pad_multiple, pad_val, process_group)
+
+
+class _GatherForwardSplitBackwardWithMegatronCPTND(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, val, seq_dim, actual_seq_len, pad_multiple=None, cp_group=None):
+        cp_rank = torch.distributed.get_rank(group=cp_group)
+        cp_size = torch.distributed.get_world_size(group=cp_group)
+
+        if pad_multiple is None:
+            pad_multiple = 2 * cp_size
+
+        raw_lens, padded_lens = build_padded_lens_from_cu_seqlens(
+            actual_seq_len=actual_seq_len,
+            cp_size=cp_size,
+            pad_multiple=pad_multiple,
+        )
+
+        padded_cu_seqlens = torch.cumsum(
+            torch.tensor(
+                padded_lens,
+                device=actual_seq_len.device,
+                dtype=actual_seq_len.dtype,
+            ),
+            dim=0,
+        )
+
+        local_index = get_index(padded_cu_seqlens.cpu(), cp_rank, cp_size)
+
+        # gather all ranks' local shards
+        gathered_vals = [torch.empty_like(val) for _ in range(cp_size)]
+        torch.distributed.all_gather(gathered_vals, val, group=cp_group)
+
+        # rebuild padded full tensor in original padded order
+        padded_shape = list(val.shape)
+        padded_shape[seq_dim] = sum(padded_lens)
+        padded_val = val.new_zeros(padded_shape)
+
+        for rank, rank_val in enumerate(gathered_vals):
+            rank_index = get_index(padded_cu_seqlens.cpu(), rank, cp_size)
+            padded_val.index_copy_(seq_dim, rank_index, rank_val)
+
+        out = unpad_input(padded_val, raw_lens, padded_lens, seq_dim)
+
+        ctx.seq_dim = seq_dim
+        ctx.cp_group = cp_group
+        ctx.raw_lens = raw_lens
+        ctx.padded_lens = padded_lens
+        ctx.local_index = local_index
+        ctx.padded_shape = tuple(padded_shape)
+
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        seq_dim = ctx.seq_dim
+        raw_lens = ctx.raw_lens
+        padded_lens = ctx.padded_lens
+        local_index = ctx.local_index
+
+        # 1. Padded layout of the pad returned to the forward pass.
+        grad_padded = pad_input(grad_output, raw_lens, padded_lens, seq_dim)
+
+        # 2. Switch back to the local shard based on the index of the current rank.
+        grad_val = torch.index_select(grad_padded, seq_dim, local_index)
+
+        return grad_val, None, None, None, None
 
 
 def compute_token_level_loss(loss_dict):

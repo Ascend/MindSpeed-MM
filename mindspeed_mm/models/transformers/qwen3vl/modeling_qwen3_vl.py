@@ -27,23 +27,19 @@ from mindspeed.core.context_parallel.model_parallel_utils import (
     get_context_parallel_group_for_hybrid_ring,
     get_context_parallel_for_hybrid_ring_world_size,
     get_context_parallel_for_hybrid_ulysses_world_size,
-    get_context_parallel_for_hybrid_ring_global_ranks,
     get_context_parallel_for_hybrid_ring_rank
 )
+from mindspeed.utils import set_actual_seq_len, get_actual_seq_len
 
 from mindspeed_mm.models.common.communications import (
     cal_split_sizes,
     gather_forward_split_backward,
-    split_forward_gather_backward,
     cal_split_sizes_multi,
     split_forward_gather_backward_with_cp
 )
 from mindspeed_mm.utils.async_offload import async_save_on_cpu
 from mindspeed_mm.utils.data_balance.data_balance import MBSImageDataBalance
-from mindspeed_mm.utils.utils import (
-    split_forward_gather_backward_with_megatron_cp,
-    gather_forward_split_backward_with_megatron_cp
-)
+from mindspeed_mm.utils.utils import gather_forward_split_backward_with_megatron_cp, get_packed_seq_len
 
 from ..cp_utils import get_seq_len, set_seq_len, split_visual_seqs_with_cp
 from .output import (
@@ -502,6 +498,8 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
                 seqlens_in_batch = kwargs["seqlens"]
             cu_seqlens = F.pad(torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0))
             cu_seqlens = cu_seqlens[1:] if len(cu_seqlens) > 1 else cu_seqlens
+            set_actual_seq_len(actual_seq_len=cu_seqlens)
+            set_seq_len("total", total_seq_len)
             kwargs["cu_seqlens"] = tuple(cu_seqlens.cpu().numpy().tolist())
             if "indices" not in kwargs.keys():
                 # if kwargs already have key "indices" (i.e. the form of input data is TND), do not calculate indices again
@@ -605,7 +603,13 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
             elif megatron_args.context_parallel_algo == "hybrid_cp_algo":
                 # Calculate the sequence length per ring CP group for Ulysses processing. 
                 # Since padding is applied in ring groups, the division yields an integer.
-                seq_len_per_ring = get_seq_len("total") // get_context_parallel_for_hybrid_ring_world_size()
+                actual_seq_len = get_actual_seq_len()
+                if actual_seq_len is not None:
+                    total_seq_len = get_packed_seq_len(actual_seq_len, get_context_parallel_for_hybrid_ring_world_size())
+                else:
+                    total_seq_len = get_seq_len("total")
+                seq_len_per_ring = total_seq_len // get_context_parallel_for_hybrid_ring_world_size()
+
                 # ulysses allgather
                 gather_sizes = cal_split_sizes(seq_len_per_ring, get_context_parallel_for_hybrid_ulysses_world_size())
                 hidden_states = gather_forward_split_backward(hidden_states, get_context_parallel_group_for_hybrid_ulysses(), dim=1, grad_scale="up", gather_sizes=gather_sizes)

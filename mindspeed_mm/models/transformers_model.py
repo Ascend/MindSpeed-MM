@@ -2,24 +2,17 @@ from typing import Optional
 
 import torch
 import torch.nn.functional as F
-from torch import Tensor
 from transformers import AutoConfig
 
 from megatron.training import get_args, print_rank_0
 from megatron.training.arguments import core_transformer_config_from_args
-from megatron.core import tensor_parallel, mpu
-from mindspeed.core.context_parallel.model_parallel_utils import (
-    get_context_parallel_group_for_hybrid_ulysses,
-    get_context_parallel_group_for_hybrid_ring,
-    get_context_parallel_for_hybrid_ulysses_world_size
-)
+from megatron.core import mpu
 
 from mindspeed_mm.data.data_utils.constants import AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.chunkloss import chunk_loss, calculate_lm_loss, fixed_cross_entropy
-from mindspeed_mm.models.common.communications import cal_split_sizes, split_forward_gather_backward, split_forward_gather_backward_with_cp
+from mindspeed_mm.models.common.communications import split_forward_gather_backward_with_cp
 from mindspeed_mm.models.transformers.modelhub import ModelHub
-from mindspeed_mm.utils.utils import split_forward_gather_backward_with_megatron_cp
 
 
 class TransformersModel(MultiModalModule):
@@ -242,8 +235,7 @@ class TransformersModel(MultiModalModule):
             raise NotImplementedError(f"{self.loss_type} is not implemented!")
 
         if mpu.get_context_parallel_world_size() > 1:
-            shift_labels = split_forward_gather_backward_with_cp(shift_labels, dim=-1)
-            
+            shift_labels = split_forward_gather_backward_with_cp(shift_labels, dim=-1, pad_val=ignore_index)
             if self.loss_type == "square_loss":
                 alpha = split_forward_gather_backward_with_cp(alpha.view(bs, -1), chunk_size, dim=1).view(-1)
 

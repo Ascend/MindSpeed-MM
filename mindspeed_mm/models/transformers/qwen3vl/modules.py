@@ -16,12 +16,10 @@ from transformers.cache_utils import Cache
 from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
 from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
 from transformers.processing_utils import Unpack
-from transformers.utils import TransformersKwargs
 from transformers.models.qwen3_vl.configuration_qwen3_vl import Qwen3VLTextConfig, Qwen3VLVisionConfig
 from megatron.core import mpu
 
 from megatron.training import get_args
-from megatron.core.packed_seq_params import PackedSeqParams
 from mindspeed.core.context_parallel.model_parallel_utils import (
     get_context_parallel_group_for_hybrid_ulysses,
     get_context_parallel_group_for_hybrid_ring,
@@ -33,8 +31,9 @@ from mindspeed.core.context_parallel.model_parallel_utils import (
 from mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel import ringattn_context_parallel_tnd_general, ringattn_context_parallel
 from mindspeed.utils import get_actual_seq_len
 
-from mindspeed_mm.models.common.communications import cal_split_sizes, cal_split_sizes_multi, gather_forward_split_backward, split_forward_gather_backward
-from ..cp_utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq, gather_visual_seqs_with_cp, set_seq_len
+from mindspeed_mm.models.common.communications import cal_split_sizes, cal_split_sizes_multi, split_forward_gather_backward
+from mindspeed_mm.utils.utils import get_packed_seq_params, get_packed_seq_len
+from ..cp_utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq, gather_visual_seqs_with_cp
 from ..attention_utils import ALL_ATTENTION_FUNCTIONS, pad_out
 
 
@@ -248,16 +247,17 @@ class Qwen3VLVisionAttention(nn.Module):
         query_states, key_states = apply_rotary_pos_emb_vision(query_states, key_states, cos, sin)  # TND
 
         attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
+        layout = self.config.attn_layout.upper()
         seq_dim, head_dim = None, None
         attention_kwargs = {"scale": self.scaling, "dropout": self.attention_dropout, "is_causal": self.is_causal, "attention_mask": None}
 
-        if self.config._attn_implementation == "flash_attention_2" and self.config.attn_layout == "TND":
+        if self.config._attn_implementation == "flash_attention_2" and layout == "TND":
             seq_dim, head_dim = 0, 1
             attention_kwargs["actual_seq_qlen"] = cu_seqlens
             attention_kwargs["actual_seq_kvlen"] = cu_seqlens
             attention_kwargs["layout"] = "TND"
 
-        elif self.config._attn_implementation in ["eager", "sdpa", "flash_attention_2"] and self.config.attn_layout == "BNSD":
+        elif self.config._attn_implementation in ["eager", "sdpa", "flash_attention_2"] and layout == "BNSD":
             # layout, TND --> BNSD
             query_states = query_states.transpose(0, 1).unsqueeze(0)  # [1, N, T(B*S), D]
             key_states = key_states.transpose(0, 1).unsqueeze(0)
@@ -266,7 +266,7 @@ class Qwen3VLVisionAttention(nn.Module):
             attention_kwargs["layout"] = "BNSD"
         else:
             raise NotImplementedError(
-                f"Unsupported Attention: {self.config._attn_implementation}, or layout: {self.config.attn_layout}"
+                f"Unsupported Attention: {self.config._attn_implementation}, or layout: {layout}"
                 "Qwen3VLTextAttention only support ['eager', 'sdpa', 'flash_attention_2'], layout TND and BNSD")
 
         if mpu.get_context_parallel_world_size() > 1:
@@ -281,7 +281,7 @@ class Qwen3VLVisionAttention(nn.Module):
                     gather_size=total_visual_seqlen
                 )
             elif megatron_args.context_parallel_algo == "megatron_cp_algo":
-                if self.config.attn_layout.upper() != "TND":
+                if layout != "TND":
                     raise ValueError(f"Vision Attention only support layout `TND` when using Ring Attention.")
                 all_split_sizes_tensor = cal_split_sizes_multi(get_seq_len("per_visual"), mpu.get_context_parallel_world_size())
                 attn_output = do_vit_ring_context_parallel(
@@ -300,7 +300,7 @@ class Qwen3VLVisionAttention(nn.Module):
                 attn_output = self.proj(attn_output)
                 return attn_output
             elif megatron_args.context_parallel_algo == "hybrid_cp_algo":
-                if self.config.attn_layout.upper() != "TND":
+                if layout != "TND":
                     raise ValueError(f"Vision Attention only support layout `TND` when using Hybrid Attention.")
                 # ulysses a2a
                 ulysses_process_group = get_context_parallel_group_for_hybrid_ulysses()
@@ -327,7 +327,7 @@ class Qwen3VLVisionAttention(nn.Module):
                 raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {megatron_args.context_parallel_algo}")
 
 
-        if self.config.attn_layout == "TND":
+        if layout == "TND":
             
             attn_output = attention_interface(
                 query_states,
@@ -362,7 +362,7 @@ class Qwen3VLVisionAttention(nn.Module):
                 gather_size=self.num_heads
             )
 
-        if self.config.attn_layout == "BNSD":
+        if layout == "BNSD":
             attn_output = attn_output.transpose(1, 2)
 
         attn_output = attn_output.reshape(seq_length, -1).contiguous()
@@ -540,7 +540,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
     return q_embed, k_embed
 
 
-def do_llm_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask=None, dropout_p=0., pse=None, pse_type=None, shapes=None):
+def do_llm_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask=None, dropout_p=0., pse=None, pse_type=None, shapes=None, packed_seq_params=None, layout="SBH"):
     args = get_args()
     in_hybrid_mode = get_context_parallel_group_for_hybrid_ring(check_initialized=False) is not None
     if in_hybrid_mode:
@@ -569,9 +569,24 @@ def do_llm_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask=Non
 
     cp_para['megatron_cp_in_bnsd'] = args.megatron_cp_in_bnsd
 
-    output = ringattn_context_parallel(q, k, v, head_num, cp_para, softmax_scale, attn_mask, dropout_p, shapes=shapes)
+    if layout == "TND":
+        actual_seq_len = get_actual_seq_len()
+        packed_seq_params, shapes = get_packed_seq_params(actual_seq_len, cp_size=cp_size)
+        attn_output = ringattn_context_parallel(q, k, v, head_num, cp_para, softmax_scale, attn_mask, dropout_p, packed_seq_params=packed_seq_params, shapes=shapes)
 
-    return output
+        return attn_output
+    elif layout == "BNSD":
+        # mindspeed core only support SBH as input layout
+        D = q.shape[-1]
+        q = rearrange(q, "b s n d -> s b (n d)").contiguous()
+        k = rearrange(k, "b s n d -> s b (n d)").contiguous()
+        v = rearrange(v, "b s n d -> s b (n d)").contiguous()
+        attn_output = ringattn_context_parallel(q, k, v, head_num, cp_para, softmax_scale, attn_mask, dropout_p, packed_seq_params=None, shapes=shapes)
+        # Convert back from SBH to BNSD format
+        attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=D).contiguous()
+        return attn_output
+    else:
+        raise NotImplementedError("LLM Ring CP only support TND and BNSD now")
 
 
 class Qwen3VLTextAttention(nn.Module):
@@ -626,12 +641,13 @@ class Qwen3VLTextAttention(nn.Module):
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, unsqueeze_dim=2)
 
         attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
+        layout = self.config.attn_layout.upper()
         dropout = 0.0 if not self.training else self.attention_dropout
         attention_kwargs = {
             "scale": self.scaling,
             "dropout": dropout,
             "is_causal": self.is_causal,
-            "layout": self.config.attn_layout,
+            "layout": layout,
             "enable_gqa": True
         }
 
@@ -659,13 +675,14 @@ class Qwen3VLTextAttention(nn.Module):
                     gather_size=total_seq_len
                 )
             elif megatron_args.context_parallel_algo == "megatron_cp_algo":
-                if self.config.attn_layout.upper() != "BNSD":
-                    raise ValueError(f"TextAttention only support layout `BNSD` when using Ring Attention.")
+                if layout not in ["BNSD", "TND"]:
+                    raise ValueError(f"TextAttention only support layout `BNSD` and `TND` when using Ring Attention.")
 
-                # mindspeed core only support SBH as input layout
-                query_states = rearrange(query_states, "b s n d -> s b (n d)").contiguous()
-                key_states = rearrange(key_states, "b s n d -> s b (n d)").contiguous()
-                value_states = rearrange(value_states, "b s n d -> s b (n d)").contiguous()
+                if layout == "TND":
+                    query_states = query_states.view(-1, *query_states.shape[2:])
+                    key_states = key_states.view(-1, *key_states.shape[2:])
+                    value_states = value_states.view(-1, *value_states.shape[2:])
+
                 attn_output = do_llm_ring_context_parallel(
                     query_states,
                     key_states,
@@ -677,23 +694,26 @@ class Qwen3VLTextAttention(nn.Module):
                     pse=None,
                     pse_type=None,
                     shapes=None,  # LLM inputs are padded to be divisible by 2*cp_size
+                    layout=layout
                 )
-                # Convert back from SBH to BNSD format
-                attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=self.head_dim).contiguous()
-
                 attn_output = attn_output.reshape(batch_size, seqlen, -1).contiguous()
                 attn_output = self.o_proj(attn_output)
                 return attn_output
             elif megatron_args.context_parallel_algo == "hybrid_cp_algo":
-                if get_context_parallel_for_hybrid_ulysses_world_size() > self.config.num_key_value_heads:
-                    key_states = repeat_kv(key_states, self.num_key_value_groups, "BSND")
-                    value_states = repeat_kv(value_states, self.num_key_value_groups, "BSND")
+                if layout not in ["BNSD", "TND"]:
+                    raise ValueError(f"TextAttention only support layout `BNSD` and `TND` when using Ring Attention.")
 
-                if self.config.attn_layout.upper() != "BNSD":
-                    raise ValueError(f"TextAttention only support layout `BNSD` when using Hybrid Attention.")
-                # Calculate sequence length per ring group
+                if layout == "TND" or get_context_parallel_for_hybrid_ulysses_world_size() > self.config.num_key_value_heads:
+                    key_states = repeat_kv(key_states, self.num_key_value_groups, layout="BSND")
+                    value_states = repeat_kv(value_states, self.num_key_value_groups, layout="BSND")
+
+                # Calculate sequence length per ring group, Division is exact due to padding in ring groups
+                actual_seq_len = get_actual_seq_len()
+                if actual_seq_len is not None:
+                    total_seq_len = get_packed_seq_len(actual_seq_len, get_context_parallel_for_hybrid_ring_world_size())
+                else:
+                    total_seq_len = get_seq_len("total")
                 seq_len_per_ring = total_seq_len // get_context_parallel_for_hybrid_ring_world_size()
-                # Division is exact due to padding in ring groups
 
                 # ulysses a2a
                 query_states, key_states, value_states = gather_seq_scatter_heads_qkv(
@@ -705,24 +725,31 @@ class Qwen3VLTextAttention(nn.Module):
                     gather_size=seq_len_per_ring,
                     group=get_context_parallel_group_for_hybrid_ulysses()
                 )
+
                 # ring attention
-                # mindspeed core only support SBH as input layout
-                query_states = rearrange(query_states, "b s n d -> s b (n d)").contiguous()
-                key_states = rearrange(key_states, "b s n d -> s b (n d)").contiguous()
-                value_states = rearrange(value_states, "b s n d -> s b (n d)").contiguous()
+                if layout == "TND":
+                    query_states = query_states.view(-1, *query_states.shape[2:])
+                    key_states = key_states.view(-1, *key_states.shape[2:])
+                    value_states = value_states.view(-1, *value_states.shape[2:])
+
                 attn_output = do_llm_ring_context_parallel(
                     query_states,
                     key_states,
                     value_states,
-                    self.config.num_attention_heads // get_context_parallel_for_hybrid_ulysses_world_size(),# Num of heads per ring rank
+                    self.config.num_attention_heads // get_context_parallel_for_hybrid_ulysses_world_size(),  # Num of heads per ring rank
                     softmax_scale=self.scaling,
                     attn_mask=None,
                     dropout_p=0.,
                     pse=None,
                     pse_type=None,
                     shapes=None,  # LLM inputs are padded to be divisible by 2*cp_size
+                    layout=layout
                 )
-                attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=self.head_dim).contiguous()
+                if layout == "TND":
+                    attn_output = rearrange(attn_output, '(b s) n d -> b s n d', b=batch_size).contiguous()
+                else:
+                    attn_output = rearrange(attn_output, "s b (n d) -> b s n d", d=self.head_dim).contiguous()
+
                 attn_output = gather_heads_scatter_seq(
                     attn_output,
                     seq_dim=seq_dim,
@@ -736,14 +763,14 @@ class Qwen3VLTextAttention(nn.Module):
             else:
                 raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {megatron_args.context_parallel_algo}")
 
-        if self.config.attn_layout == "BNSD":
+        if layout == "BNSD":
             query_states = query_states.transpose(1, 2)  # BNSD
             key_states = key_states.transpose(1, 2)
             value_states = value_states.transpose(1, 2)
             attention_kwargs["attention_mask"] = attention_mask
-        elif self.config.attn_layout == "BSND":
+        elif layout == "BSND":
             attention_kwargs["attention_mask"] = attention_mask
-        elif self.config.attn_layout == "TND":
+        elif layout == "TND":
             attention_kwargs["actual_seq_qlen"] = kwargs["cu_seqlens"]
             attention_kwargs["actual_seq_kvlen"] = kwargs["cu_seqlens"]
             indices = kwargs["indices"]
@@ -753,7 +780,7 @@ class Qwen3VLTextAttention(nn.Module):
             value_states = value_states.view(-1, *value_states.shape[2:])[indices]
         else:
             raise NotImplementedError(
-                f"Unsupported Attention layout: {self.config.attn_layout}, "
+                f"Unsupported Attention layout: {layout}, "
                 "Qwen3VLTextAttention only support ['BNSD', 'BSND', 'TND'] now.")
 
         attn_output = attention_interface(
@@ -763,9 +790,9 @@ class Qwen3VLTextAttention(nn.Module):
             **attention_kwargs,
         )
 
-        if self.config.attn_layout == "BNSD":
+        if layout == "BNSD":
             attn_output = attn_output.transpose(1, 2)
-        if self.config.attn_layout == "TND":
+        if layout == "TND":
             # pad output, and reshape to BSND
             attn_output = pad_out(attn_output, indices, batch_size, total_seq_len)
             attn_output = attn_output.view(batch_size, total_seq_len, *attn_output.shape[1:])

@@ -8,18 +8,16 @@ from megatron.core import mpu
 from mindspeed.core.context_parallel.model_parallel_utils import (
     get_context_parallel_group_for_hybrid_ulysses,
     get_context_parallel_group_for_hybrid_ring,
-    get_context_parallel_for_hybrid_ring_world_size,
     get_context_parallel_for_hybrid_ulysses_world_size,
-    get_context_parallel_for_hybrid_ring_global_ranks,
-    get_context_parallel_for_hybrid_ring_rank
 )
+from mindspeed.utils import get_actual_seq_len
 
 from mindspeed_mm.utils.utils import (
     get_context_parallel_world_size,
     get_context_parallel_rank,
     get_context_parallel_group,
     split_forward_gather_backward_with_megatron_cp,
-    gather_forward_split_backward_with_megatron_cp
+    split_forward_gather_backward_with_megatron_cp_tnd
 )
 
 
@@ -549,7 +547,8 @@ def gather_sequence_chunks_to_packed_tensor(
 
 def split_forward_gather_backward_with_cp(
     input_: torch.Tensor,
-    dim: int
+    dim: int,
+    pad_val=0
 ) -> torch.Tensor:
     """
     Perform a context-parallel-aware tensor split during forward pass and gather during backward pass.
@@ -563,14 +562,22 @@ def split_forward_gather_backward_with_cp(
     seq_len = input_.shape[dim]
     if args.context_parallel_algo == "ulysses_cp_algo":
         split_gather_sizes = cal_split_sizes(seq_len, mpu.get_context_parallel_world_size())
-
         input_ = split_forward_gather_backward(input_, mpu.get_context_parallel_group(), dim=dim, split_sizes=split_gather_sizes)
+
     elif args.context_parallel_algo == "megatron_cp_algo":
-        input_ = split_forward_gather_backward_with_megatron_cp(input_, mpu.get_context_parallel_group(), dim=dim)
+        actual_seq_len = get_actual_seq_len()
+        if actual_seq_len is not None:
+            input_ = split_forward_gather_backward_with_megatron_cp_tnd(input_, mpu.get_context_parallel_group(), dim=dim, actual_seq_len=actual_seq_len, pad_val=pad_val)
+        else:
+            input_ = split_forward_gather_backward_with_megatron_cp(input_, mpu.get_context_parallel_group(), dim=dim)
 
     elif args.context_parallel_algo == "hybrid_cp_algo":
         # ring split
-        input_ = split_forward_gather_backward_with_megatron_cp(input_, get_context_parallel_group_for_hybrid_ring(), dim=dim)
+        actual_seq_len = get_actual_seq_len()
+        if actual_seq_len is not None:
+            input_ = split_forward_gather_backward_with_megatron_cp_tnd(input_, get_context_parallel_group_for_hybrid_ring(), dim=dim, actual_seq_len=actual_seq_len, pad_val=pad_val)
+        else:
+            input_ = split_forward_gather_backward_with_megatron_cp(input_, get_context_parallel_group_for_hybrid_ring(), dim=dim)
 
         # ulysses split in ring
         split_gather_sizes = cal_split_sizes(input_.shape[dim], get_context_parallel_for_hybrid_ulysses_world_size())
