@@ -1,7 +1,7 @@
 import logging
 
 import torch
-from torch.distributed.fsdp import fully_shard, MixedPrecisionPolicy
+from torch.distributed.fsdp import fully_shard, MixedPrecisionPolicy, CPUOffloadPolicy
 from torch.distributed.tensor import Shard
 from torch.distributed.distributed_c10d import ReduceOp
 
@@ -23,9 +23,15 @@ def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, ep_plan: EPPl
     efsdp_modules = get_efsdp_modules(model, ep_plan)
     efsdp_hook_modules = get_fsdp_hook_modules(model, fsdp_plan)
     
+    # Configure mixed precision if enabled
+    cpu_offload = None
+    if fsdp_plan.cpu_offload:
+        cpu_offload = CPUOffloadPolicy(pin_memory=True)
+
     config = {'mesh': efsdp_mesh,
               'mp_policy': get_mixprecision_policy(fsdp_plan),
-              'shard_placement_fn': lambda x: Shard(1)}
+              'shard_placement_fn': lambda x: Shard(1),
+              'offload_policy': cpu_offload}
 
     apply_hccl_premul_sum_patch()
     for experts in efsdp_modules:

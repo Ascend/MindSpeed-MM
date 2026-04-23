@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from collections import ChainMap
 import logging
 
 import torch
@@ -57,6 +58,28 @@ class MultiOptimizer(Optimizer, Stateful):
         self.optimizers_dict = optimizers
         self._is_multi_optimizer: bool = True
         self.key_names = key_names
+
+    @property
+    def state(self):
+        """
+        Returns a read-only aggregated view of the states from all sub-optimizers.
+        Uses collections.ChainMap to combine the state dictionaries without copying,
+        providing efficient and unified access while preserving immutability at this level.
+        """
+        state_dicts = [opt.state for opt in self.optimizers_dict.values()]
+        return ChainMap(*state_dicts)
+    
+    @property
+    def param_groups(self):
+        """
+        Returns a flat list aggregating all parameter groups from every sub-optimizer.
+        This allows the composite optimizer to expose a unified interface compatible
+        with standard PyTorch optimizer expectations (e.g., for learning rate schedulers).
+        """
+        all_groups = []
+        for opt in self.optimizers_dict.values():
+            all_groups.extend(opt.param_groups)
+        return all_groups
 
     def step(self) -> None:
         for opt in self.optimizers_dict.values():
