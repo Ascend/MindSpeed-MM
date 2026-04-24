@@ -115,7 +115,7 @@ python mindspeed_mm/tools/profiler.py --profiler-path ./npu_profiling
 python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --export-type text --export-type db
 ```
 
-此命令将解析指定路径下的所有profiling数据，具体可参考《CANN性能调优工具用户指南》的“[离线解析](https://www.hiascend.com/document/detail/zh/canncommercial/850/devaids/Profiling/atlasprofiling_16_0034.html)”章节。
+此命令将解析指定路径下的所有profiling数据，具体可参考《CANN性能调优工具用户指南》的“[离线解析](https://www.hiascend.com/document/detail/zh/canncommercial/900/devaids/Profiling/atlasprofiling_16_0034.html)”章节。
 
 对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以节约训练时资源占用。
 

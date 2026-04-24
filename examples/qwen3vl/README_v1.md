@@ -50,7 +50,7 @@ commit_id=c0dbe09
 
 ‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
 
-- [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
+- [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/900/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
 - [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/docs/zh/installation_guide/installation_description.md)
 
 <a id="jump1.2"></a>

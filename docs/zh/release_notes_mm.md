@@ -39,11 +39,11 @@
 
 **表 1**  MindSpeed MM配套表
 
-|MindSpeed MM代码分支名称|CANN版本|Ascend Extension for PyTorch版本|Python版本|PyTorch版本|
-|--|--|--|--|--|
-|26.0.0|9.0.0|26.0.0|Python3.10|2.7.1|
-|2.3.0|8.5.0|7.3.0|Python3.10|2.7.1|
-|2.2.0|8.3.RC1|7.2.0|Python3.10|2.7.1|
+|MindSpeed MM代码分支名称|Megatron版本|CANN版本|Ascend Extension for PyTorch版本|Python版本|PyTorch版本|
+|--|--|--|--|--|--|
+|26.0.0|core_v0.12.1|9.0.0|26.0.0|Python3.10|2.7.1|
+|2.3.0|core_v0.12.1|8.5.0|7.3.0|Python3.10|2.7.1|
+|2.2.0|core_v0.12.1|8.3.RC1|7.2.0|Python3.10|2.7.1|
 
 >[!NOTE]
 >用户可根据需要选择MindSpeed MM代码分支下载源码并进行安装。
