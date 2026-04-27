@@ -11,18 +11,20 @@ from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
 from mindspeed_mm.fsdp.params.tools_args import ToolsArguments
-from mindspeed_mm.fsdp.params.utils import allow_extra_fields, instantiate_dataclass
+from mindspeed_mm.fsdp.params.utils import instantiate_dataclass
+from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 
-@allow_extra_fields
-@dataclass
-class Arguments:
+class Arguments(BaseArguments):
     """Root argument class: model/data/parallel/training four types of parameters"""
     parallel: ParallelArguments = field(default_factory=ParallelArguments)
     model: ModelArguments = field(default_factory=ModelArguments)
     data: DataArguments = field(default_factory=DataArguments)
     training: TrainingArguments = field(default_factory=TrainingArguments)
     tools: ToolsArguments = field(default_factory=ToolsArguments)
+
+    def model_post_init(self, __context):
+        self.training.compute_distributed_training(self.parallel)
 
 
 def parse_args(dataclass_type: Arguments):

@@ -40,6 +40,7 @@ from mindspeed_mm.fsdp.utils.lora_utils import (
     print_lora_config,
 )
 from mindspeed_mm.fsdp.utils.lora_weight_manager import LoraWeightManager
+from mindspeed_mm.config.config_manager import ConfigManager
 
 
 logger = logging.getLogger(__name__)
@@ -131,7 +132,7 @@ class Trainer():
             torch.distributed.init_process_group(backend=get_dist_comm_backend(cpu=args.parallel.fsdp_plan.cpu_offload))
 
         # Initialize parallel communication groups and mesh
-        init_parallel_state(**asdict(args.parallel))
+        init_parallel_state(**args.parallel.to_dict())
 
     def get_foundation_model(self):
         """Load the foundation model from the model hub."""
@@ -331,6 +332,6 @@ class Trainer():
 
 if __name__ == "__main__":
     # Entry point for training script
-    args = parse_args(Arguments)
+    args = ConfigManager(config_class=Arguments).load_and_parse()
     trainer = Trainer(args=args)
     trainer.train()

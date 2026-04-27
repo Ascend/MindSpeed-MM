@@ -1,11 +1,10 @@
 from dataclasses import dataclass, field
 from typing import List, Literal, Optional
 
-from mindspeed_mm.fsdp.params.utils import allow_extra_fields
+from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 
-@dataclass
-class ChunkLossPlanConfig:
+class ChunkLossPlanConfig(BaseArguments):
     apply_module: str = field(
         default="lm_head",
         metadata={"help": "module that applied chunk loss"}
@@ -20,8 +19,7 @@ class ChunkLossPlanConfig:
     )
 
 
-@dataclass
-class LossArguments:
+class LossArguments(BaseArguments):
     loss_type: Optional[str] = field(
         default="raw",
         metadata={"help": "Type of loss function type, If ot provided, will be computed based on raw model loss function"},
@@ -32,17 +30,14 @@ class LossArguments:
     )
 
 
-@dataclass
-class ActivationOffloadPlanConfig:
-    apply_modules: str = field(
+class ActivationOffloadPlanConfig(BaseArguments):
+    apply_modules: List[str] = field(
         default=None,
         metadata={"help": "module that applied activation offload"}
     )
 
 
-@allow_extra_fields
-@dataclass
-class ModelArguments:
+class ModelArguments(BaseArguments):
     model_id: Optional[str] = field(
         default=None,
         metadata={"help": "Model identifier.If not provided, will be generated automatically based on model_name_or_path."},
@@ -81,7 +76,7 @@ class ModelArguments:
         metadata={"help": "Whether apply dynamic chunkloss for loss compute"},
     )
     chunkloss_plan: ChunkLossPlanConfig = field(default_factory=ChunkLossPlanConfig)
-    
+
     enable_activation_offload: bool = field(
         default=False,
         metadata={"help": "Whether apply activation offload"}

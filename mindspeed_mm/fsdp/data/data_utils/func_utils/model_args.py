@@ -18,9 +18,10 @@
 from dataclasses import dataclass, field, asdict
 from typing import Optional, Dict, Any
 
+from mindspeed_mm.config.arguments.base_args import BaseArguments
 
-@dataclass
-class ProcessorArguments:
+
+class ProcessorArguments(BaseArguments):
     r"""
     Arguments pertaining to the image processor.
     """
@@ -90,9 +91,3 @@ class ProcessorArguments:
         default=False,
         metadata={"help": "Trust remote code for Huggingface."},
     )
-
-    def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
-        result = asdict(self)
-        if exclude_none:
-            result = {k: v for k, v in result.items() if v is not None}
-        return result

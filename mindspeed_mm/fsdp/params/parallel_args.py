@@ -1,26 +1,24 @@
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Union
 import logging
 import os
 import torch
 
-from mindspeed_mm.fsdp.params.utils import allow_extra_fields
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
-
+from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class FSDPPlanConfig:
+class FSDPPlanConfig(BaseArguments):
     """Configuration for Fully Sharded Data Parallelism (FSDP) plan."""
     ignored_modules: List[str] = field(default_factory=list)
     apply_modules: List[str] = field(default_factory=list)
 
     # mp_policy settings
-    param_dtype: Optional[torch.dtype] = None
-    reduce_dtype: Optional[torch.dtype] = None
-    output_dtype: Optional[torch.dtype] = None
+    param_dtype: Optional[str] = None
+    reduce_dtype: Optional[str] = None
+    output_dtype: Optional[str] = None
     cast_forward_inputs: bool = True
     reshard_after_forward: bool = True
 
@@ -37,16 +35,14 @@ class FSDPPlanConfig:
     cpu_offload: bool = False
 
 
-@dataclass
-class TPPlanConfig:
+class TPPlanConfig(BaseArguments):
     """Configuration for Tensor Parallelism (TP) plan."""
     colwise_parallel: List[str] = field(default_factory=list)
     rowwise_parallel: List[str] = field(default_factory=list)
     sequence_parallel: List[str] = field(default_factory=list)
 
 
-@dataclass
-class EPPlanConfig:
+class EPPlanConfig(BaseArguments):
     """Configuration for Expert Parallelism (EP) plan for MoE models."""
     apply_modules: List[str] = field(default_factory=list)
     dispatcher: Literal["eager", "fused", "mc2"] = "fused"
@@ -54,22 +50,19 @@ class EPPlanConfig:
     _gradient_divide_factor: float = None
 
 
-@dataclass
-class RecomputePlanConfig:
+class RecomputePlanConfig(BaseArguments):
     """Configuration for recompute plan."""
     apply_modules: List[str] = field(default_factory=list)
     use_reentrant: bool = False
 
 
-@allow_extra_fields
-@dataclass
-class ParallelArguments():
+class ParallelArguments(BaseArguments):
     data_parallel_size: Optional[int] = field(
         default=None,
         metadata={"help": "Size of data parallelism. If None, calculated automatically."}
     )
 
-    fully_shard_parallel_size: str = field(
+    fully_shard_parallel_size: Union[str, int] = field(
         default="auto",
         metadata={"help": "Fully Sharded Data Parallel size. (Sharding parameters)"}
     )
@@ -101,7 +94,7 @@ class ParallelArguments():
     )
     recompute_plan: RecomputePlanConfig = field(default_factory=RecomputePlanConfig)
 
-    def __post_init__(self):
+    def model_post_init(self, __context):
         self.local_rank = int(os.getenv("LOCAL_RANK"))
         self.global_rank = int(os.getenv("RANK"))
         self.world_size = int(os.getenv("WORLD_SIZE"))

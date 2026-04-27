@@ -48,6 +48,7 @@ class Register:
                 registered = self._registry[obj_id]
                 raise KeyError(f"ID '{obj_id}' is already registered to {registered.__name__}.")
             self._registry[obj_id] = obj
+            return obj
 
         return decorator
 

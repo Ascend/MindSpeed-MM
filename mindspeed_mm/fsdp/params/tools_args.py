@@ -1,16 +1,15 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
 from dataclasses import dataclass, field
-from typing import List, Literal
+from typing import List, Literal, Optional
 import logging
 
-from mindspeed_mm.fsdp.params.utils import allow_extra_fields
+from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class StaticParam:
+class StaticParam(BaseArguments):
     level: str = field(
         default="level1",
         metadata={"help": "The info level of profiler."},
@@ -57,8 +56,7 @@ class StaticParam:
     )
 
 
-@dataclass
-class Profiler:
+class Profiler(BaseArguments):
     enable: bool = field(
         default=False,
         metadata={"help": "Enable profiling."},
@@ -76,8 +74,7 @@ class Profiler:
     static_param: StaticParam = field(default_factory=StaticParam)
 
 
-@dataclass
-class MemoryProfiler:
+class MemoryProfiler(BaseArguments):
     enable: bool = field(
         default=False,
         metadata={"help": "Enable memory profiling."},
@@ -103,7 +100,7 @@ class MemoryProfiler:
         metadata={
             "help": "python, include Python, TorchScript, and inductor frames in tracebacks, all, additionally include C++ frames."},
     )
-    max_entries: int = field(
+    max_entries: Optional[int] = field(
         default=None,
         metadata={"help": "Keep a maximum of `max_entries` alloc/free events in the recorded history recorded."},
     )
@@ -113,8 +110,6 @@ class MemoryProfiler:
     )
 
 
-@allow_extra_fields
-@dataclass
-class ToolsArguments:
+class ToolsArguments(BaseArguments):
     profile: Profiler = field(default_factory=Profiler)
     memory_profile: MemoryProfiler = field(default_factory=MemoryProfiler)

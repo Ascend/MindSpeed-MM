@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, Tuple, Literal, List, Di
 
 import torch
 from transformers import PreTrainedTokenizer, ProcessorMixin, AutoProcessor, AutoConfig, AutoTokenizer, PretrainedConfig
+from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 from .log import get_logger
 from .model_args import ProcessorArguments
@@ -305,8 +306,7 @@ def align_dataset(
     )
 
 
-@dataclass
-class DatasetAttr:
+class DatasetAttr(BaseArguments):
     r"""
     Dataset attributes.
     """
@@ -338,15 +338,8 @@ class DatasetAttr:
     rejected: Optional[str] = None
     formatting: Literal["alpaca", "sharegpt", "multimodal_tool"] = "sharegpt"
 
-    def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
-        result = asdict(self)
-        if exclude_none:
-            result = {k: v for k, v in result.items() if v is not None}
-        return result
 
-
-@dataclass
-class DataArguments:
+class DataArguments(BaseArguments):
     r"""
     Arguments pertaining to what data we are going to input our model for training and evaluation.
     """
@@ -368,7 +361,7 @@ class DataArguments:
         default="data",
         metadata={"help": "Path to the folder containing the datasets."},
     )
-    dataset: Optional[str] = field(
+    dataset: Optional[Union[str, List[str]]] = field(
         default=None,
         metadata={
             "help": "The name of dataset(s) to use for training. Use commas to separate multiple datasets."},
@@ -445,7 +438,7 @@ class DataArguments:
             "help": "Name of the validation dataset."},
     )
 
-    def __post_init__(self):
+    def model_post_init(self, __context):
         if self.neat_packing:
             self.packing = True
         if self.stage is None:
@@ -455,12 +448,6 @@ class DataArguments:
 
         if self.dataset and not isinstance(self.dataset, list):
             self.dataset = self.dataset.split(",")
-
-    def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
-        result = asdict(self)
-        if exclude_none:
-            result = {k: v for k, v in result.items() if v is not None}
-        return result
 
 
 def search_for_fit(numbers: List[int], capacity: int) -> int:

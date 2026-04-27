@@ -4,14 +4,13 @@ from typing import List, Literal, Optional
 import logging
 import os
 
-from mindspeed_mm.fsdp.params.utils import allow_extra_fields
 from mindspeed_mm.fsdp.params.lora_args import LoraArguments
+from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class Profiler:
+class Profiler(BaseArguments):
     enable: bool = field(
         default=False,
         metadata={"help": "Enable profiling."},
@@ -47,7 +46,7 @@ class Profiler:
         },
     )
 
-    def __post_init__(self):
+    def model_post_init(self, __context):
         self._train_steps = -1
         self.local_rank = int(os.getenv("LOCAL_RANK"))
         self.global_rank = int(os.getenv("RANK"))
@@ -63,9 +62,7 @@ class Profiler:
             self.profile_this_rank = False
 
 
-@allow_extra_fields
-@dataclass
-class TrainingArguments:
+class TrainingArguments(BaseArguments):
     profile: Profiler = field(default_factory=Profiler)
     lora: LoraArguments = field(default_factory=LoraArguments)
     lr: float = field(
@@ -233,7 +230,7 @@ class TrainingArguments:
         metadata={"help": "Path to load custom dataset/model plugin."},
     )
 
-    def __post_init__(self):
+    def model_post_init(self, __context):
         self._train_steps = -1
         self.local_rank = int(os.getenv("LOCAL_RANK"))
         self.global_rank = int(os.getenv("RANK"))

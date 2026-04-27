@@ -22,12 +22,10 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Literal, Optional
 
-from mindspeed_mm.fsdp.params.utils import allow_extra_fields
+from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 
-@allow_extra_fields
-@dataclass
-class LoraArguments:
+class LoraArguments(BaseArguments):
     """Configuration arguments for LoRA (Low-Rank Adaptation) training.
     
     This class contains all parameters needed to configure LoRA adapters
@@ -96,8 +94,8 @@ class LoraArguments:
             "If None, validation is skipped."
         },
     )
-    
-    def __post_init__(self) -> None:
+
+    def model_post_init(self, __context):
         """Validate LoRA configuration after initialization."""
         if self.enable:
             if self.rank <= 0:
