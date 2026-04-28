@@ -139,15 +139,15 @@ class TrainEngine:
             self.lr_scheduler.step()
             self.optimizer.zero_grad()
 
-            # Stop profiling if enabled
-            self.profiler.step()
-
             # Update training state
             self.consumed_train_samples += args.training.global_batch_size
             self.iteration += 1
 
             # Calculate iteration time
             elapsed_time_per_iteration = get_time(barrier=True) - start_time
+            
+            # Stop profiling if enabled
+            self.profiler.step()
 
             # Logging
             if self.iteration % args.training.log_interval == 0:
