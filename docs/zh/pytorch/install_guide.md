@@ -21,9 +21,7 @@
 
 - 各硬件产品对应物理机部署场景支持的操作系统请参考[兼容性查询助手](https://www.hiascend.com/hardware/compatibility)。
 
-- 各硬件产品对应虚拟机部署场景支持的操作系统请参考《CANN 软件安装指南》的“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/canncommercial/900/softwareinst/instg/instg_0101.html?Mode=VmIns&InstallType=local&OS=openEuler)”章节（商用版）或“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0101.html?Mode=VmIns&InstallType=local&OS=openEuler)”章节（社区版）。
-
-- 各硬件产品对应容器部署场景支持的操作系统请参考《CANN 软件安装指南》的“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/canncommercial/900/softwareinst/instg/instg_0101.html?Mode=DockerIns&InstallType=local&OS=openEuler)”章节（商用版）或“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0101.html?Mode=DockerIns&InstallType=local&OS=openEuler)”章节（社区版）。
+- 各硬件产品对应虚拟机及容器部署场景支持的操作系统请参考《CANN 软件安装》的“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/canncommercial/900/softwareinst/instg/instg_0101.html?OS=openEuler&InstallType=netyum)”章节（商用版）或“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0101.html?OS=openEuler&InstallType=netyum)”章节（社区版）。
 
 ## 安装前准备
 
@@ -40,14 +38,12 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 ./Ascend-hdk-<chip_type>-npu-firmware_<version>.run --full
 ```
 
-更多驱动与固件的详细信息请参考《CANN软件安装指南》中的“[安装NPU驱动固件](https://www.hiascend.com/document/detail/zh/canncommercial/900/softwareinst/instg/instg_0005.html?Mode=PmIns&InstallType=local&OS=openEuler)”章节（商用版）或“[安装NPU驱动固件](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0005.html?Mode=PmIns&InstallType=netconda&OS=openEuler)”章节（社区版），安装NPU驱动和固件。
-
 ### 安装CANN
 
-参见[CANN 快速安装](https://www.hiascend.com/cann/download)获取配套版本的 Toolkit、ops和NNAL并配置CANN环境变量。
+请参考《[CANN 快速安装](https://www.hiascend.com/cann/download)》安装CANN软件（包含Toolkit、ops和NNAL包），并配置环境变量。
 
 ```shell
-#设置环境变量
+# 设置环境变量
 source /usr/local/Ascend/cann/set_env.sh # 修改为实际安装的Toolkit包路径
 source /usr/local/Ascend/nnal/atb/set_env.sh # 修改为实际安装的nnal包路径
 ```
