@@ -32,6 +32,7 @@ from torch.optim import AdamW
 from torch.optim.optimizer import Optimizer
 
 from ..distributed.parallel_state import get_parallel_state
+from ...optimizer.muon import Muon
 
 
 logger = logging.getLogger(__name__)
@@ -151,6 +152,47 @@ def _make_param_groups_for_subset(
     return groups
 
 
+# Check if a parameter is eligible for Muon optimization.
+def _is_muon_eligible(name: str, param: torch.nn.Parameter) -> bool:
+    is_2d_matrix = len(param.shape) == 2
+    return (
+        not name.endswith(".bias")
+        and "embedding" not in name
+        and "output_layer" not in name
+        and is_2d_matrix
+    )
+
+
+def _mark_muon_param_groups(
+    model: "nn.Module",
+    param_groups: Sequence[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    name_by_param = {p: n for n, p in model.named_parameters()}
+    marked_groups: List[Dict[str, Any]] = []
+
+    for group in param_groups:
+        params = group.get("params", [])
+        muon_params = []
+        fallback_params = []
+
+        for p in params:
+            if not p.requires_grad:
+                continue
+            param_name = name_by_param.get(p, "")
+            if _is_muon_eligible(param_name, p):
+                muon_params.append(p)
+            else:
+                fallback_params.append(p)
+
+        group_base = {k: v for k, v in group.items() if k != "params"}
+        if muon_params:
+            marked_groups.append({**group_base, "params": muon_params, "use_muon": True})
+        if fallback_params:
+            marked_groups.append({**group_base, "params": fallback_params, "use_muon": False})
+
+    return marked_groups
+
+
 # adapted from https://github.com/huggingface/transformers/blob/v4.49.0/src/transformers/trainer_pt_utils.py#L1123
 def get_parameter_names(model, forbidden_layer_types, forbidden_param_names):
     forbidden_layer_types = [] if forbidden_layer_types is None else forbidden_layer_types
@@ -182,13 +224,28 @@ def build_optimizer(
     param_groups: Optional[Sequence[Dict[str, Any]]] = None,
     no_decay_modules: Optional[List[str]] = None,
     no_decay_params: Optional[List[str]] = None,
+    matched_adamw_rms: float = 0.2,
+    muon_momentum: float = 0.95,
+    ns_steps: int = 5,
 ) -> "torch.optim.Optimizer":
     # EP-aware routing: for FSDP2+EP, split params into EP and non-EP groups and build two optimizers.
     ps = get_parallel_state()
     if ps.get_ep_group_size() > 1:
         logger.info("Building EP+FSDP2 optimizer")
         return build_ep_fsdp2_optimizer(
-            model, lr, betas, eps, weight_decay, fused, optimizer_type, param_groups, no_decay_modules, no_decay_params
+            model,
+            lr,
+            betas,
+            eps,
+            weight_decay,
+            fused,
+            optimizer_type,
+            param_groups,
+            no_decay_modules,
+            no_decay_params,
+            matched_adamw_rms=matched_adamw_rms,
+            muon_momentum=muon_momentum,
+            ns_steps=ns_steps,
         )
     # Other cases remain the same
     if param_groups is None:
@@ -209,12 +266,25 @@ def build_optimizer(
             logger.info(f"Parameters without weight decay: {no_decay_parameter_names}")
             param_groups.append({"params": no_decay_parameters, "weight_decay": 0.0})
 
-    if optimizer_type == "adamw":
+    if optimizer_type == "muon":
+        param_groups = _mark_muon_param_groups(model, param_groups)
+        logger.info(f"Muon parameter groups: {param_groups}")
+        optim = Muon(
+            param_groups,
+            lr=lr,
+            weight_decay=weight_decay,
+            matched_adamw_rms=matched_adamw_rms,
+            momentum=muon_momentum,
+            ns_steps=ns_steps,
+            adamw_betas=betas,
+            adamw_eps=eps,
+        )
+    elif optimizer_type == "adamw":
         foreach = not fused
         fused = fused
         optim = AdamW(param_groups, lr, betas, eps, weight_decay, fused=fused, foreach=foreach)
     else:
-        raise ValueError("Only adamw and anyprecision_adamw are supported as optimizers.")
+        raise ValueError("Only adamw and muon are supported as optimizers.")
 
     return optim
 
@@ -230,6 +300,9 @@ def build_ep_fsdp2_optimizer(
     param_groups: Optional[List[Dict[str, Any]]] = None,
     no_decay_modules: Optional[List[str]] = None,
     no_decay_params: Optional[List[str]] = None,
+    matched_adamw_rms: float = 0.2,
+    muon_momentum: float = 0.95,
+    ns_steps: int = 5,
 ):
     """
     Build a MultiOptimizer instance when model is parallelized with EP+FSDP2
@@ -318,10 +391,22 @@ def build_ep_fsdp2_optimizer(
     def _build(groups: Sequence[Dict[str, Any]]) -> Optimizer:
         foreach = not fused
         fused_ = fused
-        if optimizer_type == "adamw":
+        if optimizer_type == "muon":
+            groups = _mark_muon_param_groups(model, groups)
+            return Muon(
+                groups,
+                lr=lr,
+                weight_decay=weight_decay,
+                matched_adamw_rms=matched_adamw_rms,
+                momentum=muon_momentum,
+                ns_steps=ns_steps,
+                adamw_betas=betas,
+                adamw_eps=eps,
+            )
+        elif optimizer_type == "adamw":
             return AdamW(groups, lr, betas, eps, weight_decay, fused=fused_, foreach=foreach)
         else:
-            raise ValueError("Only adamw and anyprecision_adamw are supported as optimizers.")
+            raise ValueError("Only adamw and muon are supported as optimizers.")
 
     optimizer_dict: Dict[str, Optimizer] = {}
     if ep_groups:

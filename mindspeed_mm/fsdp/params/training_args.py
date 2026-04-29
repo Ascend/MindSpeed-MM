@@ -89,9 +89,26 @@ class TrainingArguments(BaseArguments):
         default_factory=list,
         metadata={"help": "Parameters without weight decay, for example, bias."},
     )
-    optimizer: Literal["adamw"] = field(
+    optimizer: Literal["adamw", "muon"] = field(
         default="adamw",
-        metadata={"help": "Optimizer. Default to adamw."},
+        metadata={"help": "Optimizer. Supported: adamw, muon. Default to adamw."},
+    )
+    matched_adamw_rms: float = field(
+        default=0.2,
+        metadata={
+            "help": (
+                "Matched AdamW RMS value for Muon optimizer. "
+                "Controls how closely Muon matches AdamW update magnitude."
+            )
+        },
+    )
+    muon_momentum: float = field(
+        default=0.95,
+        metadata={"help": "Momentum coefficient for Muon internal SGD."},
+    )
+    ns_steps: int = field(
+        default=5,
+        metadata={"help": "Number of Newton-Schulz iterations for Muon orthogonalization."},
     )
     adam_fused: bool = field(
         default=True,

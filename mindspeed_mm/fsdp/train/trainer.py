@@ -273,6 +273,9 @@ class Trainer():
             weight_decay=args.training.weight_decay,
             fused=args.training.adam_fused,
             optimizer_type=args.training.optimizer,
+            matched_adamw_rms=args.training.matched_adamw_rms,
+            muon_momentum=args.training.muon_momentum,
+            ns_steps=args.training.ns_steps,
         )
         return optimizer
 
