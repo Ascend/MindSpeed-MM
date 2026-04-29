@@ -38,7 +38,7 @@ def get_chunkloss_forward_fn():
 def apply_chunkloss_module(module):
     chunkloss_forward = get_chunkloss_forward_fn()
     module.forward = types.MethodType(chunkloss_forward, module)
-    
+
 
 def get_chunkloss_module(modules, plan):
     matched_modules = []
@@ -49,11 +49,7 @@ def get_chunkloss_module(modules, plan):
         raise RuntimeError(f'[CHUNKLOSS] No module named {plan}.')
     elif len(matched_modules) > 1:
         raise RuntimeError(f'[CHUNKLOSS] gets more than one module named {plan}.')
-    return matched_modules[0]
-
-
-def get_chunkloss_module(modules, plan):
-    chunkloss_module = get_chunkloss_module(modules, plan)
+    chunkloss_module = matched_modules[0]
 
     if not isinstance(chunkloss_module, torch.nn.Linear):
         raise ValueError(f"Chunk loss configuration error for module '{chunkloss_module}': "
