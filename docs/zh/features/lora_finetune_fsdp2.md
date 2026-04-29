@@ -52,7 +52,6 @@ training:
     dropout: 0.0
     init_lora_weights: true
     pretrained_lora_path: null
-    save_mode: "lora_only"
 ```
 
 ### 参数说明
@@ -66,7 +65,6 @@ training:
 | `dropout` | float | `0.0` | LoRA 层的 dropout 比例，取值范围 `[0, 1)`                                                                                                                                 |
 | `init_lora_weights` | bool \| str | `True` | 权重初始化方式。`True`；`False`；或选择以下字符串值：`"gaussian"`, `"eva"`, `"olora"`, `"pissa"`, `"pissa_niter_[number of iters]"`, `"corda"`, `"loftq"`, `"orthogonal"` |
 | `pretrained_lora_path` | str | `null` | 预训练 LoRA 权重路径（可选），支持 `.safetensors` 和 `.pt/.bin` 格式                                                                                                              |
-| `save_mode` | str | `"lora_only"` | 权重保存模式：`"lora_only"` 仅保存 LoRA 权重，`"full_model"` 保存完整模型                                                                                                           |
 
 ### target_modules 配置说明
 
@@ -124,32 +122,12 @@ training:
 
 ### 仅保存 LoRA 权重
 
-当 `save_mode` 配置为 `"lora_only"` 时，训练过程中仅保存 LoRA 适配器权重，保存格式为 safetensors：
-
-```yaml
-training:
-  lora:
-    enable: true
-    save_mode: "lora_only"
-```
-
-保存的文件结构：
+训练过程中仅保存 LoRA 适配器权重，保存格式为 safetensors，保存的文件结构：
 
 ```bash
 save_path/
 ├── lora_adapter.safetensors
 └── ...
-```
-
-### 保存完整模型
-
-当 `save_mode` 配置为 `"full_model"` 时，训练过程中保存包含 LoRA 适配器的完整模型权重：
-
-```yaml
-training:
-  lora:
-    enable: true
-    save_mode: "full_model"
 ```
 
 ## 启动训练
@@ -161,6 +139,16 @@ bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 ```
 
 训练启动后，会自动打印 LoRA 配置摘要，包括匹配的模块数量、可训练参数量等信息。
+
+## 合并lora权重到HuggingFase权重
+
+```bash
+cd checkpoint/common
+python merge_lora_safetensors_to_base.py \
+    --base_hf_dir ./Qwen3.5-27B \
+    --lora_safetensors ./save_path/lora_adapter_iteration_10.safetensors \
+    --save_merged_hf_dir ./merged_qwen3_5_27B_lora
+```
 
 ## 注意事项
 

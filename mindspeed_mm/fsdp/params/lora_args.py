@@ -39,7 +39,6 @@ class LoraArguments(BaseArguments):
         dropout: Dropout rate for LoRA layers.
         init_lora_weights: Weight initialization method.
         pretrained_lora_path: Path to pretrained LoRA weights (optional).
-        save_mode: Mode for saving LoRA weights.
         lora_target_modules_support: List of supported module types.
     """
     enable: bool = field(
@@ -79,14 +78,6 @@ class LoraArguments(BaseArguments):
         default=None,
         metadata={"help": "Path to pretrained LoRA weights to load."},
     )
-    save_mode: Literal["lora_only", "full_model"] = field(
-        default="lora_only",
-        metadata={
-            "help": "Mode for saving LoRA weights. "
-            "'lora_only': Save only LoRA adapter weights. "
-            "'full_model': Save complete model with LoRA."
-        },
-    )
     lora_target_modules_support: Optional[List[str]] = field(
         default=None,
         metadata={
@@ -125,10 +116,4 @@ class LoraArguments(BaseArguments):
             elif not isinstance(self.init_lora_weights, bool):
                 raise ValueError(
                     f"init_lora_weights must be bool or str, got {type(self.init_lora_weights)}"
-                )
-            
-            if self.save_mode not in ["lora_only", "full_model"]:
-                raise ValueError(
-                    f"save_mode must be 'lora_only' or 'full_model', "
-                    f"got {self.save_mode}"
                 )

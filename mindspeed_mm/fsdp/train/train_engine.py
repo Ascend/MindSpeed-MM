@@ -244,17 +244,13 @@ class TrainEngine:
         
         # Handle LoRA save modes
         if args.training.lora.enable:
-            if args.training.lora.save_mode == "lora_only":
-                # Save only LoRA adapter weights
-                if self.lora_weight_manager is not None:
-                    self.lora_weight_manager.save_lora_only(
-                        save_path=args.training.save,
-                        iteration=iteration,
-                    )
-                return
-            elif args.training.lora.save_mode == "full_model":
-                # Save full model with LoRA (default behavior)
-                pass
+            # Save only LoRA adapter weights
+            if self.lora_weight_manager is not None:
+                self.lora_weight_manager.save_lora_only(
+                    save_path=args.training.save,
+                    iteration=iteration,
+                )
+            return
         
         # Default save behavior (full model)
         state = {

@@ -265,7 +265,6 @@ training:
     dropout: 0.0
     init_lora_weights: true
     pretrained_lora_path: null
-    save_mode: "lora_only"
 
 tools:
   profile:
