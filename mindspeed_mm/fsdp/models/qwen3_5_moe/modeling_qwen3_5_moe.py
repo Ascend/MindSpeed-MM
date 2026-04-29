@@ -1061,11 +1061,16 @@ class Qwen3_5MoeTopKRouter(nn.Module):
     def forward(self, hidden_states):
         hidden_states = hidden_states.reshape(-1, self.hidden_dim)
         router_logits = F.linear(hidden_states, self.weight)  # (seq_len, num_experts)
-        router_logits = torch.nn.functional.softmax(router_logits, dtype=torch.float, dim=-1)
-        router_top_value, router_indices = torch.topk(router_logits, self.top_k, dim=-1)  # (seq_len, top_k)
+        # Notice: Fix aux_loss calculation to avoid double softmax.
+        # In older transformers versions (e.g., v5.2.0), softmax was applied twice (once here and once in loss compute),
+        # causing aux_loss to be abnormally high and stagnant.
+        # This implementation aligns with transformers >= 5.6.0 by applying softmax only once.
+        router_probs = torch.nn.functional.softmax(router_logits, dtype=torch.float, dim=-1)
+        router_top_value, router_indices = torch.topk(router_probs, self.top_k, dim=-1)  # (seq_len, top_k)
         router_top_value /= router_top_value.sum(dim=-1, keepdim=True)
         router_top_value = router_top_value.to(router_logits.dtype)
         router_scores = router_top_value
+        # Return raw logits for load_balancing_loss computation
         return router_logits, router_scores, router_indices
 
 

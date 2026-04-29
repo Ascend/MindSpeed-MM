@@ -24,6 +24,8 @@ def load_balancing_loss_func_optimized(
     else:
         tokens_total = torch.zeros(top_k, num_experts, device=compute_device, dtype=attention_mask.dtype)
 
+    expert_attention_mask = None
+    
     for layer_gate in gate_logits:
         routing_weights = torch.nn.functional.softmax(layer_gate, dim=-1)  # [batch*seq_len, num_experts]
         _, selected_experts = torch.topk(routing_weights, top_k, dim=-1)  # [batch*seq_len, top_k]
@@ -31,23 +33,26 @@ def load_balancing_loss_func_optimized(
 
         if attention_mask is None:
             num_tokens = layer_gate.shape[0]  # batch_size * sequence_length
-            expert_attention_mask = torch.ones(
-                num_tokens, top_k, num_experts,
-                device=compute_device, dtype=torch.float32
-            ).reshape(-1, top_k, num_experts)
+            if expert_attention_mask is None or expert_attention_mask.shape[0] != num_tokens:
+                expert_attention_mask = torch.ones(
+                    num_tokens, top_k, num_experts,
+                    device=compute_device, dtype=torch.float32
+                ).reshape(-1, top_k, num_experts)
+                layer_tokens_total = torch.sum(expert_attention_mask, dim=0)
+                
             layer_tokens_selected = torch.sum(expert_mask.float(), dim=0)
-            layer_tokens_total = torch.sum(expert_attention_mask, dim=0)
         else:
             batch_size, sequence_length = attention_mask.shape
-            expert_attention_mask = (
-                attention_mask[None, :, :, None, None]
-                .expand((1, batch_size, sequence_length, top_k, num_experts))
-                .reshape(-1, top_k, num_experts)
-                .to(compute_device)
-            )
+            if expert_attention_mask is None:
+                expert_attention_mask = (
+                    attention_mask[None, :, :, None, None]
+                    .expand((1, batch_size, sequence_length, top_k, num_experts))
+                    .reshape(-1, top_k, num_experts)
+                    .to(compute_device)
+                )
+                layer_tokens_total = torch.sum(expert_attention_mask, dim=0)
 
             layer_tokens_selected = torch.sum(expert_mask.float() * expert_attention_mask, dim=0)
-            layer_tokens_total = torch.sum(expert_attention_mask, dim=0)
 
         tokens_selected += layer_tokens_selected
         tokens_total += layer_tokens_total
