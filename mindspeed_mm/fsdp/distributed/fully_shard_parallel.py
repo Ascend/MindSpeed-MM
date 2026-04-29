@@ -56,6 +56,14 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
     ps = get_parallel_state()
 
     if ps.fully_shard_parallel_size == 1 and not training_config.init_model_with_meta_device:
+        # Background: In DDP mode, model is loaded in float32 by default.
+        # Qwen3.5's ChunkGatedDeltaRuleFunction requires bfloat16, so we need to
+        # convert the model to the target dtype specified in fsdp_plan.
+        target_dtype = get_dtype(fsdp_plan.param_dtype) if fsdp_plan.param_dtype else None
+        if target_dtype is not None:
+            for name, param in model.named_parameters():
+                if "lora" not in name:
+                    param.data = param.data.to(dtype=target_dtype)
 
         # wrap model in DDP
         dp_group = ps.get_dp_group()

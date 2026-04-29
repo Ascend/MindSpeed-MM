@@ -24,6 +24,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 from peft import PeftModel
+from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import DataCollatorForSeq2Seq, ProcessorMixin
 from .mm_plugin import IGNORE_INDEX, IMAGE_PLACEHOLDER, AUDIO_PLACEHOLDER
 from .template import Template
@@ -60,6 +61,12 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
     def __post_init__(self):
         if self.template is None:
             raise ValueError("Template is required for MultiModalDataCollator.")
+
+        # Background: In single-NPU LoRA training, model is wrapped as DDP(PeftModel(OriginalModel)).
+        # Original code only checked isinstance(model, PeftModel) which returns False when wrapped in DDP,
+        # causing AttributeError when accessing model.config. Solution: unwrap DDP first, then PeftModel.
+        if isinstance(self.model, DDP):
+            self.model = self.model.module
 
         if isinstance(self.model, PeftModel):
             self.model = self.model.base_model.model

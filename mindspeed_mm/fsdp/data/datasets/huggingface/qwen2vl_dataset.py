@@ -84,6 +84,13 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
                 # 配置了overwrite_cache为true（默认为false)时，所有节点都读取cache不再进行map处理
                 "load_from_cache_file": (not data_args.overwrite_cache) or (local_process_index != 0)
             }
+            # Background: In single-NPU LoRA training with torchrun forkserver mode,
+            # datasets.map() forked child processes inherit parent's HCCL distributed
+            # communication context, causing deadlock. Solution: use spawn start method
+            # to create clean child processes without inheriting parent process state.
+            import multiprocess
+            if multiprocess.get_start_method(allow_none=True) != "spawn":
+                multiprocess.set_start_method("spawn", force=True)
         logger.debug(f'Rank: %s, kwargs: %s', local_process_index, kwargs)
         # -----------------convert to sharegpt ---------------------------------------------------------------------------
         train_dataset = align_dataset(train_dataset, dataset_attr, data_args)
