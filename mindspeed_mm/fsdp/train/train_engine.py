@@ -8,7 +8,7 @@ from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import pregather_fsdp_params
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time
+from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time, configure_hsdp_gradient_sync
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.tools.profiler import Profiler
@@ -84,7 +84,7 @@ class TrainEngine:
         total_loss = 0
         total_aux_loss = None
         # Gradient accumulation
-        for _ in range(args.training.gradient_accumulation_steps):
+        for step in range(args.training.gradient_accumulation_steps):
             # Get current batch data
             batch_data = self.get_batch(train_dataloader_iter)
 
@@ -93,6 +93,10 @@ class TrainEngine:
 
             # setup loss ctx
             self.set_loss_func(batch_data)
+            
+            # Determine if this is the last step of gradient accumulation
+            is_last_step = (step == args.training.gradient_accumulation_steps - 1)
+            configure_hsdp_gradient_sync(self.model, is_last_step)
 
             # forward step
             output = self.model(**batch_data, use_cache=False)

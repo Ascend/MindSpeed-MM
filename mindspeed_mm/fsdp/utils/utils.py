@@ -113,6 +113,29 @@ def is_npu_available():
         return False
 
 
+def configure_hsdp_gradient_sync(model, is_last_step: bool):
+    """
+    Configure gradient synchronization strategy for HSDP (Hierarchical Sharded Data Parallel).
+
+    In HSDP sharding, by default, gradients are AllReduced across different FSDP domains
+    during every backward pass. However, this is redundant as synchronization is only
+    required once before `optimizer.step`.
+
+    This function optimizes communication overhead by controlling:
+    1. set_requires_all_reduce: Sets if the module should all-reduce gradients. 
+        This can be used to implement gradient accumulation with only reduce-scatter but not all-reduce for HSDP.
+    2. set_is_last_backward: Sets whether the next backward is the last one. On the last backward, 
+        FSDP waits on pending gradient reduction and clears internal data data structures for backward prefetching. 
+        This can be useful for microbatching.
+
+    Args:
+        model: The model wrapped with fully_shard (FSDP2).
+        is_last_step (bool): Whether the current step is the last in the gradient accumulation cycle.
+    """
+    model.set_is_last_backward(is_last_step)
+    model.set_requires_all_reduce(is_last_step)
+
+
 class Singleton(type):
     """Singleton metaclass to ensure only one instance of ParallelState exists."""
     _instances = {}
