@@ -166,7 +166,7 @@ def forward_step(data_iterator, model):
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 
-class CustomModel(MultiModalModule, FSDP2Mixin, WeightInitMixin)：
+class CustomModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
  """您的自定义模型类"""
     ...
 ```
@@ -384,7 +384,7 @@ offload_to_cpu: False
 from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.transformers.base_model import FSDP2Mixin, WeightInitMixin
 
-class YourModel(MultiModalModule, FSDP2Mixin, WeightInitMixin)：
+class YourModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
     def _fully_shard(self, fsdp2_kwargs=None, fsdp2_config=None):
         """
         自定义fully_shard实现
