@@ -48,15 +48,13 @@ def calculate_chunk_size(batch_size: int, total_size: int) -> int:
     return max_power_of_two_chunk_size
 
 
-def build_loss_func(
+def get_loss_func_params(
+    labels, 
     loss_type,
     ignore_index=-100,
     chunk_size=1024,
     **kwargs
 ):
-    labels = kwargs.get('labels', None)
-    if labels is None:
-        raise ValueError("labels are missing.")
     bs = labels.shape[0]
     total_chunk_size = kwargs.get('total_chunk_size', None)
     if total_chunk_size:
@@ -81,10 +79,6 @@ def build_loss_func(
         torch.distributed.all_reduce(avg_per_step_token_num, op=torch.distributed.ReduceOp.AVG)
         alpha = avg_per_step_token_num
         reduction = "sum"
-    elif loss_type == "token_loss":
-        alpha = loss_mask.sum()
-        torch.distributed.all_reduce(alpha, op=torch.distributed.ReduceOp.AVG)
-        reduction = "none"
     elif loss_type == "default":
         # Default: normalize loss by total number of valid tokens in the batch.
         alpha = loss_mask.sum()  # scalar
@@ -95,12 +89,14 @@ def build_loss_func(
     ps = get_parallel_state()
     if ps.is_cp_enable():
         shift_labels = split_forward_gather_backward_with_cp(shift_labels, dim=1)
-
+    
     if chunk_size:
         # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
+        bs = shift_labels.shape[0]
         chunk_labels = torch.split(shift_labels, chunk_size, dim=1)
 
-        if loss_type == "square_loss":
+        # Each token has its own coefficient.
+        if alpha.ndim >= 2 and alpha.shape[1] > 1:
             alpha = torch.split(alpha.view(bs, -1), chunk_size, dim=1)
 
         # Prepare keyword arguments for each chunk to be passed to the chunked loss function.
@@ -113,9 +109,44 @@ def build_loss_func(
             }
             for i in range(len(chunk_labels))
         ]
+        return loss_func_kwargs
+        
+    loss_func_kwargs = [
+        {
+            "shift_labels": shift_labels,
+            "ignore_index": ignore_index,
+            "reduction": reduction,
+            "alpha": alpha,
+        }
+    ]
+    
+    return loss_func_kwargs
+  
 
+def build_loss_func(
+    loss_type,
+    ignore_index=-100,
+    chunk_size=1024,
+    **kwargs
+):
+    outer_labels = kwargs.get("labels", None)
+    _kwargs = {}
+    _kwargs[AVG_PER_STEP_TOKEN_NUM] = kwargs.get(AVG_PER_STEP_TOKEN_NUM, None)
+    _kwargs['total_chunk_size'] = kwargs.get('total_chunk_size', None)
+    if chunk_size:
         # Return a closure that computes the chunked language modeling loss using the prepared config.
-        def loss_func(hidden_states, head_weight, head_bias):
+        def loss_func(hidden_states, head_weight, head_bias, labels=None):
+            labels = labels if labels is not None else outer_labels
+            if labels is None:
+                raise ValueError("labels must be provided either in build_loss_func or in loss_func call.")
+            loss_func_kwargs = get_loss_func_params(
+                labels, 
+                loss_type, 
+                ignore_index, 
+                chunk_size, 
+                **_kwargs,
+            )
+            
             return chunk_loss(
                 hidden_states,
                 head_weight,
@@ -127,12 +158,27 @@ def build_loss_func(
 
     else:
         def loss_func(logits, labels=None, vocab_size=None):
+            labels = labels if labels is not None else outer_labels
+            if labels is None:
+                raise ValueError("labels must be provided either in build_loss_func or in loss_func call.")
+            loss_func_kwargs = get_loss_func_params(
+                labels, 
+                loss_type, 
+                ignore_index, 
+                chunk_size, 
+                **_kwargs,
+            )
+            shift_labels = loss_func_kwargs[0]["shift_labels"]
+            reduction = loss_func_kwargs[0]["reduction"]
+            alpha = loss_func_kwargs[0]["alpha"]
+            
             logits = logits.view(-1, logits.shape[-1]).contiguous().float()
             labels = shift_labels.view(-1)
             return fixed_cross_entropy(
                 logits, labels,
+                ignore_index=ignore_index,
                 alpha=alpha,
                 reduction=reduction
             )
 
-    return loss_func, loss_mask
+    return loss_func

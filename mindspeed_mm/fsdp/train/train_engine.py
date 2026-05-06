@@ -69,14 +69,16 @@ class TrainEngine:
         chunk_size = args.model.chunkloss_plan.chunk_size if args.model.enable_chunk_loss else None
         if args.model.enable_dynamic_chunk_loss:
             batch_data['total_chunk_size'] = args.model.chunkloss_plan.total_chunk_size
-        loss_func, loss_mask = build_loss_func(args.model.loss_cfg.loss_type, chunk_size=chunk_size, **batch_data)
+        loss_func = build_loss_func(args.model.loss_cfg.loss_type, chunk_size=chunk_size, **batch_data)
 
         if hasattr(self.model, "loss_function"):
             self.model.loss_function = loss_func
         else:
             setattr(self.model, "loss_function", loss_func)
 
-        batch_data.update(output_router_logits=args.model.loss_cfg.router_aux_loss_coef > 0.0)
+        output_router_logits = args.model.loss_cfg.router_aux_loss_coef > 0.0
+        if output_router_logits:
+            batch_data.update(output_router_logits=True)
 
     def train_step(self, train_dataloader_iter):
         """Perform a single training step with gradient accumulation."""
