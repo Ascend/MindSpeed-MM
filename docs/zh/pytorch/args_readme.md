@@ -15,58 +15,39 @@
 
 ### 一般参数
 
---micro-batch-size：
-取值来自\${MBS}，表示单个GPU在一次前向/反向传播中直接处理的样本数量，适应单个NPU内的内存限制。直接影响GPU显存容量。
-
---global-batch-size：取值来自\${GBS}，模型进行一次参数更新所使用的所有设备上的总样本数。
-
---num-workers: 取值为非负整数，pytorch中数据加载处理部分会启动的子进程数。设置过大会占用CPU资源，设置过小会导致模型等待数据加载过慢。
-
---seq_length: 序列长度，整数类型。表示模型一次能够处理的单个样本中包含的token数量。注意在启用--variable-seq-lengths时该功能失效。序列长度决定了能够捕捉的上下文信息范围，较长的序列长度可以捕捉更长的依赖关系，但会显著增加计算复杂度和内存消耗。
-
---normalization RMSNorm: 使用RMSNorm。推荐搭配--use-fused-rmsnorm使用。
-
---swiglu: store_true,使用swiglu激活函数，推荐搭配--use-fused-swiglu使用。
-
---lr-warmup-fraction: 0~1之间浮点数，用于学习率“预热”阶段占总步长的比例。
-
---weight-decay-exclude-modules: 参数级的权重衰减排除，通过配置参数名关键词（可多个）排除特定参数的权重衰减。 [详细介绍](../features/parameter_lr_wd_tuning.md)
-
---lr-scale-modules：参数级学习率缩放，通过配置参数名关键词（可多个）来对特定参数的学习率进行缩放。 [详细介绍](../features/parameter_lr_wd_tuning.md)
-
---clip-grad: 浮点数，默认为1，非0时启用该功能。在优化器中对权重做限制，防止loss波动过大。
-
---seed: 整型，随机种子。
-
---bf16: store_true,使用torch.bfloat16格式训练，极大降低显存消耗。
-
---load: str,模型权重路径，根据各example中指导填写。
-
---variable-seq-lengths: store_true,启用可变序列长度。
-
---calculate-per-sample-loss：按样本粒度计算 loss。[详细介绍](../features/vlm_model_loss_calculate_type.md)
-
---calculate-per-token-loss：按 token 粒度计算 loss。[详细介绍](../features/vlm_model_loss_calculate_type.md)
-
---ckpt-format torch_dcp: 保存时使用dcp格式。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
-
---init-model-with-meta-device: 使用fsdp2的meta初始化模型，目前仅qwen3vl模型支持，详细使用请参考examples下具体模型readme.md界面。
+| 参数名 | 类型/取值 | 说明 |
+|--------|----------|------|
+| `--micro-batch-size` | 整数（来自 `${MBS}`） | 单个GPU在一次前向/反向传播中直接处理的样本数量，适应单个NPU内的内存限制。直接影响GPU显存容量。 |
+| `--global-batch-size` | 整数（来自 `${GBS}`） | 模型进行一次参数更新所使用的所有设备上的总样本数。 |
+| `--num-workers` | 非负整数 | PyTorch中数据加载处理部分会启动的子进程数。设置过大会占用CPU资源，设置过小会导致模型等待数据加载过慢。 |
+| `--seq_length` | 整数 | 序列长度，表示模型一次能够处理的单个样本中包含的token数量。注意在启用 `--variable-seq-lengths` 时该功能失效。序列长度决定了能够捕捉的上下文信息范围，较长的序列长度可以捕捉更长的依赖关系，但会显著增加计算复杂度和内存消耗。 |
+| `--normalization` | `RMSNorm` | 使用RMSNorm。推荐搭配 `--use-fused-rmsnorm` 使用。 |
+| `--swiglu` | store_true | 使用SwiGLU激活函数，推荐搭配 `--use-fused-swiglu` 使用。 |
+| `--lr-warmup-fraction` | 浮点数（0~1） | 用于学习率"预热"阶段占总步长的比例。 |
+| `--weight-decay-exclude-modules` | 字符串列表 | 参数级的权重衰减排除，通过配置参数名关键词（可多个）排除特定参数的权重衰减。[详细介绍](../features/parameter_lr_wd_tuning.md) |
+| `--lr-scale-modules` | 字符串列表 | 参数级学习率缩放，通过配置参数名关键词（可多个）来对特定参数的学习率进行缩放。[详细介绍](../features/parameter_lr_wd_tuning.md) |
+| `--clip-grad` | 浮点数（默认1） | 非0时启用该功能。在优化器中对权重做限制，防止loss波动过大。 |
+| `--seed` | 整数 | 随机种子。 |
+| `--bf16` | store_true | 使用torch.bfloat16格式训练，极大降低显存消耗。 |
+| `--load` | 字符串 | 模型权重路径，根据各example中指导填写。 |
+| `--variable-seq-lengths` | store_true | 启用可变序列长度。 |
+| `--calculate-per-sample-loss` | - | 按样本粒度计算 loss。[详细介绍](../features/vlm_model_loss_calculate_type.md) |
+| `--calculate-per-token-loss` | - | 按 token 粒度计算 loss。[详细介绍](../features/vlm_model_loss_calculate_type.md) |
+| `--ckpt-format` | `torch_dcp` | 保存时使用DCP格式。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md) |
+| `--init-model-with-meta-device` | - | 使用FSDP2的meta初始化模型，目前仅Qwen3VL模型支持，详细使用请参考examples下具体模型readme.md界面。 |
 
 ---
 
 ### 显存优化
 
---tensor-model-parallel-size: 非0整数，默认为1。取值来自\${TP}。张量并行数量设置，把模型权重切分多份放到不同卡上去运算，减少单卡显存占用，但会带来额外的通信时间。
-
---pipeline-model-parallel-size: 非0整数，默认为1。取值来自\${PP}。流水线并行参数设置，把整个模型按阶段分到多张卡上去计算，减少单卡内存占用，但会增加通信时间，同时会引起部分卡闲时等待现象。
-
---context-parallel-size: 非0整数，默认为1。取值来自\${CP}。序列并行数量设置，沿着序列维度进行数据切分。主要用于长序列任务，减少单卡内存占用，会引入额外通信时间影响性能。
-
---context-parallel-algo: string, CP算法选择，可选范围[ulysses_cp_algo, hybrid_cp_algo, megatron_cp_algo]，[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/ulysses-context-parallel.md)
-
---expert-model-parallel-size: 非0整数，默认为1。取值来自\${EP}。MOE网络中专家并行设置，把专家分配到不同卡上去进行计算。主要用来减少单张卡显存限制无法放下所有专家问题，但会引起专家负载不均衡，计算效率低的问题。
-
---use-distributed-optimizer: store_true,分布式优化器，将优化器状态切分到各个设备上去独立完成计算与存储。启用后可显著降低显存消耗，提升计算资源利用率。
+| 参数名 | 类型/取值 | 说明 |
+|--------|----------|------|
+| `--tensor-model-parallel-size` | 非0整数（默认1，来自 `${TP}`） | 张量并行数量设置，把模型权重切分多份放到不同卡上去运算，减少单卡显存占用，但会带来额外的通信时间。 |
+| `--pipeline-model-parallel-size` | 非0整数（默认1，来自 `${PP}`） | 流水线并行参数设置，把整个模型按阶段分到多张卡上去计算，减少单卡内存占用，但会增加通信时间，同时会引起部分卡闲时等待现象。 |
+| `--context-parallel-size` | 非0整数（默认1，来自 `${CP}`） | 序列并行数量设置，沿着序列维度进行数据切分。主要用于长序列任务，减少单卡内存占用，会引入额外通信时间影响性能。 |
+| `--context-parallel-algo` | 字符串 | CP算法选择，可选范围：`ulysses_cp_algo`、`hybrid_cp_algo`、`megatron_cp_algo`。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/ulysses-context-parallel.md) |
+| `--expert-model-parallel-size` | 非0整数（默认1，来自 `${EP}`） | MOE网络中专家并行设置，把专家分配到不同卡上去进行计算。主要用来减少单张卡显存限制无法放下所有专家问题，但会引起专家负载不均衡，计算效率低的问题。 |
+| `--use-distributed-optimizer` | store_true | 分布式优化器，将优化器状态切分到各个设备上去独立完成计算与存储。启用后可显著降低显存消耗，提升计算资源利用率。 |
 
 ---
 
@@ -74,51 +55,50 @@
 
 [详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md)
 
---recompute-granularity: 目前仅支持配置full用于开启全量重计算。
-
---recompute-method: [block, uniform]。重计算模式配置。uniform:将transformer层均匀划分组，每组大小（--recompute-num-layers）,按组存入输入和激活值。block: 前--recompute-num-layers个transformer层使用重计算，剩余层跳过。
-
---recompute-num-layers: 整型，其使用影响如上。
+| 参数名 | 类型/取值 | 说明 |
+|--------|----------|------|
+| `--recompute-granularity` | `full` | 目前仅支持配置full用于开启全量重计算。 |
+| `--recompute-method` | `block` 或 `uniform` | 重计算模式配置。<br>- **uniform**: 将transformer层均匀划分组，每组大小由 `--recompute-num-layers` 指定，按组存入输入和激活值。<br>- **block**: 前 `--recompute-num-layers` 个transformer层使用重计算，剩余层跳过。 |
+| `--recompute-num-layers` | 整数 | 重计算的层数配置，具体作用取决于 `--recompute-method` 的设置。 |
 
 ---
 
 #### FSDP2
 
-注:启用FSDP2时，megatron各种切分策略及重计算配置均需关闭。
+> **注意**: 启用FSDP2时，Megatron各种切分策略及重计算配置均需关闭。
 
---fsdp2-config-path: fsdp2相关配置文件路径。
-
---use-cpu-initialization: 使用CPU初始化权重，需开启。
+| 参数名 | 类型/取值 | 说明 |
+|--------|----------|------|
+| `--fsdp2-config-path` | 字符串 | FSDP2相关配置文件路径。 |
+| `--use-cpu-initialization` | - | 使用CPU初始化权重，需开启。 |
 
 ---
 
 ### 加速特性
 
---use-fused-swiglu: 使能相关融合算子，仅在使用swiglu时有效。
-
---use-fused-rmsnorm: 使能相关融合算子，仅在使用rmsnorm时有效。
-
---overlap-grad-reduce 与 --overlap-param-gather: 权重更新通信掩盖，仅在使能--use-distributed-optimizer时有效。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/async-ddp-param-gather.md)
+| 参数名 | 类型/取值 | 说明 |
+|--------|----------|------|
+| `--use-fused-swiglu` | - | 使能相关融合算子，仅在使用SwiGLU时有效。 |
+| `--use-fused-rmsnorm` | - | 使能相关融合算子，仅在使用RMSNorm时有效。 |
+| `--overlap-grad-reduce` 与 `--overlap-param-gather` | - | 权重更新通信掩盖，仅在使能 `--use-distributed-optimizer` 时有效。[详细介绍](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/async-ddp-param-gather.md) |
 
 ---
 
 ## MOE_ARGS下参数解释
 
---moe-token-dispatcher-type: moe网络中分发token到通信方式选择，默认为allgather,如果开启了专家并行，推荐使用alltoall。
-
---moe-permute-fusion: 使能permute和unpermute融合算子，加速计算。
+| 参数名 | 类型/取值 | 说明 |
+|--------|----------|------|
+| `--moe-token-dispatcher-type` | 字符串（默认 `allgather`） | MOE网络中分发token到通信方式选择。如果开启了专家并行，推荐使用 `alltoall`。 |
+| `--moe-permute-fusion` | - | 使能permute和unpermute融合算子，加速计算。 |
 
 ---
 
 ## OUTPUT_ARGS下参数解释说明
 
---save : 取值来自SAVE_PATH,权重保存路径。
-注：仅有该值配置时才会进行权重保存
-
---ckpt-format: 支持配置列表[torch，torch_dcp],权重保存方式。推荐优先使用[torch_dcp](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)。
-
-注:1、当在使用fsdp2进行模型训练时，仅支持使用torch_dcp配置。
-2、OUTPUT_ARGS下设置--ckpt-format为torch_dcp与GPT_ARGS下使能--ckpt-format torch_dcp二者作用相同，择一即可。
+| 参数名 | 类型/取值 | 说明 |
+|--------|----------|------|
+| `--save` | 字符串（来自 `SAVE_PATH`） | 权重保存路径。<br>**注**：仅有该值配置时才会进行权重保存。 |
+| `--ckpt-format` | `torch` 或 `torch_dcp` | 权重保存方式。推荐优先使用 [`torch_dcp`](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)。<br><br>**注**：<br>1. 当在使用FSDP2进行模型训练时，仅支持使用 `torch_dcp` 配置。<br>2. OUTPUT_ARGS下设置 `--ckpt-format` 为 `torch_dcp` 与GPT_ARGS下使能 `--ckpt-format torch_dcp` 二者作用相同，择一即可。 |
 
 ---
 
@@ -126,7 +106,7 @@
 
 所有环境变量具体解释均可在[Ascend官网](https://www.hiascend.com/)搜索查询到详细信息，以下仅展示MM套件中常用的。
 
-| 环境初始化脚本 | 描述 | 
+| 环境初始化脚本 | 描述 |
 |-----------------------------------------|--------------------------------------------------------------------|
 | `source /usr/local/Ascend/cann/set_env.sh`| cann安装路径，必须配置 |
 | `source /usr/local/Ascend/nnal/atb/set_env.sh` | nnal安装路径 |
