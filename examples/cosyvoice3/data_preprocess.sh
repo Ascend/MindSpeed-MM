@@ -2,6 +2,7 @@
 # Copyright 2024 Alibaba Inc. All Rights Reserved.
 
 # . ./path.sh || exit 1;
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 stage=0

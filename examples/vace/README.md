@@ -1,6 +1,6 @@
-# VACE 使用指南
+# VACE使用指南
 
-- [VACE 使用指南](#VACE-使用指南)
+- [VACE 使用指南](#vace使用指南)
   - [版本说明](#版本说明)
     - [参考实现](#参考实现)
   - [任务支持列表](#任务支持列表)
@@ -365,6 +365,7 @@ bash examples/vace/{model_type}/pretrain_fsdp.sh
 ### 启动推理
 
 ```shell
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 python examples/wanvideo/model_inference/Wan-VACE-Inference.py ../inference/inference_wan{2.1/2.2}_{model_type}.json
 ```

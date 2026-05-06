@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 export NON_MEGATRON=true
 export MULTI_STREAM_MEMORY_REUSE=2

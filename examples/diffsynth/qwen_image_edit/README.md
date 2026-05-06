@@ -293,6 +293,7 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 3. 运行代码
 
     ```shell
+    # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/cann/set_env.sh
     python examples/qwen_image/model_inference/inference_qwen_image_edit_bf16.py
     ```
@@ -332,6 +333,7 @@ Qwen Image Edit 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 3. 运行代码
 
     ```shell
+    # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/cann/set_env.sh
     python examples/qwen_image/model_inference/inference_qwen_image_edit_lora_bf16.py
     ```

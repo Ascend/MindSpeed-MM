@@ -76,7 +76,9 @@ pip install torch-2.5.1-cp311-cp311-*.whl
 pip install torch_npu-2.5.1*.manylinux2014_*.whl
 
 
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/nnal/atb/set_env.sh
 
 # vllm
@@ -181,7 +183,9 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
     修改以下配置：
 
     ```shell
+    # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/cann/set_env.sh # 修改cann路径
+    # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/nnal/atb/set_env.sh # 修改nnal路径
 
     NNODES=1 # 节点数

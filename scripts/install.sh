@@ -234,6 +234,7 @@ if [ "$INSTALL_CANN" = true ]; then
     # Validate CANN installation
     echo "Validating CANN installation..."
 
+    # Change the ascend-toolkit path to the actual installation path.
     if [ -f "/usr/local/Ascend/ascend-toolkit/set_env.sh" ]; then
         source /usr/local/Ascend/ascend-toolkit/set_env.sh
         # Verify if acl module can be imported

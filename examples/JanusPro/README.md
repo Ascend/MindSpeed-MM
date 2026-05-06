@@ -73,6 +73,7 @@ cd ..
 另外还需设置CANN包安装位置。
 
 ```shell
+    # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/cann/set_env.sh
 ```
 

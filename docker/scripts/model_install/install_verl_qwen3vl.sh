@@ -39,6 +39,7 @@ echo ">>> Installing pybind11..."
 pip_install_retry "pybind11==3.0.1" 3
 
 echo ">>> Sourcing CANN environment..."
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh || true
 source /usr/local/Ascend/nnal/atb/set_env.sh || true
 

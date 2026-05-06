@@ -93,6 +93,7 @@ docker run -it --rm \
     mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
 
 # 使用 NPU 设备运行（示例：设备 /dev/davinci1）
+# 根据实际情况修改 ascend-toolkit 路径
 # 假设您的 NPU 设备安装在 /dev/davinci1 上，并且 NPU 驱动程序安装在 /usr/local/Ascend 上：
 docker run -it --rm \
     --device=/dev/davinci1 \
@@ -107,6 +108,7 @@ docker run -it --rm \
     mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
 
 # 挂载数据目录运行（示例：设备 /dev/davinci1）
+# 根据实际情况修改 ascend-toolkit 路径
 docker run -it --rm \
     --device=/dev/davinci1 \
     --device=/dev/davinci_manager \
@@ -363,6 +365,7 @@ WORKDIR /workspace/your-project
 构建并运行（示例：设备 /dev/davinci1）：
 
 ```bash
+# 根据实际情况修改 ascend-toolkit 路径
 docker build -t my-mindspeed-app:latest .
 docker run -it --rm \
     --device=/dev/davinci1 \

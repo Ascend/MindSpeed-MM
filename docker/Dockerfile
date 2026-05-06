@@ -187,4 +187,5 @@ RUN echo 'cd /workspace/MindSpeed-MM' >> /root/.bashrc && \
     echo 'conda activate base' >> /root/.bashrc
 
 ENV PATH=/opt/conda/bin:$PATH
+# 根据实际情况修改 ascend-toolkit 路径
 ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/ascend-toolkit

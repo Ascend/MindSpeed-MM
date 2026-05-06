@@ -338,6 +338,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
   - 训练权重后处理：使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
 
     ```bash
+    # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/cann/set_env.sh
     mm-convert WanConverter layerzero_to_mm \
      --cfg.source_path <./save_ckpt/wan2.1/> \

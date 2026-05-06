@@ -1,3 +1,4 @@
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export NON_MEGATRON=true
 export HCCL_CONNECT_TIMEOUT=1200

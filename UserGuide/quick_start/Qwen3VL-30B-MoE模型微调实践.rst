@@ -167,6 +167,7 @@ Step 4: 参数配置
 
     #!/bin/bash
     # 改为实际的环境变量路径
+    # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/cann/set_env.sh
     # 该变量只用于规避megatron对其校验，对npu无效
     export CUDA_DEVICE_MAX_CONNECTIONS=2 # 开启FSDP2时，不能置为1

@@ -150,6 +150,7 @@ python examples/qwen3tts/process_data.py \
 ```shell
 # 设置环境变量
 export NON_MEGATRON=true
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 # 执行数据提取脚本
@@ -200,6 +201,7 @@ bash examples/qwen3tts/finetune_qwen3tts.sh
 通过Speaker微调保存的权重为distcp分布式格式，为了方便部署到推理框架中，需要将其转换回hf格式
 
 ```shell
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 export NON_MEGATRON=true
 mm-convert Qwen3TTSConverter dcp_to_hf \
@@ -213,6 +215,7 @@ mm-convert Qwen3TTSConverter dcp_to_hf \
 若仅需转换为原始hf格式，使用以下命令将distcp格式权重转换为原始hf格式
 
 ```shell
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 export NON_MEGATRON=true
 mm-convert Qwen3TTSConverter dcp_to_hf \

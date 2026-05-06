@@ -50,7 +50,9 @@ conda create -n test python=3.10
 conda activate test
 
 # 使用环境变量
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 # 安装MindSpeed-Core-MS一键拉起部署
@@ -351,6 +353,7 @@ $save_dir
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost

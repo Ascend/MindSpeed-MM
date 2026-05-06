@@ -1,3 +1,4 @@
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 export ASCEND_RT_VISIBLE_DEVICES="0"
 # 该变量只用于规避megatron对其校验，对npu无效

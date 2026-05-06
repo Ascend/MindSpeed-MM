@@ -17,6 +17,7 @@ pip install -e .
 pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
 cd "$INITIAL_DIR"
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 # 该变量只用于规避megatron对其校验，对npu无效
 export CUDA_DEVICE_MAX_CONNECTIONS=2 # 开启FSDP2时，不能置为1

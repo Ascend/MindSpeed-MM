@@ -63,9 +63,11 @@ bash Ascend-hdk-*-npu-firmware_*.run --full
 # 因为版本迭代，包名存在出入，根据实际修改
 bash Ascend-cann-toolkit_8.5.0_linux-aarch64.run --install
 bash Ascend-cann-*-ops_8.5.0_linux-aarch64.run --install
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh # 安装nnal包需要source环境变量
 bash Ascend-cann-nnal_8.5.0_linux-aarch64.run --install
 # 设置环境变量
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh
 ```

@@ -93,6 +93,7 @@ docker run -it --rm \
     mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
 
 # Run with NPU device (example: device /dev/davinci1)
+# Change the ascend-toolkit path to the actual installation path.
 # Assuming your NPU device is installed at /dev/davinci1 and NPU driver is installed at /usr/local/Ascend:
 docker run -it --rm \
     --device=/dev/davinci1 \

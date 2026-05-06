@@ -1,5 +1,7 @@
 #!/bin/bash
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1

@@ -49,11 +49,13 @@ bash Ascend-hdk-*-npu-driver_*.run --full --force
 
 ```shell
 bash Ascend-cann-toolkit_8.5.0_linux-aarch64.run --install
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/cann/set_env.sh
 
 bash Ascend-cann-kernels-*_8.5.0_linux-aarch64.run --install
 bash Ascend-cann-nnal_8.5.0_linux-aarch64.run --install
 # 设置环境变量
+# 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/nnal/asdsip/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh --cxx_abi=0
 ```

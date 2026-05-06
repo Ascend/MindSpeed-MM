@@ -337,6 +337,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
     该特性和TP不能兼容，开启时TP必须设置为1，使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
     
     ```bash
+    # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/cann/set_env.sh
     # your_mindspeed_path和your_megatron_path分别替换为之前下载的mindspeed和megatron的路径
     export PYTHONPATH=$PYTHONPATH:<your_mindspeed_path>
