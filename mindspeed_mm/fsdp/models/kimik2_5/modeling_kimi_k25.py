@@ -41,7 +41,7 @@
 import math
 from collections.abc import Sequence
 from copy import deepcopy
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -69,6 +69,32 @@ from mindspeed_mm.fsdp.models.base_model import WeightInitMixin
 from mindspeed_mm.fsdp.models.kimik2_5.configuration_kimi_k25 import KimiK25Config
 from mindspeed_mm.fsdp.models.kimik2_5.modeling_deepseek import DeepseekV3ForCausalLM
 
+_SIN = None
+_COS = None
+
+
+def set_global_param(param_name: str = None, param: Optional[torch.Tensor] = None) -> None:
+    if param_name == "sin":
+        global _SIN
+        _SIN = param
+    elif param_name == "cos":
+        global _COS
+        _COS = param
+    else:
+        raise ValueError(f"Invalid param type: '{param_name}'.")
+
+
+def get_global_param(param_name: str = None) -> Optional[torch.Tensor]:
+    if param_name == "sin":
+        global _SIN
+        return _SIN
+    elif param_name == "cos":
+        global _COS
+        return _COS
+    else:
+        raise ValueError(f"Invalid param type: '{param_name}'.")
+
+
 # Flash attention imports
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -80,8 +106,8 @@ def multihead_attention(
     q: torch.Tensor,
     k: torch.Tensor,
     v: torch.Tensor,
-    q_cu_seqlens: torch.Tensor | None = None,
-    k_cu_seqlens: torch.Tensor | None = None,
+    q_cu_seqlens: Union[tuple, torch.Tensor] | None = None,
+    k_cu_seqlens: Union[tuple, torch.Tensor] | None = None,
     max_seqlen_q: int | None = None,
     max_seqlen_k: int | None = None,
     deterministic: bool = False,
@@ -91,10 +117,8 @@ def multihead_attention(
     Args:
         q, k, v: tensor of shape (batch_size, seqlen, num_heads, head_dim),
             or (tot_seqlens, num_heads, head_dim) if packing.
-        q_cu_seqlens (torch.Tensor): cumulative sequence lengths of q.
-            The first element should be 0 and the last element should be q.shape[0].
-        k_cu_seqlens (torch.Tensor): cumulative sequence lengths of k.
-            The first element should be 0 and the last element should be k.shape[0].
+        q_cu_seqlens (Union[tuple, torch.Tensor]): cumulative sequence lengths of q.
+        k_cu_seqlens (Union[tuple, torch.Tensor]): cumulative sequence lengths of k.
 
     Returns:
         output: shape (batch_size, seqlen, dim) or (tot_seqlens, dim) if packing,
@@ -112,8 +136,8 @@ def multihead_attention(
         scale=1.0 / math.sqrt(q.shape[-1]),
         keep_prob=1,
         input_layout="TND",
-        actual_seq_qlen=tuple(q_cu_seqlens[1:].cpu().numpy().tolist()),
-        actual_seq_kvlen=tuple(k_cu_seqlens[1:].cpu().numpy().tolist()),
+        actual_seq_qlen=q_cu_seqlens,
+        actual_seq_kvlen=k_cu_seqlens
     )[0]
     # Modification end
 
@@ -216,10 +240,8 @@ def apply_rope(xq: torch.Tensor, xk: torch.Tensor,
     _apply_rope_input_validation(xq, freqs_cis)
     _apply_rope_input_validation(xk, freqs_cis)
 
-    freqs_cis = freqs_cis.unsqueeze(-2)  # ..., 1, head_dim/2
-    # Modification start
-    cos = freqs_cis.real.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
-    sin = freqs_cis.imag.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
+    cos = get_global_param("cos")
+    sin = get_global_param("sin")
     xq_out = torch_npu.npu_rotary_mul(xq.float(), cos, sin, rotary_mode="interleave")
     xk_out = torch_npu.npu_rotary_mul(xk.float(), cos, sin, rotary_mode="interleave")
     # Modification end
@@ -510,7 +532,7 @@ class MoonViTEncoderLayer(nn.Module):
     def attention_qkvpacked(
         self,
         x: torch.Tensor,
-        cu_seqlens: torch.Tensor,
+        cu_seqlens: Union[tuple, torch.Tensor],
         max_seqlen: torch.Tensor,
         rope_freqs_cis: torch.Tensor | None = None,
     ):
@@ -548,7 +570,7 @@ class MoonViTEncoderLayer(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
-        cu_seqlens: torch.Tensor,
+        cu_seqlens: Union[tuple, torch.Tensor],
         max_seqlen: int,
         rope_freqs_cis: torch.Tensor | None = None,
     ):
@@ -605,6 +627,11 @@ class MoonViT3dEncoder(nn.Module):
         max_seqlen = lengths.max()
         cu_seqlens = lengths.to(hidden_states.device).cumsum(dim=0,
                                                              dtype=torch.int32)
+        cu_seqlens = tuple(cu_seqlens[1:].cpu().numpy().tolist())
+        cos = rope_freqs_cis.unsqueeze(-2).real.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
+        sin = rope_freqs_cis.unsqueeze(-2).imag.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
+        set_global_param("cos", cos)
+        set_global_param("sin", sin)
         for block in self.blocks:
             hidden_states = block(hidden_states,
                                   cu_seqlens,
@@ -942,7 +969,7 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
             input_ids.shape)
 
         max_embed_dim = _token_occupation_table.sum(-1).max().item()
-        if  max_embed_dim < sequence_length:
+        if max_embed_dim < sequence_length:
             raise AssertionError(
                 f"The max_embed_dim({max_embed_dim}) is less than sequence_length({sequence_length})"
             )
