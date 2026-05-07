@@ -582,6 +582,16 @@ Copyright 2025 KwaiVGI/VideoAlign
 
 
 Software Notice
+Software MiMo V2.5
+License: Apache License 2.0
+For the full text of the license, please go to the above.
+
+Copyright Notice included in the software:
+Copyright 2026 Xiaomi Corporation.
+Copyright 2026 The HuggingFace Inc. team.
+
+
+Software Notice
 License: TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT
 Tencent Hunyuan Image 3.0 Release Date: September 28, 2025
 THIS LICENSE AGREEMENT DOES NOT APPLY IN THE EUROPEAN UNION, UNITED KINGDOM AND SOUTH KOREA AND IS EXPRESSLY LIMITED TO THE TERRITORY, AS DEFINED BELOW.
