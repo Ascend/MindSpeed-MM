@@ -10,6 +10,19 @@
 | **Dockerfile 路径** | `docker/` |
 | **许可证** | Apache-2.0 |
 
+## MindSpeed MM
+
+MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件，支持业界主流多模态大模型训练，旨在为华为 [昇腾芯片](https://www.hiAscend.com/) 提供端到端的多模态训练解决方案, 包含预置业界主流模型，数据工程，分布式训练及加速，预训练、微调、后训练、在线推理任务等特性。
+
+MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，支持 x86_64 和 aarch64（ARM64）两种 CPU 架构。镜像中预安装了以下软件：
+
+- **PyTorch** + **torch_npu**：深度学习框架
+- **decord 0.6.0**：高效视频解码库
+- **CANN**：华为昇腾 AI 处理器基础软件栈
+- **verl_qwen3vl conda 环境**：预编译完成的 VERL Qwen3VL 强化学习训练环境（包含 vllm、vllm-ascend、verl）
+
+由于不同模型的依赖环境存在差异，镜像中仅预安装了上述基础依赖包。用户在拉取镜像并启动容器后，需根据目标模型的 README 文件，在 base 环境中手动安装该模型所需的额外依赖。
+
 ## 镜像 Tag 关键字段描述
 
 镜像 Tag 命名遵循模板：`{版本号}-{芯片信息}-{操作系统}-py{Python版本}-{架构类型}`

@@ -10,6 +10,19 @@
 | **Dockerfile Path** | `docker/` |
 | **License** | Apache-2.0 |
 
+## MindSpeed MM
+
+MindSpeed MM: An Ascend multimodal large model suite for large-scale distributed training, supporting mainstream multimodal large model training in the industry. It aims to provide an end-to-end multimodal training solution for Huawei [Ascend chips](https://www.hiAscend.com/), including features such as pre-built mainstream models, data engineering, distributed training and acceleration, pre-training, fine-tuning, post-training, and online inference tasks.
+
+The MindSpeed MM image is based on both Ubuntu 22.04 and openEuler 24.03 operating systems, supporting x86_64 and aarch64 (ARM64) CPU architectures. The image comes with the following pre-installed software:
+
+- **PyTorch** + **torch_npu**: Deep learning framework
+- **decord 0.6.0**: High-performance video decoding library
+- **CANN**: Huawei Ascend AI processor base software stack
+- **verl_qwen3vl conda environment**: Pre-compiled VERL Qwen3VL reinforcement learning training environment (including vllm, vllm-ascend, verl)
+
+Due to differences in dependencies between models, only the above basic packages are pre-installed in the image. After pulling the image and starting a container, users should manually install additional dependencies required by their target model in the base environment according to the model's README file.
+
 ## Key Field Description of Image Tag
 
 Image tag naming follows the template: `{version}-{chip_info}-{os}-py{python_version}-{architecture}`
