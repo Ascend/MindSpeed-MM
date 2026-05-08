@@ -333,17 +333,17 @@ class Qwen3_5MoeRMSNormGated(nn.Module):
         input_dtype = hidden_states.dtype
         if IS_NPU_AVAILABLE:
             import torch_npu
-            hidden_states = torch_npu.npu_rms_norm(hidden_states.float(), self.weight.float(), self.variance_epsilon)[0]
+            hidden_states = torch_npu.npu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+            hidden_states = hidden_states * F.silu(gate)
         else:
             hidden_states = hidden_states.to(torch.float32)
             variance = hidden_states.pow(2).mean(-1, keepdim=True)
             # Norm before gate
             hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
             hidden_states = self.weight * hidden_states.to(input_dtype)
+            hidden_states = hidden_states * F.silu(gate.to(torch.float32)).to(input_dtype) 
 
-        hidden_states = hidden_states * F.silu(gate.to(torch.float32))
-
-        return hidden_states.to(input_dtype)
+        return hidden_states
 
 
 def apply_mask_to_padding_states(hidden_states, attention_mask):
@@ -822,8 +822,13 @@ def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     k_rot, k_pass = k[..., :rotary_dim], k[..., rotary_dim:]
 
     # Apply rotary embeddings on the first half or full tensor
-    q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
-    k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
+    if IS_NPU_AVAILABLE:
+        import torch_npu
+        q_embed = torch_npu.npu_rotary_mul(q_rot, cos, sin)
+        k_embed = torch_npu.npu_rotary_mul(k_rot, cos, sin)        
+    else:
+        q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
+        k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
 
     # Concatenate back to full shape
     q_embed = torch.cat([q_embed, q_pass], dim=-1)
@@ -1001,7 +1006,7 @@ class Qwen3_5MoeExperts(nn.Module):
             intermediate_hidden_states = npu_group_gemm(permuted_hidden_states, self.gate_up_proj, tokens_per_expert)
             intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
             output = npu_group_gemm(intermediate_activations, self.down_proj, tokens_per_expert)
-            final_hidden_states = torch_npu.npu_moe_token_unpermute(output.to(routing_weights.dtype), row_ids_map, probs=routing_weights)
+            final_hidden_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=routing_weights)
             return final_hidden_states
         else:
             # eager implementation of MoE block
@@ -1110,7 +1115,7 @@ class Qwen3_5MoeRMSNorm(nn.Module):
     def forward(self, x):
         if IS_NPU_AVAILABLE:
             import torch_npu
-            output = torch_npu.npu_rms_norm(x.float(), 1.0 + self.weight.float(), self.eps)[0]
+            output = torch_npu.npu_rms_norm(x, 1.0 + self.weight, self.eps)[0]
         else:
             output = self._norm(x.float())
             # Llama does x.to(float16) * w whilst Qwen3_5Moe is (x * w).to(float16)
