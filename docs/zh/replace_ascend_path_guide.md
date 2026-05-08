@@ -56,19 +56,19 @@ python3 scripts/replace_ascend_path.py --dry-run
 输出示例：
 
 ```bash
-[预览模式] 路径替换：/usr/local/Ascend → /usr/local/npu
-扫描目录：/path/to/MindSpeed-MM
-文件类型：.md, .py, .rst, .sh + Dockerfile
+[DRY RUN] Path replacement: /usr/local/Ascend -> /usr/local/npu
+Scan directory : /path/to/MindSpeed-MM
+File types     : .md, .py, .rst, .sh + Dockerfile
 ------------------------------------------------------------
-共扫描到 XXX 个候选文件，开始处理...
+Found XXX candidate file(s), processing...
 
-  [将替换  3 处] examples/qwen_vl/pretrain_qwen_vl.sh
-  [将替换  1 处] docker/Dockerfile
+  [would replace   1] UserGuide/dev_guide/新模型开发.rst
+  [would replace   1] UserGuide/quick_start/Qwen3VL-30B-MoE模型微调实践.rst
   ...
 
 ============================================================
-[预览] 将修改 XXX 个文件，共 XXX 处替换。
-       执行实际替换请去掉 --dry-run 参数。
+[DRY RUN] XXX file(s) would be modified, XXX replacement(s) total.
+          Remove --dry-run to apply changes.
 ```
 
 ### 第三步：执行批量替换
