@@ -64,10 +64,11 @@ from transformers.models.llava.modeling_llava import \
     LlavaCausalLMOutputWithPast
 from transformers.utils import is_flash_attn_2_available
 
-from mindspeed_mm.fsdp.utils.register import model_register
+from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.models.base_model import WeightInitMixin
 from mindspeed_mm.fsdp.models.kimik2_5.configuration_kimi_k25 import KimiK25Config
 from mindspeed_mm.fsdp.models.kimik2_5.modeling_deepseek import DeepseekV3ForCausalLM
+from mindspeed_mm.fsdp.utils.register import model_register
 
 _SIN = None
 _COS = None
@@ -1190,26 +1191,37 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
             return_dict=return_dict,
         )
 
-        logits = outputs[0]
+        # Modification: start，kimi性能优化，loss计算优化，适配chunkloss
+        hidden_states = outputs.hidden_states
 
-        loss = None
-        if labels is not None:
-            # Shift so that tokens < n predict n
-            if attention_mask is not None:
-                shift_attention_mask = attention_mask[..., 1:]
-                shift_logits = logits[..., :-1, :][shift_attention_mask.to(
-                    logits.device) != 0].contiguous()
-                shift_labels = labels[..., 1:][shift_attention_mask.to(
-                    labels.device) != 0].contiguous()
-            else:
-                shift_logits = logits[..., :-1, :].contiguous()
-                shift_labels = labels[..., 1:].contiguous()
-            # Flatten the tokens
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1).to(shift_logits.device),
-            )
+        if getattr(self, "enable_chunk_loss", False):
+            logits = None
+            chunk_size = getattr(self, "chunk_size", 1024)
+            self.loss_function = build_loss_func(loss_type="default", chunk_size=chunk_size, labels=labels)
+            loss = self.language_model.lm_head(hidden_states, self.loss_function)
+        else:
+            logits = self.language_model.lm_head(hidden_states)
+            logits = logits.float()
+
+            loss = None
+            if labels is not None:
+                # Shift so that tokens < n predict n
+                if attention_mask is not None:
+                    shift_attention_mask = attention_mask[..., 1:]
+                    shift_logits = logits[..., :-1, :][shift_attention_mask.to(
+                        logits.device) != 0].contiguous()
+                    shift_labels = labels[..., 1:][shift_attention_mask.to(
+                        labels.device) != 0].contiguous()
+                else:
+                    shift_logits = logits[..., :-1, :].contiguous()
+                    shift_labels = labels[..., 1:].contiguous()
+                # Flatten the tokens
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(
+                    shift_logits.view(-1, shift_logits.size(-1)),
+                    shift_labels.view(-1).to(shift_logits.device),
+                )
+        # Modification：end
 
         if not return_dict:
             output = (logits, ) + outputs[1:]

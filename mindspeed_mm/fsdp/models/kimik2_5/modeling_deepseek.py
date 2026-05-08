@@ -150,21 +150,28 @@ class PatchDeepseekV3MoE(nn.Module):
     def route_tokens_to_experts(self, router_logits):
         router_logits = router_logits.sigmoid()
         router_logits_for_choice = router_logits + self.gate.e_score_correction_bias
-        group_scores = (
-            router_logits_for_choice.view(-1, self.n_group, self.n_routed_experts // self.n_group)
-            .topk(2, dim=-1)[0]
-            .sum(dim=-1)
-        )
-        group_idx = torch.topk(group_scores, k=self.topk_group, dim=-1, sorted=False)[1]
-        group_mask = torch.zeros_like(group_scores)
-        group_mask.scatter_(1, group_idx, 1)
-        score_mask = (
-            group_mask.unsqueeze(-1)
-            .expand(-1, self.n_group, self.n_routed_experts // self.n_group)
-            .reshape(-1, self.n_routed_experts)
-        )
-        scores_for_choice = router_logits_for_choice.masked_fill(~score_mask.bool(), 0.0)
-        topk_indices = torch.topk(scores_for_choice, k=self.top_k, dim=-1, sorted=False)[1]
+
+        # Modification  start，kimi性能优化，去除不必要的分组操作
+        if self.n_group == 1 and self.topk_group == 1:
+            topk_indices = torch.topk(router_logits_for_choice, k=self.top_k, dim=-1, sorted=False)[1]
+        else:
+            group_scores = (
+                router_logits_for_choice.view(-1, self.n_group, self.n_routed_experts // self.n_group)
+                .topk(2, dim=-1)[0]
+                .sum(dim=-1)
+            )
+            group_idx = torch.topk(group_scores, k=self.topk_group, dim=-1, sorted=False)[1]
+            group_mask = torch.zeros_like(group_scores)
+            group_mask.scatter_(1, group_idx, 1)
+            score_mask = (
+                group_mask.unsqueeze(-1)
+                .expand(-1, self.n_group, self.n_routed_experts // self.n_group)
+                .reshape(-1, self.n_routed_experts)
+            )
+            scores_for_choice = router_logits_for_choice.masked_fill(~score_mask.bool(), 0.0)
+            topk_indices = torch.topk(scores_for_choice, k=self.top_k, dim=-1, sorted=False)[1]
+        # Modification  end
+
         topk_weights = router_logits.gather(1, topk_indices)
         if self.norm_topk_prob:
             denominator = topk_weights.sum(dim=-1, keepdim=True) + 1e-20
@@ -743,6 +750,17 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen,
                                  head_dim)
 
+# Modification  start， kimi性能优化，fa替换融合算子，并对mask做缓存，此优化仅对shape不变的mask做缓存
+ATTN_MASK_NPU_CACHE = {}
+
+
+def get_attn_mask_npu(device, seq_len=2048):
+    """Get or create NPU attention mask"""
+    if device not in ATTN_MASK_NPU_CACHE:
+        ATTN_MASK_NPU_CACHE[device] = torch.triu(torch.ones([seq_len, seq_len], device=device), diagonal=1).bool()
+    return ATTN_MASK_NPU_CACHE[device]
+# Modification  end
+
 
 # Copied from transformers.models.llama.modeling_llama.LlamaAttention with Llama->DeepseekV3
 class DeepseekV3Attention(nn.Module):
@@ -927,32 +945,21 @@ class DeepseekV3Attention(nn.Module):
             key_states, value_states = past_key_value.update(
                 key_states, value_states, self.layer_idx, cache_kwargs)
 
-        attn_weights = (
-            torch.matmul(query_states, key_states.transpose(2, 3)) *
-            self.softmax_scale)
-
-        if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
-            raise ValueError(
-                f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
-                f" {attn_weights.size()}")
-        if attention_mask is None:
-            raise AssertionError("attention_mask should not be none")
-        if attention_mask is not None:
-            if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
-                raise ValueError(
-                    f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
-                )
-            attn_weights = attn_weights + attention_mask
-
-        # upcast attention to fp32
-        attn_weights = nn.functional.softmax(attn_weights,
-                                             dim=-1,
-                                             dtype=torch.float32).to(
-                                                 query_states.dtype)
-        attn_weights = nn.functional.dropout(attn_weights,
-                                             p=self.attention_dropout,
-                                             training=self.training)
-        attn_output = torch.matmul(attn_weights, value_states)
+        # Modification  start， kimi性能优化，fa替换融合算子
+        attn_output = torch_npu.npu_fusion_attention(
+            query_states,
+            key_states,
+            value_states,
+            self.config.num_attention_heads,
+            pse=None,
+            input_layout="BNSD",
+            atten_mask=get_attn_mask_npu(device=query_states.device),
+            keep_prob=1.0 if not self.training else 1.0 - self.attention_dropout,
+            scale=self.softmax_scale,
+            sparse_mode=3,
+        )[0]
+        attn_weights = None
+        # Modification  end
 
         if attn_output.size() != (bsz, self.num_heads, q_len, self.v_head_dim):
             raise ValueError(
@@ -1710,35 +1717,13 @@ class DeepseekV3ForCausalLM(DeepseekV3PreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-
-        hidden_states = outputs[0]
-        logits = self.lm_head(hidden_states)
-        logits = logits.float()
-
-        loss = None
-        if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            # Flatten the tokens
-            loss_fct = CrossEntropyLoss()
-            shift_logits = shift_logits.view(-1, self.config.vocab_size)
-            shift_labels = shift_labels.view(-1)
-            # Enable model parallelism
-            shift_labels = shift_labels.to(shift_logits.device)
-            loss = loss_fct(shift_logits, shift_labels)
-
-        if not return_dict:
-            output = (logits, ) + outputs[1:]
-            return (loss, ) + output if loss is not None else output
-
+        # Modification  start，kimi性能优化，loss计算优化
         return CausalLMOutputWithPast(
-            loss=loss,
-            logits=logits,
             past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
+            hidden_states=outputs.last_hidden_state,
             attentions=outputs.attentions,
         )
+        # Modification  end
 
     def prepare_inputs_for_generation(
         self,

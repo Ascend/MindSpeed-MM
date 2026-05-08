@@ -37,6 +37,7 @@ class FeaturesApplier:
     def apply_chunkloss(self, model):
         if self.config.enable_chunk_loss:
             setattr(model, "enable_chunk_loss", True)
+            setattr(model, "chunk_size", self.config.chunkloss_plan.chunk_size)
         elif self.config.enable_dynamic_chunk_loss:
             setattr(model, "enable_dynamic_chunk_loss", True)
         else:

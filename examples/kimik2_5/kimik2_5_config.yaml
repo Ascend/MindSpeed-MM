@@ -7,9 +7,14 @@ parallel:
       - vision_tower
       - vision_tower.encoder.blocks.{*}
       - mm_projector
+      - language_model.model
       - language_model.model.embed_tokens
       - language_model.model.layers.{*}
       - language_model.lm_head
+    hook_modules:
+      - language_model.model.layers.{*}
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
     param_dtype: bf16
     reduce_dtype: fp32
   recompute: true
@@ -82,8 +87,13 @@ model:
   trust_remote_code: true
   freeze:
     - vision_tower
+    - mm_projector
   loss_cfg:
-    loss_type: raw
+    loss_type: default
+  enable_chunk_loss: true
+  chunkloss_plan:
+    apply_module: language_model.lm_head
+    chunk_size: 1024
   text_decoder:
     activation_offload: false
 
