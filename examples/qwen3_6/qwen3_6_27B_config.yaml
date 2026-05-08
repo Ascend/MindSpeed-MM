@@ -11,10 +11,6 @@ parallel:
       - lm_head
     param_dtype: bf16
     reduce_dtype: fp32
-  recompute: true
-  recompute_plan:
-      apply_modules:
-        - model.language_model.layers.{*}
   ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
 
 ### 数据相关配置
@@ -80,6 +76,12 @@ model:
   loss_cfg:
     loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
     router_aux_loss_coef: 0.0
+  # 重计算配置
+  recompute: true
+  recompute_plan:
+      apply_modules:
+        - model.visual.blocks.{*}
+        - model.language_model.layers.{*}
   # chunkloss配置
   enable_chunk_loss: true
   chunkloss_plan:

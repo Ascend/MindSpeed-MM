@@ -157,8 +157,9 @@ class Trainer():
             model = self.enable_lora(model)
 
         # Apply parallelization strategy and model features
+        self.model_features_applier.pre_fully_shard_apply(model)
         model = self.model_parallel_applier(model)
-        self.model_features_applier(model)
+        self.model_features_applier.post_fully_shard_apply(model)
 
         # Initialize weights on meta device if specified (for memory efficiency)
         if args.training.init_model_with_meta_device:

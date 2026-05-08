@@ -1,7 +1,6 @@
 import torch
 
 from mindspeed.fsdp.distributed.tensor_parallel.tensor_parallel import tensor_parallel_modules
-from ..features.memory.recompute import recompute_modules
 
 from .expert_parallel.expert_parallel import expert_parallelize_modules
 from .expert_parallel.expert_fully_shard_parallel import expert_fully_shard_modules
@@ -37,11 +36,6 @@ class ParallelApplier:
             model = expert_fully_shard_modules(model, self.parallel_state.get_efsdp_device_mesh(), self.config.ep_plan, self.config.fsdp_plan)
             # Remove modules already handled by efsdp from the standard FSDP plan to prevent duplicate fully_shard errors
             self.config.fsdp_plan.apply_modules = [x for x in self.config.fsdp_plan.apply_modules if x not in self.config.ep_plan.apply_efsdp_modules]
-
-    def apply_recompute_modules(self, model):
-        if not self.config.recompute:
-            return
-        model = recompute_modules(model, self.config.recompute_plan)
         
     def set_modules_to_prefetch(self, model):          
         if self.config.fsdp_plan.num_to_forward_prefetch > 0 or self.config.fsdp_plan.num_to_backward_prefetch > 0:
@@ -54,7 +48,6 @@ class ParallelApplier:
         # Order matters: TP -> EP -> Recompute -> FSDP
         self.apply_tp_modules(model=model)
         self.apply_ep_modules(model=model)
-        self.apply_recompute_modules(model=model)
         model = self.apply_fsdp_modules(model=model, training_config=self.training_config)
         model = self.set_modules_to_prefetch(model=model)
         return model

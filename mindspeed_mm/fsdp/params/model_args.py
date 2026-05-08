@@ -4,6 +4,12 @@ from typing import List, Literal, Optional
 from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 
+class RecomputePlanConfig(BaseArguments):
+    """Configuration for recompute plan"""
+    apply_module: List[str] = field(default_factory=list)
+    use_reentrant: bool = False
+    
+
 class ChunkLossPlanConfig(BaseArguments):
     apply_module: str = field(
         default="lm_head",
@@ -34,6 +40,33 @@ class ActivationOffloadPlanConfig(BaseArguments):
     apply_modules: List[str] = field(
         default=None,
         metadata={"help": "module that applied activation offload"}
+    )
+    
+
+class ChunkMbsPlanConfig(BaseArguments):
+    apply_modules: List[str] = field(
+        default=None,
+        metadata={"help": "module that applied chunkmbs"}
+    )
+    
+    chunk_mbs: int = field(
+        default=1,
+        metadata={"help": "chunk_mbs, chunked micro batch size"}
+    )
+    
+    batch_dim: int = field(
+        default=0,
+        metadata={"help": "chunk_mbs, batchsize dim"}
+    )
+    
+    chunk_arg_indexs: List[int] = field(
+        default=[0],
+        metadata={"help": "chunk_mbs, chunk args indexs"}
+    )
+    
+    chunk_kwarg_names: List[str] = field(
+        default=[],
+        metadata={"help": "chunk_mbs, chunk kwarg names"}
     )
 
 
@@ -66,7 +99,11 @@ class ModelArguments(BaseArguments):
         default_factory=list,
         metadata={"help": "List of module names to freeze during training."},
     )
+    
+    recompute_plan: RecomputePlanConfig = field(default_factory=RecomputePlanConfig)
+    
     loss_cfg: LossArguments = field(default_factory=LossArguments)
+    
     enable_chunk_loss: bool = field(
         default=False,
         metadata={"help": "Whether apply chunkloss for loss compute"},
@@ -82,3 +119,9 @@ class ModelArguments(BaseArguments):
         metadata={"help": "Whether apply activation offload"}
     )
     activation_offload_plan: ActivationOffloadPlanConfig = field(default_factory=ActivationOffloadPlanConfig)
+    
+    enable_chunk_mbs: bool = field(
+        default=False,
+        metadata={"help": "Whether apply chunk_mbs"}
+    )
+    chunkmbs_plan: ChunkMbsPlanConfig = field(default_factory=ChunkMbsPlanConfig)    

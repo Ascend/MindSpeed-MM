@@ -6,8 +6,11 @@ if version.parse(transformers.__version__) >= version.parse("5.2.0"):
     
 from mindspeed.fsdp.utils.str_match import module_name_match
 from ..params.model_args import ModelArguments
+from ..params.parallel_args import ParallelArguments
 from ..features.memory.async_offload import async_offload_modules, get_offload_modules
 from ..features.memory.chunkloss_lm_head import apply_chunkloss_module, get_chunkloss_module
+from ..features.communication.chunk_mbs import get_chunkmbs_modules, apply_chunkmbs_module
+from ..features.memory.recompute import recompute_modules
 
 
 class FeaturesApplier:
@@ -22,6 +25,12 @@ class FeaturesApplier:
                     if (name, module) not in matched_submodules:
                         matched_submodules.append((name, module))
         return matched_submodules
+    
+    def apply_recompute_models(self, model):
+        if not getattr(self.config, "recompute", False) or not getattr(self.config, "recompute_plan", None):
+            return 
+        
+        model = recompute_modules(model, self.config.recompute_plan)
 
     def apply_activation_offload_modules(self, model):
         if (
@@ -66,8 +75,26 @@ class FeaturesApplier:
                     # from_pretrained. We need to update the _CAN_RECORD_REGISTRY with the
                     # new class keys from the sharded sub-modules.
                     _CAN_RECORD_REGISTRY[str(sub_module.__class__)] = sub_module._can_record_outputs
-
-    def __call__(self, model):
+                    
+    def apply_chunk_mbs(self, model):
+        if not getattr(self.config, "enable_chunk_mbs", False) or not getattr(self.config, "chunkmbs_plan", None):
+            return 
+        
+        chunk_mbs_modules = get_chunkmbs_modules(model, self.config.chunkmbs_plan.apply_modules)
+        apply_chunkmbs_module(chunk_mbs_modules=chunk_mbs_modules, chunkmbs_cfg=self.config.chunkmbs_plan)
+        
+    def pre_fully_shard_apply(self, model):
+        # The order of these three operations is critical and must not be changed.
+        # 1. Recompute: Wraps the forward pass to save memory by recomputing strategy.
+        # 2. Activation Offload: Wraps the logic to move activations to CPU to free up device memory.
+        # 3. Chunk MBS: Splits the input batch into micro-batches. This must be the outermost wrapper 
+        #    to ensure that the micro-batch slicing logic executes *before* the data enters the 
+        #    recomputation and offloading logic.
+        self.apply_recompute_models(model=model)
         self.apply_activation_offload_modules(model=model)
+        self.apply_chunk_mbs(model=model)
+        
         self.apply_chunkloss(model=model)
+    
+    def post_fully_shard_apply(self, model):
         self.apply_aux_loss_capture(model=model)

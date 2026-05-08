@@ -18,10 +18,6 @@ parallel:
     reduce_dtype: fp32
     num_to_forward_prefetch: 1
     num_to_backward_prefetch: 1
-  recompute: true
-  recompute_plan:
-      apply_modules:
-        - model.layers.{*}
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
@@ -97,6 +93,10 @@ model:
   loss_cfg:
     loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
     router_aux_loss_coef: 0.0
+  recompute: true
+  recompute_plan:
+      apply_modules:
+        - model.layers.{*}
   enable_chunk_loss: true  # If loss_type is set to "raw", enable_chunk_loss must be set to false.
   chunkloss_plan:
     apply_module: lm_head

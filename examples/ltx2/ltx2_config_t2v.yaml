@@ -9,10 +9,6 @@ parallel:
       - transformer.proj_out
     param_dtype: bf16
     reduce_dtype: fp32
-  recompute: false
-  recompute_plan:
-    apply_modules:
-      - transformer.transformer_blocks.{*}
   context_parallel_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
@@ -76,6 +72,10 @@ model:
   enable_gradient_checkpointing: true
   loss_cfg:
     loss_type: raw
+  recompute: false
+  recompute_plan:
+    apply_modules:
+      - transformer.transformer_blocks.{*}
 
 training:
   micro_batch_size: 1

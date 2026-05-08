@@ -14,10 +14,6 @@ parallel:
       - lm_head
     param_dtype: bf16
     reduce_dtype: fp32
-  recompute: true
-  recompute_plan:
-    apply_modules:
-      - model.language_model.layers.{*}
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
@@ -93,6 +89,11 @@ model:
   loss_cfg:
     loss_type: default # If you want custom loss in model, loss_type can be set to "custom".
     router_aux_loss_coef: 0.0
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - model.visual.blocks.{*}
+      - model.language_model.layers.{*}
   enable_chunk_loss: false
   chunkloss_plan:
     apply_module: lm_head

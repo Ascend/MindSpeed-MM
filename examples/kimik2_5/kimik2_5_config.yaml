@@ -17,10 +17,6 @@ parallel:
     num_to_backward_prefetch: 1
     param_dtype: bf16
     reduce_dtype: fp32
-  recompute: true
-  recompute_plan:
-      apply_modules:
-        - language_model.model.layers.{*}
   context_parallel_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 128
@@ -96,6 +92,11 @@ model:
     chunk_size: 1024
   text_decoder:
     activation_offload: false
+  recompute: true
+  recompute_plan:
+      apply_modules:
+        - vision_tower.encoder.blocks.{*}
+        - language_model.model.layers.{*}
 
 # 训练配置
 training:
