@@ -499,15 +499,93 @@ _register_template(
 )
 
 
+_register_template(
+    name="empty",
+    params=RegisterParams(
+        format_assistant=StringFormatter(slots=["{{content}}"])
+    ),
+)
+
+
+def parse_template(tokenizer: "PreTrainedTokenizer") -> "Template":
+    r"""Extract a chat template from the tokenizer."""
+
+    def find_diff(short_str: str, long_str: str) -> str:
+        i, j = 0, 0
+        diff = ""
+        while i < len(short_str) and j < len(long_str):
+            if short_str[i] == long_str[j]:
+                i += 1
+                j += 1
+            else:
+                diff += long_str[j]
+                j += 1
+
+        return diff
+
+    prefix = tokenizer.decode(tokenizer.encode(""))
+
+    # user role is mandatory for some templates
+    messages = [{"role": "system", "content": "{{content}}"}, {"role": "user", "content": ""}]
+    system_slot = tokenizer.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)[len(prefix):]
+    messages = [{"role": "user", "content": ""}]
+    user_slot_empty_content = tokenizer.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)[len(prefix):]
+    system_slot = system_slot.split(user_slot_empty_content)[0]
+
+    messages = [{"role": "system", "content": ""}, {"role": "user", "content": "{{content}}"}]
+    user_slot_empty_system = tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    user_slot_empty_system = user_slot_empty_system[len(prefix):]
+
+    messages = [{"role": "user", "content": "{{content}}"}]
+    user_slot = tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    user_slot = user_slot[len(prefix):]
+    messages = [{"role": "user", "content": "{{content}}"}, {"role": "assistant", "content": "{{content}}"}]
+    assistant_slot = tokenizer.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
+    assistant_slot = assistant_slot[len(prefix) + len(user_slot):]
+    assistant_slot = assistant_slot.replace("<think>", "").replace("</think>", "").lstrip("\n")  # remove thought tags
+
+    if len(user_slot) > len(user_slot_empty_system):
+        default_system = find_diff(user_slot_empty_system, user_slot)
+        sole_system = system_slot.replace("{{content}}", default_system, 1)
+        user_slot = user_slot[len(sole_system):]
+    else:  # if defaut_system is empty, user_slot_empty_system will be longer than user_slot
+        default_system = ""
+
+    template_class = ReasoningTemplate if "<think>" in assistant_slot else Template
+    return template_class(
+        format_user=StringFormatter(slots=[user_slot]),
+        format_assistant=StringFormatter(slots=[assistant_slot]),
+        format_system=StringFormatter(slots=[system_slot]),
+        format_observation=StringFormatter(slots=[user_slot]),
+        format_tool=StringFormatter(slots=[tools_slot]),
+        format_prefix=EmptyFormatter(slots=[prefix]) if prefix else EmptyFormatter(),
+        default_system=default_system,
+        stop_words=[],
+        thought_words=("<think>\n", "\n</think>\n\n"),
+        efficient_eos=False,
+        replace_eos=False,
+        enable_thinking=True,
+        mm_plugin=get_mm_plugin(name="base"),
+    )
+
+
 def get_template_and_fix_tokenizer(tokenizer: "PreTrainedTokenizer", template: str) -> "Template":
     r"""
     Gets chat template and fixes the tokenizer.
     """
 
-    template = TEMPLATES.get(template, None)
     if template is None:
-        raise ValueError(
-            "Template {} does not exist.".format(template))
+        if isinstance(tokenizer.chat_template, str):
+            logger.warning("`template` was not specified, try parsing the chat template from the tokenizer.")
+            template = parse_template(tokenizer)
+        else:
+            logger.warning("`template` was not specified, use `empty` template.")
+            template = TEMPLATES["empty"]  # placeholder
+    else:
+        template = TEMPLATES.get(template, None)
+        if template is None:
+            raise ValueError(
+                "Template {} does not exist.".format(template))
 
     stop_words = template.stop_words
     if template.replace_eos:

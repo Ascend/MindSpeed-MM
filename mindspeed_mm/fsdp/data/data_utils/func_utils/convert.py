@@ -353,6 +353,11 @@ class DataArguments(BaseArguments):
         metadata={
             "help": "Which template to use for constructing prompts in training and inference."},
     )
+    chat_template: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Which chat template file to use for constructing prompts in training and inference."},
+    )
     enable_thinking: Optional[bool] = field(
         default=True,
         metadata={"help": "Whether or not to enable thinking mode for reasoning models."},
@@ -881,3 +886,19 @@ def load_tokenizer(model_args: "ProcessorArguments") -> "TokenizerModule":
         processor = None
 
     return {"tokenizer": tokenizer, "processor": processor}
+
+
+def update_tokenizer_with_chat_template(tokenizer: "PreTrainedTokenizer", chat_template: str) -> "PreTrainedTokenizer":
+    r"""
+    Update tokenizer with custom chat_template file.
+    """
+
+    if not os.path.isfile(chat_template):
+        raise FileNotFoundError(f"The chat_template path {chat_template} does not exist or is not a file")
+
+    with open(chat_template, 'r', encoding='utf-8') as f:
+        chat_template_content = f.read()
+
+    logger.info("Apply custom chat_template %s to tokenizer.", chat_template)
+    tokenizer.chat_template = chat_template_content
+    return tokenizer

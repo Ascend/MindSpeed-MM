@@ -12,6 +12,7 @@ from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import (
     DatasetAttr,
     load_tokenizer,
     align_dataset,
+    update_tokenizer_with_chat_template,
     SupervisedDatasetProcessor,
     PackedSupervisedDatasetProcessor,
     PairwiseDatasetProcessor,
@@ -48,7 +49,14 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
 
     tokenizer_module = load_tokenizer(process_args)
     tokenizer, processor = tokenizer_module['tokenizer'], tokenizer_module['processor']
-    template = get_template_and_fix_tokenizer(tokenizer, data_args.template)
+
+    # chat_template的优先级高于template。如果chat_template和template同时为None，使用模型自带的chat_template
+    if data_args.chat_template is not None:
+        tokenizer = update_tokenizer_with_chat_template(tokenizer, data_args.chat_template)
+        template = get_template_and_fix_tokenizer(tokenizer, None)
+    else:
+        template = get_template_and_fix_tokenizer(tokenizer, data_args.template)
+
     # 确保主进程进行数据处理，其他进程复用缓存避免重复计算，该策略和llamafactory对数据处理策略一致
     with TrainingArguments(output_dir='./').main_process_first(desc="pre-process dataset"):
         # -----------------load dataset from file-------------------------------------------------------------------------
