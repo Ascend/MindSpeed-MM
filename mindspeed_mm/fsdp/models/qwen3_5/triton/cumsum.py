@@ -83,7 +83,13 @@ def chunk_local_cumsum_scalar(
         raise ValueError(
             f"chunk_size must be a power of 2, chunk_size is{chunk_size}"
         )
-    BT = triton.next_power_of_2((1 << 18) // (H * chunk_size))
+    # We adjust the tiling strategy to prevent overflow in in backward passes and context parallel scenarios
+    #  while maximizing UB utilization where possible.
+    # The tiling strategy is as follows:
+    # 1. BT must be greater than or equal to chunk_size.
+    # 2. UB estimation varies directly with H.
+    # 3. BT in reverse mode is smaller than in forward mode.
+    BT = max(chunk_size, triton.next_power_of_2((1 << 11 if reverse else 1 << 12) // H))
     chunk_indices = prepare_chunk_indices(cu_seqlens, BT) if cu_seqlens is not None else None
     NT = triton.cdiv(T, BT) if cu_seqlens is None else len(chunk_indices)
     g_org, g = g, torch.empty_like(g, dtype=output_dtype or g.dtype)
