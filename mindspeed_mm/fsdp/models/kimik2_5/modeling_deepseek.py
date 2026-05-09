@@ -50,6 +50,12 @@ from transformers.utils.import_utils import is_torch_fx_available
 
 from .configuration_deepseek import DeepseekV3Config
 
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+    split_forward_gather_backward_with_cp,
+    all_to_all
+)
+
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func
     from flash_attn.bert_padding import pad_input  # noqa
@@ -67,6 +73,41 @@ if is_torch_fx_available():
 logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "DeepseekV3Config"
+_TOTAL_SEQ_LEN = None
+_VISUAL_SEQ_LEN = None
+_VISUAL_PER_SEQ_LEN = None
+
+
+def set_seq_len(seq_type: str = None, seq_len: Optional[Union[int, List[int]]] = None) -> None:
+    if seq_type == "total":
+        global _TOTAL_SEQ_LEN
+        _TOTAL_SEQ_LEN = seq_len
+    elif seq_type == "visual":
+        global _VISUAL_SEQ_LEN
+        _VISUAL_SEQ_LEN = seq_len
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        _VISUAL_PER_SEQ_LEN = seq_len
+    else:
+        raise ValueError(
+            f"Invalid sequence type: '{seq_type}'. Expected 'total', 'visual' or 'per_visual'."
+        )
+
+
+def get_seq_len(seq_type: str = None) -> int:
+    if seq_type == "total":
+        global _TOTAL_SEQ_LEN
+        return _TOTAL_SEQ_LEN
+    elif seq_type == "visual":
+        global _VISUAL_SEQ_LEN
+        return _VISUAL_SEQ_LEN
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        return _VISUAL_PER_SEQ_LEN
+    else:
+        raise ValueError(
+            f"Invalid sequence type: '{seq_type}'. Expected 'total', 'visual' or 'per_visual'."
+        )
 
 
 # Modification start
@@ -280,6 +321,11 @@ class DeepseekV3RotaryEmbedding(nn.Module):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
+        ps = get_parallel_state()
+        is_ulysses_enabled = ps.is_ulysses_enable()
+        if is_ulysses_enabled:
+            seq_len = get_seq_len("total")
+
         if self.max_seq_len_cached is None or seq_len > self.max_seq_len_cached:
             self._set_cos_sin_cache(seq_len=seq_len,
                                     device=x.device,
@@ -945,12 +991,42 @@ class DeepseekV3Attention(nn.Module):
             key_states, value_states = past_key_value.update(
                 key_states, value_states, self.layer_idx, cache_kwargs)
 
-        # Modification  start， kimi性能优化，fa替换融合算子
+        # Modification: Context Parallel
+        ps = get_parallel_state()
+        is_ulysses_enabled = ps.is_ulysses_enable()
+        total_seq_len = get_seq_len("total")
+        q_head_num = query_states.shape[1]
+        kv_head_num = key_states.shape[1]
+
+        if is_ulysses_enabled:
+            # ulysses validation
+            ulysses_size = ps.get_ulysses_group_size()
+            if q_head_num % ulysses_size != 0:
+                raise ValueError(f"num_query_heads ({q_head_num}) must be divisible by ulysses_size ({ulysses_size})")
+            if ulysses_size > kv_head_num:
+                if ulysses_size % kv_head_num != 0:
+                    raise ValueError(f"ulysses_size ({ulysses_size}) must be divisible by num_key_value_heads ({kv_head_num})")
+                n_repeat = ulysses_size // kv_head_num
+                # Shape before: (batch_size, kv_head_num, seq_len, head_dim)
+                # This repeats the K/V heads (dim 1) to match the ulysses_size (SP world size)
+                # Shape after: (batch_size, kv_head_num * n_repeat, seq_len, head_dim) where (kv_head_num * n_repeat) == ulysses_size
+                key = torch.repeat_interleave(key, dim=1, repeats=n_repeat)
+                value = torch.repeat_interleave(value, dim=1, repeats=n_repeat)
+
+            query_states = all_to_all(query_states, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2, gather_size=total_seq_len)
+            key_states = all_to_all(key_states, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2, gather_size=total_seq_len)
+            value_states = all_to_all(value_states, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2, gather_size=total_seq_len)
+
+        # Obtain head_num and seq_len according to CP
+        head_num = query_states.shape[1]
+        seq_len = query_states.shape[2]
+
+        # Modification start, kimi性能优化, fa替换融合算子
         attn_output = torch_npu.npu_fusion_attention(
             query_states,
             key_states,
             value_states,
-            self.config.num_attention_heads,
+            head_num,
             pse=None,
             input_layout="BNSD",
             atten_mask=get_attn_mask_npu(device=query_states.device),
@@ -961,10 +1037,13 @@ class DeepseekV3Attention(nn.Module):
         attn_weights = None
         # Modification  end
 
-        if attn_output.size() != (bsz, self.num_heads, q_len, self.v_head_dim):
+        if attn_output.size() != (bsz, head_num, seq_len, self.v_head_dim):
             raise ValueError(
-                f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.v_head_dim)}, but is"
+                f"`attn_output` should be of size {(bsz, head_num, seq_len, self.v_head_dim)}, but is"
                 f" {attn_output.size()}")
+
+        if is_ulysses_enabled:
+            attn_output = all_to_all(attn_output, ps.get_ulysses_group(), scatter_dim=2, gather_dim=1)
 
         attn_output = attn_output.transpose(1, 2).contiguous()
 
@@ -1570,6 +1649,14 @@ class DeepseekV3Model(DeepseekV3PreTrainedModel):
                 inputs_embeds,
                 past_key_values_length,
             )
+
+        total_seq_len = inputs_embeds.shape[1]
+        set_seq_len("total", total_seq_len)
+
+        ps = get_parallel_state()
+        if ps.is_ulysses_enable():
+            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=1)
+            inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
 
         # embed positions
         hidden_states = inputs_embeds

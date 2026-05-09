@@ -67,8 +67,15 @@ from transformers.utils import is_flash_attn_2_available
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.models.base_model import WeightInitMixin
 from mindspeed_mm.fsdp.models.kimik2_5.configuration_kimi_k25 import KimiK25Config
-from mindspeed_mm.fsdp.models.kimik2_5.modeling_deepseek import DeepseekV3ForCausalLM
+from mindspeed_mm.fsdp.models.kimik2_5.modeling_deepseek import DeepseekV3ForCausalLM, set_seq_len, get_seq_len
 from mindspeed_mm.fsdp.utils.register import model_register
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+    all_to_all,
+    gather_forward_split_backward,
+    packed_data_split_forward_gather_backward_with_cp
+)
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
 
 _SIN = None
 _COS = None
@@ -126,12 +133,37 @@ def multihead_attention(
             where dim = num_heads * head_dim
     """
     # Modification start
+    ps = get_parallel_state()
+    is_ulysses_enabled = ps.is_ulysses_enable()
+    total_seq_len = get_seq_len("visual")
     head_num = q.shape[1]
+    kv_head_num = k.shape[1]
+
+    # ulysses validation
+    if is_ulysses_enabled:
+        ulysses_size = ps.get_ulysses_group_size()
+        if head_num % ulysses_size != 0:
+            raise ValueError(f"num_query_heads ({head_num}) must be divisible by ulysses_size ({ulysses_size})")
+        if ulysses_size > kv_head_num:
+            if ulysses_size % kv_head_num != 0:
+                raise ValueError(f"ulysses_size ({ulysses_size}) must be divisible by num_key_value_heads ({kv_head_num})")
+            n_repeat = ulysses_size // kv_head_num
+            # Shape before: (total_seq_len, kv_head_num, head_dim)
+            # This repeats the K/V heads (dim 1) to match the ulysses_size (SP world size)
+            # Shape after: (total_seq_len, kv_head_num * n_repeat, head_dim) where (kv_head_num * n_repeat) == ulysses_size
+            key = torch.repeat_interleave(key, dim=1, repeats=n_repeat)
+            value = torch.repeat_interleave(value, dim=1, repeats=n_repeat)
+
+    if is_ulysses_enabled:
+        q = all_to_all(q, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
+        k = all_to_all(k, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
+        v = all_to_all(v, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
+
     attn_out = torch_npu.npu_fusion_attention(
         q,
         k,
         v,
-        head_num,
+        head_num=q.shape[1],
         pse=None,
         atten_mask=None,
         scale=1.0 / math.sqrt(q.shape[-1]),
@@ -144,6 +176,9 @@ def multihead_attention(
 
     if isinstance(attn_out, tuple):
         attn_out = attn_out[0]
+
+    if is_ulysses_enabled:
+        attn_out = all_to_all(attn_out, ps.get_ulysses_group(), scatter_dim=0, gather_dim=1)
 
     attn_out = attn_out.flatten(start_dim=-2)
 
@@ -549,7 +584,7 @@ class MoonViTEncoderLayer(nn.Module):
             self.num_heads,
             self.hidden_size_per_attention_head,
         )
-        # xqkv: (batch_size, seqlen, 3, nheads, headdim)
+        # xqkv: (total_seqlen, 3, nheads, headdim)
         xqkv = xqkv.view(*qkv_shape)
         xq, xk, xv = torch.unbind(xqkv, dim=-3)
 
@@ -574,6 +609,7 @@ class MoonViTEncoderLayer(nn.Module):
         cu_seqlens: Union[tuple, torch.Tensor],
         max_seqlen: int,
         rope_freqs_cis: torch.Tensor | None = None,
+        **kwargs
     ):
         residual = hidden_states
         hidden_states = self.norm0(hidden_states)
@@ -629,6 +665,19 @@ class MoonViT3dEncoder(nn.Module):
         cu_seqlens = lengths.to(hidden_states.device).cumsum(dim=0,
                                                              dtype=torch.int32)
         cu_seqlens = tuple(cu_seqlens[1:].cpu().numpy().tolist())
+
+        # Modification start: ulysses cp
+        seq_len, _ = hidden_states.size()
+        sequence_lengths = torch.repeat_interleave(grid_thws[:, 1] * grid_thws[:, 2], grid_thws[:, 0]).cpu()
+        set_seq_len("visual", seq_len)
+        set_seq_len("per_visual", sequence_lengths)
+
+        ps = get_parallel_state()
+        # Split sequences across context parallel groups for distributed processing
+        if ps.is_cp_enable():
+            hidden_states = packed_data_split_forward_gather_backward_with_cp(hidden_states, dim=0, seq_lens=sequence_lengths)
+            rope_freqs_cis = packed_data_split_forward_gather_backward_with_cp(rope_freqs_cis, dim=0, seq_lens=sequence_lengths)
+
         cos = rope_freqs_cis.unsqueeze(-2).real.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
         sin = rope_freqs_cis.unsqueeze(-2).imag.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
         set_global_param("cos", cos)
@@ -638,6 +687,17 @@ class MoonViT3dEncoder(nn.Module):
                                   cu_seqlens,
                                   max_seqlen,
                                   rope_freqs_cis=rope_freqs_cis)
+
+        ps = get_parallel_state()
+        if ps.is_cp_enable():
+            gather_sizes = cal_split_sizes(get_seq_len("visual"), ps.get_ulysses_group_size())
+            hidden_states = gather_forward_split_backward(
+                hidden_states,
+                ps.get_ulysses_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes,
+            )
 
         hidden_states = self.final_layernorm(hidden_states)
         return hidden_states
@@ -1222,6 +1282,11 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
                     shift_labels.view(-1).to(shift_logits.device),
                 )
         # Modification：end
+
+        ps = get_parallel_state()
+        if ps.is_cp_enable():
+            loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0)
+            loss = loss.sum()
 
         if not return_dict:
             output = (logits, ) + outputs[1:]

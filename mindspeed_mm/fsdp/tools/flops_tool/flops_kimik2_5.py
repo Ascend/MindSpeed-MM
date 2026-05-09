@@ -47,7 +47,7 @@ def _preprocess_image(image, image_max_pixels, image_min_pixels):
     if image.mode != "RGB":
         image = image.convert("RGB")
 
-    width, height = max(image.width, 28), max(image.height, 28)  # # NOTE：htwang 需要与预处理逻辑对齐
+    width, height = max(image.width, 28), max(image.height, 28)
     image = image.resize((width, height), resample=Image.NEAREST)
 
     if image.width / image.height > 200:
@@ -309,7 +309,7 @@ if __name__ == "__main__":
 """
 示例:
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-python examples/kimik2_5/mfu.py \
+python mindspeed_mm/fsdp/tools/flops_tool/flops_kimik2_5.py \
     --batch_size 16 \
     --image_num 10 \
     --width 1024 \
