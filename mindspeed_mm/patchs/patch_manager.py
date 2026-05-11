@@ -27,8 +27,10 @@ from mindspeed_mm.patchs import (
 )
 from mindspeed_mm.patchs.layerwise_disaggregated_training import (
     schedules_patch,
+    training_patch,
     u_shaped_split_learning_patch,
-    vlm_model_patch
+    vlm_model_patch,
+    utils as vtp_utils,
 )
 
 
@@ -73,6 +75,13 @@ class PatchesManager:
             ("megatron.training.training.build_train_valid_test_datasets", u_shaped_split_learning_patch.build_train_valid_test_datasets_wrapper),
             ("megatron.training.training.setup_model_and_optimizer", vlm_model_patch.setup_model_and_optimizer),
             ("megatron.training.utils.print_rank_last", print_rank_0),
+            # VTP utility patches (hierarchical allreduce/barrier/all_gather)
+            ("megatron.core.optimizer.clip_grads.get_grad_norm_fp32", vtp_utils.vtp_get_grad_norm_fp32),
+            ("torch.distributed.barrier", vtp_utils.vtp_timer_barrier_wrapper),
+            ("torch.distributed.all_gather_into_tensor", vtp_utils.vtp_all_gather_into_tensor_wrapper),
+            ("megatron.training.utils.reduce_max_stat_across_model_parallel_group", vtp_utils.vtp_reduce_max_stat_across_model_parallel_group),
+            ("megatron.training.utils.logical_and_across_model_parallel_group", vtp_utils.vtp_logical_and_across_model_parallel_group),
+            ("mindspeed_mm.training.train_step", training_patch.train_step_wrapper),
         ],
     }
 

@@ -3,7 +3,7 @@
 import os
 import contextlib
 from datetime import timedelta
-from functools import partial
+from functools import partial, wraps, wraps
 from typing import Callable, List, Optional, Iterator, Union, Dict, Any
 
 import torch
@@ -58,6 +58,18 @@ stream_pang = None
 stream_last_to_first = None
 stream_first_to_last = None
 default_stream = None
+
+# VTP state and getters live in parallel_state_patch to avoid circular imports
+from mindspeed_mm.patchs.layerwise_disaggregated_training.parallel_state_patch import (
+    _init_vtp_state,
+    _create_vtp_groups,
+    is_vtp_enabled,
+    get_vtp_size_list,
+    get_vtp_stage_ranks,
+    get_vtp_intra_stage_group,
+    get_vtp_my_stage_idx,
+    is_vtp_stage_rank0,
+)
 
 
 def move_to_device(batch: Dict[str, Any], float_dtype: str):
@@ -208,13 +220,6 @@ def get_forward_backward_func():
     pipeline_model_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
     if pipeline_model_parallel_size > 1:
         forward_backward_func = forward_backward_pipelining_without_interleaving
-        group_initialize(
-            tensor_model_parallel_size=parallel_state.get_tensor_model_parallel_world_size(),
-            pipeline_model_parallel_size=parallel_state.get_pipeline_model_parallel_world_size(),
-            virtual_pipeline_model_parallel_size=parallel_state.get_virtual_pipeline_model_parallel_world_size(),
-            context_parallel_size=parallel_state.get_expert_model_parallel_world_size(),
-            expert_tensor_parallel_size=parallel_state.get_expert_tensor_parallel_world_size(),
-        )
     else:
         forward_backward_func = forward_backward_no_pipelining
 
@@ -241,6 +246,7 @@ def group_initialize(
     get_position_embedding_ranks: Optional[
         Callable[[List[int], Optional[int]], List[int]]
     ] = None,
+    **_kwargs,
 ) -> None:
     if encoder_pipeline_model_parallel_size is None:
         encoder_pipeline_model_parallel_size = 0
@@ -717,6 +723,387 @@ def get_pipeline_model_parallel_group_first_to_last():
     return _PIPELINE_MODEL_PARALLEL_GROUP_FOR_FIRST_TO_LAST
 
 
+def vtp_allreduce(tensor, op=torch.distributed.ReduceOp.SUM):
+    """VTP-aware hierarchical allreduce.
+
+    Replaces a flat cross-network allreduce on model_parallel_group
+    with a 3-step hierarchical reduction:
+      1. Intra-stage TP allreduce  (intra-node, fast)
+      2. Cross-stage PP allreduce  (rank0-only, cross-network)
+      3. Intra-stage broadcast     (from rank0, fast)
+    """
+    # Step 1: reduce within stage (TP group, intra-node)
+    if parallel_state.get_tensor_model_parallel_world_size() > 1:
+        torch.distributed.all_reduce(
+            tensor, op=op, group=parallel_state.get_tensor_model_parallel_group()
+        )
+
+    # Step 2: reduce across stages (PP group, rank0 only — cross-network)
+    if is_vtp_stage_rank0():
+        torch.distributed.all_reduce(
+            tensor, op=op, group=parallel_state.get_pipeline_model_parallel_group()
+        )
+
+    # Step 3: broadcast result to all ranks in stage
+    intra_group = get_vtp_intra_stage_group()
+    if intra_group is not None:
+        stage_ranks = get_vtp_stage_ranks()
+        my_stage = get_vtp_my_stage_idx()
+        torch.distributed.broadcast(
+            tensor, src=stage_ranks[my_stage][0], group=intra_group
+        )
+
+
+def vtp_hierarchical_barrier():
+    """VTP-aware hierarchical barrier (3-step sync)."""
+    # Step 1: TP barrier (intra-node)
+    if parallel_state.get_tensor_model_parallel_world_size() > 1:
+        torch.distributed.barrier(group=parallel_state.get_tensor_model_parallel_group())
+
+    # Step 2: PP barrier (cross-network, rank0 only)
+    if is_vtp_stage_rank0():
+        torch.distributed.barrier(group=parallel_state.get_pipeline_model_parallel_group())
+
+    # Step 3: Intra-stage barrier (intra-node)
+    intra_group = get_vtp_intra_stage_group()
+    if intra_group is not None:
+        torch.distributed.barrier(group=intra_group)
+
+
+def _auto_detect_vtp_sizes(args):
+    """Auto-detect VTP sizes from per-node GPU topology via all_gather.
+
+    Uses greedy packing: each stage occupies max_tp consecutive ranks,
+    aligned to node boundaries. A node can hold multiple stages if it has
+    enough cards. This supports the "one node, multiple stages" topology
+    (e.g. a cloud node with 8 cards hosting 4 PP stages at TP=2).
+
+    Returns:
+        list[int] or None: VTP sizes per stage if greedy packing succeeds
+        (stages fit within world_size at node boundaries), None otherwise.
+    """
+    world_size = getattr(args, 'world_size', torch.distributed.get_world_size())
+    local_ws = int(os.getenv('LOCAL_WORLD_SIZE', '0'))
+    if not local_ws:
+        local_ws = torch.cuda.device_count()
+
+    max_tp = args.tensor_model_parallel_size
+    pp = args.pipeline_model_parallel_size
+
+    # all_gather LOCAL_WORLD_SIZE from all ranks
+    local_ws_tensor = torch.tensor([local_ws], dtype=torch.long,
+                                   device=torch.cuda.current_device())
+    gathered = [torch.zeros(1, dtype=torch.long,
+                            device=torch.cuda.current_device())
+                for _ in range(world_size)]
+    torch.distributed.all_gather(gathered, local_ws_tensor)
+    all_local_ws = [int(t.item()) for t in gathered]
+
+    # Group ranks by node: (start_rank, local_world_size)
+    nodes = []
+    i = 0
+    while i < world_size:
+        node_lws = all_local_ws[i]
+        nodes.append((i, node_lws))
+        i += node_lws
+
+    # Greedy packing: assign stages sequentially, each taking max_tp cards.
+    # If the starting node has < max_tp cards, that stage gets min(remaining, max_tp)
+    # (e.g. edge node with 1 card gets a TP=1 stage). Nodes that cannot host a
+    # full stage are skipped. Remaining cards on the last node become idle.
+    vtp_sizes = []
+    stage_idx = 0
+    node_idx = 0
+    cards_left_in_node = nodes[0][1] if nodes else 0
+
+    for _ in range(pp):
+        # Advance to next node if current one is exhausted
+        while cards_left_in_node <= 0 and node_idx + 1 < len(nodes):
+            node_idx += 1
+            cards_left_in_node = nodes[node_idx][1]
+
+        if cards_left_in_node <= 0:
+            # No more cards left across all nodes
+            return None
+
+        # This stage takes as many cards as available (up to max_tp)
+        stage_tp = min(cards_left_in_node, max_tp)
+        vtp_sizes.append(stage_tp)
+        cards_left_in_node -= stage_tp
+
+    # After placing all stages, remaining cards on the last node become idle
+
+    if max(vtp_sizes) != max_tp:
+        return None
+
+    # All stages same TP → no VTP needed; let standard Megatron handle it
+    if len(set(vtp_sizes)) == 1:
+        return None
+
+    return vtp_sizes
+
+
+def _initialize_vtp_static(fn, vtp_sizes, orig_args, orig_kwargs, world_size=None):
+    """Initialize parallel state for static VTP with non-uniform TP sizes.
+
+    Strategy:
+    1. Call Megatron's init with TP=sum(sizes), PP=1 to pass validation
+    2. Override TP/PP/DP/model-parallel groups to match actual VTP layout
+    3. Create LDT alternate PP groups 
+    4. Initialize VTP state and communication groups
+
+    Args:
+        fn: Original initialize_model_parallel function
+        vtp_sizes: List of TP sizes per stage
+        orig_args, orig_kwargs: Arguments to pass to the original function
+        world_size: Optional override for world_size. If None, uses get_world_size().
+    """
+    vtp_model_size = sum(vtp_sizes)
+    pp_size = len(vtp_sizes)
+
+    if world_size is None:
+        world_size = torch.distributed.get_world_size()
+    rank = torch.distributed.get_rank()
+
+    if world_size > vtp_model_size:
+        # Idle ranks: ranks >= vtp_model_size do not participate in training
+        if rank >= vtp_model_size:
+            return
+        # world_size here equals the inflated value from pre_validate_args_for_vtp
+        # (sum of vtp_sizes), so the divisibility check below is always satisfied.
+    elif world_size % vtp_model_size != 0:
+        raise RuntimeError(
+            f"VTP static: world_size ({world_size}) is not divisible by "
+            f"sum(vtp_sizes) ({vtp_model_size})"
+        )
+    data_parallel_size = world_size // vtp_model_size
+
+    # Call Megatron's init with TP=sum, PP=1, VPP=None to pass validation
+    modified_args = (vtp_model_size, 1, None) + orig_args[3:]
+    modified_kwargs = dict(orig_kwargs)
+    if 'expert_tensor_parallel_size' in modified_kwargs:
+        modified_kwargs['expert_tensor_parallel_size'] = None
+    fn(*modified_args, **modified_kwargs)
+
+    # Build stage_ranks for each DP domain
+    all_domain_stages = []
+    for dp in range(data_parallel_size):
+        offset = dp * vtp_model_size
+        stages = []
+        for tp_size in vtp_sizes:
+            stages.append(list(range(offset, offset + tp_size)))
+            offset += tp_size
+        all_domain_stages.append(stages)
+
+    # Find current rank's position
+    my_dp = rank // vtp_model_size
+    my_stages = all_domain_stages[my_dp]
+    my_stage_idx = None
+    my_intra_rank = None
+    for idx, stage in enumerate(my_stages):
+        if rank in stage:
+            my_stage_idx = idx
+            my_intra_rank = stage.index(rank)
+            break
+
+    if my_stage_idx is None:
+        raise RuntimeError(
+            f"VTP static init: rank {rank} not found in any stage of domain {my_dp}. "
+            f"stages={my_stages}"
+        )
+    actual_tp = vtp_sizes[my_stage_idx]
+
+    # Parse config for group creation
+    nccl_comm_cfgs = {}
+    nccl_config_path = orig_kwargs.get('nccl_communicator_config_path', None)
+    if nccl_config_path:
+        import yaml
+        with open(nccl_config_path, 'r') as f:
+            nccl_comm_cfgs = yaml.safe_load(f)
+
+    timeout = timedelta(
+        minutes=orig_kwargs.get('distributed_timeout_minutes', 30)
+    )
+    backend = orig_kwargs.get('pipeline_model_parallel_comm_backend', None)
+
+    # Override TP groups
+    for domain_stages in all_domain_stages:
+        for stage in domain_stages:
+            group = torch.distributed.new_group(stage, timeout=timeout)
+            if rank in stage:
+                parallel_state._TENSOR_MODEL_PARALLEL_GROUP = group
+                parallel_state._TENSOR_MODEL_PARALLEL_GLOBAL_RANKS = stage
+    parallel_state._MPU_TENSOR_MODEL_PARALLEL_WORLD_SIZE = actual_tp
+    parallel_state._MPU_TENSOR_MODEL_PARALLEL_RANK = my_intra_rank
+
+    # Override PP groups: per-TP-intra-rank PP chains
+    pg_options = (
+        get_nccl_options('pp', nccl_comm_cfgs)
+        if backend != 'ucc' else None
+    )
+    global _PIPELINE_MODEL_PARALLEL_GROUP_ALTERNATE
+    global _PIPELINE_MODEL_PARALLEL_GROUP_FOR_LAST_TO_FIRST
+    global _PIPELINE_MODEL_PARALLEL_GROUP_FOR_FIRST_TO_LAST
+    for domain_stages in all_domain_stages:
+        rank0_list = [s[0] for s in domain_stages]
+        all_domain_ranks = [r for stage in domain_stages for r in stage]
+        max_intra = max(len(stage) for stage in domain_stages)
+
+        for intra in range(max_intra):
+            pp_chain = []
+            for stage in domain_stages:
+                if intra < len(stage):
+                    pp_chain.append(stage[intra])
+                else:
+                    pp_chain.append(stage[0])
+
+            group = torch.distributed.new_group(
+                pp_chain, timeout=timeout,
+                backend=backend, pg_options=pg_options,
+            )
+            group_alt = torch.distributed.new_group(
+                pp_chain, timeout=timeout,
+                backend=backend, pg_options=pg_options,
+            )
+
+            if rank in pp_chain:
+                is_rank0 = rank in rank0_list
+                if intra == 0 or not is_rank0:
+                    parallel_state._PIPELINE_MODEL_PARALLEL_GROUP = group
+                    parallel_state._PIPELINE_GLOBAL_RANKS = pp_chain
+                    _PIPELINE_MODEL_PARALLEL_GROUP_ALTERNATE = group_alt
+
+        # L2F/F2L groups: rank0-only
+        group_l2f = torch.distributed.new_group(
+            rank0_list, timeout=timeout, backend=backend, pg_options=pg_options,
+        )
+        group_f2l = torch.distributed.new_group(
+            rank0_list, timeout=timeout, backend=backend, pg_options=pg_options,
+        )
+        if rank in all_domain_ranks:
+            _PIPELINE_MODEL_PARALLEL_GROUP_FOR_LAST_TO_FIRST = group_l2f
+            _PIPELINE_MODEL_PARALLEL_GROUP_FOR_FIRST_TO_LAST = group_f2l
+
+    parallel_state._MPU_PIPELINE_MODEL_PARALLEL_WORLD_SIZE = pp_size
+    parallel_state._MPU_PIPELINE_MODEL_PARALLEL_RANK = my_stage_idx
+
+    # Override model-parallel group
+    for domain_stages in all_domain_stages:
+        all_ranks = [r for stage in domain_stages for r in stage]
+        group = torch.distributed.new_group(all_ranks, timeout=timeout)
+        if rank in all_ranks:
+            parallel_state._MODEL_PARALLEL_GROUP = group
+            parallel_state._MODEL_PARALLEL_GLOBAL_RANKS = all_ranks
+
+    # Override DP groups if DP > 1
+    if data_parallel_size > 1:
+        create_gloo = orig_kwargs.get('create_gloo_process_groups', True)
+        for stage_idx in range(pp_size):
+            for intra in range(vtp_sizes[stage_idx]):
+                dp_ranks = [
+                    all_domain_stages[dp][stage_idx][intra]
+                    for dp in range(data_parallel_size)
+                ]
+                g_nccl = torch.distributed.new_group(
+                    dp_ranks, timeout=timeout
+                )
+                g_gloo = (
+                    torch.distributed.new_group(
+                        dp_ranks, timeout=timeout, backend='gloo'
+                    )
+                    if create_gloo else None
+                )
+                if rank in dp_ranks:
+                    parallel_state._DATA_PARALLEL_GROUP = g_nccl
+                    parallel_state._DATA_PARALLEL_GROUP_GLOO = g_gloo
+                    parallel_state._DATA_PARALLEL_GLOBAL_RANKS = dp_ranks
+        parallel_state._MPU_DATA_PARALLEL_WORLD_SIZE = data_parallel_size
+        parallel_state._MPU_DATA_PARALLEL_RANK = my_dp
+
+    # Update args to reflect actual parallelism for this rank
+    cli_args = get_args()
+    cli_args.tensor_model_parallel_size = actual_tp
+    cli_args.data_parallel_size = data_parallel_size
+
+    # Restore VPP that was cleared for the Megatron init call
+    orig_vpp = orig_args[2] if len(orig_args) > 2 else None
+    if orig_vpp is not None:
+        parallel_state._VIRTUAL_PIPELINE_MODEL_PARALLEL_WORLD_SIZE = orig_vpp
+        parallel_state._VIRTUAL_PIPELINE_MODEL_PARALLEL_RANK = 0
+
+    # Initialize VTP state and communication groups
+    _init_vtp_state(True, vtp_sizes, my_stages)
+    _create_vtp_groups(my_stages, timeout, backend)
+
+
+def initialize_model_parallel_wrapper(fn):
+    """Wrapper for megatron.core.parallel_state.initialize_model_parallel.
+
+    Auto-detects VTP sizes from per-node GPU topology when LDT is enabled.
+    If non-uniform TP is detected, uses _initialize_vtp_static instead of
+    the standard Megatron init path.
+
+    For the standard (non-VTP) path, also creates the LDT alternate PP
+    groups after Megatron init,
+    mirroring MindSpeed-LLM's initialize_model_parallel_impl pattern.
+    """
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        cli_args = get_args()
+
+        vtp_sizes = None
+        ldt = getattr(cli_args, 'layerwise_disaggregated_training', False)
+        if ldt:
+            vtp_sizes = _auto_detect_vtp_sizes(cli_args)
+
+        if vtp_sizes and len(set(vtp_sizes)) > 1:
+            # Pass real distributed world_size. _initialize_vtp_static will handle
+            _initialize_vtp_static(fn, vtp_sizes, args, kwargs,
+                                    world_size=torch.distributed.get_world_size())
+            return
+
+        fn(*args, **kwargs)
+
+        # Create LDT alternate PP groups after standard Megatron init,
+        # using the same original arguments that were passed to
+        # initialize_model_parallel (not from parallel_state getters).
+        if ldt:
+            group_initialize(*args, **kwargs)
+
+    return wrapper
+
+
+def pre_validate_args_for_vtp(args):
+    """Inflate world_size so Megatron's divisibility validation passes.
+
+    This only affects the _validate_args pass. The wrapper (which runs after)
+    uses the real world_size and calls Megatron init directly without going
+    through the validation path again.
+
+    Caller is responsible for guarding with
+    ``args.layerwise_disaggregated_training`` before invoking.
+    """
+    world_size = getattr(args, 'world_size', None)
+    if world_size is None:
+        return
+    tp = args.tensor_model_parallel_size
+    pp = args.pipeline_model_parallel_size
+    cp = getattr(args, 'context_parallel_size', 1) or 1
+    expected = tp * pp * cp
+    if world_size % expected == 0:
+        return
+    args._vtp_orig_world_size = world_size
+    args.world_size = expected
+
+
+def post_validate_args_for_vtp(args):
+    """Restore real world_size after Megatron validation."""
+    orig = getattr(args, '_vtp_orig_world_size', None)
+    if orig is not None:
+        args.world_size = orig
+        del args._vtp_orig_world_size
+
+
 def forward_step_impl(data_iterator, model, batch=None):
     """Forward step."""
     is_vit_last_stage = False
@@ -982,6 +1369,94 @@ def send_backward(
         p2p_communication_patch.send_backward(input_tensor_grad, config, is_end_stage, **kwargs)
 
 
+# ──────────────────────────────────────────────────────────────
+# VTP schedule wrapper functions
+# ──────────────────────────────────────────────────────────────
+
+def _vtp_send_forward_wrapper(output_tensors, tensor_shapes, config, group, is_end_stage=False):
+    """VTP-aware forward send: uses rank0 async P2P. Returns isend work handles."""
+    if not isinstance(output_tensors, list):
+        output_tensors = [output_tensors]
+    handles = []
+    for output_tensor, tensor_shape in zip(output_tensors, tensor_shapes):
+        if tensor_shape is None:
+            continue
+        h = p2p_communication_patch._vtp_send_forward(output_tensor, config, group)
+        if h is not None:
+            handles.append(h)
+    return handles
+
+
+def _vtp_recv_forward_wrapper(tensor_shapes, config, group, async_op=False, is_end_stage=False):
+    """VTP-aware forward recv: uses rank0 irecv + deferred broadcast.
+
+    When async_op=True, returns (input_tensors, reqs_list) for overlap with compute.
+    When async_op=False, blocks until recv + broadcast complete.
+    """
+    input_tensors = []
+    reqs_list = []
+    for tensor_shape in tensor_shapes:
+        if tensor_shape is None:
+            input_tensors.append(None)
+        else:
+            if async_op:
+                tensor, reqs = p2p_communication_patch._vtp_recv_forward(
+                    tensor_shape, config, group, async_op=True
+                )
+                input_tensors.append(tensor)
+                reqs_list.append(reqs)
+            else:
+                tensor = p2p_communication_patch._vtp_recv_forward(
+                    tensor_shape, config, group, async_op=False
+                )
+                input_tensors.append(tensor)
+    if async_op:
+        return input_tensors, reqs_list
+    return input_tensors
+
+
+def _vtp_send_backward_wrapper(input_tensor_grads, tensor_shapes, config, group, is_end_stage=False):
+    """VTP-aware backward send: uses rank0 async P2P. Returns isend work handles."""
+    if not isinstance(input_tensor_grads, list):
+        input_tensor_grads = [input_tensor_grads]
+    handles = []
+    for input_tensor_grad, tensor_shape in zip(input_tensor_grads, tensor_shapes):
+        if tensor_shape is None:
+            continue
+        h = p2p_communication_patch._vtp_send_backward(input_tensor_grad, config, group)
+        if h is not None:
+            handles.append(h)
+    return handles
+
+
+def _vtp_recv_backward_wrapper(tensor_shapes, config, group, async_op=False, is_end_stage=False):
+    """VTP-aware backward recv: uses rank0 irecv + deferred broadcast.
+
+    When async_op=True, returns (output_tensor_grads, reqs_list) for overlap.
+    When async_op=False, blocks until recv + broadcast complete.
+    """
+    output_tensor_grads = []
+    reqs_list = []
+    for tensor_shape in tensor_shapes:
+        if tensor_shape is None:
+            output_tensor_grads.append(None)
+        else:
+            if async_op:
+                tensor, reqs = p2p_communication_patch._vtp_recv_backward(
+                    tensor_shape, config, group, async_op=True
+                )
+                output_tensor_grads.append(tensor)
+                reqs_list.append(reqs)
+            else:
+                tensor = p2p_communication_patch._vtp_recv_backward(
+                    tensor_shape, config, group, async_op=False
+                )
+                output_tensor_grads.append(tensor)
+    if async_op:
+        return output_tensor_grads, reqs_list
+    return output_tensor_grads
+
+
 def get_all_batchs(mbn, data_iterator, model, config):
 
     device = f"npu:{torch.cuda.current_device()}"
@@ -994,8 +1469,21 @@ def get_all_batchs(mbn, data_iterator, model, config):
 
     def _broadcast(item):
         if item is not None:
-            torch.distributed.broadcast(item, parallel_state.get_pipeline_model_parallel_first_rank(),
-                                        group=parallel_state.get_pipeline_model_parallel_group())
+            if is_vtp_enabled():
+                # VTP path: only rank0 of each VTP stage participates in PP broadcast
+                if is_vtp_stage_rank0():
+                    torch.distributed.broadcast(item, parallel_state.get_pipeline_model_parallel_first_rank(),
+                                                group=parallel_state.get_pipeline_model_parallel_group())
+                # Intra-stage broadcast: rank0 sends to other ranks in the stage
+                vtp_intra_group = get_vtp_intra_stage_group()
+                if vtp_intra_group is not None:
+                    stage_ranks = get_vtp_stage_ranks()
+                    my_stage = get_vtp_my_stage_idx()
+                    torch.distributed.broadcast(item, stage_ranks[my_stage][0], group=vtp_intra_group)
+            else:
+                # Non-VTP (LDT) path: use standard broadcast from first PP rank
+                torch.distributed.broadcast(item, parallel_state.get_pipeline_model_parallel_first_rank(),
+                                            group=parallel_state.get_pipeline_model_parallel_group())
     
     def get_batch_infos(attention_infos, thws, shapes, i_forward):
         seq_len, mbs = shapes[i_forward][0][0], shapes[i_forward][0][1]
@@ -1246,6 +1734,32 @@ def forward_backward_pipelining_without_interleaving(
             send_forward_stream = stream_last_to_first
             send_forward_group = group_last_to_first
 
+    # VTP: detect asymmetric boundaries (including U-shape wraparound)
+    vtp_active = is_vtp_enabled()
+    vtp_need_asymmetric_fwd = False
+    vtp_need_asymmetric_bwd = False
+    vtp_send_forward_group = None
+    vtp_recv_forward_group = None
+    vtp_send_backward_group = None
+    vtp_recv_backward_group = None
+
+    if vtp_active:
+        vtp_size_list = get_vtp_size_list()
+        my_stage = get_vtp_my_stage_idx()
+        pp_size = parallel_state.get_pipeline_model_parallel_world_size()
+
+        # Check forward/backward asymmetric boundaries with wraparound
+        next_stage = (my_stage + 1) % pp_size
+        prev_stage = (my_stage - 1) % pp_size
+        vtp_need_asymmetric_fwd = vtp_size_list[my_stage] != vtp_size_list[next_stage]
+        vtp_need_asymmetric_bwd = vtp_size_list[my_stage] != vtp_size_list[prev_stage]
+
+    if vtp_need_asymmetric_fwd or vtp_need_asymmetric_bwd:
+        vtp_send_forward_group = send_forward_group
+        vtp_recv_forward_group = receive_forward_group
+        vtp_send_backward_group = send_backward_group
+        vtp_recv_backward_group = receive_backward_group
+
     if not isinstance(receive_forward_group, list):
         receive_forward_group = [receive_forward_group]
     if not isinstance(receive_backward_group, list):
@@ -1255,7 +1769,17 @@ def forward_backward_pipelining_without_interleaving(
     if not isinstance(send_backward_group, list):
         send_backward_group = [send_backward_group]
 
+    # VTP async send handles: isend work objects collected from VTP wrappers.
+    # Drained inside wait_helper() so sends overlap with next recv + compute.
+    _vtp_pending_sends = []
+
+    def _drain_vtp_sends():
+        for h in _vtp_pending_sends:
+            h.wait()
+        _vtp_pending_sends.clear()
+
     def wait_helper(reqs_list):
+        _drain_vtp_sends()
         is_wait = False
         recv_prev = False
         for reqs in reqs_list:
@@ -1276,7 +1800,19 @@ def forward_backward_pipelining_without_interleaving(
     def send_forward_with_stream(output_tensor, send_tensor_shapes, config, is_end_stage=False, **kwargs):
         with torch.cuda.stream(send_forward_stream):
             send_forward_stream.wait_stream(default_stream)
-            send_forward(output_tensor, send_tensor_shapes, config, is_end_stage, **kwargs)
+            if vtp_need_asymmetric_fwd:
+                # LDT: first stage + end_stage = end of U-shape forward, no send
+                if (parallel_state.is_pipeline_first_stage(ignore_virtual=True)
+                        and is_end_stage):
+                    return
+                handles = _vtp_send_forward_wrapper(
+                    output_tensor, send_tensor_shapes, config,
+                    group=vtp_send_forward_group,
+                    is_end_stage=is_end_stage,
+                )
+                _vtp_pending_sends.extend(handles)
+            else:
+                send_forward(output_tensor, send_tensor_shapes, config, is_end_stage, **kwargs)
             if output_tensor is not None:
                 if isinstance(output_tensor, list):
                     for output_tensor_i in output_tensor:
@@ -1287,10 +1823,42 @@ def forward_backward_pipelining_without_interleaving(
     
     def recv_forward_with_stream(recv_tensor_shapes, config, is_end_stage=False, **kwargs):
         with torch.cuda.stream(receive_forward_stream):
-            input_tensor, reqs_list = recv_forward_with_reqs(recv_tensor_shapes, config, is_end_stage, **kwargs)
-            for input_tensor_i in input_tensor:
-                if input_tensor_i is not None:
-                    input_tensor_i.record_stream(default_stream)
+            if vtp_need_asymmetric_bwd:
+                # First stage doesn't recv in normal forward (only in wraparound)
+                if (parallel_state.is_pipeline_first_stage(ignore_virtual=True)
+                        and not is_end_stage):
+                    default_stream.wait_stream(receive_forward_stream)
+                    if kwargs.get("wait_on_reqs", True):
+                        return [None]
+                    return [None], []
+                # VTP async path: irecv (non-blocking) + deferred broadcast
+                vtp_group = vtp_recv_forward_group
+                wait_on_reqs = kwargs.get("wait_on_reqs", True)
+
+                if wait_on_reqs:
+                    input_tensor = _vtp_recv_forward_wrapper(
+                        recv_tensor_shapes, config, group=vtp_group,
+                        async_op=False, is_end_stage=is_end_stage,
+                    )
+                    for input_tensor_i in input_tensor:
+                        if input_tensor_i is not None:
+                            input_tensor_i.record_stream(default_stream)
+                    default_stream.wait_stream(receive_forward_stream)
+                    return input_tensor
+                else:
+                    input_tensor, reqs_list = _vtp_recv_forward_wrapper(
+                        recv_tensor_shapes, config, group=vtp_group,
+                        async_op=True, is_end_stage=is_end_stage,
+                    )
+                    for input_tensor_i in input_tensor:
+                        if input_tensor_i is not None:
+                            input_tensor_i.record_stream(default_stream)
+                    return input_tensor, reqs_list
+            else:
+                input_tensor, reqs_list = recv_forward_with_reqs(recv_tensor_shapes, config, is_end_stage, **kwargs)
+                for input_tensor_i in input_tensor:
+                    if input_tensor_i is not None:
+                        input_tensor_i.record_stream(default_stream)
         if 'wait_on_reqs' in kwargs.keys():
             if kwargs['wait_on_reqs'] is True:
                 default_stream.wait_stream(receive_forward_stream)
@@ -1303,7 +1871,19 @@ def forward_backward_pipelining_without_interleaving(
     def send_backward_with_stream(input_tensor_grad, recv_tensor_shapes, config, is_end_stage=False, **kwargs):
         with torch.cuda.stream(send_backward_stream):
             send_backward_stream.wait_stream(default_stream)
-            send_backward(input_tensor_grad, recv_tensor_shapes, config, is_end_stage, **kwargs)
+            if vtp_need_asymmetric_bwd:
+                # First stage doesn't send backward in normal backward
+                if (parallel_state.is_pipeline_first_stage(ignore_virtual=True)
+                        and not is_end_stage):
+                    return
+                handles = _vtp_send_backward_wrapper(
+                    input_tensor_grad, recv_tensor_shapes, config,
+                    group=vtp_send_backward_group,
+                    is_end_stage=is_end_stage,
+                )
+                _vtp_pending_sends.extend(handles)
+            else:
+                send_backward(input_tensor_grad, recv_tensor_shapes, config, is_end_stage, **kwargs)
             if input_tensor_grad is not None:
                 if isinstance(input_tensor_grad, list):
                     for input_tensor_grad_i in input_tensor_grad:
@@ -1314,12 +1894,42 @@ def forward_backward_pipelining_without_interleaving(
     
     def recv_backward_with_stream(recv_tensor_shapes, config, is_end_stage=False, **kwargs):
         with torch.cuda.stream(receive_backward_stream):
-            output_tensor_grad, reqs_list = recv_backward_with_reqs(
-                recv_tensor_shapes, config, is_end_stage, **kwargs
-                )
-            for output_tensor_grad_i in output_tensor_grad:
-                if output_tensor_grad_i is not None:
-                    output_tensor_grad_i.record_stream(default_stream)
+            if vtp_need_asymmetric_fwd:
+                # LDT: first stage + end_stage = no backward recv
+                if (parallel_state.is_pipeline_first_stage(ignore_virtual=True)
+                        and is_end_stage):
+                    default_stream.wait_stream(receive_backward_stream)
+                    return [None], []
+                # VTP async path for backward recv
+                vtp_group = vtp_recv_backward_group
+                wait_on_reqs = kwargs.get("wait_on_reqs", True)
+
+                if wait_on_reqs:
+                    output_tensor_grad = _vtp_recv_backward_wrapper(
+                        recv_tensor_shapes, config, group=vtp_group,
+                        async_op=False, is_end_stage=is_end_stage,
+                    )
+                    for output_tensor_grad_i in output_tensor_grad:
+                        if output_tensor_grad_i is not None:
+                            output_tensor_grad_i.record_stream(default_stream)
+                    default_stream.wait_stream(receive_backward_stream)
+                    return output_tensor_grad, []
+                else:
+                    output_tensor_grad, reqs_list = _vtp_recv_backward_wrapper(
+                        recv_tensor_shapes, config, group=vtp_group,
+                        async_op=True, is_end_stage=is_end_stage,
+                    )
+                    for output_tensor_grad_i in output_tensor_grad:
+                        if output_tensor_grad_i is not None:
+                            output_tensor_grad_i.record_stream(default_stream)
+                    return output_tensor_grad, reqs_list
+            else:
+                output_tensor_grad, reqs_list = recv_backward_with_reqs(
+                    recv_tensor_shapes, config, is_end_stage, **kwargs
+                    )
+                for output_tensor_grad_i in output_tensor_grad:
+                    if output_tensor_grad_i is not None:
+                        output_tensor_grad_i.record_stream(default_stream)
         default_stream.wait_stream(receive_backward_stream)
         return output_tensor_grad, reqs_list
     
@@ -1760,6 +2370,9 @@ def forward_backward_pipelining_without_interleaving(
 
     if config.timers is not None:
         config.timers('forward-backward').stop()
+
+    # Drain any remaining VTP async sends before returning.
+    _drain_vtp_sends()
 
     if hasattr(config, 'enable_cuda_graph') and config.enable_cuda_graph:
         create_cudagraphs()
