@@ -19,6 +19,7 @@
 
 - 原始样本不上云：PP并行支持模型U-shape切分，模型首尾层同时部署在边侧，云侧无需读取样本；
 - 跨域协同训练性能优化：通过流水编排优化和计算通信掩盖，实现边云跨域连接场景的高效训练。
+- 边云卡数不一致：支持 TP 不对等的p2p通信模式，实现边侧与云侧卡数不一致的训练；
 
 ### 方案原理
 
@@ -61,25 +62,59 @@
 
 效果：以上流水编排方案可保证稳态运行阶段（steady state）不引入额外空泡。当边云通信时延小于 tf（边侧单个microbatch的前向计算时间）时，稳态运行阶段无额外空泡（warmup/cooldown阶段有少量额外空泡）。
 
+### 非对称TP
+
+功能说明：针对边侧算力卡数量不足的情况，支持边侧TP小于云侧TP。
+
+非对称TP实现逻辑：在对称TP的P2P通信模式下，每张卡会与同一PP组上的相邻卡进行通信（以PP=2，TP=8为例，前向传播通信方式为0->8, 1->9, 2->10, ...）。不同于对称TP，非对称TP的P2P通信模式如下：
+
+- 步骤1：当前TP组内编号最小的卡将数据传输给下一个TP组内编号最小的卡；
+- 步骤2：下一TP组内编号最小的卡在接收到数据后，通过broadcast将数据共享给TP组内的全部卡。
+
+案例：PP=2，TP=8，对称TP
+
+![image](../../../sources/images/layerwise_disaggregated_training/ldt_tp.png 'ldt_tp.png') 
+
+案例：PP=2，TP=4/TP=8，非对称TP
+
+![image](../../../sources/images/layerwise_disaggregated_training/ldt_vtp.png 'ldt_vtp.png') 
+
+效果：由于在进行P2P通信之前，megatron现有逻辑会提前在TP组内完成AR通信，因此仅通过单卡进行通信即可将完整的数据传递给下一级PP，以上P2P通信方式可保证非对称TP下跨流水线层级通信的正确性。
+
 ## 使用方法
 
-由于边云协同分布式训练特性当前仅支持Qwen2.5VL系列模型，因此本文档以Qwen2.5VL-32B-Instruct模型为例（PP=8，vit隐藏层数32层，llm隐藏层数64层）介绍使能方法，具体步骤如下：
+本文档以Qwen2.5VL-32B-Instruct模型为例（VIT隐藏层数32层，LLM隐藏层数64层）介绍边云特性使能方法，具体步骤如下：
 
 1. 参考[MindSpeed MM安装指导](../install_guide.md)，完成环境安装。
 
 2. 从Hugging Face库下载对应的模型权重[Qwen2.5-VL-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct)，放至./ckpt/hf_path路径下。
 
 3. 进行权重转换，将HF权重转换成Megatron-Mcore格式。
+    
+    开启边云特性后，支持边侧卡数小于云侧TP size，此时边侧TP size即为边侧卡数。在进行权重转换时，边侧和云侧分别使用各自的TP size来进行转换。
 
-    调用方法hf_to_mm_ldt生成U-shape切分模型权重。
+    以边侧2卡，云侧16卡为例，按照PP=5，边侧TP=2，云侧TP=4来进行权重转换的具体步骤如下。
+
+    步骤一：边侧按照TP=2，PP=5来进行权重转换
 
     ```json
     mm-convert Qwen2_5_VLConverter hf_to_mm_ldt \
-    --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-32B-Instruct" \
+    --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-32B-Instruct-edge" \
     --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-32B-Instruct" \
-    --cfg.parallel_config.llm_pp_layers [[1,9,9,9,9,9,9,8],[1,0,0,0,0,0,0,0]] \
-    --cfg.parallel_config.vit_pp_layers [[32,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]] \
+    --cfg.parallel_config.llm_pp_layers [[0,16,16,16,16],[0,0,0,0,0]] \
+    --cfg.parallel_config.vit_pp_layers [[32,0,0,0,0],[0,0,0,0,0]] \
     --cfg.parallel_config.tp_size 2
+    ```
+ 
+    步骤二：云侧按照TP=4，PP=5来进行权重转换
+
+    ```json
+    mm-convert Qwen2_5_VLConverter hf_to_mm_ldt \
+    --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-32B-Instruct-cloud" \
+    --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-32B-Instruct" \
+    --cfg.parallel_config.llm_pp_layers [[0,16,16,16,16],[0,0,0,0,0]] \
+    --cfg.parallel_config.vit_pp_layers [[32,0,0,0,0],[0,0,0,0,0]] \
+    --cfg.parallel_config.tp_size 4
     ```
 
     各参数解析如下：
@@ -92,7 +127,7 @@
     | `--cfg.parallel_config.vit_pp_layers`  | VIT模块PP切分每张卡上切分几层 (required, type: list[Annotated[int, Ge(ge=0)]])          | 是   |
     | `--cfg.parallel_config.tp_size` | TP切分大小    | 是   |
 
-    通过--cfg.parallel_config.llm_pp_layers指定各级流水线的隐藏层数，两个子列表中的首个元素表示流水线头尾上部署的llm隐藏层数，实际部署时会部署在一起。
+    通过--cfg.parallel_config.llm_pp_layers指定各级流水线的隐藏层数，两个子列表中的首个元素表示流水线头尾上部署的llm隐藏层数，实际部署时会部署在同一张卡。
 
 4. 数据集下载（以COCO2017数据集为例）
 
@@ -126,18 +161,18 @@
     }
     ```
 
-    同时在模型配置文件examples/qwen2.5vl/model_32b.json中修改以下参数以配置非均匀PP切分。按照以下方法配置vision_encoder和text_decoder的pipeline_num_layers参数，实际部署方式为：首级流水线上部署32层vit+text_decoder头部隐藏层\*1+text_decoder尾部隐藏层\*1，其余流水线上部署text_decoder的中间隐藏层，层数为9,9,9,9,9,9,8。
+    同时在模型配置文件examples/qwen2.5vl/model_32b.json中修改以下参数以配置非均匀PP切分。按照以下方法配置vision_encoder和text_decoder的pipeline_num_layers参数，实际部署方式为：首级流水线上部署32层vit+text_decoder embedding 层+text_decoder unembedding层，其余流水线上部署text_decoder的中间隐藏层，层数为 16,16,16,16。
 
     ```json
     {
         "image_encoder": {
             "vision_encoder": {
-                "pipeline_num_layers": [[32, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]],
+                "pipeline_num_layers": [[32, 0, 0, 0, 0], [0, 0, 0, 0, 0]],
                 ...
             },
         },
         "text_decoder": {
-            "pipeline_num_layers": [[1, 9, 9, 9, 9, 9, 9, 8], [1, 0, 0, 0, 0, 0, 0, 0]],
+            "pipeline_num_layers": [[0, 16, 16, 16, 16],[0, 0, 0, 0, 0]],
             ...
         },
         ...
