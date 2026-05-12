@@ -48,150 +48,41 @@ MindSpeed-MM训练逻辑整体沿用Megatron风格，各类模型统一使用 ``
 📁结构概览
 :::::::::::::
 
-.. raw:: html
+.. list-table::
+   :header-rows: 1
 
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            /* 基础表格样式 */
-            table {
-                width: 100%;
-                border-collapse: collapse; /* 合并边框，使线条更细 */
-                margin: 20px 0;
-                font-family: sans-serif;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.05); /* 添加轻微阴影 */
-            }
-
-            /* 表头样式 */
-            thead th {
-                background-color: #2c3e50; /* 深色背景 */
-                color: white;
-                padding: 12px 15px;
-                text-align: left;
-                font-weight: bold;
-                border-bottom: 3px solid #3498db; /* 底部边框 */
-            }
-
-            /* 单元格通用样式 */
-            td, tbody th {
-                padding: 12px 15px;
-                border: 1px solid #ddd; /* 浅灰色边框 */
-                vertical-align: top; /* 内容顶部对齐 */
-                line-height: 1.5;
-            }
-
-            /* 模块类型列样式 (第一列) */
-            td:first-child,
-            tbody th {
-                background-color: #f8f9fa; /* 轻微灰色背景 */
-                font-weight: bold;
-                color: #2c3e50;
-            }
-
-            /* 行交替背景色，提高可读性 */
-            tbody tr:nth-child(even) {
-                background-color: #f8f9fa;
-            }
-            tbody tr:hover {
-                background-color: #e9f7fe; /* 悬停高亮 */
-            }
-
-            /* 代码块样式 */
-            code {
-                background-color: #eee;
-                font-family: 'Courier New', Courier, monospace;
-                padding: 2px 6px;
-                border-radius: 3px;
-                color: #c7254e;
-                font-size: 0.9em;
-            }
-
-            /* 标题样式 */
-            caption {
-                font-size: 1.5em;
-                font-weight: bold;
-                margin: 10px 0;
-                color: #2c3e50;
-            }
-        </style>
-    </head>
-    <body>
-        <table>
-            <thead>
-                <tr>
-                    <th>模块类型</th>
-                    <th>子模块/文件</th>
-                    <th>路径</th>
-                    <th>功能描述</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                <!-- 训练入口文件 -->
-                <tr>
-                    <td rowspan="1"><strong>训练入口文件</strong></td>
-                    <td>主训练脚本</td>
-                    <td><code>pretrain_xxx.py</code> (根目录)</td>
-                    <td>如 pretrain_sora.py, pretrain_vlm.py 等</td>
-                </tr>
-
-                <!-- 示例配置目录 -->
-                <tr>
-                    <td rowspan="4"><strong>示例配置目录</strong></td>
-                    <td>模型配置目录</td>
-                    <td><code>examples/</code>(根目录)</td>
-                    <td>特定模型的训练配置目录，如 examples/qwen3vl/</td>
-                </tr>
-                <tr>
-                    <td>数据配置文件</td>
-                    <td><code>examples/model_name/data.json</code></td>
-                    <td>定义数据集路径、预处理方式、数据增强策略等</td>
-                </tr>
-                <tr>
-                    <td>模型配置文件</td>
-                    <td><code>examples/model_name/model.json</code></td>
-                    <td>定义模型架构、参数等</td>
-                </tr>
-                <tr>
-                    <td>启动脚本</td>
-                    <td><code>examples/model_name/pretrain.sh</code></td>
-                    <td>训练启动脚本，包含执行命令和参数设置</td>
-                </tr>
-
-                <!-- 核心源码目录 -->
-                <tr>
-                    <td rowspan="5"><strong>核心源码目录</strong></td>
-                    <td>数据处理模块</td>
-                    <td><code>mindspeed_mm/data/</code></td>
-                    <td>数据加载、预处理、增强、采样等功能实现</td>
-                </tr>
-                <tr>
-                    <td>模型结构模块</td>
-                    <td><code>mindspeed_mm/model/</code></td>
-                    <td>各种模型组件的实现，包括编码器、解码器、视觉模块等</td>
-                </tr>
-                <!-- 注意：此处示例中“核心源码目录”只列出了2个子模块，但rowspan为5。 -->
-                <!-- 如需完整，应在此处补充另外3个空的或实际内容的 <tr> -->
-            </tbody>
-        </table>
-
-        <script>
-            // （可选）添加简单的交互效果，例如点击行高亮
-            document.addEventListener('DOMContentLoaded', function() {
-                const rows = document.querySelectorAll('tbody tr');
-                rows.forEach(row => {
-                    row.addEventListener('click', function() {
-                        // 切换一个高亮类
-                        this.classList.toggle('selected-row');
-                    });
-                });
-            });
-        </script>
-    </body>
-    </html>
+   * - 模块类型
+     - 子模块/文件
+     - 路径
+     - 功能描述
+   * - **训练入口文件**
+     - 主训练脚本
+     - ``pretrain_xxx.py`` (根目录)
+     - 如 pretrain_sora.py, pretrain_vlm.py 等
+   * - **示例配置目录**
+     - 模型配置目录
+     - ``examples/``(根目录)
+     - 特定模型的训练配置目录，如 examples/qwen3vl/
+   * - **示例配置目录**
+     - 数据配置文件
+     - ``examples/model_name/data.json``
+     - 定义数据集路径、预处理方式、数据增强策略等
+   * - **示例配置目录**
+     - 模型配置文件
+     - ``examples/model_name/model.json``
+     - 定义模型架构、参数等
+   * - **示例配置目录**
+     - 启动脚本
+     - ``examples/model_name/pretrain.sh``
+     - 训练启动脚本，包含执行命令和参数设置
+   * - **核心源码目录**
+     - 数据处理模块
+     - ``mindspeed_mm/data/``
+     - 数据加载、预处理、增强、采样等功能实现
+   * - **核心源码目录**
+     - 模型结构模块
+     - ``mindspeed_mm/model/``
+     - 各种模型组件的实现，包括编码器、解码器、视觉模块等
 
 🚀核心接口适配
 ::::::::::::::::::
@@ -213,50 +104,9 @@ train_valid_test_datasets_provider   构建数据加载器
 🔄核心接口调用流程
 ::::::::::::::::::
 
-.. mermaid::
-    :align: left
-
-    sequenceDiagram
-        participant M as pretrain_xxx
-        participant E as Training
-        participant D as Data
-        participant MP as ModelProvider
-        participant LC as LossCalculator
-        participant Model
-
-        M->>E: 初始化训练
-        activate E
-
-        E->>MP: 调用model_provider构建模型
-        activate MP
-        MP->>Model: 创建模型实例
-        MP-->>E: 返回模型
-        deactivate MP
-
-        E->>D: 调用train_valid_test_datasets_provider
-        activate D
-        D-->>E: 返回DataLoader
-        deactivate D
-
-        loop 每个训练步骤
-            E->>D: 调用get_batch获取数据
-            activate D
-            D-->>E: 返回batch数据
-            deactivate D
-
-            E->>Model: 调用forward_step前向计算
-            activate Model
-            Model->>LC: 调用loss_func计算损失
-            activate LC
-            LC-->>E: 返回损失值
-            deactivate LC
-            deactivate Model
-
-            E->>E: 反向传播与参数更新
-            Note over E: 梯度计算、优化器步进<br/>学习率调整
-        end
-
-        E-->>M: 训练完成
+.. image:: ../_static/dev_guide/migration/flowchart.png
+    :width: 50%
+    :align: center
 
 
 模型迁移
@@ -675,169 +525,103 @@ MindSpeed-MM 支持通过 YAML 配置文件灵活管理 FSDP2 训练策略，实
 必查项清单
 ^^^^^^^^^^^^^^^^^
 
-.. raw:: html
+.. list-table::
+   :header-rows: 1
 
-    <a id="precesion_checklist"></a>
-
-    <table>
-    <thead>
-        <tr>
-        <th>项目</th>
-        <th>说明</th>
-        <th>检查方法</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-        <td><strong>版本对齐</strong></td>
-        <td>确保第三方库版本一致</td>
-        <td>
-            执行 <code>pip list</code> 检查 transformers、diffusers 等版本
-        </td>
-        </tr>
-        <tr>
-        <td><strong>关闭私有格式</strong></td>
-        <td>统一计算格式</td>
-        <td>
-            对比原仓和MM精度时，在运行开始处添加 <code>torch.npu.config.allow_internal_format = False</code></br>MM仓库已默认添加
-        </td>
-        </tr>
-        <tr>
-        <td><strong>开启确定性计算</strong></td>
-        <td>确保结果可复现</td>
-        <td>
-            安装<code> pip install mindstudio-probe</code>，
-    <pre># 使用
-    from msprobe.pytorch import seed_all
-    seed_all(is_gpu=False, mode=True)</pre>
-        </td>
-        </tr>
-        <tr>
-        <td><strong>开启HCCL确定性</strong></td>
-        <td>确保分布式通信可复现</td>
-        <td>
-            在启动脚本中添加 <code>export HCCL_DETERMINISTIC=TRUE</code>
-        </td>
-        </tr>
-        <tr>
-        <td><strong>优化器对齐</strong></td>
-        <td>使用相同优化器配置</td>
-        <td>
-            MindSpeed-MM默认使用AdamW，建议原仓和MM使用相同的优化器
-        </td>
-        </tr>
-        <tr>
-        <td><strong>通信dtype对齐</strong></td>
-        <td>统一梯度通信精度</td>
-        <td>
-        MM中梯度的all reduce操作在多卡进行通信时，使用fp32数据类型，</br>在deepspeed中，默认情况下是以原始参数类型通信，需在其配置中添加<code>"communication_data_type": "fp32"</code>
-        </td>
-        </tr>
-        <tr>
-        <td><strong>初始权重对齐</strong></td>
-        <td>确保权重初始化一致</td>
-        <td>
-            验证原仓和MM的权重加载逻辑，尤其当<strong>部分模块随机初始化，部分模块参数冻结</strong>的场景
-        </td>
-        </tr>
-    </tbody>
-    </table>
+   * - 项目
+     - 说明
+     - 检查方法
+   * - **版本对齐**
+     - 确保第三方库版本一致
+     - 执行 ``pip list`` 检查 transformers、diffusers 等版本
+   * - **关闭私有格式**
+     - 统一计算格式
+     - 对比原仓和MM精度时，在运行开始处添加 ``torch.npu.config.allow_internal_format = False``，MM仓库已默认添加
+   * - **开启确定性计算**
+     - 确保结果可复现
+     - 安装 ``pip install mindstudio-probe``，使用：``from msprobe.pytorch import seed_all; seed_all(is_gpu=False, mode=True)``
+   * - **开启HCCL确定性**
+     - 确保分布式通信可复现
+     - 在启动脚本中添加 ``export HCCL_DETERMINISTIC=TRUE``
+   * - **优化器对齐**
+     - 使用相同优化器配置
+     - MindSpeed-MM默认使用AdamW，建议原仓和MM使用相同的优化器
+   * - **通信dtype对齐**
+     - 统一梯度通信精度
+     - MM中梯度的all reduce操作在多卡进行通信时，使用fp32数据类型，在deepspeed中，默认情况下是以原始参数类型通信，需在其配置中添加 ``"communication_data_type": "fp32"``
+   * - **初始权重对齐**
+     - 确保权重初始化一致
+     - 验证原仓和MM的权重加载逻辑，尤其当**部分模块随机初始化，部分模块参数冻结**的场景
 
 配置对齐
 ^^^^^^^^^^^^^^^^^
-.. raw:: html
+.. list-table::
+   :header-rows: 1
 
-    <a id="precesion_config"></a>
-    <table>
-    <thead>
-        <tr>
-        <th>参数分类</th>
-        <th>项目</th>
-        <th>MM框架配置</th>
-        <th>说明</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-        <td rowspan="10"><strong>超参数配置</strong></td>
-        <td><strong>学习率</strong></td>
-        <td><code>--lr</code></td>
-        <td>设置初始学习率</td>
-        </tr>
-        <tr>
-        <td><strong>学习率调度器类型</strong></td>
-        <td><code>--lr-decay-style</code></td>
-        <td>指定学习率衰减策略</td>
-        </tr>
-        <tr>
-        <td><strong>学习率预热比例</strong></td>
-        <td><code>--lr-warmup-fraction</code></td>
-        <td>学习率预热阶段占比</td>
-        </tr>
-        <tr>
-        <td><strong>训练步长</strong></td>
-        <td><code>--train-iters</code></td>
-        <td>训练的总迭代步数</td>
-        </tr>
-        <tr>
-        <td><strong>GBS（全局批次大小）</strong></td>
-        <td><code>$MBS*$GRAD_ACC_STEP*$DP</code></td>
-        <td>GBS = 微批次大小 × 梯度累积步数 × 数据并行度</td>
-        </tr>
-        <tr>
-        <td><strong>梯度裁剪</strong></td>
-        <td><code>--clip-grad</code></td>
-        <td>梯度裁剪阈值，防止梯度爆炸</td>
-        </tr>
-        <tr>
-        <td><strong>优化器类型</strong></td>
-        <td><code>--optimizer-selection</code></td>
-        <td>选择优化器类型</td>
-        </tr>
-        <tr>
-        <td><strong>权重衰减</strong></td>
-        <td><code>--weight-decay</code></td>
-        <td>权重衰减系数，默认值为0</td>
-        </tr>
-        <tr>
-        <td><strong>Adam Beta1</strong></td>
-        <td><code>--adam-beta1</code></td>
-        <td>Adam优化器的一阶矩估计指数衰减率，默认0.9</td>
-        </tr>
-        <tr>
-        <td><strong>Adam Beta2</strong></td>
-        <td><code>--adam-beta2</code></td>
-        <td>Adam优化器的二阶矩估计指数衰减率，默认0.999</td>
-        </tr>
-        <tr>
-        <td rowspan="4"><strong>确定性计算配置</strong></td>
-        <td><strong>随机种子</strong></td>
-        <td><code>--seed</code></td>
-        <td>设置随机种子以确保实验可复现</td>
-        </tr>
-        <tr>
-        <td><strong>确定性计算配置</strong></td>
-        <td><code>--use-deter-comp</code></td>
-        <td>启用确定性计算，确保每次运行结果一致</td>
-        </tr>
-        <tr>
-        <td><strong>HCCL确定性</strong></td>
-        <td><code>export HCCL_DETERMINISTIC=TRUE</code></td>
-        <td>确保分布式通信结果可复现</td>
-        </tr>
-        <tr>
-        <td><strong>矩阵乘法优化</strong></td>
-        <td><code>export CLOSE_MATMUL_K_SHIFT=1</code></td>
-        <td></td>
-        </tr>
-        <tr>
-        <td><strong>数据加载配置</strong></td>
-        <td><strong>采样方式</strong></td>
-        <td><code>examples/xxx/data.json中设置dataloader的shuffle为false</code></td>
-        <td>在数据配置文件中控制是否打乱数据顺序</td>
-        </tr>
-    </tbody>
-    </table>
+   * - 参数分类
+     - 项目
+     - MM框架配置
+     - 说明
+   * - **超参数配置**
+     - **学习率**
+     - ``--lr``
+     - 设置初始学习率
+   * - **超参数配置**
+     - **学习率调度器类型**
+     - ``--lr-decay-style``
+     - 指定学习率衰减策略
+   * - **超参数配置**
+     - **学习率预热比例**
+     - ``--lr-warmup-fraction``
+     - 学习率预热阶段占比
+   * - **超参数配置**
+     - **训练步长**
+     - ``--train-iters``
+     - 训练的总迭代步数
+   * - **超参数配置**
+     - **GBS（全局批次大小）**
+     - ``$MBS*$GRAD_ACC_STEP*$DP``
+     - GBS = 微批次大小 × 梯度累积步数 × 数据并行度
+   * - **超参数配置**
+     - **梯度裁剪**
+     - ``--clip-grad``
+     - 梯度裁剪阈值，防止梯度爆炸
+   * - **超参数配置**
+     - **优化器类型**
+     - ``--optimizer-selection``
+     - 选择优化器类型
+   * - **超参数配置**
+     - **权重衰减**
+     - ``--weight-decay``
+     - 权重衰减系数，默认值为0
+   * - **超参数配置**
+     - **Adam Beta1**
+     - ``--adam-beta1``
+     - Adam优化器的一阶矩估计指数衰减率，默认0.9
+   * - **超参数配置**
+     - **Adam Beta2**
+     - ``--adam-beta2``
+     - Adam优化器的二阶矩估计指数衰减率，默认0.999
+   * - **确定性计算配置**
+     - **随机种子**
+     - ``--seed``
+     - 设置随机种子以确保实验可复现
+   * - **确定性计算配置**
+     - **确定性计算配置**
+     - ``--use-deter-comp``
+     - 启用确定性计算，确保每次运行结果一致
+   * - **确定性计算配置**
+     - **HCCL确定性**
+     - ``export HCCL_DETERMINISTIC=TRUE``
+     - 确保分布式通信结果可复现
+   * - **确定性计算配置**
+     - **矩阵乘法优化**
+     - ``export CLOSE_MATMUL_K_SHIFT=1``
+     -
+   * - **数据加载配置**
+     - **采样方式**
+     - ``examples/xxx/data.json中设置dataloader的shuffle为false``
+     - 在数据配置文件中控制是否打乱数据顺序
 
 
 精度工具使用
