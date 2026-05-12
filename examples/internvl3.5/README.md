@@ -107,7 +107,7 @@ pip install -e .
 
 #### 特别说明
 
-权重下载后，需修改权重路径下的`ckpt/hf_path/modeling_internvl_chat.py`代码文件，96行将None修改为151671，112行为forward函数增加**kwargs参数
+权重下载后，需修改权重路径下的`ckpt/hf_path/InternVL3_5-30B-A3B-Instruct/modeling_internvl_chat.py`代码文件，96行将None修改为151671，112行为forward函数增加**kwargs参数
 
 ```python
     # 96行示例
