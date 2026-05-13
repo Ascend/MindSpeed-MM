@@ -8,14 +8,14 @@ from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import pregather_fsdp_params
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time, configure_hsdp_gradient_sync
+from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time, configure_hsdp_gradient_sync, tensor_to_dtensor
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.tools.profiler import Profiler
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
-
+from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,23 @@ class TrainEngine:
         # Load checkpoint if specified
         if args.training.load:
             self.iteration, self.consumed_train_samples = self.load()
+
+        if args.training.init_model_with_meta_device and args.training.lora.enable and args.training.lora.pretrained_lora_path:
+            lora_state_dict = load_state_dict(args.training.lora.pretrained_lora_path)
+            model_state_dict = model.state_dict()
+            for key, value in lora_state_dict.items():
+                if key in model_state_dict:
+                    target_tensor = model_state_dict[key]
+                    device_mesh = getattr(target_tensor, "device_mesh", None)
+                    placements = getattr(target_tensor, "placements", None)
+                    if device_mesh is not None and placements is not None:
+                        target_tensor.copy_(tensor_to_dtensor(value, device_mesh, placements))
+                    else:
+                        target_tensor.copy_(value)
+            print_rank(
+                logger.info,
+                f"Reloaded {len(lora_state_dict)} LoRA parameters from {args.training.lora.pretrained_lora_path}"
+            )
 
         self.profiler = Profiler(args.tools.profile)
         self.profiler.start()
