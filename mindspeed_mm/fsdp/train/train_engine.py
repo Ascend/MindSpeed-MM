@@ -22,7 +22,18 @@ logger = logging.getLogger(__name__)
 
 class TrainEngine:
     """Training engine that manages the main training loop and operations."""
-    def __init__(self, args: Arguments, train_dataloader, model, optimizer, scheduler, checkpointer, lora_weight_manager=None, **kwargs):
+
+    def __init__(
+        self,
+        args: Arguments,
+        train_dataloader,
+        model,
+        optimizer,
+        scheduler,
+        checkpointer,
+        lora_weight_manager=None,
+        **kwargs,
+    ):
         self.args = args
 
         self.model = model
@@ -39,7 +50,11 @@ class TrainEngine:
         if args.training.load:
             self.iteration, self.consumed_train_samples = self.load()
 
-        if args.training.init_model_with_meta_device and args.training.lora.enable and args.training.lora.pretrained_lora_path:
+        if (
+            args.training.init_model_with_meta_device
+            and args.training.lora.enable
+            and args.training.lora.pretrained_lora_path
+        ):
             lora_state_dict = load_state_dict(args.training.lora.pretrained_lora_path)
             model_state_dict = model.state_dict()
             for key, value in lora_state_dict.items():
@@ -53,7 +68,7 @@ class TrainEngine:
                         target_tensor.copy_(value)
             print_rank(
                 logger.info,
-                f"Reloaded {len(lora_state_dict)} LoRA parameters from {args.training.lora.pretrained_lora_path}"
+                f"Reloaded {len(lora_state_dict)} LoRA parameters from {args.training.lora.pretrained_lora_path}",
             )
 
         self.profiler = Profiler(args.tools.profile)
@@ -62,12 +77,9 @@ class TrainEngine:
     def average_losses_across_data_parallel_group(self, losses):
         """Reduce a tensor of losses across all GPUs."""
         ps = get_parallel_state()
-        averaged_losses = torch.cat(
-            [loss.clone().detach().view(1) for loss in losses])
-        torch.distributed.all_reduce(averaged_losses,
-                                    group=ps.get_dp_group())
-        averaged_losses = averaged_losses / \
-            torch.distributed.get_world_size(group=ps.get_dp_group())
+        averaged_losses = torch.cat([loss.clone().detach().view(1) for loss in losses])
+        torch.distributed.all_reduce(averaged_losses, group=ps.get_dp_group())
+        averaged_losses = averaged_losses / torch.distributed.get_world_size(group=ps.get_dp_group())
 
         return averaged_losses
 
@@ -108,13 +120,16 @@ class TrainEngine:
             batch_data = self.get_batch(train_dataloader_iter)
 
             # Move input to device and cast precision
-            batch_data = move_to_device(batch_data, get_dtype(args.parallel.fsdp_plan.param_dtype) if args.parallel.fsdp_plan.param_dtype else None)
+            batch_data = move_to_device(
+                batch_data,
+                get_dtype(args.parallel.fsdp_plan.param_dtype) if args.parallel.fsdp_plan.param_dtype else None,
+            )
 
             # setup loss ctx
             self.set_loss_func(batch_data)
-            
+
             # Determine if this is the last step of gradient accumulation
-            is_last_step = (step == args.training.gradient_accumulation_steps - 1)
+            is_last_step = step == args.training.gradient_accumulation_steps - 1
             configure_hsdp_gradient_sync(self.model, is_last_step)
 
             # forward step
@@ -155,7 +170,9 @@ class TrainEngine:
             loss, aux_loss = self.train_step(train_dataloader_iter)
 
             # Clip gradients when clip_grad>0 and get total grad_norm
-            grad_norm = clip_grad_norm(self.model, max_norm=args.training.clip_grad, foreach=args.training.clip_grad_foreach)
+            grad_norm = clip_grad_norm(
+                self.model, max_norm=args.training.clip_grad, foreach=args.training.clip_grad_foreach
+            )
 
             # Update parameters
             self.optimizer.step()
@@ -168,7 +185,7 @@ class TrainEngine:
 
             # Calculate iteration time
             elapsed_time_per_iteration = get_time(barrier=True) - start_time
-            
+
             # Stop profiling if enabled
             self.profiler.step()
 
@@ -181,13 +198,17 @@ class TrainEngine:
                     self.consumed_train_samples,
                     loss,
                     aux_loss,
-                    grad_norm
+                    grad_norm,
                 )
 
             curr_step_lr = self.lr_scheduler.get_last_lr()[0]
 
             # Save checkpoint at specified intervals
-            if args.training.save and args.training.save_interval > 0 and self.iteration % args.training.save_interval == 0:
+            if (
+                args.training.save
+                and args.training.save_interval > 0
+                and self.iteration % args.training.save_interval == 0
+            ):
                 self.save(self.iteration, self.consumed_train_samples)
 
         # Stop profiling if enabled
@@ -198,23 +219,13 @@ class TrainEngine:
             self.save(self.iteration, self.consumed_train_samples)
 
     def training_log(
-        self,
-        iteration,
-        elapsed_time_per_iteration,
-        curr_step_lr,
-        consumed_train_samples,
-        loss,
-        aux_loss,
-        grad_norm
+        self, iteration, elapsed_time_per_iteration, curr_step_lr, consumed_train_samples, loss, aux_loss, grad_norm
     ):
         args = self.args
         log_string = f" [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
-        log_string += ' iteration {:8d}/{:8d} |'.format(
-            iteration, args.training.train_iters)
-        log_string += ' consumed samples: {:12d} |'.format(
-            consumed_train_samples)
-        log_string += ' elapsed time per iteration (ms): {:.1f} |'.format(
-            elapsed_time_per_iteration * 1000.0)
+        log_string += ' iteration {:8d}/{:8d} |'.format(iteration, args.training.train_iters)
+        log_string += ' consumed samples: {:12d} |'.format(consumed_train_samples)
+        log_string += ' elapsed time per iteration (ms): {:.1f} |'.format(elapsed_time_per_iteration * 1000.0)
         log_string += ' learning rate: {:.6E} |'.format(curr_step_lr)
         log_string += ' global batch size: {:5d} |'.format(args.training.global_batch_size)
         log_string += ' loss: {:.6E} |'.format(loss.item())
@@ -241,6 +252,7 @@ class TrainEngine:
             state=state,
             load_rank0_and_broadcast=args.training.load_rank0_and_broadcast,
             load_strict=args.training.load_strict,
+            enable_lora=args.training.lora.enable,
         )
 
         if not release:
@@ -252,7 +264,7 @@ class TrainEngine:
                 self.train_dataloader.load_state_dict(state["extra_state"]["train_dataloader"])
             if not args.training.no_load_rng:
                 if "torch_rng_state" not in state["extra_state"]:
-                    print_rank(logger.warning, f"No RNG state found in checkpoint, skipping RNG loading")
+                    print_rank(logger.warning, "No RNG state found in checkpoint, skipping RNG loading")
                 else:
                     torch.set_rng_state(state["extra_state"]["torch_rng_state"])
 
@@ -264,7 +276,7 @@ class TrainEngine:
     def save(self, iteration, consumed_train_samples):
         """Save checkpoint with model, optimizer, and training state."""
         args = self.args
-        
+
         # Handle LoRA save modes
         if args.training.lora.enable:
             # Save only LoRA adapter weights
@@ -274,7 +286,7 @@ class TrainEngine:
                     iteration=iteration,
                 )
             return
-        
+
         # Default save behavior (full model)
         state = {
             "model": self.model,
@@ -282,7 +294,7 @@ class TrainEngine:
                 "iteration": iteration,
                 "consumed_train_samples": consumed_train_samples,
                 "lr_scheduler": self.lr_scheduler.state_dict(),
-                "train_dataloader": self.train_dataloader.state_dict()
+                "train_dataloader": self.train_dataloader.state_dict(),
             },
         }
         if not args.training.no_save_optim:

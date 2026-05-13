@@ -21,11 +21,17 @@ from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 from torch.distributed.checkpoint.stateful import Stateful
 
 from mindspeed.fsdp.utils.log import print_rank
-from ..distributed.parallel_state import get_parallel_state
-from ..utils.device import empty_cache, synchronize
-from .checkpointer import CheckpointerBase
-from .utils import get_checkpoint_name, read_metadata, get_checkpoint_tracker_filename
-from .load_utils import rank0_load_and_broadcast_weights
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.utils.device import empty_cache, synchronize
+from mindspeed_mm.fsdp.checkpoint.checkpointer import CheckpointerBase
+from mindspeed_mm.fsdp.checkpoint.utils import (
+    get_checkpoint_name,
+    read_metadata,
+    get_checkpoint_tracker_filename,
+    remove_base_layer_keys,
+    restore_base_layer_keys,
+)
+from mindspeed_mm.fsdp.checkpoint.load_utils import rank0_load_and_broadcast_weights
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +68,29 @@ class ModelState(Stateful):
         need to drop EP-dim when loading from DCP checkpoints
         so that EP-FSDP would not be confused
         """
+        set_model_state_dict(model=self.model, model_state_dict=state_dict)
+
+
+class LoraModelState(ModelState):
+    """
+    A wrapper around a lora model to make it stateful.
+    Args:
+        model (Model): lora model to wrap.
+    """
+
+    def __init__(self, model):
+        super().__init__(model)
+        self.key_mapping = None
+
+    @torch.no_grad()
+    def state_dict(self):
+        model_state_dict = get_model_state_dict(model=self.model)
+        self.key_mapping = remove_base_layer_keys(model_state_dict)
+        return model_state_dict
+
+    @torch.no_grad()
+    def load_state_dict(self, state_dict):
+        restore_base_layer_keys(state_dict, self.key_mapping)
         set_model_state_dict(model=self.model, model_state_dict=state_dict)
 
 
@@ -154,10 +183,9 @@ class DistributedCheckpointer(CheckpointerBase):
 
         cls.execute_save(save_state=save_state, storage_writer=storage_writer, save_async=save_async)
 
-        if not torch.distributed.is_initialized() \
-                or torch.distributed.get_rank() == 0:
+        if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
             tracker_filename = get_checkpoint_tracker_filename(path)
-            with open(tracker_filename, 'w') as f:
+            with open(tracker_filename, 'w', encoding='utf-8') as f:
                 f.write(str(iteration))
 
         print_rank(logger.info, f"Saved checkpoint to {checkpoint_dir}")
@@ -171,6 +199,7 @@ class DistributedCheckpointer(CheckpointerBase):
         storage_reader: Optional[FileSystemReader] = None,
         load_rank0_and_broadcast: bool = False,
         load_strict: bool = False,
+        enable_lora: bool = False,
     ) -> Dict[str, Any]:
         """
         load training state from distributed checkpoint
@@ -179,7 +208,7 @@ class DistributedCheckpointer(CheckpointerBase):
             state: state to load, "model" are required,  "optimizer" and "extra_state" are optional
             process_group: process group for loading checkpoint
             storage_reader: storage reader backend for dcp.load. If None, will use FileSystemReader
-
+            enable_lora: whether to enable LoRA checkpoint loading logic
         return:
             state: state loaded
         """
@@ -198,7 +227,7 @@ class DistributedCheckpointer(CheckpointerBase):
         if "model" not in state:
             raise ValueError("Model must be provided to load a distributed checkpoint.")
 
-        load_state = {"model": ModelState(state["model"])}
+        load_state = {"model": LoraModelState(state["model"])} if enable_lora else {"model": ModelState(state["model"])}
         if not release and "optimizer" in state:
             load_state["optimizer"] = OptimizerState(model=state["model"], optimizer=state["optimizer"])  # type: ignore[index]
 
@@ -240,7 +269,7 @@ class DistributedCheckpointer(CheckpointerBase):
                 cls._async_process_group = dist.new_group(backend="gloo")
 
             if cls.dcp_save_future is not None:
-                logger.info(f"[RANK {dist.get_rank()}] waiting for previous DCP saving session to end...")
+                logger.info("[RANK %s] waiting for previous DCP saving session to end...", dist.get_rank())
                 cls.dcp_save_future.result()
                 cls.dcp_save_future = None
                 # block until all the ranks resolve their previous dcp async saving

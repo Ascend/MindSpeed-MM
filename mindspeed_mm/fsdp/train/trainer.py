@@ -1,7 +1,7 @@
-from dataclasses import MISSING, asdict, dataclass, field, fields
-from typing import Any, Callable, Dict, List, Literal, Optional, TypeVar, Union, get_type_hints
+from typing import Callable, Optional
 import logging
 import os
+
 os.environ["USE_TF"] = "FALSE"
 from functools import partial
 
@@ -15,7 +15,7 @@ from mindspeed_mm.fsdp.utils.device import (
     get_torch_device,
     get_device_type,
     set_accelerator_compatible,
-    set_allow_hf32
+    set_allow_hf32,
 )
 from mindspeed_mm.fsdp.distributed.parallel_state import init_parallel_state, get_parallel_state
 from mindspeed_mm.fsdp.models.modelhub import ModelHub
@@ -28,7 +28,7 @@ from mindspeed_mm.fsdp.optimizer.optimizer import build_optimizer
 from mindspeed_mm.fsdp.optimizer.lr_scheduler import build_lr_scheduler
 from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
 from mindspeed_mm.fsdp.utils.register import import_plugin
-from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
+from mindspeed_mm.fsdp.params.argument import Arguments
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.train.train_engine import TrainEngine
 from mindspeed_mm.fsdp.utils.lora_utils import (
@@ -46,9 +46,10 @@ from mindspeed_mm.config.config_manager import ConfigManager
 logger = logging.getLogger(__name__)
 
 
-
-class Trainer():
-    def __init__(self, args: Arguments, model_provider: Optional[Callable] = None, dataloader_provider: Optional[Callable] = None):
+class Trainer:
+    def __init__(
+        self, args: Arguments, model_provider: Optional[Callable] = None, dataloader_provider: Optional[Callable] = None
+    ):
         """
         Initialize the trainer with configuration and optional custom providers.
 
@@ -74,15 +75,19 @@ class Trainer():
         self.lr_scheduler = self.get_scheduler()
         self.train_dataloader = self.get_dataloader() if dataloader_provider is None else dataloader_provider(args)
         self.checkpointer = self.get_checkpointer()
-        
-        
+
         # Validate and calculate training iterations
         self._validate_and_set_train_iters(args)
 
         # Create the training engine
         self.trainer = TrainEngine(
-            args, self.train_dataloader, self.model, self.optimizer, self.lr_scheduler, self.checkpointer,
-            lora_weight_manager=self.lora_weight_manager
+            args,
+            self.train_dataloader,
+            self.model,
+            self.optimizer,
+            self.lr_scheduler,
+            self.checkpointer,
+            lora_weight_manager=self.lora_weight_manager,
         )
 
     def _validate_and_set_train_iters(self, args: Arguments):
@@ -111,7 +116,7 @@ class Trainer():
     def initialize(self):
         """Initialize training environment: logging, random seeds, distributed groups."""
         args: Arguments = self.args
-        print_rank(logger.info, f"Start initializing training environment!!!")
+        print_rank(logger.info, "Start initializing training environment!!!")
 
         # Set allow_hf32
         set_allow_hf32(args.training.allow_hf32)
@@ -169,11 +174,13 @@ class Trainer():
                 device = get_device_type()
 
             if args.training.load is None and args.training.load_rank0_and_broadcast:
-                raise ValueError("Must set `training.load` when `training.load_rank0_and_broadcast` is True, otherwise the model will be initialized with meta device but no weights will be loaded.")
-            elif args.training.load is None and not args.training.load_rank0_and_broadcast:
+                raise ValueError(
+                    "Must set `training.load` when `training.load_rank0_and_broadcast` is True, otherwise the model will be initialized with meta device but no weights will be loaded."
+                )
+            elif args.training.load is None and not args.training.load_rank0_and_broadcast or args.training.lora.enable:
                 to_empty_if_needed(model, device=device)
                 init_model_weights(model)
-            else: # load is not None
+            else:  # load is not None
                 to_empty_if_needed(model, device=device)
 
         if args.training.lora.enable:
@@ -185,24 +192,24 @@ class Trainer():
     def enable_lora(self, model: torch.nn.Module) -> torch.nn.Module:
         """
         Enable LoRA fine-tuning by injecting LoRA adapters into model.
-        
+
         This method should be called before FSDP2 sharding to ensure
         LoRA parameters are properly distributed across GPUs.
-        
+
         Args:
             model: The PyTorch model to inject LoRA adapters into.
-            
+
         Returns:
             The model with LoRA adapters injected.
-            
+
         Raises:
             ImportError: If PEFT library is not installed.
             ValueError: If LoRA configuration is invalid.
         """
         lora_config = self.args.training.lora
-        
+
         print_rank(logger.info, "Enabling LoRA fine-tuning...")
-        
+
         # Validate LoRA configuration
         try:
             validate_lora_config(
@@ -214,25 +221,25 @@ class Trainer():
             )
         except ValueError as e:
             raise ValueError(f"Invalid LoRA configuration: {e}") from e
-        
+
         # Match target modules using wildcard patterns
         matched_modules = match_target_modules(model, lora_config.target_modules)
-        
+
         if not matched_modules:
             raise ValueError(
                 f"No modules matched target_modules: {lora_config.target_modules}. "
                 f"Please check your model architecture and target_modules configuration."
             )
-        
+
         print_rank(logger.info, f"Matched {len(matched_modules)} modules for LoRA:")
         for module_name in matched_modules[:5]:
             print_rank(logger.info, f"  - {module_name}")
         if len(matched_modules) > 5:
             print_rank(logger.info, f"  ... and {len(matched_modules) - 5} more")
-        
+
         # Freeze base model parameters
         freeze_parameters(model)
-        
+
         # Inject LoRA adapters
         model = add_lora_to_model(
             model=model,
@@ -244,10 +251,10 @@ class Trainer():
             pretrained_lora_path=lora_config.pretrained_lora_path,
             lora_target_modules_support=lora_config.lora_target_modules_support,
         )
-        
+
         # Get LoRA parameter statistics
         trainable_params, total_params, stats_dict = get_lora_trainable_params(model)
-        
+
         # Print LoRA configuration summary
         print_lora_config(
             rank=lora_config.rank,
@@ -264,8 +271,8 @@ class Trainer():
         return model
 
     def get_optimizer(self):
-        args = self.args
         """Build optimizer for the model."""
+        args = self.args
         optimizer = build_optimizer(
             model=self.model,
             lr=args.training.lr,
@@ -320,8 +327,9 @@ class Trainer():
         train_dataloader = build_dataloader(datasets)
 
         if args.model.loss_cfg.loss_type == "per_token_loss":
-            train_dataloader = PrefetchGradAccDataLoader(train_dataloader,
-                                                         grad_acc_step=args.training.gradient_accumulation_steps)
+            train_dataloader = PrefetchGradAccDataLoader(
+                train_dataloader, grad_acc_step=args.training.gradient_accumulation_steps
+            )
 
         return train_dataloader
 
@@ -336,6 +344,6 @@ class Trainer():
 
 if __name__ == "__main__":
     # Entry point for training script
-    args = ConfigManager(config_class=Arguments).load_and_parse()
-    trainer = Trainer(args=args)
+    arguments = ConfigManager(config_class=Arguments).load_and_parse()
+    trainer = Trainer(args=arguments)
     trainer.train()
