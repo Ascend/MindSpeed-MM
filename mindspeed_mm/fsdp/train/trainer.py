@@ -24,7 +24,7 @@ from mindspeed_mm.fsdp.features.apply_features import FeaturesApplier
 from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed, init_model_weights
 from mindspeed_mm.fsdp.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.fsdp.data.dataloader.dataloader import PrefetchGradAccDataLoader
-from mindspeed_mm.fsdp.optimizer.optimizer import build_optimizer
+from mindspeed_mm.fsdp.optimizer.optimizer import build_layerwise_param_groups, build_optimizer
 from mindspeed_mm.fsdp.optimizer.lr_scheduler import build_lr_scheduler
 from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
 from mindspeed_mm.fsdp.utils.register import import_plugin
@@ -273,6 +273,16 @@ class Trainer:
     def get_optimizer(self):
         """Build optimizer for the model."""
         args = self.args
+        param_groups = None
+        if args.training.layerwise_lr.enable:
+            param_groups = build_layerwise_param_groups(
+                model=self.model,
+                layerwise_lr_config=args.training.layerwise_lr,
+                base_lr=args.training.lr,
+                weight_decay=args.training.weight_decay,
+                no_decay_modules=args.training.no_decay_modules,
+                no_decay_params=args.training.no_decay_params,
+            )
         optimizer = build_optimizer(
             model=self.model,
             lr=args.training.lr,
@@ -281,6 +291,9 @@ class Trainer:
             weight_decay=args.training.weight_decay,
             fused=args.training.adam_fused,
             optimizer_type=args.training.optimizer,
+            param_groups=param_groups,
+            no_decay_modules=args.training.no_decay_modules,
+            no_decay_params=args.training.no_decay_params,
             matched_adamw_rms=args.training.matched_adamw_rms,
             muon_momentum=args.training.muon_momentum,
             ns_steps=args.training.ns_steps,

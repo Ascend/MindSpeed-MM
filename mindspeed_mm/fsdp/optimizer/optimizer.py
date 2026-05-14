@@ -213,6 +213,145 @@ def get_parameter_names(model, forbidden_layer_types, forbidden_param_names):
     return result
 
 
+def _get_rule_field(rule: Any, field_name: str, default: Any):
+    """Extract field from rule config (dict or object) with fallback to default."""
+    if isinstance(rule, dict):
+        return rule.get(field_name, default)
+    return getattr(rule, field_name, default)
+
+
+def _match_layerwise_rule(param_name: str, rule: Any) -> bool:
+    """Check if param_name matches rule via prefix or substring match."""
+    prefixes = _get_rule_field(rule, "prefixes", []) or []
+    contains = _get_rule_field(rule, "contains", []) or []
+
+    for prefix in prefixes:
+        if param_name.startswith(prefix):
+            return True
+    for part in contains:
+        if part in param_name:
+            return True
+    return False
+
+
+def build_layerwise_param_groups(
+    model: "nn.Module",
+    layerwise_lr_config: Any,
+    base_lr: float,
+    weight_decay: float,
+    no_decay_modules: Optional[List[str]] = None,
+    no_decay_params: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Build param groups with layer-wise learning rates based on matching rules."""
+    rules = _get_rule_field(layerwise_lr_config, "rules", []) or []
+    if not rules:
+        raise ValueError("layerwise_lr is enabled, but `rules` is empty.")
+
+    decay_param_names = set(get_parameter_names(model, no_decay_modules, no_decay_params))
+    rule_buckets: Dict[int, Dict[str, Any]] = {}
+    default_params: List[torch.nn.Parameter] = []
+    default_names: List[str] = []
+    matched_param_names = set()
+    num_trainable = 0
+
+    def _split_by_decay(
+        params_list: Sequence[torch.nn.Parameter],
+        names_list: Sequence[str],
+    ) -> Tuple[List[torch.nn.Parameter], List[torch.nn.Parameter]]:
+        """Split params into weight-decay and no-decay groups."""
+        decayed_params: List[torch.nn.Parameter] = []
+        undecayed_params: List[torch.nn.Parameter] = []
+        for p, n in zip(params_list, names_list):
+            if n in decay_param_names:
+                decayed_params.append(p)
+            else:
+                undecayed_params.append(p)
+        return decayed_params, undecayed_params
+
+    # Assign each trainable param to a rule bucket or default group
+    for name, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+        num_trainable += 1
+        matched = False
+        for rule_idx, rule in enumerate(rules):
+            if not _match_layerwise_rule(name, rule):
+                continue
+
+            if rule_idx not in rule_buckets:
+                rule_buckets[rule_idx] = {
+                    "name": _get_rule_field(rule, "name", None),
+                    "lr": _get_rule_field(rule, "lr", None),
+                    "params": [],
+                    "names": [],
+                }
+            rule_buckets[rule_idx]["params"].append(p)
+            rule_buckets[rule_idx]["names"].append(name)
+            matched_param_names.add(name)
+            matched = True
+            break
+
+        if not matched:
+            default_params.append(p)
+            default_names.append(name)
+
+    param_groups: List[Dict[str, Any]] = []
+
+    # Build param groups from rule buckets, split by weight_decay
+    for rule_idx in sorted(rule_buckets.keys()):
+        bucket = rule_buckets[rule_idx]
+        group_lr = bucket["lr"]
+        if group_lr is None:
+            raise ValueError(f"layerwise_lr rule at index {rule_idx} does not define `lr`.")
+        params = bucket["params"]
+        decayed, undecayed = _split_by_decay(params, bucket["names"])
+
+        if decayed:
+            param_groups.append({"params": decayed, "lr": group_lr, "weight_decay": weight_decay})
+        if undecayed:
+            param_groups.append({"params": undecayed, "lr": group_lr, "weight_decay": 0.0})
+
+        logger.info(
+            "[LayerwiseLR] rule[%d](%s) lr=%s matched=%d sample=%s",
+            rule_idx,
+            bucket["name"] if bucket["name"] else "unnamed",
+            group_lr,
+            len(bucket["params"]),
+            bucket["names"][:8],
+        )
+
+    # Handle unmatched (default) params
+    if default_params:
+        decayed, undecayed = _split_by_decay(default_params, default_names)
+        if decayed:
+            param_groups.append({"params": decayed, "lr": base_lr, "weight_decay": weight_decay})
+        if undecayed:
+            param_groups.append({"params": undecayed, "lr": base_lr, "weight_decay": 0.0})
+
+    logger.info(
+        "[LayerwiseLR] default_lr=%s unmatched=%d sample=%s",
+        base_lr,
+        len(default_params),
+        default_names[:8],
+    )
+
+    # Verify all trainable params are covered
+    covered = len(matched_param_names) + len(default_names)
+    if covered != num_trainable:
+        raise RuntimeError(
+            f"Layerwise param coverage mismatch: trainable={num_trainable}, covered={covered}."
+        )
+
+    logger.info(
+        "[LayerwiseLR] total_trainable=%d total_matched=%d total_unmatched=%d generated_groups=%d",
+        num_trainable,
+        len(matched_param_names),
+        len(default_names),
+        len(param_groups),
+    )
+    return param_groups
+
+
 def build_optimizer(
     model: "nn.Module",
     lr: float = 1e-3,

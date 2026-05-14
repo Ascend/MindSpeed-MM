@@ -62,9 +62,73 @@ class Profiler(BaseArguments):
             self.profile_this_rank = False
 
 
+class LayerwiseLrRule(BaseArguments):
+    name: Optional[str] = field(
+        default=None,
+        metadata={"help": "Optional rule name for logging."},
+    )
+    prefixes: List[str] = field(
+        default_factory=list,
+        metadata={"help": "Parameter-name prefixes to match by startswith."},
+    )
+    contains: List[str] = field(
+        default_factory=list,
+        metadata={"help": "Substrings to match in parameter names."},
+    )
+    lr: Optional[float] = field(
+        default=None,
+        metadata={"help": "Absolute learning rate for matched parameters."},
+    )
+
+
+class LayerwiseLrConfig(BaseArguments):
+    enable: bool = field(
+        default=False,
+        metadata={"help": "Enable layer-wise learning rate by name matching."},
+    )
+    rules: List[LayerwiseLrRule] = field(
+        default_factory=list,
+        metadata={"help": "Ordered rules. First matched rule wins."},
+    )
+
+    def __post_init__(self):
+        normalized_rules: List[LayerwiseLrRule] = []
+        for idx, rule in enumerate(self.rules):
+            if isinstance(rule, LayerwiseLrRule):
+                normalized_rules.append(rule)
+            elif isinstance(rule, dict):
+                normalized_rules.append(LayerwiseLrRule(**rule))
+            else:
+                raise ValueError(
+                    f"Invalid layerwise_lr rule type at index {idx}: {type(rule)}. "
+                    "Expected dict or LayerwiseLrRule."
+                )
+        self.rules = normalized_rules
+
+    def validate(self):
+        if not self.enable:
+            return
+        if not self.rules:
+            raise ValueError("`training.layerwise_lr.enable` is True, but no rules are provided.")
+
+        for idx, rule in enumerate(self.rules):
+            if not rule.prefixes and not rule.contains:
+                raise ValueError(
+                    f"`training.layerwise_lr.rules[{idx}]` must provide at least one of `prefixes` or `contains`."
+                )
+            if rule.lr is None or rule.lr <= 0:
+                raise ValueError(
+                    f"`training.layerwise_lr.rules[{idx}].lr` must be a positive float."
+                )
+
+
 class TrainingArguments(BaseArguments):
     profile: Profiler = field(default_factory=Profiler)
     lora: LoraArguments = field(default_factory=LoraArguments)
+    layerwise_lr: LayerwiseLrConfig = field(
+        default_factory=LayerwiseLrConfig,
+        metadata={"help": "Layer-wise learning rate configuration."},
+    )
     lr: float = field(
         default=5e-5,
         metadata={"help": "Maximum learning rate or defult learning rate, or init learning rate for warmup."},
