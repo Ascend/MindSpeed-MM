@@ -7,6 +7,7 @@ from mindspeed_mm.fsdp.data import build_mm_dataset
 from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
 from mindspeed_mm.fsdp.train.trainer import Trainer
 from mindspeed_mm.fsdp.utils.device import get_device_type
+from mindspeed_mm.config.config_manager import ConfigManager
 
 
 def get_cosyvoice_dataloader(args):
@@ -30,6 +31,6 @@ def get_cosyvoice_dataloader(args):
 
 if __name__ == "__main__":
     # Entry point for training script
-    args = parse_args(Arguments)
+    args = ConfigManager(config_class=Arguments).load_and_parse()
     trainer = Trainer(args=args, dataloader_provider=get_cosyvoice_dataloader)
     trainer.train()

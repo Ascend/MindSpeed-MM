@@ -11,6 +11,7 @@ from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.tools.profiler import Profiler
 from mindspeed_mm.fsdp.train.trainer import Trainer
 from mindspeed_mm.fsdp.tasks.funasr.train_engine import FunasrTrainEngine
+from mindspeed_mm.config.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,6 @@ class FunasrTrainer(Trainer):
 
 
 if __name__ == "__main__":
-    args = parse_args(Arguments)
+    args = ConfigManager(config_class=Arguments).load_and_parse()
     trainer = FunasrTrainer(args=args)
     trainer.train()
