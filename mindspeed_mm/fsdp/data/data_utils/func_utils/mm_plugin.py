@@ -1165,18 +1165,51 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
 
 class KimiK25Plugin(BasePlugin):
     @override
+    def _get_mm_inputs(
+        self,
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        processor: "MMProcessor",
+    ) -> Dict[str, "torch.Tensor"]:
+        image_processor: BaseImageProcessor = getattr(processor, "image_processor", None)
+        mm_inputs = {}
+        if len(images) != 0:
+            images = self._regularize_images(
+                images,
+                image_max_pixels=getattr(processor, "image_max_pixels", 768 * 768),
+                image_min_pixels=getattr(processor, "image_min_pixels", 32 * 32),
+            )["images"]
+            mm_inputs.update(image_processor(images, return_tensors="pt"))
+
+        return mm_inputs
+
+    @override
     def process_messages(self, messages, images, videos, audios, processor):
         self._validate_input(processor, images, videos, audios)
         self._validate_messages(messages, images, videos, audios)
 
         num_image_tokens = 0
         messages = deepcopy(messages)
+
+        image_processor: BaseImageProcessor = getattr(processor, "image_processor", None)
+        image_merge_length: int = getattr(image_processor, "media_proc_cfg")["merge_kernel_size"] ** 2
+
+        if self.expand_mm_tokens:
+            mm_inputs = self._get_mm_inputs(images, videos, audios, processor)
+            image_grid_thw = mm_inputs.get("grid_thws", [])
+        else:
+            image_grid_thw = [None] * len(images)
+
         for message in messages:
             content = message["content"]
             while IMAGE_PLACEHOLDER in content:
+                image_seqlen = (
+                    image_grid_thw[num_image_tokens].prod() // image_merge_length if self.expand_mm_tokens else 1
+                )
                 content = content.replace(
                     IMAGE_PLACEHOLDER,
-                    f"<|media_start|>image<|media_content|>{self.image_token}<|media_end|>",
+                    f"<|media_start|>image<|media_content|>{self.image_token * image_seqlen}<|media_end|>",
                     1,
                 )
                 num_image_tokens += 1

@@ -151,8 +151,8 @@ def multihead_attention(
             # Shape before: (total_seq_len, kv_head_num, head_dim)
             # This repeats the K/V heads (dim 1) to match the ulysses_size (SP world size)
             # Shape after: (total_seq_len, kv_head_num * n_repeat, head_dim) where (kv_head_num * n_repeat) == ulysses_size
-            key = torch.repeat_interleave(key, dim=1, repeats=n_repeat)
-            value = torch.repeat_interleave(value, dim=1, repeats=n_repeat)
+            k = torch.repeat_interleave(k, dim=1, repeats=n_repeat)
+            v = torch.repeat_interleave(v, dim=1, repeats=n_repeat)
 
     if is_ulysses_enabled:
         q = all_to_all(q, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
@@ -1007,13 +1007,30 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
             labels (:obj:`torch.Tensor` of shape :obj:`(batch_size, sequence_length)`, *optional*):
                 The labels.
         """
-        _, embed_dim = image_features[0].shape
-        feature_lengths = [x.shape[0] for x in image_features]
-        image_features = torch.cat(image_features, dim=0)
-
         image_token_index: int = self.config.media_placeholder_token_id
         pad_token_id: int = self.config.pad_token_id
         ignore_index: int = self.config.ignore_index
+
+        if self.training:
+            pad_mask = input_ids == pad_token_id
+            image_mask = input_ids == image_token_index
+            image_features = torch.cat(image_features, dim=0)
+
+            n_image_tokens = image_mask.sum()
+            if image_features is not None and n_image_tokens != image_features.shape[0]:
+                raise ValueError(
+                    f"Image features and image tokens do not match: tokens: {n_image_tokens}, features {image_features.shape[0]}"
+                )
+
+            inputs_embeds[image_mask] = image_features
+            inputs_embeds *= ~pad_mask.unsqueeze(-1)
+            position_ids = (attention_mask.cumsum(-1) - 1).masked_fill_(attention_mask == 0, 1)
+
+            return inputs_embeds, attention_mask, labels, position_ids
+
+        _, embed_dim = image_features[0].shape
+        feature_lengths = [x.shape[0] for x in image_features]
+        image_features = torch.cat(image_features, dim=0)
 
         batch_size, sequence_length = input_ids.shape
         left_padding = not torch.sum(
