@@ -908,3 +908,736 @@ def _create_single_video_positions(
     )
 
     return video_positions
+
+
+@maybe_allow_in_graph
+class InternVLUTransformerBlock(nn.Module):
+    """
+    Dual-stream transformer block used by InternVLU diffusion models.
+
+    The block applies modulation, joint attention, and feed-forward layers with separate
+    normalization paths for image and text tokens.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_attention_heads: int,
+        attention_head_dim: int,
+        qk_norm: str = "rms_norm",
+        eps: float = 1e-6,
+    ):
+        super().__init__()
+
+        self.dim = dim
+        self.num_attention_heads = num_attention_heads
+        self.attention_head_dim = attention_head_dim
+
+        self.img_mod = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(dim, 6 * dim, bias=True),
+        )
+        self.img_norm1 = FP32LayerNorm(dim, elementwise_affine=False, eps=eps)
+        self.attn = AttentionVE(
+            query_dim=dim,
+            cross_attention_dim=None,
+            added_kv_proj_dim=dim,
+            dim_head=attention_head_dim,
+            heads=num_attention_heads,
+            out_dim=dim,
+            context_pre_only=False,
+            bias=True,
+            processor=(InternVLUDoubleStreamFlashAttnProcessor()if is_flash_attn_2_available() else InternVLUDoubleStreamTorchAttnProcessor()),
+            qk_norm=qk_norm,
+            eps=eps,
+        )
+        self.img_norm2 = FP32LayerNorm(dim, elementwise_affine=False, eps=eps)
+        self.img_mlp = FeedForward(
+            dim=dim, dim_out=dim, activation_fn="gelu-approximate"
+        )
+
+        self.txt_mod = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(dim, 6 * dim, bias=True),
+        )
+        self.txt_norm1 = FP32LayerNorm(dim, elementwise_affine=False, eps=eps)
+        self.txt_norm2 = FP32LayerNorm(dim, elementwise_affine=False, eps=eps)
+        self.txt_mlp = FeedForward(
+            dim=dim, dim_out=dim, activation_fn="gelu-approximate"
+        )
+
+    def _modulate(self, x, mod_params):
+        """Apply modulation to input tensor"""
+        shift, scale, gate = mod_params.chunk(3, dim=-1)
+        return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1), gate.unsqueeze(1)
+
+    def _forward_ve(
+        self,
+        hidden_states: torch.Tensor,
+        temb: torch.Tensor,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        image_rotary_emb: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        enc_token_mask: Optional[torch.Tensor] = None,
+        padding_type: str = "pad",
+        joint_attention_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+
+        batch_size, seq_len = hidden_states.shape[:2]
+
+        img_mod_params = self.img_mod(temb)
+        txt_mod_params = self.txt_mod(temb)
+
+        enc_mask = enc_token_mask.unsqueeze(-1).to(hidden_states.dtype)
+        img_mask = 1.0 - enc_mask
+
+        if padding_type == "pack":
+            per_seq_lens = attention_mask[0, 1:] - attention_mask[0, :-1]
+            img_mod_params = img_mod_params.repeat_interleave(per_seq_lens, dim=0)[None]
+            txt_mod_params = txt_mod_params.repeat_interleave(per_seq_lens, dim=0)[None]
+            mod_params = img_mod_params * img_mask + txt_mod_params * enc_mask
+        elif padding_type == "pad":
+            img_expanded = img_mod_params.unsqueeze(1).expand(-1, seq_len, -1)
+            txt_expanded = txt_mod_params.unsqueeze(1).expand(-1, seq_len, -1)
+            mod_params = img_expanded * img_mask + txt_expanded * enc_mask
+
+        mod1, mod2 = mod_params.chunk(2, dim=-1)
+        shift1, scale1, gate1 = mod1.chunk(3, dim=-1)
+        shift2, scale2, gate2 = mod2.chunk(3, dim=-1)
+
+        img_normed = self.img_norm1(hidden_states)
+        txt_normed = self.txt_norm1(hidden_states)
+
+        normed_states = img_normed * img_mask + txt_normed * enc_mask
+        modulated_states = normed_states * (1 + scale1) + shift1
+
+        joint_attention_kwargs = joint_attention_kwargs or {}
+        attn_output = self.attn(
+            hidden_states=modulated_states,
+            attention_mask=attention_mask,
+            image_rotary_emb=image_rotary_emb,
+            enc_token_mask=enc_token_mask,
+            attn_mode="ve",
+            padding_type=padding_type,
+            **joint_attention_kwargs,
+        )
+
+        gated_attn = gate1 * attn_output
+        hidden_states = hidden_states + gated_attn
+
+        img_normed = self.img_norm2(hidden_states)
+        txt_normed = self.txt_norm2(hidden_states)
+
+        normed_states = img_normed * img_mask + txt_normed * enc_mask
+        modulated_states = normed_states * (1 + scale2) + shift2
+
+        img_mlp_out = self.img_mlp(modulated_states)
+        txt_mlp_out = self.txt_mlp(modulated_states)
+
+        mlp_output = img_mlp_out * img_mask + txt_mlp_out * enc_mask
+        hidden_states = hidden_states + gate2 * mlp_output
+
+        if hidden_states.dtype == torch.float16:
+            hidden_states = hidden_states.clip(-65504, 65504)
+
+        return hidden_states
+
+    def _forward_ori(
+        self,
+        hidden_states: torch.Tensor,
+        encoder_hidden_states: torch.Tensor,
+        encoder_hidden_states_mask: torch.Tensor,
+        temb: torch.Tensor,
+        image_rotary_emb: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        joint_attention_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        img_mod_params = self.img_mod(temb)
+        txt_mod_params = self.txt_mod(temb)
+
+        img_mod1, img_mod2 = img_mod_params.chunk(2, dim=-1)
+        txt_mod1, txt_mod2 = txt_mod_params.chunk(2, dim=-1)
+
+        img_normed = self.img_norm1(hidden_states)
+        img_modulated, img_gate1 = self._modulate(img_normed, img_mod1)
+
+        txt_normed = self.txt_norm1(encoder_hidden_states)
+        txt_modulated, txt_gate1 = self._modulate(txt_normed, txt_mod1)
+
+        joint_attention_kwargs = joint_attention_kwargs or {}
+        attn_output = self.attn(
+            hidden_states=img_modulated,
+            encoder_hidden_states=txt_modulated,
+            encoder_hidden_states_mask=encoder_hidden_states_mask,
+            image_rotary_emb=image_rotary_emb,
+            attn_mode="default",
+            **joint_attention_kwargs,
+        )
+
+        img_attn_output, txt_attn_output = attn_output
+
+        hidden_states = hidden_states + img_gate1 * img_attn_output
+        encoder_hidden_states = encoder_hidden_states + txt_gate1 * txt_attn_output
+
+        img_normed2 = self.img_norm2(hidden_states)
+        img_modulated2, img_gate2 = self._modulate(img_normed2, img_mod2)
+        img_mlp_output = self.img_mlp(img_modulated2)
+        hidden_states = hidden_states + img_gate2 * img_mlp_output
+
+        txt_normed2 = self.txt_norm2(encoder_hidden_states)
+        txt_modulated2, txt_gate2 = self._modulate(txt_normed2, txt_mod2)
+        txt_mlp_output = self.txt_mlp(txt_modulated2)
+        encoder_hidden_states = encoder_hidden_states + txt_gate2 * txt_mlp_output
+
+        if encoder_hidden_states.dtype == torch.float16:
+            encoder_hidden_states = encoder_hidden_states.clip(-65504, 65504)
+        if hidden_states.dtype == torch.float16:
+            hidden_states = hidden_states.clip(-65504, 65504)
+
+        return encoder_hidden_states, hidden_states
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        temb: torch.Tensor,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        image_rotary_emb: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        enc_token_mask: Optional[torch.Tensor] = None,
+        padding_type: str = "pad",
+        joint_attention_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+
+        output_ve = self._forward_ve(
+            hidden_states,
+            temb,
+            attention_mask=attention_mask,
+            image_rotary_emb=image_rotary_emb,
+            enc_token_mask=enc_token_mask,
+            padding_type=padding_type,
+            joint_attention_kwargs=joint_attention_kwargs,
+        )
+
+        return output_ve
+
+
+class InternVLUDoubleStreamFlashAttnProcessor:
+    """
+    Flash Attention 2 processor for InternVLU double-stream architecture, matching DoubleStreamLayerMegatron logic.
+    This processor implements joint attention computation where text and image streams are processed together.
+    """
+
+    _attention_backend = None
+
+    def __init__(self):
+        if not hasattr(F, "scaled_dot_product_attention"):
+            raise ImportError(
+                "InternVLUDoubleStreamFlashAttnProcessor requires PyTorch 2.0, please upgrade PyTorch to 2.0."
+            )
+        self._flash_attn_uses_top_left_mask = not is_flash_attn_greater_or_equal_2_10()
+        self.is_causal = False
+
+    def _call_ve(
+        self,
+        attn: AttentionVE,
+        hidden_states: torch.FloatTensor,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        image_rotary_emb: Optional[torch.Tensor] = None,
+        enc_token_mask: Optional[torch.Tensor] = None,
+        padding_type: str = "pad",
+    ):
+        dtype = attn.to_v.weight.dtype
+
+        enc_mask = enc_token_mask.unsqueeze(-1).to(dtype)
+        img_mask = 1.0 - enc_mask
+
+        q_enc = attn.add_q_proj(hidden_states).unflatten(-1, (attn.heads, -1))
+        k_enc = attn.add_k_proj(hidden_states).unflatten(-1, (attn.heads, -1))
+        v_enc = attn.add_v_proj(hidden_states)
+
+        q_img = attn.to_q(hidden_states).unflatten(-1, (attn.heads, -1))
+        k_img = attn.to_k(hidden_states).unflatten(-1, (attn.heads, -1))
+        v_img = attn.to_v(hidden_states)
+
+        bsz, q_len = q_enc.shape[:2]
+        head_dim = attn.out_dim // attn.heads
+
+        q_enc, gate_score_enc = torch.split(q_enc, [head_dim, head_dim], dim=-1)
+        gate_score_enc = gate_score_enc.reshape(bsz, q_len, -1)
+        q_img, gate_score_img = torch.split(q_img, [head_dim, head_dim], dim=-1)
+        gate_score_img = gate_score_img.reshape(bsz, q_len, -1)
+
+        q_enc = attn.norm_added_q(q_enc)
+        k_enc = attn.norm_added_k(k_enc)
+        q_img = attn.norm_q(q_img)
+        k_img = attn.norm_k(k_img)
+
+        joint_query = (
+            q_enc * enc_mask.unsqueeze(-1) + q_img * img_mask.unsqueeze(-1)
+        ).to(dtype)
+        joint_key = (
+            k_enc * enc_mask.unsqueeze(-1) + k_img * img_mask.unsqueeze(-1)
+        ).to(dtype)
+        joint_value = (
+            (v_enc * enc_mask + v_img * img_mask)
+            .unflatten(-1, (attn.heads, -1))
+            .to(dtype)
+        )
+
+        if image_rotary_emb is not None:
+            joint_freqs = image_rotary_emb
+            joint_query = apply_rotary_emb_ms(joint_query, joint_freqs, use_real=False)
+            joint_key = apply_rotary_emb_ms(joint_key, joint_freqs, use_real=False)
+
+        bsz, q_len = joint_query.shape[:2]
+
+        attn_dtype = torch.bfloat16
+        joint_hidden_states = self._flash_attention_forward(
+            joint_query.to(dtype=attn_dtype),
+            joint_key.to(dtype=attn_dtype),
+            joint_value.to(dtype=attn_dtype),
+            attention_mask=attention_mask,
+            query_length=q_len,
+            dropout=0.0,
+            use_sliding_windows=False,
+            padding_type=padding_type,
+        )
+
+        joint_hidden_states = joint_hidden_states.reshape(bsz, q_len, -1).contiguous()
+        joint_hidden_states = joint_hidden_states.to(joint_query.dtype)
+
+        enc_output = attn.to_add_out(joint_hidden_states)
+
+        img_output = attn.to_out[0](joint_hidden_states)
+        if len(attn.to_out) > 1:
+            img_output = attn.to_out[1](img_output)
+
+        attn_output = enc_output * enc_mask + img_output * img_mask
+
+        gate_score = gate_score_enc * enc_mask + gate_score_img * img_mask
+        attn_output = attn_output * torch.sigmoid(gate_score)
+
+        return attn_output
+
+    def _call_ori(
+        self,
+        attn: AttentionVE,
+        hidden_states: torch.FloatTensor,
+        encoder_hidden_states: torch.FloatTensor = None,
+        encoder_hidden_states_mask: torch.FloatTensor = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        image_rotary_emb: Optional[torch.Tensor] = None,
+        padding_type: str = "pad",
+    ) -> torch.FloatTensor:
+        if encoder_hidden_states is None:
+            raise ValueError(
+                "InternVLUDoubleStreamFlashAttnProcessor requires encoder_hidden_states (text stream)"
+            )
+
+        seq_txt = encoder_hidden_states.shape[1]
+
+        img_query = attn.to_q(hidden_states)
+        img_key = attn.to_k(hidden_states)
+        img_value = attn.to_v(hidden_states)
+
+        txt_query = attn.add_q_proj(encoder_hidden_states)
+        txt_key = attn.add_k_proj(encoder_hidden_states)
+        txt_value = attn.add_v_proj(encoder_hidden_states)
+
+        img_query = img_query.unflatten(-1, (attn.heads, -1))
+        img_key = img_key.unflatten(-1, (attn.heads, -1))
+        img_value = img_value.unflatten(-1, (attn.heads, -1))
+
+        txt_query = txt_query.unflatten(-1, (attn.heads, -1))
+        txt_key = txt_key.unflatten(-1, (attn.heads, -1))
+        txt_value = txt_value.unflatten(-1, (attn.heads, -1))
+
+        if attn.norm_q is not None:
+            img_query = attn.norm_q(img_query)
+        if attn.norm_k is not None:
+            img_key = attn.norm_k(img_key)
+        if attn.norm_added_q is not None:
+            txt_query = attn.norm_added_q(txt_query)
+        if attn.norm_added_k is not None:
+            txt_key = attn.norm_added_k(txt_key)
+
+        if image_rotary_emb is not None:
+            img_freqs, txt_freqs = image_rotary_emb
+            img_query = apply_rotary_emb_ms(img_query, img_freqs, use_real=False)
+            img_key = apply_rotary_emb_ms(img_key, img_freqs, use_real=False)
+            txt_query = apply_rotary_emb_ms(txt_query, txt_freqs, use_real=False)
+            txt_key = apply_rotary_emb_ms(txt_key, txt_freqs, use_real=False)
+
+        joint_query = torch.cat([txt_query, img_query], dim=1)
+        joint_key = torch.cat([txt_key, img_key], dim=1)
+        joint_value = torch.cat([txt_value, img_value], dim=1)
+
+        q_len = joint_query.shape[1]
+
+        joint_hidden_states = self._flash_attention_forward(
+            joint_query,
+            joint_key,
+            joint_value,
+            attention_mask=None,
+            query_length=q_len,
+            dropout=0.0,
+            use_sliding_windows=False,
+            padding_type=padding_type,
+        )
+        joint_hidden_states = joint_hidden_states.flatten(2, 3)
+        joint_hidden_states = joint_hidden_states.to(joint_query.dtype)
+
+        txt_attn_output = joint_hidden_states[:, :seq_txt, :]
+        img_attn_output = joint_hidden_states[:, seq_txt:, :]
+
+        img_attn_output = attn.to_out[0](img_attn_output)
+        if len(attn.to_out) > 1:
+            img_attn_output = attn.to_out[1](img_attn_output)
+
+        txt_attn_output = attn.to_add_out(txt_attn_output)
+
+        return img_attn_output, txt_attn_output
+
+    def __call__(
+        self,
+        attn: AttentionVE,
+        hidden_states: torch.FloatTensor,
+        encoder_hidden_states: torch.FloatTensor = None,
+        encoder_hidden_states_mask: torch.FloatTensor = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        image_rotary_emb: Optional[torch.Tensor] = None,
+        enc_token_mask: Optional[torch.Tensor] = None,
+        padding_type: str = "pad",
+        attn_mode: str = "default",
+    ) -> torch.FloatTensor:
+
+        if attn_mode == "default":
+            output = self._call_ori(
+                attn,
+                hidden_states,
+                encoder_hidden_states,
+                encoder_hidden_states_mask,
+                attention_mask,
+                image_rotary_emb,
+                padding_type,
+            )
+            return output
+        elif attn_mode == "ve":
+            output_ve = self._call_ve(
+                attn,
+                hidden_states,
+                attention_mask,
+                image_rotary_emb,
+                enc_token_mask,
+                padding_type,
+            )
+            return output_ve
+
+    def _flash_attention_forward(
+        self,
+        query_states,
+        key_states,
+        value_states,
+        attention_mask,
+        query_length,
+        dropout=0.0,
+        softmax_scale=None,
+        use_sliding_windows=False,
+        padding_type="pad",
+    ):
+        """
+        Calls the forward method of Flash Attention - if the input hidden states contain at least one padding token
+        first unpad the input, then computes the attention scores and pad the final attention scores.
+
+        Args:
+            query_states (`torch.Tensor`):
+                Input query states to be passed to Flash Attention API
+            key_states (`torch.Tensor`):
+                Input key states to be passed to Flash Attention API
+            value_states (`torch.Tensor`):
+                Input value states to be passed to Flash Attention API
+            attention_mask (`torch.Tensor`):
+                The padding mask - corresponds to a tensor of size `(batch_size, seq_len)` where 0 stands for the
+                position of padding tokens and 1 for the position of non-padding tokens.
+            dropout (`int`, *optional*):
+                Attention dropout
+            softmax_scale (`float`, *optional*):
+                The scaling of QK^T before applying softmax. Default to 1 / sqrt(head_dim)
+            use_sliding_windows (`bool`, *optional*):
+                Whether to activate sliding window attention.
+        """
+        if padding_type == "pad":
+            attn_output = self._flash_attention_forward_pad(
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                query_length,
+                dropout=dropout,
+                softmax_scale=softmax_scale,
+                use_sliding_windows=use_sliding_windows,
+            )
+        elif padding_type == "pack":
+            attn_output = self._flash_attention_forward_pack(
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                query_length,
+                dropout=dropout,
+                softmax_scale=softmax_scale,
+                use_sliding_windows=use_sliding_windows,
+            )
+        else:
+            raise ValueError(
+                f"padding_type should be either `pad` or `pack`, got {padding_type}"
+            )
+        return attn_output
+
+    def _flash_attention_forward_pad(
+        self,
+        query_states,
+        key_states,
+        value_states,
+        attention_mask,
+        query_length,
+        dropout=0.0,
+        softmax_scale=None,
+        use_sliding_windows=False,
+    ):
+        """
+        Calls the forward method of Flash Attention - if the input hidden states contain at least one padding token
+        first unpad the input, then computes the attention scores and pad the final attention scores.
+
+        Args:
+            query_states (`torch.Tensor`):
+                Input query states to be passed to Flash Attention API
+            key_states (`torch.Tensor`):
+                Input key states to be passed to Flash Attention API
+            value_states (`torch.Tensor`):
+                Input value states to be passed to Flash Attention API
+            attention_mask (`torch.Tensor`):
+                The padding mask - corresponds to a tensor of size `(batch_size, seq_len)` where 0 stands for the
+                position of padding tokens and 1 for the position of non-padding tokens.
+            dropout (`float`):
+                Attention dropout
+            softmax_scale (`float`, *optional*):
+                The scaling of QK^T before applying softmax. Default to 1 / sqrt(head_dim)
+            use_sliding_windows (`bool`, *optional*):
+                Whether to activate sliding window attention.
+        """
+        if not self._flash_attn_uses_top_left_mask:
+            causal = self.is_causal
+        else:
+            causal = self.is_causal and query_length != 1
+
+        if use_sliding_windows and self.layer_idx >= self.config.max_window_layers:
+            use_sliding_windows = False
+
+        if attention_mask is not None:
+            batch_size = query_states.shape[0]
+            (
+                query_states,
+                key_states,
+                value_states,
+                indices_q,
+                cu_seq_lens,
+                max_seq_lens,
+            ) = self._upad_input(
+                query_states, key_states, value_states, attention_mask, query_length
+            )
+
+            cu_seqlens_q, cu_seqlens_k = cu_seq_lens
+            max_seqlen_in_batch_q, max_seqlen_in_batch_k = max_seq_lens
+
+            if not use_sliding_windows:
+                attn_output_unpad = flash_attn_varlen_func(
+                    query_states,
+                    key_states,
+                    value_states,
+                    cu_seqlens_q=cu_seqlens_q,
+                    cu_seqlens_k=cu_seqlens_k,
+                    max_seqlen_q=max_seqlen_in_batch_q,
+                    max_seqlen_k=max_seqlen_in_batch_k,
+                    dropout_p=dropout,
+                    softmax_scale=softmax_scale,
+                    causal=causal,
+                )
+            else:
+                attn_output_unpad = flash_attn_varlen_func(
+                    query_states,
+                    key_states,
+                    value_states,
+                    cu_seqlens_q=cu_seqlens_q,
+                    cu_seqlens_k=cu_seqlens_k,
+                    max_seqlen_q=max_seqlen_in_batch_q,
+                    max_seqlen_k=max_seqlen_in_batch_k,
+                    dropout_p=dropout,
+                    softmax_scale=softmax_scale,
+                    causal=causal,
+                    window_size=(
+                        self.config.sliding_window,
+                        self.config.sliding_window,
+                    ),
+                )
+
+            attn_output = pad_input(
+                attn_output_unpad, indices_q, batch_size, query_length
+            )
+        else:
+            if not use_sliding_windows:
+                attn_output = flash_attn_func(
+                    query_states,
+                    key_states,
+                    value_states,
+                    dropout,
+                    softmax_scale=softmax_scale,
+                    causal=causal,
+                )
+            else:
+                attn_output = flash_attn_func(
+                    query_states,
+                    key_states,
+                    value_states,
+                    dropout,
+                    softmax_scale=softmax_scale,
+                    causal=causal,
+                    window_size=(
+                        self.config.sliding_window,
+                        self.config.sliding_window,
+                    ),
+                )
+
+        return attn_output
+
+    def _flash_attention_forward_pack(
+        self,
+        query_states,
+        key_states,
+        value_states,
+        attention_mask,
+        query_length,
+        dropout=0.0,
+        softmax_scale=None,
+        use_sliding_windows=False,
+    ):
+        """
+        Calls the forward method of Flash Attention - if the input hidden states contain at least one padding token
+        first unpad the input, then computes the attention scores and pad the final attention scores.
+
+        Args:
+            query_states (`torch.Tensor`):
+                Input query states to be passed to Flash Attention API
+            key_states (`torch.Tensor`):
+                Input key states to be passed to Flash Attention API
+            value_states (`torch.Tensor`):
+                Input value states to be passed to Flash Attention API
+            attention_mask (`torch.Tensor`):
+                The padding mask - corresponds to a tensor of size `(batch_size, seq_len)` where 0 stands for the
+                position of padding tokens and 1 for the position of non-padding tokens.
+            dropout (`int`, *optional*):
+                Attention dropout
+            softmax_scale (`float`, *optional*):
+                The scaling of QK^T before applying softmax. Default to 1 / sqrt(head_dim)
+            use_sliding_windows (`bool`, *optional*):
+                Whether to activate sliding window attention.
+        """
+        assert query_states.size(0) == key_states.size(0) == value_states.size(0) == 1
+        query_states = query_states.squeeze(0)
+        key_states = key_states.squeeze(0)
+        value_states = value_states.squeeze(0)
+        cu_seqlens = attention_mask.squeeze(0).to(dtype=torch.int32)
+
+        with torch.no_grad():
+            max_seqlen = max(
+                [
+                    cu_seqlens[idx + 1] - cu_seqlens[idx]
+                    for idx in range(cu_seqlens.size(0) - 1)
+                ]
+            ).item()
+
+        if not self._flash_attn_uses_top_left_mask:
+            causal = self.is_causal
+        else:
+            causal = self.is_causal and query_length != 1
+
+        if use_sliding_windows and self.layer_idx >= self.config.max_window_layers:
+            use_sliding_windows = False
+
+        if not use_sliding_windows:
+            attn_output = flash_attn_varlen_func(
+                q=query_states,
+                k=key_states,
+                v=value_states,
+                cu_seqlens_q=cu_seqlens,
+                cu_seqlens_k=cu_seqlens,
+                max_seqlen_q=max_seqlen,
+                max_seqlen_k=max_seqlen,
+                dropout_p=dropout,
+                softmax_scale=softmax_scale,
+                causal=causal,
+            )
+        else:
+            attn_output = flash_attn_varlen_func(
+                q=query_states,
+                k=key_states,
+                v=value_states,
+                cu_seqlens_q=cu_seqlens,
+                cu_seqlens_k=cu_seqlens,
+                max_seqlen_q=max_seqlen,
+                max_seqlen_k=max_seqlen,
+                dropout_p=dropout,
+                softmax_scale=softmax_scale,
+                causal=causal,
+                window_size=(self.config.sliding_window, self.config.sliding_window),
+            )
+
+        query_states = query_states.unsqueeze(0)
+        key_states = key_states.unsqueeze(0)
+        value_states = value_states.unsqueeze(0)
+        return attn_output
+
+    def _upad_input(
+        self, query_layer, key_layer, value_layer, attention_mask, query_length
+    ):
+        batch_size, kv_seq_len, num_heads, head_dim = key_layer.shape
+
+        if kv_seq_len != attention_mask.shape[-1]:
+            attention_mask_num_tokens = attention_mask.shape[-1]
+            attention_mask = attention_mask[:, attention_mask_num_tokens - kv_seq_len :]
+
+        indices_k, cu_seqlens_k, max_seqlen_in_batch_k = _get_unpad_data(attention_mask)
+
+        key_layer = index_first_axis(
+            key_layer.reshape(batch_size * kv_seq_len, num_heads, head_dim), indices_k
+        )
+        value_layer = index_first_axis(
+            value_layer.reshape(batch_size * kv_seq_len, num_heads, head_dim), indices_k
+        )
+
+        if query_length == kv_seq_len:
+            query_layer = index_first_axis(
+                query_layer.reshape(batch_size * kv_seq_len, num_heads, head_dim),
+                indices_k,
+            )
+            cu_seqlens_q = cu_seqlens_k
+            max_seqlen_in_batch_q = max_seqlen_in_batch_k
+            indices_q = indices_k
+        elif query_length == 1:
+            max_seqlen_in_batch_q = 1
+            cu_seqlens_q = torch.arange(
+                batch_size + 1, dtype=torch.int32, device=query_layer.device
+            )
+            indices_q = cu_seqlens_q[:-1]
+            query_layer = query_layer.squeeze(1)
+        else:
+            attention_mask = attention_mask[:, -query_length:]
+            query_layer, indices_q, cu_seqlens_q, max_seqlen_in_batch_q = unpad_input(
+                query_layer, attention_mask
+            )
+
+        return (
+            query_layer,
+            key_layer,
+            value_layer,
+            indices_q,
+            (cu_seqlens_q, cu_seqlens_k),
+            (max_seqlen_in_batch_q, max_seqlen_in_batch_k),
+        )
