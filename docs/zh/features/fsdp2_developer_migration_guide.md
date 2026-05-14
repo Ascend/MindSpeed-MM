@@ -204,10 +204,6 @@ parallel:
       - model.language_model.layers.{*}
     param_dtype: bf16
     reduce_dtype: fp32
-  recompute: false
-  recompute_plan:
-    apply_modules:
-      - model.language_model.layers.{*}
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
@@ -240,6 +236,10 @@ model:
   freeze: []
   loss_cfg:
     loss_type: raw
+  recompute: false
+  recompute_plan:
+    apply_modules:
+      - model.language_model.layers.{*}
 
 training:
   micro_batch_size: 1
@@ -287,7 +287,6 @@ tools:
 | `parallel.fsdp_plan.apply_modules` | 指定先被 `fully_shard` 包装的子模块；框架随后还会对最外层 model 调用 `fully_shard`。为空时只包装最外层 model。 |
 | `parallel.fsdp_plan.hook_modules` | 指定 FSDP hook manager 挂载模块。开启 EP 时应配置到稳定的上层层级，例如 `model.language_model.layers.{*}`，否则专家层通信和预取容易带来显存压力。 |
 | `parallel.fsdp_plan.cpu_offload` | 将 FSDP 参数等状态 offload 到 CPU；开启后初始化和通信后端也会走 CPU 相关路径，需结合内存与性能验证。 |
-| `parallel.recompute` / `recompute_plan.apply_modules` | 重计算配置，以计算换显存；模块路径同样来自 `named_modules()`。 |
 | `parallel.expert_parallel_size` / `ep_plan.apply_modules` | MoE 专家并行配置。仅在模型专家模块已适配 EP 时开启。 |
 
 数据字段：
@@ -307,6 +306,7 @@ tools:
 | `model.model_name_or_path` | HF/第三方权重、config 或本地模型目录路径。 |
 | `model.loss_cfg.loss_type` | 默认为 `raw`，表示直接使用模型输出的 `.loss`；|
 | `model.freeze` | 按模块路径模式冻结参数。 |
+| `model.recompute` / `recompute_plan.apply_modules` | 重计算配置，以计算换显存；模块路径同样来自 `named_modules()`。 |
 
 训练与检查点字段：
 
