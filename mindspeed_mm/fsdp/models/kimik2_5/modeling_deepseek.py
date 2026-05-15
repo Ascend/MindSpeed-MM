@@ -48,6 +48,7 @@ from transformers.utils import (add_start_docstrings,
                                 replace_return_docstrings)
 from transformers.utils.import_utils import is_torch_fx_available
 
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from .configuration_deepseek import DeepseekV3Config
 
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
@@ -268,12 +269,17 @@ class DeepseekV3RMSNorm(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, hidden_states):
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance +
-                                                    self.variance_epsilon)
-        return self.weight * hidden_states.to(input_dtype)
+        if IS_NPU_AVAILABLE:
+            import torch_npu
+            hidden_states = torch_npu.npu_rms_norm(hidden_states.to(self.weight.dtype), self.weight, self.variance_epsilon)[0]
+            return hidden_states
+        else:
+            input_dtype = hidden_states.dtype
+            hidden_states = hidden_states.to(torch.float32)
+            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            hidden_states = hidden_states * torch.rsqrt(variance +
+                                                        self.variance_epsilon)
+            return self.weight * hidden_states.to(input_dtype)
 
 
 ALL_LAYERNORM_LAYERS.append(DeepseekV3RMSNorm)
