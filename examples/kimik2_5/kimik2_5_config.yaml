@@ -81,9 +81,6 @@ model:
   model_id: kimi_k25
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
-  freeze:
-    - vision_tower
-    - mm_projector
   loss_cfg:
     loss_type: default
   enable_chunk_loss: true
@@ -97,6 +94,15 @@ model:
       apply_modules:
         - vision_tower.encoder.blocks.{*}
         - language_model.model.layers.{*}
+  # chunkmbs配置
+  enable_chunk_mbs: false
+  chunkmbs_plan:
+    apply_modules:
+      - language_model.model.layers.{*}
+    chunk_mbs: 1 # 这个表示的是chunk之后的micro batchsize
+    batch_dim: 0
+    chunk_arg_indexs: [ 0 ]
+    chunk_kwarg_names: [ "position_embeddings", "position_ids", "rope_deltas", "attention_mask" ]
 
 # 训练配置
 training:
