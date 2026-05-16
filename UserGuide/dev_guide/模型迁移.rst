@@ -136,7 +136,7 @@ train_valid_test_datasets_provider   构建数据加载器
     # 安装加速库
     git clone https://gitcode.com/Ascend/MindSpeed.git
     cd MindSpeed
-    # checkout commit from MindSpeed core_r0.12.1
+    # checkout commit from MindSpeed 26.0.0_core_r0.12.1
     git checkout xxxxxxx
 
     # 安装mindspeed及依赖

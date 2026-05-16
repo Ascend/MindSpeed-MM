@@ -7,11 +7,11 @@ MindSpeed MM训练逻辑整体沿用Megatron风格，各类模型使用统一的
 `pretrain_xxx.py`中提供了模型训练过程中涉及的主要（回调）函数，用户需要根据具体任务需求，在这些函数中实现相应的业务逻辑。这些函数将在训练过程中被自动调用：
 
 | ​​**函数**       | **描述**                              |
-| ---------------------------------------- | ---------------------------------------- | 
+| ---------------------------------------- | ---------------------------------------- |
 | `model_provider`                        | 构建模型                               |
-| `get_batch`                             | 构建模型的前向输入数据                 | 
-| `loss_func`                             | 计算模型前向损失                       | 
-| `forward_step`                          | 模型前向，并计算损失                   | 
+| `get_batch`                             | 构建模型的前向输入数据                 |
+| `loss_func`                             | 计算模型前向损失                       |
+| `forward_step`                          | 模型前向，并计算损失                   |
 | `train_valid_test_datasets_provider` | 构造数据加载器                             |
 
 ## 核心接口调用流程
@@ -27,26 +27,26 @@ sequenceDiagram
 
     M->>E: 初始化训练
     activate E
-    
+
     E->>MP: 调用model_provider构建模型
     activate MP
     MP->>Model: 创建模型实例
     MP-->>E: 返回模型
     deactivate MP
-    
+
     E->>D: 调用train_valid_test_datasets_provider
     activate D
     D-->>E: 返回DataLoader
     deactivate D
-    
 
-    
+
+
     loop 每个训练步骤
         E->>D: 调用get_batch获取数据
         activate D
         D-->>E: 返回batch数据
         deactivate D
-        
+
         E->>Model: 调用forward_step前向计算
         activate Model
         Model->>LC: 调用loss_func计算损失
@@ -54,11 +54,11 @@ sequenceDiagram
         LC-->>E: 返回损失值
         deactivate LC
         deactivate Model
-        
+
         E->>E: 反向传播与参数更新
         Note over E: 梯度计算、优化器步进<br/>学习率调整
     end
-    
+
     E-->>M: 训练完成
 ```
 
@@ -86,7 +86,7 @@ mkdir logs data ckpt
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
-# checkout commit from MindSpeed core_r0.12.1
+# checkout commit from MindSpeed 26.0.0_core_r0.12.1
 git checkout xxxxxxx
 
 # 安装mindspeed及依赖
@@ -116,7 +116,7 @@ def train_valid_test_datasets_provider():
     train_dataloader= build_dataloader(CustomDataset(...))
     valid_dataloader= build_dataloader(CustomDataset(...))
     test_dataloader= build_dataloader(CustomDataset(...))
-    
+
     return train_dataloader, valid_dataloader, test_dataloader
 
 def get_batch(data_iterator, args):
@@ -356,20 +356,20 @@ MindSpeed MM 支持通过 YAML 配置文件灵活管理 FSDP2 训练策略，实
 配置示例如下，`fsdp2_config.yaml`
 
 ```yaml
-sharding_size: auto 
-sub_modules_to_wrap: 
-  - "text_decoder.output_layer" 
-  - "text_decoder.embedding" 
-  - "text_decoder.rotary_pos_emb" 
-  - "text_decoder.decoder.layers.{*}" 
-param_dtype: "bf16" 
-reduce_dtype: "fp32" 
-cast_forward_inputs: True 
-ignored_modules: 
-  - "image_encoder" 
-recompute_modules: 
-  - "text_decoder.decoder.layers.{*}" 
-num_to_forward_prefetch: 2 
+sharding_size: auto
+sub_modules_to_wrap:
+  - "text_decoder.output_layer"
+  - "text_decoder.embedding"
+  - "text_decoder.rotary_pos_emb"
+  - "text_decoder.decoder.layers.{*}"
+param_dtype: "bf16"
+reduce_dtype: "fp32"
+cast_forward_inputs: True
+ignored_modules:
+  - "image_encoder"
+recompute_modules:
+  - "text_decoder.decoder.layers.{*}"
+num_to_forward_prefetch: 2
 num_to_backward_prefetch: 2
 offload_to_cpu: False
 ```

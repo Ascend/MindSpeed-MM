@@ -20,17 +20,38 @@ Last updated: 12/15/2025. Author: zhuyanru
 调度时间：模型从CPU的指令到调用NPU侧的核（Kernel）所需要的时间。
 
 
+
 性能数据采集
 ------------
+
+MindSpeed-MM提供了Profiling采集工具，支持静态采集和动态采集两种模式，用于采集模型训练过程中的性能数据。详细使用方法请参考 `Profiling采集工具 <../../docs/zh/tools.md#profiling采集工具>`_ 。
+
 
 
 性能分析流程
 ------------
+
+采集到性能数据后，可通过 `MindStudio Insight <https://www.hiascend.com/document/detail/zh/mindstudio/2600/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/overview.md>`_ 对性能数据进行可视化分析，定位性能瓶颈。
+
+MindStudio Insight是昇腾提供的性能分析工具，支持对Profiling采集的数据进行多维度分析，包括：
+
+- 算子耗时分析：识别耗时较长的算子，定位计算瓶颈
+- 通信耗时分析：分析通信与计算的时间占比，优化通信策略
+- 内存分析：查看显存使用情况，识别显存瓶颈
+- 流水线分析：分析流水线并行的空泡比例
 
 
 
 性能调优方法
 ------------
 
-参考资料
-------------
+MindSpeed-MM提供了多种性能调优特性，可根据实际场景选择合适的策略。各特性的详细使用方法请参考 `特性目录 <../../docs/zh/features/feature_list.md>`_ 中的对应文档。
+
+常用的性能调优特性包括：
+
+- **序列并行**：通过切分序列维度降低单卡计算量，支持Ulysses、RingAttention、USP等算法，详见 `DiT USP <../../docs/zh/features/dit_usp.md>`_ 和 `DiT Ring Attention <../../docs/zh/features/dit_ring_attention.md>`_
+- **异步激活值卸载**：将激活值卸载至Host侧，利用异步机制使拷贝被计算掩盖，降低峰值显存，详见 `异步激活值卸载 <../../docs/zh/features/async_activation_offload.md>`_
+- **异构并行**：支持不同维度的并行策略组合，详见 `异构并行 <../../docs/zh/features/hetero_parallel.md>`_
+- **ChunkLoss**：对序列维度分块计算loss，避免同时保留整个序列的logits，降低显存峰值，详见 `ChunkLoss <../../docs/zh/features/chunkloss.md>`_
+- **Bucket重排**：优化通信效率，详见 `Bucket重排 <../../docs/zh/features/bucket_reordering.md>`_
+
