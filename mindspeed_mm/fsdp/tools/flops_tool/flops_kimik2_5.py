@@ -250,12 +250,12 @@ def _estimate_deepseek_v3_flops(text_cfg, tokens_sum, batch_seqlens):
     # Attention 计算含两次矩阵乘法: Q @ KT 及 score @ V
     # Q: [B, N, S, Dq] KT: [B, N, Dq, S]  矩阵乘法: [B, N, S, Dq] × [B, N, Dq, S] ⇒ [B, N, S, S], 即 2bns^2d_q (乘法 + 加法)
     # score: [B, N, S, S] V: [B, N, S, Dv]  矩阵乘法: [B, N, S, S] × [B, N, S, Dv] ⇒ [B, N, S, Dv], 即 2bns^2d_v (乘法 + 加法)
-    # 前向计算一次矩阵乘法, 反向计算两次矩阵乘法, 共计 3 次
+    # 前向计算一次矩阵乘法, 反向计算两次矩阵乘法, 共计 3 次；采用了casual mask，计算量减半，因此除以2
     seqlen_square_sum = 0
     # for 循环相当于遍历 batch_size
     for seqlen in batch_seqlens:
         seqlen_square_sum += seqlen * seqlen * num_hidden_layers
-    attn_qkv_flops = 6 * seqlen_square_sum * (q_head_dim + text_cfg.v_head_dim) * num_query_heads
+    attn_qkv_flops = 6 * seqlen_square_sum * (q_head_dim + text_cfg.v_head_dim) * num_query_heads / 2
     # -------------------------------------- 4.Attention --------------------------------------
 
     # -------------------------------------- Sum --------------------------------------
@@ -290,7 +290,11 @@ def main(args):
 
     # 总 FLOPs
     total_flops = image_encoder_flops * args.batch_size * args.image_num + text_decoder_flops
-    print(f"Total flops is: {total_flops}")
+
+    # 单个 rank 的平均 FLOPs
+    average_flops = total_flops / (args.n_npu * args.latency)
+
+    print(f"Average FLOPs is: {average_flops}")
 
 
 if __name__ == "__main__":
@@ -301,6 +305,8 @@ if __name__ == "__main__":
     parser.add_argument('--height', type=int, help='Image height')
     parser.add_argument('--text_seq_length', type=int, help='Text sequence length')
     parser.add_argument('--hf_ckpt_path', type=str, help='HuggingFace config path')
+    parser.add_argument('--n_npu', type=int, help='Number of NPU')
+    parser.add_argument('--latency', type=float, help='Elapsed time per iteration (s)')
 
     args = parser.parse_args()
     main(args)
@@ -315,5 +321,7 @@ python mindspeed_mm/fsdp/tools/flops_tool/flops_kimik2_5.py \
     --width 1024 \
     --height 1024 \
     --text_seq_length 8192 \
-    --hf_ckpt_path "./mindspeed_mm/fsdp/models/kimik2_5"
+    --hf_ckpt_path "./mindspeed_mm/fsdp/models/kimik2_5" \
+    --n_npu 16 \
+    --latency 34.340
 """

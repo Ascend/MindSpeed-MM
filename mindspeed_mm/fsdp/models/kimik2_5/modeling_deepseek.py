@@ -1016,8 +1016,8 @@ class DeepseekV3Attention(nn.Module):
                 # Shape before: (batch_size, kv_head_num, seq_len, head_dim)
                 # This repeats the K/V heads (dim 1) to match the ulysses_size (SP world size)
                 # Shape after: (batch_size, kv_head_num * n_repeat, seq_len, head_dim) where (kv_head_num * n_repeat) == ulysses_size
-                key = torch.repeat_interleave(key, dim=1, repeats=n_repeat)
-                value = torch.repeat_interleave(value, dim=1, repeats=n_repeat)
+                key_states = torch.repeat_interleave(key_states, dim=1, repeats=n_repeat)
+                value_states = torch.repeat_interleave(value_states, dim=1, repeats=n_repeat)
 
             query_states = all_to_all(query_states, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2, gather_size=total_seq_len)
             key_states = all_to_all(key_states, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2, gather_size=total_seq_len)

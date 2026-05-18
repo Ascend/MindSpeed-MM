@@ -348,9 +348,9 @@ class Learnable2DInterpPosEmbDivided_fixed(nn.Module):
         nn.init.normal_(self.weight)
 
     def forward(self, x: torch.Tensor,
-                grid_thws: torch.Tensor) -> torch.Tensor:
+                grid_thws_list: list) -> torch.Tensor:
         pos_embs = []
-        for t, h, w in grid_thws.tolist():
+        for t, h, w in grid_thws_list:
             if t > self.num_frames:
                 raise AssertionError(f't:{t} > self.num_frames:{self.num_frames}')
             if (h, w) == self.weight.shape[:-1]:
@@ -409,7 +409,7 @@ class MoonVision3dPatchEmbed(nn.Module):
                 f'Not support pos_emb_type: {pos_emb_type}')
 
     def forward(self, x: torch.Tensor,
-                grid_thws: torch.Tensor) -> torch.Tensor:
+                grid_thws_list: list) -> torch.Tensor:
         """
         Args:
             x (L, Channels): input tensor
@@ -420,7 +420,7 @@ class MoonVision3dPatchEmbed(nn.Module):
         """
         x = self.proj(x).view(x.size(0), -1)
         # apply positional embedding
-        x = self.pos_emb(x, grid_thws)
+        x = self.pos_emb(x, grid_thws_list)
         return x
 
 
@@ -485,11 +485,11 @@ class Rope2DPosEmbRepeated(nn.Module):
         freqs_cis = freqs_cis.reshape(self.max_height, self.max_width, -1)
         return freqs_cis
 
-    def get_freqs_cis(self, grid_thws: torch.Tensor,
+    def get_freqs_cis(self, grid_thws_list: list,
                       device: torch.device) -> torch.Tensor:
         """
         Args:
-            grid_thws (torch.Tensor): grid time, height and width
+            grid_thws_list (list): grid time, height and width
 
         Returns:
             freqs_cis: tensor of shape (sum(t * height * width), dim//2)
@@ -499,15 +499,14 @@ class Rope2DPosEmbRepeated(nn.Module):
                                  self._precompute_freqs_cis(device),
                                  persistent=False)
 
-        shapes = grid_thws.tolist()
-        if not all(1 <= h <= self.max_height and 1 <= w <= self.max_width for t, h, w in shapes):
+        if not all(1 <= h <= self.max_height and 1 <= w <= self.max_width for t, h, w in grid_thws_list):
             raise AssertionError(
                 "Some (h, w) values are out of bounds (1<=h<=self.max_height, 1<=w<=self.max_width)."
             )
         freqs_cis = torch.cat(
             [
                 self.freqs_cis[:h, :w].reshape(-1, self.dim // 2).repeat(t, 1)
-                for t, h, w in shapes
+                for t, h, w in grid_thws_list
             ],
             dim=0,
         )
@@ -652,9 +651,10 @@ class MoonViT3dEncoder(nn.Module):
         self,
         hidden_states: torch.Tensor,
         grid_thws: torch.Tensor,
+        grid_thws_list: list,
     ) -> torch.Tensor:
         rope_freqs_cis = self.rope_2d.get_freqs_cis(
-            grid_thws=grid_thws, device=hidden_states.device)
+            grid_thws_list=grid_thws_list, device=hidden_states.device)
 
         lengths = torch.cat((
             torch.zeros(1, dtype=grid_thws.dtype, device=grid_thws.device),
@@ -705,14 +705,14 @@ class MoonViT3dEncoder(nn.Module):
 
 def tpool_patch_merger(
         x: torch.Tensor,
-        grid_thws: torch.Tensor,
+        grid_thws_list: list,
         merge_kernel_size: tuple[int, int] = (2, 2),
 ) -> list[torch.Tensor]:
     d_model = x.size(-1)
 
     outputs = []
     pre_sum = 0
-    for t, h, w in grid_thws.tolist():
+    for t, h, w in grid_thws_list:
         # Get the current sequence
         seq = x[pre_sum:pre_sum + t * h * w]
         # Reshape along self.merge_kernel_size and concat to the last dimension
@@ -786,12 +786,13 @@ class MoonViT3dPretrainedModel(PreTrainedModel):
             raise AssertionError(f'grid_thws should be 2D, got {grid_thws.ndim}')
         if grid_thws.size(1) != 3:
             raise AssertionError(f'No support for thw: {grid_thws}')
-        hidden_states = self.patch_embed(pixel_values, grid_thws)
-        hidden_states = self.encoder(hidden_states, grid_thws)
+        grid_thws_list = grid_thws.tolist()
+        hidden_states = self.patch_embed(pixel_values, grid_thws_list)
+        hidden_states = self.encoder(hidden_states, grid_thws, grid_thws_list)
         if self.merge_type == 'sd2_tpool':  # spatial downsampling 2x with temporal pooling all
             hidden_states = tpool_patch_merger(
                 hidden_states,
-                grid_thws,
+                grid_thws_list,
                 merge_kernel_size=self.merge_kernel_size)
         else:
             raise NotImplementedError(f'Not support {self.merge_type}')
