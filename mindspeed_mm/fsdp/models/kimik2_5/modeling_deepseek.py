@@ -1648,13 +1648,16 @@ class DeepseekV3Model(DeepseekV3PreTrainedModel):
                               (attention_mask is not None
                                and 0 in attention_mask) else None)
         else:
-            # 4d mask is passed through the layers
-            attention_mask = _prepare_4d_causal_attention_mask(
-                attention_mask,
-                (batch_size, seq_length),
-                inputs_embeds,
-                past_key_values_length,
-            )
+            if IS_NPU_AVAILABLE:
+                attention_mask = None
+            else:
+                # 4d mask is passed through the layers
+                attention_mask = _prepare_4d_causal_attention_mask(
+                    attention_mask,
+                    (batch_size, seq_length),
+                    inputs_embeds,
+                    past_key_values_length,
+                )
 
         total_seq_len = inputs_embeds.shape[1]
         set_seq_len("total", total_seq_len)
