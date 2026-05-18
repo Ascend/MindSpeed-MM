@@ -57,6 +57,7 @@ from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
+from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
     split_forward_gather_backward,
     gather_forward_split_backward,
@@ -1037,21 +1038,33 @@ class Qwen3_5MoeExperts(nn.Module):
         hidden_states: torch.Tensor,
         top_k_index: torch.Tensor,
         top_k_weights: torch.Tensor,
-        ep_group: ProcessGroup
+        ep_group: ProcessGroup,
+        ep_plan: EPPlanConfig,
     ) -> torch.Tensor:
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
 
-        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward
-        hidden_states = ep_forward(
-            self.num_experts,
-            top_k_weights,
-            top_k_index,
-            hidden_states,
-            fc1_weight=gate_up_proj,
-            fc2_weight=down_proj,
-            ep_group=ep_group
-        )
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward, ep_mc2_forward
+        
+        ep_dispatcher_dict = {
+            "alltoall": ep_forward,
+            "mc2": ep_mc2_forward
+        }
+        if ep_plan.dispatcher in ep_dispatcher_dict:
+            dipatcher_func = ep_dispatcher_dict[ep_plan.dispatcher]
+            hidden_states = dipatcher_func(
+                self.num_experts,
+                top_k_weights,
+                top_k_index,
+                hidden_states,
+                fc1_weight=gate_up_proj,
+                fc2_weight=down_proj,
+                ep_group=ep_group,
+                fused=ep_plan.use_npu_fused_ops
+            )
+        else:
+            raise NotImplementedError(f"EP dispatcher {ep_plan.dispatcher} is not implenmented for Qwen3.5 MoE.")
+        
         return hidden_states
 
 

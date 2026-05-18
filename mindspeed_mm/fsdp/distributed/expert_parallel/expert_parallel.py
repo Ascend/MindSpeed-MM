@@ -8,11 +8,9 @@ import torch
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import Shard, DTensor, Replicate, distribute_tensor, distribute_module
 
-from mindspeed.fsdp.distributed.expert_parallel.dispatcher import get_experts_forward_fn
-from mindspeed.fsdp.distributed.expert_parallel.dispatcher_mc2 import get_experts_forward_mc2_fn
-from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 
 
 logger = logging.getLogger(__name__)
@@ -30,9 +28,9 @@ def expert_parallelize_modules(modules: torch.nn.Module, ep_mesh: DeviceMesh, pl
 
         # replace forward with ep forward
         if hasattr(module, 'ep_forward') and callable(module.ep_forward):
-            module.forward = partial(module.ep_forward, ep_group=ep_group)
+            module.forward = partial(module.ep_forward, ep_group=ep_group, ep_plan=plan)
         else:
-            experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group, dispatcher=plan.dispatcher)
+            experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=plan.use_npu_fused_ops, dispatcher=plan.dispatcher)
             module.forward = types.MethodType(experts_forward_fn, module)
 
     return modules
@@ -77,24 +75,6 @@ def distribute_experts_module(module: torch.nn.Module, ep_mesh: DeviceMesh):
                              # input_fn=prepare_distribute_input_fn, output_fn=prepare_distribute_output_fn)
 
 
-def get_dispatcher_fn(dispatcher, ep_group):
-    forward_fn = None
-    if isinstance(dispatcher, Callable):
-        forward_fn = partial(dispatcher, ep_group)
-    elif isinstance(dispatcher, str):
-        if dispatcher == 'eager':
-            forward_fn = get_experts_forward_fn(ep_group, fused=False)
-        elif dispatcher == 'fused':
-            forward_fn = get_experts_forward_fn(ep_group, fused=True)
-        elif dispatcher == 'mc2':
-            forward_fn = get_experts_forward_mc2_fn(ep_group)
-
-    if forward_fn is None:
-        raise RuntimeError(f'Unsupported dispatcher {dispatcher}.')
-
-    return forward_fn
-
-
 def get_grad_division_hook(param, ep_size):
     def hook(*unused):
         return param.grad.mul_(1 / ep_size)
@@ -110,8 +90,8 @@ def apply_grad_division_hook(module, ep_size):
             grad_acc.register_hook(get_grad_division_hook(param, ep_size))
 
 
-def get_experts_forward_fn_for_qwen(ep_group, dispatcher="fused"):
-    from .ep_dispatcher import ep_forward
+def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher="alltoall"):
+    from .ep_dispatcher import ep_forward, ep_mc2_forward
 
     def experts_forward(self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor):
         batch_size = hidden_states.shape[0]
@@ -119,17 +99,28 @@ def get_experts_forward_fn_for_qwen(ep_group, dispatcher="fused"):
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
 
-        fused = False if dispatcher == "eager" else True
-        hidden_states = ep_forward(
-            self.num_experts,
-            routing_weights,
-            router_indices,
-            hidden_states,
-            fc1_weight=gate_up_proj,
-            fc2_weight=down_proj,
-            ep_group=ep_group,
-            fused=fused,
-        )
+        fused = use_npu_fused_ops
+        
+        ep_dispatcher_dict = {
+            "alltoall": ep_forward,
+            "mc2": ep_mc2_forward
+        }
+        
+        if dispatcher in ep_dispatcher_dict:
+            dipatcher_func = ep_dispatcher_dict[dispatcher]
+            hidden_states = dipatcher_func(
+                self.num_experts,
+                routing_weights,
+                router_indices,
+                hidden_states,
+                fc1_weight=gate_up_proj,
+                fc2_weight=down_proj,
+                ep_group=ep_group,
+                fused=fused,
+            )
+        else:
+            raise NotImplementedError(f"ep dispatcher {dispatcher} is not implenmented now.")
+        
         hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
         return hidden_states
 

@@ -7,6 +7,7 @@ from mindspeed.fsdp.distributed.dist_ops import all_to_all as _all_to_all
 from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
+from mindspeed_mm.fsdp.ops.moe_ops.gemm_mc2 import grouped_matmul_all2all, all2all_grouped_matmul
 from mindspeed_mm.fsdp.ops.swiglu import swiglu
 
 
@@ -93,7 +94,7 @@ def dispatch_preprocess(
     )
     num_local_experts = num_global_experts // ep_size
 
-    num_local_tokens_per_expert = torch.bincount(selected_experts.view(-1), minlength=num_global_experts)
+    num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_global_experts, min=0, max=num_global_experts)
 
     if ep_group is None or ep_size <= 1:
         num_global_tokens_per_expert = num_local_tokens_per_expert.view(1, -1)
@@ -172,4 +173,56 @@ def alltoall_combine(
     hidden_states = all_to_all(hidden_states, ep_group, scatter_sizes=output_splits, gather_sizes=input_splits)
     hidden_states = unpermute(hidden_states.to(routing_weights.dtype), unpermute_indices,
                                                       probs=routing_weights, fused=fused)
+    return hidden_states
+
+
+def ep_mc2_forward(
+    num_experts: int,
+    routing_weights: torch.Tensor,
+    selected_experts: torch.Tensor,
+    hidden_states: torch.Tensor,
+    fc1_weight: torch.Tensor,
+    fc2_weight: torch.Tensor,
+    ep_group: Optional[dist.ProcessGroup] = None,
+    fused: bool = True,
+) -> torch.Tensor:
+    
+    if not fused:
+        raise ValueError(f"ep mc2 only support fused = True")
+    
+    hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
+    ep_size = dist.get_world_size(ep_group)
+    ep_rank = dist.get_rank(ep_group)
+    num_local_experts = num_experts // ep_size
+    
+    num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_experts, min=0, max=num_experts)
+    
+    num_global_tokens_per_expert = torch.zeros(
+        ep_size,
+        num_experts,
+        dtype=num_local_tokens_per_expert.dtype,
+        device=num_local_tokens_per_expert.device
+    ) # [ep_size, num_experts]
+    dist.all_gather_into_tensor(num_global_tokens_per_expert, num_local_tokens_per_expert, group=ep_group)
+    
+    start_idx, end_idx = ep_rank * num_local_experts, (ep_rank + 1) * num_local_experts
+    
+    send_counts = num_local_tokens_per_expert
+    recv_counts = num_global_tokens_per_expert[:, start_idx:end_idx].reshape(-1)
+    
+    hidden_states, unpermute_indices = permute(hidden_states, selected_experts.to(torch.int32), fused=fused)
+    
+    intermediate_hidden_states = all2all_grouped_matmul(
+        inputs=hidden_states, weights=fc1_weight, group=ep_group, send_counts=send_counts, recv_counts=recv_counts
+    )
+    
+    intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+    
+    hidden_states = grouped_matmul_all2all(
+        inputs=intermediate_activations, weights=fc2_weight, group=ep_group, send_counts=recv_counts, recv_counts=send_counts
+    )
+    hidden_states = unpermute(
+        hidden_states, unpermute_indices, probs=routing_weights, fused=True
+    )
+    
     return hidden_states
