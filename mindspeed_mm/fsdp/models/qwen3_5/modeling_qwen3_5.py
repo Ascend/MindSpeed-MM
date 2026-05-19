@@ -52,6 +52,9 @@ from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5Config, Qwe
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
+if IS_NPU_AVAILABLE:
+    import torch_npu
+
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
     split_forward_gather_backward,
     gather_forward_split_backward,
@@ -321,6 +324,10 @@ class Qwen3_5RMSNormGated(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, hidden_states, gate=None):
+        if IS_NPU_AVAILABLE:
+            # NPU optimized: fused rms_norm + silu gate via npu_rms_norm
+            hidden_states = torch_npu.npu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+            return hidden_states * F.silu(gate)
         input_dtype = hidden_states.dtype
         hidden_states = hidden_states.to(torch.float32)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
@@ -806,9 +813,14 @@ def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     q_rot, q_pass = q[..., :rotary_dim], q[..., rotary_dim:]
     k_rot, k_pass = k[..., :rotary_dim], k[..., rotary_dim:]
 
-    # Apply rotary embeddings on the first half or full tensor
-    q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
-    k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
+    if IS_NPU_AVAILABLE:
+        # NPU optimized: fused rotary mul instead of separate rotate_half + multiply
+        q_embed = torch_npu.npu_rotary_mul(q_rot, cos, sin)
+        k_embed = torch_npu.npu_rotary_mul(k_rot, cos, sin)
+    else:
+        # Apply rotary embeddings on the first half or full tensor
+        q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
+        k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
 
     # Concatenate back to full shape
     q_embed = torch.cat([q_embed, q_pass], dim=-1)
@@ -965,6 +977,9 @@ class Qwen3_5RMSNorm(nn.Module):
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
     def forward(self, x):
+        if IS_NPU_AVAILABLE:
+            # NPU optimized: fused rms_norm with pre-added bias (1.0 + weight)
+            return torch_npu.npu_rms_norm(x, 1.0 + self.weight, self.eps)[0]
         output = self._norm(x.float())
         # Llama does x.to(float16) * w whilst Qwen3_5 is (x * w).to(float16)
         output = output * (1.0 + self.weight.float())
@@ -1139,8 +1154,13 @@ def apply_rotary_pos_emb_vision(
     orig_k_dtype = k.dtype
     q, k = q.float(), k.float()
     cos, sin = cos.unsqueeze(-2).float(), sin.unsqueeze(-2).float()
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
+    if IS_NPU_AVAILABLE:
+        # NPU optimized: fused rotary mul instead of separate rotate_half + multiply
+        q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
+        k_embed = torch_npu.npu_rotary_mul(k, cos, sin)
+    else:
+        q_embed = (q * cos) + (rotate_half(q) * sin)
+        k_embed = (k * cos) + (rotate_half(k) * sin)
     q_embed = q_embed.to(orig_q_dtype)
     k_embed = k_embed.to(orig_k_dtype)
     return q_embed, k_embed
@@ -1787,21 +1807,27 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
             special_image_mask = input_ids == self.config.image_token_id
             special_video_mask = input_ids == self.config.video_token_id
 
-        n_image_tokens = special_image_mask.sum()
-        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)
+        # Keep mask at compact shape (batch, seq_len) instead of expanding to (batch, seq_len, hidden_dim).
+        # The compact mask avoids allocating a huge boolean tensor and enables efficient nonzero + direct indexing
+        # in forward(), replacing the expensive masked_scatter which scans the full (batch, seq_len, hidden_dim) space.
         if image_features is not None:
-            torch_compilable_check(
-                inputs_embeds[special_image_mask].numel() == image_features.numel(),
-                f"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}",
-            )
+            n_image_tokens = special_image_mask.sum()
+            if n_image_tokens != image_features.shape[0]:
+                raise ValueError(
+                    f"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}"
+                )
+        else:
+            special_image_mask = None
 
-        n_video_tokens = special_video_mask.sum()
-        special_video_mask = special_video_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)
         if video_features is not None:
-            torch_compilable_check(
-                inputs_embeds[special_video_mask].numel() == video_features.numel(),
-                f"Video features and video tokens do not match, tokens: {n_video_tokens}, features: {video_features.shape[0]}",
-            )
+            n_video_tokens = special_video_mask.sum()
+            if n_video_tokens != video_features.shape[0]:
+                raise ValueError(
+                    f"Video features and video tokens do not match, tokens: {n_video_tokens}, features: {video_features.shape[0]}"
+                )
+        else:
+            special_video_mask = None
+
         return special_image_mask, special_video_mask
 
     def compute_3d_position_ids(
@@ -1878,7 +1904,11 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
             image_mask, _ = self.get_placeholder_mask(
                 input_ids, inputs_embeds=inputs_embeds, image_features=image_embeds
             )
-            inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
+            # Use nonzero + direct indexing instead of masked_scatter to avoid scanning the full
+            # (batch, seq_len, hidden_dim) tensor. nonzero finds target positions on the compact (batch, seq_len)
+            # mask in O(batch * seq_len), then direct indexing writes only to those positions.
+            image_indices_tuple = torch.nonzero(image_mask, as_tuple=True)
+            inputs_embeds[image_indices_tuple] = image_embeds
 
         if pixel_values_videos is not None:
             video_outputs: BaseModelOutputWithPooling = self.get_video_features(
@@ -1889,7 +1919,9 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
             _, video_mask = self.get_placeholder_mask(
                 input_ids, inputs_embeds=inputs_embeds, video_features=video_embeds
             )
-            inputs_embeds = inputs_embeds.masked_scatter(video_mask, video_embeds)
+            # Same optimization as image: nonzero + direct indexing replaces masked_scatter.
+            video_indices_tuple = torch.nonzero(video_mask, as_tuple=True)
+            inputs_embeds[video_indices_tuple] = video_embeds
 
         if position_ids is None:
             position_ids = self.compute_3d_position_ids(

@@ -1997,21 +1997,27 @@ class Qwen3_5MoeModel(Qwen3_5MoePreTrainedModel):
             special_image_mask = input_ids == self.config.image_token_id
             special_video_mask = input_ids == self.config.video_token_id
 
-        n_image_tokens = special_image_mask.sum()
-        special_image_mask = special_image_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)
+        # Keep mask at compact shape (batch, seq_len) instead of expanding to (batch, seq_len, hidden_dim).
+        # The compact mask avoids allocating a huge boolean tensor and enables efficient nonzero + direct indexing
+        # in forward(), replacing the expensive masked_scatter which scans the full (batch, seq_len, hidden_dim) space.
         if image_features is not None:
-            torch_compilable_check(
-                inputs_embeds[special_image_mask].numel() == image_features.numel(),
-                f"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}",
-            )
+            n_image_tokens = special_image_mask.sum()
+            if n_image_tokens != image_features.shape[0]:
+                raise ValueError(
+                    f"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}"
+                )
+        else:
+            special_image_mask = None
 
-        n_video_tokens = special_video_mask.sum()
-        special_video_mask = special_video_mask.unsqueeze(-1).expand_as(inputs_embeds).to(inputs_embeds.device)
         if video_features is not None:
-            torch_compilable_check(
-                inputs_embeds[special_video_mask].numel() == video_features.numel(),
-                f"Video features and video tokens do not match, tokens: {n_video_tokens}, features: {video_features.shape[0]}",
-            )
+            n_video_tokens = special_video_mask.sum()
+            if n_video_tokens != video_features.shape[0]:
+                raise ValueError(
+                    f"Video features and video tokens do not match, tokens: {n_video_tokens}, features: {video_features.shape[0]}"
+                )
+        else:
+            special_video_mask = None
+
         return special_image_mask, special_video_mask
 
     def compute_3d_position_ids(
@@ -2088,7 +2094,12 @@ class Qwen3_5MoeModel(Qwen3_5MoePreTrainedModel):
             image_mask, _ = self.get_placeholder_mask(
                 input_ids, inputs_embeds=inputs_embeds, image_features=image_embeds
             )
-            inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
+            # Use nonzero + direct indexing instead of masked_scatter to avoid scanning the full
+            # (batch, seq_len, hidden_dim) tensor. nonzero finds target positions on the compact
+            # (batch, seq_len) mask in O(batch * seq_len), then direct indexing writes only to
+            # those positions — reducing memory bandwidth by a factor of hidden_dim.
+            image_indices_tuple = torch.nonzero(image_mask, as_tuple=True)
+            inputs_embeds[image_indices_tuple] = image_embeds
 
         if pixel_values_videos is not None:
             video_outputs: BaseModelOutputWithPooling = self.get_video_features(
@@ -2099,7 +2110,9 @@ class Qwen3_5MoeModel(Qwen3_5MoePreTrainedModel):
             _, video_mask = self.get_placeholder_mask(
                 input_ids, inputs_embeds=inputs_embeds, video_features=video_embeds
             )
-            inputs_embeds = inputs_embeds.masked_scatter(video_mask, video_embeds)
+            # Same optimization as image: nonzero + direct indexing replaces masked_scatter
+            video_indices_tuple = torch.nonzero(video_mask, as_tuple=True)
+            inputs_embeds[video_indices_tuple] = video_embeds
 
         if position_ids is None:
             position_ids = self.compute_3d_position_ids(

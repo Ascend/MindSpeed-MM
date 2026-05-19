@@ -51,6 +51,7 @@ def apply_transformers_rope_half_npu(q, k, cos, sin, position_ids=None, unsqueez
 
 
 def apply_transformers_vision_rope_half_npu(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
+    """NPU optimized implementation for vision RoPE(half mode)."""
     orig_q_shape = q.shape
     orig_k_shape = k.shape
     orig_q_dtype = q.dtype
