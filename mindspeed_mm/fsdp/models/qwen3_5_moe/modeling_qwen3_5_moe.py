@@ -72,6 +72,8 @@ from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysse
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
 
 from mindspeed_mm.utils.aux_loss import load_balancing_loss_func_optimized
+from mindspeed_mm.fsdp.features.memory.grad_offload import clear_offload_grad
+from mindspeed_mm.fsdp.features.memory.aux_loss_grad_offload import offload_wrapper, restore_wrapper
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
@@ -1075,6 +1077,8 @@ class Qwen3_5MoeTopKRouter(nn.Module):
         self.num_experts = config.num_experts
         self.hidden_dim = config.hidden_size
         self.weight = nn.Parameter(torch.zeros(self.num_experts, self.hidden_dim))
+        self.router_aux_loss_offload = config.router_aux_loss_offload
+        self.num_hidden_layers = config.num_hidden_layers
 
     def forward(self, hidden_states):
         hidden_states = hidden_states.reshape(-1, self.hidden_dim)
@@ -1088,7 +1092,8 @@ class Qwen3_5MoeTopKRouter(nn.Module):
         router_top_value /= router_top_value.sum(dim=-1, keepdim=True)
         router_top_value = router_top_value.to(router_logits.dtype)
         router_scores = router_top_value
-        # Return raw logits for load_balancing_loss computation
+        if self.router_aux_loss_offload:
+            router_logits = restore_wrapper(router_logits, num_hidden_layers=self.num_hidden_layers)
         return router_logits, router_scores, router_indices
 
 
@@ -2323,6 +2328,7 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         super().__init__(config)
         self.model = Qwen3_5MoeModel(config)
         self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
+        self.router_aux_loss_offload = config.text_config.router_aux_loss_offload
 
         self.post_init()
 
@@ -2333,6 +2339,7 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         use_grouped_expert_matmul = getattr(model_args, "use_grouped_expert_matmul", False)
         transformer_config.text_config.use_grouped_expert_matmul = use_grouped_expert_matmul
         transformer_config.text_config.router_aux_loss_coef = model_args.loss_cfg.router_aux_loss_coef
+        transformer_config.text_config.router_aux_loss_offload = model_args.loss_cfg.router_aux_loss_offload
         return transformer_config
 
     def get_input_embeddings(self):
@@ -2441,6 +2448,9 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         "A woman in a plaid shirt sits on a sandy beach at sunset, smiling as she gives a high-five to a yellow Labrador Retriever wearing a harness. The ocean waves roll in the background."
         ```"""
 
+        if self.router_aux_loss_offload:
+            clear_offload_grad()
+
         outputs = self.model(
             input_ids=input_ids,
             pixel_values=pixel_values,
@@ -2480,8 +2490,14 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         if kwargs.get("output_router_logits", False):
             if attention_mask is not None:
                 attention_mask = split_forward_gather_backward_with_cp(attention_mask, dim=1)
+
+            gate_logits = outputs.router_logits
+
+            if self.router_aux_loss_offload:
+                gate_logits = offload_wrapper(gate_logits)
+
             aux_loss = load_balancing_loss_func_optimized(
-                outputs.router_logits,
+                gate_logits,
                 self.config.text_config.num_experts,
                 self.config.text_config.num_experts_per_tok,
                 attention_mask,

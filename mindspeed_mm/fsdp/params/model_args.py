@@ -34,6 +34,10 @@ class LossArguments(BaseArguments):
         default=0.0,
         metadata={"help": "Router Auxiliary Loss Coefficient"},
     )
+    router_aux_loss_offload: bool = field(
+        default=False,
+        metadata={"help": "Whether apply router auxiliary loss offload"},
+    )
 
 
 class ActivationOffloadPlanConfig(BaseArguments):

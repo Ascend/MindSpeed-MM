@@ -106,6 +106,7 @@ def get_loss_func_params(
                 "ignore_index": ignore_index,
                 "reduction": reduction,
                 "alpha": alpha[i].view(-1) if isinstance(alpha, (list, tuple)) else alpha,
+                "chunk_size": chunk_size,
             }
             for i in range(len(chunk_labels))
         ]
@@ -117,6 +118,7 @@ def get_loss_func_params(
             "ignore_index": ignore_index,
             "reduction": reduction,
             "alpha": alpha,
+            "chunk_size": chunk_size,
         }
     ]
     
@@ -153,7 +155,7 @@ def build_loss_func(
                 head_bias,
                 loss_forward=calculate_lm_loss,
                 loss_kwargs_chunks=loss_func_kwargs,
-                chunk_size=chunk_size
+                chunk_size=loss_func_kwargs[0]["chunk_size"],
             )
 
     else:

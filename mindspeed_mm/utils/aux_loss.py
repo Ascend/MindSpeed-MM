@@ -72,11 +72,9 @@ def load_balancing_loss_func_optimized(
 
     tokens_per_expert = tokens_selected / tokens_total
 
-    # 计算router_prob_per_expert
+    # calculate router_prob_per_expert
     compute_device = gate_logits[0].device
-    concatenated_gate_logits = torch.cat([layer_gate.to(compute_device) for layer_gate in gate_logits], dim=0)
-
-    routing_weights = torch.nn.functional.softmax(concatenated_gate_logits, dim=-1)
+    routing_weights = torch.cat([torch.nn.functional.softmax(layer_gate, dim=-1).to(compute_device) for layer_gate in gate_logits], dim=0)
 
     if attention_mask is not None:
         router_per_expert_attention_mask = (
