@@ -1232,10 +1232,6 @@ class Qwen3OmniMoeThinkerTextExperts(nn.ModuleList):
         Returns:
             (batch_size * sequence_length, hidden_dim)
         """
-        # Fixes the memory reorganization problem triggered when fast host dispatch
-        # and tensor multi-stream reuse occur simultaneously.
-        torch.npu.synchronize()
-
         batch_size = hidden_states.shape[0]
         hidden_states = hidden_states.reshape(-1, self.hidden_size)
         permuted_hidden_states, row_ids_map = torch_npu.npu_moe_token_permute(hidden_states, top_k_index.to(torch.int32))

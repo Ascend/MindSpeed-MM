@@ -15,6 +15,7 @@ export ASCEND_LAUNCH_BLOCKING=0
 export ACLNN_CACHE_LIMIT=100000
 export TOKENIZERS_PARALLELISM=false
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+export MULTI_STREAM_MEMORY_REUSE=2
 
 # 当前脚本双机拉起配置仅作参考，请根据实际情况修改
 export GLOO_SOCKET_IFNAME="Your SOCKET IFNAME"
