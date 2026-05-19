@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import threading
 from typing import Optional
 
 import torch
@@ -26,6 +27,7 @@ from mindspeed_mm.fsdp.data.dataloader.data_collator import DATA_COLLATOR
 from mindspeed_mm.fsdp.utils.constants import GLOBAL_STEP_TOKEN_NUM, AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
+from mindspeed_mm.fsdp.utils.utils import move_to_device
 
 
 def prepare_sampler_dataloader(
@@ -44,6 +46,7 @@ def prepare_sampler_dataloader(
     collate_param=None,
     dataset_param=None,
     model=None,
+    **kwargs,
 ):
     """
     Prepare a dataloader for distributed training. The dataloader will be wrapped by
@@ -185,3 +188,55 @@ class PrefetchGradAccDataLoader:
 
     def load_state_dict(self, **kwargs):
         self.base_dataloader.load_state_dict(**kwargs)
+
+
+class Preloader:
+    """
+    Async data preloader that overlaps CPU data loading with training computation.
+
+    Uses a background thread to preload the next CPU batch while the current batch
+    is being processed by forward/backward.
+    """
+
+    def __init__(self, data_iterator, param_dtype=None):
+        self.data_iterator = data_iterator
+        self.param_dtype = param_dtype
+        self.next_batch = None
+        self._thread = None
+        self._exhausted = False
+        self._load_next()
+
+    def _load_next(self):
+        """Load the next batch from the iterator."""
+        try:
+            self.next_batch = next(self.data_iterator)
+        except (StopIteration, Exception):
+            self.next_batch = None
+            self._exhausted = True
+
+    def _start_async_preload(self):
+        """Start a background thread to preload the next CPU batch."""
+        if self._exhausted:
+            return
+        self._thread = threading.Thread(target=self._load_next, daemon=True)
+        self._thread.start()
+
+    def next(self):
+        """Wait for CPU preload, and start next CPU preload."""
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
+        if self.next_batch is None:
+            return None
+        batch = move_to_device(self.next_batch, float_dtype=self.param_dtype)
+        self._start_async_preload()
+        return batch
+
+    def __iter__(self):
+        yield self.next()
+
+    def __next__(self):
+        batch = self.next()
+        if batch is None:
+            raise StopIteration("Dataloader has been exhausted, no more data available.")
+        return batch

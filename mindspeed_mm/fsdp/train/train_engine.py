@@ -16,6 +16,7 @@ from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
 from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
+from mindspeed_mm.fsdp.data.dataloader.dataloader import Preloader
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,11 @@ class TrainEngine:
             batch = next(data_iterator)
         else:
             raise ValueError("Data iterator is None. Unable to retrieve batch.")
+
+        # Move input to device and cast precision
+        if not self.args.data.dataloader_param.enable_preload:
+            param_dtype = self.args.parallel.fsdp_plan.param_dtype
+            batch = move_to_device(batch, get_dtype(param_dtype) if param_dtype else None)
         return batch
 
     def set_loss_func(self, batch_data):
@@ -116,14 +122,8 @@ class TrainEngine:
         total_aux_loss = None
         # Gradient accumulation
         for step in range(args.training.gradient_accumulation_steps):
-            # Get current batch data
+            # Wait for the preloaded batch to be ready
             batch_data = self.get_batch(train_dataloader_iter)
-
-            # Move input to device and cast precision
-            batch_data = move_to_device(
-                batch_data,
-                get_dtype(args.parallel.fsdp_plan.param_dtype) if args.parallel.fsdp_plan.param_dtype else None,
-            )
 
             # setup loss ctx
             self.set_loss_func(batch_data)
@@ -155,6 +155,12 @@ class TrainEngine:
 
         # Get data iterator
         train_dataloader_iter, _, _ = build_iterations(self.train_dataloader)
+        param_dtype = get_dtype(args.parallel.fsdp_plan.param_dtype) if args.parallel.fsdp_plan.param_dtype else None
+        
+        # Preload data
+        if args.data.dataloader_param.enable_preload:
+            train_dataloader_iter = Preloader(train_dataloader_iter, param_dtype=param_dtype)
+
         self.model.train()
 
         # --- Train Loop ---

@@ -39,6 +39,10 @@ class DataloaderArguments(BaseArguments):
     pin_memory: bool = field(metadata={"help": "Whether to pin memory for faster data transfer to GPU."})
     collate_param: CollateArguments = field(default_factory=CollateArguments)
     num_workers: int = field(default=2, metadata={"help": "Number of worker processes for data loading."})
+    enable_preload: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable async data preloading to overlap CPU-H2D transfer with training."},
+    )
 
 
 class DataArguments(BaseArguments):

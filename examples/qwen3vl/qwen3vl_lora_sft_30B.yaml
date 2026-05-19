@@ -125,6 +125,7 @@ data:
     collate_param:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
+    enable_preload: false
 
 
 ### 模型相关配置
