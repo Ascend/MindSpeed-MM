@@ -82,6 +82,12 @@ model:
   attn_implementation: flash_attention_2
   freeze:
     - model.visual
+  # 融合算子配置
+  use_triton_gdn: true
+  use_grouped_expert_matmul: true
+
+# 优化特性配置
+features:
   # loss 配置
   loss_cfg:
     loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
@@ -103,9 +109,6 @@ model:
     apply_modules:
      - model.visual.blocks.{*}
      - model.language_model.layers.{*}
-  # 融合算子配置
-  use_triton_gdn: true
-  use_grouped_expert_matmul: true
 
 # 训练配置
 training:

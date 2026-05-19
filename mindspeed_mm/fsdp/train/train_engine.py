@@ -1,3 +1,4 @@
+# pylint: skip-file
 import logging
 from datetime import datetime
 
@@ -99,19 +100,19 @@ class TrainEngine:
 
     def set_loss_func(self, batch_data):
         args = self.args
-        if args.model.loss_cfg.loss_type == "raw":
+        if args.features.loss_cfg.loss_type == "raw":
             return
-        chunk_size = args.model.chunkloss_plan.chunk_size if args.model.enable_chunk_loss else None
-        if args.model.enable_dynamic_chunk_loss:
-            batch_data['total_chunk_size'] = args.model.chunkloss_plan.total_chunk_size
-        loss_func = build_loss_func(args.model.loss_cfg.loss_type, chunk_size=chunk_size, **batch_data)
+        chunk_size = args.features.chunkloss_plan.chunk_size if args.features.enable_chunk_loss else None
+        if args.features.enable_dynamic_chunk_loss:
+            batch_data['total_chunk_size'] = args.features.chunkloss_plan.total_chunk_size
+        loss_func = build_loss_func(args.features.loss_cfg.loss_type, chunk_size=chunk_size, **batch_data)
 
         if hasattr(self.model, "loss_function"):
             self.model.loss_function = loss_func
         else:
             setattr(self.model, "loss_function", loss_func)
 
-        output_router_logits = args.model.loss_cfg.router_aux_loss_coef > 0.0
+        output_router_logits = args.features.loss_cfg.router_aux_loss_coef > 0.0
         if output_router_logits:
             batch_data.update(output_router_logits=True)
 

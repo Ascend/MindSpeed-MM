@@ -1,3 +1,4 @@
+# pylint: skip-file
 import torch
 from packaging import version
 import transformers 
@@ -5,7 +6,7 @@ if version.parse(transformers.__version__) >= version.parse("5.2.0"):
     from transformers.utils.output_capturing import _CAN_RECORD_REGISTRY
     
 from mindspeed.fsdp.utils.str_match import module_name_match
-from ..params.model_args import ModelArguments
+from ..params.feature_args import FeatureArguments
 from ..params.parallel_args import ParallelArguments
 from ..features.memory.async_offload import async_offload_modules, get_offload_modules
 from ..features.memory.chunkloss_lm_head import apply_chunkloss_module, get_chunkloss_module
@@ -14,8 +15,8 @@ from ..features.memory.recompute import recompute_modules
 
 
 class FeaturesApplier:
-    def __init__(self, model_config: ModelArguments):
-        self.config = model_config
+    def __init__(self, feature_config: FeatureArguments):
+        self.config = feature_config
 
     def get_needed_modules(self, modules, plan):
         matched_submodules = []

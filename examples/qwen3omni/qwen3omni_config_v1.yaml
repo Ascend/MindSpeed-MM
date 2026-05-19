@@ -90,6 +90,10 @@ model:
     - visual.pos_embed
     - visual.merger
     - audio_tower
+  use_grouped_expert_matmul: true
+
+# 优化特性配置
+features:
   loss_cfg:
     loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
     router_aux_loss_coef: 0.0
@@ -101,7 +105,6 @@ model:
   chunkloss_plan:
     apply_module: lm_head
     chunk_size: 1024
-  use_grouped_expert_matmul: true
 
 # 训练配置
 training:

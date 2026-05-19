@@ -73,6 +73,11 @@ model:
   attn_implementation: sdpa
   freeze:
     - model.visual
+  # 融合算子配置
+  use_triton_gdn: true
+
+# 优化特性配置
+features:
   # loss 配置
   loss_cfg:
     loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
@@ -103,8 +108,6 @@ model:
     batch_dim: 0
     chunk_arg_indexs: [0]
     chunk_kwarg_names: ["position_embeddings", "position_ids", "rope_deltas", "attention_mask"]
-  # 融合算子配置
-  use_triton_gdn: true
 
 # 训练配置
 training:

@@ -70,6 +70,9 @@ model:
     rope_type: interleaved
   text_encoder_path: /home/data/gemma-3-12b-it-qat-q4_0-unquantized
   enable_gradient_checkpointing: true
+
+# 优化特性配置
+features:
   loss_cfg:
     loss_type: raw
   recompute: false
@@ -123,4 +126,3 @@ tools:
     stacks: all
     max_entries: null
     mem_info: false
-

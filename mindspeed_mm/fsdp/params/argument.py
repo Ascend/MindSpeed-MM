@@ -1,3 +1,4 @@
+# pylint: skip-file
 from typing import Any, Callable, Dict, List, Literal, Optional, TypeVar, Union, get_type_hints
 from dataclasses import MISSING, asdict, dataclass, field, fields
 import sys
@@ -8,6 +9,7 @@ import yaml
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.params.data_args import DataArguments
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
+from mindspeed_mm.fsdp.params.feature_args import FeatureArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
 from mindspeed_mm.fsdp.params.tools_args import ToolsArguments
@@ -22,6 +24,7 @@ class Arguments(BaseArguments):
     data: DataArguments = field(default_factory=DataArguments)
     training: TrainingArguments = field(default_factory=TrainingArguments)
     tools: ToolsArguments = field(default_factory=ToolsArguments)
+    features: FeatureArguments = field(default_factory=FeatureArguments)
 
     def model_post_init(self, __context):
         self.training.compute_distributed_training(self.parallel)

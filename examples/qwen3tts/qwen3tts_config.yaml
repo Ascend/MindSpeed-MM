@@ -41,6 +41,9 @@ model:
   model_id: qwen3_tts
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
+
+# 优化特性配置
+features:
   loss_cfg:
     loss_type: raw
 

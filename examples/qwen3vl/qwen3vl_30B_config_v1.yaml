@@ -87,6 +87,9 @@ model:
   attn_implementation: flash_attention_2
   freeze:
     - model.visual
+
+# 优化特性配置
+features:
   loss_cfg:
     loss_type: default # If you want custom loss in model, loss_type can be set to "custom".
     router_aux_loss_coef: 0.0

@@ -82,6 +82,9 @@ model:
   model_id: kimi_k25
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
+
+# 优化特性配置
+features:
   loss_cfg:
     loss_type: default
   enable_chunk_loss: true

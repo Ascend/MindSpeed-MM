@@ -64,7 +64,7 @@ class Trainer:
 
         # Initialize model parallelization and feature application
         self.model_parallel_applier = ParallelApplier(args.parallel, args.training)
-        self.model_features_applier = FeaturesApplier(args.model)
+        self.model_features_applier = FeaturesApplier(args.features)
 
         # Reset memory profiler
         memory_profiler.reset(args.tools.memory_profile)
