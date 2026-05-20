@@ -339,7 +339,7 @@ class Trainer:
         )
         train_dataloader = build_dataloader(datasets)
 
-        if args.model.loss_cfg.loss_type == "per_token_loss":
+        if args.features.loss_cfg.loss_type == "per_token_loss":
             train_dataloader = PrefetchGradAccDataLoader(
                 train_dataloader, grad_acc_step=args.training.gradient_accumulation_steps
             )
