@@ -2145,7 +2145,7 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
         self.post_init()
 
     @staticmethod
-    def overwrite_transformer_config(transformer_config, model_args):
+    def overwrite_transformer_config(transformer_config, model_args, feature_args):
         gdn_implementation = getattr(model_args, "gdn_implementation", "eager")
         if gdn_implementation not in ("eager", "triton", "AscendC"):
             raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'AscendC'.")

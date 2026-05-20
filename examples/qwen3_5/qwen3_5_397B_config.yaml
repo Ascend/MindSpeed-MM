@@ -79,7 +79,7 @@ model:
   model_id: qwen3_5_moe
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
-  attn_implementation: sdpa
+  attn_implementation: flash_attention_2
   freeze:
     - model.visual
   # 融合算子配置

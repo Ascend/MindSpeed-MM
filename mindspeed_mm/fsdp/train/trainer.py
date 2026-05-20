@@ -142,7 +142,7 @@ class Trainer:
     def get_foundation_model(self):
         """Load the foundation model from the model hub."""
         args: Arguments = self.args
-        model = ModelHub.build(args.model, args.training)
+        model = ModelHub.build(args.model, args.features, args.training)
         return model
 
     def get_model(self, model_provider: Optional[Callable] = None):

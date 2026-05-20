@@ -1985,7 +1985,7 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(
         self.post_init()
 
     @staticmethod
-    def overwrite_transformer_config(transformer_config, model_args):
+    def overwrite_transformer_config(transformer_config, model_args, feature_args):
         transformer_config.thinker_config.text_config.use_grouped_expert_matmul = getattr(model_args, "use_grouped_expert_matmul", False)
         return transformer_config
 

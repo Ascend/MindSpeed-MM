@@ -2413,7 +2413,7 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         self.post_init()
 
     @staticmethod
-    def overwrite_transformer_config(transformer_config, model_args):
+    def overwrite_transformer_config(transformer_config, model_args, feature_args):
         gdn_implementation = getattr(model_args, "gdn_implementation", "eager")
         if gdn_implementation not in ("eager", "triton", "AscendC"):
             raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'AscendC'.")
@@ -2424,8 +2424,8 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
         use_grouped_expert_matmul = getattr(model_args, "use_grouped_expert_matmul", False)
         transformer_config.text_config.use_grouped_expert_matmul = use_grouped_expert_matmul
-        transformer_config.text_config.router_aux_loss_coef = model_args.loss_cfg.router_aux_loss_coef
-        transformer_config.text_config.router_aux_loss_offload = model_args.loss_cfg.router_aux_loss_offload
+        transformer_config.text_config.router_aux_loss_coef = feature_args.loss_cfg.router_aux_loss_coef
+        transformer_config.text_config.router_aux_loss_offload = feature_args.loss_cfg.router_aux_loss_offload
         return transformer_config
 
     def get_input_embeddings(self):

@@ -11,6 +11,7 @@ from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed.fsdp.utils.log import print_rank
 
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
+from mindspeed_mm.fsdp.params.feature_args import FeatureArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.models.base_model import BaseModel
@@ -49,7 +50,8 @@ class ModelHub:
         return model
     
     @staticmethod
-    def _build_transformers_model(transformer_config: PretrainedConfig, model_args: ModelArguments, training_args: TrainingArguments) -> PreTrainedModel:
+    def _build_transformers_model(transformer_config: PretrainedConfig, model_args: ModelArguments,
+        feature_args: FeatureArguments, training_args: TrainingArguments) -> PreTrainedModel:
         # Get model architecture from config
         architectures = getattr(transformer_config, "architectures", [])
         model_cls = None
@@ -66,9 +68,9 @@ class ModelHub:
         if model_cls is None:
             raise ValueError("load model from config failed")
 
-        # overwrite transformer config with model_args
+        # overwrite transformer config with model_args and feature_args
         if callable(getattr(model_cls, 'overwrite_transformer_config', None)):
-            transformer_config = model_cls.overwrite_transformer_config(transformer_config, model_args)
+            transformer_config = model_cls.overwrite_transformer_config(transformer_config, model_args, feature_args)
 
 
         # Initialize model with meta device for memory efficiency if specified
@@ -92,7 +94,7 @@ class ModelHub:
         return model
 
     @staticmethod
-    def build(model_args: ModelArguments, training_args: TrainingArguments):
+    def build(model_args: ModelArguments, feature_args: FeatureArguments, training_args: TrainingArguments):
         """
         Build a model instance from HuggingFace based on model arguments and training configuration.
 
@@ -118,7 +120,8 @@ class ModelHub:
         # Determine which builder to use based on config availability
         if transformer_config:
             print_rank(logger.info, f"Building transformers model from configuration...")
-            model: PreTrainedModel = ModelHub._build_transformers_model(transformer_config, model_args, training_args)
+            model: PreTrainedModel = ModelHub._build_transformers_model(transformer_config, model_args, feature_args,
+                                                                        training_args)
         else:
             print_rank(logger.info, f"Building custom model...")
             model: BaseModel = ModelHub._build_custom_model(model_args, training_args)

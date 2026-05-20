@@ -1652,9 +1652,9 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
         self.post_init()
 
     @staticmethod
-    def overwrite_transformer_config(transformer_config, model_args):
+    def overwrite_transformer_config(transformer_config, model_args, feature_args):
         # set router_aux_loss_coef, for moe model
-        router_aux_loss_coef = getattr(model_args.loss_cfg, "router_aux_loss_coef", 0.0) if getattr(model_args, "loss_cfg", None) else 0.0
+        router_aux_loss_coef = getattr(feature_args.loss_cfg, "router_aux_loss_coef", 0.0) if getattr(feature_args, "loss_cfg", None) else 0.0
         transformer_config.text_config.router_aux_loss_coef = router_aux_loss_coef
 
         return transformer_config
