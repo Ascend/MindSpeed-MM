@@ -15,7 +15,7 @@ import pytest
 import torch
 
 from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
-from mindspeed_mm.fsdp.models.qwen3_5.triton.utils import is_arch35
+from mindspeed_mm.fsdp.ops.gdn.triton.utils import is_arch35
 
 from .conftest import DEVICE
 from .reference_impl import (
@@ -25,7 +25,7 @@ from .reference_impl import (
 )
 
 if not is_arch35():
-    from mindspeed_mm.fsdp.models.qwen3_5.triton.convolution import (
+    from mindspeed_mm.fsdp.ops.gdn.triton.convolution import (
         causal_conv1d_bwd_impl,
         causal_conv1d_fwd_impl,
     )

@@ -1,11 +1,13 @@
-# Copyright 2025 The Qwen team, Alibaba Group and the HuggingFace Inc. team. All rights reserved.
+# Copyright 2025 The Qwen Team and The HuggingFace Inc. team. All rights reserved
+# Copyright 2025 Google LLC
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 
 import torch
 import torch.nn.functional as F
 import pytest
 
-from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_delta_rule as triton_chunk_gated_delta_rule
+from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule as triton_chunk_gated_delta_rule
 from tests.ut.utils import judge_expression
 
 

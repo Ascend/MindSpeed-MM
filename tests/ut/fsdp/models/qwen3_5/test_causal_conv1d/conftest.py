@@ -2,7 +2,7 @@
 
 import pytest
 
-from mindspeed_mm.fsdp.models.qwen3_5.triton.utils import get_available_device, is_arch35
+from mindspeed_mm.fsdp.ops.gdn.triton.utils import get_available_device, is_arch35
 
 
 def pytest_configure(config):

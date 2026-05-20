@@ -558,14 +558,33 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         self.causal_conv1d_fn = causal_conv1d_fn
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
 
-        self.use_triton_gdn = config.use_triton_gdn
-        if self.use_triton_gdn and IS_NPU_AVAILABLE:
-            from mindspeed_mm.fsdp.models.qwen3_5.chunk_gated_delta_rule import chunk_gated_delta_rule
-            self.chunk_gated_delta_rule = chunk_gated_delta_rule
-        elif self.use_triton_gdn and is_flash_linear_attention_available():
-            self.chunk_gated_delta_rule = fla_chunk_gated_delta_rule
-        else:
+        self.gdn_compute_mode = config.gdn_compute_mode
+        if self.gdn_compute_mode == "triton":
+            if IS_NPU_AVAILABLE:
+                from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule
+                self.chunk_gated_delta_rule = chunk_gated_delta_rule
+            elif is_flash_linear_attention_available():
+                self.chunk_gated_delta_rule = fla_chunk_gated_delta_rule
+            else:
+                raise ValueError(
+                    f"gdn_compute_mode='triton' requires NPU or flash_linear_attention, "
+                    f"but neither is available. Please install the required dependency or use gdn_compute_mode='eager'."
+                )
+        elif self.gdn_compute_mode == "ascendc":
+            if IS_NPU_AVAILABLE:
+                from mindspeed_mm.fsdp.ops.gdn.flash_chunk_gated_delta_rule import chunk_gated_delta_rule
+                self.chunk_gated_delta_rule = chunk_gated_delta_rule
+            else:
+                raise ValueError(
+                    f"gdn_compute_mode='ascendc' requires NPU, but NPU is not available. "
+                    f"Please use gdn_compute_mode='eager' or gdn_compute_mode='triton' instead."
+                )
+        elif self.gdn_compute_mode == "eager":
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
+        else:
+            raise ValueError(
+                f"Invalid gdn_compute_mode='{self.gdn_compute_mode}'. Must be one of: 'eager', 'triton', 'ascendc'."
+            )
 
         self.recurrent_gated_delta_rule = fused_recurrent_gated_delta_rule or torch_recurrent_gated_delta_rule
 
@@ -2078,8 +2097,10 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
 
     @staticmethod
     def overwrite_transformer_config(transformer_config, model_args):
-        use_triton_gdn = getattr(model_args, "use_triton_gdn", False)
-        transformer_config.text_config.use_triton_gdn = use_triton_gdn
+        gdn_compute_mode = getattr(model_args, "gdn_compute_mode", "eager")
+        if gdn_compute_mode not in ("eager", "triton", "ascendc"):
+            raise ValueError(f"Invalid gdn_compute_mode='{gdn_compute_mode}'. Must be one of: 'eager', 'triton', 'ascendc'.")
+        transformer_config.text_config.gdn_compute_mode = gdn_compute_mode
         return transformer_config
 
     def get_input_embeddings(self):

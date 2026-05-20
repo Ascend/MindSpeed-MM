@@ -74,7 +74,7 @@ model:
   freeze:
     - model.visual
   # 融合算子配置
-  use_triton_gdn: true
+  gdn_compute_mode: triton
 
 # 优化特性配置
 features:

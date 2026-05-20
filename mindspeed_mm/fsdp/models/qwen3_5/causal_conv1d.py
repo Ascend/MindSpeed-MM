@@ -1,4 +1,5 @@
 # Copyright (c) 2026, Huawei Technologies Co., Ltd.
+# Copyright 2025 XPU-Forces Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -7,12 +8,12 @@ from typing import Optional
 
 import torch
 
-from .triton.convolution import (
+from mindspeed_mm.fsdp.ops.gdn.triton.convolution import (
     causal_conv1d_fwd_impl,
     causal_conv1d_bwd_impl,
 )
 
-from .triton.utils import is_arch35
+from mindspeed_mm.fsdp.ops.gdn.triton.utils import is_arch35
 
 __all__ = ["CausalConv1dFunction", "causal_conv1d"]
 
