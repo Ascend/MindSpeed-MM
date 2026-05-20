@@ -57,13 +57,13 @@ Step 1: 搭建开发环境
 
 .. code:: bash
 
-    bash scripts/install.sh --arch x86 --msid d76dbddd4517d48a2fc1cd494de8b9a6cfdbfbab&& pip install -r examples/qwen3vl/requirements.txt
+    bash scripts/install.sh --msid d76dbddd4517d48a2fc1cd494de8b9a6cfdbfbab&& pip install -r examples/qwen3vl/requirements.txt
 
 对于ARM架构机器，执行如下指令：
 
 .. code:: bash
 
-    bash scripts/install.sh --arch arm --msid d76dbddd4517d48a2fc1cd494de8b9a6cfdbfbab&& pip install -r examples/qwen3vl/requirements.txt
+    bash scripts/install.sh --msid d76dbddd4517d48a2fc1cd494de8b9a6cfdbfbab&& pip install -r examples/qwen3vl/requirements.txt
 
 
 Step 2: 权重下载及转换

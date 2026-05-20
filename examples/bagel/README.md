@@ -150,7 +150,7 @@ bagel_example
 
     "t2i": {
       "data_dir": "data/t2i",
-      "num_files": 8, 
+      "num_files": 8,
       "num_total_samples": 800
     },
     "llava_ov":{
@@ -179,13 +179,13 @@ bagel_example
 - fsdp2
 
   - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存。
-  
+
   - 使能方式：`examples/bagel/finetune_bagel.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dcp`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
 
 启动训练
 
- ```bash 
- bash examples/bagel/finetune_bagel.sh 
+ ```bash
+ bash examples/bagel/finetune_bagel.sh
  ```
 
 ## 环境变量声明
