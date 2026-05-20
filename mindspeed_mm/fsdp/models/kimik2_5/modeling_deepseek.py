@@ -24,7 +24,6 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
-import torch_npu
 import torch.distributed as dist
 import torch.nn.functional as F
 import torch.utils.checkpoint
@@ -48,7 +47,6 @@ from transformers.utils import (add_start_docstrings,
                                 replace_return_docstrings)
 from transformers.utils.import_utils import is_torch_fx_available
 
-from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from .configuration_deepseek import DeepseekV3Config
 
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
@@ -56,6 +54,10 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
     split_forward_gather_backward_with_cp,
     all_to_all
 )
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+
+if IS_NPU_AVAILABLE:
+    import torch_npu
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func
@@ -270,7 +272,6 @@ class DeepseekV3RMSNorm(nn.Module):
 
     def forward(self, hidden_states):
         if IS_NPU_AVAILABLE:
-            import torch_npu
             hidden_states = torch_npu.npu_rms_norm(hidden_states.to(self.weight.dtype), self.weight, self.variance_epsilon)[0]
             return hidden_states
         else:
@@ -555,8 +556,12 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, unsqueeze_dim=1):
     b, h, s, d = k.shape
     k = k.view(b, h, s, d // 2, 2).transpose(4, 3).reshape(b, h, s, d)
 
-    q_embed = torch_npu.npu_rotary_mul(q, cos, sin)  # Modification
-    k_embed = torch_npu.npu_rotary_mul(k, cos, sin)  # Modification
+    if IS_NPU_AVAILABLE:
+        q_embed = torch_npu.npu_rotary_mul(q, cos, sin)  # Modification
+        k_embed = torch_npu.npu_rotary_mul(k, cos, sin)  # Modification
+    else:
+        q_embed = (q * cos) + (rotate_half(q) * sin)
+        k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
 
 
@@ -997,12 +1002,13 @@ class DeepseekV3Attention(nn.Module):
             key_states, value_states = past_key_value.update(
                 key_states, value_states, self.layer_idx, cache_kwargs)
 
-        # Modification: Context Parallel
+        # Modification start, Context Parallel
         ps = get_parallel_state()
         is_ulysses_enabled = ps.is_ulysses_enable()
         total_seq_len = get_seq_len("total")
         q_head_num = query_states.shape[1]
         kv_head_num = key_states.shape[1]
+        kv_seq_len = value_states.shape[-2]
 
         if is_ulysses_enabled:
             # ulysses validation
@@ -1026,30 +1032,61 @@ class DeepseekV3Attention(nn.Module):
         # Obtain head_num and seq_len according to CP
         head_num = query_states.shape[1]
         seq_len = query_states.shape[2]
+        # Modification end, Context Parallel
 
-        # Modification start, kimi性能优化, fa替换融合算子
-        attn_output = torch_npu.npu_fusion_attention(
-            query_states,
-            key_states,
-            value_states,
-            head_num,
-            pse=None,
-            input_layout="BNSD",
-            atten_mask=get_attn_mask_npu(device=query_states.device),
-            keep_prob=1.0 if not self.training else 1.0 - self.attention_dropout,
-            scale=self.softmax_scale,
-            sparse_mode=3,
-        )[0]
-        attn_weights = None
-        # Modification  end
+        if IS_NPU_AVAILABLE:
+            # Modification start, kimi性能优化, fa替换融合算子
+            attn_output = torch_npu.npu_fusion_attention(
+                query_states,
+                key_states,
+                value_states,
+                head_num,
+                pse=None,
+                input_layout="BNSD",
+                atten_mask=get_attn_mask_npu(device=query_states.device),
+                keep_prob=1.0 if not self.training else 1.0 - self.attention_dropout,
+                scale=self.softmax_scale,
+                sparse_mode=3,
+            )[0]
+            attn_weights = None
+            # Modification  end
+        else:
+            attn_weights = (
+                    torch.matmul(query_states, key_states.transpose(2, 3)) *
+                    self.softmax_scale)
+
+            if attn_weights.size() != (bsz, head_num, seq_len, kv_seq_len):
+                raise ValueError(
+                    f"Attention weights should be of size {(bsz, head_num, seq_len, kv_seq_len)}, "
+                    f"but is {attn_weights.size()}")
+            if attention_mask is None:
+                raise AssertionError("attention_mask should not be none")
+            if attention_mask is not None:
+                if attention_mask.size() != (bsz, 1, seq_len, kv_seq_len):
+                    raise ValueError(
+                        f"Attention mask should be of size {(bsz, 1, seq_len, kv_seq_len)}, "
+                        f"but is {attention_mask.size()}"
+                    )
+                attn_weights = attn_weights + attention_mask
+
+            # upcast attention to fp32
+            attn_weights = nn.functional.softmax(attn_weights,
+                                                 dim=-1,
+                                                 dtype=torch.float32).to(query_states.dtype)
+            attn_weights = nn.functional.dropout(attn_weights,
+                                                 p=self.attention_dropout,
+                                                 training=self.training)
+            attn_output = torch.matmul(attn_weights, value_states)
 
         if attn_output.size() != (bsz, head_num, seq_len, self.v_head_dim):
             raise ValueError(
-                f"`attn_output` should be of size {(bsz, head_num, seq_len, self.v_head_dim)}, but is"
-                f" {attn_output.size()}")
+                f"`attn_output` should be of size {(bsz, head_num, seq_len, self.v_head_dim)}, "
+                f"but is {attn_output.size()}")
 
+        # Modification start, Context Parallel
         if is_ulysses_enabled:
             attn_output = all_to_all(attn_output, ps.get_ulysses_group(), scatter_dim=2, gather_dim=1)
+        # Modification end, Context Parallel
 
         attn_output = attn_output.transpose(1, 2).contiguous()
 
@@ -1260,44 +1297,70 @@ class DeepseekV3FlashAttention2(DeepseekV3Attention):
 
             cu_seqlens_q, cu_seqlens_k = cu_seq_lens
 
-            # Modification start
-            atten_mask_npu = torch.triu(torch.ones([2048, 2048]), diagonal=1).bool().to(query_states.device)
-            head_num = query_states.shape[1]
-            attn_output_unpad = torch_npu.npu_fusion_attention(
-                query_states,
-                key_states,
-                value_states,
-                head_num,
-                pse=None,
-                padding_mask=None,
-                atten_mask=atten_mask_npu,
-                scale=1.0 / math.sqrt(query_states.shape[-1]),
-                keep_prob=1,
-                input_layout="TND",
-                actual_seq_qlen=tuple(cu_seqlens_q[1:].cpu().numpy().tolist()),
-                actual_seq_kvlen=tuple(cu_seqlens_k[1:].cpu().numpy().tolist()),
-                sparse_mode=3,
-            )[0]
-            # Modification end
+            if IS_NPU_AVAILABLE:
+                # Modification start
+                atten_mask_npu = torch.triu(torch.ones([2048, 2048]), diagonal=1).bool().to(query_states.device)
+                head_num = query_states.shape[1]
+                attn_output_unpad = torch_npu.npu_fusion_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    head_num,
+                    pse=None,
+                    padding_mask=None,
+                    atten_mask=atten_mask_npu,
+                    scale=1.0 / math.sqrt(query_states.shape[-1]),
+                    keep_prob=1,
+                    input_layout="TND",
+                    actual_seq_qlen=tuple(cu_seqlens_q[1:].cpu().numpy().tolist()),
+                    actual_seq_kvlen=tuple(cu_seqlens_k[1:].cpu().numpy().tolist()),
+                    sparse_mode=3,
+                )[0]
+                # Modification end
+            else:
+                max_seqlen_in_batch_q, max_seqlen_in_batch_k = max_seq_lens
+                attn_output_unpad = flash_attn_varlen_func(
+                    query_states,
+                    key_states,
+                    value_states,
+                    cu_seqlens_q=cu_seqlens_q,
+                    cu_seqlens_k=cu_seqlens_k,
+                    max_seqlen_q=max_seqlen_in_batch_q,
+                    max_seqlen_k=max_seqlen_in_batch_k,
+                    dropout_p=dropout,
+                    softmax_scale=softmax_scale,
+                    causal=causal,
+                )
 
             attn_output = pad_input(attn_output_unpad, indices_q, batch_size,
                                     query_length)
         else:
-            # Modification start
-            atten_mask_npu = torch.triu(torch.ones([2048, 2048]), diagonal=1).bool().to(query_states.device)
-            head_num = query_states.shape[2]
-            attn_output = torch_npu.npu_fusion_attention(
-                query_states,
-                key_states,
-                value_states,
-                head_num,
-                "BSND",
-                keep_prob=1.0,
-                scale=softmax_scale,
-                atten_mask=atten_mask_npu,
-                sparse_mode=3,
-            )[0]
-            # Modification end
+            if IS_NPU_AVAILABLE:
+                # Modification start
+                atten_mask_npu = torch.triu(torch.ones([2048, 2048]), diagonal=1).bool().to(query_states.device)
+                head_num = query_states.shape[2]
+                attn_output = torch_npu.npu_fusion_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    head_num,
+                    "BSND",
+                    keep_prob=1.0,
+                    scale=softmax_scale,
+                    atten_mask=atten_mask_npu,
+                    sparse_mode=3,
+                )[0]
+                # Modification end
+            else:
+                attn_output = flash_attn_func(
+                    query_states,
+                    key_states,
+                    value_states,
+                    dropout,
+                    softmax_scale=softmax_scale,
+                    causal=causal,
+                )
+
         return attn_output
 
     def _upad_input(self, query_layer, key_layer, value_layer, attention_mask,

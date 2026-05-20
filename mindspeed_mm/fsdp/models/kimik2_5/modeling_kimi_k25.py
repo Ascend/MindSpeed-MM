@@ -47,7 +47,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch_npu
 from transformers import activations
 
 try:
@@ -76,6 +75,10 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
     packed_data_split_forward_gather_backward_with_cp
 )
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+
+if IS_NPU_AVAILABLE:
+    import torch_npu
 
 _SIN = None
 _COS = None
@@ -132,7 +135,8 @@ def multihead_attention(
         output: shape (batch_size, seqlen, dim) or (tot_seqlens, dim) if packing,
             where dim = num_heads * head_dim
     """
-    # Modification start
+
+    # Modification start, ulysses cp
     ps = get_parallel_state()
     is_ulysses_enabled = ps.is_ulysses_enable()
     total_seq_len = get_seq_len("visual")
@@ -159,20 +163,36 @@ def multihead_attention(
         k = all_to_all(k, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
         v = all_to_all(v, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
 
-    attn_out = torch_npu.npu_fusion_attention(
-        q,
-        k,
-        v,
-        head_num=q.shape[1],
-        pse=None,
-        atten_mask=None,
-        scale=1.0 / math.sqrt(q.shape[-1]),
-        keep_prob=1,
-        input_layout="TND",
-        actual_seq_qlen=q_cu_seqlens,
-        actual_seq_kvlen=k_cu_seqlens
-    )[0]
-    # Modification end
+    # Modification end, ulysses cp
+
+    if IS_NPU_AVAILABLE:
+        # Modification start
+        attn_out = torch_npu.npu_fusion_attention(
+            q,
+            k,
+            v,
+            head_num=q.shape[1],
+            pse=None,
+            atten_mask=None,
+            scale=1.0 / math.sqrt(q.shape[-1]),
+            keep_prob=1,
+            input_layout="TND",
+            actual_seq_qlen=q_cu_seqlens,
+            actual_seq_kvlen=k_cu_seqlens
+        )[0]
+        # Modification end
+    else:
+        attn_out = flash_attn_varlen_func(
+            q,
+            k,
+            v,
+            q_cu_seqlens,
+            k_cu_seqlens,
+            max_seqlen_q,
+            max_seqlen_k,
+            causal=False,
+            deterministic=deterministic,
+        )
 
     if isinstance(attn_out, tuple):
         attn_out = attn_out[0]
@@ -276,11 +296,20 @@ def apply_rope(xq: torch.Tensor, xk: torch.Tensor,
     _apply_rope_input_validation(xq, freqs_cis)
     _apply_rope_input_validation(xk, freqs_cis)
 
-    cos = get_global_param("cos")
-    sin = get_global_param("sin")
-    xq_out = torch_npu.npu_rotary_mul(xq.float(), cos, sin, rotary_mode="interleave")
-    xk_out = torch_npu.npu_rotary_mul(xk.float(), cos, sin, rotary_mode="interleave")
-    # Modification end
+    if IS_NPU_AVAILABLE:
+        # Modification start
+        cos = get_global_param("cos")
+        sin = get_global_param("sin")
+        xq_out = torch_npu.npu_rotary_mul(xq.float(), cos, sin, rotary_mode="interleave")
+        xk_out = torch_npu.npu_rotary_mul(xk.float(), cos, sin, rotary_mode="interleave")
+        # Modification end
+    else:
+        freqs_cis = freqs_cis.unsqueeze(-2)  # ..., 1, head_dim/2
+        # ..., num_heads, head_dim/2
+        xq_ = torch.view_as_complex(xq.float().view(*xq.shape[:-1], -1, 2))
+        xk_ = torch.view_as_complex(xk.float().view(*xq.shape[:-1], -1, 2))
+        xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(-2)  # ..., num_heads, head_dim
+        xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(-2)  # ..., num_heads, head_dim
     return xq_out.type_as(xq), xk_out.type_as(xk)
 
 
@@ -664,7 +693,8 @@ class MoonViT3dEncoder(nn.Module):
         max_seqlen = lengths.max()
         cu_seqlens = lengths.to(hidden_states.device).cumsum(dim=0,
                                                              dtype=torch.int32)
-        cu_seqlens = tuple(cu_seqlens[1:].cpu().numpy().tolist())
+        if IS_NPU_AVAILABLE:
+            cu_seqlens = tuple(cu_seqlens[1:].cpu().numpy().tolist())
 
         # Modification start: ulysses cp
         seq_len, _ = hidden_states.size()
