@@ -68,7 +68,7 @@ def reorder_output(attn_output, cp_rank, cp_size, cp_group, dim=0):
     return attn_output
 
 
-def generate_ulysses_cu_seqlen_params(position_ids):
+def generate_cu_seqlen_params(position_ids, need_cpu_tensor=True):
     """
     Generate cumulative sequence length parameters for Ulysses Flash Attention.
     """
@@ -76,7 +76,7 @@ def generate_ulysses_cu_seqlen_params(position_ids):
     
     # Handle device placement based on NPU availability
     # GPU needs cuda. But NPU needs cpu in case of host&device synchronizing when calculating FA.
-    if IS_NPU_AVAILABLE:
+    if IS_NPU_AVAILABLE and need_cpu_tensor:
         cu_seq_lens_q = cu_seq_lens_q.cpu()
         cu_seq_lens_k = cu_seq_lens_k.cpu()
 

@@ -9,7 +9,7 @@ from mindspeed.fsdp.utils.str_match import module_name_match
 from ..params.feature_args import FeatureArguments
 from ..params.parallel_args import ParallelArguments
 from ..features.memory.async_offload import async_offload_modules, get_offload_modules
-from ..features.memory.chunkloss_lm_head import apply_chunkloss_module, get_chunkloss_module
+from ..features.memory.chunkloss.chunkloss_lm_head import apply_chunkloss_module, get_chunkloss_module
 from ..features.communication.chunk_mbs import get_chunkmbs_modules, apply_chunkmbs_module
 from ..features.memory.recompute import recompute_modules
 

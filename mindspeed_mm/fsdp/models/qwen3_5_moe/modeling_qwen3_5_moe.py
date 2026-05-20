@@ -68,7 +68,7 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
 )
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
-from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_cu_seqlen_params
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
 
 from mindspeed_mm.utils.aux_loss import load_balancing_loss_func_optimized
@@ -565,11 +565,17 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
 
         self.out_proj = nn.Linear(self.value_dim, self.hidden_size, bias=False)
 
-        self.causal_conv1d_fn = causal_conv1d_fn
+        self.causal_conv1d_implementation = config.causal_conv1d_implementation
+        if self.causal_conv1d_implementation == "triton" and IS_NPU_AVAILABLE:
+            from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
+            print_rank(logger.info, "Qwen3_5Moe causal_conv1d use NPU triton ops")
+            self.causal_conv1d_fn = causal_conv1d
+        else:
+            self.causal_conv1d_fn = causal_conv1d_fn
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
-        self.gdn_compute_mode = config.gdn_compute_mode
+        self.gdn_implementation = config.gdn_implementation
 
-        if self.gdn_compute_mode == "triton":
+        if self.gdn_implementation == "triton":
             if IS_NPU_AVAILABLE:
                 from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule
                 print_rank(logger.info, "Qwen3_5MoeGatedDeltaNet use NPU fused ops")
@@ -578,24 +584,24 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                 self.chunk_gated_delta_rule = fla_chunk_gated_delta_rule
             else:
                 raise ValueError(
-                    f"gdn_compute_mode='triton' requires NPU or flash_linear_attention, "
-                    f"but neither is available. Please install the required dependency or use gdn_compute_mode='eager'."
+                    f"gdn_implementation='triton' requires NPU or flash_linear_attention, "
+                    f"but neither is available. Please install the required dependency or use gdn_implementation='eager'."
                 )
-        elif self.gdn_compute_mode == "ascendc":
+        elif self.gdn_implementation == "AscendC":
             if IS_NPU_AVAILABLE:
                 from mindspeed_mm.fsdp.ops.gdn.flash_chunk_gated_delta_rule import chunk_gated_delta_rule
                 print_rank(logger.info, "Qwen3_5MoeGatedDeltaNet use NPU fused ops")
                 self.chunk_gated_delta_rule = chunk_gated_delta_rule
             else:
                 raise ValueError(
-                    f"gdn_compute_mode='ascendc' requires NPU, but NPU is not available. "
-                    f"Please use gdn_compute_mode='eager' or gdn_compute_mode='triton' instead."
+                    f"gdn_implementation='AscendC' requires NPU, but NPU is not available. "
+                    f"Please use gdn_implementation='eager' or gdn_implementation='triton' instead."
                 )
-        elif self.gdn_compute_mode == "eager":
+        elif self.gdn_implementation == "eager":
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
         else:
             raise ValueError(
-                f"Invalid gdn_compute_mode='{self.gdn_compute_mode}'. Must be one of: 'eager', 'triton', 'ascendc'."
+                f"Invalid gdn_implementation='{self.gdn_implementation}'. Must be one of: 'eager', 'triton', 'AscendC'."
             )
 
         self.recurrent_gated_delta_rule = fused_recurrent_gated_delta_rule or torch_recurrent_gated_delta_rule
@@ -632,6 +638,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         cache_params: Qwen3_5MoeDynamicCache | None = None,
         cache_position: torch.LongTensor | None = None,
         attention_mask: torch.Tensor | None = None,
+        **kwargs: Unpack[TransformersKwargs],
     ):
         hidden_states = apply_mask_to_padding_states(hidden_states, attention_mask)
 
@@ -724,8 +731,21 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                 )
             else:
                 conv_weight = self.conv1d.weight
+            
+            cu_seqlens = None
+            if "cu_seqlens" in kwargs and kwargs.get("cu_seqlens") is not None:
+                cu_seqlens = kwargs.get("cu_seq_lens_q").to(torch.int64)
 
-            if self.causal_conv1d_fn is not None:
+            if self.causal_conv1d_implementation == "triton":
+                conv_weight = conv_weight.squeeze(1)
+                mixed_qkv, _ = self.causal_conv1d_fn(
+                    x=mixed_qkv,
+                    weight=conv_weight.transpose(-1, -2).contiguous(),
+                    bias=self.conv1d.bias,
+                    activation=self.activation,
+                    cu_seqlens=cu_seqlens,
+                )
+            elif self.causal_conv1d_implementation == "eager" and self.causal_conv1d_fn is not None:  # for fla
                 conv_weight = conv_weight.squeeze(1)
                 mixed_qkv = self.causal_conv1d_fn(
                     x=mixed_qkv,
@@ -734,11 +754,12 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                     activation=self.activation,
                     seq_idx=None,
                 )
+                mixed_qkv = mixed_qkv.transpose(1, 2)
             else:
                 mixed_qkv = mixed_qkv.transpose(1, 2)
                 mixed_qkv = F.silu(F.conv1d(mixed_qkv, weight=conv_weight, bias=self.conv1d.bias, padding=self.conv_kernel_size - 1, groups=local_key_dim * 2 + local_value_dim)[:, :, :mixed_qkv.shape[-1]])
-
-        mixed_qkv = mixed_qkv.transpose(1, 2)
+                mixed_qkv = mixed_qkv.transpose(1, 2)
+        
         query, key, value = torch.split(
             mixed_qkv,
             [
@@ -767,16 +788,29 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
             key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
 
         if not use_precomputed_states:
-            core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
-                query,
-                key,
-                value,
-                g=g,
-                beta=beta,
-                initial_state=None,
-                output_final_state=cache_params is not None,
-                use_qk_l2norm_in_kernel=True,
-            )
+            if self.gdn_implementation == "triton" or self.gdn_implementation == "AscendC":
+                core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
+                    query,
+                    key,
+                    value,
+                    g=g,
+                    beta=beta,
+                    cu_seqlens=cu_seqlens,
+                    initial_state=None,
+                    output_final_state=cache_params is not None,
+                    use_qk_l2norm_in_kernel=True,
+                )
+            else:
+                core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
+                    query,
+                    key,
+                    value,
+                    g=g,
+                    beta=beta,
+                    initial_state=None,
+                    output_final_state=cache_params is not None,
+                    use_qk_l2norm_in_kernel=True,
+                )
 
         else:
             core_attn_out, last_recurrent_state = self.recurrent_gated_delta_rule(
@@ -1198,6 +1232,7 @@ class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
                 cache_params=past_key_values,
                 cache_position=cache_position,
                 attention_mask=attention_mask,
+                **kwargs,
             )
         elif self.layer_type == "full_attention":
             # Self Attention
@@ -1779,19 +1814,30 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
         else:
             text_position_ids = position_ids[0]
 
-        causal_mask = create_causal_mask(
-            config=self.config,
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            cache_position=cache_position,
-            past_key_values=past_key_values,
-            position_ids=text_position_ids,
-        )
+        use_packing = "cu_seqlens" in kwargs and kwargs["cu_seqlens"] is not None
+        if use_packing:
+            causal_mask = None
+            kwargs.update(generate_cu_seqlen_params(text_position_ids, need_cpu_tensor=False))
+        else:
+            causal_mask = create_causal_mask(
+                config=self.config,
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+                position_ids=text_position_ids,
+            )
         linear_attn_mask = self._update_linear_attn_mask(attention_mask, cache_position)
         # Modification: For Ulysses, cu_seq_len needs to be calculated before position_ids split
+        kwargs_fa = kwargs
         ps = get_parallel_state()
         if ps.is_ulysses_enable():
-            kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
+            if not use_packing:
+                kwargs.update(generate_cu_seqlen_params(text_position_ids))
+            else:
+                kwargs_fa = kwargs.copy()
+                kwargs_fa["cu_seq_lens_q"] = kwargs_fa["cu_seq_lens_q"].cpu()
+                kwargs_fa["cu_seq_lens_k"] = kwargs_fa["cu_seq_lens_k"].cpu()
 
         # Modification: sequence parallel patch
         total_seq_len = inputs_embeds.shape[1]
@@ -1806,6 +1852,7 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
 
         for layer_idx, decoder_layer in enumerate(self.layers[: self.config.num_hidden_layers]):
             layer_mask = linear_attn_mask if decoder_layer.layer_type == "linear_attention" else causal_mask
+            new_kwargs = kwargs if decoder_layer.layer_type == "linear_attention" else kwargs_fa
 
             hidden_states = decoder_layer(
                 hidden_states,
@@ -1815,7 +1862,7 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
                 past_key_values=past_key_values,
                 use_cache=use_cache,
                 cache_position=cache_position,
-                **kwargs,
+                **new_kwargs,
             )
 
         hidden_states = self.norm(hidden_states)
@@ -2367,10 +2414,14 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
 
     @staticmethod
     def overwrite_transformer_config(transformer_config, model_args):
-        gdn_compute_mode = getattr(model_args, "gdn_compute_mode", "eager")
-        if gdn_compute_mode not in ("eager", "triton", "ascendc"):
-            raise ValueError(f"Invalid gdn_compute_mode='{gdn_compute_mode}'. Must be one of: 'eager', 'triton', 'ascendc'.")
-        transformer_config.text_config.gdn_compute_mode = gdn_compute_mode
+        gdn_implementation = getattr(model_args, "gdn_implementation", "eager")
+        if gdn_implementation not in ("eager", "triton", "AscendC"):
+            raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'AscendC'.")
+        transformer_config.text_config.gdn_implementation= gdn_implementation
+        causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", "eager")
+        if causal_conv1d_implementation not in ("eager", "triton"):
+            raise ValueError(f"Invalid causal_conv1d='{causal_conv1d_implementation}'. Must be one of: 'eager', 'triton'.")
+        transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
         use_grouped_expert_matmul = getattr(model_args, "use_grouped_expert_matmul", False)
         transformer_config.text_config.use_grouped_expert_matmul = use_grouped_expert_matmul
         transformer_config.text_config.router_aux_loss_coef = model_args.loss_cfg.router_aux_loss_coef

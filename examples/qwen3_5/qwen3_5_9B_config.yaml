@@ -74,7 +74,8 @@ model:
   freeze:
     - model.visual
   # 融合算子配置
-  gdn_compute_mode: triton
+  gdn_implementation: AscendC
+  causal_conv1d_implementation: triton
 
 # 优化特性配置
 features:

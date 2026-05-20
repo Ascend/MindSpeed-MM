@@ -68,8 +68,25 @@ def get_loss_func_params(
 
     # Retrieve loss_type arguments to determine loss reduction behavior.
     if loss_type == "per_sample_loss":
-        # Compute per-sample loss: alpha scales each sample by total valid tokens in the batch.
-        alpha = loss_mask.sum(1) * loss_mask.shape[0]  # shape: [batch_size]
+        if "cu_seqlens" in kwargs and kwargs.get("cu_seqlens", None) is not None:
+            cu_seqlens = kwargs.get("cu_seqlens")
+            lengths = cu_seqlens[:, 1:] - cu_seqlens[:, :-1]  # [1, num_samples]
+            total_seq_len = loss_mask.size(1)
+            positions = torch.arange(total_seq_len, device=loss_mask.device)[None, :]  # [1, T]
+            sample_ids = (positions.unsqueeze(1) >= cu_seqlens[:, 1:].unsqueeze(2)).sum(dim=1)  # [1, T]
+            valid_per_sample = torch.zeros_like(lengths, dtype=torch.int32)
+            for i in range(lengths.size(1)):
+                mask = (sample_ids == i)
+                valid_per_sample[:, i] = loss_mask[mask].sum()
+            result = torch.repeat_interleave(valid_per_sample, lengths[0], dim=1).float()  # [1, total_seq_len]
+            alpha = torch.nn.functional.pad(result, (0, max(0, total_seq_len-result.size(1))), value=1 / lengths.size(1)) * lengths.size(1)
+            
+            ps = get_parallel_state()
+            if ps.is_cp_enable():
+                alpha = split_forward_gather_backward_with_cp(alpha, dim=1)
+        else:
+            # Compute per-sample loss: alpha scales each sample by total valid tokens in the batch.
+            alpha = loss_mask.sum(1) * loss_mask.shape[0]  # shape: [batch_size]
         reduction = "none"  # Keep per-token losses for sample-wise aggregation.
     elif loss_type == "per_token_loss":
         # Use raw sum loss without normalization here;
@@ -135,6 +152,7 @@ def build_loss_func(
     _kwargs = {}
     _kwargs[AVG_PER_STEP_TOKEN_NUM] = kwargs.get(AVG_PER_STEP_TOKEN_NUM, None)
     _kwargs['total_chunk_size'] = kwargs.get('total_chunk_size', None)
+    _kwargs['cu_seqlens'] = kwargs.get('cu_seqlens', None)
     if chunk_size:
         # Return a closure that computes the chunked language modeling loss using the prepared config.
         def loss_func(hidden_states, head_weight, head_bias, labels=None):
