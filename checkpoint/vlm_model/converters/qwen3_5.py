@@ -22,7 +22,9 @@ class Qwen35Converter(Converter):
     # MoE experts params
     expert_weight_name_patterns = [
         r"model\.language_model\.layers\.\d+\.mlp\.experts\.gate_up_proj",
-        r"model\.language_model\.layers\.\d+\.mlp\.experts\.down_proj"
+        r"model\.language_model\.layers\.\d+\.mlp\.experts\.down_proj",
+        r"mtp\.layers\.\d+\.mlp\.experts\.gate_up_proj",
+        r"mtp\.layers\.\d+\.mlp\.experts\.down_proj"
     ]
 
     def hf_to_dcp(

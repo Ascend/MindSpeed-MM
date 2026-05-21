@@ -238,6 +238,10 @@ data->dataset_param->basic_parameters->dataset
 
 **注意在开启ulysses-cp时，请将`xxx_config.yaml`中的`attn_implementation`配置为`flash_attention_2`**
 
+【mtp配置】
+当前模型支持配置mtp模块，在`xxx_config.yaml`中model下的`mtp_num_layers`字段配置为1，默认为0；`mtp_loss_scaling_factor`字段也支持配置，默认为0.1
+注意：qwen3.5的mtp layer目前只支持配置1层。
+
 【单机运行配置】
 以qwen3_5模型为例：
 配置`examples/qwen3_5/finetune_qwen3_5.sh`参数如下

@@ -153,7 +153,7 @@ def build_loss_func(
     _kwargs[AVG_PER_STEP_TOKEN_NUM] = kwargs.get(AVG_PER_STEP_TOKEN_NUM, None)
     _kwargs['total_chunk_size'] = kwargs.get('total_chunk_size', None)
     _kwargs['cu_seqlens'] = kwargs.get('cu_seqlens', None)
-    if chunk_size:
+    if chunk_size or kwargs.get('total_chunk_size', None):
         # Return a closure that computes the chunked language modeling loss using the prepared config.
         def loss_func(hidden_states, head_weight, head_bias, labels=None):
             labels = labels if labels is not None else outer_labels

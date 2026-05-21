@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_chunkloss_forward_fn():
-    def chunkloss_forward(self, hidden_states: torch.Tensor, loss_func: callable):
+    def chunkloss_forward(self, hidden_states: torch.Tensor, loss_func: callable, labels=None):
         # Handle distributed tensor (DTensor) weights and biases by converting to local tensors.
         if isinstance(self.weight, DTensor):
             w = self.weight.to_local()
@@ -30,7 +30,7 @@ def get_chunkloss_forward_fn():
             w = self.weight
             b = self.bias
 
-        loss = loss_func(hidden_states, w, b)
+        loss = loss_func(hidden_states, w, b, labels)
         return loss
     return chunkloss_forward
 

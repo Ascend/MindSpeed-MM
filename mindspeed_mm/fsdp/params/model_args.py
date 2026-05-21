@@ -35,5 +35,12 @@ class ModelArguments(BaseArguments):
     freeze: List[str] = field(
         default_factory=list,
         metadata={"help": "List of module names to freeze during training."},
-    )    
-    
+    )
+    mtp_num_layers: int = field(
+        default=0,
+        metadata={"help": "Number of mtp layers."},
+    )
+    mtp_loss_scaling_factor: float = field(
+        default=0.1,
+        metadata={"help": "Mtp loss scaling factor."},
+    )

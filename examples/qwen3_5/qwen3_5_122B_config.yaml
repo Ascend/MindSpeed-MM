@@ -11,6 +11,7 @@ parallel:
       - model.language_model.layers.{*}.linear_attn
       - model.language_model.layers.{*}.mlp.experts
       - lm_head
+      - mtp
     hook_modules:
       - model.language_model.layers.{*}
     param_dtype: bf16

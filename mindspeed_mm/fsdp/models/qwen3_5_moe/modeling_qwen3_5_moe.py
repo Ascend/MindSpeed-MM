@@ -74,6 +74,7 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_
 from mindspeed_mm.utils.aux_loss import load_balancing_loss_func_optimized
 from mindspeed_mm.fsdp.features.memory.grad_offload import clear_offload_grad
 from mindspeed_mm.fsdp.features.memory.aux_loss_grad_offload import offload_wrapper, restore_wrapper
+from mindspeed_mm.fsdp.models.mtp import MultiTokenPredictionBlock
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
@@ -1199,10 +1200,10 @@ class Qwen3_5MoeRMSNorm(nn.Module):
 
 
 class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
-    def __init__(self, config: Qwen3_5MoeTextConfig, layer_idx: int):
+    def __init__(self, config: Qwen3_5MoeTextConfig, layer_idx: int, is_mtp: bool = False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.layer_type = config.layer_types[layer_idx]
+        self.layer_type = config.layer_types[layer_idx] if not is_mtp else "full_attention"
         if self.layer_type == "linear_attention":
             self.linear_attn = Qwen3_5MoeGatedDeltaNet(config, layer_idx)
         elif self.layer_type == "full_attention":
@@ -1286,10 +1287,17 @@ class Qwen3_5MoePreTrainedModel(PreTrainedModel):
         elif isinstance(module, Qwen3_5MoeRMSNorm):
             init.zeros_(module.weight)
         elif isinstance(module, Qwen3_5MoeExperts):
-            init.normal_(module.gate_up_proj, mean=0.0, std=self.config.initializer_range)
-            init.normal_(module.down_proj, mean=0.0, std=self.config.initializer_range)
+            if getattr(self.config, "text_config", False):
+                init.normal_(module.gate_up_proj, mean=0.0, std=self.config.text_config.initializer_range)
+                init.normal_(module.down_proj, mean=0.0, std=self.config.text_config.initializer_range)
+            else:
+                init.normal_(module.gate_up_proj, mean=0.0, std=self.config.initializer_range)
+                init.normal_(module.down_proj, mean=0.0, std=self.config.initializer_range)
         elif isinstance(module, Qwen3_5MoeSparseMoeBlock):
-            init.normal_(module.gate.weight, mean=0.0, std=self.config.initializer_range)
+            if getattr(self.config, "text_config", False):
+                init.normal_(module.gate.weight, mean=0.0, std=self.config.text_config.initializer_range)
+            else:
+                init.normal_(module.gate.weight, mean=0.0, std=self.config.initializer_range)
         elif isinstance(module, Qwen3_5MoeVisionRotaryEmbedding):
             inv_freq = 1.0 / (module.theta ** (torch.arange(0, module.dim, 2, dtype=torch.float) / module.dim))
             init.copy_(module.inv_freq, inv_freq)
@@ -1728,6 +1736,7 @@ class Qwen3_5MoeModelOutputWithPast(ModelOutput):
     attentions: tuple[torch.FloatTensor] | None = None
     rope_deltas: torch.LongTensor | None = None
     router_logits: tuple[torch.FloatTensor] | None = None
+    position_ids: torch.LongTensor | None = None
 
 
 @dataclass
@@ -1758,6 +1767,7 @@ class Qwen3_5MoeCausalLMOutputWithPast(ModelOutput):
     attentions: tuple[torch.FloatTensor] | None = None
     rope_deltas: torch.LongTensor | None = None
     aux_loss: torch.FloatTensor | None = None
+    mtp_loss: torch.FloatTensor | list[torch.FloatTensor] | None = None
 
 
 class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
@@ -2204,6 +2214,7 @@ class Qwen3_5MoeModel(Qwen3_5MoePreTrainedModel):
         return Qwen3_5MoeModelOutputWithPast(
             **outputs,
             rope_deltas=self.rope_deltas,
+            position_ids=position_ids,
         )
 
 
@@ -2409,6 +2420,10 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         self.model = Qwen3_5MoeModel(config)
         self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
         self.router_aux_loss_offload = config.text_config.router_aux_loss_offload
+        self.enable_mtp = bool(config.text_config.mtp_num_layers)
+        self.mtp = MultiTokenPredictionBlock(
+            config.text_config, Qwen3_5MoeDecoderLayer, Qwen3_5MoeRMSNorm
+        ) if self.enable_mtp else None
 
         self.post_init()
 
@@ -2426,6 +2441,13 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         transformer_config.text_config.use_grouped_expert_matmul = use_grouped_expert_matmul
         transformer_config.text_config.router_aux_loss_coef = feature_args.loss_cfg.router_aux_loss_coef
         transformer_config.text_config.router_aux_loss_offload = feature_args.loss_cfg.router_aux_loss_offload
+        # mtp
+        mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
+        if mtp_num_layers not in (0, 1):
+            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be one of: 0, 1.")
+        transformer_config.text_config.mtp_num_layers = mtp_num_layers
+        transformer_config.text_config.enable_chunk_loss = getattr(feature_args, "enable_chunk_loss", False)
+        transformer_config.text_config.enable_dynamic_chunk_loss = getattr(feature_args, "enable_dynamic_chunk_loss", False)
         return transformer_config
 
     def get_input_embeddings(self):
@@ -2465,6 +2487,21 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
             The temporal, height and width of feature shape of each image in LLM.
         """
         return self.model.get_image_features(pixel_values=pixel_values, image_grid_thw=image_grid_thw, **kwargs)
+
+    def _compute_mtp_loss(self, hidden_states: torch.Tensor, **kwargs):
+        if not self.enable_mtp:
+            return None
+
+        mtp_loss = self.mtp(
+            hidden_states,
+            embed_tokens=self.model.language_model.embed_tokens,
+            rotary_emb=self.model.language_model.rotary_emb,
+            output_layer=self.lm_head,
+            loss_function=self.loss_function,
+            seq_len=get_seq_len("total"),
+            **kwargs,
+        )
+        return mtp_loss
 
     @can_return_tuple
     def forward(
@@ -2555,7 +2592,7 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        if getattr(self, "enable_chunk_loss", False):
+        if getattr(self, "enable_chunk_loss", False) or getattr(self, "enable_dynamic_chunk_loss", False):
             logits = None
             loss = self.lm_head(hidden_states[:, slice_indices, :], self.loss_function)
         else:
@@ -2594,9 +2631,22 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
                     loss.device
                 )  # make sure to reside in the same device
 
+        final_mtp_loss = self._compute_mtp_loss(
+            hidden_states,
+            input_ids=input_ids,
+            labels=labels,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=outputs.past_key_values,
+            cache_position=cache_position,
+            logits_to_keep=logits_to_keep,
+            **kwargs,
+        )
+
         return Qwen3_5MoeCausalLMOutputWithPast(
             loss=loss,
             aux_loss=aux_loss,
+            mtp_loss=final_mtp_loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,

@@ -121,6 +121,7 @@ class TrainEngine:
         args = self.args
         total_loss = 0
         total_aux_loss = None
+        all_mtp_loss = None
         # Gradient accumulation
         for step in range(args.training.gradient_accumulation_steps):
             # Wait for the preloaded batch to be ready
@@ -136,19 +137,40 @@ class TrainEngine:
             # forward step
             output = self.model(**batch_data, use_cache=False)
             loss = output.loss / args.training.gradient_accumulation_steps
+            total_loss += loss
 
+            # mtp loss
+            mtp_loss = output.mtp_loss
+            if mtp_loss:
+                final_mtp_loss = torch.mean(torch.stack(mtp_loss)) / args.training.gradient_accumulation_steps
+                loss += final_mtp_loss * getattr(args.model, 'mtp_loss_scaling_factor', 0.1)
+                if all_mtp_loss is None:
+                    all_mtp_loss = [torch.zeros_like(loss) for loss in mtp_loss]
+                for i in range(len(mtp_loss)):
+                    all_mtp_loss[i] += mtp_loss[i] / args.training.gradient_accumulation_steps
             # Backward
             loss.backward()
 
-            total_loss += loss
             if getattr(output, 'aux_loss', None) is not None:
                 aux_loss = output.aux_loss / args.training.gradient_accumulation_steps
                 total_aux_loss = aux_loss if total_aux_loss is None else total_aux_loss + aux_loss
 
+        # log dict for loss
+        loss_dict = {}
+
         # Average loss across data parallel group
         total_loss = self.average_losses_across_data_parallel_group([total_loss])
+        loss_dict["loss"] = total_loss.item()
+    
+        if all_mtp_loss:
+            for i in range(len(all_mtp_loss)):
+                all_mtp_loss[i] = self.average_losses_across_data_parallel_group([all_mtp_loss[i]])
+                loss_dict[f"mtp_{i+1} loss"] = all_mtp_loss[i].item()
 
-        return total_loss, total_aux_loss
+        if total_aux_loss:
+            loss_dict["aux loss"] = total_aux_loss.item()
+
+        return loss_dict
 
     def train(self):
         """Main training loop."""
@@ -174,7 +196,7 @@ class TrainEngine:
             if self.args.parallel.fsdp_plan.pregather:
                 pregather_fsdp_params(self.model)
 
-            loss, aux_loss = self.train_step(train_dataloader_iter)
+            loss_dict = self.train_step(train_dataloader_iter)
 
             # Clip gradients when clip_grad>0 and get total grad_norm
             grad_norm = clip_grad_norm(
@@ -203,8 +225,7 @@ class TrainEngine:
                     elapsed_time_per_iteration,
                     curr_step_lr,
                     self.consumed_train_samples,
-                    loss,
-                    aux_loss,
+                    loss_dict,
                     grad_norm,
                 )
 
@@ -226,7 +247,7 @@ class TrainEngine:
             self.save(self.iteration, self.consumed_train_samples)
 
     def training_log(
-        self, iteration, elapsed_time_per_iteration, curr_step_lr, consumed_train_samples, loss, aux_loss, grad_norm
+        self, iteration, elapsed_time_per_iteration, curr_step_lr, consumed_train_samples, loss_dict, grad_norm
     ):
         args = self.args
         log_string = f" [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
@@ -235,10 +256,8 @@ class TrainEngine:
         log_string += ' elapsed time per iteration (ms): {:.1f} |'.format(elapsed_time_per_iteration * 1000.0)
         log_string += ' learning rate: {:.6E} |'.format(curr_step_lr)
         log_string += ' global batch size: {:5d} |'.format(args.training.global_batch_size)
-        log_string += ' loss: {:.6E} |'.format(loss.item())
-
-        if aux_loss is not None:
-            log_string += ' aux loss: {:.6E} |'.format(aux_loss.item())
+        for name, value in loss_dict.items():
+            log_string += f" {name}: {value:.6E} |"
 
         if grad_norm is not None:
             log_string += ' grad norm: {:.3f} |'.format(grad_norm)

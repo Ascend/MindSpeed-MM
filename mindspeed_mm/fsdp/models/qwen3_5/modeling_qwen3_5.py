@@ -68,6 +68,7 @@ from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
+from mindspeed_mm.fsdp.models.mtp import MultiTokenPredictionBlock
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
@@ -1044,10 +1045,10 @@ class Qwen3_5RMSNorm(nn.Module):
 
 
 class Qwen3_5DecoderLayer(GradientCheckpointingLayer):
-    def __init__(self, config: Qwen3_5TextConfig, layer_idx: int):
+    def __init__(self, config: Qwen3_5TextConfig, layer_idx: int, is_mtp: bool = False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.layer_type = config.layer_types[layer_idx]
+        self.layer_type = config.layer_types[layer_idx] if not is_mtp else "full_attention"
         if self.layer_type == "linear_attention":
             self.linear_attn = Qwen3_5GatedDeltaNet(config, layer_idx)
         elif self.layer_type == "full_attention":
@@ -1568,6 +1569,7 @@ class Qwen3_5ModelOutputWithPast(ModelOutput):
     hidden_states: tuple[torch.FloatTensor] | None = None
     attentions: tuple[torch.FloatTensor] | None = None
     rope_deltas: torch.LongTensor | None = None
+    position_ids: torch.LongTensor | None = None
 
 
 class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
@@ -2013,6 +2015,7 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
         return Qwen3_5ModelOutputWithPast(
             **outputs,
             rope_deltas=self.rope_deltas,
+            position_ids=position_ids,
         )
 
 
@@ -2126,6 +2129,7 @@ class Qwen3_5CausalLMOutputWithPast(ModelOutput):
     hidden_states: tuple[torch.FloatTensor] | None = None
     attentions: tuple[torch.FloatTensor] | None = None
     rope_deltas: torch.LongTensor | None = None
+    mtp_loss: torch.FloatTensor | list[torch.FloatTensor] | None = None
 
 
 @model_register.register("qwen3_5")
@@ -2140,6 +2144,10 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
         super().__init__(config)
         self.model = Qwen3_5Model(config)
         self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
+        self.enable_mtp = bool(config.text_config.mtp_num_layers)
+        self.mtp = MultiTokenPredictionBlock(
+            config.text_config, Qwen3_5DecoderLayer, Qwen3_5RMSNorm
+        ) if self.enable_mtp else None
 
         self.post_init()
 
@@ -2153,6 +2161,13 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
         if causal_conv1d_implementation not in ("eager", "triton"):
             raise ValueError(f"Invalid causal_conv1d='{causal_conv1d_implementation}'. Must be one of: 'eager', 'triton'.")
         transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
+        # mtp
+        mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
+        if mtp_num_layers not in (0, 1):
+            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be one of: 0, 1.")
+        transformer_config.text_config.mtp_num_layers = mtp_num_layers
+        transformer_config.text_config.enable_chunk_loss = getattr(feature_args, "enable_chunk_loss", False)
+        transformer_config.text_config.enable_dynamic_chunk_loss = getattr(feature_args, "enable_dynamic_chunk_loss", False)
         return transformer_config
 
     def get_input_embeddings(self):
@@ -2192,6 +2207,21 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
             The temporal, height and width of feature shape of each image in LLM.
         """
         return self.model.get_image_features(pixel_values=pixel_values, image_grid_thw=image_grid_thw, **kwargs)
+
+    def _compute_mtp_loss(self, hidden_states: torch.Tensor, **kwargs):
+        if not self.enable_mtp:
+            return None
+
+        mtp_loss = self.mtp(
+            hidden_states,
+            embed_tokens=self.model.language_model.embed_tokens,
+            rotary_emb=self.model.language_model.rotary_emb,
+            output_layer=self.lm_head,
+            loss_function=self.loss_function,
+            seq_len=get_seq_len("total"),
+            **kwargs,
+        )
+        return mtp_loss
 
     @can_return_tuple
     def forward(
@@ -2275,7 +2305,7 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        if getattr(self, "enable_chunk_loss", False):
+        if getattr(self, "enable_chunk_loss", False) or getattr(self, "enable_dynamic_chunk_loss", False):
             logits = None
             loss = self.lm_head(hidden_states[:, slice_indices, :], self.loss_function)
         else:
@@ -2291,9 +2321,22 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
             loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0)
             loss = loss.sum()
 
+        final_mtp_loss = self._compute_mtp_loss(
+            hidden_states,
+            input_ids=input_ids,
+            labels=labels,
+            attention_mask=attention_mask,
+            position_ids=outputs.position_ids,
+            past_key_values=outputs.past_key_values,
+            cache_position=cache_position,
+            logits_to_keep=logits_to_keep,
+            **kwargs,
+        )
+
         return Qwen3_5CausalLMOutputWithPast(
             loss=loss,
             logits=logits,
+            mtp_loss=final_mtp_loss,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
