@@ -441,6 +441,10 @@ class DataArguments:
         default=False,
         metadata={"help": "Whether to perform async preprocess during training."},
     )
+    async_preprocess_buffer_size: Optional[int] = field(
+        default=None,
+        metadata={"help": "Buffer size for async preprocess. Defaults to 8 when not set and num_workers is unset."},
+    )
     use_pmcc_data: Optional[bool] = field(
         default=False,
         metadata={"help": "Whether to use PMCC dataset."},
@@ -1129,3 +1133,4 @@ def load_reward_tokenizer(model_args) -> "TokenizerModule":
         processor = None
 
     return {"tokenizer": processor.tokenizer, "processor": processor}
+    

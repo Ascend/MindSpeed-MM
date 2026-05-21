@@ -49,48 +49,143 @@ class DistributedIterableDataset(IterableDataset):
 
 
 class AsyncPreprocessIterableDataset(IterableDataset):
-    def __init__(self, dataset, preprocess_fn, buffer_size=4):
+    def __init__(self, dataset, preprocess_fn, buffer_size=None, num_workers=None):
         self.dataset = dataset
         self.preprocess_fn = preprocess_fn
-        self.buffer_size = buffer_size
+        self.buffer_size, self.num_workers = self._resolve_async_config(buffer_size, num_workers)
+
+    @staticmethod
+    def _resolve_async_config(buffer_size, num_workers):
+        """Normalize async worker settings while preserving the existing defaults."""
+        if buffer_size is None and num_workers is None:
+            normalized_buffer_size = 8
+            normalized_num_workers = max(1, min(normalized_buffer_size, os.cpu_count() or 1))
+        elif buffer_size is not None and num_workers is None:
+            normalized_buffer_size = max(1, buffer_size)
+            normalized_num_workers = max(1, min(normalized_buffer_size, os.cpu_count() or 1))
+        elif buffer_size is None and num_workers is not None:
+            normalized_num_workers = max(1, num_workers)
+            normalized_buffer_size = normalized_num_workers
+        else:
+            normalized_buffer_size = max(1, buffer_size)
+            normalized_num_workers = max(1, num_workers)
+
+        return normalized_buffer_size, normalized_num_workers
+
+    def _preprocess_item(self, item):
+        batch_dict = {k: [v] for k, v in item.items()}
+        processed = self.preprocess_fn(batch_dict)
+        if not processed:
+            return []
+
+        num_items = len(next(iter(processed.values())))
+        return [{k: v[i] for k, v in processed.items()} for i in range(num_items)]
     
     def __iter__(self):
-        q = queue.Queue(maxsize=self.buffer_size)
+        queue_size = max(self.buffer_size, self.num_workers)
+        task_queue = queue.Queue(maxsize=queue_size)
+        result_queue = queue.Queue(maxsize=queue_size)
         stop_event = threading.Event()
+        task_done = object()
+
+        def put_with_stop(target_queue, value, allow_after_stop=False):
+            while allow_after_stop or not stop_event.is_set():
+                try:
+                    target_queue.put(value, timeout=0.1)
+                    return True
+                except queue.Full:
+                    if not allow_after_stop and stop_event.is_set():
+                        return False
+                    continue
+            return False
+
+        def get_with_stop(source_queue):
+            while True:
+                try:
+                    return source_queue.get(timeout=0.1)
+                except queue.Empty:
+                    if stop_event.is_set():
+                        return None
+
+        def producer():
+            try:
+                # Only one thread consumes the upstream iterable so DP-based sharding stays deterministic.
+                for sequence_idx, item in enumerate(self.dataset):
+                    if stop_event.is_set():
+                        break
+                    if not put_with_stop(task_queue, (sequence_idx, item)):
+                        return
+            except Exception as exc:
+                put_with_stop(result_queue, ("error", "Failed to iterate dataset for preprocessing.", exc))
+            finally:
+                for _ in range(self.num_workers):
+                    if not put_with_stop(task_queue, task_done):
+                        break
 
         def worker():
-            batch = []
-            for item in self.dataset:
-                if stop_event.is_set():
-                    break
-                batch.append(item)
-                if len(batch) == 1:  # batch_size=1
-                    try:
-                        batch_dict = {k: [v] for k, v in batch[0].items()}
-                        processed = self.preprocess_fn(batch_dict)
-                        for i in range(len(next(iter(processed.values())))):
-                            q.put({k: v[i] for k, v in processed.items()})
-                    except Exception as e:
-                        raise RuntimeError("Preprocessing failed. Check input data and preprocessing function.") from e
-                    batch = []
-            if batch:
-                batch_dict = {k: [v] for k, v in batch[0].items()}
-                processed = self.preprocess_fn(batch_dict)
-                for i in range(len(next(iter(processed.values())))):
-                    q.put({k: v[i] for k, v in processed.items()})
-            q.put(None)
+            while not stop_event.is_set():
+                task = get_with_stop(task_queue)
+                if task is None:
+                    return
+                if task is task_done:
+                    put_with_stop(result_queue, ("done", None, None))
+                    return
 
-        thread = threading.Thread(target=worker, daemon=True)
-        thread.start()
+                sequence_idx, item = task
+                try:
+                    processed_items = self._preprocess_item(item)
+                except Exception as exc:
+                    stop_event.set()
+                    put_with_stop(
+                        result_queue,
+                        ("error", "Preprocessing failed. Check input data and preprocessing function.", exc),
+                        allow_after_stop=True,
+                    )
+                    return
+
+                if not put_with_stop(result_queue, ("result", sequence_idx, processed_items)):
+                    return
+
+        producer_thread = threading.Thread(target=producer, daemon=True)
+        worker_threads = [threading.Thread(target=worker, daemon=True) for _ in range(self.num_workers)]
+        producer_thread.start()
+        for thread in worker_threads:
+            thread.start()
 
         try:
-            while True:
-                item = q.get()
-                if item is None:
+            pending_results = {}
+            next_sequence_idx = 0
+            finished_workers = 0
+
+            while finished_workers < self.num_workers:
+                while next_sequence_idx in pending_results:
+                    for item in pending_results.pop(next_sequence_idx):
+                        yield item
+                    next_sequence_idx += 1
+
+                message = get_with_stop(result_queue)
+                if message is None:
                     break
-                yield item
+
+                message_type, payload, exc = message
+                if message_type == "result":
+                    pending_results[payload] = exc
+                elif message_type == "done":
+                    finished_workers += 1
+                else:
+                    stop_event.set()
+                    raise RuntimeError(payload) from exc
+
+            # Reorder completed tasks before yielding so all ranks in the same DP replica see the same sample order.
+            while next_sequence_idx in pending_results:
+                for item in pending_results.pop(next_sequence_idx):
+                    yield item
+                next_sequence_idx += 1
         finally:
             stop_event.set()
+            producer_thread.join(timeout=1)
+            for thread in worker_threads:
+                thread.join(timeout=1)
 
 
 def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
@@ -172,7 +267,12 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
         if data_args.streaming:
             if data_args.async_preprocess:
                 train_dataset = DistributedIterableDataset(train_dataset)
-                train_dataset = AsyncPreprocessIterableDataset(train_dataset, preprocess_func, buffer_size=8)
+                train_dataset = AsyncPreprocessIterableDataset(
+                    train_dataset,
+                    preprocess_func,
+                    buffer_size=data_args.async_preprocess_buffer_size,
+                    num_workers=data_args.preprocessing_num_workers,
+                )
             else:
                 train_dataset = train_dataset.map(
                     preprocess_func,
@@ -186,7 +286,12 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
             if val_dataset:
                 if data_args.async_preprocess:
                     val_dataset = DistributedIterableDataset(val_dataset)
-                    val_dataset = AsyncPreprocessIterableDataset(val_dataset, preprocess_func, buffer_size=8)
+                    val_dataset = AsyncPreprocessIterableDataset(
+                        val_dataset,
+                        preprocess_func,
+                        buffer_size=data_args.async_preprocess_buffer_size,
+                        num_workers=data_args.preprocessing_num_workers,
+                    )
                 else:
                     val_dataset = val_dataset.map(
                         preprocess_func,
@@ -301,3 +406,4 @@ def get_reward_video_dataset(basic_param, preprocess_param, dataset_param):
                 val_dataset = DistributedIterableDataset(val_dataset)
 
         return [train_dataset, val_dataset]
+        
