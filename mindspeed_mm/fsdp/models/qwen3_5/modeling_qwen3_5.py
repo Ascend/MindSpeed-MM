@@ -1672,7 +1672,6 @@ class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
                 past_key_values=past_key_values,
                 use_cache=use_cache,
                 cache_position=cache_position,
-                **kwargs,
                 **new_kwargs,
             )
 

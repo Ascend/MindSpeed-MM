@@ -5,15 +5,25 @@ import warnings
 from typing import Optional
 import math
 
-import fla_npu
 import torch
-import torch_npu
 
+from mindspeed_mm.fsdp.utils.import_utils import IS_FLA_NPU_AVAILABLE, IS_TRITON_AVAILABLE
 
-from .triton.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
-from .triton.solve_tril import solve_tril
-from .triton.cumsum import chunk_local_cumsum
-from .triton.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
+if IS_FLA_NPU_AVAILABLE:
+    import fla_npu
+    import torch_npu
+
+if IS_TRITON_AVAILABLE:
+    from .triton.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
+    from .triton.solve_tril import solve_tril
+    from .triton.cumsum import chunk_local_cumsum
+    from .triton.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
+else:
+    def _identity_decorator(fn):
+        return fn
+    input_guard = _identity_decorator
+    autocast_custom_fwd = _identity_decorator
+    autocast_custom_bwd = _identity_decorator
 
 def prepare_chunk_indices( 
     cu_seqlens: list[int],
@@ -125,8 +135,8 @@ def chunk_gated_delta_rule_fwd(
         k,
         v_new,
         h,
-        g,
         scale,
+        g=g,
         cu_seqlens=cu_seqlens1,
         chunk_indices=chunk_indices,
         chunk_size=chunk_size
@@ -152,7 +162,6 @@ def chunk_gated_delta_rule_bwd(
     cu_seqlens: Optional[torch.LongTensor] = None,
     chunk_size: int = 64,
 ):
-
     if cu_seqlens is not None:
         cu_seqlens1 = cu_seqlens.tolist()
         chunk_indices = prepare_chunk_indices(cu_seqlens1, chunk_size)
