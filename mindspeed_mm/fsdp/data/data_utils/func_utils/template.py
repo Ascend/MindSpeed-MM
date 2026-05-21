@@ -535,13 +535,17 @@ def parse_template(tokenizer: "PreTrainedTokenizer") -> "Template":
     messages = [{"role": "system", "content": ""}, {"role": "user", "content": "{{content}}"}]
     user_slot_empty_system = tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
     user_slot_empty_system = user_slot_empty_system[len(prefix):]
+    user_slot_empty_system = user_slot_empty_system.replace("<think>\n", "") # remove thought tags
 
     messages = [{"role": "user", "content": "{{content}}"}]
     user_slot = tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
     user_slot = user_slot[len(prefix):]
+    user_slot = user_slot.replace("<think>\n", "") # remove thought tags
+
     messages = [{"role": "user", "content": "{{content}}"}, {"role": "assistant", "content": "{{content}}"}]
     assistant_slot = tokenizer.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
     assistant_slot = assistant_slot[len(prefix) + len(user_slot):]
+    template_class = ReasoningTemplate if "<think>" in assistant_slot else Template
     assistant_slot = assistant_slot.replace("<think>", "").replace("</think>", "").lstrip("\n")  # remove thought tags
 
     if len(user_slot) > len(user_slot_empty_system):
@@ -551,7 +555,6 @@ def parse_template(tokenizer: "PreTrainedTokenizer") -> "Template":
     else:  # if defaut_system is empty, user_slot_empty_system will be longer than user_slot
         default_system = ""
 
-    template_class = ReasoningTemplate if "<think>" in assistant_slot else Template
     return template_class(
         format_user=StringFormatter(slots=[user_slot]),
         format_assistant=StringFormatter(slots=[assistant_slot]),
