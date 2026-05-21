@@ -24,9 +24,10 @@ DISTRIBUTED_ARGS="
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
+config_path=examples/qwen3_5/qwen3_5_122B_config.yaml
 mkdir -p logs
 torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
-    examples/qwen3_5/qwen3_5_122B_config.yaml \
+    ${config_path} \
     2>&1 | tee logs/train_${logfile}.log
 
 STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
