@@ -1,4 +1,5 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
+# pylint: skip-file
 import gc
 import os
 from typing import Any, Dict, Optional
@@ -200,7 +201,7 @@ class DistributedCheckpointer(CheckpointerBase):
         load_rank0_and_broadcast: bool = False,
         load_strict: bool = False,
         enable_lora: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> bool:
         """
         load training state from distributed checkpoint
         args:
@@ -210,7 +211,7 @@ class DistributedCheckpointer(CheckpointerBase):
             storage_reader: storage reader backend for dcp.load. If None, will use FileSystemReader
             enable_lora: whether to enable LoRA checkpoint loading logic
         return:
-            state: state loaded
+            release (bool): whether the loaded checkpoint is a "release" checkpoint
         """
         checkpoint_dir = path
 

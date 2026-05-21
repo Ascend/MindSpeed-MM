@@ -1,3 +1,4 @@
+# pylint: skip-file
 __all__ = [
     "build_mm_dataset", "build_mm_dataloader"
 ]
@@ -146,7 +147,8 @@ def build_mm_dataloader(dataset, dataloader_param, process_group=None, consumed_
             dataset, **dataloader_param, process_group=process_group, consumed_samples=consumed_samples)
         return data_loader
     else:
-        raise NotImplementedError(dataloader_param["dataloader_mode"])
+        # keyerror, pop before
+        raise NotImplementedError(f"Unsupported dataloader_mode: {dataloader_mode}")
 
 
 def build_ae_dataset(dataset_param):

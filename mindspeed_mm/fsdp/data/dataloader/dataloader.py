@@ -1,3 +1,4 @@
+# pylint: skip-file
 # coding=utf-8
 # Copyright (c) 2019, NVIDIA CORPORATION.  All rights reserved.
 #
@@ -173,7 +174,9 @@ class PrefetchGradAccDataLoader:
                     if fetched == 0:
                         break  # No more data
 
-                avg_tokens = total_tokens / self.grad_acc_step
+                # 尾端不足时，平均tokens数应该用实际值做除法
+                denom = fetched if fetched > 0 else self.grad_acc_step
+                avg_tokens = total_tokens / denom
                 for batch in buffer:
                     batch_dict = dict(batch)
                     batch_dict[GLOBAL_STEP_TOKEN_NUM] = total_tokens

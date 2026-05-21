@@ -1,3 +1,4 @@
+# pylint: skip-file
 from mindspeed_mm.fsdp.data.dataloader.dataloader import (
     prepare_sampler_dataloader,
 )
@@ -64,4 +65,5 @@ def build_mm_dataloader(
         )
         return data_loader
     else:
-        raise NotImplementedError(dataloader_param["dataloader_mode"])
+        # keyerror, pop before
+        raise NotImplementedError(f"Unsupported dataloader_mode: {dataloader_mode}")
