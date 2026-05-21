@@ -68,7 +68,7 @@ def reorder_output(attn_output, cp_rank, cp_size, cp_group, dim=0):
     return attn_output
 
 
-def generate_cu_seqlen_params(position_ids, need_cpu_tensor=True):
+def generate_ulysses_cu_seqlen_params(position_ids, need_cpu_tensor=True):
     """
     Generate cumulative sequence length parameters for Ulysses Flash Attention.
     """

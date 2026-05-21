@@ -66,7 +66,7 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
 )
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
-from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_cu_seqlen_params
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
 
 _TOTAL_SEQ_LEN = None
@@ -1627,7 +1627,7 @@ class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
         use_packing = "cu_seqlens" in kwargs and kwargs["cu_seqlens"] is not None
         if use_packing:
             causal_mask = None
-            kwargs.update(generate_cu_seqlen_params(text_position_ids, need_cpu_tensor=False))
+            kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids, need_cpu_tensor=False))
         else:
             causal_mask = create_causal_mask(
                 config=self.config,
@@ -1643,7 +1643,7 @@ class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
         ps = get_parallel_state()
         if ps.is_ulysses_enable():
             if not use_packing:
-                kwargs.update(generate_cu_seqlen_params(text_position_ids))
+                kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
             else:
                 kwargs_fa = kwargs.copy()
                 kwargs_fa["cu_seq_lens_q"] = kwargs_fa["cu_seq_lens_q"].cpu()
