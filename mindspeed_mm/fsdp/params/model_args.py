@@ -8,7 +8,9 @@ from mindspeed_mm.config.arguments.base_args import BaseArguments
 class ModelArguments(BaseArguments):
     model_id: Optional[str] = field(
         default=None,
-        metadata={"help": "Model identifier.If not provided, will be generated automatically based on model_name_or_path."},
+        metadata={
+            "help": "Model identifier.If not provided, will be generated automatically based on model_name_or_path."
+        },
     )
     model_name_or_path: Optional[str] = field(
         default=None,
