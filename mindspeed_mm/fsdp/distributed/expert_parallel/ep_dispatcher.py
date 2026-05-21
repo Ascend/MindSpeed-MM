@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 
 import torch
@@ -9,6 +10,11 @@ from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
 from mindspeed_mm.fsdp.ops.moe_ops.gemm_mc2 import grouped_matmul_all2all, all2all_grouped_matmul
 from mindspeed_mm.fsdp.ops.swiglu import swiglu
+
+# Enable forced expert balance for debugging purposes only.
+# Set environment variable export MM_FORCE_EP_BALANCE=1 to activate.
+# MUST BE DISABLED during formal training.
+FORCE_EP_BALANCE = int(os.getenv("MM_FORCE_EP_BALANCE", "0")) == 1
 
 
 def all_to_all(
@@ -22,6 +28,22 @@ def all_to_all(
     return _all_to_all(process_group, input_, gather_sizes, scatter_sizes)
 
 
+def force_ep_balance(
+    num_experts: int,
+    selected_experts: torch.Tensor
+) -> torch.Tensor:
+    seq_len, activation_num = selected_experts.shape
+
+    _indices = torch.arange(
+        seq_len * activation_num, 
+        dtype=selected_experts.dtype, 
+        device=selected_experts.device
+    ) % num_experts
+    selected_experts = _indices.view(seq_len, activation_num)
+
+    return selected_experts
+
+
 def ep_forward(
     num_experts: int,
     routing_weights: torch.Tensor,
@@ -32,6 +54,9 @@ def ep_forward(
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
 ) -> torch.Tensor:
+    if FORCE_EP_BALANCE:
+        selected_experts = force_ep_balance(num_experts, selected_experts)
+
     if routing_weights.size() != selected_experts.size():
         routing_weights = routing_weights.gather(1, selected_experts)
 
@@ -186,17 +211,19 @@ def ep_mc2_forward(
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
 ) -> torch.Tensor:
-    
+    if FORCE_EP_BALANCE:
+        selected_experts = force_ep_balance(num_experts, selected_experts)
+
     if not fused:
         raise ValueError(f"ep mc2 only support fused = True")
-    
+
     hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
     ep_size = dist.get_world_size(ep_group)
     ep_rank = dist.get_rank(ep_group)
     num_local_experts = num_experts // ep_size
-    
+
     num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_experts, min=0, max=num_experts)
-    
+
     num_global_tokens_per_expert = torch.zeros(
         ep_size,
         num_experts,
@@ -204,25 +231,25 @@ def ep_mc2_forward(
         device=num_local_tokens_per_expert.device
     ) # [ep_size, num_experts]
     dist.all_gather_into_tensor(num_global_tokens_per_expert, num_local_tokens_per_expert, group=ep_group)
-    
+
     start_idx, end_idx = ep_rank * num_local_experts, (ep_rank + 1) * num_local_experts
-    
+
     send_counts = num_local_tokens_per_expert
     recv_counts = num_global_tokens_per_expert[:, start_idx:end_idx].reshape(-1)
-    
+
     hidden_states, unpermute_indices = permute(hidden_states, selected_experts.to(torch.int32), fused=fused)
-    
+
     intermediate_hidden_states = all2all_grouped_matmul(
         inputs=hidden_states, weights=fc1_weight, group=ep_group, send_counts=send_counts, recv_counts=recv_counts
     )
-    
+
     intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
-    
+
     hidden_states = grouped_matmul_all2all(
         inputs=intermediate_activations, weights=fc2_weight, group=ep_group, send_counts=recv_counts, recv_counts=send_counts
     )
     hidden_states = unpermute(
         hidden_states, unpermute_indices, probs=routing_weights, fused=True
     )
-    
+
     return hidden_states
