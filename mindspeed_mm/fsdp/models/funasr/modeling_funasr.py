@@ -46,7 +46,7 @@ def get_funasr_model(model_args, model_parallel_applier):
     if frontend is None:
         logging.warning("Frontend not found in model instance. Audio features may not be extracted correctly.")
 
-    if model_args.audio_encoder_conf.freeze:
+    if model_args.audio_encoder_conf["freeze"]:
         for param in model.audio_encoder.parameters():
             param.requires_grad = False
         model.audio_encoder.eval()
@@ -54,7 +54,7 @@ def get_funasr_model(model_args, model_parallel_applier):
         for param in model.audio_encoder.parameters():
             param.requires_grad = True
 
-    if model_args.llm_conf.freeze:
+    if model_args.llm_conf["freeze"]:
         for param in model.llm.parameters():
             param.requires_grad = False
         model.llm.eval()
@@ -62,7 +62,7 @@ def get_funasr_model(model_args, model_parallel_applier):
         for param in model.llm.parameters():
             param.requires_grad = True
     
-    if model_args.audio_adaptor_conf.freeze:
+    if model_args.audio_adaptor_conf["freeze"]:
         for param in model.audio_adaptor.parameters():
             param.requires_grad = False
         model.audio_adaptor.eval()
@@ -70,7 +70,7 @@ def get_funasr_model(model_args, model_parallel_applier):
         for param in model.audio_adaptor.parameters():
             param.requires_grad = True
     
-    if model_args.ctc_decoder_conf.freeze:
+    if model_args.ctc_decoder_conf["freeze"]:
         for param in model.ctc_decoder.parameters():
             param.requires_grad = False
         model.ctc_decoder.eval()

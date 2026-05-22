@@ -413,9 +413,8 @@ class DataloaderMapStyle:
 
 def build_funasr_dataloader_factory(data_args, frontend, tokenizer):
     """Build FunASR dataloader factory with proper distributed config."""
-    dataset_conf = asdict(data_args.dataset_param.dataset_conf)
-    dataloader_conf = asdict(data_args.dataloader_param)
-
+    dataset_conf = data_args.dataset_param.dataset_conf
+    dataloader_conf = data_args.dataset_param.dataset_conf
     combined_conf = {**dataloader_conf, **dataset_conf}
 
     dataloader_kwargs = {

@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import logging
 
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DatasetAttr
@@ -15,7 +15,7 @@ class DataSetArguments(BaseArguments):
         metadata={"help": "Type of dataset to use."}
     )
     basic_parameters: BasicDataAruments = field(default_factory=BasicDataAruments)
-    preprocess_parameters: ProcessorArguments = field(default_factory=ProcessorArguments)
+    preprocess_parameters: Optional[ProcessorArguments] = field(default_factory=ProcessorArguments)
     attr: DatasetAttr = field(default_factory=DatasetAttr)
 
 
@@ -34,7 +34,7 @@ class CollateArguments(BaseArguments):
 class DataloaderArguments(BaseArguments):
     dataloader_mode: str = field(metadata={"help": "Mode of dataloader."})
     sampler_type: str = field(metadata={"help": "Type of sampler to use."})
-    shuffle: bool = field(metadata={"help": "Whether to shuffle the data during training."})
+    shuffle: Optional[bool] = field(metadata={"help": "Whether to shuffle the data during training."})
     drop_last: bool = field(metadata={"help": "Whether to drop the last incomplete batch if dataset size is not divisible by batch size."})
     pin_memory: bool = field(metadata={"help": "Whether to pin memory for faster data transfer to GPU."})
     collate_param: CollateArguments = field(default_factory=CollateArguments)

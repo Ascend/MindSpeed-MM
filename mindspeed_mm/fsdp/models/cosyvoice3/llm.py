@@ -88,10 +88,10 @@ class CosyVoice3LM(torch.nn.Module, BaseModel):
         # 4. sampling method
         self.sampling = partial(
             ras_sampling,
-            top_p=config.sampling.top_p,
-            top_k=config.sampling.top_k,
-            win_size=config.sampling.win_size,
-            tau_r=config.sampling.tau_r
+            top_p=config.sampling.get("top_p", 0.8),
+            top_k=config.sampling.get("top_k", 25),
+            win_size=config.sampling.get("win_size", 10),
+            tau_r=config.sampling.get("tau_r", 0.1),
         )
         self.mix_ratio = config.mix_ratio
 

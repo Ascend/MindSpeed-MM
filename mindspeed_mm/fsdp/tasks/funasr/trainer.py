@@ -79,7 +79,7 @@ class FunasrTrainer(Trainer):
         if scheduler_name not in scheduler_classes:
             raise ValueError(f"Invalid scheduler name: {scheduler_name}. Available schedulers: {list(scheduler_classes.keys())}")
         scheduler_class = scheduler_classes[scheduler_name]
-        scheduler = scheduler_class(self.optimizer, **vars(self.args.training.scheduler_conf))
+        scheduler = scheduler_class(self.optimizer, **self.args.training.scheduler_conf)
         
         return scheduler
 

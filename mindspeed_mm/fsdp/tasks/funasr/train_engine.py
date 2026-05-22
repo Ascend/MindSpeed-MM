@@ -141,7 +141,7 @@ class FunasrTrainEngine(TrainEngine):
                     if self.iteration % self.args.training.log_interval == 0:
                         self.training_log(
                             self.iteration, elapsed_time, curr_lr,
-                            self.consumed_train_samples, loss, grad_norm
+                            self.consumed_train_samples, loss, loss.new_tensor(0.0), grad_norm
                         )
                     
                     # Checkpointing (reuse parent method)
