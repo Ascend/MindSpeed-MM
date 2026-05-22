@@ -1,4 +1,9 @@
 """
+Optimized native PyTorch FSDP2 for enhanced performance and ease of use. Key highlights include:
+
+---------
+Optimization 1:
+
 FSDP2 (fully_shard) Custom Patch for Layer-wise Hook Management and Multi-Stream Communication.
 
 This module extends PyTorch's native FSDP2 implementation to support:
@@ -16,6 +21,17 @@ Usage:
     >>> apply_fully_shard_patch()
     >>> from torch.distributed.fsdp import fully_shard
     >>> model = fully_shard(model, hook_module=layer_block)
+    
+--------
+Optimization 2:
+
+Refined FSDP2 multi-stream event dependencies to resolve the issue of an 
+extra block being prefetched in the timeline when prefetching is enabled, 
+resulting in a more rational pipeline layout. 
+
+In scenarios like EP, this prevents bandwidth contention caused by the 
+overlap between FSDP2 unshard communication and token dispatch communication.
+
 """
 
 
@@ -380,6 +396,43 @@ def _root_post_backward_final_callback(self) -> None:
                     _comm_ctx.reduce_scatter_state = None
 
         self._state_ctx.post_backward_final_callback_queued = False
+
+
+@disable_if_config_true
+def _pre_forward(
+    self, module: nn.Module, args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    # When composing with module-hook-based activation checkpointing, the
+    # the pre-backward hook is responsible for the unshard
+    if self._training_state == TrainingState.PRE_BACKWARD:
+        return args, kwargs
+    self._training_state = TrainingState.FORWARD
+    args, kwargs = self._root_pre_forward(module, args, kwargs)
+    if self._mp_policy.cast_forward_inputs and self._mp_policy.param_dtype:
+        with torch.profiler.record_function("FSDP::cast_forward_inputs"):
+            cast_fn = functools.partial(
+                _cast_fp_tensor, self._mp_policy.param_dtype
+            )
+            args, kwargs = tree_map(cast_fn, args), tree_map(cast_fn, kwargs)
+    if self._fsdp_param_group:
+        args, kwargs = self._fsdp_param_group.pre_forward(module, args, kwargs)
+    for fsdp_state in self._states_to_forward_prefetch:
+        if (target_param_group := fsdp_state._fsdp_param_group) is not None:
+            prefetch_all_gather_copy_in_stream = target_param_group.comm_ctx.all_gather_copy_in_stream
+ 
+            # Notice: 
+            # [Optimization 2] Refine multi-stream event dependencies to optimize 
+            # pipeline scheduling.
+            # Explicitly wait for the previous global communication event to complete 
+            # before triggering a new prefetch. This prevents an extra block from being 
+            # prefetched and avoids bandwidth contention (e.g., between FSDP unshard 
+            # and token dispatch in EP scenarios).
+            for comm_ctx in self.global_comm_ctx:
+                if comm_ctx.all_gather_state and comm_ctx.all_gather_state.event:
+                    prefetch_all_gather_copy_in_stream.wait_event(comm_ctx.all_gather_state.event)
+ 
+            FSDPParamGroup._prefetch_unshard(target_param_group, "forward")
+    return args, kwargs
 
 
 @disable_if_config_true
@@ -780,6 +833,7 @@ def apply_fully_shard_patch() -> None:
     FSDPState.init = hook_module_init
     FSDPState._init_shared_state = hook_module_init_shared_state
     FSDPState._root_post_backward_final_callback = _root_post_backward_final_callback
+    FSDPState._pre_forward = _pre_forward
     FSDPState._post_forward = _post_forward
 
     # Patch FSDPParamGroup methods
