@@ -140,8 +140,8 @@ class TrainEngine:
             total_loss += loss
 
             # mtp loss
-            mtp_loss = output.mtp_loss
-            if mtp_loss:
+            mtp_loss = getattr(output, 'mtp_loss', None)
+            if mtp_loss is not None:
                 final_mtp_loss = torch.mean(torch.stack(mtp_loss)) / args.training.gradient_accumulation_steps
                 loss += final_mtp_loss * getattr(args.model, 'mtp_loss_scaling_factor', 0.1)
                 if all_mtp_loss is None:
