@@ -66,7 +66,7 @@ Agentic SFT数据采用JSON格式，每条数据包含以下关键字段：
             {"role": "user", "content": "您好，是的，我是杜女士。"},
             {"role": "assistant", "content": "杜女士，感谢您的确认。我是疾控中心的工作人员。我们注意到您还没有接种新型流感疫苗。为了您的健康和公共卫生安全，我们建议您尽快接种。"},
             {"role": "user", "content": "那我选择周三下午三点可以吗？"},
-            {"role": "tool_call", "content": "<tool_call>\n{name: register_vaccine_appointment, arguments: {appointment_time: 周三下午三点}}\n送往"},
+            {"role": "tool_call", "content": "<tool_call>\n{name: register_vaccine_appointment, arguments: {appointment_time: 周三下午三点}}\n</tool_call>"},
             {"role": "tool_response", "content": "{status: success, message: 预约成功}"},
             {"role": "assistant", "content": "好的，已经为您登记了周三下午三点的接种时间。请您携带有效身份证件按时前往指定接种点。感谢您对疫情防控工作的支持。"},
             {"role": "user", "content": "谢谢您，辛苦了。"},
@@ -78,15 +78,15 @@ Agentic SFT数据采用JSON格式，每条数据包含以下关键字段：
                 "type": "function",
                 "function": {
                     "name": "register_vaccine_appointment",
-                    "description": "登记用户的疫苗接种预约", 
+                    "description": "登记用户的疫苗接种预约",
                     "parameters": {
-                        "type": "object", 
+                        "type": "object",
                         "properties": {
                             "appointment_time": {
-                                "type": "string", 
+                                "type": "string",
                                 "description": "用户选择的接种时间"
                             }
-                        }, 
+                        },
                         "required": ["appointment_time"]
                     }
                 }
