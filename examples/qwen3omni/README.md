@@ -445,7 +445,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 
 ### 3. 启动微调
 
-以Qwen3-Omni为例，启动微调训练任务。  
+以Qwen3-Omni为例，启动微调训练任务。
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 
 ```shell
@@ -590,3 +590,5 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
 ## 注意事项
 
 ‼️当前用多卡微调时，会遇到梯度通信问题，需要在transformers中对MOE实现方式改写，需要转换权重的改写方式可以有更好的性能，其他改写方式（比如，让所有专家参与前向运算）的性能较差
+
+‼️项目中预留了 `position_ids.to(torch.bfloat16)`和`self.rope_deltas = None` 两行代码，文件路径为`mindspeed_mm/models/transformers/qwen3omni/modeling_qwen3_omni_moe.py`，**唯一用途是与 LLaMA Factory 保持精度对齐**。经实测验证：**移除这两行代码**，通常能获得更优的训练效果

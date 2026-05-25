@@ -4,20 +4,14 @@ parallel:
   fully_shard_parallel_size: auto
   fsdp_plan:
     apply_modules:
-      - audio_tower.positional_embedding
-      - audio_tower.layers.{*}
-      - visual.blocks.{*}
-      - visual.merger
-      - visual.merger_list.{*}
       - visual
+      - visual.blocks.{*}
+      - model
       - model.embed_tokens
       - model.layers.{*}
-      - model
       - lm_head
     param_dtype: bf16
     reduce_dtype: fp32
-    num_to_forward_prefetch: 1
-    num_to_backward_prefetch: 1
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1

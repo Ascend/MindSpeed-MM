@@ -93,7 +93,7 @@ pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
 - 模型地址: [Qwen3-Omni-30B-A3B-Instruct](https://huggingface.co/collections/Qwen/qwen3-omni)；
 
-将下载的模型权重保存到本地的``ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct`目录下。
+将下载的模型权重保存到本地的`ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct`目录下。
 
 <a id="jump2.2"></a>
 
@@ -356,3 +356,5 @@ bash examples/qwen3omni/finetune_qwen3omni_v1.sh
 ## 注意事项
 
 ‼️当前用多卡微调时，会遇到梯度通信问题，需要使能use_grouped_expert_matmul，在transformers中对MOE实现方式改写，性能更好；如果关闭use_grouped_expert_matmul，让所有专家参与前向运算，性能较差
+
+‼️项目中预留了 `position_ids.to(torch.bfloat16)`和`self.rope_deltas = None` 两行代码，文件路径为`mindspeed_mm/fsdp/models/qwen3omni/modeling_qwen3_omni_moe.py`，**唯一用途是与 LLaMA Factory 保持精度对齐**。经实测验证：**移除这两行代码**，通常能获得更优的训练效果

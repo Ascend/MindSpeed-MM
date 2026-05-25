@@ -2270,8 +2270,12 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(
                 position_ids = position_ids.view(1, -1).expand(batch_size, -1)
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
+
+        # to align precision with LLaMA Factory
         position_ids = position_ids.to(torch.bfloat16)
         self.rope_deltas = None
+        # NOTE: Removing these two lines usually yields better training performance
+
         outputs = self.model(
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -2371,43 +2375,6 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(
             model_inputs["input_features"] = None
 
         return model_inputs
-
-    def fully_shard(self, fsdp_plan):
-        # Get modules and parameters that should be ignored for FSDP
-        ignored_modules, ignored_params = get_ignored_modules(self, fsdp_plan)
-        # Get modules that should have FSDP applied
-        fsdp_modules = get_fsdp_modules(self, fsdp_plan, ignored_modules)
-
-        # Configure mixed precision if enabled
-        ps = get_parallel_state()
-        config = {'mesh': ps.get_fsdp_device_mesh(), 'ignored_params': ignored_params, "reshard_after_forward": fsdp_plan.reshard_after_forward}
-        config["mp_policy"] = get_mixprecision_policy(fsdp_plan)
-        # Apply FSDP to specific child modules first
-        for module in fsdp_modules:
-            fully_shard(module, **config)
-        # Apply FSDP to the entire model
-        fully_shard(self, **config)
-
-        # Forward prefetch
-        if fsdp_plan.num_to_forward_prefetch > 0:
-            for curr_layer, next_layer in zip(self.audio_tower.layers[:-1], self.audio_tower.layers[1:]):
-                curr_layer.set_modules_to_forward_prefetch([next_layer])
-            self.audio_tower.layers[-1].set_modules_to_forward_prefetch([self.visual.blocks[0]])
-
-            for i, (curr_block, next_block) in enumerate(zip(self.visual.blocks[:-1], self.visual.blocks[1:])):
-                prefetch_modules: List[nn.Module] = []
-                if i in self.visual.deepstack_visual_indexes:
-                    prefetch_modules.append(self.visual.deepstack_merger_list[self.visual.deepstack_visual_indexes.index(i)])
-                prefetch_modules.append(next_block)
-                curr_block.set_modules_to_forward_prefetch(prefetch_modules)
-            self.visual.blocks[-1].set_modules_to_forward_prefetch([self.visual.merger])
-            self.visual.merger.set_modules_to_forward_prefetch([self.model.embed_tokens])
-
-            self.model.embed_tokens.set_modules_to_forward_prefetch([self.model.layers[0]])
-            for curr_layer, next_layer in zip(self.model.layers[:-1], self.model.layers[1:]):
-                curr_layer.set_modules_to_forward_prefetch([next_layer])
-            self.model.layers[-1].set_modules_to_forward_prefetch([self.lm_head])
-        return self
 
 
 if IS_NPU_AVAILABLE:

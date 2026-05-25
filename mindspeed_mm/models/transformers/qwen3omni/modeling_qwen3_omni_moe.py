@@ -1919,8 +1919,11 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(
                 position_ids = position_ids.view(1, -1).expand(batch_size, -1)
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
+
+        # to align precision with LLaMA Factory
         position_ids = position_ids.to(torch.bfloat16)
         self.rope_deltas = None
+        # NOTE: Removing these two lines usually yields better training performance
 
         outputs = self.model(
             attention_mask=attention_mask,
