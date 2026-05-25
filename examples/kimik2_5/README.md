@@ -162,7 +162,6 @@ cp -f \
   kimi_k25_vision_processing.py \
   preprocessor_config.json \
   tiktoken.model \
-  tokenization_kimi.py \
   tokenizer_config.json \
   tool_declaration_ts.py \
   ${MM_PATH}/mindspeed_mm/fsdp/models/kimik2_5/
