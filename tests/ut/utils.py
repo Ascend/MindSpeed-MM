@@ -2,7 +2,6 @@
 We can't use assert in our code for codecheck, so create this auxiliary function to wrap
 the assert case in ut for ci.
 """
-import megatron.core.parallel_state as ps
 
 
 def judge_expression(expression):
@@ -35,6 +34,7 @@ def initialize_model_parallel(
     pipeline_model_parallel_split_rank=None,
     context_parallel_size=1,
 ):
+    import megatron.core.parallel_state as ps
     ps.destroy_model_parallel()
     ps.initialize_model_parallel(
         tensor_model_parallel_size=tensor_model_parallel_size,

@@ -48,7 +48,7 @@ class DebugBwd(torch.autograd.Function):
         """
 
         # 从上下文获取数据
-        x = ctx.x
+        x = ctx.saved_tensors[0]
         debug_rank = ctx.debug_info["debug_rank"]
         print_info = ctx.debug_info["print_info"]
         extra_info = ctx.debug_info["extra_info"]
@@ -66,7 +66,7 @@ class DebugBwd(torch.autograd.Function):
             # 可以在反向加入断点调试
 
         # 返回对应输入的梯度，多余参数返回 None
-        return grad_output, None, None
+        return grad_output, None, None, None
 
 
 def debug_fn(
