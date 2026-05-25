@@ -72,12 +72,14 @@ class Trainer:
         # Build core training components
         self.model = self.get_model(model_provider)
         self.optimizer = self.get_optimizer()
-        self.lr_scheduler = self.get_scheduler()
         self.train_dataloader = self.get_dataloader() if dataloader_provider is None else dataloader_provider(args)
         self.checkpointer = self.get_checkpointer()
 
         # Validate and calculate training iterations
         self._validate_and_set_train_iters(args)
+
+        # if set `train_epochs`,  `train_iters` will be updated after building dataset
+        self.lr_scheduler = self.get_scheduler()
 
         # Create the training engine
         self.trainer = TrainEngine(
