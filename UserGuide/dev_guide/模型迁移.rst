@@ -125,6 +125,7 @@ train_valid_test_datasets_provider   构建数据加载器
 
 .. code:: bash
 
+    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
     git clone https://github.com/NVIDIA/Megatron-LM.git
     cd Megatron-LM
     git checkout core_v0.12.1
@@ -356,7 +357,7 @@ MindSpeed-MM 训练的启动方式与 Megatron 保持一致。以下是训练启
         --distributed-backend nccl \
         >> logs/train_${logfile}.log 2>&1  # 可选：重定向日志
 
-FSDP2 训练
+Megatron-FSDP2 训练
 ---------------
 
 **为实现模型的快速迁移**，MindSpeed-MM 深度集成了 **PyTorch FSDP2** ，提供统一的分布式训练解决方案：用户自定义模型只需简单继承即可获得分布式能力，第三方模型通过标准化适配流程无缝接入，同时支持灵活的配置文件驱动和高级自定义切分策略，满足从快速上手到深度定制的全场景需求。
