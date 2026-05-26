@@ -23,6 +23,9 @@ MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，
 
 由于不同模型的依赖环境存在差异，镜像中仅预安装了上述基础依赖包。用户在拉取镜像并启动容器后，需根据目标模型的 README 文件，在 base 环境中手动安装该模型所需的额外依赖。
 
+镜像下载：请访问 [镜像中心](https://www.hiascend.com/developer/ascendhub) 搜索 mindspeed-mm，获取对应的 `docker pull` 命令。
+当前仅提供`openEuler 24.03`操作系统及`aarch64`架构的镜像。
+
 ## 镜像 Tag 关键字段描述
 
 镜像 Tag 命名遵循模板：`{版本号}-{芯片信息}-{操作系统}-py{Python版本}-{架构类型}`

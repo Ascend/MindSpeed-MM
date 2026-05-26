@@ -12,54 +12,19 @@
 
 ## MindSpeed MM
 
-MindSpeed MM: An Ascend multimodal large model suite for large-scale distributed training, supporting mainstream multimodal large model training in the industry. It aims to provide an end-to-end multimodal training solution for Huawei [Ascend chips](https://www.hiAscend.com/), including features such as pre-built mainstream models, data engineering, distributed training and acceleration, pre-training, fine-tuning, post-training, and online inference tasks.
+MindSpeed MM: An Atlas multimodal large model suite for large-scale distributed training, supporting mainstream multimodal large model training in the industry. It aims to provide an end-to-end multimodal training solution for Huawei [Atlas chips](https://www.hiAscend.com/), including features such as pre-built mainstream models, data engineering, distributed training and acceleration, pre-training, fine-tuning, post-training, and online inference tasks.
 
 The MindSpeed MM image is based on both Ubuntu 22.04 and openEuler 24.03 operating systems, supporting x86_64 and aarch64 (ARM64) CPU architectures. The image comes with the following pre-installed software:
 
 - **PyTorch** + **torch_npu**: Deep learning framework
 - **decord 0.6.0**: High-performance video decoding library
-- **CANN**: Huawei Ascend AI processor base software stack
+- **CANN**: Huawei Atlas AI processor base software stack
 - **verl_qwen3vl conda environment**: Pre-compiled VERL Qwen3VL reinforcement learning training environment (including vllm, vllm-ascend, verl)
 
 Due to differences in dependencies between models, only the above basic packages are pre-installed in the image. After pulling the image and starting a container, users should manually install additional dependencies required by their target model in the base environment according to the model's README file.
 
-## Key Field Description of Image Tag
-
-Image tag naming follows the template: `{version}-{chip_info}-{os}-py{python_version}-{architecture}`
-
-| Field | Description | Example |
-| ------ | ------ | -------- |
-| Version | MindSpeed MM version identifier, also the Git branch name | master |
-| Chip Info | NPU chip type (lowercase) | a3, 910b |
-| Operating System | Operating system | openeuler24.03, ubuntu22.04 |
-| Python Version | Python version | py3.11 |
-| Architecture | CPU architecture | x86_64, aarch64 |
-
-### Example Tags
-
-| Tag | NPU | Operating System | Python | Architecture |
-| ----- | ----- | --------- | -------- | ------ |
-| `master-a3-openeuler24.03-py3.11-x86_64` | A3 | openEuler 24.03 | 3.11 | x86_64 |
-| `master-a3-openeuler24.03-py3.11-aarch64` | A3 | openEuler 24.03 | 3.11 | aarch64 |
-| `master-910b-openeuler24.03-py3.11-x86_64` | 910B | openEuler 24.03 | 3.11 | x86_64 |
-| `master-910b-openeuler24.03-py3.11-aarch64` | 910B | openEuler 24.03 | 3.11 | aarch64 |
-
-## Dockerfile Archive Path
-
-| NPU | Operating System | Dockerfile Path |
-| ----- | --------- | ---------------- |
-| A3 | openEuler | `docker/Dockerfile` |
-| A3 | Ubuntu | `docker/Dockerfile` |
-| 910B | openEuler | `docker/Dockerfile` |
-| 910B | Ubuntu | `docker/Dockerfile` |
-
-Dockerfile naming follows the template: `Dockerfile[.{chip_info}.{os}.{other_fields}]`
-
-- Unified `Dockerfile` supports all NPU types and OS versions through build arguments
-- Fields are connected with `.`
-- Hyphens `-` are used within fields
-- Chip info uses lowercase (a3, 910b)
-- OS uses PascalCase (openEuler, ubuntu)
+Image download: Please visit the [Image Center](https://www.hiascend.com/developer/ascendhub) and search for mindspeed-mm to get the corresponding `docker pull` command.
+Currently, only images for `openEuler 24.03` OS and `aarch64` architecture are provided.
 
 ## Project Directory Structure Specification
 
@@ -159,7 +124,7 @@ The build script `build.sh` supports multiple parameter configurations. The foll
 
 | Parameter | Description | Default (Example) |
 | ------ | ------ | ------------ |
-| `-t, --npu-type` | NPU type: A3 or 910B | None (required) |
+| `-t, --npu-type` | NPU type | None (required) |
 | `-o, --os` | Operating system: openeuler24.03 or ubuntu22.04 | openeuler24.03 |
 | `-v, --version` | MindSpeed MM version identifier, used as Git branch name and script directory selection basis | master |
 | `--torch-version` | PyTorch version | 2.7.1 |
@@ -178,7 +143,7 @@ cd docker
 # Build A3 + openEuler image (default)
 bash build.sh -t A3
 
-# Build 910B + openEuler image
+# Build A2 + openEuler image
 bash build.sh -t 910B
 
 # Build A3 + Ubuntu image
@@ -213,7 +178,7 @@ The build script supports automatic download of the following resources. Please 
 
 The build script automatically recognizes key information from the base image name:
 
-1. **NPU type recognition**: Recognizes `910b` or `a3` patterns from the image tag
+1. **NPU type recognition**: Recognizes the NPU chip model from the image tag
 2. **Operating system recognition**: Recognizes `openeuler24.03` or `ubuntu22.04` from the image tag
 3. **Automatic image tag generation**: Automatically generates image tags that conform to naming rules based on recognized information
 
@@ -242,7 +207,7 @@ bash "${SCRIPT_DIR}/build.sh" \
 
 **Key Feature Description:**
 
-1. **Automatic recognition**: The script automatically recognizes NPU type (910B) and operating system (openeuler24.03) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
+1. **Automatic recognition**: The script automatically recognizes NPU type (910) and operating system (openeuler24.03) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
 2. **Automatic tag generation**: Automatically generates image tags based on recognition results, such as `mindspeed-mm:master-910b-openeuler24.03-py3.11-x86_64`
 3. **Automatic download**: If the Miniconda installer or decord dependencies are not available locally, the script will automatically download them
 4. **Failure cleanup**: The `--cleanup-on-fail` parameter ensures cleanup of dangling resources if the build fails
