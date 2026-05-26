@@ -52,7 +52,14 @@ class Qwen35FlopsCounter:
         seqlen_square_sum = 0
         for seqlen in images_seqlens:
             seqlen_square_sum += seqlen * seqlen
-        attn_qkv_flops = 12 * seqlen_square_sum * head_dim * num_heads * full_attn_layer_num
+
+        # Notice: This is the attention flops calculation for the full scenario,
+        # which differs from veomni.
+        # Forward pass: 4 * seqlen_square_sum * head_dim * num_heads
+        # Backward pass: (8 + 2) * seqlen_square_sum * head_dim * num_heads.
+        # This is because the FA operator recomputes the kv matrix during backward.
+        # This implementation applies to both GPU and NPU.
+        attn_qkv_flops = 14 * seqlen_square_sum * head_dim * num_heads * full_attn_layer_num
 
         vit_flops = dense_N_flops + attn_qkv_flops
 
@@ -225,7 +232,14 @@ class Qwen35FlopsCounter:
         seqlen_square_sum = 0
         for seqlen in batch_seqlens:
             seqlen_square_sum += seqlen * seqlen
-        attn_qkv_flops = 12 * seqlen_square_sum * head_dim * num_attention_heads * num_full_attn_layers
+
+        # Notice: This is the attention flops calculation for the causal scenario,
+        # which differs from veomni.
+        # Forward pass: 2 * seqlen_square_sum * head_dim * num_heads
+        # Backward pass: (4 + 1) * seqlen_square_sum * head_dim * num_heads.
+        # This is because the FA operator recomputes the kv matrix during backward.
+        # This implementation applies to both GPU and NPU.
+        attn_qkv_flops = 7 * seqlen_square_sum * head_dim * num_attention_heads * num_full_attn_layers
 
         # GatedDeltaNet recurrence flops (state update + query, for all GDN layers)
         gdn_recurrence_flops = self._compute_gdn_recurrence_flops(text_config, tokens_sum, num_full_attn_layers)
@@ -239,10 +253,8 @@ class Qwen35FlopsCounter:
 
         # all_layer & all_token fwd & bwd flops
         flops_all_token = dense_N_flops + attn_qkv_flops + gdn_recurrence_flops + vit_flops
-    
+
         return flops_all_token
-
-
 
     def estimate_flops(self, batch_seqlens, step_time, **kwargs):
         """
@@ -256,32 +268,33 @@ class Qwen35FlopsCounter:
             promised_flops (float): The expected FLOPS of the current device.
         """
         tokens_sum = sum(batch_seqlens)
-        
+
         estimated_flops = self._estimate_qwen3_5_family_flops(tokens_sum, batch_seqlens, **kwargs) / step_time
-        
+
         return estimated_flops
 
 
 def get_args():
     parser = argparse.ArgumentParser(description="Qwen3.5 and Qwen3.6 FLOPs Calculation Tool")
-    parser.add_argument('--vit_seqlens', type=int, default=0, nargs="+", help='seqlen in vit')
-    parser.add_argument('--llm_seqlens', type=int, default=16384, nargs="+", help='seqlen in language_model')
-    parser.add_argument('--hf_path', type=str, default="/home/weights/Qwen3.5-35B-A3B/", help='HuggingFace config path')
-    parser.add_argument('--cp_size', type=int, default=1, help="Cp size")
-    parser.add_argument('--mbs', type=int, default=1, help="Micro batchsize")
-    parser.add_argument('--step_time', type=float, help="Step time (s)")
+    parser.add_argument("--vit_seqlens", type=int, default=0, nargs="+", help="seqlen in vit")
+    parser.add_argument("--llm_seqlens", type=int, default=16384, nargs="+", help="seqlen in language_model")
+    parser.add_argument("--hf_path", type=str, default="/home/weights/Qwen3.5-35B-A3B/", help="HuggingFace config path")
+    parser.add_argument("--device_num", type=int, default=1, help="Device num")
+    parser.add_argument("--gbs", type=int, default=1, help="global batchsize")
+    parser.add_argument("--step_time", type=float, help="Step time (s)")
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = get_args()
     flopcounter = Qwen35FlopsCounter(config=AutoConfig.from_pretrained(args.hf_path))
-    cp_size = args.cp_size
-    mbs = args.mbs
-    flops = flopcounter.estimate_flops(batch_seqlens=args.llm_seqlens, images_seqlens=args.vit_seqlens, step_time=args.step_time)
-    flops = flops / cp_size * mbs
+    flops = flopcounter.estimate_flops(
+        batch_seqlens=args.llm_seqlens, images_seqlens=args.vit_seqlens, step_time=args.step_time
+    )
+    flops = flops * args.gbs / args.device_num
     print(f"flops: {flops:.4e}")
-    
-    
+
+
 """
 e.g.:
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -289,7 +302,7 @@ python mindspeed_mm/fsdp/tools/flops_tool/flops_qwen3_5.py \
     --vit_seqlens 1024 \
     --llm_seqlens 16384 \
     --hf_path /home/weights/Qwen3.5-35B-A3B/ \
-    --cp_size 1 \
-    --mbs 1 \
+    --device_num 1 \
+    --gbs 1 \
     --step_time 6.9
 """
