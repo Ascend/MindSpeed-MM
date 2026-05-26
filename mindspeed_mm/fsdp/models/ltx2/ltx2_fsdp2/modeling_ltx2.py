@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import importlib
 import sys
+import types
 from typing import Any
 
 import torch
@@ -28,14 +29,15 @@ from ltx_core.utils import find_matching_file
 from mindspeed_mm.fsdp.models.base_model import BaseModel
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.utils.register import model_register
-
+from mindspeed_mm.fsdp.models.ltx2.ltx2_fsdp2.modified import _process_transformer_blocks
+from mindspeed_mm.fsdp.models.ltx2.ltx2_fsdp2.modified import block_forward
+from mindspeed_mm.fsdp.models.ltx2.ltx2_fsdp2.modified import model_forward
 
 @dataclass
 class LTX2ModelOutput:
     loss: torch.Tensor
     video_pred: torch.Tensor | None = None
     audio_pred: torch.Tensor | None = None
-
 
 @model_register.register("ltx2")
 class LTX2ForTraining(torch.nn.Module, BaseModel):
@@ -52,6 +54,12 @@ class LTX2ForTraining(torch.nn.Module, BaseModel):
         if text_encoder is not None:
             text_encoder.requires_grad_(False)
             text_encoder.eval()
+        # Monkey patch the transformer to use the modified methods to use recompute while using FSDP2 training
+        self.transformer._process_transformer_blocks = types.MethodType(_process_transformer_blocks, self.transformer)
+        for block in self.transformer.transformer_blocks:
+            block.forward = types.MethodType(block_forward, block)
+        self.transformer.forward = types.MethodType(model_forward, self.transformer)
+
 
     @property
     def text_encoder(self) -> torch.nn.Module | None:

@@ -64,10 +64,10 @@ model:
     out_channels: 128
     num_layers: 48
     cross_attention_dim: 4096
-    caption_channels: 4096
+    caption_channels: 3840
     positional_embedding_max_pos: [20, 2048, 2048]
     timestep_scale_multiplier: 1000
-    rope_type: interleaved
+    rope_type: split
   text_encoder_path: /home/data/gemma-3-12b-it-qat-q4_0-unquantized
   enable_gradient_checkpointing: true
 
@@ -75,7 +75,7 @@ model:
 features:
   loss_cfg:
     loss_type: raw
-  recompute: false
+  recompute: true
   recompute_plan:
     apply_modules:
       - transformer.transformer_blocks.{*}
