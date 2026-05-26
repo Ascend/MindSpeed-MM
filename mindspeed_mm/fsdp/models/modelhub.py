@@ -115,6 +115,14 @@ class ModelHub:
             )
         except Exception as e:
             # If config loading fails, treat as custom model
+            first_line = next(iter(str(e).splitlines()), "")
+            _MAX_ERROR_MSG_LEN = 200
+            msg = first_line[:_MAX_ERROR_MSG_LEN] + "..." if len(first_line) > _MAX_ERROR_MSG_LEN else first_line
+            logger.warning(
+                f"AutoConfig.from_pretrained failed for '{model_args.model_name_or_path}' "
+                f"({type(e).__name__}: {msg}); falling back to custom model builder. "
+                f"If you intended to load a HuggingFace model, check the error above."
+            )
             transformer_config = None
 
         # Determine which builder to use based on config availability
