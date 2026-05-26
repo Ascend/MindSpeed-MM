@@ -121,6 +121,12 @@ class MindSpeedArgsRequired:
     # Ring Attention CP
     reset_attention_mask: Any = None
 
+    # CoC configs
+    use_ascend_coc: Any = None
+    coc_mode: Any = None
+    coc_parallel_num: Any = None
+    coc_fused_kernel: Any = None
+
 
 def tranformer_config_post_init_wrapper(fn):
     @wraps(fn)
