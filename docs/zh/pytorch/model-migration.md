@@ -159,7 +159,7 @@ export CPU_AFFINITY_CONF=<mode>,npu<value1>:<value2>-<value3>
 1. 仓库拉取
 
     ```shell
-    git clone https://gitcode.com/Ascend/MindSpeed-MM.git
+    git clone --branch 26.0.0 https://gitcode.com/Ascend/MindSpeed-MM.git
     git clone https://github.com/NVIDIA/Megatron-LM.git
     cd Megatron-LM
     git checkout core_v0.12.1
@@ -272,12 +272,13 @@ export CPU_AFFINITY_CONF=<mode>,npu<value1>:<value2>-<value3>
 
 ---
 
->[!NOTE]   
+>[!NOTE]
+>
 >当前支持读取多个以`,`（注意不要加空格）分隔的数据集，配置方式为`data.json`中
 dataset_param->basic_parameters->dataset
-从"./data/mllm_format_llava_instruct_data.json"修改为"./data/mllm_format_llava_instruct_data.json,./data/mllm_format_llava_instruct_data2.json"  
->同时注意`data.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。  
-   
+从"./data/mllm_format_llava_instruct_data.json"修改为"./data/mllm_format_llava_instruct_data.json,./data/mllm_format_llava_instruct_data2.json"
+>同时注意`data.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
+
 ### 执行训练
 
 以Qwen2VL-7B为例，启动微调训练任务。

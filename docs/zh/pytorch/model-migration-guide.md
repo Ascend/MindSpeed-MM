@@ -70,31 +70,11 @@ sequenceDiagram
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
+请参考[安装指南](install_guide.md)，完成昇腾软件安装。
 
+>[!NOTE]
+>
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
-
-```shell
-git clone https://github.com/NVIDIA/Megatron-LM.git
-cd Megatron-LM
-git checkout core_v0.12.1
-cp -r megatron ../MindSpeed-MM/
-cd ..
-cd MindSpeed-MM
-mkdir logs data ckpt
-
-# 安装加速库
-git clone https://gitcode.com/Ascend/MindSpeed.git
-cd MindSpeed
-# checkout commit from MindSpeed 26.0.0_core_r0.12.1
-git checkout xxxxxxx
-
-# 安装mindspeed及依赖
-pip install -e .
-cd ..
-# 安装mindspeed mm及依赖
-pip install -e .
-```
 
 ### 数据模块迁移
 

@@ -1,6 +1,6 @@
 # MindSpeed MM 工具库使用指南
 
-## Profiling采集工具  
+## Profiling采集工具
 
 套件集成了昇腾[profiling采集工具](../../mindspeed_mm/tools/profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件即可生效。
 
@@ -11,7 +11,7 @@ from mindspeed_mm.tools.profiler import Profiler
 
 prof = Profiler(prof_config)
 prof.start()
-while train:
+while train():
     train_one_step
     prof.step()
 prof.stop()
@@ -25,7 +25,7 @@ prof.stop()
 --ranks                   # 指profiling采集的rank，default为-1，指采集全部rank
 ```
 
-### 静态采集  
+### 静态采集
 
 `Static Profile`静态采集功能为执行模型训练过程中，针对指定的steps区间进行采集，操作步骤如下：
 
@@ -61,7 +61,7 @@ prof.stop()
         python mindspeed_mm/tools/profiler.py
         ```
 
-### 动态采集  
+### 动态采集
 
 `Dynamic Profile`动态采集功能可在执行模型训练过程中随时开启采集进程，操作步骤如下：
 
@@ -74,7 +74,7 @@ prof.stop()
     ```bash
     --config_path               # config与log文件的路径
     ```
-  
+
     - `config_path`指向空文件夹并自动生成`profiler_config.json`文件
     - `config_path`指已有动态配置文件`profiler_config.json`的路径
 
@@ -115,11 +115,11 @@ python mindspeed_mm/tools/profiler.py --profiler-path ./npu_profiling
 python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --export-type text --export-type db
 ```
 
-此命令将解析指定路径下的所有profiling数据，具体可参考《CANN性能调优工具用户指南》的“[离线解析](https://www.hiascend.com/document/detail/zh/canncommercial/850/devaids/Profiling/atlasprofiling_16_0034.html)”章节。
+此命令将解析指定路径下的所有profiling数据，具体可参考《CANN性能调优工具用户指南》的“[离线解析](https://www.hiascend.com/document/detail/zh/canncommercial/900/devaids/Profiling/atlasprofiling_16_0034.html)”章节。
 
 对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以节约训练时资源占用。
 
-## Sora类模型特征提取  
+## Sora类模型特征提取
 
 [feature_extraction](../../mindspeed_mm/tools/feature_extraction)目录下工具可用于提取视频和文本特征并保存，目前支持单batch静态数据集特征提取。
 
@@ -151,7 +151,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
   "memory_profile": {
     "enable": false,    // 内存采集功能开关
     "start_step": 0,    // 开始录制的步数。数值为训练步数的起始点，0代表开始采集的步数
-    "end_step": 2,      // 结束录制的步数。数值为训练步数的终止点点，2代表结束采集的步数
+    "end_step": 2,      // 结束录制的步数。数值为训练步数的终止点，2代表结束采集的步数
     "save_path": "./memory_snapshot",  // 快照文件保存路径
     "dump_ranks": [     // 录制快照的rank列表，从0开始
       0
@@ -198,7 +198,7 @@ _stop()
 
 dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件，可以在[交互式查看器](https://pytorch.org/memory_viz)可视化查看内存快照。
 
-## Tensorboard使用  
+## Tensorboard使用
 
 1. 若使用Tensorboard，需进行安装：
 
