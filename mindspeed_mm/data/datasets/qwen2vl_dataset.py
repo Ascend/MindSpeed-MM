@@ -36,8 +36,6 @@ logger = get_logger(__name__)
 
 class DistributedIterableDataset(IterableDataset):
     def __init__(self, dataset, rank=None):
-
-
         self.dataset = dataset
         self.num_dp = mpu.get_data_parallel_world_size()
         self.dp_rank = mpu.get_data_parallel_rank()
@@ -212,8 +210,9 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                                      streaming=data_args.streaming)
         if data_args.max_samples and not data_args.streaming:
             train_dataset = train_dataset.select(range(data_args.max_samples))
-        
-        if consumed_samples > 0:
+
+        # Skip consumed samples only in streaming mode (single-epoch training).
+        if data_args.streaming and consumed_samples > 0:
             logger.info(f"Skipping first {consumed_samples} samples to resume from checkpoint.")
             train_dataset.skip(consumed_samples)
 
