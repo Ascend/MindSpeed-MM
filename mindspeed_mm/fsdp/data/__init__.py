@@ -1,5 +1,6 @@
 # pylint: skip-file
 from mindspeed_mm.fsdp.data.dataloader.dataloader import (
+    prepare_base_dataloader,
     prepare_sampler_dataloader,
 )
 from mindspeed_mm.fsdp.utils.register import data_register
@@ -56,7 +57,10 @@ def build_mm_dataloader(
         raise AssertionError("Key parameter missing: dataloader_mode")
     dataloader_mode = dataloader_param.pop("dataloader_mode")
 
-    if dataloader_mode == "sampler":
+    if dataloader_mode == "base":
+        data_loader = prepare_base_dataloader(dataset, **dataloader_param, dataset_param=dataset_param)
+        return data_loader
+    elif dataloader_mode == "sampler":
         data_loader = prepare_sampler_dataloader(
             dataset, **dataloader_param,
             process_group=process_group,

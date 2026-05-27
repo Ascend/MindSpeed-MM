@@ -437,6 +437,14 @@ class DataArguments(BaseArguments):
         default=False,
         metadata={"help": "Whether to perform preprocess during training."},
     )
+    async_preprocess: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to perform async preprocess during training."},
+    )
+    async_preprocess_buffer_size: Optional[int] = field(
+        default=None,
+        metadata={"help": "Buffer size for async preprocess. Defaults to 8 when not set and num_workers is unset."},
+    )
     stage: Optional[str] = field(
         default=None,
         metadata={

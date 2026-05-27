@@ -31,6 +31,58 @@ from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.utils.utils import move_to_device
 
 
+def prepare_base_dataloader(
+    dataset,
+    batch_size=1,
+    shuffle=False,
+    seed=1024,
+    drop_last=False,
+    pin_memory=False,
+    num_workers=0,
+    prefetch_factor=None,
+    persistent_workers=None,
+    collate_param=None,
+    dataset_param=None,
+    **kwargs,
+):
+    """
+    Prepare a dataloader for distributed training. The dataloader will be wrapped by
+    `torch.utils.data.DataLoader`.
+
+    Args:
+        dataset (`torch.utils.data.Dataset`): The dataset to be loaded.
+        shuffle (bool, optional): Whether to shuffle the dataset. Defaults to False.
+        seed (int, optional): Random worker seed for sampling, defaults to 1024.
+        drop_last (bool, optional): Set to True to drop the last incomplete batch, if the dataset size
+            is not divisible by the batch size. If False and the size of dataset is not divisible by
+            the batch size, then the last batch will be smaller, defaults to False.
+        pin_memory (bool, optional): Whether to pin memory address in CPU memory. Defaults to False.
+        num_workers (int, optional): Number of worker threads for this dataloader. Defaults to 0.
+        kwargs (dict): optional parameters for ``torch.utils.data.DataLoader``
+
+    Returns:
+        :class:`torch.utils.data.DataLoader`: A DataLoader used for training or testing.
+    """
+    collate_fn = None
+    if collate_param:
+        data_collate_type = collate_param.pop("model_name")
+        collate_fn = DATA_COLLATOR[data_collate_type](dataset_param=dataset_param, **collate_param)
+    if persistent_workers is None:
+        persistent_workers = True if num_workers > 0 else False
+    
+    return StatefulDataLoader(
+        dataset,
+        pin_memory=pin_memory,
+        pin_memory_device=get_device_type(),
+        collate_fn=collate_fn,
+        worker_init_fn=get_seed_worker(seed),
+        num_workers=num_workers,
+        batch_sampler=None,
+        prefetch_factor=prefetch_factor,
+        persistent_workers=persistent_workers
+    )
+
+
 def prepare_sampler_dataloader(
     dataset,
     batch_size=1,
