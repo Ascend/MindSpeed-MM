@@ -299,7 +299,7 @@ class TestRuntimeUtils:
 
     def test_singleton_metaclass_reuses_instance(self):
         pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.utils.utils import Singleton
+        from mindspeed_mm.fsdp.utils.decorators import Singleton
 
         class Example(metaclass=Singleton):
             def __init__(self, value):

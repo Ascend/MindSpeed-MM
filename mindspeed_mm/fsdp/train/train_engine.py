@@ -9,7 +9,8 @@ from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import pregather_fsdp_params
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time, configure_hsdp_gradient_sync, tensor_to_dtensor
+from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time, configure_hsdp_gradient_sync, tensor_to_dtensor, \
+    report_memory
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.tools.profiler import Profiler
@@ -18,6 +19,7 @@ from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
 from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
 from mindspeed_mm.fsdp.data.dataloader.dataloader import Preloader
+from mindspeed_mm.fsdp.utils.constants import MEMORY_REPORT_ITERATION
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +230,10 @@ class TrainEngine:
                     loss_dict,
                     grad_norm,
                 )
+
+            # Report memory after optimizer state has been initialized.
+            if self.iteration == MEMORY_REPORT_ITERATION:
+                report_memory('(after {} iterations)'.format(self.iteration))
 
             curr_step_lr = self.lr_scheduler.get_last_lr()[0]
 

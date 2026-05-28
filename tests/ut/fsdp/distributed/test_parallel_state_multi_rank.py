@@ -45,7 +45,7 @@ def _worker(rank: int, world_size: int, init_file: str):
 
         # Reset singleton/global state inside spawned worker
         ps_mod._PARALLEL_STATE = None
-        from mindspeed_mm.fsdp.utils.utils import Singleton
+        from mindspeed_mm.fsdp.utils.decorators import Singleton
 
         Singleton._instances = {}
 

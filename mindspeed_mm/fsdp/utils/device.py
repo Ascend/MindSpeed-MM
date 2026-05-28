@@ -117,11 +117,25 @@ def switch_to_specified_stream(stream) -> Any:
     return get_torch_device().stream(stream)
 
 
+def get_memory_reserved():
+    if IS_NPU_AVAILABLE:
+        return torch.npu.memory_reserved()
+    else:
+        return torch.cuda.memory.memory_reserved()
+
+
 def get_max_memory_reserved():
     if IS_NPU_AVAILABLE:
         return torch.npu.max_memory_reserved()
     else:
         return torch.cuda.memory.max_memory_reserved()
+
+
+def get_memory_allocated():
+    if IS_NPU_AVAILABLE:
+        return torch.npu.memory_allocated()
+    else:
+        return torch.cuda.memory.memory_allocated()
 
 
 def get_max_memory_allocated():

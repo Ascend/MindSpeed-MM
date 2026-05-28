@@ -7,7 +7,7 @@ from torch.autograd.graph import saved_tensors_hooks
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.utils.device import create_stream, create_event, get_current_stream, switch_to_specified_stream
-from mindspeed_mm.fsdp.utils.utils import Singleton
+from mindspeed_mm.fsdp.utils.decorators import Singleton
 
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,7 @@ from typing import Optional, Tuple, Dict
 import torch
 
 from mindspeed_mm.fsdp.utils.device import create_stream, create_event, get_current_stream, switch_to_specified_stream
-from mindspeed_mm.fsdp.utils.utils import Singleton
+from mindspeed_mm.fsdp.utils.decorators import Singleton
 
 
 class DeviceState(Enum):

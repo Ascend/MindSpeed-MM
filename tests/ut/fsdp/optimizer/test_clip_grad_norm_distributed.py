@@ -21,7 +21,7 @@ def _reset_parallel_state_for_worker():
     ps_mod.get_device_type = lambda: "npu"
 
     ps_mod._PARALLEL_STATE = None
-    from mindspeed_mm.fsdp.utils.utils import Singleton
+    from mindspeed_mm.fsdp.utils.decorators import Singleton
 
     Singleton._instances = {}
 

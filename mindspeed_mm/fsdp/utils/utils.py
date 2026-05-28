@@ -7,6 +7,14 @@ from torch.distributed.tensor import DTensor, Replicate
 from .constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
 from .device import get_device_type, get_torch_device
 
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.utils.device import (
+    get_memory_reserved,
+    get_max_memory_reserved,
+    get_memory_allocated,
+    get_max_memory_allocated,
+)
+
 
 def to_empty_if_needed(model, device: torch.device | str | int | None, recurse: bool = True):
     """Move the parameters and buffers to the specified device without copying storage if they are not already on that device.
@@ -136,13 +144,18 @@ def configure_hsdp_gradient_sync(model, is_last_step: bool):
     model.set_requires_all_reduce(is_last_step)
 
 
-class Singleton(type):
-    """Singleton metaclass to ensure only one instance of ParallelState exists."""
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-
-        return cls._instances[cls]
+def report_memory(name):
+    """Simple memory report."""
+    mega_bytes = 1024.0 * 1024.0
+    string = name + ' memory (MB)'
+    string += ' | allocated: {}'.format(
+        get_memory_allocated() / mega_bytes)
+    string += ' | max allocated: {}'.format(
+        get_max_memory_allocated() / mega_bytes)
+    string += ' | reserved: {}'.format(
+        get_memory_reserved() / mega_bytes)
+    string += ' | max reserved: {}'.format(
+        get_max_memory_reserved() / mega_bytes)
+    if get_parallel_state().get_dp_rank() == 0:
+        print("[Rank {}] {}".format(torch.distributed.get_rank(), string),
+            flush=True)

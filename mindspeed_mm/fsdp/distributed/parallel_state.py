@@ -11,7 +11,7 @@ from torch.distributed.device_mesh import init_device_mesh, DeviceMesh
 from torch.distributed import ProcessGroup
 
 from mindspeed_mm.fsdp.utils.device import get_device_type
-from mindspeed_mm.fsdp.utils.utils import Singleton
+from mindspeed_mm.fsdp.utils.decorators import Singleton
 
 
 logger = logging.getLogger(__name__)
