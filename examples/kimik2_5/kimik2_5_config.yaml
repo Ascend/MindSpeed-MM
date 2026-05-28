@@ -11,6 +11,7 @@ parallel:
       - language_model.model.embed_tokens
       - language_model.model.layers.{*}
       - language_model.lm_head
+      - language_model.model.layers.{*}.mlp.experts
     hook_modules:
       - language_model.model.layers.{*}
     num_to_forward_prefetch: 1

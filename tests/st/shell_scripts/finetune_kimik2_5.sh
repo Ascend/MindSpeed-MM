@@ -19,7 +19,7 @@ fetch_and_copy_mindspeed() {
     else
         echo "Path does not exist: $TARGET_PATH"
         # Try to clone the MindSpeed repository into the target path
-        if git clone https://gitcode.com/Ascend/MindSpeed "$TARGET_PATH"; then
+        if git clone --depth 1 https://gitcode.com/Ascend/MindSpeed "$TARGET_PATH"; then
             echo "Clone successful: $TARGET_PATH"
             # If success, copy the mindspeed folder to BASEPATH
             cp -r "$TARGET_PATH/mindspeed" "$BASEPATH/"
