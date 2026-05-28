@@ -208,6 +208,15 @@ class TrainingArguments(BaseArguments):
         default=None,
         metadata={"help": "Path to load checkpoint from. Used for resuming training."},
     )
+    load_format: Literal["auto", "hf", "dcp"] = field(
+        default="auto",
+        metadata={
+            "help": (
+                "Format of the load path. 'auto' detects HF safetensors vs DCP "
+                "automatically (recommended); set explicitly to override."
+            )
+        },
+    )
     load_strict: bool = field(
         default=False,
         metadata={"help": "Whether to load checkpoint strictly."},

@@ -19,6 +19,7 @@ from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
 from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
 from mindspeed_mm.fsdp.data.dataloader.dataloader import Preloader
+from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_checkpoint, looks_like_hf_weight_dir
 from mindspeed_mm.fsdp.utils.constants import MEMORY_REPORT_ITERATION
 
 logger = logging.getLogger(__name__)
@@ -279,13 +280,24 @@ class TrainEngine:
         if not args.training.no_load_optim:
             state["optimizer"] = self.optimizer
 
-        release = self.checkpointer.load(
-            path=args.training.load,
-            state=state,
-            load_rank0_and_broadcast=args.training.load_rank0_and_broadcast,
-            load_strict=args.training.load_strict,
-            enable_lora=args.training.lora.enable,
-        )
+        fmt = args.training.load_format
+        if fmt == "auto":
+            fmt = "hf" if looks_like_hf_weight_dir(args.training.load) else "dcp"
+        if fmt == "hf":
+            release = load_hf_checkpoint(
+                self.model, args.training.load,
+                load_rank0_and_broadcast=args.training.load_rank0_and_broadcast,
+                enable_lora=args.training.lora.enable,
+                load_strict=args.training.load_strict,
+            )
+        else:
+            release = self.checkpointer.load(
+                path=args.training.load,
+                state=state,
+                load_rank0_and_broadcast=args.training.load_rank0_and_broadcast,
+                load_strict=args.training.load_strict,
+                enable_lora=args.training.lora.enable,
+            )
 
         if not release:
             iteration = state["extra_state"]["iteration"]

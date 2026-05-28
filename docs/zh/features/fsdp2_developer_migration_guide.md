@@ -314,7 +314,7 @@ tools:
 |---|---|
 | `training.micro_batch_size` / `gradient_accumulation_steps` | 单卡 micro batch 与梯度累积步数；`gradient_accumulation_steps` 为空时框架会关闭梯度累积。 |
 | `training.init_model_with_meta_device` | 是否先在 meta device 上构建模型结构，用于大模型降低初始化峰值内存。 |
-| `training.load` / `save` | DCP 检查点加载与保存路径；为空时对应动作不执行。 |
+| `training.load` / `save` | 权重/检查点加载与保存路径；为空时对应动作不执行。`load` 可指向 DCP 目录或 HF safetensors 目录。 |
 | `training.plugin` | 需要导入的模型、数据等插件路径。 |
 
 工具字段：
@@ -335,7 +335,8 @@ tools:
 | 场景 | 建议方式 |
 |---|---|
 | 模型可直接从 HF/第三方权重加载，且单机内存足够 | `training.init_model_with_meta_device: false`，在模型 `from_pretrained` 中加载原始权重 |
-| 大模型需要节省初始化峰值内存 | 先将权重转换为 DCP；设置 `training.init_model_with_meta_device: true` 和 `training.load: <dcp_dir>` |
+| 在线加载 HF 权重 | 设置 `training.init_model_with_meta_device: true`, 在`training.load: <hf_dir>`配置原始权重路径 |
+| 大模型先离线转 DCP 再加载 | 先用 `hf_to_dcp` 转换；设置 `training.init_model_with_meta_device: true` 和 `training.load: <dcp_dir>` |
 | 从框架保存的训练检查点续训 | 设置 `training.load`，按需配置 `no_load_optim`、`no_load_rng`、`load_strict` |
 
 meta 初始化的关键语义：
