@@ -6,9 +6,6 @@ from collections import OrderedDict
 
 import pytest
 
-os.environ.setdefault("NON_MEGATRON", "true")
-os.environ.setdefault("MINDSPEED_MM_DISABLE_FSDP_OPS_PATCH", "true")
-
 
 def _make_optimizer(lr=1.0):
     torch = pytest.importorskip("torch")

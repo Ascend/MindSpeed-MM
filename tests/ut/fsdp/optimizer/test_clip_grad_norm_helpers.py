@@ -6,9 +6,6 @@ import types
 
 import pytest
 
-os.environ.setdefault("NON_MEGATRON", "true")
-os.environ.setdefault("MINDSPEED_MM_DISABLE_FSDP_OPS_PATCH", "true")
-
 
 def _make_param_with_grad(values):
     torch = pytest.importorskip("torch")

@@ -3,8 +3,6 @@ import sys
 import unittest
 import torch
 
-# Set the NON_MEGATRON environment variable before importing qwen3_5_moe
-os.environ['NON_MEGATRON'] = 'true'
 
 # Use the native aux_loss calculation from transformers as a reference.
 # The calculation formula in the qwen3vl model is the same as the aux_loss implementation in the qwen3.5 model.

@@ -4,9 +4,6 @@ import tempfile
 
 import pytest
 
-os.environ.setdefault("NON_MEGATRON", "true")
-os.environ.setdefault("MINDSPEED_MM_DISABLE_FSDP_OPS_PATCH", "true")
-
 
 def _init_pg(rank: int, world_size: int, init_file: str):
     import torch.distributed as dist

@@ -3,9 +3,6 @@ import os
 
 import pytest
 
-os.environ.setdefault("NON_MEGATRON", "true")
-os.environ.setdefault("MINDSPEED_MM_DISABLE_FSDP_OPS_PATCH", "true")
-
 
 class TestClipGradNorm:
     def test_clip_grad_norm_matches_manual_l2(self, monkeypatch):

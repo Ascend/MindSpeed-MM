@@ -5,9 +5,6 @@ from dataclasses import dataclass, field, is_dataclass
 
 import pytest
 
-os.environ.setdefault("NON_MEGATRON", "true")
-os.environ.setdefault("MINDSPEED_MM_DISABLE_FSDP_OPS_PATCH", "true")
-
 
 class TestDtype:
     @pytest.mark.parametrize(

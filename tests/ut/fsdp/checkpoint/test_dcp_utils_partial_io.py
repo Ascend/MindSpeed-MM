@@ -4,9 +4,6 @@ from dataclasses import dataclass
 
 import pytest
 
-os.environ.setdefault("NON_MEGATRON", "true")
-os.environ.setdefault("MINDSPEED_MM_DISABLE_FSDP_OPS_PATCH", "true")
-
 
 @dataclass
 class _FakePlan:

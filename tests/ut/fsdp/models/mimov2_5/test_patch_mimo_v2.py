@@ -4,8 +4,6 @@ import torch
 import torch.nn as nn
 import pytest
 
-# Set the NON_MEGATRON environment variable before importing model
-os.environ['NON_MEGATRON'] = 'true'
 
 from mindspeed_mm.fsdp.models.mimov2_5.modeling_mimo_v2 import PatchMiMoV2TopkRouter, PatchMiMoV2NaiveMoe, PatchMiMoV2MoE
 from mindspeed_mm.fsdp.models.mimov2_5.configuration_mimo_v2 import MiMoV2Config

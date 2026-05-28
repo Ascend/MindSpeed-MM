@@ -5,9 +5,6 @@ import tempfile
 
 import pytest
 
-os.environ.setdefault("NON_MEGATRON", "true")
-os.environ.setdefault("MINDSPEED_MM_DISABLE_FSDP_OPS_PATCH", "true")
-
 
 class TestCheckpointNameAndTracker:
     @pytest.mark.parametrize(

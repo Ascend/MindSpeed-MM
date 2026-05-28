@@ -4,7 +4,6 @@ import torch
 import inspect
 from unittest.mock import patch, MagicMock
 
-os.environ['NON_MEGATRON'] = 'true'
 
 from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.loss.loss_func import (
