@@ -64,8 +64,6 @@ class Qwen3TTSConverter(DcpConverter):
             config_dict = json.load(f)
         talker_config = config_dict.get("talker_config", {})
 
-        with open(output_config_file, 'w', encoding='utf-8') as f:
-            json.dump(config_dict, f, indent=2, ensure_ascii=False)
 
         if speaker_name is not None and speaker_audio_path is not None:
             import librosa
@@ -111,6 +109,10 @@ class Qwen3TTSConverter(DcpConverter):
                 del state_dict[k]
 
         config_dict["talker_config"] = talker_config
+        with open(output_config_file, 'w', encoding='utf-8') as f:
+            # 落盘json文件使用2空格进行缩进，并保持非ASCII原始字符不转义
+            json.dump(config_dict, f, indent=2, ensure_ascii=False)
+
         save_path = os.path.join(save_dir, "model.safetensors")
         save_file(state_dict, save_path)
         set_directory_permissions(Path(save_path))

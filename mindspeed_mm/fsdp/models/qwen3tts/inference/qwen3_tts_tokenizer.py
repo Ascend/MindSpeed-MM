@@ -138,10 +138,11 @@ class Qwen3TTSTokenizer:
                 1-D float32 waveform at target_sr.
         """
         if self._is_url(x):
-            with urllib.request.urlopen(x) as resp:
-                audio_bytes = resp.read()
-            with io.BytesIO(audio_bytes) as f:
-                audio, sr = sf.read(f, dtype="float32", always_2d=False)
+            raise ValueError(
+                "The current implementation, for security reasons, does not support reading online data. "
+                "Please download the audio to your local device for loading, "
+                "or implement it yourself using third-party libraries like urllib."
+            )
         elif self._is_probably_base64(x):
             wav_bytes = self._decode_base64_to_wav_bytes(x)
             with io.BytesIO(wav_bytes) as f:
