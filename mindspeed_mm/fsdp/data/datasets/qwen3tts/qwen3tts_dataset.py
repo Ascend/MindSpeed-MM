@@ -17,6 +17,7 @@ from typing import Any, List, Tuple, Union
 
 import json
 import torch
+import torch.distributed as dist
 import librosa
 import numpy as np
 from torch.utils.data import Dataset
@@ -24,6 +25,7 @@ from transformers import AutoConfig, AutoProcessor
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DataArguments
 from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
 from mindspeed_mm.fsdp.models.qwen3tts.core.models.modeling_qwen3_tts import mel_spectrogram
+from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.utils.register import data_register
 
 
@@ -159,7 +161,14 @@ class TTSDataset(Dataset):
             raise AssertionError("lag_num should be -1")
 
         item_length = [b['text_ids'].shape[1] + b['audio_codes'].shape[0] for b in batch]
-        max_length = max(item_length) + 8
+        local_max_length = max(item_length) + 8
+        max_length = local_max_length
+        # Modified：如果是多卡场景，这里需要获取全局最大长度来padding，保证和原仓行为一致
+        if dist.is_initialized():
+            global_max_length = torch.tensor([local_max_length], device=get_device_type(), dtype=torch.long)
+            dist.all_reduce(global_max_length, op=dist.ReduceOp.MAX)
+            max_length = global_max_length.item()
+
         b, t = len(batch), max_length
 
         input_ids = torch.zeros((b, t, 2), dtype=torch.long)

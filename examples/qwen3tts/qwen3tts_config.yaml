@@ -32,7 +32,7 @@ data:
     dataloader_mode: sampler
     drop_last: true
     sampler_type: BaseRandomBatchSampler
-    num_workers: 8
+    num_workers: 0
     collate_param:
       model_name: qwen3tts
 
@@ -41,6 +41,7 @@ model:
   model_id: qwen3_tts
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
+  attn_implementation: eager
 
 # 优化特性配置
 features:
@@ -49,10 +50,10 @@ features:
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  micro_batch_size: 2
   gradient_accumulation_steps: 1
   seed: 42
-  lr: 2.0e-5
+  lr: 1e-6
   lr_decay_style: constant
   lr_warmup_ratio: 0
   weight_decay: 0.01
@@ -60,6 +61,9 @@ training:
   clip_grad: 1.0
   init_model_with_meta_device: false
   optimizer: adamw
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_eps: 1e-8
   adam_fused: false
   save_interval: 10000
   # load: load_path

@@ -28,12 +28,13 @@
 
 ```shell
 url=https://github.com/QwenLM/Qwen3-TTS
-commit_id=8a98526
+commit_id=022e286
 ```
 
 ### 变更记录
 
 2026.01.29: 首次支持Qwen3-TTS模型
+2026.05.28: 同步Qwen3-TTS原仓最新代码，commit_id=022e286
 
 ---
 <a id="jump1"></a>
@@ -46,7 +47,7 @@ commit_id=8a98526
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
