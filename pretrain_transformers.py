@@ -12,6 +12,12 @@ import torch
 import transformers
 from packaging import version
 
+if os.getenv("ENABLE_GC_THRESHOLD") == "1":
+    import gc
+
+    # Set gc threshold to mitigate performance fluctuation.
+    gc.set_threshold(700, 10, 1000)
+
 # Patch ALL possible locations BEFORE any transformers import
 if version.parse(transformers.__version__).major >= 5:
     def _dummy_check_model_inputs(*args, **kwargs):

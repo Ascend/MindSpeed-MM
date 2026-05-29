@@ -16,6 +16,7 @@ export CPU_AFFINITY_CONF=1
 export HCCL_CONNECT_TIMEOUT=1200
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 export MULTI_STREAM_MEMORY_REUSE=1
+export ENABLE_GC_THRESHOLD=1
 
 # Launch training
 NPUS_PER_NODE=8
