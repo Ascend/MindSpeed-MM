@@ -113,6 +113,7 @@ class UT_Test:
         base_dir = Path(__file__).absolute().parent.parent
         test_dir = os.path.join(base_dir, 'tests')
         self.ut_file = os.path.join(test_dir, "ut")
+        self.ut_fsdp_file = os.path.join(test_dir, "ut_fsdp")
 
     def run_ut(self, local=False):
         if not local:
@@ -124,6 +125,18 @@ class UT_Test:
             print("UT test success")
         else:
             print("UT failed")
+        return code
+
+    def run_ut_fsdp(self, local=False):
+        if not local:
+            command = f"pytest -x {self.ut_fsdp_file}"
+        else:
+            command = f"pytest {self.ut_fsdp_file}"
+        code = acquire_exitcode(command)
+        if code == 0:
+            print("UT(fsdp) test success")
+        else:
+            print("UT(fsdp) failed")
         return code
 
 
@@ -157,12 +170,20 @@ class ST_Test:
 
 def run_ut_tests():
     ut = UT_Test()
-    return ut.run_ut()
+    code = ut.run_ut()
+    if code != 0:
+        return code
+    else:
+        return ut.run_ut_fsdp()
 
 
 def run_ut_local_tests():
     ut = UT_Test()
-    return ut.run_ut(local=True)
+    code = ut.run_ut(local=True)
+    if code != 0:
+        return code
+    else:
+        return ut.run_ut_fsdp(local=True)
 
 
 def run_st_tests():

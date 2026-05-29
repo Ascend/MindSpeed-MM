@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import pytest
 
 from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule as triton_chunk_gated_delta_rule
-from tests.ut.utils import judge_expression
+from tests.ut_fsdp.utils.utils import judge_expression
 
 
 def varlen_to_nonvarlen(cu_seqlens, *inputs):

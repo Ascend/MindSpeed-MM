@@ -1,7 +1,7 @@
 import torch
 from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
-from tests.ut.utils import judge_expression
+from tests.ut_fsdp.utils.utils import judge_expression
 
 
 def test_fused_vs_eager_consistency_for_permute():

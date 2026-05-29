@@ -1,7 +1,7 @@
 import torch
 from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.ops.swiglu import swiglu
-from tests.ut.utils import judge_expression
+from tests.ut_fsdp.utils.utils import judge_expression
 
 def test_eager_swiglu_basic():
     inputs = torch.randn(2, 4, 8, device=torch.device(get_device_type()))

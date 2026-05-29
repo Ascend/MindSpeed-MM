@@ -7,7 +7,7 @@ import pytest
 
 from mindspeed_mm.fsdp.models.mimov2_5.modeling_mimo_v2 import PatchMiMoV2TopkRouter, PatchMiMoV2NaiveMoe, PatchMiMoV2MoE
 from mindspeed_mm.fsdp.models.mimov2_5.configuration_mimo_v2 import MiMoV2Config
-from tests.ut.utils import judge_expression
+from tests.ut_fsdp.utils.utils import judge_expression
 
 
 class TestPatchMiMoV2TopkRouter:

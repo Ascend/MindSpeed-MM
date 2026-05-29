@@ -11,7 +11,7 @@ from mindspeed_mm.fsdp.loss.loss_func import (
     get_loss_func_params,
     build_loss_func,
 )
-from tests.ut.utils import judge_expression
+from tests.ut_fsdp.utils.utils import judge_expression
 
 @pytest.fixture(autouse=True)
 def mock_parallel_state():
