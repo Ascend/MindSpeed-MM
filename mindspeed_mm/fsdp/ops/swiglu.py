@@ -21,3 +21,10 @@ def swiglu(inputs, dim=-1, fused=True):
         return fused_swiglu(inputs, dim=dim)
     else:
         return eager_swiglu(inputs, dim=dim)
+
+def clamp_swiglu(inputs, dim=-1, fused=True, limit=0.0):
+    y1, y2 = torch.chunk(inputs, 2, dim=-1)
+    if limit > 0:
+        y1 = y1.clamp(min=None, max=limit)
+        y2 = y2.clamp(min=-limit, max=limit)
+    return swiglu(torch.cat([y1, y2], dim=-1), dim=dim, fused=fused)

@@ -9,7 +9,7 @@ from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
 from mindspeed_mm.fsdp.ops.moe_ops.gemm_mc2 import grouped_matmul_all2all, all2all_grouped_matmul
-from mindspeed_mm.fsdp.ops.swiglu import swiglu
+from mindspeed_mm.fsdp.ops.swiglu import swiglu, clamp_swiglu
 
 # Enable forced expert balance for debugging purposes only.
 # Set environment variable export MM_FORCE_EP_BALANCE=1 to activate.
@@ -35,8 +35,8 @@ def force_ep_balance(
     seq_len, activation_num = selected_experts.shape
 
     _indices = torch.arange(
-        seq_len * activation_num, 
-        dtype=selected_experts.dtype, 
+        seq_len * activation_num,
+        dtype=selected_experts.dtype,
         device=selected_experts.device
     ) % num_experts
     selected_experts = _indices.view(seq_len, activation_num)
@@ -53,6 +53,7 @@ def ep_forward(
     fc2_weight: torch.Tensor,
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
+    swiglu_limit: float = 0.0,
 ) -> torch.Tensor:
     if FORCE_EP_BALANCE:
         selected_experts = force_ep_balance(num_experts, selected_experts)
@@ -78,7 +79,10 @@ def ep_forward(
     # If no tokens are assigned to the expert in the current EP shard, no computation is performed
     if hidden_states.shape[0] > 0:
         intermediate_hidden_states = grouped_matmul(hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert, fused=fused)
-        intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+        if swiglu_limit > 0:
+            intermediate_activations = clamp_swiglu(intermediate_hidden_states, dim=-1, fused=fused, limit=swiglu_limit)
+        else:
+            intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
         hidden_states = grouped_matmul(
             intermediate_activations, fc2_weight, num_global_sum_tokens_per_local_expert, fused=fused
         )
@@ -210,6 +214,7 @@ def ep_mc2_forward(
     fc2_weight: torch.Tensor,
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
+    swiglu_limit: float = 0.0,
 ) -> torch.Tensor:
     if FORCE_EP_BALANCE:
         selected_experts = force_ep_balance(num_experts, selected_experts)
@@ -242,8 +247,10 @@ def ep_mc2_forward(
     intermediate_hidden_states = all2all_grouped_matmul(
         inputs=hidden_states, weights=fc1_weight, group=ep_group, send_counts=send_counts, recv_counts=recv_counts
     )
-
-    intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+    if swiglu_limit > 0:
+        intermediate_activations = clamp_swiglu(intermediate_hidden_states, dim=-1, fused=fused, limit=swiglu_limit)
+    else:
+        intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
 
     hidden_states = grouped_matmul_all2all(
         inputs=intermediate_activations, weights=fc2_weight, group=ep_group, send_counts=recv_counts, recv_counts=send_counts
