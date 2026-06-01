@@ -73,27 +73,48 @@
 
 案例：PP=2，TP=8，对称TP
 
-![image](../../../sources/images/layerwise_disaggregated_training/ldt_tp.png 'ldt_tp.png') 
+![image](../../../sources/images/layerwise_disaggregated_training/ldt_tp.png 'ldt_tp.png')
 
 案例：PP=2，TP=4/TP=8，非对称TP
 
-![image](../../../sources/images/layerwise_disaggregated_training/ldt_vtp.png 'ldt_vtp.png') 
+![image](../../../sources/images/layerwise_disaggregated_training/ldt_vtp.png 'ldt_vtp.png')
 
 效果：由于在进行P2P通信之前，megatron现有逻辑会提前在TP组内完成AR通信，因此仅通过单卡进行通信即可将完整的数据传递给下一级PP，以上P2P通信方式可保证非对称TP下跨流水线层级通信的正确性。
+
+### 非对称DP
+
+功能说明：针对边侧节点数量不足的情况，支持边侧DP小于云侧DP。
+非对称DP实现逻辑：在对称DP场景下，通过卡分复用的方式，不同DP域的节点或卡处理各自DP域的数据。不同于对称DP，非对称DP场景下，边侧通过时分复用的方式处理多个DP域的数据，并分别与云侧进行通信。
+
+案例：PP=3, TP=8, DP=2，对称DP
+
+![image](../../../sources/images/layerwise_disaggregated_training/ldt_dp.png 'ldt_dp.png')
+
+案例：PP=3, TP=8, DP=1/DP=2，非对称DP
+
+![image](../../../sources/images/layerwise_disaggregated_training/ldt_vdp.png 'ldt_vdp.png')
+
+针对通讯组初始化的处理，复用现有Megatron生成rank组的逻辑，首先基于对称DP场景将边云分开进行rank组生成；再将边侧的rank组进行重计算合并；云侧的rank组整体偏移边侧卡数。
+
+![image](../../../sources/images/layerwise_disaggregated_training/ldt_vdp_gen_ranks.png 'ldt_vdp_gen_ranks.png')
+
+针对边侧梯度的处理，megatron现有逻辑在时分复用处理多个DP域的数据计算梯度时，默认会累加梯度，相当于边侧默认对梯度已经做了AR操作，只需要在最后对累加的总梯度求平均即可。
+
+效果：边侧通过时分复用的方式处理多个DP域的数据，并分别与云侧进行通信。数据处理和通信顺序统一按照PP组内（不同的PP组处理不同DP域的数据）Ranks的顺序进行，保证多DP域数据处理和通信的正确性。
 
 ## 使用方法
 
 本文档以Qwen2.5VL-32B-Instruct模型为例（VIT隐藏层数32层，LLM隐藏层数64层）介绍边云特性使能方法，具体步骤如下：
 
-1. 参考[MindSpeed MM安装指导](../install_guide.md)，完成环境安装。
+1. 参考[MindSpeed MM安装指导](../pytorch/install_guide.md)，完成环境安装。
 
 2. 从Hugging Face库下载对应的模型权重[Qwen2.5-VL-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct)，放至./ckpt/hf_path路径下。
 
 3. 进行权重转换，将HF权重转换成Megatron-Mcore格式。
-    
+
     开启边云特性后，支持边侧卡数小于云侧TP size，此时边侧TP size即为边侧卡数。在进行权重转换时，边侧和云侧分别使用各自的TP size来进行转换。
 
-    以边侧2卡，云侧16卡为例，按照PP=5，边侧TP=2，云侧TP=4来进行权重转换的具体步骤如下。
+    以边侧2卡，云侧32卡为例，按照PP=5，边侧TP=2，DP=1，云侧TP=4，DP=2来进行权重转换的具体步骤如下。
 
     步骤一：边侧按照TP=2，PP=5来进行权重转换
 
@@ -101,19 +122,19 @@
     mm-convert Qwen2_5_VLConverter hf_to_mm_ldt \
     --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-32B-Instruct-edge" \
     --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-32B-Instruct" \
-    --cfg.parallel_config.llm_pp_layers [[0,16,16,16,16],[0,0,0,0,0]] \
-    --cfg.parallel_config.vit_pp_layers [[32,0,0,0,0],[0,0,0,0,0]] \
+    --cfg.parallel_config.llm_pp_layers [[0,0,0,0,0],[0,16,16,16,16],[0,0,0,0,0]] \
+    --cfg.parallel_config.vit_pp_layers [[3,7,7,7,7],[1,0,0,0,0],[0,0,0,0,0]] \
     --cfg.parallel_config.tp_size 2
     ```
- 
+
     步骤二：云侧按照TP=4，PP=5来进行权重转换
 
     ```json
     mm-convert Qwen2_5_VLConverter hf_to_mm_ldt \
     --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-32B-Instruct-cloud" \
     --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-32B-Instruct" \
-    --cfg.parallel_config.llm_pp_layers [[0,16,16,16,16],[0,0,0,0,0]] \
-    --cfg.parallel_config.vit_pp_layers [[32,0,0,0,0],[0,0,0,0,0]] \
+    --cfg.parallel_config.llm_pp_layers [[0,0,0,0,0],[0,16,16,16,16],[0,0,0,0,0]] \
+    --cfg.parallel_config.vit_pp_layers [[3,7,7,7,7],[1,0,0,0,0],[0,0,0,0,0]] \
     --cfg.parallel_config.tp_size 4
     ```
 
@@ -132,7 +153,7 @@
 4. 数据集下载（以COCO2017数据集为例）
 
     用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
-        
+
     获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
 
     运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
@@ -161,18 +182,18 @@
     }
     ```
 
-    同时在模型配置文件examples/qwen2.5vl/model_32b.json中修改以下参数以配置非均匀PP切分。按照以下方法配置vision_encoder和text_decoder的pipeline_num_layers参数，实际部署方式为：首级流水线上部署32层vit+text_decoder embedding 层+text_decoder unembedding层，其余流水线上部署text_decoder的中间隐藏层，层数为 16,16,16,16。
+    同时在模型配置文件examples/qwen2.5vl/model_32b.json中修改以下参数以配置非均匀PP切分。按照以下方法配置vision_encoder和text_decoder的pipeline_num_layers参数，实际部署方式为：在VPP0上部署vit模型，各级流水线上部署的层数为3,7,7,7,7；从VPP1开始，首级流水线上部署vit模型的尾层+text_decoder embedding 层+text_decoder unembedding层，其余流水线上部署text_decoder的中间隐藏层，层数为16,16,16,16。
 
     ```json
     {
         "image_encoder": {
             "vision_encoder": {
-                "pipeline_num_layers": [[32, 0, 0, 0, 0], [0, 0, 0, 0, 0]],
+                "pipeline_num_layers": [[3,7,7,7,7],[1,0,0,0,0],[0,0,0,0,0]],
                 ...
             },
         },
         "text_decoder": {
-            "pipeline_num_layers": [[0, 16, 16, 16, 16],[0, 0, 0, 0, 0]],
+            "pipeline_num_layers": [[0,0,0,0,0],[0,16,16,16,16],[0,0,0,0,0]],
             ...
         },
         ...
@@ -182,7 +203,7 @@
     配置模型微调脚本，详细配置请参考[Qwen2.5VL-32B微调脚本](../../../examples/qwen2.5vl/finetune_qwen2_5_vl_32b.sh)，开启边云协同特性需要在训练脚本中增加以下参数：
 
     ```shell
-    --virtual-pipeline-model-parallel-size 2         # 虚拟Pipeline Stage数，必须配置为2
+    --virtual-pipeline-model-parallel-size 3         # 虚拟Pipeline Stage数，必须配置为3
     ```
 
     相关参数设置完毕后，运行微调脚本：
@@ -200,8 +221,12 @@
 
 ### 其他约束
 
+- 不支持PP=1
 - 暂不支持LoRA
-- 暂不支持常规VPP并行：`--virtual-pipeline-model-parallel-size`传参必须为`2`，使能首尾层共部署。
+- 暂不支持常规VPP并行：`--virtual-pipeline-model-parallel-size`传参必须为`3`，使能首尾层共部署。
+- 非对称TP场景，仅支持DP=1。
+- 非对称DP场景，仅支持边侧DP=1。
+- 非对称TP和非对称DP同时开启场景，仅支持TP为偶数，且边侧TP可以被云测TP整除。
 
 ## 注意事项
 
