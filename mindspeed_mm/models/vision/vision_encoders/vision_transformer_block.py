@@ -295,7 +295,10 @@ class Qwen2VLVisionTransformerBlock(TransformerBlock):
                 previous_layer = sum(sum(row[:pp_rank]) for row in self.config.pipeline_num_layers[:vp_rank]) + sum(
                     self.config.pipeline_num_layers[vp_rank][:pp_rank])
             else:
-                previous_layer = sum(self.config.pipeline_num_layers[:pp_rank])
+                if isinstance(self.config.pipeline_num_layers[0], list):
+                    previous_layer = sum(self.config.pipeline_num_layers[0][:pp_rank])
+                else:
+                    previous_layer = sum(self.config.pipeline_num_layers[:pp_rank])
             for x in self.config.fullatt_block_indexes:
                 fullatt_block_indexes_now.append(x - previous_layer)
 

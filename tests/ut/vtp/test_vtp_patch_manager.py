@@ -50,7 +50,7 @@ def _load_patch_manager():
         ldt_pkg_name + ".training_patch",
         ldt_pkg_name + ".u_shaped_split_learning_patch",
         ldt_pkg_name + ".vlm_model_patch",
-        ldt_pkg_name + ".utils",
+        ldt_pkg_name + ".utils_patch",
     ]:
         if name not in sys.modules:
             extra[name] = MagicMock()
@@ -82,7 +82,6 @@ class TestPatchManagerLdtRegistrations:
             "torch.distributed.all_gather_into_tensor",
             "megatron.training.utils.reduce_max_stat_across_model_parallel_group",
             "megatron.training.utils.logical_and_across_model_parallel_group",
-            "mindspeed_mm.training.train_step",
         ]
         for target in expected_targets:
             judge_expression(target in target_paths)

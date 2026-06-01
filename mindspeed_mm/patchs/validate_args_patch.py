@@ -14,26 +14,11 @@ from megatron.training.utils import get_device_arch_version, update_use_dist_ckp
 
 from mindspeed_mm.configs.config import merge_mm_args
 from mindspeed_mm.utils.utils import ensure_valid
-from mindspeed_mm.patchs.layerwise_disaggregated_training.schedules_patch import (
+from mindspeed_mm.patchs.layerwise_disaggregated_training.parallel_state_patch import (
     pre_validate_args_for_vtp,
     post_validate_args_for_vtp,
-    initialize_model_parallel_wrapper,
+    install_ldt_init_model_parallel_patch,
 )
-
-
-def _install_ldt_init_model_parallel_patch():
-    """Replace megatron's initialize_model_parallel with the VTP-aware wrapper.
-
-    Called from validate_args (LDT branch only), which runs inside
-    initialize_megatron BEFORE _initialize_distributed calls the function.
-    """
-    import megatron.core.parallel_state as _ps
-    orig = _ps.initialize_model_parallel
-    if getattr(orig, '_ldt_wrapped', False):
-        return
-    wrapped = initialize_model_parallel_wrapper(orig)
-    wrapped._ldt_wrapped = True
-    _ps.initialize_model_parallel = wrapped
 
 
 def safe_getattr(mm_object, mm_name, mm_default_value):
@@ -60,7 +45,6 @@ def validate_args(args, defaults=None):
         args.layerwise_disaggregated_training = bool(
             getattr(args.mm.model.patch, 'layerwise_disaggregated_training', False)
         )
-
     # use model.json to fill args
     if hasattr(args.mm.model, 'text_decoder'):
         args.num_layers = safe_getattr(args.mm.model.text_decoder, 'num_layers', args.num_layers)
@@ -153,7 +137,6 @@ def validate_args(args, defaults=None):
     # VTP: temporarily inflate world_size so the divisibility check passes
     if getattr(args, 'layerwise_disaggregated_training', False):
         pre_validate_args_for_vtp(args)
-
     encoder_model_size = args.encoder_tensor_model_parallel_size * args.encoder_pipeline_model_parallel_size * args.context_parallel_size
     decoder_model_size = args.tensor_model_parallel_size * args.pipeline_model_parallel_size * args.context_parallel_size
     total_model_size = encoder_model_size + decoder_model_size
@@ -174,7 +157,7 @@ def validate_args(args, defaults=None):
     # VTP: restore real world_size after validation
     if getattr(args, 'layerwise_disaggregated_training', False):
         post_validate_args_for_vtp(args)
-        _install_ldt_init_model_parallel_patch()
+        install_ldt_init_model_parallel_patch()
 
     if args.rank == 0:
         print('using world size: {}, data-parallel size: {}, '

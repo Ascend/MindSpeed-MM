@@ -26,11 +26,12 @@ from mindspeed_mm.patchs import (
     bridge_patch
 )
 from mindspeed_mm.patchs.layerwise_disaggregated_training import (
+    distributed_data_parallel_patch,
+    parallel_state_patch,
     schedules_patch,
-    training_patch,
+    utils_patch,
     u_shaped_split_learning_patch,
-    vlm_model_patch,
-    utils as vtp_utils,
+    vlm_model_patch
 )
 
 
@@ -70,18 +71,19 @@ class PatchesManager:
             ("megatron.core.optimizer._get_megatron_optimizer_based_on_param_groups", optimizer_patch._get_megatron_optimizer_based_on_param_groups)
         ],
         "layerwise_disaggregated_training": [
+            ("megatron.core.parallel_state.create_group", parallel_state_patch.create_group),
             ("megatron.core.pipeline_parallel.schedules.get_forward_backward_func", schedules_patch.get_forward_backward_func),
             ("megatron.core.pipeline_parallel.schedules.forward_backward_pipelining_without_interleaving", schedules_patch.forward_backward_pipelining_without_interleaving),
             ("megatron.training.training.build_train_valid_test_datasets", u_shaped_split_learning_patch.build_train_valid_test_datasets_wrapper),
             ("megatron.training.training.setup_model_and_optimizer", vlm_model_patch.setup_model_and_optimizer),
             ("megatron.training.utils.print_rank_last", print_rank_0),
-            # VTP utility patches (hierarchical allreduce/barrier/all_gather)
-            ("megatron.core.optimizer.clip_grads.get_grad_norm_fp32", vtp_utils.vtp_get_grad_norm_fp32),
-            ("torch.distributed.barrier", vtp_utils.vtp_timer_barrier_wrapper),
-            ("torch.distributed.all_gather_into_tensor", vtp_utils.vtp_all_gather_into_tensor_wrapper),
-            ("megatron.training.utils.reduce_max_stat_across_model_parallel_group", vtp_utils.vtp_reduce_max_stat_across_model_parallel_group),
-            ("megatron.training.utils.logical_and_across_model_parallel_group", vtp_utils.vtp_logical_and_across_model_parallel_group),
-            ("mindspeed_mm.training.train_step", training_patch.train_step_wrapper),
+            ("megatron.core.distributed.distributed_data_parallel.finish_grad_sync", distributed_data_parallel_patch.finish_grad_sync),
+            ("megatron.core.distributed.distributed_data_parallel.register_grad_ready", distributed_data_parallel_patch.register_grad_ready),
+            ("megatron.training.utils.reduce_max_stat_across_model_parallel_group", utils_patch.ldt_reduce_max_stat_across_model_parallel_group),
+            ("megatron.training.utils.logical_and_across_model_parallel_group", utils_patch.ldt_logical_and_across_model_parallel_group),
+            ("megatron.core.optimizer.clip_grads.get_grad_norm_fp32", utils_patch.ldt_get_grad_norm_fp32),
+            ("torch.distributed.barrier", utils_patch.ldt_vdp_barrier_wrapper),
+            ('torch.distributed.all_gather_into_tensor', utils_patch.vtp_all_gather_into_tensor_wrapper)
         ],
     }
 

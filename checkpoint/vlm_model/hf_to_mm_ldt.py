@@ -85,10 +85,13 @@ def merge_vpp_index_ldt(vit_pipeline_num_layers: VPP_LAYER_NUM_T,
             continue
         modality_pp_acc = list(accumulate(modality_pp_flat))
         if is_llm:
-            # LLM的embedding层固定在PP0/VPP0, unembedding层固定在PP0/VPP_last(U形布局)
+            # LLM的embedding层放在第一个有层数的VPP stage的PP0,
+            # unembedding层固定在最后一个VPP stage的PP0(U形布局)
+            # embedding跳过整个VPP stage全为0的情况
             pp_size = len(modality[0])
             vpp_size = len(modality)
-            first_layer_rank = 0
+            first_vpp_idx = next(i for i in range(vpp_size) if sum(modality[i]) > 0)
+            first_layer_rank = first_vpp_idx * pp_size
             last_layer_rank = (vpp_size - 1) * pp_size
         else:
             first_layer_rank, last_layer_rank = np.nonzero(np.array(modality_pp_flat))[0][[0, -1]]

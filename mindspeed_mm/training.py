@@ -820,9 +820,8 @@ def train_step(
     cfg = args.mm.model
     if hasattr(cfg, "patch"):
         cfg = cfg.patch.to_dict()
-        if "layerwise_disaggregated_training" in cfg.keys():
-            if cfg.get("layerwise_disaggregated_training"):
-                loss_is_needed = mpu.is_pipeline_first_stage(ignore_virtual=True)
+        if cfg.get("layerwise_disaggregated_training", False):
+            loss_is_needed = mpu.is_pipeline_first_stage(ignore_virtual=True)
         
     if loss_is_needed:
         # Average loss across microbatches.

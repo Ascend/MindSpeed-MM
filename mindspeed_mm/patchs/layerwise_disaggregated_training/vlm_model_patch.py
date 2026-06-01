@@ -567,9 +567,10 @@ def model_provider(pre_process=True, post_process=True, modules=None):
             else:
                 local_num_layers = config.pipeline_num_layers[self.pp_rank]
 
-            if local_num_layers == 0 and not mpu.is_pipeline_first_stage(ignore_virtual=True):
-                self.add_text_decoder = False
-                return None
+            if local_num_layers == 0:
+                if mpu.get_virtual_pipeline_model_parallel_rank() == 0 or not mpu.is_pipeline_first_stage(ignore_virtual=True):
+                    self.add_text_decoder = False
+                    return None
 
             if self.enable_vp:
                 pipeline_start_index = sum(
@@ -584,13 +585,17 @@ def model_provider(pre_process=True, post_process=True, modules=None):
             pre_process = pipeline_start_index == 0
             post_process = pipeline_end_index == config.num_layers
 
+            # PP=0, VPP=1: text_decoder embedding
+            # PP=0, VPP=2: text_decoder unembedding
             if mpu.is_pipeline_first_stage(ignore_virtual=True):
-                if mpu.get_virtual_pipeline_model_parallel_rank() == 0:
+                if mpu.get_virtual_pipeline_model_parallel_rank() == 1:
                     pre_process = True
                     post_process = False
-                else:
+                elif mpu.get_virtual_pipeline_model_parallel_rank() == 2:
                     pre_process = False
                     post_process = True
+                else:
+                    pre_process = post_process = False
             else:
                 pre_process = post_process = False
 

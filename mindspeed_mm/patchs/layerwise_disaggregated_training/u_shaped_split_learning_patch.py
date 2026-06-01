@@ -51,7 +51,7 @@ def build_train_valid_test_datasets_provider(train_val_test_num_samples):
             args.micro_batch_size = pp_mbs * args.hetero_encoder_mbs_scale
 
     datasets = build_mm_dataset_ldt(data_config.dataset_param)
-    if not mpu.is_pipeline_first_stage(ignore_virtual=True):
+    if not mpu.is_pipeline_first_stage():
         return None, None, None
     build_dataloader = partial(
         build_mm_dataloader,
