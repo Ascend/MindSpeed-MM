@@ -10,6 +10,8 @@ parallel:
       - model.language_model.layers.{*}
       - lm_head
       - mtp
+    hook_modules:
+      - model.language_model.layers.{*}
     param_dtype: bf16
     reduce_dtype: fp32
   ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
@@ -56,7 +58,7 @@ data:
   # 数据加载
   dataloader_param:
     pin_memory: true
-    shuffle: false
+    shuffle: true
     dataloader_mode: sampler
     drop_last: true
     sampler_type: BaseRandomBatchSampler

@@ -65,7 +65,7 @@ data:
   # 数据加载
   dataloader_param:
     pin_memory: true
-    shuffle: false
+    shuffle: true
     dataloader_mode: sampler
     drop_last: true
     sampler_type: BaseRandomBatchSampler
