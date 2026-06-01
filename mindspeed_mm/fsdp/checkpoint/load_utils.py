@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from tqdm import tqdm
 
 import torch
+from torch.distributed.tensor import DTensor
 
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.checkpoint.dcp_utils import load_metadata, extract_metadata, partial_load_dcp_state_dict
@@ -187,9 +188,14 @@ def rank0_load_and_broadcast_weights(load_state, storage_reader):
             else:
                 target_state_dict = model_state_dict
             target_tensor = target_state_dict[param_name]
-            device_mesh = getattr(target_tensor, "device_mesh", None)
-            placements = getattr(target_tensor, "placements", None)
-            target_state_dict[param_name].copy_(tensor_to_dtensor(tensor, device_mesh, placements))
+
+            if isinstance(target_tensor, DTensor):
+                device_mesh = getattr(target_tensor, "device_mesh", None)
+                placements = getattr(target_tensor, "placements", None)
+                target_state_dict[param_name].copy_(tensor_to_dtensor(tensor, device_mesh, placements))
+            else:
+                target_state_dict[param_name].copy_(tensor)
+
             del tensor
 
         gc.collect()

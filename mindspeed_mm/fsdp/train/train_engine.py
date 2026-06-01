@@ -96,7 +96,7 @@ class TrainEngine:
             raise ValueError("Data iterator is None. Unable to retrieve batch.")
 
         # Move input to device and cast precision
-        if not self.args.data.dataloader_param.enable_preload:
+        if not self.args.data or not self.args.data.dataloader_param.enable_preload:
             param_dtype = self.args.parallel.fsdp_plan.param_dtype
             batch = move_to_device(batch, get_dtype(param_dtype) if param_dtype else None)
         return batch
@@ -184,7 +184,7 @@ class TrainEngine:
         param_dtype = get_dtype(args.parallel.fsdp_plan.param_dtype) if args.parallel.fsdp_plan.param_dtype else None
         
         # Preload data
-        if args.data.dataloader_param.enable_preload:
+        if args.data and args.data.dataloader_param.enable_preload:
             train_dataloader_iter = Preloader(train_dataloader_iter, param_dtype=param_dtype)
 
         self.model.train()

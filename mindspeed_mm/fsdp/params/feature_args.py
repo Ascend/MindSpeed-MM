@@ -7,7 +7,7 @@ from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 class RecomputePlanConfig(BaseArguments):
     """Configuration for recompute plan"""
-    apply_module: List[str] = field(default_factory=list)
+    apply_modules: List[str] = field(default_factory=list)
     use_reentrant: bool = False
     
 
