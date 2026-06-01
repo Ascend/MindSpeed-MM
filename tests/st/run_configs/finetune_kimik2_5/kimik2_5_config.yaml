@@ -1,6 +1,5 @@
 # 并行策略
 parallel:
-  tensor_parallel_size: 1
   fully_shard_parallel_size: auto
   fsdp_plan:
     apply_modules:
@@ -10,6 +9,7 @@ parallel:
       - language_model.model
       - language_model.model.embed_tokens
       - language_model.model.layers.{*}
+      - language_model.model.layers.{*}.mlp.experts
       - language_model.lm_head
     hook_modules:
       - language_model.model.layers.{*}
@@ -17,7 +17,6 @@ parallel:
     num_to_backward_prefetch: 1
     param_dtype: bf16
     reduce_dtype: fp32
-  context_parallel_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 8
   ep_plan:
@@ -91,13 +90,17 @@ features:
   chunkloss_plan:
     apply_module: language_model.lm_head
     chunk_size: 1024
-  text_decoder:
-    activation_offload: false
   recompute: true
   recompute_plan:
-      apply_modules:
-        - vision_tower.encoder.blocks.{*}
-        - language_model.model.layers.{*}
+    apply_modules:
+      - vision_tower.encoder.blocks.{*}
+      - language_model.model.layers.{*}
+  # activation offload 配置
+  enable_activation_offload: false
+  activation_offload_plan:
+    apply_modules:
+     - vision_tower.encoder.blocks.{*}
+     - language_model.model.layers.{*}
   # chunkmbs配置
   enable_chunk_mbs: false
   chunkmbs_plan:
