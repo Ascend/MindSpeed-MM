@@ -77,12 +77,12 @@ commit_id=f8d4a1e
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 ### 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -101,17 +101,17 @@ conda activate test
 pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 # apex for Ascend 参考 https://gitcode.com/Ascend/apex
-# 建议从原仓编译安装 
+# 建议从原仓编译安装
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-source /usr/local/Ascend/cann/set_env.sh 
+source /usr/local/Ascend/cann/set_env.sh
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 93c45456c7044bacddebc5072316c01006c938f9
-pip install -r requirements.txt 
+pip install -r requirements.txt
 pip install -e .
 cd ..
 
@@ -313,9 +313,9 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 - CP: 序列并行。
 
   - 使用场景：在视频序列（分辨率X帧数）较大时，可以开启来降低内存占用。
-  
+
   - 使能方式：在启动脚本中设置 CP > 1，如：CP=2；
-  
+
   - 限制条件：head 数量需要能够被CP整除（在`examples/wan2.1/{model_size}/{task}/pretrain_model.json`中配置，参数为`num_heads`）
 
   - 默认使能方式为Ulysses序列并行。
@@ -331,9 +331,9 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 - layer_zero
 
   - 使用场景：在模型参数规模较大时，单卡上无法承载完整的模型，可以通过开启layerzero降低静态内存。
-  
+
   - 使能方式：`examples/wan2.1/{model_size}/{task}/pretrain.sh`的`GPT_ARGS`中加入`--layerzero`和`--layerzero-config ${layerzero_config}`
-  
+
   <a id="jump1"></a>
   - 训练权重后处理：使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
 
@@ -354,9 +354,9 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
   - 使能方式：
     - 修改在 pretrain_model.json 文件中的"pipeline_num_layers", 类型为list。该list的长度即为 pipeline rank的数量，每一个数值代表rank_i中的层数。例如，[7, 8, 8, 7]代表有4个pipeline stage， 每个容纳7/8个dit layers。注意list中 所有的数值的和应该和总num_layers字段相等。此外，pp_rank==0的stage中除了包含dit层数以外，还会容纳text_encoder和ae，因此可以酌情减少第0个stage的dit层数。注意保证PP模型参数配置和模型转换时的参数配置一致。
     - 此外使用pp时需要在运行脚本GPT_ARGS中打开以下几个参数
-  
+
     ```shell
-    PP = 4 # PP > 1 开启 
+    PP = 4 # PP > 1 开启
     GPT_ARGS="
     --optimization-level 2 \
     --use-multiparameter-pipeline-model-parallel \  #使用PP或者VPP功能必须要开启
@@ -410,7 +410,7 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 - fsdp2
 
   - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存。
-  
+
   - 使能方式：`examples/wan2.1/{model_size}/{task}/pretrain_fsdp2.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dist`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
 
 #### 启动训练
@@ -496,7 +496,7 @@ mm-convert WanConverter merge_lora_to_base \
 执行如下命令，为生成的视频样本打分，并生成偏好数据文件
 
 ```bash
-python examples/stepvideo/histogram_generator.py --prompt_file <prompt文件路径> --videos_path <视频样本路径> --num_inference_videos_per_sample <每个prompt生成的视频样本数量>
+python examples/wan2.1/histogram_generator.py --prompt_file <prompt文件路径> --videos_path <视频样本路径> --num_inference_videos_per_sample <每个prompt生成的视频样本数量>
 ```
 
 生成偏好数据集脚本的参数说明如下：

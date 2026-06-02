@@ -1,6 +1,0 @@
-{
-    "model_path": "model path",
-    "image_path": "image path",
-    "question": "Your question about this image.",
-    "trust_remote_code": false
-}

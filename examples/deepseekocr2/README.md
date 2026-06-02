@@ -123,7 +123,7 @@ $playground
 
 ### 2. 启动训练
 
-1. 以图文理解的微调任务为例，可根据实际情况修改[启动脚本](../../examples/deepseekocr/finetune_ocr.sh)的配置，以下配置必须修改：
+1. 以图文理解的微调任务为例，可根据实际情况修改[启动脚本](../../examples/deepseekocr2/finetune_ocr2.sh)的配置，以下配置必须修改：
 
     ``` shell
     DATA_PATH="./data/output.jsonl" # 数据集的文件

@@ -1,1 +1,0 @@
-examples/stepvideo/i2v/061.png

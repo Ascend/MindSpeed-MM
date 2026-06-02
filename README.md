@@ -318,7 +318,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td rowspan="46"> 多模态生成 </td>
       </tr>
       <tr>
-      <td><a href="./examples/lumina">Lumina-mGPT 2.0</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/lumina">Lumina-mGPT 2.0</a></td>
       <td><a href="https://huggingface.co/Alpha-VLLM/Lumina-mGPT-2.0">7B</a></td>
       <td> 微调 </td>
       <td> 1x8</td>
@@ -466,7 +466,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td><a href="./examples/hunyuanvideo">HunyuanVideo-T2V</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/hunyuanvideo">HunyuanVideo-T2V</a></td>
       <td><a href="https://huggingface.co/tencent/HunyuanVideo">13B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -477,7 +477,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="./examples/hunyuanvideo">HunyuanVideo-I2V</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/hunyuanvideo">HunyuanVideo-I2V</a></td>
       <td><a href="https://huggingface.co/tencent/HunyuanVideo-I2V">13B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -565,7 +565,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="./examples/vae">WFVAE</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/vae">WFVAE</a></td>
       <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.3.0/tree/main/vae"> 0.18B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -640,7 +640,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="./examples/qihoo_t2x">Qihoo-T2X</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qihoo_t2x">Qihoo-T2X</a></td>
       <td><a href="https://huggingface.co/qihoo360/Qihoo-T2X">1.1B</a></td>
       <td> 推理 </td>
       <td> 1x1 </td>
@@ -817,7 +817,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="./examples/deepseekocr">DeepSeek-OCR</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/deepseekocr">DeepSeek-OCR</a></td>
       <td><a href="https://github.com/deepseek-ai/DeepSeek-OCR">3B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -1060,7 +1060,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td> 语音识别 </td>
-      <td><a href="./examples/whisper">Whisper</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/whisper">Whisper</a></td>
       <td><a href="https://github.com/openai/whisper">1.5B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -1095,7 +1095,6 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
 
 ---
 
-- 【新模型】  JanusPro
 - 【模型特性】 CogVideoX: PP
 - 【模型特性】 OpensoraPlan1.3: CP (Ring Attention)
 - 【模型特性】 Qwen2VL: VPP, CP (Ulysses & Ring Attention)

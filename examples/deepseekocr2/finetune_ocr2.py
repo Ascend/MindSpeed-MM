@@ -13,7 +13,7 @@ ocr_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "deepseekocr"
 if ocr_dir not in sys.path:
     sys.path.insert(0, ocr_dir)
 
-from examples.deepseekocr.finetune_ocr import OCRTrainer, get_parser
+from examples.deepseekocr2.finetune_ocr import OCRTrainer, get_parser
 
 
 class OCR2Trainer(OCRTrainer):
