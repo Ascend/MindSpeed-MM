@@ -89,7 +89,7 @@ class LuminaConversationDataset(Dataset):
                 return self[index - 1]
             else:
                 return self[index + self.meta_collection[meta_idx]["len"] - 1]
-    
+
     def tie_index_to_meta(self, idx: int):
         # Initialize the starting index
         start_idx = 0
@@ -106,7 +106,7 @@ class LuminaConversationDataset(Dataset):
             start_idx = end_idx
         # If the index is out of range of all collections, raise an error
         raise IndexError("Index out of range")
-    
+
     def get_item_func(self, meta_idx, idx_in_meta):
         data_item = self.annotations_collection[meta_idx][idx_in_meta]
         data_item = copy.deepcopy(data_item)

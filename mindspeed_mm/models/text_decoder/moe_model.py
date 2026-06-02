@@ -294,7 +294,7 @@ class MOETransformerBlock(TransformerBlock):
             )
         else:
             self.final_layernorm = None  # Either this or nn.Identity
-        
+
         # For recompute norm
         if args.recompute_norm:
             for layer in self.layers:
@@ -352,7 +352,7 @@ class MOEModel(MMGPTModel):
         self.position_embedding_type = position_embedding_type
         self.mtp_process = hasattr(config, "mtp_num_layers") and config.mtp_num_layers
 
-        # megatron core pipelining currently depends on model type 
+        # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
 
         # These 2 attributes are needed for TensorRT-LLM export.
@@ -387,7 +387,7 @@ class MOEModel(MMGPTModel):
             pre_process=self.pre_process,
             post_process=self.post_process,
         )
-        
+
         if self.post_process and self.mtp_process:
             mtp_block_spec = get_mtp_block_spec(
                 config=self.config,
@@ -486,14 +486,14 @@ class MOEModel(MMGPTModel):
             # intermediate stage of pipeline
             # decoder will get hidden_states from encoder.input_tensor
             decoder_input = None
-            
+
         if mpu.get_context_parallel_world_size() > 1:
             split_gather_sizes = cal_split_sizes(decoder_input.shape[0], mpu.get_context_parallel_world_size())
-            decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0, 
+            decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0,
                                                         split_gather_sizes, "down")
-            input_ids = split_forward_gather_backward(input_ids, mpu.get_context_parallel_group(), 1, 
+            input_ids = split_forward_gather_backward(input_ids, mpu.get_context_parallel_group(), 1,
                                                         split_gather_sizes, "down")
-            position_ids = split_forward_gather_backward(position_ids, mpu.get_context_parallel_group(), 2, 
+            position_ids = split_forward_gather_backward(position_ids, mpu.get_context_parallel_group(), 2,
                                                         split_gather_sizes, "down")
 
         # Rotary positional embeddings (embedding is None for PP intermediate devices)
@@ -531,9 +531,9 @@ class MOEModel(MMGPTModel):
             packed_seq_params=packed_seq_params,
             **(extra_block_kwargs or {}),
         )
-        
+
         if mpu.get_context_parallel_world_size() > 1:
-            hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), 0, 
+            hidden_states = gather_forward_split_backward(hidden_states, mpu.get_context_parallel_group(), 0,
                                                         split_gather_sizes, "up")
 
         if not self.post_process:
@@ -559,7 +559,7 @@ class MOEModel(MMGPTModel):
                 output_weight=output_weight,
                 compute_language_model_loss=self.compute_language_model_loss,
                 **(extra_block_kwargs or {}),
-            )            
+            )
 
         if self.final_layernorm is not None:
             hidden_states = self.final_layernorm(hidden_states)

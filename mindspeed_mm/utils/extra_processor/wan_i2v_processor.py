@@ -73,12 +73,12 @@ class WanVideoI2VProcessor(torch.nn.Module):
         # back vae tiling mode for video encode
         if vae_model.get_tiling_state() != vae_model_tiling_state:
             self.set_vae_tiling_state(vae_model, vae_model_tiling_state)
-        
+
         return {
             "i2v_clip_feature": clip_features,
             "i2v_vae_feature": vae_features
         }
-    
+
     def set_vae_tiling_state(self, vae_model, use_tiling):
         if use_tiling:
             vae_model.enable_tiling()

@@ -48,7 +48,7 @@ class Qwen3TTSProcessor(ProcessorMixin):
         """
         Main method to prepare for the model one or several sequences(s) and audio(s). This method forwards the `text`
         and `kwargs` arguments to Qwen2TokenizerFast's [`~Qwen2TokenizerFast.__call__`] if `text` is not `None` to encode
-        the text. 
+        the text.
 
         Args:
             text (`str`, `List[str]`, `List[List[str]]`):

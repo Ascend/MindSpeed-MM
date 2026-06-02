@@ -163,4 +163,3 @@ def test_moe_expert_split(setup_test_files):
                 save_dir = Path(temp_dir)
                 moe_expert("split", test_dir, save_dir)
                 assert len(list(save_dir.glob("*.safetensors"))) > 0
-

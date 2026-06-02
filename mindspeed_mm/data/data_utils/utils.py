@@ -953,4 +953,3 @@ def orjson_load(data_path):
                 if line.strip():
                     content.append(orjson.loads(line))
     return content
-

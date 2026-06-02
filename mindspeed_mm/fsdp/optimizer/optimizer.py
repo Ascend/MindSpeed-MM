@@ -70,7 +70,7 @@ class MultiOptimizer(Optimizer, Stateful):
         """
         state_dicts = [opt.state for opt in self.optimizers_dict.values()]
         return ChainMap(*state_dicts)
-    
+
     @property
     def param_groups(self):
         """

@@ -30,7 +30,7 @@ class TestCheckpointUtils:
             it, rel = read_metadata(f2)
             assert it == 0
             assert rel is True
-    
+
     def test_read_metadata_invalid_raises(self):
         from mindspeed_mm.fsdp.checkpoint.utils import read_metadata
 
@@ -38,7 +38,6 @@ class TestCheckpointUtils:
             fn = os.path.join(td, "latest.txt")
             with open(fn, "w", encoding="utf-8") as f:
                 f.write("not-a-number")
-            
+
             with pytest.raises(ValueError):
                 read_metadata(fn)
-                

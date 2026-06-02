@@ -26,7 +26,7 @@ class TestCalculateChunkSize:
     """
     Test calculate_chunk_size function
     """
-    
+
     def test_normal_case_power_of_two(self):
         """Test normal case where max_possible_chunk_size is a power of two"""
         result = calculate_chunk_size(batch_size=2, total_size=4096)
@@ -70,7 +70,7 @@ class TestGetLossFuncParamsWithTotalChunkSize:
     """
     Test get_loss_func_params with total_chunk_size parameter
     """
-    
+
     device = torch.device(get_device_type())
 
     def test_total_chunk_size_none_uses_passed_chunk_size(self):
@@ -98,10 +98,10 @@ class TestGetLossFuncParamsWithTotalChunkSize:
         batch_sizes = [1, 2, 4, 8]
         total_chunk_size = 4096
         expected_chunk_sizes = [4096, 2048, 1024, 512]
-        
+
         for batch_size, expected in zip(batch_sizes, expected_chunk_sizes):
             labels = torch.randint(0, 1000, (batch_size, 1024), device=self.device)
-            
+
             result = get_loss_func_params(
                 labels=labels,
                 loss_type="default",
@@ -109,7 +109,7 @@ class TestGetLossFuncParamsWithTotalChunkSize:
                 chunk_size=1024,
                 total_chunk_size=total_chunk_size
             )
-            
+
             judge_expression(result[0]["chunk_size"] == expected)
 
 
@@ -131,7 +131,7 @@ class TestBuildLossFuncBranch:
         """
         sig = inspect.signature(loss_func)
         params = list(sig.parameters.keys())
-        
+
         # Chunk loss: (hidden_states, head_weight, head_bias, labels=None)
         # Non-chunk loss: (logits, labels=None, vocab_size=None)
         if params[:3] == ['hidden_states', 'head_weight', 'head_bias']:
@@ -146,22 +146,22 @@ class TestBuildLossFuncBranch:
                 head_weight = torch.randn(self.vocab_size, self.hidden_dim, device=self.device)
                 head_bias = None
                 labels = torch.randint(0, self.vocab_size, (1, 10), device=self.device)
-                
+
                 # This should work for chunk loss
                 loss_func(hidden_states, head_weight, head_bias, labels)
                 return True
             except TypeError:
                 return False
-    
+
     def test_chunk_size_non_zero_enters_chunk_branch(self):
         """Test that non-zero chunk_size enters chunk loss branch"""
         loss_func = build_loss_func(
             loss_type="default",
             chunk_size=1024,  # Non-zero
         )
-        
+
         judge_expression(self._is_chunk_loss_func(loss_func))
-    
+
     def test_total_chunk_size_non_zero_enters_chunk_branch(self):
         """Test that non-zero total_chunk_size enters chunk loss branch"""
         loss_func = build_loss_func(
@@ -169,14 +169,14 @@ class TestBuildLossFuncBranch:
             chunk_size=None,
             total_chunk_size=2048  # Non-zero
         )
-        
+
         judge_expression(self._is_chunk_loss_func(loss_func))
-    
+
     def test_chunk_size_none_enters_non_chunk_branch(self):
         """Test that none chunk_size and None total_chunk_size enters non-chunk branch"""
         loss_func = build_loss_func(
             loss_type="default",
             chunk_size=None,
         )
-        
+
         judge_expression(not self._is_chunk_loss_func(loss_func))

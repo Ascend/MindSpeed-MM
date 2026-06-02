@@ -47,7 +47,7 @@ class LlamaRMSNorm(nn.Module):
             hidden_states = hidden_states.to(torch.float32)
             variance = hidden_states.pow(2).mean(-1, keepdim=True)
             hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-            return self.weight * hidden_states.to(input_dtype)  
+            return self.weight * hidden_states.to(input_dtype)
 
 
 class FP32LayerNorm(nn.Module):
@@ -75,7 +75,7 @@ class FP32LayerNorm(nn.Module):
             self.weight.float() if self.weight is not None else None,
             self.bias.float() if self.bias is not None else None,
             self.eps,
-        ).to(origin_dtype)  
+        ).to(origin_dtype)
 
 
 def normalize(in_channels, num_groups=32, eps=1e-6, affine=True, norm_type="groupnorm", gather=False, **kwargs):

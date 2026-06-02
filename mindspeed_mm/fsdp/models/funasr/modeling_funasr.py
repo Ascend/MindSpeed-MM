@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 def get_funasr_model(model_args, model_parallel_applier):
     model_dir = model_args.model_name_or_path
     config_path = os.path.join(model_dir, "config.yaml")
-    
+
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"config.yaml not found in {model_dir}")
-    
+
     with open(config_path) as f:
         model_config = yaml.safe_load(f)
-    
+
     model_type = model_config.get("model")
     if not model_type:
         raise ValueError(f"'model' field missing in {config_path}")
@@ -61,7 +61,7 @@ def get_funasr_model(model_args, model_parallel_applier):
     else:
         for param in model.llm.parameters():
             param.requires_grad = True
-    
+
     if model_args.audio_adaptor_conf["freeze"]:
         for param in model.audio_adaptor.parameters():
             param.requires_grad = False
@@ -69,7 +69,7 @@ def get_funasr_model(model_args, model_parallel_applier):
     else:
         for param in model.audio_adaptor.parameters():
             param.requires_grad = True
-    
+
     if model_args.ctc_decoder_conf["freeze"]:
         for param in model.ctc_decoder.parameters():
             param.requires_grad = False
@@ -81,12 +81,12 @@ def get_funasr_model(model_args, model_parallel_applier):
     model = model_parallel_applier(model)
     for i, (name, param) in enumerate(model.named_parameters()):
         print_rank(logger.info, f"  Param: {name}, dtype={param.dtype}, device={param.device}, requires_grad={param.requires_grad}, shape: {param.shape}, numel: {param.numel()}, sum={param.sum().item():.6f}, mean={param.mean().item():.6f}")
-    
+
     if IS_NPU_AVAILABLE:
         from mindspeed_mm.fsdp.models.funasr.npu_patch import apply_funasr_npu_patch
 
         apply_funasr_npu_patch()
-    
+
     return model, tokenizer, frontend
 
 model_register.register("funasr")(get_funasr_model)

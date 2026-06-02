@@ -325,8 +325,8 @@ class GenerationMixin:
         raise NotImplementedError(
             "A model class needs to define a `prepare_inputs_for_generation` method in order to use `.generate()`."
         )
-    
-    
+
+
     def _update_model_kwargs_for_generation(self, *args, **kwargs):
         raise NotImplementedError(
             "A model class needs to define a `_update_model_kwargs_for_generation` method in order to use `.generate()`."
@@ -1095,7 +1095,7 @@ class GenerationMixin:
         # Therefore, padding should be done according to the maximum generated sequence length.
         input_ids_padding = torch.nn.functional.pad(input_ids, (0, stopping_criteria.max_length - input_ids_length),
                                                     "constant", 0)
-        
+
         while True:
             input_ids = input_ids_padding[:, :input_ids_length]
             model_kwargs["input_ids"] = input_ids

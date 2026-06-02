@@ -154,7 +154,7 @@ class T2VDataset(MMBaseDataset):
     def getitem(self, index):
         # init output data
         examples = copy.deepcopy(T2VOutputData)
-        
+
         if self.data_storage_mode == "standard":
             sample = self.data_samples[index]
             file_path, texts = sample[FILE_INFO], sample[CAPTIONS]
@@ -170,10 +170,10 @@ class T2VDataset(MMBaseDataset):
             raise NotImplementedError(
                 f"Not support now: data_storage_mode={self.data_storage_mode}."
             )
-        
+
         # Generic media processing pipeline
         file_type = self.get_type(file_path)
-        
+
         # Image/video processing
         if file_type == "image":
             video_value = self.image_processer(file_path)
@@ -188,7 +188,7 @@ class T2VDataset(MMBaseDataset):
         # Text processing
         if isinstance(texts, (list, tuple)) and len(texts) > 1:
             texts = random.choice(texts)  # Random selection from multiple options
-        
+
         # Handle aesthetic scoring
         if self.use_aesthetic:
             aes = sample.get('aesthetic') or sample.get('aes')
@@ -279,7 +279,7 @@ class T2VDataset(MMBaseDataset):
                 ]
         if self.vid_img_fusion_by_splicing and not self.use_img_from_vid:
             raise NotImplementedError("Not support now.")
-        
+
         return (prompt_ids, prompt_mask)
 
 
@@ -342,7 +342,7 @@ class DynamicVideoTextDataset(MMBaseDataset):
             train_pipeline=self.train_pipeline,
             image_reader_type=self.image_reader_type,
         )
-        
+
         if "video_mask_ratios" in kwargs:
             self.video_mask_generator = MaskGenerator(kwargs["video_mask_ratios"])
         else:
@@ -398,7 +398,7 @@ class DynamicVideoTextDataset(MMBaseDataset):
         video_or_image_path = sample["path"]
         if self.data_folder:
             video_or_image_path = os.path.join(self.data_folder, video_or_image_path)
-            
+
         video, video_fps = self.get_value_from_vid_or_img(num_frames, video_or_image_path, image_size=(height, width), frame_interval=frame_interval)
         ar = height / width
 
@@ -411,7 +411,7 @@ class DynamicVideoTextDataset(MMBaseDataset):
             "ar": ar,
             "fps": video_fps,
         }
-        
+
         if self.video_mask_generator is not None:
             ret["video_mask"] = self.video_mask_generator.get_mask(video)
 

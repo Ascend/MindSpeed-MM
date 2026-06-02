@@ -42,10 +42,10 @@ from mindspeed_mm.data.dataloader.data_collator import DATA_COLLATOR
 
 class PrefetchGradAccDataLoader:
     """
-    A DataLoader wrapper that prefetches a fixed number of batches (equal to gradient 
+    A DataLoader wrapper that prefetches a fixed number of batches (equal to gradient
     accumulation steps), computes total and average valid token counts across them,
     and injects these metrics into each batch before yielding.
-    
+
     This is Used for calculate per-token-loss
     """
     def __init__(self, base_dataloader, grad_acc_step: int):
@@ -59,7 +59,7 @@ class PrefetchGradAccDataLoader:
         self.grad_acc_step = grad_acc_step
         self.base_dataloader = base_dataloader
         self._current_iterator = None  # Holds the active generator
-        
+
     def __iter__(self):
         # Start a new iteration (reset state)
         self._current_iterator = self._generate_batches()
@@ -212,7 +212,7 @@ def prepare_sampler_dataloader(
         if collate_param:
             data_collate_type = collate_param.pop("model_name")
             collate_fn = DATA_COLLATOR[data_collate_type](**collate_param, dataset_param=dataset_param)
-            
+
         if isinstance(dataset, torch.utils.data.dataset.IterableDataset):
             sampler = None
         else:
@@ -278,7 +278,7 @@ def prepare_sampler_dataloader(
                 shuffle=shuffle,
                 consumed_samples=consumed_samples,
             )
-            
+
         if collate_param is None:
             collate_fn = None
         elif "model_name" not in collate_param:
@@ -322,7 +322,7 @@ def prepare_sampler_dataloader(
             collate_fn = None
         elif "model_name" not in collate_param:
             raise ValueError("collate_param with model_name must be provided.")
-        
+
         if collate_param:
             data_collate_type = collate_param.pop("model_name")
             collate_fn = DATA_COLLATOR[data_collate_type](**collate_param, dataset_param=dataset_param)

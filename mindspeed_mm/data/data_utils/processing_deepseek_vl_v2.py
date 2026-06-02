@@ -463,7 +463,7 @@ class DeepseekVLV2Processor(ProcessorMixin):
                 input_ids = torch.cat([input_ids, torch.full((max_length - len(input_ids),), self.pad_id, dtype=input_ids.dtype, device=input_ids.device)], dim=0)
                 target_ids = torch.cat([target_ids, torch.full((max_length - len(target_ids),), self.ignore_id, dtype=target_ids.dtype, device=target_ids.device)], dim=0)
                 images_seq_mask = torch.cat([images_seq_mask, torch.full((max_length - len(images_seq_mask),), False, dtype=images_seq_mask.dtype, device=images_seq_mask.device)], dim=0)
-        
+
         if inference_mode:
             # drop the ending eos token
             if input_ids[-1] != self.eos_id:
@@ -595,7 +595,7 @@ class DeepseekVLV2Processor(ProcessorMixin):
             tokenized_str += tokenized_image
             images_seq_mask += [True] * len(tokenized_image)
             num_image_tokens.append(len(tokenized_image))
-            
+
         """process the last text split"""
         tokenized_sep = self.encode(text_splits[-1], bos=False, eos=False)
         tokenized_str += tokenized_sep
@@ -611,5 +611,5 @@ class DeepseekVLV2Processor(ProcessorMixin):
 
         if len(tokenized_str) != len(images_seq_mask):
             raise AssertionError(f"tokenize_with_images func: tokenized_str's length {len(tokenized_str)} is not equal to imags_seq_mask's length {len(images_seq_mask)}")
-    
+
         return tokenized_str, images_list, images_seq_mask, images_spatial_crop, num_image_tokens

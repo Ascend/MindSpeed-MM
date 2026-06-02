@@ -177,8 +177,8 @@ class SparseUMMDiT(MultiModalModule):
 
         # 2. time embedding and pooled text embedding
         self.time_text_embed = CombinedTimestepTextProjEmbeddings(
-            timestep_embed_dim=timestep_embed_dim, 
-            embedding_dim=timestep_embed_dim, 
+            timestep_embed_dim=timestep_embed_dim,
+            embedding_dim=timestep_embed_dim,
             pooled_projection_dim=pooled_projection_dim
         )
 
@@ -207,7 +207,7 @@ class SparseUMMDiT(MultiModalModule):
                             eps=norm_eps,
                             sequence_parallel=self.sequence_parallel,
                         ) if not self.skip_connection_zero_init else nn.Identity(),
-                        skip_connection_linear(hidden_size * 2, hidden_size), 
+                        skip_connection_linear(hidden_size * 2, hidden_size),
                     )
                 )
                 self.skip_norm_linear_enc.append(
@@ -217,7 +217,7 @@ class SparseUMMDiT(MultiModalModule):
                             eps=norm_eps,
                             sequence_parallel=self.sequence_parallel,
                         ) if not self.skip_connection_zero_init else nn.Identity(),
-                        skip_connection_linear(hidden_size * 2, hidden_size), 
+                        skip_connection_linear(hidden_size * 2, hidden_size),
                     )
                 )
             stage_blocks = nn.ModuleList(
@@ -304,8 +304,8 @@ class SparseUMMDiT(MultiModalModule):
         def get_attention_mask(mask, repeat_num):
             mask = mask.to(torch.bool)
             mask = mask.repeat(1, 1, repeat_num, 1)
-            return mask        
-        
+            return mask
+
         attention_mask_sparse_1d = get_attention_mask(
             attention_mask_sparse_1d, attention_mask_sparse_1d.shape[-1]
         )
@@ -433,11 +433,11 @@ class SparseUMMDiT(MultiModalModule):
         return output
 
     def block_forward(
-        self, 
-        block, 
-        hidden_states, 
-        attention_mask, 
-        encoder_hidden_states, 
+        self,
+        block,
+        hidden_states,
+        attention_mask,
+        encoder_hidden_states,
         inputs: BlockForwardInputs,
     ):
         if self.training and self.gradient_checkpointing:
@@ -581,7 +581,7 @@ class SparseMMDiTBlock(nn.Module):
         dim: int,
         num_heads: int,
         head_dim: int,
-        timestep_embed_dim: int, 
+        timestep_embed_dim: int,
         dropout=0.0,
         activation_fn: str = "geglu",
         attention_bias: bool = False,
@@ -639,11 +639,11 @@ class SparseMMDiTBlock(nn.Module):
 
         # adanorm-zero2: to introduce timestep and clip condition
         self.norm2 = OpenSoraNormZero(
-            timestep_embed_dim, 
-            dim, 
-            norm_elementwise_affine, 
-            norm_eps, 
-            bias=True, 
+            timestep_embed_dim,
+            dim,
+            norm_elementwise_affine,
+            norm_eps,
+            bias=True,
             norm_cls=norm_cls,
             context_pre_only=(not double_ff and context_pre_only)
         )
@@ -806,7 +806,7 @@ class AdaNorm(nn.Module):
         else:
             temb = tensor_parallel.mappings.gather_from_tensor_model_parallel_region(temb)
         temb = temb.float()
-        
+
         # x shape: (S B H), temb shape: (B, H)
         shift, scale = temb.chunk(2, dim=1)
         shift = shift[None, :, :]
@@ -854,7 +854,7 @@ class OpenSoraNormZero(nn.Module):
         self.norm_enc = None
         if not context_pre_only:
             self.norm_enc = self.norm_cls(embedding_dim, eps=eps, sequence_parallel=self.sequence_parallel)
-            
+
     def forward(
         self, hidden_states: torch.Tensor, encoder_hidden_states: torch.Tensor, temb: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:

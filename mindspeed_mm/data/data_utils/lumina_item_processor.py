@@ -51,7 +51,7 @@ class ItemProcessor:
     def create(item_processor_type=None, **kwargs) -> "ItemProcessorBase":
         """
         Initialize with specified item processor type
-        
+
         Args:
             item_processor_type: Registered item processor type (e.g., 'LoadFeatureItemProcessor', 'TokenizerItemProcessor')
         """
@@ -126,7 +126,7 @@ class TokenizerItemProcessor(ItemProcessorBase):
         print_rank_0("List of crop sizes:")
         for i in range(0, len(self.crop_size_list), 6):
             print_rank_0(" " + "".join([f"{f'{w} x {h}':14s}" for w, h in self.crop_size_list[i: i + 6]]))
-        
+
         # prepare model
         self.tokenizer = Tokenizer(tokenizer_config).get_tokenizer()
         self.vqgan = AEModel(args.mm.model.ae).get_model().to(device).eval()
@@ -151,11 +151,11 @@ class TokenizerItemProcessor(ItemProcessorBase):
 
     def token2id(self, token: str) -> int:
         return self.tokenizer.tokenizer.vocab[token]
-    
+
     def id2token(self, id_) -> str:
         voc = self.tokenizer.tokenizer.vocab
         return list(voc.keys())[list(voc.values()).index(id_.item())]
-    
+
     def _whiten_transparency(self, img: PIL.Image) -> PIL.Image:
         # Check if it's already in RGB format.
         if img.mode == "RGB":
@@ -178,18 +178,18 @@ class TokenizerItemProcessor(ItemProcessorBase):
         np_img = np.array(img) / 255.0  # Normalize to [0, 1]
         np_img = np_img * 2 - 1  # Scale to [-1, 1]
         img = torch.from_numpy(np_img).permute(2, 0, 1).to(self.vqgan.encoder.conv_in.weight)
-        
+
         img = img.unsqueeze(0)
         info = self.vqgan.encode(img)
         return info
-    
+
     def process_image(self, image) -> Dict:
         if isinstance(image, Image.Image):
             pass
         else:
             with Image.open(image) as img:
                 image = img.copy()
-        
+
         image = var_center_crop(image, crop_size_list=self.crop_size_list)
         w_grids, h_grids = image.size[0] // self.patch_size, image.size[1] // self.patch_size
 
@@ -248,7 +248,7 @@ class TokenizerItemProcessor(ItemProcessorBase):
                     input_tokens_item += token_or_media["input_ids"]
 
             return input_tokens_item
-        
+
     def get_txt_and_img_tokens(self, data_item):
         d_media = self.collect_and_process_media(data_item)
         source = self.insert_implicit_media_symbol_in_q1(data_item["conversations"], d_media)
@@ -281,7 +281,7 @@ class TokenizerItemProcessor(ItemProcessorBase):
             if p["predict"]:
                 labels[check_pos: check_pos + len(tokenized_value)] = tokenized_value
             check_pos = check_pos + len(tokenized_value)
-        
+
         # labels will be processed later by the model
         tokens, labels = self.replace_media_token_with_media(tokens, labels, d_media)
         return tokens, labels
@@ -392,7 +392,7 @@ class TokenizerItemProcessor(ItemProcessorBase):
             caption = raw_item["prompt"]
         else:
             raise ValueError(f"No 'prompt' key found in {raw_item}.")
-        
+
         image = var_center_crop(image, crop_size_list=self.crop_size_list)
 
         if random.random() < 0.9:
@@ -411,7 +411,7 @@ class TokenizerItemProcessor(ItemProcessorBase):
             "image": img_path,
         }
         return item
-    
+
     def predict_item_token_length(self, data_item: dict) -> int:
         """
         estimate the length of each item
@@ -421,4 +421,3 @@ class TokenizerItemProcessor(ItemProcessorBase):
             return sum([len(_["value"]) for _ in data_item["conversations"]])
         else:
             return 1
-

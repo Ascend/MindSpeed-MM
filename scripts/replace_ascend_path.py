@@ -2,19 +2,19 @@
 # Copyright 2026 Huawei Technologies Co., Ltd
 """
 Batch-replace CANN/Ascend install paths in the MindSpeed-MM repository.
- 
+
 Background:
   In the international release, the CANN/HDK install path has changed from
   /usr/local/Ascend to /usr/local/npu. This script replaces all occurrences
   of the old path across the repository in one pass.
- 
+
 Usage:
   python3 scripts/replace_ascend_path.py [options]
- 
+
 Examples:
   # Preview changes without modifying any files
   python3 scripts/replace_ascend_path.py --dry-run
- 
+
   # Apply replacement: /usr/local/Ascend -> /usr/local/npu (default)
   python3 scripts/replace_ascend_path.py
 """

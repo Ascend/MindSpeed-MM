@@ -150,7 +150,7 @@ class VideoVLMRewardTrainer(DPOTrainer):
         args_.retro_encoder_hidden_dropout = 0.0
         args_.retro_encoder_attention_dropout = 0.0
         set_args(args_)
-    
+
     def _convert_A_B_to_chosen_rejected(self, rewards_A, rewards_B, scores_A, scores_B, chosen_label, label_dim=None):
         """
         Inputs:
@@ -184,7 +184,7 @@ class VideoVLMRewardTrainer(DPOTrainer):
             valid_mask = valid_mask[:, label_dim].unsqueeze(1).expand(-1, N)
 
         return rewards_chosen, rewards_rejected, scores_chosen, scores_rejected, nontied_mask, valid_mask
-    
+
     @staticmethod
     def get_batch(data_iterator):
         """Generate a batch."""
@@ -207,7 +207,7 @@ class VideoVLMRewardTrainer(DPOTrainer):
         batch['chosen_label'] = torch.tensor(batch['chosen_label']).to(device)
 
         return batch
-    
+
     def loss_func(self, rewards_chosen, rewards_rejected, nontied_mask, valid_mask, inputs, output_tensor):
         rewards_A, rewards_B = output_tensor[0], output_tensor[1]
         metrics = {}
@@ -248,7 +248,7 @@ class VideoVLMRewardTrainer(DPOTrainer):
             out_mask = valid_mask
         else:
             raise NotImplementedError(f"Loss type {self.loss_type} not implemented.")
-        
+
         loss = loss * out_mask
 
         loss = loss.mean()

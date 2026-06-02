@@ -29,7 +29,7 @@ if is_npu_available():
 class FeatureExtractor:
     """
     Distributed feature extractor for multimodal data (text + image)
-    
+
     This class handles:
     1. Distributed environment setup using Megatron
     2. Data loading and preprocessing
@@ -37,12 +37,12 @@ class FeatureExtractor:
     4. Saving extracted features to disk
     5. Metadata management for extracted features
     """
-    
+
     def __init__(self):
         """Initialize the feature extraction pipeline"""
         # Initialize distributed environment (Megatron)
         self._initialize_distributed()
-        
+
         # Get save path from configuration
         self.save_path = self.args.mm.tool.sorafeature.save_path
         self.features_dir = os.path.join(self.save_path, "features")
@@ -52,53 +52,53 @@ class FeatureExtractor:
         if self.rank == 0:
             os.makedirs(self.features_dir, exist_ok=True)
             print_rank_0(f"Created features directory at: {self.features_dir}")
-        
+
         # clear data.jsonl
         with open(self.data_info_path, "w", encoding="utf-8") as f:
             pass
-        
+
         # Configure PyTorch for optimal performance
         set_jit_fusion_options()
         torch.set_grad_enabled(False)
 
         self.device = get_device("npu")
-        
+
         # Prepare data pipeline (dataset and dataloader)
         self.dataset, self.dataloader = self._prepare_data()
         torch.distributed.barrier()
-    
+
     def _initialize_distributed(self):
         """Initialize Megatron distributed training environment"""
         # Initialize Megatron with multimodal-specific arguments
         initialize_megatron(extra_args_provider=mm_extra_args_provider, args_defaults={})
-        
+
         # Get and merge arguments
         args = get_args()
         merge_mm_args(args)
         self.args = get_args()
-        
+
         # Store rank and world size for distributed operations
         self.rank = torch.distributed.get_rank()
         self.world_size = torch.distributed.get_world_size()
 
         print_rank_0(f"Initialized distributed environment (rank {self.rank}/{self.world_size})")
-    
+
     def extract_all(self):
         """Main method to extract features from all data samples"""
         total_samples = len(self.dataset)
         print_rank_0(f"Starting feature extraction. Total samples: {total_samples}")
-        
+
         # Initialize counters and profiler
         counter = 0
         profiler = self._init_profiler()
         if profiler:
             profiler.start()
-        
+
         try:
             # Process all batches in the dataloader
             for index, batch in tqdm(enumerate(self.dataloader)):
                 # Extract features from current batch
-                file_names, tokens, labels = batch 
+                file_names, tokens, labels = batch
 
                 batch_size = len(file_names)
                 # Save features for each sample in the batch
@@ -109,11 +109,11 @@ class FeatureExtractor:
                         labels=labels[i],
                         index=index
                     )
-                
+
                 # Update profiler if enabled
                 if profiler:
                     profiler.step()
-                
+
         except Exception as e:
             print_rank_0(f"Feature extraction failed: {str(e)}")
             raise
@@ -121,14 +121,14 @@ class FeatureExtractor:
             # Clean up profiler
             if profiler:
                 profiler.stop()
-    
+
     def _init_profiler(self):
         """Initialize performance profiler if enabled in configuration"""
         if hasattr(self.args.mm.tool, "profile"):
             print_rank_0("Initializing performance profiler")
             return Profiler(self.args.mm.tool.profile)
         return None
-    
+
     def _save_sample_features(
         self,
         file_name: str,
@@ -148,12 +148,12 @@ class FeatureExtractor:
         with open(self.data_info_path, "a") as f:
             record_str = json.dumps(record) + "\n"
             f.write(record_str)
-    
+
     def _prepare_data(self) -> Tuple[Any, Any]:
         """Prepare dataset and data loader"""
         # Build dataset
         dataset = build_mm_dataset(self.args.mm.data.dataset_param)
-        
+
         # Build dataloader
         dataloader = build_mm_dataloader(
             dataset,
@@ -161,15 +161,15 @@ class FeatureExtractor:
             process_group=mpu.get_data_parallel_group(),
             dataset_param=self.args.mm.data.dataset_param,
         )
-        
+
         print_rank_0(f"Prepared dataset with {len(dataset)} samples")
         return dataset, dataloader
-    
+
     @staticmethod
     def _generate_safe_filename(file_path: str) -> str:
         """
         Generate a safe filename without special characters
-        
+
         Example:
             Input: "/path/to/image/0.jpg"
             Output: "0_jpg.pkl"

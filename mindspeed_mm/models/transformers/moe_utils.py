@@ -74,12 +74,12 @@ def create_default_local_load_plan_with_moe(
                     moe_req = _create_read_items(fqn, md, obj)
             else:
                 moe_req = _create_read_items(fqn, md, obj)
-            
+
             if obj.device_mesh.mesh_dim_names:
                 ep_fsdp_sharding_size = torch.distributed.get_world_size(obj.device_mesh["EP_Replicate"].get_group())
             else:
                 ep_fsdp_sharding_size = 1
-            
+
             requests += [get_chunk_readitem(req, ep_rank, ep_fsdp_sharding_size) for req in moe_req]
 
     return LoadPlan(requests)
@@ -99,7 +99,7 @@ def get_chunk_readitem(readitem, ep_rank, ep_fsdp_sharding_size=1, operate_dim=0
     storage_offsets = readitem.storage_offsets
     lengths = readitem.lengths
     experts_ndim = len(storage_offsets)
-    
+
     if len(storage_offsets) != len(lengths):
         raise ValueError("storage_offsets and lengths must have the same size.")
     offset_list = []

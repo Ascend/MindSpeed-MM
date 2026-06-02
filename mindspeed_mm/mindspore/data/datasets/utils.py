@@ -12,7 +12,7 @@ def process_in_cpu_wrapper(func):
         _pynative_executor.sync()
         msadapter.configs.set_pyboost(False)
         mindspore.set_context(device_target="CPU")
- 
+
         # process dataset
         result = func(*args, **kwargs)
 
@@ -20,6 +20,6 @@ def process_in_cpu_wrapper(func):
         msadapter.configs.set_pyboost(True)
         _pynative_executor.sync()
         mindspore.set_context(device_target="Ascend")
-        
+
         return result
     return wrapper

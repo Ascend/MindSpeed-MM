@@ -94,14 +94,14 @@ class SoRADPOModel(nn.Module):
                         latents_lose, _ = self.ae.encode(video_lose, **kwargs)
                     else:
                         raise NotImplementedError(f"Task {self.task} is not Implemented!")
-                
+
                  # Text Encode
                 if self.load_text_features:
                     prompts = prompt_ids
                     prompt_mask = prompt_mask
                 else:
                     prompts, prompt_mask = self.text_encoder.encode(prompt_ids, prompt_mask, **kwargs)
-            
+
             noised_latents_win, noise, timesteps = self.diffusion.q_sample(latents, model_kwargs=kwargs, mask=video_mask)
             noised_latents_lose, _, _ = self.diffusion.q_sample(latents_lose, noise=noise, t=timesteps, model_kwargs=kwargs, mask=video_mask)
             noised_latents = torch.cat((noised_latents_win, noised_latents_lose), dim=0)
@@ -115,11 +115,11 @@ class SoRADPOModel(nn.Module):
             else:
                 prompt = torch.cat((prompts, prompts), dim=0)
                 prompt_mask = torch.cat((prompt_mask, prompt_mask), dim=0)
-            
+
             if i2v_results is not None:
                 for k, v in i2v_results.items():
                     kwargs[k] = torch.cat((v, v), dim=0)
-            
+
             predictor_input_latent, predictor_timesteps, predictor_prompt = noised_latents, timesteps, prompt
             predictor_video_mask, predictor_prompt_mask = video_mask, prompt_mask
             predictor_input_latent_ref, predictor_timesteps_ref, predictor_prompt_ref = noised_latents, timesteps, prompt
@@ -164,7 +164,7 @@ class SoRADPOModel(nn.Module):
                 prompt_mask=predictor_prompt_mask_ref,
                 **kwargs_ref,
             )
-        
+
         actor_output = self.actor(
             predictor_input_latent,
             timestep=predictor_timesteps,
@@ -185,19 +185,19 @@ class SoRADPOModel(nn.Module):
         output = []
         for index, _ in enumerate(actor_output):
             output.append(torch.cat((actor_output[index], refer_output[index]), dim=0))
-        
+
         output = output + [score, score_lose]
 
         return self.actor.pipeline_set_next_stage_tensor(
             input_list=[latents, noised_latents, timesteps, noise, video_mask],
             output_list=output,
             extra_kwargs=kwargs)
-    
+
     def state_dict_for_save_checkpoint(self, prefix="", keep_vars=False):
         """Customized state_dict"""
         state_dict = self.actor.state_dict(prefix=prefix, keep_vars=keep_vars)
         return state_dict
-    
+
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         """Customized load."""
         if not isinstance(state_dict, Mapping):

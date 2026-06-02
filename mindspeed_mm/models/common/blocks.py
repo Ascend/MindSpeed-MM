@@ -135,7 +135,7 @@ class T2IFinalLayer(nn.Module):
         self.out_channels = out_channels
         self.d_t = d_t
         self.d_s = d_s
-    
+
     def t_mask_select(self, x_mask, x, masked_x):
         # x: [B, (T, S), C]
         # mased_x: [B, (T, S), C]
@@ -156,7 +156,7 @@ class T2IFinalLayer(nn.Module):
             x = self.t_mask_select(x_mask, x, x_zero)
         x = self.linear(x)
         return x
-    
+
 
 class ModulateDiT(nn.Module):
     """Modulation layer for DiT."""
@@ -208,7 +208,7 @@ class ModulateDiT(nn.Module):
             return output
         else:
             return self.linear(self.act(x))
-    
+
 
 class MLP(nn.Module):
     """MLP as used in Vision Transformer, MLP-Mixer and related networks"""
@@ -263,7 +263,7 @@ class MLP(nn.Module):
         if norm_layer is not None:
             for param in self.norm.parameters():
                 setattr(param, "sequence_parallel", enable_tp_sp and args.sequence_parallel)
-        
+
         if self.enable_tensor_parallel:
             config.sequence_parallel = enable_tp_sp and args.sequence_parallel
             self.fc2 = tensor_parallel.RowParallelLinear(

@@ -447,7 +447,7 @@ def vtp_recv_forward(tensor_shape, config, async_op=False, **kwargs):
         pp_group = group
     else:
         pp_group = get_pipeline_model_parallel_group()
-    
+
     # vitural dp scenario, get nr and pr from kwargs
     next_rank = kwargs.get("next_rank", None)
     prev_rank = kwargs.get("prev_rank", None)
@@ -455,7 +455,7 @@ def vtp_recv_forward(tensor_shape, config, async_op=False, **kwargs):
         next_rank = get_pipeline_model_parallel_next_rank()
     if prev_rank is None:
         prev_rank = get_pipeline_model_parallel_prev_rank()
-            
+
     if not isinstance(pp_group, list):
         pp_group = [pp_group]
     if not isinstance(next_rank, list):
@@ -487,7 +487,7 @@ def vtp_recv_forward(tensor_shape, config, async_op=False, **kwargs):
             for g, sr in zip(pp_group, prev_rank):
                 work = torch.distributed.irecv(tensor, src=sr, group=g)
                 work.wait()
-        
+
         if dst_size > 1 and intra_group is not None:
             torch.distributed.broadcast(
                 tensor, src=broadcast_src, group=intra_group
@@ -511,7 +511,7 @@ def vtp_recv_backward(tensor_shape, config, async_op=False, **kwargs):
         pp_group = group
     else:
         pp_group = get_pipeline_model_parallel_group()
-        
+
     # vitural dp scenario, get nr and pr from kwargs
     next_rank = kwargs.get("next_rank", None)
     prev_rank = kwargs.get("prev_rank", None)
@@ -519,7 +519,7 @@ def vtp_recv_backward(tensor_shape, config, async_op=False, **kwargs):
         next_rank = get_pipeline_model_parallel_next_rank()
     if prev_rank is None:
         prev_rank = get_pipeline_model_parallel_prev_rank()
-            
+
     if not isinstance(pp_group, list):
         pp_group = [pp_group]
     if not isinstance(next_rank, list):
@@ -572,7 +572,7 @@ def vtp_send_forward(tensor, **kwargs):
             pp_group = group
         else:
             pp_group = get_pipeline_model_parallel_group()
-        
+
         # vitural dp scenario, get nr and pr from kwargs
         next_rank = kwargs.get("next_rank", None)
         prev_rank = kwargs.get("prev_rank", None)
@@ -580,14 +580,14 @@ def vtp_send_forward(tensor, **kwargs):
             next_rank = get_pipeline_model_parallel_next_rank()
         if prev_rank is None:
             prev_rank = get_pipeline_model_parallel_prev_rank()
-            
+
         if not isinstance(pp_group, list):
             pp_group = [pp_group]
         if not isinstance(next_rank, list):
             next_rank = [next_rank]
         if not isinstance(prev_rank, list):
             prev_rank = [prev_rank]
-        
+
         handles = []
         for g, dr in zip(pp_group, next_rank):
             h = torch.distributed.isend(tensor, dst=dr, group=g)
@@ -610,7 +610,7 @@ def vtp_send_backward(tensor, **kwargs):
             pp_group = group
         else:
             pp_group = get_pipeline_model_parallel_group()
-        
+
         # vitural dp scenario, get nr and pr from kwargs
         next_rank = kwargs.get("next_rank", None)
         prev_rank = kwargs.get("prev_rank", None)
@@ -618,7 +618,7 @@ def vtp_send_backward(tensor, **kwargs):
             next_rank = get_pipeline_model_parallel_next_rank()
         if prev_rank is None:
             prev_rank = get_pipeline_model_parallel_prev_rank()
-            
+
         if not isinstance(pp_group, list):
             pp_group = [pp_group]
         if not isinstance(next_rank, list):

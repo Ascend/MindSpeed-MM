@@ -35,12 +35,12 @@ class Profiler:
             "static_param":
                 "level": type-str, profiling level0, level1, level2,
                 "with_stack": type-bool, profiling with stack info,
-                "with_memory": type-bool, profiling with memory info, 
+                "with_memory": type-bool, profiling with memory info,
                 "record_shapes": type-bool, profiling with shape info,
                 "with_cpu": type-bool, profiling with cpu info,
-                "save_path": type-str, path to save profiling files, 
-                "start_step": type-int, profiling start step, 
-                "end_step": type-int, profiling end step, 
+                "save_path": type-str, path to save profiling files,
+                "start_step": type-int, profiling start step,
+                "end_step": type-int, profiling end step,
                 "data_simplification": type-bool, profiling with Simplified data,
             "dynamic_param":
                 "config_path": type-str, path of config and log,
@@ -71,9 +71,9 @@ class Profiler:
         self.sp_analyse_flag = config.static_param.analyse_flag
 
         self.dp_config_path = config.dynamic_param.config_path
-        
+
         self.aic_metrics_type = config.static_param.aic_metrics_type
-        
+
         if self.profile_type == "static":
             if self.sp_level == 'level0':
                 profiler_level = torch_npu.profiler.ProfilerLevel.Level0
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("--export-type", action="append", choices=["text", "db"],
                         help="Export type(s) for analysis results, supports: text, db, can be specified multiple times, default: text")
     args = parser.parse_args()
-    
+
     # Determine profiler path
     if args.profiler_path:
         profiler_path = args.profiler_path
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         from mindspeed_mm.configs.config import MMConfig
         config = MMConfig({"tool": args.mm_tool})
         profiler_path = os.path.join(config.tool.profile.static_param.save_path)
-    
+
     analyse(
         profiler_path=profiler_path,
         max_process_number=args.max_process_number,

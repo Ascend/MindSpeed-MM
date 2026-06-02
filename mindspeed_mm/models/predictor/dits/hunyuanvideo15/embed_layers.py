@@ -128,13 +128,13 @@ class VisionProjection(torch.nn.Module):
         super().__init__()
 
         self.proj = torch.nn.Sequential(
-            torch.nn.LayerNorm(input_dim), 
+            torch.nn.LayerNorm(input_dim),
             torch.nn.Linear(input_dim, input_dim),
-            torch.nn.GELU(), 
+            torch.nn.GELU(),
             torch.nn.Linear(input_dim, output_dim),
             torch.nn.LayerNorm(output_dim)
         )
-        
+
 
     def forward(self, vision_embeds):
         return self.proj(vision_embeds)

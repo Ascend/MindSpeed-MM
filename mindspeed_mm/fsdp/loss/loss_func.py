@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def calculate_chunk_size(batch_size: int, total_size: int) -> int:
     """
-    Calculate dynamic Chunk Size to ensure batch_size * chunk_size ≤ total size, 
+    Calculate dynamic Chunk Size to ensure batch_size * chunk_size ≤ total size,
     where chunk_size is the largest power of two not exceeding the theoretical maximum value.
 
     Args:
@@ -49,7 +49,7 @@ def calculate_chunk_size(batch_size: int, total_size: int) -> int:
 
 
 def get_loss_func_params(
-    labels, 
+    labels,
     loss_type,
     ignore_index=-100,
     chunk_size=1024,
@@ -80,7 +80,7 @@ def get_loss_func_params(
                 valid_per_sample[:, i] = loss_mask[mask].sum()
             result = torch.repeat_interleave(valid_per_sample, lengths[0], dim=1).float()  # [1, total_seq_len]
             alpha = torch.nn.functional.pad(result, (0, max(0, total_seq_len-result.size(1))), value=1 / lengths.size(1)) * lengths.size(1)
-            
+
             ps = get_parallel_state()
             if ps.is_cp_enable():
                 alpha = split_forward_gather_backward_with_cp(alpha, dim=1)
@@ -106,7 +106,7 @@ def get_loss_func_params(
     ps = get_parallel_state()
     if ps.is_cp_enable():
         shift_labels = split_forward_gather_backward_with_cp(shift_labels, dim=1)
-    
+
     if chunk_size:
         # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
         bs = shift_labels.shape[0]
@@ -128,7 +128,7 @@ def get_loss_func_params(
             for i in range(len(chunk_labels))
         ]
         return loss_func_kwargs
-        
+
     loss_func_kwargs = [
         {
             "shift_labels": shift_labels,
@@ -138,9 +138,9 @@ def get_loss_func_params(
             "chunk_size": chunk_size,
         }
     ]
-    
+
     return loss_func_kwargs
-  
+
 
 def build_loss_func(
     loss_type,
@@ -160,13 +160,13 @@ def build_loss_func(
             if labels is None:
                 raise ValueError("labels must be provided either in build_loss_func or in loss_func call.")
             loss_func_kwargs = get_loss_func_params(
-                labels, 
-                loss_type, 
-                ignore_index, 
-                chunk_size, 
+                labels,
+                loss_type,
+                ignore_index,
+                chunk_size,
                 **_kwargs,
             )
-            
+
             return chunk_loss(
                 hidden_states,
                 head_weight,
@@ -182,16 +182,16 @@ def build_loss_func(
             if labels is None:
                 raise ValueError("labels must be provided either in build_loss_func or in loss_func call.")
             loss_func_kwargs = get_loss_func_params(
-                labels, 
-                loss_type, 
-                ignore_index, 
-                chunk_size, 
+                labels,
+                loss_type,
+                ignore_index,
+                chunk_size,
                 **_kwargs,
             )
             shift_labels = loss_func_kwargs[0]["shift_labels"]
             reduction = loss_func_kwargs[0]["reduction"]
             alpha = loss_func_kwargs[0]["alpha"]
-            
+
             logits = logits.view(-1, logits.shape[-1]).contiguous().float()
             labels = shift_labels.view(-1)
             return fixed_cross_entropy(

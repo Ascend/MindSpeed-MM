@@ -156,12 +156,12 @@ class SatDiT(MultiModalModule):
                     nn.SiLU(),
                     nn.Linear(self.ofs_embed_dim, self.ofs_embed_dim),
                 )
-            
+
             # Init Projection
             self.caption_projection = None
             if text_hidden_size is not None:
                 self.caption_projection = nn.Linear(self.text_hidden_size, inner_dim)
-        
+
         self.global_layer_idx = global_layer_idx if global_layer_idx is not None else tuple(range(num_layers))
 
         # Init VideoDiTBlock
@@ -212,7 +212,7 @@ class SatDiT(MultiModalModule):
                 setattr(param, "sequence_parallel", self.sequence_parallel)
             for param in self.norm_out.parameters():
                 setattr(param, "sequence_parallel", self.sequence_parallel)
-        
+
         print(self)
 
     def _get_text_length(self, input_size, text_length):
@@ -547,7 +547,7 @@ class SatDiT(MultiModalModule):
         micro_batch_size = args.mm.data.dataloader_param.batch_size
         dtype = args.params_dtype
         latent_size = (self.out_channels, *self.input_size)
-        seq_len = self.seq_len 
+        seq_len = self.seq_len
 
         if self.enable_sequence_parallelism and not self.sequence_parallel:
             prev_output_shape = (seq_len // mpu.get_context_parallel_world_size(), micro_batch_size, self.inner_dim) # SBH
@@ -558,7 +558,7 @@ class SatDiT(MultiModalModule):
 
         pipeline_tensor_shapes = [
             {'shape': prev_output_shape, 'dtype': dtype},                                           # prev_stage_output
-            {'shape': (micro_batch_size, *latent_size), 'dtype': dtype},                            # latents 
+            {'shape': (micro_batch_size, *latent_size), 'dtype': dtype},                            # latents
             {'shape': (micro_batch_size, self.ori_text_length, self.inner_dim), 'dtype': dtype},    # prompt
             {'shape': (micro_batch_size, self.time_embed_dim), 'dtype': dtype},                     # embedded_timestep
             {'shape': (micro_batch_size, *latent_size), 'dtype': torch.float32},                    # video_diffusion: self.noised_start
@@ -570,10 +570,10 @@ class SatDiT(MultiModalModule):
     def pipeline_set_prev_stage_tensor(self, input_tensor_list, extra_kwargs=None):
         """
         Process tensor from prev_pipeline_stage, and adjust to predictor input and training loss input.
-        Input: 
-            input_tensor_list: 
+        Input:
+            input_tensor_list:
                 model_output, latents, predictor_prompt, predictor_timesteps,
-            extra_kwargs (extra parameter for video_diffusion): 
+            extra_kwargs (extra parameter for video_diffusion):
                 extra_kwargs["noised_start"], extra_kwargs["c_out"], extra_kwargs["alphas_cumprod"]
         Return:
             predictor_input_list (input for self.predictor in SoraModel.forward):
@@ -586,12 +586,12 @@ class SatDiT(MultiModalModule):
         predictor_video_mask, predictor_prompt_mask = None, None
         predictor_input_list = [predictor_input_latent, predictor_timesteps, predictor_prompt, predictor_video_mask, predictor_prompt_mask]
         training_loss_input_list = [latents, None, predictor_timesteps, None, predictor_video_mask]
-    
+
         return predictor_input_list, training_loss_input_list
 
     def pipeline_set_next_stage_tensor(self, input_list, output_list, extra_kwargs=None):
         """
-        Process predictor output tensors from curr pipeline stage, and adjust to next pipeline stage 
+        Process predictor output tensors from curr pipeline stage, and adjust to next pipeline stage
         Input:
             input_list: [latents, noised_latents, timesteps, noise, video_mask]
             output_list: [predictor_output, predictor_prompt, predictor_timesteps]

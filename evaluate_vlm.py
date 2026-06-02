@@ -14,7 +14,7 @@ from mindspeed_mm.tasks.evaluation.eval_prompt import eval_model_prompt_dict
 mindspeed_args = get_mindspeed_args()
 
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
-    import mindspeed_mm.mindspore.mindspore_adaptor 
+    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def main():

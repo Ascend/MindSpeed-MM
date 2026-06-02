@@ -662,7 +662,7 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
                     "Dropped invalid example: {}".format(examples["_prompt"][i] + examples["_response"][i])
                 )
                 continue
-            
+
             tool_schema = []
             if "_tools" in examples:
                 tool_schema = examples['_tools'][i]

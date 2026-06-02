@@ -7,7 +7,7 @@ allocated = OS + CANN + Driver + GE + PTA
 
 PTA = fragmentation + Multi-stream overhead + allocated
 
-allocated = static_mem + active_mem + worksapce 
+allocated = static_mem + active_mem + worksapce
 
 In a model,
     Optimizer: param_fp32, momentum, variance.  All are FP32
@@ -35,7 +35,7 @@ s_vit = 1344
 s_llm = 496
 
 bf16 = 2
-fp32 = 4 
+fp32 = 4
 tp = 2
 dp = 4
 
@@ -54,7 +54,7 @@ max_workspace = 0.8  # embedding_backward + embedding, usually, max workspace co
 active_mem = hidden_state + max_workspace
 
 # optimizer
-m, v = fp32 * model_size, fp32 * model_size  # self.grad_data 
+m, v = fp32 * model_size, fp32 * model_size  # self.grad_data
 fp32_param = fp32 * model_size
 
 grad_data = fp32 * model_size / tp  # megatron/core/distributed/param_and_grad_buffer.py:366

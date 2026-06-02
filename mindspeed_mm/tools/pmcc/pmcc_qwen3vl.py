@@ -41,9 +41,9 @@ class Qwen3VLPMCC:
         print(res)
 
     def obfuscate_data(
-        self, 
+        self,
         src_json_path, src_img_dir,
-        obf_json_path, obf_img_dir, 
+        obf_json_path, obf_img_dir,
         data_limit=1000):
         """
         src_json_path: the origin mllm_format_json_path.
@@ -80,7 +80,7 @@ class Qwen3VLPMCC:
                 break
             if not item.get("image"):
                 continue
-            
+
             img_path = os.path.join(src_img_dir, item["image"])
             obf_img_path = os.path.join(obf_img_dir, item["image"])
 
@@ -133,10 +133,10 @@ def parse_args():
     parser.add_argument("--obf-type",
                         choices=["model", "data"],
                         help="Choice to obfuscate model or data")
-    parser.add_argument("--hf-model-path", 
+    parser.add_argument("--hf-model-path",
                         type=str, required=True,
                         help="Path to HF format checkpoint directory")
-    parser.add_argument("--obf-seed", 
+    parser.add_argument("--obf-seed",
                         type=str, required=True,
                         help="Obfuscate factor")
 

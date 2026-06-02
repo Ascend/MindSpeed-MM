@@ -77,7 +77,7 @@ def chunk_local_cumsum_scalar(
     head_first: bool = False,
     output_dtype: Optional[torch.dtype] = torch.float
 ) -> torch.Tensor:
-    
+
     B, T, H = g.shape
     if chunk_size != 2 ** (chunk_size.bit_length() - 1):
         raise ValueError(

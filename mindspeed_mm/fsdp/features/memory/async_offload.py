@@ -45,16 +45,16 @@ class GetCnt:
             # one step end
             self._block_idx = block_idx
             self._block_tensor_nums = {block_idx: 1}
-        
+
         offload_tensor_key = "{}_{}".format(self._block_idx, self._block_tensor_nums[self._block_idx] - 1)
         return offload_tensor_key, after_block
-    
+
     def get_prefetch_keys(self, block_idx, tensor_idx):
         prefetch_block_idx = max((idx for idx in self._block_tensor_nums.keys() if idx < block_idx), default=None)
-        
+
         if prefetch_block_idx is None:
             return []
-            
+
         prefetch_block_tensor_nums = self._block_tensor_nums[prefetch_block_idx]
         block_tensor_nums = self._block_tensor_nums[block_idx]
         start = tensor_idx * prefetch_block_tensor_nums // block_tensor_nums
@@ -83,7 +83,7 @@ class SwapTensor:
     # device to host
     def launch_d2h(self, stream):
         if self.stat != "device":
-            return 
+            return
 
         forward_event = create_event()
         forward_event.record()
@@ -96,11 +96,11 @@ class SwapTensor:
                     self.tensor_cpu.storage().copy_(self.tensor.storage(), non_blocking=True)
                 self.d2h_event.record()
                 self.stat = "host"
-    
+
     # synchronize d2h and resize 0
     def wait_d2h_finished(self):
         if self.stat != "host":
-            return 
+            return
         get_current_stream().wait_event(self.d2h_event)
         self.tensor.storage().resize_(0)
         self.stat = "host"
@@ -110,8 +110,8 @@ class SwapTensor:
         if self.stat != "host":
             return
         backward_event = create_event()
-        backward_event.record()        
-        
+        backward_event.record()
+
         with torch.no_grad():
             with switch_to_specified_stream(h2d_stream):
                 h2d_stream.wait_event(backward_event)
@@ -122,7 +122,7 @@ class SwapTensor:
                     self.tensor.storage().copy_(self.tensor_cpu.storage(), non_blocking=True)
                 self.h2d_event.record()
                 self.stat = "device"
-    
+
 
 class OffloadItem:
     """
@@ -133,7 +133,7 @@ class OffloadItem:
         self.act = act
         self.ref_cnt = ref_cnt
         self.event = event
-    
+
 
 class OffloadManager(metaclass=Singleton):
     """
@@ -156,7 +156,7 @@ class OffloadManager(metaclass=Singleton):
 
     def exist(self, key):
         return key in self.items
-    
+
     def assert_not_exist(self, key):
         if key not in self.items:
             raise RuntimeError(f"Key {key} already exist in items")
@@ -169,7 +169,7 @@ class OffloadManager(metaclass=Singleton):
             self.items[key].event = event
         else:
             self.items[key] = OffloadItem(act, 1, event)
-    
+
     def put_npu_tensor(self, act):
         self.npu_item.append(act)
 
@@ -192,7 +192,7 @@ class OffloadManager(metaclass=Singleton):
         if item.ref_cnt == 0:
             self.clear(key)
         return act
-    
+
     # Prefetch tensors needed for the current computation by loading them from host to device (H2D).
     def prefetch_get(self, block_idx, tensor_idx, h2d_stream, d2h_stream):
         prefetch_keys = self.getcnt.get_prefetch_keys(block_idx, tensor_idx)
@@ -201,7 +201,7 @@ class OffloadManager(metaclass=Singleton):
                 prefetch_swap_tensor = self.get(prefetch_key)
                 d2h_stream.wait_stream(h2d_stream)
                 prefetch_swap_tensor.launch_h2d(h2d_stream)
-    
+
     def clear(self, key=None):
         if key is None:
             self.items.clear()
@@ -218,17 +218,17 @@ class async_save_on_cpu(saved_tensors_hooks):
     """
     def __init__(
             self,
-            block_idx, 
+            block_idx,
             depth,
-            custom_check_fn=None, 
-            prefetch=True 
+            custom_check_fn=None,
+            prefetch=True
         ) -> None:
 
         def _pack_to_cpu(tensor):
             # skip ineligible tensors
             if not base_check_fn(tensor):
                 return tensor
-            
+
             if (custom_check_fn is not None) and (not custom_check_fn(tensor)):
                 return tensor
 
@@ -246,10 +246,10 @@ class async_save_on_cpu(saved_tensors_hooks):
             # Only offload if not in last block (to avoid unnecessary transfer before backward)
             if block_idx < depth - 1:
                 swap_tensor.launch_d2h(d2h_stream)
-            
+
             OffloadManager().put(key, swap_tensor)
             return swap_tensor
-        
+
         def _unpack_from_cpu(swap_tensor) -> torch.Tensor:
             if isinstance(swap_tensor, torch.Tensor):
                 return swap_tensor
@@ -257,15 +257,15 @@ class async_save_on_cpu(saved_tensors_hooks):
             d2h_stream = OffloadManager().swap_stream
             h2d_stream = OffloadManager().swap_stream
             swap_tensor.launch_h2d(h2d_stream)
-            
+
             # make sure d2h copy is done before into backward
             get_current_stream().wait_event(swap_tensor.h2d_event)
-            
+
             if prefetch:
                 block_idx, tensor_idx = swap_tensor.key.split("_")
                 OffloadManager().prefetch_get(int(block_idx), int(tensor_idx), h2d_stream, d2h_stream)
             return swap_tensor.tensor
-        
+
         super().__init__(_pack_to_cpu, _unpack_from_cpu)
 
 
@@ -295,11 +295,11 @@ def get_offload_modules(modules, plan):
                     if not any(item[0] == name for item in matched_submodules):
                         matched_submodules.append([name, module, offload_layers, depth])
                         offload_layers += 1
-                        
+
     # finally, update depth
     for matched_submodule in matched_submodules:
         matched_submodule[-1] = offload_layers
-        
+
     return matched_submodules
 
 

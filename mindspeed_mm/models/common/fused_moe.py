@@ -124,11 +124,11 @@ def alltoall_dispatch(
         raise ValueError(
             f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
     )
-    
+
     _expert_ids_per_ep_rank = torch.arange(num_global_experts, dtype=torch.int32, device=hidden_states.device) % num_local_experts
     global_input_tokens_local_experts_indices = torch.repeat_interleave(_expert_ids_per_ep_rank, num_global_tokens_per_local_expert.ravel())
     hidden_states, post_dispatch_unpermute_indices = torch_npu.npu_moe_token_permute(hidden_states, global_input_tokens_local_experts_indices)
-    
+
     return hidden_states, unpermute_indices, post_dispatch_unpermute_indices
 
 
@@ -148,7 +148,7 @@ def alltoall_combine(
         raise ValueError(
             f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
     )
-    
+
     hidden_states = torch_npu.npu_moe_token_unpermute(hidden_states, post_dispatch_unpermute_indices)
 
     hidden_states = all_to_all(hidden_states, ep_group, scatter_sizes=output_splits, gather_sizes=input_splits)

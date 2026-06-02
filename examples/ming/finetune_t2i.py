@@ -59,7 +59,7 @@ class BailingMMT2IModel(nn.Module):
             prompt_ids = batched_input_ids[index]
             attn_mask = batched_attn_mask[index]
             prompt_embed = self.model.get_condition_embeds_for_image_gen(
-                input_ids=prompt_ids, 
+                input_ids=prompt_ids,
                 attention_mask=attn_mask,
                 image_embeds=None,
                 position_ids=None,
@@ -211,7 +211,7 @@ class MingT2ITrainer:
 
     def train(self):
         self.train_model.train()
-        iteration = 0 
+        iteration = 0
         while iteration < self.args.max_train_steps:
             start_time = time.time()
             if iteration % self.args.checkpointing_steps == 0:
@@ -349,7 +349,7 @@ def get_parser():
     parser.add_argument(
         "--sampler_seed",
         type=int,
-        default=1234,   
+        default=1234,
         help="seed of sampler",
     )
     parser.add_argument(

@@ -697,14 +697,14 @@ class MultiHeadSparseAttentionSBH(ParallelAttention):
             if args.context_parallel_algo == 'ulysses_cp_algo':
                 cp_group = mpu.get_context_parallel_group()
                 total_frames = frames * mpu.get_context_parallel_world_size()
-                
+
             if args.context_parallel_algo == 'hybrid_cp_algo':
                 cp_group = get_context_parallel_group_for_hybrid_ulysses()
                 total_frames = frames * args.ulysses_degree_in_cp
 
         if self.sparse1d:
             out = self._reverse_sparse_1d(out, total_frames, height, width)
-            
+
         if mpu.get_context_parallel_world_size() > 1:
             if args.context_parallel_algo == 'ulysses_cp_algo':
                 cp_group = mpu.get_context_parallel_group()
@@ -1919,4 +1919,3 @@ class WhisperAttention(nn.Module):
         if input_ndim == 4:
             out = out.transpose(-1, -2).reshape(b, c, h, w)
         return out
-

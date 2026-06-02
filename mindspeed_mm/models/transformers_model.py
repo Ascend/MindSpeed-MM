@@ -49,7 +49,7 @@ class TransformersModel(MultiModalModule):
         model_cls = ModelHub.build(config, self.transformer_config)
 
         self._set_loss_cfg(args)
-        
+
         if callable(getattr(model_cls, 'overwrite_transformer_config', None)):
             self.transformer_config = model_cls.overwrite_transformer_config(self.transformer_config)
 
@@ -88,7 +88,7 @@ class TransformersModel(MultiModalModule):
             *args, **kwargs
     ) -> torch.Tensor:
         loss_dict = {}
-        
+
         # aux loss (for moe model)
         if self.router_aux_loss_coef > 0.0:
             kwargs["output_router_logits"] = True
@@ -127,7 +127,7 @@ class TransformersModel(MultiModalModule):
             loss_ctx, loss_mask = self.build_loss_ctx(labels, chunk_size=None, **kwargs)
             loss_dict["loss"] = loss_ctx(logits)
             loss_dict["loss_mask"] = loss_mask
-                
+
         if hasattr(outputs, "aux_loss") and self.router_aux_loss_coef > 0:
             loss_dict["loss"] += self.router_aux_loss_coef * outputs.aux_loss
             loss_dict["aux_loss"] = outputs.aux_loss
@@ -151,7 +151,7 @@ class TransformersModel(MultiModalModule):
 
     def calculate_chunk_size(self, batch_size: int, total_size: int) -> int:
         """
-        Calculate dynamic Chunk Size to ensure batch_size * chunk_size ≤ total size, 
+        Calculate dynamic Chunk Size to ensure batch_size * chunk_size ≤ total size,
         where chunk_size is the largest power of two not exceeding the theoretical maximum value.
 
         Args:
@@ -242,9 +242,9 @@ class TransformersModel(MultiModalModule):
         if chunk_size:
             # Split shifted labels into chunks along the sequence dimension for memory-efficient processing.
             chunk_labels = torch.split(shift_labels, chunk_size, dim=1)
-            
+
             if self.loss_type == "square_loss":
-                alpha = torch.split(alpha.view(bs, -1), chunk_size, dim=1)  
+                alpha = torch.split(alpha.view(bs, -1), chunk_size, dim=1)
 
             # Prepare keyword arguments for each chunk to be passed to the chunked loss function.
             loss_ctx_kwargs = [
@@ -267,7 +267,7 @@ class TransformersModel(MultiModalModule):
                     loss_kwargs_chunks=loss_ctx_kwargs,
                     chunk_size=chunk_size
                 )
-        
+
         else:
             def loss_ctx(logits):
                 logits = logits.view(-1, logits.shape[-1])
@@ -302,8 +302,8 @@ class TransformersModel(MultiModalModule):
                 self.loss_chunk_size = getattr(loss_cfg, "chunk_size", 4096)
             else:
                 raise NotImplementedError(f"Unrecognized loss_compute_mode: {self.loss_compute_mode}.")
-            
+
             if self.loss_type not in ["default", "per_sample_loss", "per_token_loss", "token_loss", "square_loss"]:
                 raise NotImplementedError(f"Not implemented loss_type: {self.loss_type}.")
-            
+
             self.router_aux_loss_coef = getattr(loss_cfg, "router_aux_loss_coef", 0.0)

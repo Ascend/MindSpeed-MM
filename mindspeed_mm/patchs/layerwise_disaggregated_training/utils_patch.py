@@ -75,11 +75,11 @@ def _ldt_allreduce_model_parallel(tensor, op, group=None):
             vdp_cross_edge_cloud_group = get_pipeline_model_parallel_group_for_vdp_cross_edge_cloud()
             if vdp_cross_edge_cloud_group is not None:
                 torch.distributed.all_reduce(tensor, op=op, group=vdp_cross_edge_cloud_group)
-            
+
             vdp_cross_cloud_tp_group = get_pipeline_model_parallel_group_for_vdp_cross_cloud_tp()
             if vdp_cross_cloud_tp_group is not None:
                 torch.distributed.all_reduce(tensor, op=op, group=vdp_cross_cloud_tp_group)
-            
+
             # Broadcast to all ranks in TP group
             tp_ranks = torch.distributed.get_process_group_ranks(tp_group)
             torch.distributed.broadcast(tensor, src=tp_ranks[0], group=tp_group)
@@ -110,9 +110,9 @@ def ldt_vdp_barrier_wrapper(fn):
 
         if is_vdp_enabled():
             # VDP barriers
-            if mpu.get_tensor_model_parallel_world_size() > 1: # 直接去掉，跑vtp有问题。 
+            if mpu.get_tensor_model_parallel_world_size() > 1: # 直接去掉，跑vtp有问题。
                 fn(group=mpu.get_tensor_model_parallel_group())
-            
+
             cross_cloud_tp_group = get_pipeline_model_parallel_group_for_vdp_cross_cloud_tp()
             if cross_cloud_tp_group is not None:
                 fn(group=cross_cloud_tp_group)
@@ -120,7 +120,7 @@ def ldt_vdp_barrier_wrapper(fn):
             cross_edge_cloud_group = get_pipeline_model_parallel_group_for_vdp_cross_edge_cloud()
             if cross_edge_cloud_group is not None:
                 fn(group=cross_edge_cloud_group)
-            
+
             return None
         elif is_vtp_enabled() and kwargs.get('group') is None:
             vtp_hierarchical_barrier()
@@ -212,7 +212,7 @@ def ldt_get_grad_norm_fp32(
             torch.distributed.all_reduce(
                 total_norm_cuda, op=torch.distributed.ReduceOp.MAX, group=data_parallel_group
             )
-        
+
         if not is_vdp_enabled() and is_vtp_enabled():
             # VTP-aware allreduce
             _ldt_allreduce_model_parallel(
@@ -222,7 +222,7 @@ def ldt_get_grad_norm_fp32(
             torch.distributed.all_reduce(
                 total_norm, op=torch.distributed.ReduceOp.SUM, group=grad_stats_parallel_group
             )
-        
+
         total_norm = total_norm_cuda[0].item()
 
     else:
@@ -245,7 +245,7 @@ def ldt_get_grad_norm_fp32(
             # Virtual DP scenario, edge side average grad_norm across DP domains.
             if mpu.is_pipeline_first_stage(ignore_virtual=True):
                 grad_norm = grad_norm / get_vdp_size()
-            
+
             total_norm = grad_norm**norm_type
 
         else:
@@ -255,7 +255,7 @@ def ldt_get_grad_norm_fp32(
                 # Virtual DP scenario, edge side average grad_norm across DP domains.
                 if mpu.is_pipeline_first_stage(ignore_virtual=True):
                     grad_norm = grad_norm / get_vdp_size()
-                    
+
                 total_norm += grad_norm**norm_type
 
         # Sum across all data-parallel GPUs if using FSDP and then all model-parallel GPUs.
@@ -263,7 +263,7 @@ def ldt_get_grad_norm_fp32(
             torch.distributed.all_reduce(
                 total_norm, op=torch.distributed.ReduceOp.SUM, group=data_parallel_group
             )
-        
+
         if not is_vdp_enabled() and is_vtp_enabled():
             # VTP-aware allreduce
             _ldt_allreduce_model_parallel(
@@ -289,13 +289,13 @@ class VDPAllReduceManager:
 
     def safe_all_reduce(self, tensor: torch.Tensor, group: Union[dist.ProcessGroup, List[dist.ProcessGroup]], op: dist.ReduceOp = dist.ReduceOp.SUM):
         """
-        Perform an all-reduce operation on the tensor if virtual DP is enabled. 
+        Perform an all-reduce operation on the tensor if virtual DP is enabled.
         support edge and cloud side.
         """
         if not self.enable_vdp:
             dist.all_reduce(tensor, op=op, group=group)
             return
-        
+
         if self.vdp_role == "cloud":
             self._cloud_allreduce(tensor, op=op, group=group)
         else:
@@ -303,14 +303,14 @@ class VDPAllReduceManager:
                 self._edge_allreduce(tensor, group, op)
             else:
                 dist.all_reduce(tensor, op=op, group=group)
-    
+
     def _edge_allreduce(self, tensor: torch.Tensor, groups: List[dist.ProcessGroup], op: dist.ReduceOp):
         """
         edge side perform an all-reduce operation
         """
         for group in groups:
             dist.all_reduce(tensor, op=op, group=group)
-    
+
     def _cloud_allreduce(self, tensor: torch.Tensor, group: dist.ProcessGroup, op: dist.ReduceOp):
         """
         cloud side perform an all-reduce operation
@@ -321,15 +321,15 @@ class VDPAllReduceManager:
         if world_size == 1:
             dist.all_reduce(tensor, op=op, group=group)
             return
-        
+
         all_ranks = list(range(world_size))
         all_ranks.sort()
         for curr_rank in all_ranks:
             if curr_rank == rank:
                 dist.all_reduce(tensor, op=op, group=group)
-            
+
             dist.barrier(group=group)
-    
+
     def safe_multi_allreduce(self, tensor: torch.Tensor, groups: Union[dist.ProcessGroup, List[dist.ProcessGroup]], ops: Optional[List[dist.ReduceOp]] = None):
         """
         Perform multi all-reduce operations
@@ -338,13 +338,13 @@ class VDPAllReduceManager:
             groups_list = groups
         else:
             groups_list = [groups]
-        
+
         if ops is None:
             ops = [dist.ReduceOp.SUM] * len(groups_list)
-        
+
         if len(groups_list) != len(ops):
             raise ValueError("The length of groups_list and ops must be the same.")
-        
+
         for group, op in zip(groups_list, ops):
             self.safe_all_reduce(tensor, group, op)
 
@@ -357,7 +357,7 @@ def get_vdp_manager():
         vdp_role = 'edge'
     else:
         vdp_role = 'cloud'
-    
+
     if get_layerwise_disaggregated_training():
         return VDPAllReduceManager(enable_vdp=True, vdp_role=vdp_role)
     else:

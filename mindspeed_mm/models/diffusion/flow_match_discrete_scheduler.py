@@ -58,7 +58,7 @@ class FlowMatchDiscreteScheduler:
             n_tokens: Optional[int] = None,
             **kwargs
         ):
-        
+
         self.num_train_timesteps = num_train_timesteps
         self.num_inference_timesteps = num_inference_timesteps
         self.shift = shift
@@ -87,7 +87,7 @@ class FlowMatchDiscreteScheduler:
             raise ValueError(
                 f"Solver {solver} not supported. Supported solvers: {self.supported_solver}"
             )
-    
+
     @property
     def step_index(self):
         """
@@ -236,7 +236,7 @@ class FlowMatchDiscreteScheduler:
         self._step_index += 1
 
         return prev_sample
-    
+
     def get_sigmas(
         self,
         timesteps: torch.Tensor,
@@ -255,13 +255,13 @@ class FlowMatchDiscreteScheduler:
         else:
             # add_noise is called before first denoising step to create initial latent
             step_indices = [self.begin_index] * timesteps.shape[0]
-        
+
         sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < n_dim:
             sigma = sigma.unsqueeze(-1)
-        
+
         return sigma
-    
+
     def q_sample(
         self,
         x_start: Optional[torch.Tensor],
@@ -272,10 +272,10 @@ class FlowMatchDiscreteScheduler:
         b, _, _, _, _ = x_start.shape
         if noise is None:
             noise = torch.randn_like(x_start)
-        
+
         if noise.shape != x_start.shape:
             raise ValueError("The shape of noise and x_start must be equal.")
-        
+
         indices = (compute_density_for_timestep_sampling(
             weighting_scheme=self.sample_method,
             batch_size=b,
@@ -337,7 +337,7 @@ class FlowMatchDiscreteScheduler:
 
                 with torch.no_grad():
                     noise_pred = model(latent_model_input, t_expand, **model_kwargs)
-                
+
                 if isinstance(noise_pred, tuple) or isinstance(noise_pred, list):
                     noise_pred = noise_pred[0]
 
@@ -371,7 +371,7 @@ class FlowMatchDiscreteScheduler:
                         **extra_step_kwargs
                     )
                 propress_bar.update()
-        
+
         return latents
 
     def training_losses(

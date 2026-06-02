@@ -25,43 +25,43 @@ else:
     autocast_custom_fwd = _identity_decorator
     autocast_custom_bwd = _identity_decorator
 
-def prepare_chunk_indices( 
+def prepare_chunk_indices(
     cu_seqlens: list[int],
     chunk_size: int
- ) -> list[int]: 
+ ) -> list[int]:
     """
     基于 cu_seqlens (list[int]) 生成 chunk 索引。
-    
+
     注意：原 PyTorch 版本返回的是 shape [N, 2] 的 Tensor。
     为了保持纯 Python 兼容性，这里返回 list[tuple[start_seq_idx, chunk_idx_in_seq]]。
     如果算子需要扁平化的 list[int] (如 [s0, c0, s1, c1, ...])，请在调用前展开。
-    
+
     逻辑复刻原代码：
     1. 计算每个序列的长度: lens[i] = cu_seqlens[i+1] - cu_seqlens[i]
     2. 计算每个序列需要的 chunk 数: ceil(lens[i] / chunk_size)
     3. 生成对应的 (sequence_id, chunk_id) 对
     """
     indices = []
-    
+
     # 遍历每个序列段
     for i in range(len(cu_seqlens) - 1):
         start = cu_seqlens[i]
         end = cu_seqlens[i+1]
         length = end - start
-        
+
         if length <= 0:
             continue
-            
+
         # 计算该序列需要多少个 chunk
         # 等价于 cdiv(length, chunk_size)
         num_chunks = (length + chunk_size - 1) // chunk_size
-        
+
         for chunk_id in range(num_chunks):
             # 原逻辑: indices.eq(0).cumsum(0) - 1 对应的是序列索引 i
             # 原逻辑: indices 对应的是 chunk_id
             indices.append((i))
             indices.append((chunk_id))
-            
+
     return indices
 
 def chunk_gated_delta_rule_fwd(
@@ -90,7 +90,7 @@ def chunk_gated_delta_rule_fwd(
         A=A,
         cu_seqlens=cu_seqlens,
         output_dtype=k.dtype
-    )    
+    )
 
     if cu_seqlens is not None:
         cu_seqlens1 = cu_seqlens.tolist()
@@ -201,15 +201,15 @@ def chunk_gated_delta_rule_bwd(
     )
 
     dv = torch.ops.npu.npu_chunk_bwd_dv_local(
-      q, 
-      k, 
-      do, 
-      g, 
-      g_gamma=None, 
+      q,
+      k,
+      do,
+      g,
+      g_gamma=None,
       A=A,
       cu_seqlens=cu_seqlens1,
-      chunk_indices=chunk_indices, 
-      scale=scale, 
+      chunk_indices=chunk_indices,
+      scale=scale,
       chunk_size=chunk_size
     )
 
@@ -230,17 +230,17 @@ def chunk_gated_delta_rule_bwd(
     )
 
     dq, dk, dw, dg = torch.ops.npu.npu_chunk_bwd_dqkwg(
-        q, 
-        k, 
-        v_new, 
-        g, 
-        h, 
-        do, 
-        dh, 
-        dv, 
-        chunk_size, 
-        chunk_indices=chunk_indices, 
-        scale=scale, 
+        q,
+        k,
+        v_new,
+        g,
+        h,
+        do,
+        dh,
+        dv,
+        chunk_size,
+        chunk_indices=chunk_indices,
+        scale=scale,
         cu_seqlens=cu_seqlens1
     )
     dq = dq.transpose(1, 2).contiguous()
@@ -248,13 +248,13 @@ def chunk_gated_delta_rule_bwd(
     dg = dg.transpose(1, 2).contiguous()
 
     dA = torch.ops.npu.npu_prepare_wy_repr_bwd_da(
-        k, 
-        v, 
-        beta, 
-        A, 
-        dw, 
-        dv, 
-        g, 
+        k,
+        v,
+        beta,
+        A,
+        dw,
+        dv,
+        g,
         cu_seqlens=cu_seqlens1,
         chunk_indices=chunk_indices,
         chunk_size=chunk_size
@@ -286,9 +286,9 @@ def chunk_gated_delta_rule_bwd(
         raise ValueError(
             f"dg current type is {dg.dtype} , should be float32"
         )
-    
+
     dg = chunk_local_cumsum(dg, chunk_size=chunk_size, reverse=True, cu_seqlens=cu_seqlens, head_first=False)
-        
+
     return dq, dk, dv, db, dg, dh0
 
 
@@ -475,7 +475,7 @@ def chunk_gated_delta_rule(
             )
     if scale is None:
         scale = k.shape[-1] ** -0.5
-    
+
     def l2norm(x: torch.FloatTensor, dim: int = -1, eps: float = 1e-6):
         """This function is intended to align with the l2norm implementation in the FLA library."""
         original_dtype = x.dtype

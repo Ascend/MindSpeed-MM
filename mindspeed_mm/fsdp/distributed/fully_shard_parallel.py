@@ -26,7 +26,7 @@ def pregather_fsdp_params(model: torch.nn.Module):
     Pre-gather FSDP2 parameters before forward pass.
     This ensures all ranks have parameters ready before timed computation,
     reducing straggler effects caused by uneven allGather times.
-    
+
     Args:
         model: The model with FSDP2 applied modules.
     """
@@ -42,17 +42,17 @@ def pregather_fsdp_params(model: torch.nn.Module):
 def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, fsdp_plan: FSDPPlanConfig, training_config: TrainingArguments, **kwargs):
     """
     Apply Fully Sharded Data Parallelism (FSDP) to specified modules in the model.
-    
+
     Args:
         model: The neural network model to apply FSDP to.
         fsdp_mesh: Device mesh defining the FSDP process group.
         fsdp_plan: Configuration specifying which modules to apply FSDP to and mixed precision settings.
         **kwargs: Additional keyword arguments.
-    
+
     Returns:
         The model with FSDP applied to specified modules.
     """
-    
+
     ps = get_parallel_state()
 
     if ps.fully_shard_parallel_size == 1 and not training_config.init_model_with_meta_device:
@@ -68,8 +68,8 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
         # wrap model in DDP
         dp_group = ps.get_dp_group()
         model = DDP(
-            model.to(get_device_type()), 
-            process_group=dp_group, 
+            model.to(get_device_type()),
+            process_group=dp_group,
             find_unused_parameters=True,
             device_ids=[get_torch_device()],
         )
@@ -77,7 +77,7 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
         print_rank(logger.info,
                    "DDP mode is enabled (fully_shard_parallel_size=1) instead of FSDP wrapping")
         return model
-    
+
     if hasattr(model, 'fully_shard') and callable(getattr(model, 'fully_shard')):
         execute_result = model.fully_shard(fsdp_plan=fsdp_plan)
         if execute_result:
@@ -126,14 +126,14 @@ def get_mixprecision_policy(fsdp_plan: FSDPPlanConfig):
 def _post_order_traverse(model: torch.nn.Module, parent_path: str = ""):
     """
     Perform post-order traversal of model submodules.
-    
+
     Post-order traversal ensures child modules are visited before their parents,
     which is important for FSDP to properly handle nested modules.
-    
+
     Args:
         model: The model to traverse.
         parent_path: The path to the current module in the hierarchy.
-    
+
     Yields:
         Tuple of (module_path, module) for each module in the model.
     """
@@ -165,7 +165,7 @@ def get_fsdp_hook_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig) -> 
     fsdp_hook_modules = []
     if fsdp_plan.apply_modules is None:
         return fsdp_hook_modules
-    
+
     # Traverse all modules in the model
     if fsdp_plan.hook_modules:
         for name, module in _post_order_traverse(model):
@@ -177,7 +177,7 @@ def get_fsdp_hook_modules(model: torch.nn.Module, fsdp_plan: FSDPPlanConfig) -> 
         # Ensure at least one module matches the FSDP plan
         if len(fsdp_hook_modules) == 0:
             raise RuntimeError(f'[FSDP2] No module named {fsdp_plan.hook_modules}.')
-    
+
     return fsdp_hook_modules
 
 
@@ -234,7 +234,7 @@ def _match_pattern_with_reversed_order(patterns: List[str], name: str) -> int:
     Raises:
         RuntimeError: If no matching pattern is found after checking the entire list.
     """
-    
+
     patterns_num = len(patterns)
     for reversed_order_id, pattern in enumerate(reversed(patterns)):
         if module_name_match(pattern, name):
@@ -257,7 +257,7 @@ def _get_layer_path(model: torch.nn.Module, target_layer) -> Optional[str]:
         str | None: The path of the target layer (e.g., 'layer1.conv1') if found,
                     otherwise None.
     """
-    
+
     for name, module in model.named_modules():
         if module is target_layer:
             return name
@@ -271,35 +271,35 @@ def _is_submodule(child: torch.nn.Module, parent: torch.nn.Module) -> bool:
 def _order_sub_modules_by_hierarchy(sub_modules: List[Union[torch.nn.Module, List[torch.nn.Module]]], parent_first: bool = False) -> List[Union[torch.nn.Module, List[torch.nn.Module]]]:
     """
     Reorder a list of sub-modules based on their hierarchical relationship.
-    
-    This function supports sorting elements that are either single Modules or 
-    Lists of Modules. If an element is a list, the first item (index 0) is used 
+
+    This function supports sorting elements that are either single Modules or
+    Lists of Modules. If an element is a list, the first item (index 0) is used
     for hierarchy comparison.
-    
+
     Args:
         sub_modules: A list of torch modules (or lists of modules) to be ordered.
         parent_first: A boolean flag to control sort direction.
                       - If True: Parents are placed before children (Parent -> Child).
                       - If False: Children are placed before parents (Child -> Parent).
-        
+
     Returns:
         The list of modules sorted according to the specified hierarchy.
     """
-    
+
     # Create a copy of the list to avoid modifying the original input
     ordered_sub_modules = sub_modules.copy()
     n = len(sub_modules)
-    
+
     # Bubble sort to order modules by hierarchy
     for i in range(n):
         swapped = False
         for j in range(0, n - i - 1):
             curr_mod = ordered_sub_modules[j]
             next_mod = ordered_sub_modules[j + 1]
-            
+
             curr_compare = curr_mod[0] if isinstance(curr_mod, list) else curr_mod
             next_compare = next_mod[0] if isinstance(next_mod, list) else next_mod
-            
+
             should_swap = False
 
             if parent_first:
@@ -314,11 +314,11 @@ def _order_sub_modules_by_hierarchy(sub_modules: List[Union[torch.nn.Module, Lis
                 # So we swap to move 'next' (child) to the left.
                 if _is_submodule(next_compare, curr_compare):
                     should_swap = True
-            
+
             if should_swap:
                 ordered_sub_modules[j], ordered_sub_modules[j + 1] = ordered_sub_modules[j + 1], ordered_sub_modules[j]
                 swapped = True
-        
+
         # Optimization: if no swaps occurred in a pass, the list is already sorted
         if not swapped:
             break
@@ -326,21 +326,21 @@ def _order_sub_modules_by_hierarchy(sub_modules: List[Union[torch.nn.Module, Lis
 
 
 def set_modules_to_prefetch(
-    model: torch.nn.Module, 
+    model: torch.nn.Module,
     fsdp_plan: FSDPPlanConfig,
     ep_plan: Optional[EPPlanConfig] = None
 ):
     """
     Configure forward and backward prefetching.
-    
-    This function automatically determines the module execution order based on 
+
+    This function automatically determines the module execution order based on
     `fsdp_plan.apply_modules` and sets up prefetching accordingly.
-    
-    Note: 
-    1. This interface is not very generic. For high-performance prefetching requirements, 
+
+    Note:
+    1. This interface is not very generic. For high-performance prefetching requirements,
     it is strongly recommended to implement a custom `set_modules_to_prefetch` interface in the model.
     2. If you use the automatic setup method, it is recommended to check the relevant settings in the logs.
-    
+
     e.g.
     fsdp_plan
     - apply_modules (must in order):
@@ -351,11 +351,11 @@ def set_modules_to_prefetch(
         - model.language_model.layers.{*}
         - model.language_model.layers.{*}.attn
         - lm_head
-    
+
     ep_plan
     - apply_modules:
         - model.language_model.layers.{*}.mlp.experts
-    
+
     The setting result is:
     [forward]:
     model.visual -> model.visual.blocks[0]
@@ -365,7 +365,7 @@ def set_modules_to_prefetch(
     model.language_model.embed_tokens -> [model.language_model.layers[0], model.language_model.layers[0].attn, model.language_model.layers[0].mlp.experts]
     model.language_model.layers[i].mlp.experts -> [model.language_model.layers[i+1], model.language_model.layers[i+1].attn, model.language_model.layers[i+1].mlp.experts]
     model.language_model.layers[-1].mlp.experts -> lm_head
-    
+
     [backward]:
     lm_head -> model.language_model
     model.language_model -> [model.language_model.layers[-1], model.language_model.layers[-1].attn, model.language_model.layers[-1].mlp.experts]
@@ -375,12 +375,12 @@ def set_modules_to_prefetch(
     model.visual -> model.visual_blocks[-1]
     model.visual_blocks[i] -> model.visual_blocks[i-1]
     """
-    
+
     if hasattr(model, 'set_modules_to_prefetch') and callable(getattr(model, 'set_modules_to_prefetch')):
         execute_result = model.set_modules_to_prefetch(fsdp_plan=fsdp_plan, ep_plan=ep_plan)
         if execute_result:
             return model
-    
+
     # Get all modules that need to be wrapped by FSDP based on the plan
     ignore_modules, _ = get_ignored_modules(model, fsdp_plan)
     fsdp_modules = get_fsdp_modules(model, fsdp_plan, ignore_modules)
@@ -389,8 +389,8 @@ def set_modules_to_prefetch(
     # Initialize a list of OrderedDicts to group modules by their application order
     wrapped_modules: List[Dict[torch.nn.Module]] = [OrderedDict() for _ in range(len(fsdp_plan.apply_modules))] # [hook_module/default_hook_module: List(torch.nn.Module)]
     # Get E-FSDP modules if EP plan is provided
-    efsdp_modules = get_efsdp_modules(model, ep_plan) if ep_plan else [] 
-    
+    efsdp_modules = get_efsdp_modules(model, ep_plan) if ep_plan else []
+
     order_num = 0
     # --- Phase 1: Traverse the model to group modules by their hook/order ---
     for name, sub_module in model.named_modules():
@@ -398,12 +398,12 @@ def set_modules_to_prefetch(
         if any(sub_module is target_module for target_module in hook_modules_in_order):
             # Find the reverse order index based on pattern matching
             forward_order = _match_pattern_with_reversed_order(fsdp_plan.apply_modules, name)
-            
+
             # Register the hook module if not already present
             if sub_module not in wrapped_modules[forward_order].keys():
                 wrapped_modules[forward_order][sub_module] = []
                 order_num += 1
-            
+
             # Special handling for E-FSDP (Expert Parallelism)
             # Only effective if explicit hook_module is set to avoid memory overhead
             for efsdp_module in efsdp_modules:
@@ -411,7 +411,7 @@ def set_modules_to_prefetch(
                 # Associate E-FSDP module with this hook point
                 if hook_module is sub_module:
                     wrapped_modules[forward_order][sub_module].append(efsdp_module)
-        
+
         # Handle General FSDP Modules
         if any(sub_module is target_module for target_module in fsdp_modules):
             hook_module = find_hook_module(sub_module, hook_modules_in_order)
@@ -422,7 +422,7 @@ def set_modules_to_prefetch(
                     if hook_module in wrapped_module_order_dict.keys():
                         forward_order = i
                         break
-            
+
             else:
                 # Default behavior: use pattern matching to determine order
                 hook_module = sub_module
@@ -430,17 +430,17 @@ def set_modules_to_prefetch(
                 if hook_module not in wrapped_modules[forward_order]:
                     wrapped_modules[forward_order][hook_module] = []
                     order_num += 1
-                    
+
             # Add the current module to the list under its hook
             wrapped_modules[forward_order][hook_module].append(sub_module)
-            
-            
+
+
     # --- Phase 2: Flatten the grouped modules into a strict execution order ---
     # Initialize the final ordered list
     wrapped_modules_in_order: List[List[torch.nn.Module]] = [[] for _ in range(order_num)]
     order_id = 0
     apply_module_num = len(fsdp_plan.apply_modules)
-    
+
     def _insert_child_modules(curr_order, curr_fsdp_module, order_id):
         """
         Recursively insert child modules that belong to deeper levels of the module hierarchy.
@@ -460,7 +460,7 @@ def set_modules_to_prefetch(
                             # Remove processed module to avoid duplication
                             wrapped_modules[search_order].pop(fsdp_module)
         return order_id
-    
+
     # Build the final ordered list by iterating through the grouped modules
     for apply_match_order in range(apply_module_num):
         wrapped_module_order_dict = wrapped_modules[apply_match_order]
@@ -468,7 +468,7 @@ def set_modules_to_prefetch(
             wrapped_modules_in_order[order_id] = modules
             order_id += 1
             order_id = _insert_child_modules(apply_match_order, hook_module, order_id)
-    
+
     # --- Phase 3: Configure Forward Prefetching ---
     if fsdp_plan.num_to_forward_prefetch > 0:
         for i, layer_modules in enumerate(wrapped_modules_in_order):
@@ -478,15 +478,15 @@ def set_modules_to_prefetch(
             if layers_to_prefetch:
                 # Flatten the list of modules from the prefetch layers
                 modules_to_prefetch = [module_to_prefetch for layer_modules in layers_to_prefetch for module_to_prefetch in layer_modules]
-                
+
                 # Sort to find the first FSDP module that will be executed in this group
                 layer_modules = _order_sub_modules_by_hierarchy(layer_modules)
                 # Set the prefetch modules on the first module in the current group
                 layer_modules[0].set_modules_to_forward_prefetch(modules_to_prefetch)
-                
+
                 # Logging: Print the prefetch configuration
                 print_rank(
-                    logger.info, 
+                    logger.info,
                     f"{_get_layer_path(model, layer_modules[0])} set forward prefetch: {[_get_layer_path(model, module_to_prefetch) for module_to_prefetch in modules_to_prefetch]}"
                 )
 
@@ -506,11 +506,11 @@ def set_modules_to_prefetch(
                 layer_modules = _order_sub_modules_by_hierarchy(layer_modules)
                 # Set the prefetch modules on the last module in the current group
                 layer_modules[-1].set_modules_to_backward_prefetch(modules_to_prefetch)
-                
+
                 # Logging: Print the prefetch configuration
                 print_rank(
                     logger.info,
                     f"{_get_layer_path(model, layer_modules[-1])} set backward prefetch: {[_get_layer_path(model, module_to_prefetch) for module_to_prefetch in modules_to_prefetch]}"
                 )
-                
+
     return model

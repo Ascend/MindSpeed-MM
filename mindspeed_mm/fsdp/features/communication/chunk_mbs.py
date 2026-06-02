@@ -14,14 +14,14 @@ logger = logging.getLogger(__name__)
 def get_chunkmbs_modules(modules, plan):
     """
     Retrieve modules from a model whose names match a specified plan pattern.
-    
+
     Args:
         modules (nn.Module): The parent module to search within.
         plan (str): The target module name or pattern to match.
-    
+
     Returns:
         List[Tuple[str, nn.Module]]: A list of (name, module) pairs that matched the plan.
-    
+
     Raises:
         RuntimeError: If no modules match the given plan name.
     """
@@ -30,21 +30,21 @@ def get_chunkmbs_modules(modules, plan):
         for name, module in modules.named_modules():
             if module_name_match(plan_name, name):
                 matched_modules.append((name, module))
-    
+
     if len(matched_modules) == 0:
         raise RuntimeError(f'[ChunkMBS] No module named {plan}.')
-    
+
     return matched_modules
 
 
 def apply_chunkmbs_module(chunk_mbs_modules, chunkmbs_cfg):
     """
     Apply the ChunkMBS micro-batching wrapper to a list of modules.
-    
+
     This function monkey-patches the 'forward' method of the target modules.
     It wraps the original forward pass with a decorator that splits the batch
     into smaller micro-batches.
-    
+
     Args:
         chunk_mbs_modules (List[Tuple[str, nn.Module]]): List of modules to modify.
         chunkmbs_cfg (object): Configuration object containing chunking parameters.
@@ -52,7 +52,7 @@ def apply_chunkmbs_module(chunk_mbs_modules, chunkmbs_cfg):
     for name, module in chunk_mbs_modules:
         # Log which module is being modified (only on the main rank)
         print_rank(logger.info, f'Applying chunkmbs to module: {name}')
-        
+
         # Replace the forward method with the wrapped version
         module.forward = chunk_mbs_forward(
             chunk_mbs=chunkmbs_cfg.chunk_mbs,
@@ -70,16 +70,16 @@ def _slice_batch_recursive(
 ) -> Any:
     """
     Recursively slice tensors within a nested data structure along the batch dimension.
-    
+
     This utility handles complex input/output structures (tuples, lists, dicts).
     Non-tensor types (int, str, None, etc.) are returned unchanged.
-    
+
     Args:
         data: The input data (Tensor, list, tuple, dict, or primitive).
         start (int): Start index for slicing.
         end (int): End index for slicing.
         batch_dim (int): The dimension along which to slice tensors.
-    
+
     Returns:
         Sliced data with the same structure as input.
     """
@@ -88,44 +88,44 @@ def _slice_batch_recursive(
         slices = [slice(None)] * data.ndim
         slices[batch_dim] = slice(start, end)
         return data[tuple(slices)]
-    
+
     elif isinstance(data, (tuple, list)):
         # Recursively slice each item in the sequence
         return type(data)(
             _slice_batch_recursive(item, start, end, batch_dim)
             for item in data
         )
-        
+
     elif isinstance(data, dict):
         # Recursively slice each value in the dictionary
         return {
             key: _slice_batch_recursive(value, start, end, batch_dim)
             for key, value in data.items()
         }
-        
+
     else:
         # Return non-container, non-tensor types unchanged
         return data
-    
+
 
 def chunk_mbs_forward(
-    chunk_mbs: int = 1, 
-    batch_dim: int = 0, 
-    chunk_arg_indexs: Optional[List[int]] = None, 
+    chunk_mbs: int = 1,
+    batch_dim: int = 0,
+    chunk_arg_indexs: Optional[List[int]] = None,
     chunk_kwarg_names: Optional[List[str]] = None
 ):
     """
     Decorator factory to enable chunk Micro-Batch on a forward pass.
-    
+
     This decorator splits a large input batch into smaller micro-batches.
     It processes them sequentially and concatenates the results.
-    
+
     Args:
         chunk_mbs (int): Micro-batch size (default: 1).
         batch_dim (int): Dimension of the batch in the tensor (default: 0).
         chunk_arg_indexs (List[int]): Indices of positional args to chunk.
         chunk_kwarg_names (List[str]): Names of keyword args to chunk.
-    
+
     Returns:
         Callable: A decorator that wraps a forward function.
     """
@@ -145,13 +145,13 @@ def chunk_mbs_forward(
             if full_batch_size <= chunk_mbs:
                 # If the input is smaller than the micro-batch, run normally
                 return forward_func(*args, **kwargs)
-            
+
             else:
                 # --- Process Micro-Batches ---
                 # Calculate the number of micro-batches needed
                 num_micros = (full_batch_size + chunk_mbs - 1) // chunk_mbs
                 outputs = []
-                
+
                 for i in range(num_micros):
                     start = i * chunk_mbs
                     end = min(start + chunk_mbs, full_batch_size)
@@ -165,7 +165,7 @@ def chunk_mbs_forward(
                         else:
                             # Pass non-tensor arguments unchanged
                             micro_args.append(arg)
-                    
+
                     # Prepare micro-batch for keyword arguments
                     micro_kwargs = {}
                     for kwarg_name, kwarg_value in kwargs.items():
@@ -192,5 +192,5 @@ def chunk_mbs_forward(
                     raise TypeError(f"Unsupported output type: {type(outputs[0])}")
 
         return wrapper
-    
+
     return decorator

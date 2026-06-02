@@ -27,10 +27,10 @@ from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 class LoraArguments(BaseArguments):
     """Configuration arguments for LoRA (Low-Rank Adaptation) training.
-    
+
     This class contains all parameters needed to configure LoRA adapters
     for efficient fine-tuning of large models.
-    
+
     Attributes:
         enable: Whether to enable LoRA fine-tuning.
         rank: Rank of the low-rank matrices.
@@ -91,16 +91,16 @@ class LoraArguments(BaseArguments):
         if self.enable:
             if self.rank <= 0:
                 raise ValueError(f"LoRA rank must be positive, got {self.rank}")
-            
+
             if self.alpha <= 0:
                 raise ValueError(f"LoRA alpha must be positive, got {self.alpha}")
-            
+
             if not self.target_modules:
                 raise ValueError("target_modules cannot be empty when LoRA is enabled")
-            
+
             if not 0.0 <= self.dropout < 1.0:
                 raise ValueError(f"LoRA dropout must be in [0, 1), got {self.dropout}")
-            
+
             valid_init_methods = [
                 "gaussian", "eva", "olora", "pissa", "corda", "loftq", "orthogonal"
             ]

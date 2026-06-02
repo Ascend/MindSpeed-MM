@@ -129,7 +129,7 @@ class PatchedQwenDoubleStreamAttention(QwenDoubleStreamAttention):
 
         img_q, img_k = self.norm_q(img_q), self.norm_k(img_k)
         txt_q, txt_k = self.norm_added_q(txt_q), self.norm_added_k(txt_k)
-        
+
         if image_rotary_emb is not None:
             img_freqs, txt_freqs = image_rotary_emb
             img_q = patched_apply_rotary_emb_qwen(img_q, img_freqs)
@@ -260,7 +260,7 @@ class PatchedQwenImageDiT(QwenImageDiT):
     ):
         img_shapes = [(latents.shape[0], latents.shape[2] // 2, latents.shape[3] // 2)]
         txt_seq_lens = prompt_emb_mask.sum(dim=1).tolist()
-        
+
         image = rearrange(latents, "B C (H P) (W Q) -> B (H W) (C P Q)", H=height // 16, W=width // 16, P=2, Q=2)
         image = self.img_in(image)
         text = self.txt_in(self.txt_norm(prompt_emb))
@@ -276,13 +276,13 @@ class PatchedQwenImageDiT(QwenImageDiT):
                 temb=conditioning,
                 image_rotary_emb=image_rotary_emb,
             )
-        
+
         image = self.norm_out(image, conditioning)
         image = self.proj_out(image)
-        
+
         latents = rearrange(image, "B (H W) (C P Q) -> B C (H P) (W Q)", H=height // 16, W=width // 16, P=2, Q=2)
         return image
-    
+
     @staticmethod
     def state_dict_converter():
         return QwenImageDiTStateDictConverter()
@@ -309,7 +309,7 @@ def Patched_launch_training_task(
         num_epochs = args.num_epochs
         gradient_accumulation_steps = args.gradient_accumulation_steps
         find_unused_parameters = args.find_unused_parameters
-    
+
     optimizer = torch.optim.AdamW(model.trainable_modules(), lr=learning_rate, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer)
     dataloader = torch.utils.data.DataLoader(dataset, shuffle=False, collate_fn=lambda x: x[0], num_workers=num_workers)
@@ -318,7 +318,7 @@ def Patched_launch_training_task(
         kwargs_handlers=[DistributedDataParallelKwargs(find_unused_parameters=find_unused_parameters)],
     )
     model, optimizer, dataloader, scheduler = accelerator.prepare(model, optimizer, dataloader, scheduler)
-    
+
     preprocess_cache_path = Path(f"./preprocessed_cache_{torch.distributed.get_rank()}.pkl")
 
     preprocessed_inputs = []
@@ -330,7 +330,7 @@ def Patched_launch_training_task(
 
     if hasattr(model, 'module'):
         original_model = model.module
-    else:   
+    else:
         original_model = model
     if hasattr(original_model.pipe, 'text_encoder') and original_model.pipe.text_encoder is not None:
         if accelerator.is_main_process:
@@ -342,7 +342,7 @@ def Patched_launch_training_task(
         if hasattr(model.pipe, 'text_encoder'):
             del model.pipe.text_encoder
             model.pipe.text_encoder = None
-    
+
     gc.collect()
     torch.npu.empty_cache()
     if accelerator.is_main_process:

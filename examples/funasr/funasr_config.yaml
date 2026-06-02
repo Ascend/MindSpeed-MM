@@ -5,7 +5,7 @@ parallel:
     param_dtype: bf16
     reduce_dtype: fp32
     reshard_after_forward: false
-    apply_modules: 
+    apply_modules:
       - llm
       - llm.model.embed_tokens
     pregather: true
@@ -52,7 +52,7 @@ data:
         chinese_hotwords_list: null
         english_hotwords_list: null
       use_dynamic_output_ratio: 0.0
-      
+
   dataloader_param:
     pin_memory: true
     shuffle: true
@@ -83,7 +83,7 @@ model:
     selfattention_layer_type: sanm
     freeze_layer_num: -1
     feat_permute: true
-    freeze: true  
+    freeze: true
   audio_adaptor_conf:
     downsample_rate: 1
     use_low_frame_rate: true
@@ -91,7 +91,7 @@ model:
     llm_dim: 1024
     encoder_dim: 512
     n_layer: 2
-    freeze: true  
+    freeze: true
   llm_conf:
     freeze: false
     llm_dtype: bf16
@@ -106,7 +106,7 @@ model:
     n_mels: 80
     frame_length: 25
     frame_shift: 10
-    cmvn_file: null 
+    cmvn_file: null
   detach_ctc_decoder: true
   ctc_decoder_conf:
     downsample_rate: 1
@@ -133,7 +133,7 @@ training:
   optimizer: adamw
   adam_fused: false
   lr: 2.0e-6
-  lr_warmup_ratio: 0 
+  lr_warmup_ratio: 0
   lr_decay_style: constant
   init_model_with_meta_device: false
   weight_decay: 0.0

@@ -17,8 +17,8 @@ class LPIPS(nn.Module):
         self.lin2 = NetLinLayer(self.chns[2], use_dropout=use_dropout)
         self.lin3 = NetLinLayer(self.chns[3], use_dropout=use_dropout)
         self.lin4 = NetLinLayer(self.chns[4], use_dropout=use_dropout)
-        
-        
+
+
         self.load_state_dict(torch.load(perceptual_from_pretrained, map_location=torch.device("cpu")), strict=False)
         for param in self.parameters():
             param.requires_grad = False
@@ -33,7 +33,7 @@ class LPIPS(nn.Module):
             diffs[chn_idx] = (feats0[chn_idx] - feats1[chn_idx]) ** 2
 
         res = [spatial_average(layers[chn_idx].model(diffs[chn_idx]), keepdim=True) for chn_idx in range(len(self.chns))]
-        
+
         val = res[0]
         for chn_idx in range(1, len(self.chns)):
             val += res[chn_idx]
@@ -63,7 +63,7 @@ class vgg16(torch.nn.Module):
     def __init__(self, requires_grad=False, pretrained=True):
         super(vgg16, self).__init__()
         vgg_pretrained_features = models.vgg16(pretrained=pretrained).features
-        
+
         self.slice1 = self._build_slice(vgg_pretrained_features, 0, 4)
         self.slice2 = self._build_slice(vgg_pretrained_features, 4, 9)
         self.slice3 = self._build_slice(vgg_pretrained_features, 9, 16)

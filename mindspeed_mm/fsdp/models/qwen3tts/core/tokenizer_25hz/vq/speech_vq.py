@@ -53,7 +53,7 @@ class MelSpectrogramFeatures(nn.Module):
         sampling_rate (int): The sampling rate of the audio data (in Hz). Default is 16000.
         sampling_rate_org (int, optional): The original sampling rate of the audio data before any resampling (in Hz), if applicable. Default is None.
         padding (str): The padding mode for the input signal. 'center' pads the signal symmetrically around its center. Default is 'center'.
- 
+
     Returns:
         torch.Tensor: Mel spectrogram.
     """

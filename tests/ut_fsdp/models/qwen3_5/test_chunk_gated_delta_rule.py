@@ -14,9 +14,9 @@ from tests.ut_fsdp.utils.utils import judge_expression
 def varlen_to_nonvarlen(cu_seqlens, *inputs):
     B = len(cu_seqlens) - 1  # batch size
     max_len = max(cu_seqlens[i + 1] - cu_seqlens[i] for i in range(B))  # 最长序列长度
-    
+
     nonvarlens = [torch.zeros(B, max_len, *v.shape[2:], device=v.device, dtype=v.dtype) for v in inputs]
-    
+
     for i in range(B):
         start = cu_seqlens[i]
         end = cu_seqlens[i + 1]
@@ -24,7 +24,7 @@ def varlen_to_nonvarlen(cu_seqlens, *inputs):
         if seq_len > 0:
             for nonvarlen, var in zip(nonvarlens, inputs):
                 nonvarlen[i, :seq_len] = var[0, start:end]
-    
+
     return nonvarlens
 
 
@@ -245,4 +245,3 @@ class TestChunkGatedDeltaRule:
         judge_expression(backward_close)
         backward_close = torch.allclose(g_g.float(), g_ref.grad.float(), rtol=1e-2, atol=1e-2)
         judge_expression(backward_close)
-

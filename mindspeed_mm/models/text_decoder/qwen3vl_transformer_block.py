@@ -32,7 +32,7 @@ class Qwen3vlTransformerBlock(TransformerBlock):
         post_process: bool = True,
     ):
         super().__init__(config=config, spec=spec, post_layer_norm=post_layer_norm, pre_process=pre_process, post_process=post_process)
-    
+
     def _deepstack_process(
         self, hidden_states: torch.Tensor, visual_pos_masks: torch.Tensor, visual_embeds: torch.Tensor
     ):
@@ -41,7 +41,7 @@ class Qwen3vlTransformerBlock(TransformerBlock):
         local_this = hidden_states[visual_pos_masks, :].clone() + visual_embeds
         hidden_states[visual_pos_masks, :] = local_this
         return hidden_states
-    
+
     def forward(self,
         hidden_states: Union[Tensor, WrappedTensor],
         attention_mask: Optional[Tensor],
@@ -109,7 +109,7 @@ class Qwen3vlTransformerBlock(TransformerBlock):
                         if use_inner_fp8_context
                         else nullcontext()
                     )
-                    with self.offload_context, inner_fp8_context: 
+                    with self.offload_context, inner_fp8_context:
                         hidden_states, context = layer(
                             hidden_states=hidden_states,
                             attention_mask=attention_mask,
@@ -245,11 +245,11 @@ class Qwen3vlTransformerBlock(TransformerBlock):
                     hidden_states, context = custom(layer_idx, layer_idx + 1)(
                         hidden_states, attention_mask, context, context_mask, rotary_pos_emb
                     )
-                
+
                 # process deepstack visual embeds feature for qwen3vl
                 if deepstack_visual_embeds is not None and layer_idx in range(len(deepstack_visual_embeds)):
                     hidden_states += deepstack_visual_embeds[layer_idx]
-                
+
         else:
             raise ValueError("Invalid activation recompute method.")
 

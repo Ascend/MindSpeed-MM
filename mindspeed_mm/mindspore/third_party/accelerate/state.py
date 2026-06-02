@@ -45,4 +45,4 @@ def PartialState_set_device(self):
             torch.xpu.set_device(self.device)
         elif device == "mlu":
             torch.mlu.set_device(self.device)
-        # Avoid calling set_device() after initialization when using NPU or CUDA devices, as it may cause runtime errors. 
+        # Avoid calling set_device() after initialization when using NPU or CUDA devices, as it may cause runtime errors.

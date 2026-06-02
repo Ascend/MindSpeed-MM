@@ -63,9 +63,9 @@ def gather_seq_scatter_heads(
 
 
 def gather_heads_scatter_seq(
-    input_tensor: Tensor, 
-    head_dim: int, 
-    seq_dim: int, 
+    input_tensor: Tensor,
+    head_dim: int,
+    seq_dim: int,
     gather_size: int,
     group: ProcessGroup = None
 ) -> Tensor:
@@ -106,7 +106,7 @@ def gather_visual_seqs_with_cp(
             grad_scale="up",
             gather_sizes=gather_sizes
         )
-        
+
     elif megatron_args.context_parallel_algo == "megatron_cp_algo":
         all_split_sizes_tensor = cal_split_sizes_multi(get_seq_len("per_visual"), mpu.get_context_parallel_world_size())
         x = gather_sequence_chunks_to_packed_tensor(
@@ -136,7 +136,7 @@ def gather_visual_seqs_with_cp(
         )
     else:
         raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {megatron_args.context_parallel_algo}")
-    
+
     return x
 
 
@@ -194,7 +194,7 @@ def split_visual_seqs_with_cp(
         )  # [s1+s2+s3+..., h]
     else:
         raise NotImplementedError(f"Only support `ulysses_cp_algo`,`megatron_cp_algo`,`hybrid_cp_algo`, but got {args.context_parallel_algo}")
-    
+
     return x
 
 
@@ -223,5 +223,5 @@ def split_audio_seqs_with_cp(
         )# [s1+s2+s3+..., h]
     else:
         raise NotImplementedError(f"Only support `ulysses_cp_algo`, but got {args.context_parallel_algo}")
-    
+
     return x

@@ -160,7 +160,7 @@ class TestValidateLoraConfig:
                 dropout=0.05,
                 init_lora_weights=method,
             )
-        
+
         # Test pissa_niter_[number] format
         pissa_niter_values = ["pissa_niter_0", "pissa_niter_5", "pissa_niter_10", "pissa_niter_100"]
         for value in pissa_niter_values:
@@ -171,7 +171,7 @@ class TestValidateLoraConfig:
                 dropout=0.05,
                 init_lora_weights=value,
             )
-        
+
         # Test bool values
         validate_lora_config(
             rank=8,

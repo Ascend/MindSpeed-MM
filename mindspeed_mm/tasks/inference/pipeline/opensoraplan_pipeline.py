@@ -116,9 +116,9 @@ class OpenSoraPlanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
                 clean_caption=clean_caption,
                 use_prompt_preprocess=use_prompt_preprocess
             )
-        
+
         # multi text encoder
-        else:        
+        else:
             prompt_embeds, prompt_embeds_attention_mask, negative_prompt_embeds, negative_prompt_attention_mask = [], [], [], []
             for tokenizer, text_encoder in zip(self.tokenizer, self.text_encoder):
                 prompt_embed, attention_mask, negative_prompt_embed, negative_attention_mask = self.encode_texts(
@@ -140,7 +140,7 @@ class OpenSoraPlanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         if do_classifier_free_guidance:
             if isinstance(prompt_embeds, list):
                 prompt_embeds = [
-                    torch.cat([negative_prompt_embed, prompt_embed], dim=0) 
+                    torch.cat([negative_prompt_embed, prompt_embed], dim=0)
                     for negative_prompt_embed, prompt_embed in zip(negative_prompt_embeds, prompt_embeds)
                 ]
                 prompt_embeds_attention_mask = [
@@ -180,10 +180,10 @@ class OpenSoraPlanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             math.ceil(int(self.width) / self.vae.vae_scale_factor[2]),
         )
         latents = self.prepare_latents(
-            shape, 
-            generator=generator, 
-            device=device, 
-            dtype=prompt_embeds[0].dtype 
+            shape,
+            generator=generator,
+            device=device,
+            dtype=prompt_embeds[0].dtype
             if isinstance(prompt_embeds, list) else prompt_embeds.dtype,
             latents=latents
         )
@@ -245,7 +245,7 @@ class OpenSoraPlanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             high quality, high aesthetic, {}
             """
             negative_template = """
-            nsfw, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, 
+            nsfw, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality,
             low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry.
             """
         elif self.version == "v1.5":
@@ -254,8 +254,8 @@ class OpenSoraPlanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             """
 
             negative_template = """
-            Worst quality, Normal quality, Low quality, Low res, Blurry, Jpeg artifacts, Grainy, watermark, banner, 
-            Cropped, Out of frame, Out of focus, Bad anatomy, Bad proportions, Deformed, Disconnected limbs, Disfigured, 
+            Worst quality, Normal quality, Low quality, Low res, Blurry, Jpeg artifacts, Grainy, watermark, banner,
+            Cropped, Out of frame, Out of focus, Bad anatomy, Bad proportions, Deformed, Disconnected limbs, Disfigured,
             username, error, sketch, duplicate, ugly, monochrome, horror, geometry, mutation, disgusting, overexposed, underexposed.
             """
         else:

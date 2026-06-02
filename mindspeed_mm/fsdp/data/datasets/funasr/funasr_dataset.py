@@ -348,7 +348,7 @@ class DataloaderMapStyle:
     def build_iter(self, epoch=0, data_split_i=0, start_step=0, **kwargs):
         # Check if we have a cached dataloader that we can reuse
         cache_key = f"cache_{data_split_i}_{start_step}"
-        
+
         # For data_split_num = 1 and start_step = 0, we can reuse cached dataloaders
         if self.data_split_num == 1 and start_step == 0:
             if hasattr(self, '_cached_dataloaders') and cache_key in self._cached_dataloaders:
@@ -388,12 +388,12 @@ class DataloaderMapStyle:
         # Set epoch on batch samplers for proper shuffling
         batch_sampler["batch_sampler"].set_epoch(epoch)
         batch_sampler_val["batch_sampler"].set_epoch(epoch)
-        
+
         # Add persistent_workers to dataloader arguments
         if "num_workers" in batch_sampler and batch_sampler["num_workers"] > 0:
             batch_sampler.setdefault("persistent_workers", True)
             batch_sampler_val.setdefault("persistent_workers", True)
-        
+
         # Create dataloader instances
         dataloader_tr = torch.utils.data.DataLoader(
             self.dataset_tr, collate_fn=self.dataset_tr.collator, **batch_sampler
@@ -401,7 +401,7 @@ class DataloaderMapStyle:
         dataloader_val = torch.utils.data.DataLoader(
             self.dataset_val, collate_fn=self.dataset_val.collator, **batch_sampler_val
         )
-        
+
         # Cache dataloaders when data_split_num = 1 and start_step = 0
         if self.data_split_num == 1 and start_step == 0:
             if not hasattr(self, '_cached_dataloaders'):
@@ -425,7 +425,7 @@ def build_funasr_dataloader_factory(data_args, frontend, tokenizer):
         'frontend': frontend,
         'tokenizer': tokenizer,
     }
-    
+
     dl_class = tables.dataloader_classes.get(
         dataset_conf.get('dataloader', 'DataloaderMapStyle')
     )

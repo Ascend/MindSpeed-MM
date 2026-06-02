@@ -117,7 +117,7 @@ class VideoDitSparse(MultiModalModule):
             # set label "sequence_parallel", for all_reduce the grad
             for param in self.adaln_single.parameters():
                 setattr(param, "sequence_parallel", self.sequence_parallel)
-            
+
         # Rotary positional embeddings
         self.rope = RoPE3DSORA(
             head_dim=head_dim,
@@ -199,7 +199,7 @@ class VideoDitSparse(MultiModalModule):
             video_mask_sparse_1d = None
         if not video_mask_sparse_1d_group.any():
             video_mask_sparse_1d_group = None
-        
+
         args = get_args()
         if args.context_parallel_algo == 'megatron_cp_algo' or args.context_parallel_algo == 'hybrid_cp_algo':
             if args.context_parallel_algo == 'megatron_cp_algo':
@@ -208,7 +208,7 @@ class VideoDitSparse(MultiModalModule):
             else:
                 r_size = get_context_parallel_for_hybrid_ring_world_size()
                 r_rank = get_context_parallel_for_hybrid_ring_rank()
-            
+
             if prompt_mask_sparse_1d is not None:
                 prompt_mask_sparse_1d_row = prompt_mask_sparse_1d.chunk(r_size, dim=2)[r_rank].contiguous()
                 prompt_mask_sparse_1d = [m.contiguous() for m in prompt_mask_sparse_1d_row.chunk(r_size, dim=3)]
@@ -681,10 +681,10 @@ class VideoDiTSparseBlock(nn.Module):
         self.scale_shift_table = nn.Parameter(torch.randn(6, dim) / dim ** 0.5)
         # set label "sequence_parallel", for all_reduce the grad
         setattr(self.scale_shift_table, "sequence_parallel", self.sequence_parallel)
-    
+
     def _function_before_self_core_attention(
-            self, 
-            latents, 
+            self,
+            latents,
             timestep,
             frames=None,
             height=None,
@@ -701,7 +701,7 @@ class VideoDiTSparseBlock(nn.Module):
         query, key, value = self.self_atten.function_before_core_attention(
             norm_latents,
             frames=frames,
-            height=height, 
+            height=height,
             width=width,
             rotary_pos_emb=rotary_pos_emb
         )
@@ -751,7 +751,7 @@ class VideoDiTSparseBlock(nn.Module):
         ff_output = self.ff(norm_latents)
         ff_output = gate_mlp * ff_output
         latents = ff_output + latents
-    
+
         return latents
 
     def forward(
@@ -822,7 +822,7 @@ class VideoDiTSparseBlock(nn.Module):
                 scale_mlp,
                 gate_mlp,
             )
-        
+
         return latents
 
 

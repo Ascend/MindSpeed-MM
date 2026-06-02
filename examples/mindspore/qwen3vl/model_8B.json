@@ -29,7 +29,7 @@
         },
         "rope_theta": 5000000,
         "vocab_size": 151936,
-        "pipeline_num_layers": [6, 10, 10, 10],   
+        "pipeline_num_layers": [6, 10, 10, 10],
         "seq_length": 1024,
         "untie_embeddings_and_output_weights": true,
         "disable_bias_linear": true,
@@ -109,7 +109,7 @@
             "use_postshuffle_norm": false
         }
     },
-    
+
     "text_encoder": null,
     "video_encoder": null
 }

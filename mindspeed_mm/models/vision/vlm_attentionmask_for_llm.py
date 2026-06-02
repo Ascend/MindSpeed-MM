@@ -66,7 +66,7 @@ def qwen2vl_get_rope_index(
     args = get_args()
     spatial_merge_size = getattr(args.mm.model.image_encoder.vision_encoder, 'spatial_merge_size', 2)
     # image_token_id is fixed during data generation, used to determine the number of images from input id.
-    # video_token_id is fixed during data generation, used to determine the number of videos from input id, 
+    # video_token_id is fixed during data generation, used to determine the number of videos from input id,
     # 151655 corresponds to "<|image_pad|>" in raw data, and 151656 corresponds to "<|video_pad|>" in raw data.
     # The fixed logic for data generation is in the function _register_template.
     image_token_id = 151655
@@ -914,8 +914,8 @@ def qwen2_5_omni_position(config,
                      use_audio_in_video=False,
                      **kwargs):
     position_ids, rope_deltas = qwen2_5_omni_get_rope_index(config, input_ids, image_grid_thw, video_grid_thw,
-                                     kwargs.get('video_second_per_grid', None), attention_mask=attention_mask, 
-                                     use_audio_in_video=use_audio_in_video, 
+                                     kwargs.get('video_second_per_grid', None), attention_mask=attention_mask,
+                                     use_audio_in_video=use_audio_in_video,
                                      audio_seqlens=torch.sum(kwargs.get('feature_attention_mask'), dim=1))
     return position_ids, rope_deltas
 
@@ -981,7 +981,7 @@ def _build_attentionmask_positionid_qwenllm(config, input_ids, attention_mask, i
                     delta = delta.repeat_interleave(batch_size // delta.shape[0], dim=0)
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
-    
+
     # if context parallel is enabled, we do not need to build attention mask, it is already handled by the context parallel algorithm
     args = get_args()
     if args.context_parallel_size > 1 and args.context_parallel_algo == "megatron_cp_algo":

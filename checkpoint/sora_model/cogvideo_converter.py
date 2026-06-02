@@ -5,7 +5,7 @@ from checkpoint.sora_model.sora_model_converter import SoraModelConverter
 from checkpoint.sora_model.convert_utils.cfg import ConvertConfig
 from checkpoint.sora_model.convert_utils.save_load_utils import (
     load_pt,
-    load_from_hf, 
+    load_from_hf,
     save_as_mm
 )
 from checkpoint.sora_model.convert_utils.utils import check_method_support
@@ -18,7 +18,7 @@ class LayerIndexConverter:
             idx = int(name.split('.')[1])
             return idx
         return None
-        
+
     @staticmethod
     def convert_layer_index(name, new_layer_index):
         if name.startswith("videodit_blocks"):
@@ -56,7 +56,7 @@ class CogVideoConverter(SoraModelConverter):
         "model.diffusion_model.mixins.final_layer.adaLN_modulation.1.weight": "adaLN_modulation.1.weight",
         "model.diffusion_model.mixins.final_layer.adaLN_modulation.1.bias": "adaLN_modulation.1.bias"
     }
-    
+
     hf_to_mm_convert_mapping = {
         "time_embedding.linear_1.bias": "time_embed.time_embed.0.bias",
         "time_embedding.linear_1.weight": "time_embed.time_embed.0.weight",
@@ -92,7 +92,7 @@ class CogVideoConverter(SoraModelConverter):
         "adaLN_modulation.1.weight", "adaLN_modulation.1.bias"
     ] # post_process layers for pp
 
-    layer_index_converter = LayerIndexConverter() 
+    layer_index_converter = LayerIndexConverter()
 
     tp_split_mapping = {
         "column_parallel_tp": ["adaLN_modulation.1.weight", "adaLN_modulation.1.bias"],
@@ -170,7 +170,7 @@ class CogVideoConverter(SoraModelConverter):
                 f"videodit_blocks.{i}.self_atten.proj_qkv.weight",
                 f"videodit_blocks.{i}.self_atten.proj_qkv.bias"
             ]
-        
+
         if not remove_pos_emb:
             self.pre_process_weight_names += ["pos_embed.freqs_cos", "pos_embed.freqs_sin"]
             if version == "i2v":

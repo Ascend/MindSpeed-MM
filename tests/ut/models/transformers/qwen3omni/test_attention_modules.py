@@ -400,8 +400,8 @@ def test_vision_attention_fa2_mode_tnd_layout(setup_vision_attention, vision_inp
 """
 Qwen3Omni Thinker Text Attention Module Test Suite
 
-Validates the consistency between the mindspeed_mm implementation of the Qwen3Omni thinker text attention module 
-and the original transformers implementation, ensuring that the mathematical behavior of the model remains 
+Validates the consistency between the mindspeed_mm implementation of the Qwen3Omni thinker text attention module
+and the original transformers implementation, ensuring that the mathematical behavior of the model remains
 unchanged after optimization and refactoring.
 
 Includes three attention implementation modes:
@@ -426,8 +426,8 @@ def text_inputs(text_config):
     set_seq_len("total", hidden_states.shape[1])
 
     return {
-        "hidden_states": hidden_states, 
-        "position_embeddings": position_embeddings, 
+        "hidden_states": hidden_states,
+        "position_embeddings": position_embeddings,
         "attention_mask": attention_mask,
         "cu_seqlens": cu_seqlens,
         "indices": indices

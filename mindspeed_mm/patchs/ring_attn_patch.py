@@ -38,7 +38,7 @@ def vlm_cp_compute_mask(cls, actual_seq_qlen, actual_seq_kvlen, q_block_id, kv_b
     from bisect import bisect_right
     from mindspeed.utils import batch_index
 
-    if actual_seq_qlen:  
+    if actual_seq_qlen:
         seq_len = actual_seq_qlen[-1] // AttentionWithCp.batch_size
         actual_seq_qlen = batch_index(actual_seq_qlen, seq_len)
         actual_seq_kvlen = batch_index(actual_seq_kvlen, seq_len)
@@ -57,11 +57,11 @@ def vlm_cp_compute_mask(cls, actual_seq_qlen, actual_seq_kvlen, q_block_id, kv_b
         other_tile = other_ids.unsqueeze(dim=1) # B 1 S
 
         mask = this_tile == other_tile # B S S
-        
+
         return torch.logical_not(mask).unsqueeze(dim=1).npu()  # B 1 S S
     else:
-        return attn_mask[kv_block_id] if isinstance(attn_mask, list) else None 
-        
+        return attn_mask[kv_block_id] if isinstance(attn_mask, list) else None
+
 
 def vlm_cp_dot_product_attention_forward(
     self,
@@ -88,7 +88,7 @@ def vlm_cp_dot_product_attention_forward(
     is_ulysses_algo = getattr(self.config, 'context_parallel_algo', None) in ['ulysses_cp_algo', 'hybrid_cp_algo']
     if packed_seq_params is not None and self.config.attention_mask_type == 'causal':
         attention_mask = torch.triu(
-                        torch.ones((2048, 2048), 
+                        torch.ones((2048, 2048),
                         device='npu', dtype=torch.bool), diagonal=1)
         sparse_mode = 2
     ensure_valid(attention_bias is None, 'Attention bias is not supported for DotProductAttention.')
@@ -260,7 +260,7 @@ mindspeed_args = get_mindspeed_args()
 if getattr(mindspeed_args, 'context_parallel_algo') in ['megatron_cp_algo', 'hybrid_cp_algo'] and \
     int(getattr(mindspeed_args, 'context_parallel_size', 1)) > 1:
 
-    pm.register_patch('mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel.AttentionWithCp.compute_mask', 
+    pm.register_patch('mindspeed.core.context_parallel.ring_context_parallel.ring_context_parallel.AttentionWithCp.compute_mask',
                     vlm_cp_compute_mask, force_patch=True)
     pm.register_patch('mindspeed.core.context_parallel.dot_product_attention.CPDotProductAttentionImpl.forward',
                         vlm_cp_dot_product_attention_forward, force_patch=True)

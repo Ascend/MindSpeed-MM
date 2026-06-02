@@ -32,7 +32,7 @@ class ModelHub:
             model_cls = model_register.get(model_id)
         else:
             raise ValueError("`model_id` must be provided in model_args when using custom models.")
-        
+
         if model_cls is None:
             raise ValueError(f"model_id '{model_id}' is not registered in MODEL_MAPPINGS. ")
 
@@ -48,7 +48,7 @@ class ModelHub:
             model = model_cls.from_pretrained(model_args).float()
 
         return model
-    
+
     @staticmethod
     def _build_transformers_model(transformer_config: PretrainedConfig, model_args: ModelArguments,
         feature_args: FeatureArguments, training_args: TrainingArguments) -> PreTrainedModel:

@@ -30,7 +30,7 @@ def to_empty_if_needed(model, device: torch.device | str | int | None, recurse: 
           - Parameters:               Meta => CPU
           - Buffers:                  CUDA => CUDA
           - Tensors(eg. inv_freq):    CPU => CUDA
-        
+
         Scenario 2: Meta initialization only (no CPU offload)
         -------------------------------------------------------------------------
           - Parameters:               Meta => CUDA
@@ -38,7 +38,7 @@ def to_empty_if_needed(model, device: torch.device | str | int | None, recurse: 
           - Tensors(eg. inv_freq):    CPU => CUDA
     """
     device = torch.empty((), device=device).device
-        
+
     def _replace_tensor(t):
         # Case 1: This is a trainable parameter (subclass of torch.Tensor with requires_grad)
         if isinstance(t, torch.nn.Parameter):# meta or cpu
@@ -130,10 +130,10 @@ def configure_hsdp_gradient_sync(model, is_last_step: bool):
     required once before `optimizer.step`.
 
     This function optimizes communication overhead by controlling:
-    1. set_requires_all_reduce: Sets if the module should all-reduce gradients. 
+    1. set_requires_all_reduce: Sets if the module should all-reduce gradients.
         This can be used to implement gradient accumulation with only reduce-scatter but not all-reduce for HSDP.
-    2. set_is_last_backward: Sets whether the next backward is the last one. On the last backward, 
-        FSDP waits on pending gradient reduction and clears internal data data structures for backward prefetching. 
+    2. set_is_last_backward: Sets whether the next backward is the last one. On the last backward,
+        FSDP waits on pending gradient reduction and clears internal data data structures for backward prefetching.
         This can be useful for microbatching.
 
     Args:

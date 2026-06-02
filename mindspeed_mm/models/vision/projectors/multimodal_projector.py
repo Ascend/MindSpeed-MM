@@ -23,7 +23,7 @@ class MultimodalProjector(MultiModalModule):
         submodules (MLPSubmodules): Specifies MLP submodules for mlp type projector.
         projector_type (str): Projector type.
         input_size (int): Input size from feature encoder.
-    """ 
+    """
     def __init__(
         self,
         config: TransformerConfig,
@@ -57,10 +57,10 @@ class MultimodalProjector(MultiModalModule):
         elif self.projector_type == "lnmlp":
             self.ffn_hidden_size = config.ffn_hidden_size
             self.layernorm = TENorm(
-                config=config, 
-                hidden_size=self.ffn_hidden_size if use_postshuffle_norm else config.input_size, 
+                config=config,
+                hidden_size=self.ffn_hidden_size if use_postshuffle_norm else config.input_size,
                 eps=config.layernorm_epsilon)
-            
+
             self.encoder = MLP(
                 config=config,
                 submodules=submodules,
@@ -74,7 +74,7 @@ class MultimodalProjector(MultiModalModule):
             if self.use_postshuffle_norm:
                 hidden_states = hidden_states.view(-1, self.ffn_hidden_size)
             hidden_states = self.layernorm(hidden_states).view(-1, self.ffn_hidden_size)
-           
+
         encoder_output, encoder_output_bias = self.encoder(hidden_states)
 
         if encoder_output_bias is not None:

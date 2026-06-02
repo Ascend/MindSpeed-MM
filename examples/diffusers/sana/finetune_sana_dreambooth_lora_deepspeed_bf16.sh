@@ -1,6 +1,6 @@
 Network="Sana"
 
-model_name="Efficient-Large-Model/Sana_1600M_4Kpx_BF16_diffusers" 
+model_name="Efficient-Large-Model/Sana_1600M_4Kpx_BF16_diffusers"
 dataset_name="pokemon-blip-captions"
 batch_size=8
 num_processors=8      # 仅用于FPS计算

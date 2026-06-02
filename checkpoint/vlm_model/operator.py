@@ -577,7 +577,7 @@ class GLUSplit(BaseSplit):
             torch.cat(all_gates, dim=0),
             torch.cat(all_ups, dim=0)
         ], dim=0)
-    
+
 
 class ExpertSplitOp(Operator):
     """moe experts split op"""

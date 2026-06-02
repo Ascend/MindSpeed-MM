@@ -11,7 +11,7 @@
     "pipeline_config": {
         "input_size": [81, 480, 832],
         "cpu_offload": true
-    },    
+    },
     "ae": {
         "model_id": "wan_video_vae",
         "from_pretrained": "./weights/Wan-AI/Wan2.1-I2V-14B-480P-Diffusers/vae/",

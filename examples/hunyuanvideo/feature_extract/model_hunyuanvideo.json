@@ -18,9 +18,9 @@
             "DownEncoderBlockCausal3D"
         ],
         "up_block_types": [
-            "UpDecoderBlockCausal3D", 
             "UpDecoderBlockCausal3D",
-            "UpDecoderBlockCausal3D", 
+            "UpDecoderBlockCausal3D",
+            "UpDecoderBlockCausal3D",
             "UpDecoderBlockCausal3D"
         ],
         "scaling_factor": 0.476986,
@@ -37,7 +37,7 @@
             "hub_backend": "hf",
             "use_attention_mask": true,
             "hidden_state_skip_layer": 2,
-            "output_key": "hidden_states"            
+            "output_key": "hidden_states"
         },
         {
             "model_id": "CLIP",

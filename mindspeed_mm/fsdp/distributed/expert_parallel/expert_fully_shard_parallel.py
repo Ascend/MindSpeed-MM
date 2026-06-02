@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, ep_plan: EPPlanConfig, fsdp_plan: FSDPPlanConfig) -> torch.nn.Module:
     efsdp_modules = get_efsdp_modules(model, ep_plan)
     efsdp_hook_modules = get_fsdp_hook_modules(model, fsdp_plan)
-    
+
     # Configure mixed precision if enabled
     cpu_offload = None
     if fsdp_plan.cpu_offload:
@@ -85,4 +85,3 @@ def apply_hccl_premul_sum_patch():
     torch.distributed.reduce_scatter_tensor = hccl_premul_sum_wrapper(
         torch.distributed.reduce_scatter_tensor, "output"
     )
-

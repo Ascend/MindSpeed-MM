@@ -14,7 +14,7 @@ from torchvision.transforms import InterpolationMode
 from megatron.core import mpu
 from mindspeed_mm.data.data_utils.data_transform import (
     calculate_centered_alignment,
-    TemporalRandomCrop, 
+    TemporalRandomCrop,
     maxhwresize
 )
 from mindspeed_mm.data.data_utils.transform_pipeline import get_transforms
@@ -37,7 +37,7 @@ class VideoProcessor:
     def create(video_processor_type=None, **kwargs) -> "AbstractVideoProcessor":
         """
         Initialize with specified video processor type
-        
+
         Args:
             video_processor_type: Registered video backend type (e.g., 'opensora_video_processor', 'cogvideox_video_processor', 'opensoraplan_video_processor')
         """
@@ -47,13 +47,13 @@ class VideoProcessor:
 
 class AbstractVideoProcessor(ABC):
     """Base class for video processing pipelines
-    
+
     Attributes:
         num_frames (int): Number of frames to sample from video
         frame_interval (int): Interval between sampled frames
         train_pipeline (callable): Data augmentation pipeline
     """
-    
+
     def __init__(
         self,
         num_frames: int = 16,
@@ -65,32 +65,32 @@ class AbstractVideoProcessor(ABC):
         self.num_frames = num_frames
         self.frame_interval = frame_interval
         self.train_pipeline = train_pipeline
-        
+
         # Shared components
         self.video_transforms = None  # Will be initialized per video
         self.temporal_sample = TemporalRandomCrop(num_frames * frame_interval)
 
-    
+
     @abstractmethod
     def __call__(self, vframes, **kwargs):
         """Process video frames.
-        
+
         Args:
             vframes: Input video frames
             kwargs: Additional processing parameters
-            
+
         Returns:
             Processed video data
         """
         ...
-    
+
     @abstractmethod
     def select_valid_data(self, data_samples):
         """Filter valid data samples from input
-        
+
         Args:
             data_samples: Input data samples to be filtered
-            
+
         Returns:
             Filtered data samples. Default implementation returns original input.
         """
@@ -100,16 +100,16 @@ class AbstractVideoProcessor(ABC):
 @Registry.register
 class OpensoraVideoProcessor(AbstractVideoProcessor):
     """Opensora video processing pipeline with temporal sampling and spatial transforms"""
-    
+
     def __call__(self, vframes, num_frames=None, frame_interval=None, image_size=None, **kwargs):
         """Process video frames through standard pipeline
-        
+
         Args:
             vframes: Input video frames container
             num_frames: Override default number of frames
             frame_interval: Override default frame interval
             image_size: Target output dimensions
-            
+
         Returns:
             torch.Tensor: Processed tensor in CTHW format
         """
@@ -125,7 +125,7 @@ class OpensoraVideoProcessor(AbstractVideoProcessor):
         if num_frames:  # Dynamic parameter adjustment
             self.num_frames = num_frames
             self.temporal_sample = TemporalRandomCrop(num_frames * (frame_interval or self.frame_interval))
-            
+
         # Generate sampling window
         start, end = self.temporal_sample(total_frames)
         if end - start < self.num_frames:
@@ -134,14 +134,14 @@ class OpensoraVideoProcessor(AbstractVideoProcessor):
         # Linear sampling within window
         indices = np.linspace(start, end - 1, self.num_frames, dtype=int)
         video = vframes.get_batch(indices)  # TCHW format
-        
+
         # Apply transforms and permute dimensions
         video = self.video_transforms(video)
         # TCHW -> CTHW
         video = video.permute(1, 0, 2, 3)
 
         return video
-    
+
     def select_valid_data(self, data_samples):
         return super().select_valid_data(data_samples)
 
@@ -149,7 +149,7 @@ class OpensoraVideoProcessor(AbstractVideoProcessor):
 @Registry.register
 class CogVideoXProcessor(AbstractVideoProcessor):
     """Specialized processor for CogVideoX model
-    
+
     Args:
         skip_frame_num (int): Number of initial frames to skip (default: 0)
         train_fps (float): Target frames per second for processing
@@ -157,7 +157,7 @@ class CogVideoXProcessor(AbstractVideoProcessor):
         max_width (int): Maximum allowed frame width (default: 640)
         **base_args: Inherited parameters from AbstractVideoProcessor
     """
-    
+
     def __init__(
         self,
         skip_frame_num: int = 0,
@@ -235,7 +235,7 @@ class CogVideoXProcessor(AbstractVideoProcessor):
             return padded_tensor
         else:
             return tensor[:num_frames]
-    
+
     def _resize_for_rectangle_crop(self, arr, image_size, reshape_mode="random"):
         if arr.shape[3] / arr.shape[2] > image_size[1] / image_size[0]:
             arr = resize(
@@ -275,7 +275,7 @@ class CogVideoXProcessor(AbstractVideoProcessor):
 @Registry.register
 class OpensoraplanVideoProcessor(AbstractVideoProcessor):
     """Specialized processor for Opensoraplan model
-    
+
     Args:
         min_num_frames (int): Minimum required frames (default: 29)
         train_fps (float): Target frames per second for processing
@@ -295,7 +295,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         seed (int): Random seed (default: 42)
         **base_args: Inherited parameters from AbstractVideoProcessor
     """
-    
+
     def __init__(
         self,
         min_num_frames: int = 29,
@@ -369,17 +369,17 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         **kwargs
     ):
         """Process video frames with temporal speed adjustment and spatial validation.
-    
+
         Args:
             vframes: Video frames container object with frame access methods
             sample_num_frames: Expected number of output frames for validation
             start_frame_idx: Starting index for frame sampling
             num_frames: Total available frames (-1 = auto-detect from vframes)
             crop: Spatial crop coordinates (start_x, end_x, start_y, end_y)
-        
+
         Returns:
             torch.Tensor: Processed video tensor in CTHW format
-        
+
         Raises:
             IndexError: When video is too short for required processing
             ValueError: When sampled frames mismatch predefined count
@@ -389,18 +389,18 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         total_frames = vframes.get_len() if num_frames == -1 else num_frames
         fps = vframes.get_video_fps() if vframes.get_video_fps() > 0 else 30.0
         s_x, e_x, s_y, e_y = crop
-        
+
         # Temporal sampling interval calculation
         if self.auto_interval:
             # resample in case high fps, such as 50/60/90/144 -> train_fps(e.g, 24)
             frame_interval = 1.0 if abs(fps - self.train_fps) < 0.1 else fps / self.train_fps
         else:
             frame_interval = self.frame_interval
-        
+
         # Generate initial frame indices
         frame_indices = np.arange(start_frame_idx, start_frame_idx + total_frames, frame_interval).astype(int)
         frame_indices = frame_indices[frame_indices < start_frame_idx + total_frames]
-        
+
         # speed up through temporal subsampling
         max_speed_factor = len(frame_indices) / self.num_frames
         if self.speed_factor > 1 and max_speed_factor > 1:
@@ -415,7 +415,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         if len(frame_indices) > self.num_frames:
             begin_index, end_index = self.temporal_sample(len(frame_indices))
             frame_indices = frame_indices[begin_index:end_index]
-        
+
         # to find a suitable end_frame_idx, to ensure we do not need pad video
         end_frame_idx = self.find_closest_y(
             len(frame_indices), vae_stride_t=self.ae_stride_t, model_ds_t=self.sp_size
@@ -435,7 +435,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             raise IndexError(
                 f"video has {total_frames} frames, but need to sample {len(frame_indices)} frames ({frame_indices})"
             )
-        
+
         # Frame extraction and processing
         video = vframes.get_batch(frame_indices)  # T C H W
         if s_y is not None:
@@ -470,13 +470,13 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
 
     def select_valid_data(self, data_samples):
         """data filtering
-        
+
         Args:
             data_samples: List of video caption dictionaries
-            
+
         Returns:
             valid_samples
-            
+
         Processing Steps:
         1. Filter invalid entries (missing captions/resolution)
         2. Validate resolution constraints
@@ -493,13 +493,13 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
 
             if not self._validate_caption(sample, stats):
                 continue
-            
+
             if not self._process_resolution(sample, stats):
                 continue
-            
+
             if not self._process_temporal(sample, stats):
                 continue
-            
+
             self._validate_aesthetic(sample, stats)
 
             # sample update
@@ -519,7 +519,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             return False
         else:
             return True
-    
+
     def _process_resolution(self, sample, stats):
         """Handle resolution validation and processing"""
         res_info = sample.get("resolution", {})
@@ -527,7 +527,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         if height <= 0 or width <= 0:
             stats.increment("no_resolution")
             return False
-        
+
         # Process resolution
         if not self.force_resolution:
             # Dynamic resolution
@@ -540,20 +540,20 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             if sample_h * sample_w < self.min_hxw:
                 stats.increment("resolution_too_small")
                 return False
-            
+
             is_pick = self._filter_resolution(
-                sample_h, 
-                sample_w, 
-                max_h_div_w_ratio=self.hw_aspect_thr, 
+                sample_h,
+                sample_w,
+                max_h_div_w_ratio=self.hw_aspect_thr,
                 min_h_div_w_ratio=1 / self.hw_aspect_thr
             )
         else:
             # Static resolution
             aspect = self.max_height / self.max_width
             is_pick = self._filter_resolution(
-                height, 
-                width, 
-                max_h_div_w_ratio=self.hw_aspect_thr * aspect, 
+                height,
+                width,
+                max_h_div_w_ratio=self.hw_aspect_thr * aspect,
                 min_h_div_w_ratio=1 / self.hw_aspect_thr * aspect
             )
             sample_h, sample_w = self.max_height, self.max_width
@@ -561,11 +561,11 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         if not is_pick:
             stats.increment("aspect_mismatch")
             return False
-        
+
         # Update resolution
         sample["resolution"].update(dict(sample_height=sample_h, sample_width=sample_w))
         return True
-    
+
     def _filter_resolution(self, h, w, max_h_div_w_ratio=17 / 16, min_h_div_w_ratio=8 / 16):
         if h / w <= max_h_div_w_ratio and h / w >= min_h_div_w_ratio:
             return True
@@ -588,7 +588,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
             raise NameError(
                 f"Unknown file extension {path.split('.')[-1]}"
             )
-        
+
     def _process_video_temporal(self, sample, stats):
         # no fps and duration
         duration = sample.get("duration", None)
@@ -596,7 +596,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         num_frames = sample.get("num_frames", None)
         if fps is None or (duration is None and num_frames is None):
             return False
-        
+
         sample["num_frames"] = round(fps * duration) if num_frames is None else num_frames
         num_frames = sample["num_frames"]
 
@@ -620,12 +620,12 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         ):
             stats.increment('too_short')
             return False
-        
+
         # too long video will be temporal-crop randomly
         if len(frame_indices) > self.num_frames:
             begin_index, end_index = self.temporal_sample(len(frame_indices))
             frame_indices = frame_indices[begin_index:end_index]
-        
+
         # to find a suitable end_frame_idx, to ensure we do not need pad video
         end_frame_idx = self.find_closest_y(
             len(frame_indices), vae_stride_t=self.ae_stride_t, model_ds_t=self.sp_size
@@ -635,7 +635,7 @@ class OpensoraplanVideoProcessor(AbstractVideoProcessor):
         if end_frame_idx == -1:
             stats.increment('too_short')
             return False
-        
+
         frame_indices = frame_indices[:end_frame_idx]
         sample["sample_frame_index"] = frame_indices.tolist()
         sample["sample_num_frames"] = len(sample["sample_frame_index"])
@@ -690,7 +690,7 @@ class RewardVideoProcessor(AbstractVideoProcessor):
 
         if sample_type not in ["uniform", "multi_pts"]:
             print("Warning: No valid video sample-type is offering. Whole frames will be used for model input")
-    
+
     def round_by_factor(self, number: int, factor: int) -> int:
         """Returns the closest integer to 'number' that is divisible by 'factor'."""
         return round(number / factor) * factor
@@ -704,7 +704,7 @@ class RewardVideoProcessor(AbstractVideoProcessor):
     def floor_by_factor(self, number: int, factor: int) -> int:
         """Returns the largest integer less than or equal to 'number' that is divisible by 'factor'."""
         return math.floor(number / factor) * factor
-    
+
     def get_sample_nframes(
         self,
         total_frames: int,
@@ -731,7 +731,7 @@ class RewardVideoProcessor(AbstractVideoProcessor):
         if not (self.frame_factor <= nframes and nframes <= total_frames):
             print(f"Warning: nframes should in interval [{self.frame_factor}, {total_frames}], but got {nframes}.")
         return nframes
-    
+
     def sample_frames(self, vframes):
         total_frames, video_fps = vframes.get_len(), vframes.get_video_fps()
         if self.sample_type == "uniform":
@@ -768,7 +768,7 @@ class RewardVideoProcessor(AbstractVideoProcessor):
         else:
             min_pixels = self.video_min_pixels
             max_pixels = self.video_max_pixels if self.video_max_pixels else max(min(max_pixels_limit, max_total_pixels / nframes * self.frame_factor), int(self.video_min_pixels * 1.05))
-        
+
         if max(height, width) / min(height, width) > max_aspect_ratio:
             print(f"Warning: absolute aspect ratio must be smaller than {max_aspect_ratio}, got {max(height, width) / min(height, width)}")
 
@@ -802,7 +802,7 @@ class RewardVideoProcessor(AbstractVideoProcessor):
         video = self.video_transforms(video)
 
         return video
-    
+
     def select_valid_data(self, data_samples):
         return super().select_valid_data(data_samples)
 

@@ -12,7 +12,7 @@ from mindspeed_mm.patchs.patch_manager import PatchesManager
 mindspeed_args = get_mindspeed_args()
 
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
-    import mindspeed_mm.mindspore.mindspore_adaptor 
+    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def main():

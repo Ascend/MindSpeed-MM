@@ -20,7 +20,7 @@ class TestClipGradNorm:
         # deterministic gradients
         for p in m.parameters():
             p.grad = torch.ones_like(p.data) * 2.0
-        
+
         total = mod.clip_grad_norm(m, max_norm=0.0, norm_type=2.0)
         # manual l2 norm: sqrt(sum(g^2))
         manual = torch.sqrt(torch.sum(torch.stack([torch.sum(p.grad.float() ** 2) for p in m.parameters()])))
@@ -39,7 +39,7 @@ class TestClipGradNorm:
         m = torch.nn.Linear(2, 2, bias=False)
         for p in m.parameters():
             p.grad = torch.ones_like(p.data) * 10.0
-        
+
         # returned value is the total norm before clipping (see implementation)
         before = mod.clip_grad_norm(m, max_norm=0.0, norm_type=2.0)
         max_norm = 1.0
@@ -49,4 +49,3 @@ class TestClipGradNorm:
         # verify gradients are actually clipped
         total_after = torch.sqrt(torch.sum(torch.stack([torch.sum(p.grad.float() ** 2) for p in m.parameters()])))
         assert total_after <= max_norm + 1e-6
-        

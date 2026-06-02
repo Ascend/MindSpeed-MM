@@ -15,7 +15,7 @@ for item in info_json:
         new_item = {
             "images": [],
             "messages": []
-        } 
+        }
     else:
         img_path = os.path.join("./data/COCO2017/train2017", item["image"])
         print(f"img_path: {img_path}")

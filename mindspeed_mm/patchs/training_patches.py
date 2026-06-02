@@ -86,7 +86,7 @@ def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encode
                     post_process=post_process
                 )
             model.model_type = model_type
-        
+
         # =========================load checkpoint===============
         # Additional functionality added: Load weights from .pt checkpoint files
         # This enables loading model weights in distributed training scenarios
@@ -175,7 +175,7 @@ def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encode
                 HAVE_FSDP2,
                 "Torch FSDP2 requires torch>=2.4.0"
             )
-            
+
             DP = torch_FSDP
         elif args.use_custom_fsdp:
             DP = custom_FSDP

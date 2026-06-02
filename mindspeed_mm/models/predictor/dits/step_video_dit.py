@@ -102,7 +102,7 @@ class StepVideoDiT(MultiModalModule):
             self.caption_projection = PixArtAlphaTextProjection(
                 in_features=caption_channel, hidden_size=self.inner_dim
             )
-        
+
         # Rotary positional embeddings
         self.rope = RoPE3DStepVideo(
             ch_split=channel_split
@@ -129,7 +129,7 @@ class StepVideoDiT(MultiModalModule):
             self.norm_out = nn.LayerNorm(self.inner_dim, eps=norm_eps, elementwise_affine=norm_elementwise_affine)
             self.scale_shift_table = nn.Parameter(torch.randn(2, self.inner_dim) / self.inner_dim ** 0.5)
             self.proj_out = nn.Linear(self.inner_dim, patch_size * patch_size * self.out_channels)
-        
+
         self.use_dpo = getattr(args.mm.model, "dpo", None)
 
     @property
@@ -162,7 +162,7 @@ class StepVideoDiT(MultiModalModule):
 
     def forward(
         self,
-        hidden_states: torch.Tensor, 
+        hidden_states: torch.Tensor,
         timestep: Optional[torch.LongTensor] = None,
         prompt: Optional[list] = None,
         added_cond_kwargs: Dict[str, torch.Tensor] = None,
@@ -200,7 +200,7 @@ class StepVideoDiT(MultiModalModule):
                 frame //= mpu.get_context_parallel_world_size()
                 hidden_states = split_forward_gather_backward(hidden_states, mpu.get_context_parallel_group(), dim=1,
                                                             grad_scale='down')
-            
+
             height, width = height // self.patch_size, width // self.patch_size
             hidden_states = self.patchfy(hidden_states, condition_hidden_states)
             len_frame = hidden_states.shape[1]
@@ -270,18 +270,18 @@ class StepVideoDiT(MultiModalModule):
         if self.post_process:
             hidden_states = rearrange(hidden_states, 'b (f l) d -> (b f) l d', b=bsz, f=frame, l=len_frame)
             embedded_timestep = repeat(embedded_timestep, 'b d -> (b f) d', f=frame).contiguous()
-            
+
             shift, scale = (self.scale_shift_table[None] + embedded_timestep[:, None]).chunk(2, dim=1)
             hidden_states = self.norm_out(hidden_states)
             # Modulation
             hidden_states = hidden_states * (1 + scale) + shift
             hidden_states = self.proj_out(hidden_states)
-            
+
             # unpatchify
             hidden_states = hidden_states.reshape(
                 shape=(-1, height, width, self.patch_size, self.patch_size, self.out_channels)
             )
-            
+
             hidden_states = rearrange(hidden_states, 'n h w p q c -> n c h p w q')
             output = hidden_states.reshape(
                 shape=(-1, self.out_channels, height * self.patch_size, width * self.patch_size)
@@ -295,7 +295,7 @@ class StepVideoDiT(MultiModalModule):
 
         rtn = (output, encoder_hidden_states, timestep, embedded_timestep, attn_mask.to(torch.bfloat16), rotary_pos_emb)
         return rtn
-    
+
     def pipeline_set_prev_stage_tensor(self, input_tensor_list, extra_kwargs):
         """
         Implemnented for pipeline parallelism. The input tensor is got from last PP stage.
@@ -321,7 +321,7 @@ class StepVideoDiT(MultiModalModule):
         batch_size, frames, _, height, width = latents.shape
         len_frame = ((height - self.patch_size) // self.patch_size + 1) * ((width - self.patch_size) // self.patch_size + 1)
         (extra_kwargs["batch_size"], extra_kwargs["frames"], extra_kwargs["h"], extra_kwargs["w"], extra_kwargs["len_frame"]) = batch_size, frames, height, width, len_frame
-        
+
         if self.use_dpo is not None:
             score_list = [score, score_lose]
             return predictor_input_list, training_loss_input_list, score_list
@@ -510,7 +510,7 @@ class StepVideoTransformerBlock(nn.Module):
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (torch.clone(chunk) for chunk in chunks)
 
         scale_shift_q = self.norm1(q) * (1 + scale_msa) + shift_msa
-        
+
         # self attention
         attn_q = self.attn1(
             scale_shift_q,

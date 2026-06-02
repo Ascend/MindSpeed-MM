@@ -14,13 +14,13 @@ class _Waitable:
     def __init__(self, value):
         self._value = value
         self.wait_called = 0
-    
+
     def wait(self):
         self.wait_called += 1
-    
+
     def value(self):
         return self._value
-    
+
 
 class _FakeWriter:
     def __init__(self):
@@ -39,11 +39,11 @@ class _FakeWriter:
     def prepare_local_plan(self, plan):
         self.prepared_local += 1
         return plan
-    
+
     def prepare_global_plan(self, plans):
         self.prepared_global += 1
         return plans
-    
+
     def write_data(self, plan, planner):
         self.written += 1
         return _Waitable(["ok"])
@@ -62,14 +62,14 @@ class _FakeReader:
 
     def read_metadata(self):
         return self._metadata
-    
+
     def set_up_storage_reader(self, metadata, is_coordinator: bool):
         self.setup_called += 1
-    
+
     def prepare_local_plan(self, plan):
         self.prepared_local += 1
         return plan
-    
+
     def prepare_global_plan(self, plans):
         self.prepared_global += 1
         return plans
@@ -77,7 +77,7 @@ class _FakeReader:
     def read_data(self, plan, planner):
         self.read_called += 1
         return _Waitable(None)
-    
+
 
 def test_partial_save_uses_storage_meta_signature_and_prefix(monkeypatch):
     pytest.importorskip("torch")
@@ -87,10 +87,10 @@ def test_partial_save_uses_storage_meta_signature_and_prefix(monkeypatch):
     class PlannerWithStorageMeta:
         def __init__(self):
             self.setup_kwargs = None
-        
+
         def set_up_planner(self, *, state_dict, storage_meta, is_coordinator: bool):
             self.setup_kwargs = (state_dict, storage_meta, is_coordinator)
-        
+
         def create_local_plan(self):
             return _FakePlan(storage_data=None)
 
@@ -99,7 +99,7 @@ def test_partial_save_uses_storage_meta_signature_and_prefix(monkeypatch):
 
         def finish_plan(self, plan):
             return plan
-        
+
     writer = _FakeWriter()
     planner = PlannerWithStorageMeta()
     meta, writes = u.partial_save_dcp_state_dict({"w", 1}, writer, planner=planner, part_idx=2)
@@ -122,11 +122,11 @@ def test_partial_save_legacy_signature_emits_warning(monkeypatch):
     class LegacyPlanner:
         def __init__(self):
             self.setup_args = None
-        
+
         # legacy signature without storage_meta
         def set_up_planner(self, state_dict, is_coordinator: bool):
             self.setup_args = (state_dict, is_coordinator)
-        
+
         def create_local_plan(self):
             return _FakePlan(storage_data=None)
 
@@ -135,7 +135,7 @@ def test_partial_save_legacy_signature_emits_warning(monkeypatch):
 
         def finish_plan(self, plan):
             return plan
-    
+
     writer = _FakeWriter()
     planner = LegacyPlanner()
     with warnings.catch_warnings(record=True) as w:
@@ -158,12 +158,12 @@ def test_partial_load_waits_and_populates_state_dict(monkeypatch):
     class Planner:
         def __init__(self):
             self.setup = 0
-        
+
         def set_up_planner(self, state_dict, metadata, is_coordinator: bool):
             self.setup += 1
             # populate a sentinel to prove the same dict instance is used e2e
             state_dict["sentinel"] = 42
-        
+
         def create_local_plan(self):
             return _FakePlan()
 
@@ -177,4 +177,3 @@ def test_partial_load_waits_and_populates_state_dict(monkeypatch):
     assert st["sentinel"] == 42
     assert reader.setup_called == 1
     assert reader.read_called == 1
-    

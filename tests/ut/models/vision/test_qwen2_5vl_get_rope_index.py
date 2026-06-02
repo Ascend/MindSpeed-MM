@@ -56,7 +56,7 @@ class TestQwen2_5VLGetRoPEIndex:
             config=None,
             input_ids=input_ids
         )
-        
+
         expected_deltas = torch.tensor([[0]])
         judge_expression(torch.equal(deltas, expected_deltas))
 

@@ -21,7 +21,7 @@ class KVfusedColumnTP(TPPattern):
 
         wks = [chunk[0] for chunk in chunked_weights]
         wvs = [chunk[1] for chunk in chunked_weights]
-        
+
         weight = torch.cat([
             torch.cat(wks, dim=0),
             torch.cat(wvs, dim=0)
@@ -36,7 +36,7 @@ class LayerIndexConverter:
             idx = int(name.split('.')[1])
             return idx
         return None
-        
+
     @staticmethod
     def convert_layer_index(name, new_layer_index):
         if name.startswith("transformer_blocks"):
@@ -99,7 +99,7 @@ class StepVideoConverter(SoraModelConverter):
     kv_fused_column_tp = KVfusedColumnTP()
     spec_tp_split_mapping = {kv_fused_column_tp: []}
     layer_index_converter = LayerIndexConverter()
-        
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -124,7 +124,7 @@ class StepVideoConverter(SoraModelConverter):
                 f"transformer_blocks.{index}.norm2.weight": f"transformer_blocks.{index}.norm2.weight",
                 f"transformer_blocks.{index}.scale_shift_table": f"transformer_blocks.{index}.scale_shift_table"
             })
-        
+
             self.tp_split_mapping["column_parallel_tp"] += [
                 f"transformer_blocks.{index}.ff.net.0.proj.weight",
                 f"transformer_blocks.{index}.attn2.proj_q.weight",
@@ -155,13 +155,13 @@ class StepVideoConverter(SoraModelConverter):
         state_dict = self._xfuse_to_mm(state_dict)
         state_dicts = self._mm_split(state_dict, cfg.target_parallel_config)
         save_as_mm(cfg.target_path, state_dicts)
-    
+
     def _xfuse_to_mm(self, state_dict):
 
         def head_weight_permute(weight, fuse_num):
             weight_per_heads = torch.chunk(weight, self.num_heads)
             part_weight_per_heads = [
-                torch.chunk(weight_per_head, fuse_num, dim=0) 
+                torch.chunk(weight_per_head, fuse_num, dim=0)
                 for weight_per_head in weight_per_heads
             ]
 
@@ -172,7 +172,7 @@ class StepVideoConverter(SoraModelConverter):
                 )
             weight = torch.cat(part_weights, dim=0).clone()
             return weight
-        
+
         keys = state_dict.keys()
         for key in keys:
             if key in self.tp_split_mapping["qkv_fused_column_tp"]:

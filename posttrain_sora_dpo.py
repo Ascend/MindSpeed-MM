@@ -28,7 +28,7 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
         process_group = torch.distributed.group.WORLD
     else:
         process_group = mpu.get_data_parallel_group()
-    
+
     train_dataloader = build_mm_dataloader(train_dataset, data_config.dataloader_param,
                                            process_group=process_group,
                                            dataset_param=data_config.dataset_param,

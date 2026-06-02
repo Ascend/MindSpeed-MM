@@ -36,7 +36,7 @@ class TextProjection(nn.Module):
         hidden_states = self.act_1(hidden_states)
         hidden_states = self.linear_2(hidden_states)
         return hidden_states
-    
+
 
 class IndividualTokenRefinerBlock(nn.Module):
     def __init__(
@@ -66,11 +66,11 @@ class IndividualTokenRefinerBlock(nn.Module):
         nn.init.zeros_(self.adaLN_modulation[1].bias)
 
         self.norm1 = nn.LayerNorm(
-            hidden_size, elementwise_affine=True, eps=1e-6, 
+            hidden_size, elementwise_affine=True, eps=1e-6,
         )
 
         self.self_attn_qkv = nn.Linear(
-            hidden_size, hidden_size * 3, bias=qkv_bias, 
+            hidden_size, hidden_size * 3, bias=qkv_bias,
         )
 
         self.self_attn_q_norm = (
@@ -86,7 +86,7 @@ class IndividualTokenRefinerBlock(nn.Module):
         )
 
         self.self_attn_proj = nn.Linear(
-            hidden_size, hidden_size, bias=qkv_bias, 
+            hidden_size, hidden_size, bias=qkv_bias,
         )
 
         self.norm2 = nn.LayerNorm(
@@ -125,15 +125,15 @@ class IndividualTokenRefinerBlock(nn.Module):
             input_layout="BSND",
             scale=1 / math.sqrt(self.head_dim)
         )[0]
-        
+
         attn = attn.view(attn.shape[0], attn.shape[1], -1)  # bsnd -> bsh
         x = x + self.self_attn_proj(attn) * gate_msa
 
         # FFN Layer
-        x = x + self.mlp(self.norm2(x)) * gate_mlp 
+        x = x + self.mlp(self.norm2(x)) * gate_mlp
 
         return x
-    
+
 
 class IndividualTokenRefiner(nn.Module):
     def __init__(
@@ -174,7 +174,7 @@ class IndividualTokenRefiner(nn.Module):
         self_attn_mask = None
         if mask is not None:
             batch_size = mask.shape[0]
-            seq_len = mask.shape[-1] 
+            seq_len = mask.shape[-1]
             mask = mask.to(x.device)
             # batch_size x 1 x seq_len x seq_len
             self_attn_mask_1 = mask.view(batch_size, 1, 1, seq_len).repeat(
@@ -190,7 +190,7 @@ class IndividualTokenRefiner(nn.Module):
         for block in self.blocks:
             x = block(x, c, self_attn_mask)
         return x
-    
+
 
 class SingleTokenRefiner(nn.Module):
     """
@@ -212,7 +212,7 @@ class SingleTokenRefiner(nn.Module):
     ):
         super().__init__()
         self.input_embedder = nn.Linear(
-            in_channels, hidden_size, bias=True, 
+            in_channels, hidden_size, bias=True,
         )
 
         act_layer = get_activation_layer(act_type)

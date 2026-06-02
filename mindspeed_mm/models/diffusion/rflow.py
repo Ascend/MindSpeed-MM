@@ -30,8 +30,8 @@ def timestep_transform(
 
     new_t = new_t * num_timesteps
     return new_t
-    
-    
+
+
 class RFlow:
     def __init__(
         self,
@@ -131,7 +131,7 @@ class RFlow:
                 latents = torch.where(mask_t_upper[:, None, :, None, None], latents, x0)
 
         return latents
-    
+
     def add_noise(
         self,
         original_samples: torch.FloatTensor,
@@ -170,9 +170,9 @@ class RFlow:
             noise = torch.randn_like(x_start)
         if not noise.shape == x_start.shape:
             raise Exception("noise must have the same shape as x_start")
-        
+
         x_t = self.add_noise(x_start, noise, t)
-        
+
         if mask is not None:
             t0 = torch.zeros_like(t)
             x_t0 = self.add_noise(x_start, noise, t0)
@@ -181,12 +181,12 @@ class RFlow:
 
     @staticmethod
     def training_losses(
-        model_output, 
-        x_start, 
-        noise=None, 
+        model_output,
+        x_start,
+        noise=None,
         t=None,
-        mask=None, 
-        weights=None, 
+        mask=None,
+        weights=None,
         **kwargs) -> Tensor:
         """
         Compute training losses for a single timestep.

@@ -34,7 +34,7 @@ class TestTokenizer:
         test_text = "This is a T5 example"
         output = t5_tokenizer(test_text)
         judge_expression(output == T5_TOKENIZER_OUTPUT)
-        
+
     def test_mt5(self):
         """
         test mt5 tokenizer processor

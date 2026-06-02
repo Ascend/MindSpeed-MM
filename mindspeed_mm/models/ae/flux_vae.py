@@ -55,4 +55,3 @@ class FluxVae(nn.Module):
         z = posterior.mode()
         z = self.scale_factor * (z - self.shift_factor)
         return z
-

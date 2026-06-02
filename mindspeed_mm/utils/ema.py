@@ -4,7 +4,7 @@ class EMA:
         self.decay = decay
         self.shadow = {}
         self.backup = {}
-        
+
     def register(self):
         for name, param in self.model.named_parameters():
             if param.requires_grad:

@@ -18,7 +18,7 @@ class ColumnParallelTP(TPPattern):
     @staticmethod
     def split(weight, tp_size):
         return torch.chunk(weight, tp_size, dim=0)
-    
+
     @staticmethod
     def merge(weights):
         return torch.cat(weights, dim=0)
@@ -28,7 +28,7 @@ class RowParallelTP(TPPattern):
     @staticmethod
     def split(weight, tp_size):
         return torch.chunk(weight, tp_size, dim=1)
-    
+
     @staticmethod
     def merge(weights):
         return torch.cat(weights, dim=1)
@@ -51,7 +51,7 @@ class QKVfusedColumnTP(TPPattern):
         wqs = [chunk[0] for chunk in chunked_weights]
         wks = [chunk[1] for chunk in chunked_weights]
         wvs = [chunk[2] for chunk in chunked_weights]
-        
+
         weight = torch.cat([
             torch.cat(wqs, dim=0),
             torch.cat(wks, dim=0),

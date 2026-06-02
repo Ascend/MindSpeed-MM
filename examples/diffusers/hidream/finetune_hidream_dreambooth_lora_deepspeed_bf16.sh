@@ -1,7 +1,7 @@
 Network="Hidream"
 
 model_name="HiDream-ai/HiDream-I1-Full"
-pretrained4_path="meta-llama/Meta-Llama-3.1-8B-Instruct" 
+pretrained4_path="meta-llama/Meta-Llama-3.1-8B-Instruct"
 dataset_name="linoyts/3d_icon"
 batch_size=8
 num_processors=8      # 仅用于FPS计算

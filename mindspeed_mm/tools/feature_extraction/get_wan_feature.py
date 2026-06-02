@@ -58,7 +58,7 @@ class WanTextVideoDataset(T2VDataset):
 
         video_only_preprocess = {"video": video_only_transforms}
         vid_img_process["train_pipeline"] = {"video": video_and_first_frame_transforms}
-        
+
         super().__init__(
             basic_param=basic_param,
             vid_img_process=vid_img_process,
@@ -69,7 +69,7 @@ class WanTextVideoDataset(T2VDataset):
         )
 
         self.video_only_preprocess = get_transforms(
-            is_video=True, 
+            is_video=True,
             train_pipeline=video_only_preprocess,
             transform_size={"max_height": vid_img_process['max_height'], "max_width": vid_img_process['max_width']}
         )
@@ -86,9 +86,9 @@ class WanTextVideoDataset(T2VDataset):
         video = self.video_processer(vframes=vframes, **sample)
 
         if self.task == "i2v":
-            first_frame = video[:, 0, :, :]  # c t h w 
+            first_frame = video[:, 0, :, :]  # c t h w
             example["first_frame"] = first_frame
-        
+
         video = self.video_only_preprocess(video)
         example[VIDEO] = video
 
@@ -114,7 +114,7 @@ class WanFeatureExtractor(FeatureExtractor):
 
         dataset_param = args.mm.data.dataset_param.to_dict()
         dataset = WanTextVideoDataset(
-            task, 
+            task,
             dataset_param["basic_parameters"],
             dataset_param["preprocess_parameters"],
             **dataset_param

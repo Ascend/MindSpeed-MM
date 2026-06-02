@@ -5,7 +5,7 @@ from tests.ut.utils import judge_expression
 
 
 class TestActivation:
-    """ 
+    """
     Test activation basic function.
     """
     def test_activation_when_get_right_act_type(self):

@@ -95,7 +95,7 @@ class ParallelState(metaclass=Singleton):
             info += f'[{name}] = {enable} | Group size: {size} | device mesh:{mesh} \n'
         info += f'[fsdp] = {True} | Group size: {self.get_fsdp_group_size()} | device mesh:{self.get_fsdp_device_mesh()} \n'
         return info
-    
+
     # ----------------------------- FSDP ----------------------------- #
     def get_fsdp_group(self) -> Optional["ProcessGroup"]:
         return self.device_mesh.get_group("dp_cp")
@@ -145,7 +145,7 @@ class ParallelState(metaclass=Singleton):
     def register_funcs(self, device_mesh, mesh_names):
         """
         Dynamically register helper methods for each mesh dimension.
-        
+
         For each mesh dimension, creates methods like:
         - is_{mesh_name}_enable()
         - get_{mesh_name}_group()
@@ -170,7 +170,7 @@ class ParallelState(metaclass=Singleton):
                 return self.get_device_mesh(name)
 
             return is_enable_method, get_group_method, get_size_method, get_rank_method, get_mesh_method
-        
+
         for mesh_name in mesh_names:
             self.device_mesh_map[mesh_name] = device_mesh
             is_enable, get_group, get_size, get_rank, get_mesh = get_methods(mesh_name)
@@ -205,17 +205,17 @@ def init_parallel_state(
         expert_fully_shard_parallel_size=expert_fully_shard_parallel_size,
         expert_data_parallel_size=expert_data_parallel_size
     )
-    
+
     return _PARALLEL_STATE
 
 
 def get_parallel_state() -> ParallelState:
     """
     Get the global ParallelState singleton instance.
-    
+
     Returns:
         The ParallelState instance.
-        
+
     Note:
         If ParallelState has not been initialized, returns a default single-process state.
     """

@@ -12,10 +12,10 @@ class TestChunkLoss:
     """
     Test ChunkLoss
     """
-    
+
     device = "npu"
     dtype = torch.bfloat16
-    
+
     micro_batch_size = 2
     grad_acc = 2
     seq_len = 8192
@@ -23,7 +23,7 @@ class TestChunkLoss:
     hidden_dim = 4096
     vocab_size = 151674
     mask_len = 200
-    
+
     inputs = []
     shift_labels = []
     hidden_states = []
@@ -39,14 +39,14 @@ class TestChunkLoss:
         shift_labels.append(shift_label)
         hidden_states.append(hidden_state)
         loss_masks.append(loss_mask)
-    
+
     lm_head = torch.nn.Linear(hidden_dim, vocab_size, bias=False, dtype=dtype).to(device)
-    
+
     @staticmethod
     def _judge_result(no_chunk_forward, chunk_forward, no_chunk_grad, chunk_grad):
         judge_expression(torch.allclose(no_chunk_forward, chunk_forward, rtol=1e-5, atol=1e-6))
         judge_expression(torch.allclose(no_chunk_grad, chunk_grad, rtol=1e-4, atol=1e-5))
-    
+
     def _loss_forward_backward_per_step(self, hidden_state, shift_label, alpha, reduction):
         no_chunk_forward, _ = calculate_lm_loss(
             hidden_states=hidden_state,
@@ -58,7 +58,7 @@ class TestChunkLoss:
         )
         no_chunk_forward.backward()
         return no_chunk_forward
-    
+
     def _chunk_loss_forward_backward_per_step(self, hidden_state, shift_label, alpha, reduction):
         chunk_labels = torch.split(shift_label, self.chunk_size, dim=1)
         loss_ctx_kwargs = [
@@ -70,7 +70,7 @@ class TestChunkLoss:
             }
             for i in range(len(chunk_labels))
         ]
-        
+
         chunk_forward = chunk_loss(
             hidden_states=hidden_state,
             head_weight=self.lm_head.weight,
@@ -79,10 +79,10 @@ class TestChunkLoss:
             loss_kwargs_chunks=loss_ctx_kwargs,
             chunk_size=self.chunk_size
         )
-        
+
         chunk_forward.backward()
         return chunk_forward
-    
+
     def _loss_forward_backward(self, alphas, reductions, per_step_func):
         """no chunk"""
         accumulated_forward = 0
@@ -94,13 +94,13 @@ class TestChunkLoss:
                 reduction=reductions[i]
             )
             accumulated_forward += loss_forward
-        
+
         grad = self.lm_head.weight.grad
         # reset grad
         self.lm_head.weight.grad = None
-        
+
         return accumulated_forward, grad
-    
+
     def test_default_vlm_loss(self):
         alphas = [self.loss_masks[i].sum() for i in range(self.grad_acc)]
         reductions = ["sum"] * self.grad_acc
@@ -115,7 +115,7 @@ class TestChunkLoss:
             per_step_func=self._chunk_loss_forward_backward_per_step
         )
         self._judge_result(no_chunk_forward, chunk_forward, no_chunk_grad, chunk_grad)
-        
+
     def test_per_sample_vlm_loss(self):
         alphas = [self.loss_masks[i].sum(1) * self.loss_masks[i].shape[0] for i in range(self.grad_acc)]
         reductions = ["none"] * self.grad_acc
@@ -130,7 +130,7 @@ class TestChunkLoss:
             per_step_func=self._chunk_loss_forward_backward_per_step
         )
         self._judge_result(no_chunk_forward, chunk_forward, no_chunk_grad, chunk_grad)
-        
+
     def test_per_token_vlm_loss(self):
         alphas = [sum([self.loss_masks[i].sum() for i in range(self.grad_acc)])] * self.grad_acc
         reductions = ["none"] * self.grad_acc

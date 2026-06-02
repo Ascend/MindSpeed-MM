@@ -10,8 +10,8 @@ from megatron.training import get_args
 from megatron.core import mpu
 from einops import rearrange
 from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import (
-        all_to_all, 
-        split_forward_gather_backward, 
+        all_to_all,
+        split_forward_gather_backward,
         gather_forward_split_backward
 )
 from mindspeed_mm.models.common.attention import FlashAttention
@@ -25,7 +25,7 @@ def split_forward_gather_backward_FPDT_tensors(tensor, seq_dim=0, chunk_number=1
     indices = []
     for r in range(world_size):
         indices.extend(range(r, global_chunk_number, world_size))
-    
+
     tensor = torch.cat([chunks[i] for i in indices], dim=seq_dim)
     tensor = split_forward_gather_backward(
         tensor, group, dim=seq_dim, grad_scale=grad_scale
@@ -48,7 +48,7 @@ def gather_forward_split_backward_FPDT_tensors(tensor, seq_dim=0, chunk_number=1
 
 
 def forward_update(prev_data, cur_data):
-    
+
     prev_attn_out, prev_softmax_max, prev_softmax_sum = prev_data[0], prev_data[1], prev_data[2]
     cur_attn_out, cur_softmax_max, cur_softmax_sum = cur_data[0], cur_data[1], cur_data[2]
     origin_dtype = prev_attn_out.dtype
@@ -114,7 +114,7 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
                 dropout=0.0,
                 num_chunks=8,
                 cpu_offloading=False):
-        
+
         do_save = q.requires_grad
 
         with torch.no_grad():
@@ -127,7 +127,7 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
                 raise NotImplementedError('attention_mask is not supported now')
             ctx.num_chunks = num_chunks
             ctx.cpu_offloading = cpu_offloading
-            ctx.cpg = cpg 
+            ctx.cpg = cpg
             ctx.scatter_idx = scatter_idx
             ctx.gather_idx = gather_idx
             ctx.hidden_size_per_attention_head = hidden_size_per_attention_head
@@ -168,7 +168,7 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
                                           hidden_size_per_attention_head).permute(1, 0, 2, 3).contiguous()
                 v_chunk = v_chunk.reshape(v_chunk.shape[0], v_chunk.shape[1], -1, \
                                           hidden_size_per_attention_head).permute(1, 0, 2, 3).contiguous()
-                
+
                 q_chunk = all_to_all(q_chunk, cpg, scatter_idx, gather_idx)
                 k_chunk = all_to_all(k_chunk, cpg, scatter_idx, gather_idx)
                 v_chunk = all_to_all(v_chunk, cpg, scatter_idx, gather_idx)
@@ -177,7 +177,7 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
                 global_k.append(k_chunk)
                 global_v.append(v_chunk)
 
-            
+
             for i in range(num_chunks):
 
                 for k_i in range(num_chunks):
@@ -189,10 +189,10 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
                                                                'BSND',
                                                                scale=ctx.softmax_scale,
                                                                keep_prob=ctx.keep_p)
-                    
+
                     global_o[i], global_softmax_max[i], global_softmax_sum[i] = general_out_update(global_o[i], global_softmax_max[i], \
                                                                                                    global_softmax_sum[i], attn_outs)
-                    
+
                 global_o[i] = global_o[i].to(ctx.dtype).contiguous()
 
                 output[i] = all_to_all(global_o[i], cpg, gather_idx, scatter_idx)
@@ -213,7 +213,7 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
 
 
         return output
-    
+
     @staticmethod
     def backward(ctx, dout):
         num_chunks = ctx.num_chunks
@@ -275,13 +275,13 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
                                                                      attention_in=attn_output_chunk,
                                                                      scale_value=softmax_scale,
                                                                      keep_prob=keep_p)
-                
+
                 cur_dq, cur_dk, cur_dv = attn_grad_outs[0], attn_grad_outs[1], attn_grad_outs[2]
 
                 dq[q_i].add_(cur_dq.to(torch.float))
                 dk[i].add_(cur_dk.to(torch.float))
                 dv[i].add_(cur_dv.to(torch.float))
-        
+
         for i in range(num_chunks):
 
             dq[i] = dq[i].to(dtype).contiguous()
@@ -301,7 +301,7 @@ class _FPDTGPUAttentionImpl_(torch.autograd.Function):
         dv = dv.reshape(dv.shape[0], dv.shape[1], -1).permute(1, 0, 2).contiguous()
 
         return dq, dk, dv, None, None, None, None, None, None, None, None, None
-    
+
 
 class ChunkManager:
     def __init__(self, chunk: torch.Tensor, device=None, onload=False) -> None:
@@ -316,7 +316,7 @@ class ChunkManager:
             cpu_chunk.copy_(chunk, non_blocking=True)
         else:
             cpu_chunk = chunk
-        
+
         self.cpu_chunk = cpu_chunk
         self.npu_chunk = chunk if onload else None
 
@@ -332,7 +332,7 @@ class ChunkManager:
         if self.npu_chunk is None or str(self.npu_chunk.device) != str(self.device):
             raise AttributeError()
         return self.npu_chunk
-    
+
     def offload(self):
         if self.npu_chunk is None or str(self.npu_chunk.device) != str(self.device):
             raise AttributeError()
@@ -344,7 +344,7 @@ class ChunkManager:
             raise AttributeError()
         self.cpu_chunk.copy_(self.npu_chunk, non_blocking=True)
 
-        
+
 class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
 
     @staticmethod
@@ -360,7 +360,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                 hidden_size_per_attention_head,
                 dropout=0.0,
                 num_chunks=8):
-        
+
         do_save = q.requires_grad
 
         with torch.no_grad():
@@ -413,7 +413,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                                           hidden_size_per_attention_head).permute(1, 0, 2, 3).contiguous()
                 v_chunk = v_chunk.reshape(v_chunk.shape[0], v_chunk.shape[1], -1, \
                                           hidden_size_per_attention_head).permute(1, 0, 2, 3).contiguous()
-                
+
                 q_chunk = all_to_all(q_chunk, cpg, scatter_idx, gather_idx)
                 k_chunk = all_to_all(k_chunk, cpg, scatter_idx, gather_idx)
                 v_chunk = all_to_all(v_chunk, cpg, scatter_idx, gather_idx)
@@ -426,7 +426,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                     global_q.append(ChunkManager(q_chunk, onload=False))
                     global_k.append(ChunkManager(k_chunk, onload=False))
                     global_v.append(ChunkManager(v_chunk, onload=False))
-                    
+
 
             del q_chunks, k_chunks, v_chunks
 
@@ -446,7 +446,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                     global_v[0].load_to_npu()
                 compute_stream.wait_stream(offload_stream)
                 compute_stream.synchronize()
-                
+
                 cur_attn_output = None
                 cur_softmax_max = None
                 cur_softmax_sum = None
@@ -462,12 +462,12 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                                                                        'BSND',
                                                                        scale=ctx.softmax_scale,
                                                                        keep_prob=ctx.keep_p)
-                        
-                        cur_attn_output, cur_softmax_max, cur_softmax_sum = general_out_update(cur_attn_output, 
+
+                        cur_attn_output, cur_softmax_max, cur_softmax_sum = general_out_update(cur_attn_output,
                                                                                                cur_softmax_max,
                                                                                                cur_softmax_sum,
                                                                                                attn_outs)
-                    
+
                     can_offload_kv = True
 
                     if k_i != (len(global_k) - 1) or i != (num_chunks - 1):
@@ -478,7 +478,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
 
                         if next_kv_compute_chunk_idx == kv_compute_chunk_idx:
                             can_offload_kv = False
-                        
+
                         else:
                             with torch_npu.npu.stream(offload_stream):
                                 global_k[next_kv_compute_chunk_idx].load_to_npu()
@@ -500,7 +500,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                         global_k[kv_compute_chunk_idx].offload()
                         global_v[kv_compute_chunk_idx].offload()
                     kv_compute_chunk_idx = next_kv_compute_chunk_idx
-                
+
                 global_q[q_compute_chunk_idx].offload()
                 q_compute_chunk_idx += 1
 
@@ -595,14 +595,14 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                                     attention_in=attn_output[q_i].get_npu_chunk(),
                                     scale_value=softmax_scale,
                                     keep_prob=keep_p)
-                    
+
                     cur_dq, cur_dk, cur_dv = attn_grad_outs[0], attn_grad_outs[1], attn_grad_outs[2]
 
                 if q_i != (len(global_q) - 1):
                     next_q_compute_chunk_idx = q_i + 1
                 else:
                     next_q_compute_chunk_idx = 0
-                
+
                 can_offload_q = True
 
                 if next_q_compute_chunk_idx == q_i:
@@ -619,7 +619,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
                         global_softmax_sum[next_q_compute_chunk_idx].load_to_npu()
                         if grad_global_dout[next_q_compute_chunk_idx] is not None:
                             grad_global_dout[next_q_compute_chunk_idx].load_to_npu()
-                        
+
                         else:
 
                             grad_global_attn_output_chunk = all_to_all(dout[:, :chunk_size].contiguous(), cpg, scatter_idx, gather_idx)
@@ -657,7 +657,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
 
             dk_accum = all_to_all(dk_accum.contiguous(), cpg, gather_idx, scatter_idx)
             dv_accum = all_to_all(dv_accum.contiguous(), cpg, gather_idx, scatter_idx)
-            
+
             dist.barrier()
 
             dk_final.append(dk_accum)
@@ -673,7 +673,7 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
 
                 global_k[next_kv_compute_chunk_idx].load_to_npu()
                 global_v[next_kv_compute_chunk_idx].load_to_npu()
-            
+
             compute_stream.wait_stream(offload_stream)
             compute_stream.synchronize()
 
@@ -701,10 +701,10 @@ class _FPDTGPUAttentionOffloadImpl_(torch.autograd.Function):
         dv = dv.reshape(dv.shape[0], dv.shape[1], -1).permute(1, 0, 2).contiguous()
 
         return dq, dk, dv, None, None, None, None, None, None, None, None, None
-    
+
 
 def fpdt_attention(
-        q, k, v, 
+        q, k, v,
         attention_mask,
         ulysess_context_parallel_group,
         scatter_idx,
@@ -743,11 +743,11 @@ def fpdt_attention(
             dropout,
             FPDT_chunk_number
         )
-    
+
 
 class FPDTFlashAttention(FlashAttention):
     def __init__(
-            self, 
+            self,
             ulysess_context_parallel_group,
             hidden_size,
             head_dim,
@@ -760,8 +760,8 @@ class FPDTFlashAttention(FlashAttention):
         self.ulysess_context_parallel_group = ulysess_context_parallel_group
         self.hidden_size = hidden_size
         self.head_dim = head_dim
-        self.FPDT_chunk_number = chunk_number 
-        self.FPDT_with_offload = with_offload 
+        self.FPDT_chunk_number = chunk_number
+        self.FPDT_with_offload = with_offload
 
         if not self.FPDT_chunk_number:
             raise AttributeError("when powering FPDT, chunk_number has to be determined")
@@ -772,7 +772,7 @@ class FPDTFlashAttention(FlashAttention):
         value = value.view(value.shape[0], value.shape[1], -1)
 
         return fpdt_attention(
-            query, key, value, 
+            query, key, value,
             attention_mask=attention_mask,
             ulysess_context_parallel_group=self.ulysess_context_parallel_group,
             scatter_idx=2,

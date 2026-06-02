@@ -38,19 +38,19 @@ def partial_save_dcp_state_dict(
             - global_metadata: checkpoint metadata.
             - all_writes: Results of the write operations.
     """
-    
+
     # Use default planner if none is provided
     if planner is None:
         planner = DefaultSavePlanner()
-    
+
     # Initialize global metadata; will be set during global planning phase
     global_metadata = None
-    
+
     ckpt_kwargs = {}
     ckpt_id = getattr(storage_writer, "checkpoint_id", None)
     if ckpt_id is not None:
         ckpt_kwargs["checkpoint_id"] = ckpt_id
-        
+
     @_dcp_method_logger(**ckpt_kwargs)
     def local_step():
         storage_meta = storage_writer.storage_meta()
@@ -68,15 +68,15 @@ def partial_save_dcp_state_dict(
                 is_coordinator=True
             )
         storage_writer.set_up_storage_writer(True)
-        
+
         local_plan = planner.create_local_plan()
         local_plan = storage_writer.prepare_local_plan(local_plan)
         return local_plan
-    
+
     @_dcp_method_logger(**ckpt_kwargs)
     def global_step(all_local_plans):
         nonlocal global_metadata
-        
+
         all_local_plans, global_metadata = planner.create_global_plan(all_local_plans)
         all_local_plans = storage_writer.prepare_global_plan(all_local_plans)
         all_local_plans = [
@@ -84,19 +84,19 @@ def partial_save_dcp_state_dict(
             for i, plan in enumerate(all_local_plans)
         ]
         return all_local_plans
-    
+
     local_plan = local_step()
     all_local_plan = global_step([local_plan])[0]
-    
+
     @_dcp_method_logger(**ckpt_kwargs)
     def write_data():
         final_local_plan = planner.finish_plan(all_local_plan)
         all_writes = storage_writer.write_data(final_local_plan, planner)
         all_writes.wait()
         return all_writes.value()
-    
+
     all_writes = write_data()
-    
+
     # Return metadata and write results for potential post-processing or validation
     return global_metadata, all_writes
 
@@ -122,15 +122,15 @@ def save_metadata(
     ckpt_id = getattr(storage_writer, "checkpoint_id", None)
     if ckpt_id is not None:
         ckpt_kwargs["checkpoint_id"] = ckpt_id
-        
+
     @_dcp_method_logger(**ckpt_kwargs)
     def finish_checkpoint():
         storage_writer.finish(metadata=global_metadata, results=all_writes)
         return global_metadata
-    
+
     return finish_checkpoint()
-    
-    
+
+
 def merge_meta_info(
     global_meta_infos: List[Metadata],
 ):
@@ -153,7 +153,7 @@ def merge_meta_info(
         Metadata: A merged Metadata object containing the union of all input metadata.
                   Returns None if the input list is empty.
     """
-    
+
     # Use functools.reduce to iteratively merge all Metadata instances.
     # Start with the first element as the accumulator, then merge in the rest one by one.
     merged_data = reduce(
@@ -164,7 +164,7 @@ def merge_meta_info(
         global_meta_infos[1:],  # All elements after the first
         global_meta_infos[0]    # Initial accumulator
     ) if global_meta_infos else None    # Only merge if the list is non-empty
-    
+
     return merged_data
 
 
@@ -188,17 +188,17 @@ def load_metadata(
     Returns:
         Metadata: The deserialized global metadata object describing the entire checkpoint.
     """
-    
+
     ckpt_kwargs = {}
     ckpt_id = getattr(storage_reader, "checkpoint_id", None)
     if ckpt_id is not None:
         ckpt_kwargs["checkpoint_id"] = ckpt_id
-    
+
     @_dcp_method_logger(**ckpt_kwargs)
     def read_metadata():
         metadata = storage_reader.read_metadata()
         return metadata
-    
+
     return read_metadata()
 
 
@@ -232,42 +232,42 @@ def partial_load_dcp_state_dict(
     Returns:
         STATE_DICT_TYPE: A state dictionary containing only the tensors specified in `metadata`.
     """
-    
+
     # Initialize an empty state dict; it will be populated in-place by the planner during loading
     state_dict: STATE_DICT_TYPE = {}
-    
+
     if planner is None:
         planner = _EmptyStateDictLoadPlanner()
-        
+
     ckpt_kwargs = {}
     ckpt_id = getattr(storage_reader, "checkpoint_id", None)
     if ckpt_id is not None:
         ckpt_kwargs["checkpoint_id"] = ckpt_id
-        
+
     @_dcp_method_logger(**ckpt_kwargs)
     def local_step():
         planner.set_up_planner(state_dict, metadata, True)
         storage_reader.set_up_storage_reader(metadata, True)
-        
+
         local_plan = planner.create_local_plan()
         local_plan = storage_reader.prepare_local_plan(local_plan)
         return local_plan
-    
+
     @_dcp_method_logger(**ckpt_kwargs)
     def global_step(all_local_plans):
         all_local_plans = planner.create_global_plan(all_local_plans)
         all_local_plans = storage_reader.prepare_global_plan(all_local_plans)
         return all_local_plans
-    
+
     local_plan = local_step()
     central_plan = global_step([local_plan])[0]
-    
+
     @_dcp_method_logger(**ckpt_kwargs)
     def read_data():
         final_local_plan = planner.finish_plan(central_plan)
         all_reads = storage_reader.read_data(final_local_plan, planner)
         all_reads.wait()
-    
+
     read_data()
     return state_dict
 
@@ -297,12 +297,12 @@ def extract_metadata(
     Returns:
         Metadata: A new Metadata instance containing only the entries associated with `selected_keys`.
     """
-    
+
     # select metadata
     partial_state_dict_metadata = {}
     partial_storage_data_metadata = {}
     partial_planner_data = {}
-    
+
     # Filter meta_items include only entries whose keys are in selected_keys
     for dcp_key, tensor_storage_metadata in metadata.state_dict_metadata.items():
         if dcp_key in selected_keys:
@@ -313,12 +313,12 @@ def extract_metadata(
     for dcp_key, state_dict_key_tuple in metadata.planner_data.items():
         if dcp_key in selected_keys:
             partial_planner_data.update({dcp_key: state_dict_key_tuple})
-    
+
     # Construct and return a new Metadata object with the filtered components
     partial_metadata = Metadata(
         state_dict_metadata=partial_state_dict_metadata,
         storage_data=partial_storage_data_metadata,
         planner_data=partial_planner_data
     )
-    
+
     return partial_metadata

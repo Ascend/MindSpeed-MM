@@ -32,8 +32,7 @@ seed_list = [8, 23, 42, 1334]
 
 #输出图片
 for prompt_key, negative_prompt_key in prompts.items():
-    for i in seed_list:    
+    for i in seed_list:
         generator = torch.Generator(device="cpu").manual_seed(i)
         image = pipe(prompt=prompt_key, negative_prompt=negative_prompt_key, generator=generator).images
         image[0].save(f"{output_path}/{prompt_key[26:40]}-{i}.png")
-

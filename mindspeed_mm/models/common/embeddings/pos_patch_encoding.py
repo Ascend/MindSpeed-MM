@@ -172,8 +172,8 @@ class PatchEmbed2D_3DsincosPE(nn.Module):
         elif pos_embed_type == "sincos":
             pos_embed = get_3d_sincos_pos_embed(
                 embed_dim,
-                spatial_size=grid_size, 
-                temporal_size=self.frame, 
+                spatial_size=grid_size,
+                temporal_size=self.frame,
                 spatial_interpolation_scale=self.interpolation_scale,
                 temporal_interpolation_scale=self.time_interpolation_scale,
             )

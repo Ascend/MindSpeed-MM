@@ -82,7 +82,7 @@ class Conversation:
                 if message:
                     if role == "User":
                         # <｜sft▁begin｜>User Input<｜sft▁end｜>\nResponse<｜end▁of▁sentence｜>
-                        ret += "<｜sft▁begin｜>\n" + message + self.sep 
+                        ret += "<｜sft▁begin｜>\n" + message + self.sep
                     else:
                         ret += message + self.sep2
                 else:
@@ -106,11 +106,11 @@ class Conversation:
             raise ValueError(f"Invalid style: {self.sep_style}")
 
         return ret
-    
+
     def set_system_message(self, system_message: str):
         """Set the system message."""
         self.system_message = system_message
-    
+
     def reset_message(self):
         """Reset a new message."""
         self.messages = []

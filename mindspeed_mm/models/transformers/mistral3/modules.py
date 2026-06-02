@@ -89,4 +89,3 @@ class MMMistralAttention(MistralAttention):
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
         attn_output = self.o_proj(attn_output)
         return attn_output, attn_weights
-

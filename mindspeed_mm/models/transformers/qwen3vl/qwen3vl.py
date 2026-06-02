@@ -37,7 +37,7 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         for merger in self.model.visual.deepstack_merger_list:
             fully_shard(merger, **fsdp2_kwargs)
         fully_shard(self.model.visual, **fsdp2_kwargs)
-        
+
         if fsdp2_config.align_fsdp_param_groups:
             # Each FSDP parameter group within a block contains only Linear layer parameters,
             # enabling aligned sharding for improved communication efficiency.
@@ -53,9 +53,9 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
                 if hasattr(layer.mlp, "gate"):
                     norm_gate_params.append(layer.mlp.gate)
             norm_gate_params.append(self.model.language_model.norm)
-            
+
             fully_shard(norm_gate_params, **last_module_kwargs)
-        
+
         llm_num_layers = len(self.model.language_model.layers)
         fully_shard(self.model.language_model.embed_tokens, **fsdp2_kwargs)
         for idx, layer in enumerate(self.model.language_model.layers):
@@ -138,7 +138,7 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         # set activation offload, only suppport offload text activations now
         llm_activation_offload = getattr(model_cfg.text_decoder, "activation_offload", False)
         setattr(transformer_config.text_config, "activation_offload", llm_activation_offload)
-        
+
         # set router_aux_loss_coef, for moe model
         router_aux_loss_coef = getattr(model_cfg.loss_cfg, "router_aux_loss_coef", 0.0)
         transformer_config.text_config.router_aux_loss_coef = router_aux_loss_coef

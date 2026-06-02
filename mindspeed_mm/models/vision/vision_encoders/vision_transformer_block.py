@@ -114,7 +114,7 @@ class Qwen3VLVisionTransformerLayer(TransformerLayer):
             )
         else:
             self.deepstack_layer = None
-        
+
     def forward(self, *args, **kwargs):
         """
         Perform a forward pass through the transformer layer.

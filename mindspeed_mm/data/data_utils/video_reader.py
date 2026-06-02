@@ -40,10 +40,10 @@ class Video(ABC):
     def __init__(self, video_path: str, layout: VideoLayoutType = "TCHW", array_type: VideoArrayType = "torch"):
         """
         Initialize video source
-        
+
         Args:
             video_path: String path to video file
-            layout (VideoLayoutType): 
+            layout (VideoLayoutType):
                 Desired tensor layout format. Options:
                 - "TCHW": Time, Channel, Height, Width (default)
                 - "THWC": Time, Height, Width, Channel
@@ -69,7 +69,7 @@ class Video(ABC):
     def _load_data(self):
         """
         Abstract method for implementation-specific data loading
-        
+
         Raises:
             VideoLoadError: If video file cannot be processed
         """
@@ -84,11 +84,11 @@ class Video(ABC):
     def get_video_fps(self) -> float:
         """
         Retrieve frames per second (FPS) information
-        
+
         Returns:
             Frame rate as floating point value
         """
-    
+
     @abstractmethod
     def get_len(self) -> int:
         """
@@ -100,7 +100,7 @@ class Video(ABC):
 class DecordVideo(Video):
     """
     Decord-based video decoder implementation with shared decoder instance
-    
+
     Class Attributes:
         _decoder (ClassVar[Optional[DecordInit]]): Shared decoder instance
     """
@@ -110,7 +110,7 @@ class DecordVideo(Video):
     def _init_decoder(cls):
         """
         Initialize shared decoder instance once
-        
+
         Initializes the class-level decoder instance on first call.
         Subsequent calls reuse existing instance.
         """
@@ -126,15 +126,15 @@ class DecordVideo(Video):
         if self.layout == "TCHW":
             # THWC -> TCHW,  [T: temporal, C: channel, H: height, W: width]
             video_data = video_data.transpose(0, 3, 1, 2)
-        
+
         if self.array_type == "torch":
             video_data = torch.from_numpy(video_data)
 
         return video_data
-    
+
     def get_video_fps(self) -> float:
         return self.vframes.get_avg_fps()
-    
+
     def get_len(self) -> int:
         return len(self.vframes)
 
@@ -155,7 +155,7 @@ class TorchvisionVideo(Video):
 
     def get_batch(self, frame_indices: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
         video_data = self.vframes[frame_indices]
-        
+
         if self.layout == "numpy":
             video_data = video_data.numpy()
         return video_data
@@ -174,17 +174,17 @@ class AvVideo(Video):
         self.vframes, _, self.metadata = read_video_av(
             str(self.video_path), pts_unit="sec", output_format=self.layout
         )
-    
+
     def get_batch(self, frame_indices: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
         video_data = self.vframes[frame_indices]
-        
+
         if self.layout == "numpy":
             video_data = video_data.numpy()
         return video_data
 
     def get_video_fps(self) -> float:
         return self.metadata.get("video_fps")
-    
+
     def get_len(self) -> int:
         return len(self.vframes)
 
@@ -196,7 +196,7 @@ class VideoReader:
     def __init__(self, video_reader_type=None):
         """
         Initialize with specified video type
-        
+
         Args:
             video_type: Registered video backend type (e.g., 'decord', 'torchvision', 'av')
         """
@@ -205,16 +205,16 @@ class VideoReader:
     def __call__(self, video_path, layout: VideoLayoutType = "TCHW", array_type: VideoArrayType = "torch"):
         """
         Create and return a video reader instance with specified configurations.
-        
+
         Args:
             video_path (str/Path): Path to the video file
-            layout (VideoLayoutType): 
+            layout (VideoLayoutType):
                 Expected tensor layout format. Default is "TCHW" (Time, Channels, Height, Width).
                 Other options might include "THWC" etc.
-            array_type (VideoArrayType): 
+            array_type (VideoArrayType):
                 Desired array type for frame data. Default is "torch" (PyTorch tensors).
                 Could support "numpy" for ndarrays or other types.
-                
+
         Returns:
             BaseVideoReader: Instantiated video reader object of the specified type
         """

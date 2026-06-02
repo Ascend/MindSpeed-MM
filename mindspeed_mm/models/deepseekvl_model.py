@@ -30,7 +30,7 @@ class VLMModel(MultiModalModule):
         {
             "pre_process": (bool),  # Include the embedding leayer in the gpt decoder (used with pipeline parallelism).
             "post_process": (bool),  # Include an output layer and a layernorm in the gpt decoder (used with pipeline parallelism).
-            "add_text_encoder": (bool),  # Whether to construct the text encoder. not used now. 
+            "add_text_encoder": (bool),  # Whether to construct the text encoder. not used now.
             "add_image_encoder": (bool),  # Whether to construct the image encoder.
             "add_video_encoder": (bool),  # Whether to construct the video encoder. not used now.
             "add_text_decoder": (bool),  # Whether to construct the text decoder.
@@ -61,7 +61,7 @@ class VLMModel(MultiModalModule):
         self.share_embeddings_and_output_weights = not getattr(config.text_decoder, 'untie_embeddings_and_output_weights', True)
         self.position_embedding_type = config.text_decoder.position_embedding_type
         self.vocab_size = config.text_decoder.vocab_size
-        
+
 
         # initialize pipeline parallel configs
         self.pp_size = mpu.get_pipeline_model_parallel_world_size()
@@ -69,7 +69,7 @@ class VLMModel(MultiModalModule):
             raise NotImplementedError("Not support virtual_pipeline_model_parallel now")
         else:
             self.pp_rank = mpu.get_pipeline_model_parallel_rank()
-        
+
         if self.add_text_encoder:
             self.text_encoder = TextEncoder(config.text_encoder).get_model()
         if self.add_image_encoder:
@@ -129,7 +129,7 @@ class VLMModel(MultiModalModule):
             raise ValueError(f"length of vision_encoder.pipeline_num_layers must equal to pipeline-model-parallel-size, "
                              f"but got vision_encoder.pipeline_num_layers length:{len(config.vision_encoder.pipeline_num_layers)} "
                              f"and pipeline-model-parallel-size:{self.pp_size}.")
-        
+
         local_num_layers = config.vision_encoder.pipeline_num_layers[self.pp_rank]
         if local_num_layers == 0:
             self.add_image_encoder = False
@@ -137,10 +137,10 @@ class VLMModel(MultiModalModule):
 
         pipeline_start_index = sum(config.vision_encoder.pipeline_num_layers[:self.pp_rank])
         pipeline_end_index = sum(config.vision_encoder.pipeline_num_layers[:self.pp_rank + 1])
-        
+
         pre_process = pipeline_start_index == 0
         post_process = pipeline_end_index == config.vision_encoder.num_layers
-        
+
         print(
             f"image encoder pipeline config:\
             pp_rank:{self.pp_rank},\
@@ -172,7 +172,7 @@ class VLMModel(MultiModalModule):
                 pre_process=self.pre_process,
                 post_process=self.post_process
             )
-        
+
         if self.pp_size != len(config.pipeline_num_layers):
             raise ValueError(f"length of pipeline_num_layers must equal to pipeline-model-parallel-size, "
                              f"but got pipeline_num_layers length:{len(config.pipeline_num_layers)} "
@@ -185,7 +185,7 @@ class VLMModel(MultiModalModule):
 
         pipeline_start_index = sum(config.pipeline_num_layers[:self.pp_rank])
         pipeline_end_index = sum(config.pipeline_num_layers[:self.pp_rank + 1])
-        
+
         pre_process = pipeline_start_index == 0
         post_process = pipeline_end_index == config.num_layers
         first_k_dense_replace = config.first_k_dense_replace - pipeline_start_index
@@ -275,7 +275,7 @@ class VLMModel(MultiModalModule):
         shift_labels = labels[..., 1:].contiguous()
 
         # To align with torch.nn.CrossEntropyLoss, disable max normalization in vocab_parallel_cross_entropy (comment out)
-        loss = tensor_parallel.vocab_parallel_cross_entropy(shift_logits.float(), shift_labels) 
+        loss = tensor_parallel.vocab_parallel_cross_entropy(shift_logits.float(), shift_labels)
         loss = loss * (shift_labels > -1)
         loss = torch.sum(loss) / torch.sum(shift_labels > -1)
 
@@ -426,7 +426,7 @@ class VLMModel(MultiModalModule):
         # [b, s, h] -> [s, b, h]
         input_embeds = input_embeds.transpose(0, 1)
         return input_embeds
-        
+
 
     def forward(
             self,
@@ -434,11 +434,11 @@ class VLMModel(MultiModalModule):
             position_ids: Optional[torch.LongTensor] = None,
             input_embeds: Optional[torch.FloatTensor] = None,
             attention_mask: Optional[torch.Tensor] = None,
-            
+
             images: Optional[torch.Tensor] = None,
             images_seq_mask: Optional[torch.Tensor] = None,
             images_spatial_crop: Optional[torch.Tensor] = None,
-            
+
             labels: Optional[torch.Tensor] = None,
             inference_params: Optional[InferenceParams] = None,
             **kwargs

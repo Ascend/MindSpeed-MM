@@ -30,7 +30,7 @@ def _init_pg(rank: int, world_size: int, init_file: str):
     # bind each process to a dedicated npu
     if hasattr(torch, "npu"):
         torch.npu.set_device(rank)
-    
+
     dist.init_process_group(
         backend="hccl",
         init_method=f"file://{init_file}",
@@ -74,7 +74,7 @@ def _worker_l2_clip(rank: int, world_size: int, init_file: str):
                 super().__init__()
                 self.w = torch.nn.Parameter(torch.zeros(1))
                 self.b = torch.nn.Parameter(torch.zeros(1))
-        
+
         m = M()
         m = m.to(torch.device("npu", rank))
         #make ranks contribute different local norms
@@ -84,7 +84,7 @@ def _worker_l2_clip(rank: int, world_size: int, init_file: str):
         else:
             m.w.grad = torch.tensor([0.0], device=torch.device("npu", rank))
             m.b.grad = torch.tensor([0.0], device=torch.device("npu", rank))
-        
+
         # global l2 norm: sqrt(3^2 + 4^2) == 5
         returned = mod.clip_grad_norm(m, max_norm=1.0, norm_type=2.0)
         expected = torch.tensor(5.0, device=torch.device("npu", rank))
@@ -132,7 +132,7 @@ def _worker_inf_norm(rank: int, world_size: int, init_file: str):
             def __init__(self):
                 super().__init__()
                 self.p = torch.nn.Parameter(torch.zeros(4))
-        
+
         m = M()
         m = m.to(torch.device("npu", rank))
         if rank == 0:
@@ -192,7 +192,7 @@ def _worker_ep_path(rank: int, world_size: int, init_file: str):
         else:
             m.ep.grad = torch.tensor([0.0], device=torch.device("npu", rank))
             m.non_ep.grad = torch.tensor([0.0], device=torch.device("npu", rank))
-        
+
         returned = mod.clip_grad_norm(m, max_norm=1.0, norm_type=2.0)
         gathered = [torch.zeros_like(returned) for _ in range(world_size)]
         dist.all_gather(gathered, returned)
@@ -227,7 +227,7 @@ def test_clip_grad_norm_multi_process(worker):
 
     if not hasattr(torch, "npu") or torch.npu.device_count() < 2:
         pytest.skip("需要至少2卡NPU才能运行该用例")
-    
+
     world_size = 2
     with tempfile.NamedTemporaryFile(delete=False) as f:
         init_file = f.name
@@ -238,4 +238,3 @@ def test_clip_grad_norm_multi_process(worker):
             os.remove(init_file)
         except OSError:
             pass
-        

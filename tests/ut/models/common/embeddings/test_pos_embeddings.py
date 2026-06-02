@@ -36,10 +36,10 @@ class TestRoPE3DSORA:
         rope = RoPE3DSORA(30000, freq=10000.0, interpolation_scale=(1, 1, 1))
         b, t, h, w = 2, 3, 4, 5
         poses = rope.get_position(b, t, h, w, 'cpu')
-        
+
         # Verify output structure
         judge_expression(isinstance(poses, tuple))
-        
+
 
 class TestRoPE3DStepVideo:
     def test_init_rope3dstepvideo(self):

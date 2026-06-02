@@ -53,7 +53,7 @@ class PatchesManager:
             ("megatron.core.optimizer.clip_grads.get_grad_norm_fp32", adaptive_clip_grad_patch.get_grad_norm_fp32_async),
             ("megatron.core.optimizer.clip_grads.clip_grad_by_total_norm_fp32", adaptive_clip_grad_patch.clip_grad_by_total_norm_fp32_async)
         ],
-        
+
         # Enable this patch when loading model weights from a .pt checkpoint file in distributed training.
         # This will override the default model loading behavior to handle distributed checkpoint format.
         "get_dist_model_load_from_pt": [
@@ -106,5 +106,3 @@ class PatchesManager:
                 for orig_func_name, new_func in PatchesManager.configs[key]:
                     PatchesManager.register_patch(orig_func_name, new_func)
         PatchesManager.apply_patches()
-
-    

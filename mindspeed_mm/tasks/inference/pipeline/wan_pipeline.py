@@ -81,7 +81,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         self.generator = None if not hasattr(config, "seed") else torch.Generator().manual_seed(config.seed)
         if hasattr(args, "boundary_ratio"):
             self.boundary_timestep = self.scheduler.num_train_timesteps * args.boundary_ratio
-        
+
         self.expand_timesteps = getattr(config, "expand_timesteps", False)
         self.vae_scale_factor_spatial = getattr(config, "vae_scale_factor_spatial", self.vae_scale_factor_spatial)
 
@@ -105,7 +105,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         ]
         hook = None
 
-        if hasattr(self, "predict_model2") and self.predict_model2 is not None: 
+        if hasattr(self, "predict_model2") and self.predict_model2 is not None:
             model_sequence.insert(2, self.predict_model2)
         if hasattr(self, "image_encoder") and self.image_encoder is not None:
             model_sequence.insert(1, self.image_encoder)
@@ -124,9 +124,9 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             # wan2.2 A14B low noise stage
             curr_predict_model = self.predict_model2
             curr_guidance_scale = guidance_scale[1] if isinstance(guidance_scale, (list, tuple)) else guidance_scale
-        
+
         return curr_predict_model, curr_guidance_scale
-    
+
     def get_negative_prompt(self):
         if self.model_type == "flf2v":
             # for wan2.1 flf2v
@@ -259,7 +259,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
 
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps):
                     progress_bar.update()
-        
+
         if self.expand_timesteps and self.model_type == "ti2v":
             latents = (1 - first_frame_mask) * vae_features + first_frame_mask * latents
 
@@ -445,7 +445,7 @@ class WanPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         if self.dual_image:
             vae_input_l = vae_transform(image_l)
             vae_input = torch.concat([
-                vae_input.unsqueeze(2), 
+                vae_input.unsqueeze(2),
                 torch.zeros(batch_size, 3, self.num_frames - 2, h, w),
                 vae_input_l.unsqueeze(2)
                 ], dim=2).to(device=device, dtype=dtype)

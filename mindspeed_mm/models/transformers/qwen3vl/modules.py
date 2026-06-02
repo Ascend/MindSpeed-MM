@@ -49,10 +49,10 @@ class Qwen3VLEmptyModule(nn.Module):
     """
     def __init__(self):
         super().__init__()
-        
+
     def forward(self, hidden_state: torch.Tensor) -> torch.Tensor:
         return hidden_state
-    
+
 
 class Qwen3VLVisionMLP(nn.Module):
     def __init__(self, config):
@@ -210,7 +210,7 @@ def do_vit_ring_context_parallel(q, k, v, head_num, softmax_scale, attn_mask=Non
         if args.use_cp_send_recv_overlap else None
     cp_para['pse'] = pse
     cp_para['pse_type'] = pse_type
-    
+
     output = ringattn_context_parallel_tnd_general(q, k, v, head_num, cp_para, softmax_scale, attn_mask, dropout_p, shapes=shapes)
 
     return output
@@ -328,7 +328,7 @@ class Qwen3VLVisionAttention(nn.Module):
 
 
         if layout == "TND":
-            
+
             attn_output = attention_interface(
                 query_states,
                 key_states,

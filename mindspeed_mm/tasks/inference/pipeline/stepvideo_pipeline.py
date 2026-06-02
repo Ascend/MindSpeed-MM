@@ -51,7 +51,7 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         elif isinstance(text, list) or isinstance(text, tuple):
             return [template.format(one_text) for one_text in text]
         else:
-            raise NotImplementedError(f"Not Support text type {type(text)}") 
+            raise NotImplementedError(f"Not Support text type {type(text)}")
 
     def check_inputs(self, num_frames, width, height):
         num_frames = max(num_frames // 17 * 17, 1)
@@ -172,15 +172,15 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
-        
+
         do_classifier_free_guidance = self.guidance_scale > 1
-        
+
         # 3. Encode input prompt
         if negative_prompt is None or negative_prompt == "":
             negative_prompt = self.get_negative_magic()
         if not isinstance(negative_prompt, str):
             raise TypeError(f"`negative_prompt` must be a string, but got {type(negative_prompt)}")
-        
+
         if isinstance(prompt, str):
             prompt = [prompt + self.get_positive_magic()]
         elif isinstance(prompt, list) or isinstance(prompt, tuple):
@@ -220,7 +220,7 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
 
         if do_classifier_free_guidance:
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])# 2, s1, d1
-            clip_embedding = torch.cat([negative_clip_embedding, clip_embedding, ]).to(prompt_embeds.dtype)# 2, s2, d2 
+            clip_embedding = torch.cat([negative_clip_embedding, clip_embedding, ]).to(prompt_embeds.dtype)# 2, s2, d2
             if prompt_mask is not None:
                 prompt_mask = torch.cat([negative_prompt_mask, prompt_mask])
                 clip_mask = torch.cat([negative_clip_mask, clip_mask])
@@ -280,5 +280,5 @@ class StepVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
 
         # 6. Decode
         video = self.decode_latents(latents.to(self.vae.dtype))  # b t c h w
-        
+
         return video

@@ -17,12 +17,12 @@ from mindspeed_mm.utils.utils import get_dtype
 
 class HunyuanFeatureExtractor(FeatureExtractor):
     def _extract_single(
-        self, 
+        self,
         batch: Dict[str, Any]
     ) -> Tuple[List[str], torch.Tensor, Dict[str, Any], Any, Any]:
         if not batch:
             raise ValueError("Received empty batch")
-        
+
         video = batch.pop(VIDEO).to(self.device, dtype=self.ae_dtype)
         prompt_ids = batch.pop(PROMPT_IDS)
         prompt_mask = batch.pop(PROMPT_MASK)

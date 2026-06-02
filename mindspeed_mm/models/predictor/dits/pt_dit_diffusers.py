@@ -93,9 +93,9 @@ class ProxyTokensTransformerBlock(nn.Module):
         attention_bias: bool = False,
         upcast_attention: bool = False,
         norm_elementwise_affine: bool = True,
-        norm_type: str = "layer_norm",  
+        norm_type: str = "layer_norm",
         norm_eps: float = 1e-5,
-        shift_window: bool = False, 
+        shift_window: bool = False,
         final_dropout: bool = False,
         attention_type: str = "default",
         compress_ratios=None,
@@ -106,7 +106,7 @@ class ProxyTokensTransformerBlock(nn.Module):
         self.use_ada_layer_norm_single = norm_type == "ada_norm_single"
         self.proxy_norm1 = nn.LayerNorm(dim, elementwise_affine=norm_elementwise_affine, eps=norm_eps)
         self.norm1 = nn.LayerNorm(dim, elementwise_affine=norm_elementwise_affine, eps=norm_eps)
-        self.proxy_cross_norm = nn.LayerNorm(dim, elementwise_affine=norm_elementwise_affine, eps=norm_eps)            
+        self.proxy_cross_norm = nn.LayerNorm(dim, elementwise_affine=norm_elementwise_affine, eps=norm_eps)
 
         self.proxy_attn1 = Attention(
             query_dim=dim,
@@ -178,7 +178,7 @@ class ProxyTokensTransformerBlock(nn.Module):
             self.scale_ratio = (1, compress_ratios[1] // proxy_compress_ratios[1], compress_ratios[2] // proxy_compress_ratios[2])
         else:
             self.scale_ratio = (compress_ratios[0] // compress_ratios[0], compress_ratios[1] // proxy_compress_ratios[1], compress_ratios[2] // proxy_compress_ratios[2])
-          
+
 
         # 5. Scale-shift for PixArt-Alpha.
         if self.use_ada_layer_norm_single:
@@ -195,7 +195,7 @@ class ProxyTokensTransformerBlock(nn.Module):
         dim = hidden_states.shape[-1]
         F_new, H_new, W_new = num_frames // compress_ratios[0], height // compress_ratios[1], width // compress_ratios[2]
         f_shift_size, h_shift_size, w_shift_size = compress_ratios[0] // 2, compress_ratios[1] // 2, compress_ratios[2] // 2
-        
+
         hidden_states = rearrange(hidden_states, "(b p) n c -> b p n c", p=number_proxys)
         hidden_states = hidden_states.reshape(-1, F_new, H_new, W_new, compress_ratios[0], compress_ratios[1], compress_ratios[2], dim)
         hidden_states = rearrange(hidden_states, "b f h w x y z c -> b (f x) (h y) (w z) c")
@@ -226,7 +226,7 @@ class ProxyTokensTransformerBlock(nn.Module):
 
         hidden_states = rearrange(hidden_states, "b f h w x y z c -> (b f h w) (x y z) c")
 
-        return hidden_states    
+        return hidden_states
 
     def get_proxy_token(self, hidden_states, compress_ratios, scale_ratio, window_number, mode='first'):
         number, dim = hidden_states.shape[1], hidden_states.shape[-1]
@@ -286,7 +286,7 @@ class ProxyTokensTransformerBlock(nn.Module):
         lora_scale = cross_attention_kwargs.get("scale", 1.0) if cross_attention_kwargs is not None else 1.0
         cross_attention_kwargs = cross_attention_kwargs.copy() if cross_attention_kwargs is not None else {}
         gligen_kwargs = cross_attention_kwargs.pop("gligen", None)  # None
-        
+
         #1.----------------------------------proxy token self attention-----------------------------------
         proxy_hidden_states = self.get_proxy_token(hidden_states, compress_ratios, self.scale_ratio, window_number, mode="mean")
 
@@ -336,7 +336,7 @@ class ProxyTokensTransformerBlock(nn.Module):
         #4.---------------------------shift window Self-Attention------------------------------------
         if self.shift_window:
             after_shift_hidden_states = self.window_shift(hidden_states, window_number,
-                                                        compress_ratios, 
+                                                        compress_ratios,
                                                         num_frames, height, width)
 
             after_shift_norm_hidden_states = self.shift_window_norm(after_shift_hidden_states)
@@ -349,7 +349,7 @@ class ProxyTokensTransformerBlock(nn.Module):
                 **cross_attention_kwargs,
             )
             attn_output = self.window_Ishift(after_shift_attn_output, window_number,
-                                            compress_ratios, 
+                                            compress_ratios,
                                             num_frames, height, width)
 
             attn_output = gate_sw_msa * attn_output
@@ -422,7 +422,7 @@ class PixArtAlphaCombinedTimestepSizeEmbeddings(nn.Module):
             self.additional_condition_proj = Timesteps(num_channels=256, flip_sin_to_cos=True, downscale_freq_shift=0)
             self.resolution_embedder = TimestepEmbedding(in_channels=256, time_embed_dim=size_emb_dim)
             self.aspect_ratio_embedder = TimestepEmbedding(in_channels=256, time_embed_dim=size_emb_dim)
-            
+
             self.resolution_embedder.linear_2 = zero_module(self.resolution_embedder.linear_2)
             self.aspect_ratio_embedder.linear_2 = zero_module(self.aspect_ratio_embedder.linear_2)
 
@@ -483,26 +483,26 @@ class PTDiTDiffuser(ModelMixin, ConfigMixin):
     @register_to_config
     def __init__(
         self,
-        num_heads: int = 16, 
-        head_dim: int = 88, 
-        in_channels: Optional[int] = None, 
-        out_channels: Optional[int] = None, 
-        num_layers: int = 1, 
-        dropout: float = 0.0, 
-        norm_num_groups: int = 32, 
-        cross_attention_dim: Optional[int] = None, 
-        attention_bias: bool = False, 
-        sample_size: Optional[int] = None, 
-        frame: Optional[int] = None, 
-        patch_size: Optional[int] = None, 
-        activation_fn: str = "geglu",  
-        num_embeds_ada_norm: Optional[int] = None, 
+        num_heads: int = 16,
+        head_dim: int = 88,
+        in_channels: Optional[int] = None,
+        out_channels: Optional[int] = None,
+        num_layers: int = 1,
+        dropout: float = 0.0,
+        norm_num_groups: int = 32,
+        cross_attention_dim: Optional[int] = None,
+        attention_bias: bool = False,
+        sample_size: Optional[int] = None,
+        frame: Optional[int] = None,
+        patch_size: Optional[int] = None,
+        activation_fn: str = "geglu",
+        num_embeds_ada_norm: Optional[int] = None,
         upcast_attention: bool = False,
-        norm_type: str = "layer_norm", 
+        norm_type: str = "layer_norm",
         norm_elementwise_affine: bool = True,
-        norm_eps: float = 1e-5, 
-        attention_type: str = "default", 
-        caption_channels: int = None, 
+        norm_eps: float = 1e-5,
+        attention_type: str = "default",
+        caption_channels: int = None,
         shift_window: bool = False,
         compress_ratios: Optional[list] = None,
         proxy_compress_ratios: Optional[list] = None,
@@ -527,13 +527,13 @@ class PTDiTDiffuser(ModelMixin, ConfigMixin):
         self.sample_size = sample_size
 
         self.patch_size = patch_size
-        interpolation_scale = self.sample_size // 64 
+        interpolation_scale = self.sample_size // 64
         interpolation_scale = max(interpolation_scale, 1)
-        
+
         self.pos_embed = PatchEmbed2D_3DsincosPE(
             height=sample_size,
             width=sample_size,
-            frame=frame, 
+            frame=frame,
             patch_size=patch_size,
             in_channels=in_channels,
             embed_dim=inner_dim,
@@ -615,8 +615,8 @@ class PTDiTDiffuser(ModelMixin, ConfigMixin):
                     img_mask[:, f, h, w] = cnt
                     cnt += 1
 
-        img_mask = img_mask.view(1, video_length // compress_ratios[0], compress_ratios[0], 
-                                    height // compress_ratios[1], compress_ratios[1], 
+        img_mask = img_mask.view(1, video_length // compress_ratios[0], compress_ratios[0],
+                                    height // compress_ratios[1], compress_ratios[1],
                                     weight // compress_ratios[2], compress_ratios[2])
         mask_windows = rearrange(img_mask, "b f x h y w z -> (b f h w) (x y z)")
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
@@ -630,7 +630,7 @@ class PTDiTDiffuser(ModelMixin, ConfigMixin):
         n_f, n_h, n_w = f // compress_ratios[0], h // compress_ratios[1], w // compress_ratios[2]
         hidden_states = hidden_states.reshape(b, c, n_f, compress_ratios[0], n_h, compress_ratios[1], n_w, compress_ratios[2])
         hidden_states = rearrange(hidden_states, "b c f x h y w z -> (b f h w) c x y z")
-        
+
         return hidden_states
 
     def set_input_tensor(self, input_tensor):
@@ -735,7 +735,7 @@ class PTDiTDiffuser(ModelMixin, ConfigMixin):
 
         # 1.5 Shift Window Attention Mask
         if self.shift_window_attention_mask is None:
-            self.get_shift_window_attention_mask(video_length, height, width, self.compress_ratios, 
+            self.get_shift_window_attention_mask(video_length, height, width, self.compress_ratios,
                                                   hidden_states.dtype, hidden_states.device)
 
         if self.shift_window_attention_mask is not None and self.shift_window_attention_mask.ndim == 3:
@@ -804,9 +804,9 @@ class PTDiTDiffuser(ModelMixin, ConfigMixin):
         hidden_states = rearrange(hidden_states, "b (p n) c -> b p n c", p=number_proxy_tokens)
 
         hidden_states = hidden_states.reshape(-1, compress_f, compress_h, compress_w, self.compress_ratios[0],
-                                                self.compress_ratios[1], self.compress_ratios[2], 
+                                                self.compress_ratios[1], self.compress_ratios[2],
                                                 self.patch_size * self.patch_size * self.out_channels)
-    
+
         hidden_states = rearrange(hidden_states, "b f h w x y z c -> b (f x) (h y) (w z) c")
 
         hidden_states = hidden_states.reshape(

@@ -23,7 +23,7 @@ import torch.distributed as dist
 # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.rescale_noise_cfg
 def rescale_noise_cfg(noise_cfg, noise_pred_text, guidance_rescale=0.0):
     """
-    Rescale `noise_cfg` according to `guidance_rescale`. 
+    Rescale `noise_cfg` according to `guidance_rescale`.
     """
     std_text = noise_pred_text.std(dim=list(range(1, noise_pred_text.ndim)), keepdim=True)
     std_cfg = noise_cfg.std(dim=list(range(1, noise_cfg.ndim)), keepdim=True)
@@ -37,7 +37,7 @@ def rescale_noise_cfg(noise_cfg, noise_pred_text, guidance_rescale=0.0):
 def opensora_linear_quadratic_schedule(num_inference_steps, approximate_steps=1000):
     if approximate_steps % 2 != 0:
         raise ValueError(f"approximate_steps must be even")
-    if num_inference_steps % 2 != 0: 
+    if num_inference_steps % 2 != 0:
         raise ValueError(f"num_inference_steps must be even")
     if num_inference_steps > approximate_steps:
         raise ValueError(f"num_inference_steps must be less than or equal to approximate_steps")
@@ -51,7 +51,7 @@ def opensora_linear_quadratic_schedule(num_inference_steps, approximate_steps=10
     quadratic_b = (5 * _num_inference_steps - 4 * _approximate_steps) / (2 * _approximate_steps * _num_inference_steps)
     quadratic_c = (_approximate_steps - _num_inference_steps) / _approximate_steps
     quadratic_sigmas = [
-        quadratic_a * i ** 2 + quadratic_b * i + quadratic_c 
+        quadratic_a * i ** 2 + quadratic_b * i + quadratic_c
         for i in range(_num_inference_steps, 2 * _num_inference_steps)
     ]
     sigmas = linear_sigmas + quadratic_sigmas + [1.0]
@@ -61,13 +61,13 @@ def opensora_linear_quadratic_schedule(num_inference_steps, approximate_steps=10
 
 class OpenSoraPlanScheduler:
     """
-        In OpenSoraPlan v1.5, we use FlowMatching to train the model. 
+        In OpenSoraPlan v1.5, we use FlowMatching to train the model.
     """
 
     order = 1
 
     def __init__(
-        self, 
+        self,
         num_inference_steps: bool = None,
         guidance_scale: float = 4.5,
         guidance_rescale: float = 0.7,
@@ -99,7 +99,7 @@ class OpenSoraPlanScheduler:
         # we use sd3 config
         self.logit_mean = logit_mean
         self.logit_std = logit_std
-        self.mode_scale = mode_scale 
+        self.mode_scale = mode_scale
 
         if self.use_dynamic_shifting:
             self.base_image_seq = base_image_seq
@@ -108,18 +108,18 @@ class OpenSoraPlanScheduler:
             self.max_shift = max_shift
             self.shift_k = (self.max_shift - self.base_shift) / (self.max_image_seq - self.base_image_seq)
             self.shift_b = self.base_shift - self.shift_k * self.base_image_seq
-        
+
         sigma_eps = sigma_eps
 
         if sigma_eps is not None:
             if not (sigma_eps >= 0 and sigma_eps <= 1e-2):
-                raise ValueError("sigma_eps should be in the range of [0, 1e-2]") 
+                raise ValueError("sigma_eps should be in the range of [0, 1e-2]")
         else:
             sigma_eps = 0.0
 
         self._sigma_eps = sigma_eps
-        self._sigma_min = 0.0 
-        self._sigma_max = 1.0  
+        self._sigma_min = 0.0
+        self._sigma_max = 1.0
 
         self.sigmas = None
 
@@ -164,10 +164,10 @@ class OpenSoraPlanScheduler:
         noised_sample = noised_sample.to(sample_dtype)
 
         return noised_sample
-    
+
     def compute_density_for_sigma_sampling(
-        self, 
-        batch_size: int, 
+        self,
+        batch_size: int,
     ):
         """Compute the density for sampling the sigmas when doing SD3 training.
         """
@@ -182,7 +182,7 @@ class OpenSoraPlanScheduler:
             sigmas = torch.rand(size=(batch_size,), device="cpu")
 
         return sigmas
-    
+
     def compute_loss_weighting_for_sd3(self, sigmas=None):
         """Computes loss weighting scheme for SD3 training.
         """
@@ -267,12 +267,12 @@ class OpenSoraPlanScheduler:
             isinstance(step_index, int)
             or isinstance(step_index, torch.IntTensor)
             or isinstance(step_index, torch.LongTensor)
-        ): 
+        ):
             raise ValueError("step_index should be an integer or a tensor of integer")
 
         if not (step_index >= 0 and step_index < len(self.sigmas)):
             raise ValueError("step_index should be in the range of [0, len(sigmas)]")
-                             
+
         # Upcast to avoid precision issues when computing prev_sample
         sample = sample.to(torch.float32)
 
@@ -285,7 +285,7 @@ class OpenSoraPlanScheduler:
         prev_sample = prev_sample.to(model_output.dtype)
 
         return prev_sample
-    
+
     def training_losses(
         self,
         model_output: torch.Tensor,
@@ -316,7 +316,7 @@ class OpenSoraPlanScheduler:
             loss = loss_mse.mean()
 
         return loss
-    
+
     def q_sample(
         self,
         x_start: torch.Tensor,
@@ -379,7 +379,7 @@ class OpenSoraPlanScheduler:
 
         encoder_hidden_states = model_kwargs.pop("prompt")
         encoder_attention_mask = model_kwargs.pop("prompt_mask")
-        
+
         with tqdm(total=self.num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
@@ -395,20 +395,20 @@ class OpenSoraPlanScheduler:
                 )
                 if torch.any(torch.isnan(noise_pred)):
                     raise ValueError("noise_pred contains nan values")
-                
+
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
-                
+
                 if do_classifier_free_guidance and self.guidance_rescale > 0.0:
                     noise_pred = rescale_noise_cfg(noise_pred, noise_pred_text, guidance_rescale=self.guidance_rescale)
-            
+
                 latents = self.step(noise_pred, i, latents, **extra_step_kwargs)
 
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or (i + 1) % self.order == 0:
                     progress_bar.update()
-        
+
         return latents
 
     @staticmethod

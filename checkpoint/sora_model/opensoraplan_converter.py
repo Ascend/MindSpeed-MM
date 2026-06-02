@@ -16,7 +16,7 @@ class LayerIndexConverter:
             idx = int(name.split('.')[1])
             return idx
         return None
-        
+
     @staticmethod
     def convert_layer_index(name, new_layer_index):
         if name.startswith("videodit_sparse_blocks"):
@@ -83,7 +83,7 @@ class OpenSoraPlanConverter(SoraModelConverter):
                 "to_out.0": "proj_out",
                 "to_out.1": "dropout",
             }
-            
+
             self._enable_tp = True
             num_layers = 32
             for i in range(num_layers):
@@ -127,7 +127,7 @@ class OpenSoraPlanConverter(SoraModelConverter):
             ]
             self.post_preprocess_weight_names = ['scale_shift_table', 'proj_out.weight', 'proj_out.bias']
             self.layer_index_converter = LayerIndexConverter()
-        
+
         elif self.version == "v1.5":
             self._supported_methods = ["source_to_mm", "resplit"]
             self.str_replace_mapping = {
@@ -144,7 +144,7 @@ class OpenSoraPlanConverter(SoraModelConverter):
                 "attn1.norm_added_q": "attn1.norm_added_proj_q",
                 "attn1.norm_added_k": "attn1.norm_added_proj_k",
             }
-    
+
             self._enable_tp = True
             num_layers = [2, 4, 6, 8, 6, 4, 2]
             self.tp_split_mapping["column_parallel_tp"] += [

@@ -48,4 +48,3 @@ class DataloaderArguments(BaseArguments):
 class DataArguments(BaseArguments):
     dataset_param: DataSetArguments = field(default_factory=DataSetArguments)
     dataloader_param: DataloaderArguments = field(default_factory=DataloaderArguments)
-

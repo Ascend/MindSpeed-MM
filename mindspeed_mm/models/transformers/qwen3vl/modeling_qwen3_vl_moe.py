@@ -116,7 +116,7 @@ class Qwen3VLMoeTextExperts(nn.Module):
             )
             next_states = next_states.sum(dim=0)
         return next_states
-    
+
     @staticmethod
     def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices, *args, **kwargs):
         raise NotImplementedError("must set `use_npu_fused_moe=True` when enable expert parallelism.")
@@ -139,7 +139,7 @@ class Qwen3VLNpuFusedMoETextExperts(Qwen3VLMoeTextExperts):
         next_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=routing_weights)
         next_states = next_states.view(batch_size, -1, self.hidden_size)
         return next_states
-    
+
     @staticmethod
     def ep_forward(ep_group, self, hidden_states, routing_weights, router_indices, *args, **kwargs):
         gate_up_proj, down_proj = self._view_experts_weight()
@@ -381,14 +381,14 @@ def load_balancing_loss_func(
         # Compute the percentage of tokens routed to each experts
         sum_expert_attention_mask = torch.sum(expert_attention_mask, dim=0)
         torch.distributed.all_reduce(
-            sum_expert_attention_mask, 
-            op=torch.distributed.ReduceOp.SUM, 
+            sum_expert_attention_mask,
+            op=torch.distributed.ReduceOp.SUM,
             group=mpu.get_context_parallel_group()
         )
         tokens_per_expert = torch.sum(expert_mask.float() * expert_attention_mask, dim=0) / sum_expert_attention_mask
         torch.distributed.all_reduce(
-            tokens_per_expert, 
-            op=torch.distributed.ReduceOp.SUM, 
+            tokens_per_expert,
+            op=torch.distributed.ReduceOp.SUM,
             group=mpu.get_context_parallel_group()
         )
 
@@ -403,7 +403,7 @@ def load_balancing_loss_func(
         # Compute the average probability of routing to these experts
         sum_router_per_expert_attention_mask = torch.sum(router_per_expert_attention_mask, dim=0)
         torch.distributed.all_reduce(
-            sum_router_per_expert_attention_mask, 
+            sum_router_per_expert_attention_mask,
             op=torch.distributed.ReduceOp.SUM,
             group=mpu.get_context_parallel_group()
         )

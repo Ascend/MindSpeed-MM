@@ -18,9 +18,9 @@
             "DownEncoderBlockCausal3D"
         ],
         "up_block_types": [
-            "UpDecoderBlockCausal3D", 
             "UpDecoderBlockCausal3D",
-            "UpDecoderBlockCausal3D", 
+            "UpDecoderBlockCausal3D",
+            "UpDecoderBlockCausal3D",
             "UpDecoderBlockCausal3D"
         ],
         "scaling_factor": 0.476986,
@@ -54,7 +54,7 @@
             "hidden_state_skip_layer": 2,
             "output_key": "hidden_states",
             "template_id": "hyv-llm-encode-video",
-            "template_file_path": "examples/hunyuanvideo/template.json"         
+            "template_file_path": "examples/hunyuanvideo/template.json"
         },
         {
             "model_id": "CLIP",
@@ -70,7 +70,7 @@
         "model_id": "hunyuanvideodit",
         "from_pretrained": null,
         "dtype": "bf16",
-        "patch_size": [1, 2, 2], 
+        "patch_size": [1, 2, 2],
         "in_channels": 16,
         "out_channels": 16,
         "num_heads": 24,
@@ -80,7 +80,7 @@
         "mm_double_blocks_depth": 20,
         "mm_single_blocks_depth": 40,
         "rope_dim_list": [16, 56, 56],
-        "qkv_bias": true, 
+        "qkv_bias": true,
         "qk_norm": true,
         "qk_norm_type": "rmsnorm",
         "guidance_embed": true,
@@ -95,7 +95,7 @@
         "shift": 7.0,
         "reverse": true,
         "solver": "euler"
-    }, 
+    },
     "pipeline_config": {
         "input_size": [65, 544, 960],
         "guidance_scale": 1.0,

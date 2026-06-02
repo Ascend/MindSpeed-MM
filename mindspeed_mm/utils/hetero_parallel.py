@@ -37,15 +37,15 @@ def image_encoder_forward_pre_hook(module, input):
     text_img_num, _ = all_gather_dp_group(text_img_num, cat_dim=0)
     change_parallel_state('image_encoder')
 
-    pv_lens = []	
+    pv_lens = []
     thw_num_per_DP_rank = []
     for text_img_num_chunk in torch.chunk(text_img_num, chunks=mpu.get_data_parallel_world_size(), dim=0):
         thw_num_per_DP_rank.append(text_img_num_chunk.sum())
     start = 0
     for thw_num in thw_num_per_DP_rank:
         end = start + thw_num
-        block = image_grid_thw[start:end]         
-        prod = block.prod(dim=1).sum()          
+        block = image_grid_thw[start:end]
+        prod = block.prod(dim=1).sum()
         pv_lens.append(prod)
         start = end
     pixel_values = split_tensor_dp_group(pixel_values, pad_dim=0, chunk_seq_lens=pv_lens)  # [B, S]
@@ -53,7 +53,7 @@ def image_encoder_forward_pre_hook(module, input):
     return pixel_values, image_grid_thw
 
 
-def image_encoder_forward_hook(module, input, output):    
+def image_encoder_forward_hook(module, input, output):
     output, all_lens = all_gather_dp_group(output, cat_dim=0, pad_dim=0, remove_padding=True)
 
     change_parallel_state('text_decoder')
@@ -93,7 +93,7 @@ def audio_encoder_forward_hook(module, input, output):
         chunk_seq_lens.append(length)
 
     output = split_tensor_dp_group(output, pad_dim=0, split_dim=0, chunk_seq_lens=chunk_seq_lens)
-    
+
     return output
 
 
@@ -111,7 +111,7 @@ def initial_modules_mpu(config, kwargs):
     extra_args_provider = kwargs.get('extra_args_provider', None)
     ignore_unknown_args = kwargs.get('ignore_unknown_args', False)
     parsed_args = kwargs.get('parsed_args', None)
-    
+
     if parsed_args is None:
         args = parse_args(extra_args_provider, ignore_unknown_args)
     else:
@@ -130,7 +130,7 @@ def initial_modules_mpu(config, kwargs):
             except KeyError as e:
                 raise KeyError(f"Key '{key}' not found in current_config: {current_config}") from e
         module_config[module_group[0]] = current_config
-    
+
     def pass_hetero_initial_arguments(key, module, default=None, use_args=False, main_module='text_decoder'):
         """
         pass the args by <module config - shell - megatron config - manual default> priority
@@ -146,7 +146,7 @@ def initial_modules_mpu(config, kwargs):
             if hasattr(config, key):
                 return getattr(config, key)
         return default
-        
+
 
 
     for module in module_config.keys():
@@ -155,7 +155,7 @@ def initial_modules_mpu(config, kwargs):
             _ParallelStatesDict[module] = {}
             mpu.destroy_model_parallel()
             destroy_model_parallel_ranks(mpu)
-            
+
             initialize_model_parallel(
                 tensor_model_parallel_size=pass_hetero_initial_arguments('tensor_model_parallel_size', module),
                 pipeline_model_parallel_size=pass_hetero_initial_arguments('pipeline_model_parallel_size', module),
@@ -206,7 +206,7 @@ def initial_megatron_hetero_parallel_wrapper(fn):
 
         initial_modules_mpu(config=vlm_config,
                             kwargs=kwargs)
-        return 
+        return
     return wrapper
 
 
@@ -216,14 +216,14 @@ if hasattr(get_mindspeed_args(), 'hetero_parallel') and get_mindspeed_args().het
     mspm.apply_patches()
 
 
-def all_gather_dp_group(tensor, 
-                        pad_token_id=None, 
-                        cat_dim=0, 
-                        pad_dim=1, 
+def all_gather_dp_group(tensor,
+                        pad_token_id=None,
+                        cat_dim=0,
+                        pad_dim=1,
                         remove_padding=False,
                         parallel_state=None,
                         ):
-    """Gather tensors 
+    """Gather tensors
         暂时只支持BSH、BD
     """
 
@@ -235,7 +235,7 @@ def all_gather_dp_group(tensor,
         world_size = torch.distributed.get_world_size(group=group)
     if tensor is None:
         return None, None
-    
+
     if pad_token_id is not None or remove_padding:
         pad_token_id = 0 if pad_token_id is None else pad_token_id
         local_len = torch.tensor([tensor.shape[pad_dim]], device='cuda')
@@ -249,12 +249,12 @@ def all_gather_dp_group(tensor,
         if pad_size > 0:
             pad_dims = [0] * (2 * tensor.dim())
             # pad_dims: [B, S, H], [D_left, D_right, S_left, S_right, H_left, H_right]
-            pad_dims[2 * (tensor.dim() - pad_dim) - 1] = pad_size  
+            pad_dims[2 * (tensor.dim() - pad_dim) - 1] = pad_size
             tensor = F.pad(tensor, pad_dims, value=pad_token_id)
 
     if tensor.requires_grad:
         if remove_padding:
-            raise NotImplementedError('tensors that require grad and need removing padding are not implemented') 
+            raise NotImplementedError('tensors that require grad and need removing padding are not implemented')
         output = _AllGatherDp.apply(tensor, cat_dim)
     else:
         gathered = [torch.zeros_like(tensor) for _ in range(world_size)]
@@ -269,27 +269,27 @@ def all_gather_dp_group(tensor,
     return output, None
 
 
-def split_tensor_dp_group(tensor, 
-                          split_dim=0, 
+def split_tensor_dp_group(tensor,
+                          split_dim=0,
                           pad_dim=1,
                           chunk_seq_lens=None,
                           all_lens=None,
                           parallel_state=None):
-    """split tensors 
+    """split tensors
         暂时只支持bsh
         chunk_seq_lens: split tensor sliding chunk_seq_lens
         all_lens: all tensor origin lens(cat_dim)
                   if all_lens is None, split tensor per device equal or not remove padding,
                   if all_lens is not None, remove padding intra-dp, do not remove padding inter-dp
     """
-    
+
     if parallel_state is None:
         world_size = mpu.get_data_parallel_world_size()
         group = mpu.get_data_parallel_group()
     else:
         group = parallel_state['_DATA_PARALLEL_GROUP']
         world_size = torch.distributed.get_world_size(group=group)
-    
+
     if tensor is None:
         return None
 
@@ -346,7 +346,7 @@ class _AllGatherDp(torch.autograd.Function):
         grad_input = grad_output[tuple(idx)]
 
         return grad_input, None
-    
+
 
 def hetero_align_config(config_inner, config_outer):
     config_inner.pipeline_model_parallel_size = config_outer.pp

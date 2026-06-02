@@ -51,7 +51,7 @@ class Qwen2VlPipeline(GenerationMixin):
 
         inputs = self.prepare_inputs(prompt=prompt, images=image, videos=video)
 
-        # Use the model as a language model if no valid inputs are generated  
+        # Use the model as a language model if no valid inputs are generated
         if inputs is None:
             inputs = {'input_ids': self.tokenizer(prompt, return_tensors="pt").input_ids.to(self.infer_config.device)}
 
@@ -113,7 +113,7 @@ class Qwen2VlPipeline(GenerationMixin):
             inputs['pixel_values'] = inputs['pixel_values_videos'].unsqueeze(0)
             inputs['image_grid_thw'] = inputs['video_grid_thw']
         return inputs
-    
+
     def get_rope_index(
         self,
         input_ids: torch.LongTensor,
@@ -301,7 +301,7 @@ class Qwen2VlPipeline(GenerationMixin):
                 position_ids = position_ids.view(1, -1).expand(batch_size, -1)
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
-        
+
         model_inputs.update(
             {
                 "input_ids": input_ids,
@@ -315,7 +315,7 @@ class Qwen2VlPipeline(GenerationMixin):
         )
 
         return model_inputs
-    
+
     def _update_model_kwargs_for_generation(self, model_kwargs: Dict[str, Any], model_inputs: Dict[str, Any]):
         # updata cache_position
         if model_kwargs.get("use_cache", True):
@@ -326,7 +326,7 @@ class Qwen2VlPipeline(GenerationMixin):
                 past_positions[-1] + 1, past_positions[-1] + 2, dtype=past_positions.dtype
             ).to(past_positions.device)
             model_kwargs["cache_position"] = torch.cat((past_positions, new_positions))
-        
+
         # update rope_deltas
         if "rope_deltas" in model_inputs:
             model_kwargs["rope_deltas"] = model_inputs["rope_deltas"]

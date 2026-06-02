@@ -71,7 +71,7 @@ def split_data_to_even_chunks(megabatch, lengths, world_size, batch_size, shuffl
 
     pad_chunks = []
     for _, chunk in enumerate(chunks):
-        if batch_size != len(chunk):  
+        if batch_size != len(chunk):
             if batch_size <= len(chunk):
                 raise AssertionError("batch_size must greater than len_chunk !")
             if len(chunk) != 0:  # [[1, 2], [3]] -> [[1, 2], [3, 3]]
@@ -213,31 +213,31 @@ def group_data_fun(lengths, generator=None, shuffle=True):
 
     grouped_indices = dict(grouped_indices)  # {'1x256x256': [0, 1, 2], ...}
     sorted_indices = [grouped_indices[item] for (item, _) in sorted(counter.items(), key=lambda x: x[1], reverse=True)]
-    
+
     # shuffle in each group
     if shuffle:
         shuffle_sorted_indices = []
         for indice in sorted_indices:
             shuffle_idx = torch.randperm(len(indice), generator=generator).tolist()
             shuffle_sorted_indices.extend([indice[idx] for idx in shuffle_idx])
-        
+
         return shuffle_sorted_indices
     else:
         unshuffle_sorted_indices = []
         for indice in sorted_indices:
             unshuffle_sorted_indices.extend(indice)
-        
+
         return unshuffle_sorted_indices
 
 
 def get_length_grouped_data_indices(
-        lengths, 
-        batch_size, 
-        world_size, 
-        gradient_accumulation_size, 
-        initial_global_step, 
-        generator=None, 
-        group_data=False, 
+        lengths,
+        batch_size,
+        world_size,
+        gradient_accumulation_size,
+        initial_global_step,
+        generator=None,
+        group_data=False,
         seed=42,
         shuffle=True):
     # We need to use torch for the random part as a distributed sampler will set the random seed for torch.
@@ -246,7 +246,7 @@ def get_length_grouped_data_indices(
             generator = torch.Generator().manual_seed(seed)
         else:
             generator = torch.Generator()  # every rank will generate a fixed order but random index
-    
+
     if group_data:
         indices = group_data_fun(lengths, generator, shuffle)
     else:
@@ -254,7 +254,7 @@ def get_length_grouped_data_indices(
             indices = torch.randperm(len(lengths), generator=generator).tolist()
         else:
             indices = list(range(len(lengths)))
-    
+
     megabatch_size = world_size * batch_size
     megabatches = [indices[i: i + megabatch_size] for i in range(0, len(lengths), megabatch_size)]
 
@@ -269,7 +269,7 @@ def get_length_grouped_data_indices(
 
     if group_data:
         megabatches = last_group_frame_fun(megabatches, lengths, shuffle)
-    
+
     initial_global_step = initial_global_step * gradient_accumulation_size
     megabatches = megabatches[initial_global_step:]
 
@@ -294,8 +294,8 @@ class LengthGroupedSampler(DistributedSampler):
         num_replicas: Optional[int] = None,
         rank: Optional[int] = None,
         shuffle: bool = True,
-        gradient_accumulation_size: int = 1, 
-        initial_global_step: int = 0, 
+        gradient_accumulation_size: int = 1,
+        initial_global_step: int = 0,
         lengths: Optional[List[int]] = None,
         group_frame=False,
         group_resolution=False,
@@ -490,20 +490,20 @@ class BucketBatchSampler(BaseRandomBatchSampler):
         batch_size (int, optional): The size of each batch. Default is 1.
         num_replicas (int, optional): The number of processes (replicas) participating in distributed training.
                                       By default, the world size is retrieved from the current distributed group.
-        rank (int, optional): The rank of the current process within the `num_replicas`. By default, the rank is 
+        rank (int, optional): The rank of the current process within the `num_replicas`. By default, the rank is
                                retrieved from the current distributed group.
         shuffle (bool, optional): Whether to shuffle the indices of the dataset. If `True` (default), the sampler
-                                  will shuffle the indices before sampling. This is important for training as it 
+                                  will shuffle the indices before sampling. This is important for training as it
                                   helps to reduce model overfitting by providing randomization.
-        seed (int, optional): The random seed used to shuffle the sampler if `shuffle=True`. This seed should be 
+        seed (int, optional): The random seed used to shuffle the sampler if `shuffle=True`. This seed should be
                               the same across all processes in the distributed group to ensure consistent results.
                               Default is 0.
-        drop_last (bool, optional): If `True`, the sampler will drop the last batch if it is smaller than 
+        drop_last (bool, optional): If `True`, the sampler will drop the last batch if it is smaller than
                                     `batch_size` to ensure that each batch is fully utilized. Default is `True`.
                                     (Note: Drop last is not implemented when set to False.)
         consumed_samples (int, optional): The number of samples that have been consumed so far. Default is 0.
-        data_sharding (bool, optional): Whether to enable data sharding. If `True`, the data is split across 
-                                        multiple replicas to ensure that each replica gets a distinct subset of 
+        data_sharding (bool, optional): Whether to enable data sharding. If `True`, the data is split across
+                                        multiple replicas to ensure that each replica gets a distinct subset of
                                         the dataset. Default is `False`.
     """
     def __init__(
@@ -934,7 +934,7 @@ class AESampler(DistributedSampler):
                  seed: int = 0, drop_last: bool = False) -> None:
         super().__init__(dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle, seed=seed, drop_last=drop_last)
         self.current_index = 0
-    
+
     def __iter__(self):
         if self.shuffle:
             # deterministically shuffle based on epoch and seed
@@ -961,12 +961,12 @@ class AESampler(DistributedSampler):
         indices = indices[self.rank: self.total_size: self.num_replicas]
         if len(indices) != self.num_samples:
             raise ValueError("The length of indices on each device must equals num_samples!")
-        
+
         while self.current_index < len(indices):
             yield indices[self.current_index]
             self.current_index += 1
         self.current_index = 0
-    
+
     def state_dict(self) -> dict:
         return {
             'epoch': self.epoch,
@@ -1090,7 +1090,7 @@ class LuminaMetaLenDistSampler(Sampler):
                     global_batched_indices.extend(group_batched_indices)
             rng.shuffle(global_batched_indices)
             indices = [_
-                for batch_indices in global_batched_indices 
+                for batch_indices in global_batched_indices
                 for _ in batch_indices
             ]
         else:

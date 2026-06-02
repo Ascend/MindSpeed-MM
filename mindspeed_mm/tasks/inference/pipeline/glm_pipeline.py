@@ -42,7 +42,7 @@ class GlmPipeline(Qwen2VlPipeline, GenerationMixin):
             ]]
 
         inputs = self.image_processor.apply_chat_template(
-            messages, tokenize=True, add_generation_prompt=True, 
+            messages, tokenize=True, add_generation_prompt=True,
             return_dict=True, return_tensors="pt", padding=True)
 
         inputs = inputs.to(self.infer_config.device)

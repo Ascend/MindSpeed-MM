@@ -26,7 +26,7 @@ ENGINE=vllm
 export VLLM_USE_V1=1
 export HCCL_CONNECT_TIMEOUT=3600
 
-# Some models are optimized by vllm ascend. While in some case, e.g. rlhf training, 
+# Some models are optimized by vllm ascend. While in some case, e.g. rlhf training,
 # the optimized model may not be suitable. In this case, set this value to 0 to disable the optimized model.
 export USE_OPTIMIZED_MODEL=0
 

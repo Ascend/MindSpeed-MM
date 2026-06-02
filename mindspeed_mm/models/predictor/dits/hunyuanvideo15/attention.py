@@ -73,7 +73,7 @@ def attention(
         query = q.transpose(1, 2)  # B * H * L * D
         key = k.transpose(1, 2)    # B * H * L * D
         value = v.transpose(1, 2)  # B * H * L * D
-        
+
         if attn_mask is not None:
             if attn_mask.dtype != torch.bool and attn_mask.dtype in [torch.int64, torch.int32]:
                 if attn_mask.max() > 1 or attn_mask.min() < 0:
@@ -85,9 +85,9 @@ def attention(
             attn_mask1 = einops.rearrange(attn_mask, 'b l -> b 1 l 1')
             attn_mask2 = einops.rearrange(attn_mask1, 'b 1 l 1 -> b 1 1 l')
             attn_mask = attn_mask1 & attn_mask2
-        
+
         x = F.scaled_dot_product_attention(query, key, value, attn_mask=attn_mask, dropout_p=drop_rate, is_causal=causal)
-        
+
         # transpose back
         x = x.transpose(1, 2)  # B * L * H * D
         b, s, h, d = x.shape
@@ -105,16 +105,16 @@ def attention(
 
 
 @torch.compiler.disable
-def parallel_attention(q, k, v, img_q_len, img_kv_len, 
-                       attn_mode=None, text_mask=None, 
+def parallel_attention(q, k, v, img_q_len, img_kv_len,
+                       attn_mode=None, text_mask=None,
                        attn_param=None,
                        block_idx=None,
                        ):
     return sequence_parallel_attention(q, k, v, img_q_len, img_kv_len, attn_mode, text_mask, attn_param=attn_param, block_idx=block_idx)
 
 
-def sequence_parallel_attention(q, k, v, 
-                                img_q_len, img_kv_len, 
+def sequence_parallel_attention(q, k, v,
+                                img_q_len, img_kv_len,
                                 attn_mode=None, text_mask=None,
                                 attn_param=None,
                                 block_idx=None,
@@ -133,7 +133,7 @@ def sequence_parallel_attention(q, k, v,
         sp_group = parallel_dims.sp_group
         sp_size = parallel_dims.sp
         sp_rank = parallel_dims.sp_rank
-    
+
     if enable_sp:
         # batch_size, seq_len, attn_heads, head_dim
         query = all_to_all_4D(query, sp_group, scatter_dim=2, gather_dim=1)
@@ -154,7 +154,7 @@ def sequence_parallel_attention(q, k, v,
     encoder_sequence_length = encoder_query.size(1)
 
     attn_mode = maybe_fallback_attn_mode(attn_mode)
-    
+
     if attn_mode == "sageattn":
         from sageattention import sageattn
         query = torch.cat([query, encoder_query], dim=1)
@@ -195,10 +195,10 @@ def sequence_parallel_attention(q, k, v,
             dropout_p=0.0,
             is_causal=False
         )
-        
+
         # transpose back
         hidden_states = hidden_states.transpose(1, 2)
-        
+
     elif attn_mode == "flash2":
         query = torch.cat([query, encoder_query], dim=1)
         key = torch.cat([key, encoder_key], dim=1)
@@ -208,7 +208,7 @@ def sequence_parallel_attention(q, k, v,
 
         attn_mask = F.pad(text_mask, (sequence_length, 0), value=True)
         hidden_states = flash_attn_no_pad(qkv, attn_mask, causal=False, dropout_p=0.0, softmax_scale=None)
-        
+
     elif attn_mode == "flash3":
         query = torch.cat([query, encoder_query], dim=1)
         key = torch.cat([key, encoder_key], dim=1)

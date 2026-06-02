@@ -164,4 +164,3 @@ class ToolFormatter(Formatter):
     @override
     def extract(self, content: str) -> str | list["FunctionCall"]:
         return self.tool_utils.tool_extractor(content)
-

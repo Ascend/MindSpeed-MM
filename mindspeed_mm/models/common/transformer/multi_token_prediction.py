@@ -876,8 +876,8 @@ def forward_step_wrapper(fn):
 def apply_mtp_patch():
     from mindspeed.patch_utils import MindSpeedPatchesManager as mspm
     from mindspeed.core.performance.auto_pipeline_perf.schedules import forward_step_decorator
-    
+
     mspm.register_patch('megatron.core.pipeline_parallel.schedules.forward_step', forward_step_wrapper, force_patch=True)
     mspm.register_patch('megatron.core.pipeline_parallel.schedules.forward_step', forward_step_decorator, force_patch=True)
-    
+
     mspm.apply_patches()

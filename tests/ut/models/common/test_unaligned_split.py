@@ -1,5 +1,5 @@
 from mindspeed_mm.models.common.communications import cal_split_sizes
-from tests.ut.utils import judge_expression 
+from tests.ut.utils import judge_expression
 
 
 class TestUnalignedSplit:

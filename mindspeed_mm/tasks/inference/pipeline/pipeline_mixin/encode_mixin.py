@@ -76,7 +76,7 @@ class MMEncoderMixin:
             prompt_embeds_attention_mask = attention_mask
             if clip_skip is None:
                 prompt_embeds = text_encoder(
-                    text_input_ids.to(device), 
+                    text_input_ids.to(device),
                     attention_mask=attention_mask,
                     output_hidden_states=hasattr(text_encoder, "hidden_state_skip_layer") and text_encoder.hidden_state_skip_layer is not None
                 )

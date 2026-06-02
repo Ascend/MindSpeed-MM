@@ -25,7 +25,7 @@ from mindspeed_mm.data.data_utils.constants import (
 from mindspeed_mm.tasks.rl.dpo.dpo_trainer import DPOTrainer
 from mindspeed_mm.tasks.rl.dpo.sora_dpo_model import SoRADPOModel
 from mindspeed_mm.tasks.rl.utils import read_json_file, find_probability
-    
+
 
 class SoRADPOTrainer(DPOTrainer):
     """
@@ -129,9 +129,9 @@ class SoRADPOTrainer(DPOTrainer):
                 if isinstance(v, torch.Tensor):
                     kwargs[k] = torch.cat((v, v), dim=0)
 
-        output_tensor_list = model(video=video, video_lose=video_lose, prompt_ids=prompt_ids, video_mask=video_mask, 
+        output_tensor_list = model(video=video, video_lose=video_lose, prompt_ids=prompt_ids, video_mask=video_mask,
                                                 prompt_mask=prompt_mask, score=score, score_lose=score_lose, **kwargs)
-        
+
         if mpu.is_pipeline_last_stage():
             output_tensor = output_tensor_list[0]
             latents, noised_latents, timesteps, noise = output_tensor_list[-4:]
@@ -221,7 +221,7 @@ class SoRADPOTrainer(DPOTrainer):
         l2_loss = self.hyper_model.diffusion.training_losses(model_output=output, x_start=latents, x_t=noised_latents, t=timesteps, noise=noise, mask=None, reduction='none')
         if l2_loss.ndim > 2:
             l2_loss = torch.mean(l2_loss.reshape(output.shape[0], -1), 1)
-        
+
         chosen_l2_losses, rejected_l2_losses = torch.chunk(- self.dpo_beta * timesteps * l2_loss, 2, dim=0)
 
         all_results = (chosen_l2_losses, rejected_l2_losses, chosen_l2_losses)

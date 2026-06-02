@@ -10,7 +10,7 @@ source /usr/local/Ascend/nnal/atb/set_env.sh
 export RAY_DEDUP_LOGS=0
 export HYDRA_FULL_ERROR=1
 #TASK_QUEUE_ENABLE，下发优化
-export TASK_QUEUE_ENABLE=1  
+export TASK_QUEUE_ENABLE=1
 export HCCL_ASYNC_ERROR_HANDLING=0
 export HCCL_EXEC_TIMEOUT=3600
 export HCCL_CONNECT_TIMEOUT=3600

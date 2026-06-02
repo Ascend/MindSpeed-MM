@@ -52,7 +52,7 @@ def loss_func(output_tensor):
     for name, (add_loss, weight) in additional_loss_dict.items():
         loss = loss + add_loss * weight
         averaged_additional_loss_dict[name] = average_losses_across_data_parallel_group([add_loss])
-    
+
     averaged_additional_loss_dict["total_loss"] = average_losses_across_data_parallel_group([loss])
     loss = loss.unsqueeze(0)
 

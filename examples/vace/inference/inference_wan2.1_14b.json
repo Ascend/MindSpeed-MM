@@ -8,7 +8,7 @@
         "./Wan2.1-VACE-14B/diffusion_pytorch_model-00004-of-00007.safetensors",
         "./Wan2.1-VACE-14B/diffusion_pytorch_model-00005-of-00007.safetensors",
         "./Wan2.1-VACE-14B/diffusion_pytorch_model-00006-of-00007.safetensors",
-        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00007-of-00007.safetensors",
+        "./Wan2.1-VACE-14B/diffusion_pytorch_model-00007-of-00007.safetensors"
       ]
     ],
     "vae": "./Wan2.1-VACE-14B/Wan2.1_VAE.pth",

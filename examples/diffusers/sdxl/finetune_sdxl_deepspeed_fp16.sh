@@ -118,4 +118,3 @@ echo "ActualFPS = ${ActualFPS}" >>${output_path}/${CaseName}.log
 echo "TrainingTime = ${TrainingTime}" >>${output_path}/${CaseName}.log
 echo "ActualLoss = ${ActualLoss}" >>${output_path}/${CaseName}.log
 echo "E2ETrainingTime = ${e2e_time}" >>${output_path}/${CaseName}.log
-

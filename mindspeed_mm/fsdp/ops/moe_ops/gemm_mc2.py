@@ -14,14 +14,14 @@ class AllToAllGroupedMatmul(torch.autograd.Function):
         hcomm = group._get_backend(torch.device("npu")).get_hccl_comm_name(global_rank)
         ep_world_size = torch.distributed.get_world_size(group)
         group_list_tensor = recv_counts.reshape(ep_world_size, -1).sum(dim=0)
-        
+
         send_counts = send_counts.tolist()
         recv_counts = recv_counts.tolist()
 
         output, shared_output, permute_output = torch_npu.npu_alltoallv_gmm(inputs, weights, hcomm, ep_world_size,
                                                                            send_counts, recv_counts, mm_x=shared_inputs,
                                                                            mm_weight=shared_weight, permute_out_flag=True)
-        
+
         ctx.save_for_backward(weights, shared_inputs, shared_weight, permute_output)
         ctx.hcomm = hcomm
         ctx.ep_world_size = ep_world_size
@@ -43,7 +43,7 @@ class AllToAllGroupedMatmul(torch.autograd.Function):
         inputs_grad, shared_inputs_grad = torch_npu.npu_gmm_alltoallv(output_grad, weights, hcomm, ep_world_size,
                                                                      recv_counts, send_counts, mm_x=shared_output_grad,
                                                                      mm_weight=shared_weight, trans_gmm_weight=True)
-                
+
         weights_grad = torch_npu.npu_grouped_matmul([permute_output.T], [output_grad], bias=None, group_list=group_list_tensor,
                                                     split_item=3, group_type=2, group_list_type=1)[0]
 
@@ -59,12 +59,12 @@ class GroupedMatmulAllToAll(torch.autograd.Function):
         hcomm = group._get_backend(torch.device("npu")).get_hccl_comm_name(global_rank)
         ep_world_size = torch.distributed.get_world_size(group)
         group_list_tensor = send_counts.reshape(ep_world_size, -1).sum(dim=0)
-        
+
         send_counts = send_counts.tolist()
         recv_counts = recv_counts.tolist()
 
         output, shared_output = torch_npu.npu_gmm_alltoallv(inputs, weights, hcomm, ep_world_size, send_counts,
-                                                        recv_counts, mm_x=shared_inputs, mm_weight=shared_weight)    
+                                                        recv_counts, mm_x=shared_inputs, mm_weight=shared_weight)
 
         ctx.save_for_backward(inputs, weights, shared_inputs, shared_weight)
         ctx.hcomm = hcomm
@@ -89,7 +89,7 @@ class GroupedMatmulAllToAll(torch.autograd.Function):
                                                                         recv_counts, send_counts, mm_x=shared_output_grad,
                                                                         mm_weight=shared_weight, permute_out_flag=True,
                                                                         trans_gmm_weight=True)
-        
+
         weights_grad = torch_npu.npu_grouped_matmul([inputs.T], [permute_grad], bias=None, group_list=group_list_tensor,
                                                     split_item=3, group_type=2, group_list_type=1)[0]
 

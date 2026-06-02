@@ -30,9 +30,9 @@ The following applies to all files unless otherwise noted:
 --
 
 This repository also contains code from Hugging Face Inc., Google Research,
-Facebook (from their Fairseq and Dino projects), Microsoft(from their 
-Swin-Transformer project)and Philip Popien. Files from these 
-organizations have notices at  the top of each file. Below are 
+Facebook (from their Fairseq and Dino projects), Microsoft(from their
+Swin-Transformer project)and Philip Popien. Files from these
+organizations have notices at  the top of each file. Below are
 licenses used in those files, as indicated.
 
 

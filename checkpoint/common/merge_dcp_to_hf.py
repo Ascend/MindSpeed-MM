@@ -92,7 +92,7 @@ def merge_dcp_to_hf(
 
     config = AutoConfig.from_pretrained(str(model_assets_dir))
     processor = AutoProcessor.from_pretrained(str(model_assets_dir), trust_remote_code=True)
-    
+
     save_path = Path(save_dir)
     config.save_pretrained(save_path)
     processor.save_pretrained(save_path)
@@ -103,7 +103,7 @@ def merge_dcp_to_hf(
         state_dict=state_dict,
         prefix=prefix,
     )
-    
+
 
 def merge_dcp_to_hf_sharded(
     load_dir: DirectoryPath,
@@ -116,24 +116,24 @@ def merge_dcp_to_hf_sharded(
     """
     Load DCP weights in shards and save them as sharded checkpoints in Hugging Face (HF) format.
     """
-    
+
     config = AutoConfig.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
     processor = AutoProcessor.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
     config.save_pretrained(save_dir)
     processor.save_pretrained(save_dir)
-    
+
     index_file: Optional[FilePath] = find_safetensors_index(Path(model_assets_dir))
     if index_file is None:
         raise FileNotFoundError(f"Could not find safetensors index file in directory {model_assets_dir}")
-    
+
     shutil.copy2(index_file, save_dir)
     with open(index_file, "r", encoding="utf-8") as f:
         weight_map = json.load(f)["weight_map"]
-        
+
     storage_reader = FileSystemReader(load_dir)
     metadata = load_metadata(storage_reader)
     hf_metadata = {"format": "pt"}
-    
+
     safetensor_files = set(weight_map.values())
     for safetensor_file in tqdm(safetensor_files, desc="Processing files"):
         selected_keys = [
@@ -141,15 +141,15 @@ def merge_dcp_to_hf_sharded(
             for k, v in weight_map.items()
             if v == safetensor_file
         ]
-        
+
         partial_metadata = extract_metadata(selected_keys, metadata)
         partial_state_dict = partial_load_dcp_state_dict(partial_metadata, storage_reader)
         partial_state_dict = partial_state_dict["model"] if "model" in partial_state_dict else partial_state_dict
-        
+
         partial_state_dict = state_dict_convert_func(partial_state_dict) if state_dict_convert_func else partial_state_dict
-        
+
         save_file(partial_state_dict, save_dir / safetensor_file, metadata=hf_metadata)
-    
+
     set_directory_permissions(save_dir)
 
 
@@ -171,7 +171,7 @@ if __name__ == "__main__":
             model_assets_dir=args.model_assets_dir,
             select_key_convert_func=lambda key: f"model.{args.prefix}" + key,
             state_dict_convert_func=lambda sd: {
-                (k[len(args.prefix):] if k.startswith(args.prefix) else k): v 
+                (k[len(args.prefix):] if k.startswith(args.prefix) else k): v
                 for k, v in sd.items()
             }
         )

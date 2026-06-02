@@ -72,8 +72,8 @@ def load_from_mm(load_dir: Path,
     save_dir = load_dir.joinpath(f"iter_{int(save_iteration):07}" if save_iteration != "release" else save_iteration)
 
     global_pp_size = max(
-        len(vit_pp_list), 
-        len(llm_pp_list), 
+        len(vit_pp_list),
+        len(llm_pp_list),
         len(audio_pp_list) if audio_pp_list else 0
     )
 

@@ -117,7 +117,7 @@ class CosyVoice3LM(torch.nn.Module, BaseModel):
         lm_input_len = torch.tensor([i.size(0) for i in lm_input], dtype=torch.int32)
         lm_input = pad_sequence(lm_input, batch_first=True, padding_value=IGNORE_ID)
         return lm_input, lm_input_len
-    
+
     def sampling_ids(
         self,
         weighted_scores: torch.Tensor,
@@ -136,17 +136,17 @@ class CosyVoice3LM(torch.nn.Module, BaseModel):
         return top_ids
 
     def prepare_lm_input_target(
-        self, 
-        sos_emb, 
-        text_token, 
-        text_token_emb, 
-        text_token_len, 
-        task_id_emb, 
-        speech_token, 
-        speech_token_emb, 
-        speech_token_len, 
-        instruct_token=None, 
-        instruct_token_emb=None, 
+        self,
+        sos_emb,
+        text_token,
+        text_token_emb,
+        text_token_len,
+        task_id_emb,
+        speech_token,
+        speech_token_emb,
+        speech_token_len,
+        instruct_token=None,
+        instruct_token_emb=None,
         instruct_token_len=None
         ):
         lm_target, lm_input = [], []
@@ -489,7 +489,7 @@ class LabelSmoothingLoss(nn.Module):
         kl = self.criterion(torch.log_softmax(x, dim=1), true_dist)
         denom = total if self.normalize_length else batch_size
         return kl.masked_fill(ignore.unsqueeze(1), 0).sum() / denom
-    
+
 
 @dataclass
 @auto_docstring(
@@ -501,7 +501,7 @@ class CosyVoice3LMOutputWithPast(ModelOutput):
     r"""
     loss (`torch.FloatTensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
         Language modeling loss (for next-token prediction).
-    acc 
+    acc
     logits (`torch.FloatTensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
         Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
     """

@@ -4,10 +4,10 @@ import torch.nn as nn
 
 def get_activation_layer(act_type):
     """get activation layer
-    
+
     Args:
         act_type (str): the activation type
-    
+
     Returns:
         torch.nn.functional: the activation layer
     """
@@ -23,7 +23,7 @@ def get_activation_layer(act_type):
         return Sigmoid
     else:
         raise ValueError(f"Unknown activation type: {act_type}")
-    
+
 
 class Sigmoid:
     @staticmethod

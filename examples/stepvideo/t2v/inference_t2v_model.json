@@ -81,4 +81,3 @@
     "device":"npu",
     "dtype": "bf16"
 }
-

@@ -100,12 +100,12 @@ def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
 
         fused = use_npu_fused_ops
-        
+
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
             "mc2": ep_mc2_forward
         }
-        
+
         if dispatcher in ep_dispatcher_dict:
             dipatcher_func = ep_dispatcher_dict[dispatcher]
             hidden_states = dipatcher_func(
@@ -120,7 +120,7 @@ def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher
             )
         else:
             raise NotImplementedError(f"ep dispatcher {dispatcher} is not implenmented now.")
-        
+
         hidden_states = hidden_states.view(batch_size, -1, self.hidden_size)
         return hidden_states
 

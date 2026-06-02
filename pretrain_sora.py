@@ -27,7 +27,7 @@ from mindspeed_mm.data.data_utils.constants import (
 )
 from mindspeed_mm.data.data_utils.utils import build_iterations
 from mindspeed_mm.models.sora_model import SoRAModel
-import mindspeed_mm.utils.dpcp_utils as dpcp 
+import mindspeed_mm.utils.dpcp_utils as dpcp
 mindspeed_args = get_mindspeed_args()
 
 if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:

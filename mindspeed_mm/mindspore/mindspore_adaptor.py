@@ -84,7 +84,7 @@ def apply_mindspore_patch():
     # qwen25 omni hang issue
     from mindspeed_mm.mindspore.data.data_utils.func_utils.mm_plugin import process_messages
     aspm.register_patch('mindspeed_mm.data.data_utils.func_utils.mm_plugin.Qwen2OmniPlugin.process_messages', process_messages)
-    from mindspeed_mm.mindspore.third_party.accelerate.state import PartialState_prepare_backend_wrapper, PartialState_set_device 
+    from mindspeed_mm.mindspore.third_party.accelerate.state import PartialState_prepare_backend_wrapper, PartialState_set_device
     # Assign a value to os.environ["LOCAL_RANK"] to obtain the rank ID.
     aspm.register_patch('accelerate.state.PartialState._prepare_backend', PartialState_prepare_backend_wrapper)
     # Avoid the "set_device" error.
@@ -97,7 +97,7 @@ def apply_mindspore_patch():
     aspm.register_patch('datasets.arrow_dataset.Pool', mindspore.multiprocessing.Pool)
     # fix scatter_add_ contiguous issue for CANN8.5
     aspm.register_patch('mindspore.common.Tensor.scatter_add_', ms_scatter_add_wrapper)
-    
+
     # opt Qwenvl3 preprocessing performance
     if version.parse(transformers.__version__) >= version.parse('4.57.0.dev0'):
         from mindspeed_mm.mindspore.third_party.transformers.models.qwen2_vl.image_processing_qwen2_vl_fast import _preprocess

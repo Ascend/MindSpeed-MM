@@ -20,7 +20,7 @@ class FunasrTrainer(Trainer):
     def __init__(self, args: Arguments):
         # 1. Parse arguments
         self.args = args
-        
+
         # 2. Initialize
         self.initialize()
 
@@ -45,10 +45,10 @@ class FunasrTrainer(Trainer):
         """Setup training for FunASR models using official FunASR dataloader logic."""
         self.checkpointer = self.get_checkpointer()
         self.model_parallel_applier = ParallelApplier(self.args.parallel, self.args.training)
-        
+
         # Get model FIRST to extract tokenizer/frontend
         self.model, self.tokenizer, self.frontend = get_funasr_model(self.args.model, self.model_parallel_applier)
-        
+
         # Validate and calculate training iterations
         self._validate_and_set_train_iters(self.args)
 
@@ -56,7 +56,7 @@ class FunasrTrainer(Trainer):
         self.lr_scheduler = self.get_scheduler()
 
         self._funasr_dataloader = build_funasr_dataloader_factory(self.args.data, self.frontend, self.tokenizer)
-        
+
         # FunASR-specific state
         self._current_epoch = 0
         self.start_data_split_i = 0
@@ -80,7 +80,7 @@ class FunasrTrainer(Trainer):
             raise ValueError(f"Invalid scheduler name: {scheduler_name}. Available schedulers: {list(scheduler_classes.keys())}")
         scheduler_class = scheduler_classes[scheduler_name]
         scheduler = scheduler_class(self.optimizer, **self.args.training.scheduler_conf)
-        
+
         return scheduler
 
 

@@ -72,7 +72,7 @@ def generate_parallel_strategy_options(max_cp_size):
     max_cp_power = int(max_cp_size).bit_length() - 1
 
     global _PARALLEL_STRATEGY_LIST
-    for cp_power in range(max_cp_power + 1): 
+    for cp_power in range(max_cp_power + 1):
         cp_size = 2**cp_power
         dp_size = int(ori_dpcp_world_size // cp_size)
         _PARALLEL_STRATEGY_LIST.append([dp_size, cp_size])
@@ -97,13 +97,13 @@ def initialize_parall_switch_list(timeout):
         _PARALLEL_STRATEGY_GROUP[index]['dp_group'] = []
         _PARALLEL_STRATEGY_GROUP[index]['dp_group_gloo'] = []
         _PARALLEL_STRATEGY_GROUP[index]['dp'] = rank_generator.get_ranks('dp')
-    
+
         for ranks in _PARALLEL_STRATEGY_GROUP[index]['dp']:
             _PARALLEL_STRATEGY_GROUP[index]['dp_group'].append(torch.distributed.new_group(
                 ranks, timeout=timeout, pg_options=global_mpu.get_nccl_options('dp', {})
             ))
             _PARALLEL_STRATEGY_GROUP[index]['dp_group_gloo'].append(torch.distributed.new_group(ranks, timeout=timeout, backend="gloo"))
-        
+
         _PARALLEL_STRATEGY_GROUP[index]['cp_group'] = []
         _PARALLEL_STRATEGY_GROUP[index]['cp'] = rank_generator.get_ranks('cp')
         for ranks in _PARALLEL_STRATEGY_GROUP[index]['cp']:
@@ -127,7 +127,7 @@ def modify_parallel(strategy_idx):
         if rank in ranks:
             global_mpu._CONTEXT_PARALLEL_GROUP = group
             global_mpu._CONTEXT_PARALLEL_GLOBAL_RANKS = ranks
-    torch.distributed.barrier()    
+    torch.distributed.barrier()
 
 
 def get_batch_on_this_tp_rank(data_iterator):
@@ -214,7 +214,7 @@ def dynamic_dpcp_transfer_data(batch):
 
         received_batch_on_device = move_tensors_to_device(received_batch, f"npu:{rank}")
         CACHED_BATCH.append(received_batch_on_device)
-            
+
         torch.distributed.barrier(group=context_group)
 
 
@@ -249,7 +249,7 @@ def get_optimized_parallel_strategy(input_seq):
                 strategy_idx = torch.tensor(idx).to('npu')
                 break
         if oom_flag is True:
-            print("max_seq_size is too small")   
+            print("max_seq_size is too small")
 
     torch.distributed.broadcast(strategy_idx, src=gather_rank_dst)
     return strategy_idx
@@ -281,7 +281,7 @@ def data_aware_parallel_optimize(data_iterator):
                 args.decrease_batch_size_if_needed)
 
             # 4. Execute data rearrangement
-            dynamic_dpcp_transfer_data(batch) 
+            dynamic_dpcp_transfer_data(batch)
         else:
             reconfigure_num_microbatches_calculator(
                 torch.distributed.get_rank(),

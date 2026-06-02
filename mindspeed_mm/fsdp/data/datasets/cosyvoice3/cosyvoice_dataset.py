@@ -638,7 +638,7 @@ def data_pipeline(processor_args):
     padding_fn = partial(padding, **processor_args['padding'])
     data_fn_pipeline = [parquet_opener_fn, tokenize_fn, filter_fn, resample_fn, compute_fbank_fn, parse_embedding_fn,
                         shuffle_fn, sort_fn, batch_fn, padding_fn]
-    
+
     return data_fn_pipeline
 
 
@@ -845,7 +845,7 @@ class DistributedSampler:
             data = data[:self.num_workers]
         data = data[self.worker_id::self.num_workers]
         return data
-    
+
 
 class DataList(IterableDataset):
 

@@ -63,7 +63,3 @@ def dot_product_attention_forward_infer(
     )[0]
     attn_output = rearrange(attn_output, 'b s h d -> s b (h d)', s=query.shape[1], b=bsz)
     return attn_output
-
-
-                                                            
-                                                            

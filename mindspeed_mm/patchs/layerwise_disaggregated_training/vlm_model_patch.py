@@ -29,13 +29,13 @@ from megatron.training.checkpointing import (
     fix_query_key_value_ordering,
     generate_state_dict,
     get_checkpoint_tracker_filename,
-    get_checkpoint_version, 
+    get_checkpoint_version,
     get_checkpoint_name,
     get_distributed_optimizer_checkpoint_name,
     get_rng_state,
     read_metadata,
-    set_checkpoint_version, 
-    save_checkpoint, 
+    set_checkpoint_version,
+    save_checkpoint,
     _load_base_checkpoint,
     _to_dtensor
 )
@@ -629,7 +629,7 @@ def model_provider(pre_process=True, post_process=True, modules=None):
     _apply_freezing(model, vlm_config)
 
     return model
-    
+
 
 # copy from: pretrain_vlm.py
 def _configure_modules(vlm_config, modules):
@@ -670,7 +670,7 @@ def _configure_audio_encoder(vlm_config):
 # copy from: pretrain_vlm.py
 def _configure_text_decoder(vlm_config):
     """Configure text decoder module."""
-        
+
     vlm_config.text_decoder = get_model_config(vlm_config.text_decoder)
 
 

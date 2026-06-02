@@ -25,7 +25,7 @@ def load_from_mm(load_dir):
     if latest_checkpointed_iteration == "release":
         directory = "release"
     else:
-        directory = "iter_{:07d}".format(int(latest_checkpointed_iteration))   
+        directory = "iter_{:07d}".format(int(latest_checkpointed_iteration))
 
     pp_tp_state_dicts = {}
     sub_dirs = os.listdir(os.path.join(load_dir, directory))
@@ -49,7 +49,7 @@ def load_from_mm(load_dir):
             tp_rank = int(sub_dir.split('_')[2])
             state_dict = state_dict[MEGATRON_MODEL_KEY]
         pp_tp_state_dicts[(pp_rank, tp_rank)] = state_dict
-    
+
     pp_size = max([pp_tp_rank[0] for pp_tp_rank in pp_tp_state_dicts.keys()]) + 1
     tp_size = max([pp_tp_rank[1] for pp_tp_rank in pp_tp_state_dicts.keys()]) + 1
 
@@ -59,21 +59,21 @@ def load_from_mm(load_dir):
         for tp_rank in range(tp_size):
             tp_state_dicts.append(pp_tp_state_dicts[((pp_rank, tp_rank))])
         state_dicts.append(tp_state_dicts)
-    
+
     return state_dicts
 
 
 def save_as_mm(save_dir, state_dicts, latest_checkpointed_iteration="release"):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    
+
     flags = os.O_WRONLY | os.O_CREAT
     mode = stat.S_IWUSR | stat.S_IRUSR
 
     iteration_path = os.path.join(save_dir, MEGATRON_LASTEST_ITERATION_FILE_NAME)
     with os.fdopen(os.open(iteration_path, flags, mode), 'w') as fout:
-        fout.write(latest_checkpointed_iteration)    
-    
+        fout.write(latest_checkpointed_iteration)
+
     if latest_checkpointed_iteration == "release":
         directory = "release"
     else:
@@ -105,17 +105,17 @@ def save_as_mm(save_dir, state_dicts, latest_checkpointed_iteration="release"):
 def load_from_hf(hf_dir):
     if not os.path.exists(hf_dir):
         raise FileNotFoundError(f"Directory not found: {hf_dir}")
-    
+
     search_pattern = os.path.join(hf_dir, '**', '*.safetensors')
     files = glob.glob(search_pattern, recursive=True)
 
     if not files or len(files) == 0:
         raise FileNotFoundError(f"No .safetensors files found in directory: {hf_dir}")
-    
+
     state_dict = {}
     for safe_path in files:
         state_dict.update(load_file(str(safe_path), device='cpu'))
-    
+
     return state_dict
 
 
@@ -168,7 +168,7 @@ def load_from_layerzero(source_path, iteration=None, prefix=None, ema_model=Fals
     if ema_model:
         from mindspeed.core.distributed.layerzero.state.scripts.layerzero_checkpointer import remove_model_prefix
         remove_model_prefix(prefix)
-    
+
     # If iter is none, the result of the last save will be converted by default.
     if iteration is None:
         iteration = _get_latest_iter_number(source_path)
@@ -178,11 +178,11 @@ def load_from_layerzero(source_path, iteration=None, prefix=None, ema_model=Fals
 
     # Notice: no support TP and PP
     layerzero_checkpoint = _create_rank_checkpoint(
-        layerzero_checkpoint, 
-        tp_index=0, 
-        pp_index=0, 
+        layerzero_checkpoint,
+        tp_index=0,
+        pp_index=0,
         tp_degree=1,
-        pp_degree=1, 
+        pp_degree=1,
         for_release=for_release
     )
     return layerzero_checkpoint
@@ -206,5 +206,5 @@ def _get_latest_iter_number(directory):
 
     if max_num == -1:
         raise ValueError("No iter_xxxx directories found.")
-    
+
     return max_num

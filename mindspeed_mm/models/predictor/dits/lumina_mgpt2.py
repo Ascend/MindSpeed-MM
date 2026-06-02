@@ -110,11 +110,11 @@ class ChameleonAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
     def __init__(
-        self, 
+        self,
         num_attention_heads,
         num_key_value_heads,
         hidden_size,
-        attention_dropout, 
+        attention_dropout,
         attention_bias,
         rope_theta,
         max_position_embeddings,
@@ -158,7 +158,7 @@ class ChameleonAttention(nn.Module):
             max_position_embeddings=self.max_position_embeddings,
             base=self.rope_theta,
         )
-    
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -181,7 +181,7 @@ class ChameleonAttention(nn.Module):
 
         query_states = query_states.reshape(bsz, q_len, self.num_heads, self.head_dim)
         key_states = key_states.reshape(bsz, q_len, self.num_key_value_heads, self.head_dim)
-        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim) 
+        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim)
 
         cos, sin = self.rotary_emb(value_states, position_ids)
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, unsqueeze_dim=-2)
@@ -210,10 +210,10 @@ class ChameleonAttention(nn.Module):
 
 
 class ChameleonDecoderLayer(nn.Module):
-    def __init__(self, 
-        hidden_size, 
+    def __init__(self,
+        hidden_size,
         intermediate_size,
-        mlp_bias, 
+        mlp_bias,
         hidden_act,
         num_attention_heads,
         num_key_value_heads,
@@ -232,7 +232,7 @@ class ChameleonDecoderLayer(nn.Module):
             num_attention_heads=num_attention_heads,
             num_key_value_heads=num_key_value_heads,
             hidden_size=hidden_size,
-            attention_dropout=attention_dropout, 
+            attention_dropout=attention_dropout,
             attention_bias=attention_bias,
             rope_theta=rope_theta,
             max_position_embeddings=max_position_embeddings,
@@ -290,7 +290,7 @@ class ChameleonDecoderLayer(nn.Module):
         outputs = (hidden_states,)
         if output_attentions:
             outputs += (self_attn_weights,)
-        
+
         return outputs
 
 
@@ -329,13 +329,13 @@ class ChameleonModel(nn.Module):
             configs = json.load(file)
             vocab_map = configs.get("vocabulary_map")
         self.vocabulary_mapping = ChameleonImageVocabularyMapping(vocab_map)
-        
+
         self.layers = nn.ModuleList(
             [
                 ChameleonDecoderLayer(
-                    hidden_size=hidden_size, 
+                    hidden_size=hidden_size,
                     intermediate_size=intermediate_size,
-                    mlp_bias=mlp_bias, 
+                    mlp_bias=mlp_bias,
                     hidden_act=hidden_act,
                     num_attention_heads=num_attention_heads,
                     num_key_value_heads=num_key_value_heads,
@@ -468,7 +468,7 @@ class ChameleonModel(nn.Module):
 
 class ChameleonForConditionalGeneration(MultiModalModule):
     def __init__(
-        self, 
+        self,
         max_position_embeddings,
         vocab_size,
         hidden_size,

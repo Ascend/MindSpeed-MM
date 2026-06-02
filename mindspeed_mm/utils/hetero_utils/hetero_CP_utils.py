@@ -31,7 +31,7 @@ class HeteroCPDotProductAttention(CPDotProductAttentionImpl, MegatronDotProductA
         config = self.config
         self.scatter_idx = scatter_idx
         self.gather_idx = gather_idx
-        
+
         if config.context_parallel_algo in ['hybrid_cp_algo', 'hybrid_adaptive_cp_algo', 'ulysses_cp_algo']:
             self.spg = mpu.get_context_parallel_group()
             if config.context_parallel_algo in ['hybrid_cp_algo', 'hybrid_adaptive_cp_algo']:
@@ -41,7 +41,7 @@ class HeteroCPDotProductAttention(CPDotProductAttentionImpl, MegatronDotProductA
         self.DPA_forward = super().forward
         self.spg_world_size = dist.get_world_size(self.spg)
 
-    
+
     def forward(self, query: Tensor, key: Tensor, value: Tensor, *args: Any, **kwargs: Any):
         """ forward
 
@@ -89,7 +89,7 @@ class HeteroCPDotProductAttention(CPDotProductAttentionImpl, MegatronDotProductA
             query_layer = all_to_all(query, self.spg, self.scatter_idx, self.gather_idx, scatter_sizes_query, gather_sizes)
             key_layer = all_to_all(key, self.spg, self.scatter_idx, self.gather_idx, scatter_sizes_key, gather_sizes)
             value_layer = all_to_all(value, self.spg, self.scatter_idx, self.gather_idx, scatter_sizes_value, gather_sizes)
-            
+
         context_layer = self.DPA_forward(query_layer, key_layer, value_layer, *args, **kwargs)
         if get_mindspeed_args().context_parallel_algo == "hybrid_cp_algo" and context_layer.dim() == 3:
             context_layer = context_layer.unsqueeze(1)
@@ -97,7 +97,7 @@ class HeteroCPDotProductAttention(CPDotProductAttentionImpl, MegatronDotProductA
             context_shape = context_layer.shape
             context_layer = context_layer.reshape(context_shape[0], context_shape[1],
                                                   scatter_sizes_query[dist.get_rank(self.spg)], -1)
-        
+
         if not native_all_to_all:
             output = all_to_all(context_layer, self.spg, self.gather_idx, self.scatter_idx, query.shape[self.scatter_idx])
         else:

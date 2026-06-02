@@ -11,7 +11,7 @@ def _init_pg(rank: int, world_size: int, init_file: str):
 
     if hasattr(torch, "npu"):
         torch.npu.set_device(rank)
-    
+
     dist.init_process_group(
         backend="hccl",
         init_method=f"file://{init_file}",
@@ -106,7 +106,7 @@ def test_parallel_state_multi_rank():
 
     if not hasattr(torch, "npu") or torch.npu.device_count() < 2:
         pytest.skip("需要至少2张卡才能运行该分布式用例")
-    
+
     world_size = 2
     with tempfile.NamedTemporaryFile(delete=False) as f:
         init_file = f.name
@@ -117,4 +117,3 @@ def test_parallel_state_multi_rank():
             os.remove(init_file)
         except OSError:
             pass
-        

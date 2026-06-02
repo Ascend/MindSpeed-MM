@@ -20,7 +20,7 @@ class Lumina(MultiModalModule):
         self.config = core_transformer_config_from_args(args)
         if not isinstance(config, dict):
             config = config.to_dict()
-        
+
         self.model = ChameleonForConditionalGeneration(**config["predictor"])
         self.z_loss_weight = config.pop("z_loss_weight", 1e-5)
         self.dtype = config.pop("dtype", torch.bfloat16)
@@ -39,7 +39,7 @@ class Lumina(MultiModalModule):
 
         with torch.autocast("npu", dtype=self.dtype):
             result = self.model(input_ids=input_ids, labels=labels, **kwargs)
-        
+
         # loss
         loss = result[0]
         additional_loss_dict = {}

@@ -118,8 +118,8 @@ def text_inputs(text_config):
     set_seq_len("total", hidden_states.shape[1])
 
     return {
-        "hidden_states": hidden_states, 
-        "position_embeddings": position_embeddings, 
+        "hidden_states": hidden_states,
+        "position_embeddings": position_embeddings,
         "attention_mask": attention_mask,
         "cu_seqlens": cu_seqlens,
         "indices": indices

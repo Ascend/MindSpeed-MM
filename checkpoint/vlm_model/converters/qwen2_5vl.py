@@ -182,7 +182,7 @@ class Qwen2_5_VLConverter(Converter):
                                     llm_kv_size
                                     )
         return ops
-    
+
     @staticmethod
     def _create_lora_ops(common_model_config: Any) -> List[Operator]:
         ops = create_qwen2_5_vl_lora_ops(common_model_config.new_transformers_weight_key,

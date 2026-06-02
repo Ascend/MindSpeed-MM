@@ -862,7 +862,7 @@ class Qwen3VLMoeVisionModel(Qwen3VLMoePreTrainedModel):
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
         if IS_NPU_AVAILABLE:
             cu_seqlens = cu_seqlens.cpu()
-        
+
         # Modification: slice rotary_pos_emb and hidden_states if using cp
         # Set global sequence length variables for cp
         sequence_lengths = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cpu()
@@ -879,7 +879,7 @@ class Qwen3VLMoeVisionModel(Qwen3VLMoePreTrainedModel):
                 # Get cumulative split sizes for the current ring cp rank
                 cu_seqlens = all_split_sizes_tensor.cumsum(dim=1)[ps.get_ring_rank()]
                 cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
-        
+
         emb = torch.cat((rotary_pos_emb, rotary_pos_emb), dim=-1)
         position_embeddings = (emb.cos(), emb.sin())
 
@@ -1117,7 +1117,7 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel):
 
             # Gather hidden_states
             hidden_states = gather_forward_split_backward_with_cp(hidden_states, dim=1, gather_size=get_seq_len("total"))
-        
+
         visual_pos_masks = visual_pos_masks.to(hidden_states.device)
         visual_embeds = visual_embeds.to(hidden_states.device, hidden_states.dtype)
         local_this = hidden_states[visual_pos_masks, :].clone() + visual_embeds

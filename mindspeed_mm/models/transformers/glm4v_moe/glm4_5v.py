@@ -71,4 +71,3 @@ class Glm4VFSDP2Minxin(FSDP2Mixin):
 @register_model("glm4v_moe")
 class Glm4vMoeForConditionalGeneration(WeightInitMixin, Glm4vFusedMoeForConditionalGeneration, Glm4VFSDP2Minxin):
     pass
-

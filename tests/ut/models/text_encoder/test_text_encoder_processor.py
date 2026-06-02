@@ -6,14 +6,14 @@ import transformers
 from mindspeed_mm.models.text_encoder import TextEncoder, Tokenizer
 from mindspeed_mm.models.text_encoder.hunyuan_mllm_text_encoder import HunyuanMLLmModel
 from tests.ut.utils import TestConfig, judge_expression
-    
+
 
 @dataclass
 class TestModelInput:
     tokenizer_dict: Dict
     text_encoder_dict: Dict
     text: AnyStr
-    target_model_type: Type 
+    target_model_type: Type
     target_output_min: float
     target_att_sum: int
 
@@ -52,7 +52,7 @@ class TestTestEncoder:
         self._judge_model(text_encoder, test_model_input.target_model_type)
         output, attn_mask = self._run_text_encoder(test_model_input.text, tokenizer, text_encoder)
         self._judge_result(output, attn_mask, test_model_input.target_output_min, test_model_input.target_att_sum)
-    
+
     def test_t5(self):
         """
         test t5 text encoder processor
@@ -172,7 +172,7 @@ class TestTestEncoder:
             "hidden_state_skip_layer": 2,
             "output_key": "hidden_states",
             "template_id": "hyv-llm-encode-video",
-            "template_file_path": "/home/ci_resource/models/hunyuanvideo_t2v/template.json" 
+            "template_file_path": "/home/ci_resource/models/hunyuanvideo_t2v/template.json"
         }
 
         tokenizer_dict = {

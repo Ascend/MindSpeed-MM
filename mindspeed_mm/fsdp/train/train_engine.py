@@ -164,7 +164,7 @@ class TrainEngine:
         # Average loss across data parallel group
         total_loss = self.average_losses_across_data_parallel_group([total_loss])
         loss_dict["loss"] = total_loss.item()
-    
+
         if all_mtp_loss:
             for i in range(len(all_mtp_loss)):
                 all_mtp_loss[i] = self.average_losses_across_data_parallel_group([all_mtp_loss[i]])
@@ -182,7 +182,7 @@ class TrainEngine:
         # Get data iterator
         train_dataloader_iter, _, _ = build_iterations(self.train_dataloader)
         param_dtype = get_dtype(args.parallel.fsdp_plan.param_dtype) if args.parallel.fsdp_plan.param_dtype else None
-        
+
         # Preload data
         if args.data and args.data.dataloader_param.enable_preload:
             train_dataloader_iter = Preloader(train_dataloader_iter, param_dtype=param_dtype)

@@ -46,13 +46,13 @@ class MOVQ(nn.Module):
         # load_checkpoint
         if from_pretrained is not None:
             load_checkpoint(self, from_pretrained)
-    
+
     def encode(self, x):
         h = self.encoder(x)
         h = self.quant_conv(h)
         info = self.quantize(h)
         return info
-    
+
 
 class Encoder(nn.Module):
     def __init__(self, *, ch, out_ch, ch_mult=None, num_res_blocks=2,

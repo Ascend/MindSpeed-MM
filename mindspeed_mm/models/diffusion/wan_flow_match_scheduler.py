@@ -36,10 +36,10 @@ class WanFlowMatchScheduler():
             self._set_timesteps(self.num_inference_timesteps, training=False)
         else:
             self._set_timesteps(self.num_train_timesteps, training=True)
-        
+
         if not (0 <= min_timestep_boundary < max_timestep_boundary <= 1):
             raise ValueError("min_timestep_boundary and max_timestep_boundary must satisfy 0 <= min < max <= 1")
-        
+
         self.max_timestep_boundary = max_timestep_boundary
         self.min_timestep_boundary = min_timestep_boundary
 
@@ -92,22 +92,22 @@ class WanFlowMatchScheduler():
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latents = self._step(noise_pred, t, latents)
-                
+
                 if i == len(self.timesteps) - 1 or ((i + 1) > num_warmup_steps):
                     progress_bar.update()
-        
+
         return latents
-    
+
     def q_sample(self, latents, noise=None, t=None, **kwargs):
         if noise is None:
             noise = torch.randn_like(latents)
-        
+
         # use first frame latents in noise
         model_kwargs = kwargs.get("model_kwargs", {})
         first_frame_latents = model_kwargs.get("first_frame_latents", None)
         if first_frame_latents is not None:
             noise[:, :, 0: 1] = first_frame_latents
-        
+
         if t is None:
             max_timestep_boundary = int(self.max_timestep_boundary * self.num_train_timesteps)
             min_timestep_boundary = int(self.min_timestep_boundary * self.num_train_timesteps)
@@ -116,7 +116,7 @@ class WanFlowMatchScheduler():
         else:
             timestep = t
             timestep_idx = (t.to("cpu") == self.timesteps).nonzero()[0]
-        
+
         sigma = self.sigmas[timestep_idx].to(latents.device)
         noised_latents = (1 - sigma) * latents + sigma * noise
         return noised_latents, noise, timestep

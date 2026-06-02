@@ -78,7 +78,7 @@ class AsyncPreprocessIterableDataset(IterableDataset):
 
         num_items = len(next(iter(processed.values())))
         return [{k: v[i] for k, v in processed.items()} for i in range(num_items)]
-    
+
     def __iter__(self):
         queue_size = max(self.buffer_size, self.num_workers)
         task_queue = queue.Queue(maxsize=queue_size)
@@ -281,7 +281,7 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                     **kwargs,
                 )
                 train_dataset = DistributedIterableDataset(train_dataset)
-            
+
             if val_dataset:
                 if data_args.async_preprocess:
                     val_dataset = DistributedIterableDataset(val_dataset)
@@ -362,9 +362,9 @@ def get_reward_video_dataset(basic_param, preprocess_param, dataset_param):
                                      streaming=data_args.streaming)
         if data_args.max_samples and not data_args.streaming:
             train_dataset = train_dataset.select(range(data_args.max_samples))
-        
+
         train_dataset = process_reward_dataset(train_dataset, data_args.data_folder, preprocess_param)
-        
+
         val_dataset = None
         if data_args.val_dataset:
             if data_args.data_path_val:
@@ -405,4 +405,3 @@ def get_reward_video_dataset(basic_param, preprocess_param, dataset_param):
                 val_dataset = DistributedIterableDataset(val_dataset)
 
         return [train_dataset, val_dataset]
-        

@@ -141,7 +141,7 @@ class CaptionEmbedder(nn.Module):
             caption = self.token_drop(caption, force_drop_ids)
         caption = self.y_proj(caption)
         return caption
-    
+
 
 class SizeEmbedder(TimestepEmbedder):
     """
@@ -176,5 +176,3 @@ class SizeEmbedder(TimestepEmbedder):
     @property
     def dtype(self):
         return next(self.parameters()).dtype
-    
-

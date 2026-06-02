@@ -136,5 +136,3 @@ def resize_and_pad_image(image, target_resolution):
     new_image.paste(resized_image, (paste_x, paste_y))
 
     return new_image
-
-

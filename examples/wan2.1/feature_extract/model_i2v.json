@@ -16,11 +16,11 @@
             "processor_id": "wan_i2v_processor",
             "image_encoder": "Wan2.1-I2V-14B-Diffusers/image_encoder",
             "i2v_vae_encode_tiling": false
-        }     
+        }
     },
     "text_encoder": {
         "model_id": "UMT5",
-        "dtype": "bf16", 
+        "dtype": "bf16",
         "hub_backend": "hf",
         "from_pretrained": "Wan2.1-I2V-14B-Diffusers/text_encoder"
     }

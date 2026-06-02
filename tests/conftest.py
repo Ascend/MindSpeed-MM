@@ -68,4 +68,3 @@ def generate_log(request: pytest.FixtureRequest):
 @pytest.fixture(autouse=True)
 def generate_json(request: pytest.FixtureRequest):
     return request.config.getoption("--generate-json")
-

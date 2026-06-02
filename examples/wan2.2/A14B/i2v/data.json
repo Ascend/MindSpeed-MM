@@ -80,7 +80,7 @@
                 "method": "whitespace_clean"
             }
         ],
-        "tokenizer_config": 
+        "tokenizer_config":
         {
             "autotokenizer_name": "AutoTokenizer",
             "hub_backend": "hf",

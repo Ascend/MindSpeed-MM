@@ -1,6 +1,6 @@
 # Copyright (c) [2025] [FastVideo Team]
 # Copyright (c) [2025] [ByteDance Ltd. and/or its affiliates.]
-# SPDX-License-Identifier: [Apache License 2.0] 
+# SPDX-License-Identifier: [Apache License 2.0]
 #
 # This file has been modified by [ByteDance Ltd. and/or its affiliates.] in 2025.
 #

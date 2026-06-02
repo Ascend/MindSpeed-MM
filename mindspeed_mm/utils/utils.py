@@ -85,7 +85,7 @@ def get_packed_seq_params(
     """Constructs PackedSeqParams and shapes for ringattn_context_parallel (TND)."""
     if pad_multiple is None:
         pad_multiple = 2 * cp_size
-    
+
     packed_seq_params = PackedSeqParams(
         qkv_format='thd',
         cu_seqlens_q=actual_seq_len,
@@ -123,51 +123,51 @@ def get_packed_seq_params(
 
 class Registry:
     """A generic class registry system that automatically uses class names as registration keys.
-    
+
     Features:
     - Automatic registration using class names
     - Prohibition of manual name specification
     - Class name conflict detection
     """
-    
+
     _REGISTRY: Dict[str, Type[Any]] = {}
     """Internal registry storage mapping class names to their corresponding class objects"""
 
     @classmethod
     def register(cls, target_class: Type[Any]) -> Type[Any]:
         """Class decorator for automatic registration using the class name.
-        
+
         Args:
             target_class: Target class to be registered
-            
+
         Returns:
             The original class object to preserve class definition
-            
+
         Raises:
             ValueError: If class name is already registered
         """
         class_name = target_class.__name__
-        
+
         if class_name in cls._REGISTRY:
             existing = cls._REGISTRY[class_name]
             raise ValueError(
                 f"Class name conflict: '{class_name}' already registered by {existing}, "
                 f"attempting to register: {target_class}"
             )
-            
+
         cls._REGISTRY[class_name] = target_class
         return target_class
 
     @classmethod
     def get_class(cls, name: str) -> Type[Any]:
         """Retrieve a registered class by its name.
-        
+
         Args:
             name: Name of the class to retrieve
-            
+
         Returns:
             The registered class object
-            
+
         Raises:
             ValueError: If the class is not found in registry
         """
@@ -406,7 +406,7 @@ def dist_sort(image_num_list):
     index = image_num_list.argsort()
     for i in range(remainder):
         target[index[i]] = more_rank
-    # transfer matrix    
+    # transfer matrix
     transfer = np.zeros((world_size, world_size), dtype=int)
     # greedy strategy allocation
     surplus = []
@@ -487,7 +487,7 @@ class EncoderBalanceComm(torch.autograd.Function):
         if not ctx.no_bk:
             return recv
         return recv, [transfer, target]
- 
+
     @staticmethod
     def backward(ctx, grad_output):
         if ctx.no_bk or np.sum(ctx.transfer[0]) == 0:
@@ -495,7 +495,7 @@ class EncoderBalanceComm(torch.autograd.Function):
         else:
             data = EncoderBalanceComm.apply(grad_output, ctx.group, ctx.transfer, True)
             return data, None, None, None, None
-    
+
 
 def change_tensor_layout(tensor, src_layout, dst_layout, batch_size=None):
     """
@@ -505,13 +505,13 @@ def change_tensor_layout(tensor, src_layout, dst_layout, batch_size=None):
         tensor (torch.Tensor): The input tensor.
         src_layout (str): The source layout, e.g., "sbh" or "bsh".
         dst_layout (str): The target layout, e.g., "sbnd" or "tnd".
-    
+
     Returns:
         torch.Tensor: The tensor with the transformed layout.
     """
     src_layout = src_layout.lower()
     dst_layout = dst_layout.lower()
-    
+
     if src_layout == dst_layout:
         return tensor
     key = (src_layout, dst_layout)
@@ -554,7 +554,7 @@ def reorder_output(attn_output, cp_rank, cp_size, cp_group, dim=0):
     index_map = {element: idx for idx, element in enumerate(index_list)}
     target = [i for i in range(len(index_list))]
     target_list = [index_map[element] for element in target]
-    
+
     chunks = torch.chunk(attn_output, chunks=len(target_list), dim=dim)
     reordered_chunks = [chunks[idx] for idx in target_list]
     attn_output = torch.concat(reordered_chunks, dim=dim)
@@ -575,7 +575,7 @@ def _gather(
 
     if world_size == 1:
         return input_
-    
+
     if gather_size is not None:
         tensor_list = []
         tensor_shape_base = input_.size()
@@ -594,7 +594,7 @@ def _gather(
 
 class _SplitForwardGatherBackWardWithMegatronCP(torch.autograd.Function):
     '''
-    Split the input tensor in the forward pass and gather the gradients in the backward pass. 
+    Split the input tensor in the forward pass and gather the gradients in the backward pass.
     It will be implemented in Mindspeed in the future.
     '''
     @staticmethod
@@ -615,7 +615,7 @@ class _SplitForwardGatherBackWardWithMegatronCP(torch.autograd.Function):
         ctx.seq_dim = seq_dim
 
         return val
-        
+
     @staticmethod
     def backward(ctx, grad_output):
         grad_input = {}
@@ -655,7 +655,7 @@ class _GatherForwardSplitBackWardWithMegatronCP(torch.autograd.Function):
         ctx.seq_dim = seq_dim
 
         return val
-        
+
     @staticmethod
     def backward(ctx, grad_output):
         cp_group = ctx.cp_group
@@ -677,7 +677,7 @@ class _GatherForwardSplitBackWardWithMegatronCP(torch.autograd.Function):
 
         # Collapse the two selected chunks back into a single contiguous local sequence
         grad_input = grad_output.view(*grad_output.shape[0:seq_dim], -1, *grad_output.shape[(seq_dim + 2):])
-        
+
         return grad_input, None, None
 
 

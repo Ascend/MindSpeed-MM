@@ -54,4 +54,3 @@ class CogVideoXI2VProcessor:
                 )
 
         return {"masked_video": image_latents}
-        

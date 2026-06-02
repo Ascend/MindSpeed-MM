@@ -587,7 +587,7 @@ class FSDP2Mixin:
             The (maybe) moved module.
         """
         device = torch.empty((), device=device).device
-        
+
         def _replace_tensor(t):
             if isinstance(t, torch.nn.Parameter):
                 return torch.empty_like(t, device=device) if t.device != device else t

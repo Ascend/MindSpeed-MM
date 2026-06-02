@@ -175,7 +175,7 @@ def _get_param_groups(
                 'is_decoupled_lr': is_decoupled_lr,
             }
             param_groups.append(param_group)
-    
+
     param_groups = _update_min_and_max_lr_in_param_groups(
         param_groups,
         lr=lr,
@@ -299,7 +299,7 @@ def _get_megatron_optimizer_based_on_param_groups(
                 optimizer_defaults = dict(
                     lr=config.lr, weight_decay=config.weight_decay, momentum=config.sgd_momentum
                 )
-            
+
             optimizer = HybridDeviceOptimizer(
                 param_groups,
                 offload_fraction=config.optimizer_offload_fraction,

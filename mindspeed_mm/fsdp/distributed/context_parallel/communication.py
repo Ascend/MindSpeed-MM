@@ -609,7 +609,7 @@ def gather_forward_split_backward(
 
 class _SplitForwardGatherBackWardWithMegatronCP(torch.autograd.Function):
     '''
-    Split the input tensor in the forward pass and gather the gradients in the backward pass. 
+    Split the input tensor in the forward pass and gather the gradients in the backward pass.
     It will be implemented in Mindspeed in the future.
     '''
     @staticmethod
@@ -630,7 +630,7 @@ class _SplitForwardGatherBackWardWithMegatronCP(torch.autograd.Function):
         ctx.seq_dim = seq_dim
 
         return val
-        
+
     @staticmethod
     def backward(ctx, grad_output):
         grad_input = {}
@@ -657,7 +657,7 @@ class _GatherForwardSplitBackWardWithMegatronCP(torch.autograd.Function):
         ctx.seq_dim = seq_dim
 
         return val
-        
+
     @staticmethod
     def backward(ctx, grad_output):
         cp_group = ctx.cp_group
@@ -679,7 +679,7 @@ class _GatherForwardSplitBackWardWithMegatronCP(torch.autograd.Function):
 
         # Collapse the two selected chunks back into a single contiguous local sequence
         grad_input = grad_output.view(*grad_output.shape[0:seq_dim], -1, *grad_output.shape[(seq_dim + 2):])
-        
+
         return grad_input, None, None, None, None
 
 
@@ -711,7 +711,7 @@ def split_forward_gather_backward_with_cp(
 ) -> torch.Tensor:
     """
     Perform a context-parallel-aware tensor split during forward pass and gather during backward pass.
-    
+
     This function supports multiple context parallel (CP) algorithms:
       - Ulysses-style CP: uniform or non-uniform split across CP ranks.
       - Ring Attention: typically used with sequence parallelism and ring-based communication.
@@ -727,7 +727,7 @@ def split_forward_gather_backward_with_cp(
     if ps.is_ulysses_enable():
         split_gather_sizes = cal_split_sizes(seq_len, ps.get_ulysses_group_size())
         input_ = split_forward_gather_backward(input_, ps.get_ulysses_group(), dim=dim, split_sizes=split_gather_sizes)
-    
+
     return input_
 
 
@@ -744,16 +744,16 @@ def gather_forward_split_backward_with_cp(
     if ps.is_ring_enable():
         if gather_size % (2 * ps.get_ring_group_size()) != 0:
             raise ValueError(f"Total gather size should be multiple of 2 * ring_size, but got total gather size: {gather_size}, ring_size: {ps.get_ring_group_size()}")
-        # Calculate the sequence length per ring CP group for Ulysses processing. 
+        # Calculate the sequence length per ring CP group for Ulysses processing.
         # Since padding is applied in ring groups, the division yields an integer.
         gather_size = gather_size // ps.get_ring_group_size()
-    
+
     if ps.is_ulysses_enable():
         gather_size_list = cal_split_sizes(gather_size, ps.get_ulysses_group_size())
         input_ = gather_forward_split_backward(input_, ps.get_ulysses_group(), dim=dim, gather_sizes=gather_size_list)
     if ps.is_ring_enable():
         input_ = load_balanced_gather_forward_split_backward(input_, ps.get_ring_group(), dim=dim)
-    
+
     return input_
 
 
@@ -916,11 +916,11 @@ def packed_data_gather_forward_split_backward_with_cp(
     # Step 1: Gather within Ulysses subgroups (inner CP group)
     # First, compute how packed seqs are distributed across ring CP ranks
     all_split_sizes_tensor = cal_split_sizes_multi(seq_lens, ps.get_ring_group_size())
-    gather_sizes = cal_split_sizes(all_split_sizes_tensor[ps.get_ring_rank()].sum(), ps.get_ulysses_group_size()) 
+    gather_sizes = cal_split_sizes(all_split_sizes_tensor[ps.get_ring_rank()].sum(), ps.get_ulysses_group_size())
     if ps.is_ulysses_enable():
         x = gather_forward_split_backward(x, ps.get_ulysses_group(), dim=dim, gather_sizes=gather_sizes)
     # Step 2: Gather across ring CP ranks
     if ps.is_ring_enable():
         x = packed_data_gather_forward_split_backward(x, all_split_sizes_tensor, ps.get_ring_group(), dim=dim)
-    
+
     return x

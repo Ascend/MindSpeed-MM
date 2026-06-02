@@ -30,7 +30,7 @@ class Qwen3TTSConverter(DcpConverter):
     """
     A utility class to convert model checkpoints of Qwen3TTS between different formats,
     specifically between Hugging Face (HF) and torch-dcp (DCP) formats.
-    
+
     Supports:
     - HF → DCP conversion
     - DCP → HF merging
@@ -39,9 +39,9 @@ class Qwen3TTSConverter(DcpConverter):
 
     dcp_prefix = "model."
     hf_prefix = ""
-        
+
     def dcp_to_hf(
-        self, 
+        self,
         load_dir: str = "mm_save_dir/release",     # Input: Directory containing DCP shards
         save_dir: str = "Qwen3-TTS-12Hz-1.7B-hf",         # Output: Directory to save merged HF model
         model_assets_dir: str = "Qwen3-TTS-12Hz-1.7B-Base",     # Reference: Original HF model dir (for config/tokenizer)
@@ -50,8 +50,8 @@ class Qwen3TTSConverter(DcpConverter):
     ):
         """
         Merges torch-dcp shards and converts them back into standard Hugging Face format.
-        
-        This is typically used after training or inference in torch-dcp format to export 
+
+        This is typically used after training or inference in torch-dcp format to export
         a model that can be easily loaded with Hugging Face Transformers.
         """
         state_dict = load_dcp_state_dict(load_dir)
@@ -95,7 +95,7 @@ class Qwen3TTSConverter(DcpConverter):
                 fmax=12000
             ).transpose(1, 2)
             state_dict["talker.model.codec_embedding.weight"][3000] = _speaker_encoder(mels).to(weight.dtype)
-            
+
             config_dict["tts_model_type"] = "custom_voice"
             talker_config["spk_id"] = {
                 speaker_name: 3000
@@ -118,6 +118,6 @@ class Qwen3TTSConverter(DcpConverter):
         set_directory_permissions(Path(save_path))
 
 
-    @staticmethod    
+    @staticmethod
     def hf_to_dcp():
         pass

@@ -64,7 +64,7 @@ class HunyuanMLLmModel(nn.Module):
                     )
 
                     )
-                
+
                 last_double_return_token_indices = last_double_return_token_indices.reshape(input_ids.shape[0], -1)[:, -1]
 
                 assistant_crop_start = last_double_return_token_indices - 1 + image_emb_len - 4
@@ -100,7 +100,7 @@ class HunyuanMLLmModel(nn.Module):
                     image_attention_mask_list.append(
                         torch.ones(image_embed_list[-1].shape[0]).to(prompt_embeds.device).to(attention_mask.dtype)
                     )
-                
+
                 prompt_embed_list = torch.stack(prompt_embed_list)
                 prompt_attention_mask_list = torch.stack(prompt_attention_mask_list)
                 image_embed_list = torch.stack(image_embed_list)
@@ -109,7 +109,7 @@ class HunyuanMLLmModel(nn.Module):
                 if 0 < self.image_embed_interleave < 6:
                     image_embed_list = image_embed_list[:, ::self.image_embed_interleave, :]
                     image_attention_mask_list = image_attention_mask_list[:, ::self.image_embed_interleave]
-                
+
                 prompt_embeds = torch.cat((image_embed_list, prompt_embed_list), dim=1)
                 prompt_attention_mask = torch.cat((image_attention_mask_list, prompt_attention_mask_list), dim=1)
                 attention_mask.set_(prompt_attention_mask.contiguous())
@@ -123,7 +123,7 @@ class HunyuanMLLmModel(nn.Module):
             return super().__getattr__(name)
         else:
             return getattr(self.model, name)
-    
+
     @classmethod
     def from_pretrained(cls, **config):
         template_file_path = config.pop("template_file_path")
@@ -138,4 +138,3 @@ class HunyuanMLLmModel(nn.Module):
             template_info=templates[template_id],
             image_embed_interleave=image_embed_interleave,
         )
-    

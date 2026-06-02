@@ -100,7 +100,7 @@ class RoPE3D(nn.Module):
         x = self.apply_rope1d(x, poses[2], cos_x, sin_x)
         tokens = torch.cat((t, y, x), dim=-1)
         return tokens
-    
+
 
 class DynamicRotaryEmbedding(RotaryEmbedding):
     def __init__(self,
@@ -123,7 +123,7 @@ class DynamicRotaryEmbedding(RotaryEmbedding):
         dim = kv_channels
         if rotary_percent < 1.0:
             dim = int(dim * rotary_percent)
-        
+
         max_position_embeddings = config.max_position_embeddings
         factor = config.rope_scaling.factor if hasattr(config.rope_scaling, 'factor') else 1.0
 
@@ -169,7 +169,7 @@ class DynamicRotaryEmbedding(RotaryEmbedding):
             # slice rotary_pos_emb along sequence dimension and select the partition of the current CP rank
             emb = get_pos_emb_on_this_cp_rank(emb, 0)
         return emb
-    
+
     def get_rotary_seq_len(
         self,
         inference_context,

@@ -33,7 +33,7 @@ def forward_step(batch, ae_model, discrim_model):
         outputs = ae_model(inputs)
         recon = outputs[0]
         posterior = outputs[1]
-    
+
     gen_loss, discrim_loss = None, None
     # Generator Step
     if args.step_gen:
@@ -57,7 +57,7 @@ def forward_step(batch, ae_model, discrim_model):
                 global_step=args.current_step,
                 last_layer=None,
             )
-    
+
     return gen_loss, discrim_loss
 
 

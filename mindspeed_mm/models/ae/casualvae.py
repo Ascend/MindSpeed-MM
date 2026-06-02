@@ -9,7 +9,7 @@ from mindspeed_mm.models.common.module import MultiModalModule
 from mindspeed_mm.models.common.conv import Conv2d, CausalConv3d
 from mindspeed_mm.models.common.attention import CausalConv3dAttnBlock
 from mindspeed_mm.models.common.resnet_block import ResnetBlock2D, ResnetBlock3D
-from mindspeed_mm.models.common.updownsample import (SpatialDownsample2x, TimeDownsample2x, SpatialUpsample2x, TimeUpsample2x, 
+from mindspeed_mm.models.common.updownsample import (SpatialDownsample2x, TimeDownsample2x, SpatialUpsample2x, TimeUpsample2x,
                                     TimeUpsampleRes2x, Downsample, Spatial2xTime2x3DDownsample, Spatial2xTime2x3DUpsample)
 from mindspeed_mm.models.common.checkpoint import load_checkpoint
 from mindspeed_mm.models.common.distrib import DiagonalGaussianDistribution

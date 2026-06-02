@@ -4,10 +4,10 @@ from megatron.core import mpu
 
 from mindspeed_mm.models.common.checkpoint import load_checkpoint
 from .dits import (
-    Latte, 
-    VideoDitSparse, 
-    SatDiT, 
-    VideoDitSparseI2V, 
+    Latte,
+    VideoDitSparse,
+    SatDiT,
+    VideoDitSparseI2V,
     PTDiT,
     HunyuanVideoDiT,
     HunyuanVideo15DiT,

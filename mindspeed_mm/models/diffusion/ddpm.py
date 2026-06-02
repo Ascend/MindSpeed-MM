@@ -78,7 +78,7 @@ class DDPM:
             timestep_respacing = [self.num_train_steps]
         use_timesteps = set(space_timesteps(self.num_train_steps, timestep_respacing))
 
-        # init new_betas 
+        # init new_betas
         alphas = 1.0 - self.betas
         alphas_cumprod = torch.cumprod(alphas, axis=0)
         timestep_map = []
@@ -178,7 +178,7 @@ class DDPM:
         :param x: the [N x C x ...] tensor at time t.
         :param t: a 1-D Tensor of timesteps.
         :param clip_denoised: if True, clip the denoised signal into [-1, 1].
-        :param denoised_fn: if not None, a function which applies to the x_start prediction before 
+        :param denoised_fn: if not None, a function which applies to the x_start prediction before
             it is used to sample. Applies before clip_denoised.
         :param model_kwargs: if not None, a dict of extra keyword arguments to
             pass to the model. This can be used for conditioning.
@@ -406,7 +406,7 @@ class DDPM:
             raise AssertionError("param shape is incorrect")
         if noised_latents is None:
             noised_latents = torch.randn(*shape, device=self.device)
-        
+
         indices = list(range(self.num_timesteps))[::-1]
 
         if progress:

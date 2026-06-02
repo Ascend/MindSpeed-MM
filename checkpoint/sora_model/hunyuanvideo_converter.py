@@ -20,7 +20,7 @@ class XMLPFusedRowParallelTP(TPPattern):
         wmlps = torch.chunk(wmlp, tp_size, dim=1)
         weights = [torch.cat([wxs[i], wmlps[i]], dim=1) for i in range(tp_size)]
         return weights
-    
+
     def merge(self, weights):
         hidden_size = self.hidden_size // len(weights)
         wxs = [weight[:, :hidden_size] for weight in weights]
@@ -124,7 +124,7 @@ class HunyuanVideoConverter(SoraModelConverter):
                 f"single_blocks.{index}.linear1_mlp.weight",
                 f"single_blocks.{index}.linear1_mlp.bias"
             ]
-            
+
             self.tp_split_mapping["qkv_fused_column_tp"] += [
                 f"single_blocks.{index}.linear1_qkv.weight",
                 f"single_blocks.{index}.linear1_qkv.bias"
@@ -139,19 +139,19 @@ class HunyuanVideoConverter(SoraModelConverter):
             self._enable_tp = True
             self._enable_pp = False
             self._enable_vpp = False
-            
+
         elif self.version == "i2v":
             self._supported_methods = ["resplit", "layerzero_to_mm", "merge_lora_to_base", "source_to_mm"]
             self._enable_tp = False
             self._enable_pp = False
             self._enable_vpp = False
-        
+
         elif self.version == "t2v-lora":
             self._supported_methods = []
             self._enable_tp = False
             self._enable_pp = False
             self._enable_vpp = False
-        
+
         elif self.version == "i2v-lora":
             self._supported_methods = ["source_to_mm"]
             self._enable_tp = False
@@ -215,7 +215,7 @@ class HunyuanVideoConverter(SoraModelConverter):
             names = list(state_dict.keys())
             for name in names:
                 if ".alpha" in name:
-                    state_dict.pop(name)        
+                    state_dict.pop(name)
         state_dict = super()._replace_state_dict(state_dict, convert_mapping, str_replace_mapping)
         state_dict = self._split_qkv_mlp_fused_column_linear(state_dict)
         return state_dict
@@ -237,7 +237,7 @@ class HunyuanVideoConverter(SoraModelConverter):
                         w_mlp = lora_b[hidden_size * 3:]
                         state_dict[name.replace("linear1", "linear1_qkv")] = w_qkv
                         state_dict[name.replace("linear1", "linear1_mlp")] = w_mlp
-                        
+
         elif "single_blocks.0.linear1.weight" in state_dict.keys():
             # source_to_mm
             for index in range(self.single_stream_layers):
@@ -248,4 +248,3 @@ class HunyuanVideoConverter(SoraModelConverter):
                 state_dict[f"single_blocks.{index}.linear1_qkv.bias"] = bias1[:hidden_size * 3]
                 state_dict[f"single_blocks.{index}.linear1_mlp.bias"] = bias1[hidden_size * 3:]
         return state_dict
-        

@@ -66,14 +66,14 @@
         },{
             "method": "whitespace_clean"
         }],
-        "tokenizer_config": 
+        "tokenizer_config":
         {
             "autotokenizer_name": "AutoTokenizer",
             "hub_backend": "hf",
             "from_pretrained": "Wan2.2-TI2V-5B-Diffusers/tokenizer",
             "model_max_length": 512
         }
-        
+
     },
     "dataloader_param": {
         "dataloader_mode": "sampler",

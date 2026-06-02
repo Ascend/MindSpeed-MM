@@ -21,9 +21,9 @@
             "DownEncoderBlockCausal3D"
         ],
         "up_block_types": [
-            "UpDecoderBlockCausal3D", 
             "UpDecoderBlockCausal3D",
-            "UpDecoderBlockCausal3D", 
+            "UpDecoderBlockCausal3D",
+            "UpDecoderBlockCausal3D",
             "UpDecoderBlockCausal3D"
         ],
         "scaling_factor": 0.476986,
@@ -58,7 +58,7 @@
             "model_id": "HunyuanMLLmModel",
             "dtype": "bf16",
             "from_pretrained": "llava-llama-3-8b-v1_1-transformers",
-            "model_type": "LlavaForConditionalGeneration", 
+            "model_type": "LlavaForConditionalGeneration",
             "hub_backend": "hf",
             "use_attention_mask": true,
             "hidden_state_skip_layer": 2,
@@ -90,7 +90,7 @@
         "model_id": "hunyuanvideodit",
         "from_pretrained": null,
         "dtype": "bf16",
-        "patch_size": [1, 2, 2], 
+        "patch_size": [1, 2, 2],
         "in_channels": 16,
         "out_channels": 16,
         "num_heads": 24,
@@ -103,7 +103,7 @@
         "single_stream_full_recompute_layers": 40,
         "attention_async_offload": true,
         "rope_dim_list": [16, 56, 56],
-        "qkv_bias": true, 
+        "qkv_bias": true,
         "qk_norm": true,
         "qk_norm_type": "rmsnorm",
         "guidance_embed": true,

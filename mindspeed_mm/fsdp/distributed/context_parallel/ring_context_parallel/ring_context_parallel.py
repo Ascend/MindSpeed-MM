@@ -31,7 +31,7 @@ def causal_forward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, attn_mask=Non
         cur_q = q[1]
         # [2, s, b, h] -> [2s, b, h]
         cur_k, cur_v = [x.view(-1, *x.shape[2:]) for x in [cur_k, cur_v]]
-    
+
     return cur_q, cur_k, cur_v, cur_attn_mask
 
 
@@ -59,7 +59,7 @@ def tnd_forward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, fetch_ptrs, attn
     return cur_q, cur_k, cur_v, cur_attn_mask, (cur_seq_qlen, cur_seq_kvlen, cur_sub_out_seq_len)
 
 
-def tnd_backward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, attn_out, dout, 
+def tnd_backward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, attn_out, dout,
                           softmax_values, seq_lens, index_values, attn_mask=None):
     # fetch backward output
     actual_seq_qlen, actual_seq_kvlen, half_actual_seq_kvlen, half_actual_seq_qlen = seq_lens
@@ -84,7 +84,7 @@ def tnd_backward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, attn_out, dout,
     return (cur_q, cur_k, cur_v), cur_attn_out, cur_dout, (cur_softmax_max, cur_softmax_sum), cur_attn_mask, (cur_seq_qlen, cur_seq_kvlen)
 
 
-def causal_backward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, attn_out, dout, 
+def causal_backward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, attn_out, dout,
                           softmax_max, softmax_sum, attn_mask=None):
     cur_attn_mask = None
     if q_block_id >= kv_block_id:
@@ -107,7 +107,7 @@ def causal_backward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, attn_out, do
         # only q[1] attn_out[1] and dout[1] need to be calculated
         cur_q, cur_attn_out, cur_dout = [x[1] for x in [q, attn_out, dout]]
         cur_softmax_max, cur_softmax_sum = [x[:, :, 1, :, :] for x in [softmax_max, softmax_sum]]
-    
+
     return cur_q, cur_k, cur_v, cur_attn_out, cur_dout, cur_softmax_max, cur_softmax_sum, cur_attn_mask
 
 
@@ -127,7 +127,7 @@ def tnd_grad_update(q_block_id, kv_block_id, cur_attn_grads, global_attn_grads,
         dq.index_add_(0, q_index, cur_dq)
         dk.add_(cur_dk)
         dv.add_(cur_dv)
-    
+
     return dq, dk, dv
 
 
@@ -150,7 +150,7 @@ def causal_grad_update(q_block_id, kv_block_id, cur_dq, cur_dk, cur_dv, dq, dk, 
         cur_dv = cur_dv.view(dv.shape)
         dk.add_(cur_dk)
         dv.add_(cur_dv)
-    
+
     return dq, dk, dv
 
 
@@ -439,7 +439,7 @@ def compute_qkv_index(seq_lens):
         kv_indices.extend(full_indices[prev_eod_pos:mid])
         q_indices.extend(full_indices[mid:eod_pos])
         prev_eod_pos = eod_pos
-    
+
     kv_index = torch.tensor(kv_indices, device=torch.npu.current_device())
     q_index = torch.tensor(q_indices, device=torch.npu.current_device())
 
@@ -1138,7 +1138,7 @@ class AttentionWithCp(torch.autograd.Function):
                 elif i > 0: # receive dk dv from last step
                     intra_dkv_comm.wait()
                     cur_dkv, next_dkv = next_dkv, cur_dkv
-                
+
                 dk, dv = cur_dkv[0], cur_dkv[1]
                 # update qkv grades
                 if cp_config.is_eod_reset and cp_config.causal:
@@ -1188,7 +1188,7 @@ class AttentionWithCp(torch.autograd.Function):
         from bisect import bisect_right
         from mindspeed.utils import batch_index
 
-        if actual_seq_qlen:  
+        if actual_seq_qlen:
             seq_len = actual_seq_qlen[-1] // AttentionWithCp.batch_size
             actual_seq_qlen = batch_index(actual_seq_qlen, seq_len)
             actual_seq_kvlen = batch_index(actual_seq_kvlen, seq_len)
@@ -1211,10 +1211,10 @@ class AttentionWithCp(torch.autograd.Function):
                 mask = torch.zeros_like(mask)
             elif kv_block_id == q_block_id:
                 mask = torch.tril(mask)
-            
+
             return torch.logical_not(mask).unsqueeze(dim=1).npu()  # B 1 S S
         else:
-            return attn_mask[kv_block_id] if isinstance(attn_mask, list) else None  
+            return attn_mask[kv_block_id] if isinstance(attn_mask, list) else None
 
 
 def ringattn_context_parallel(q, k, v, n, cp_para, softmax_scale=None, attn_mask=None, dropout_p=0.,
@@ -1250,7 +1250,7 @@ class TNDGeneralAttentionStrategy(AttentionStrategy):
 
     def update_out(self, cp_config):
         """General attention strategy implementation using TND layout.
-    
+
         This strategy utilizes NPU fused attention operations for optimized performance
         with TND (Time, Number of heads, Dimension) tensor layout.
         """
@@ -1305,7 +1305,7 @@ class TNDGeneralAttentionStrategy(AttentionStrategy):
             offset=cp_config.rng_states[cp_config.kv_block_id][1],
             numels=cp_config.rng_states[cp_config.kv_block_id][2],
         )
-        
+
         return attn_grad_outs
 
 
@@ -1334,7 +1334,7 @@ class AttentionWithCpTNDGeneral(torch.autograd.Function):
         outer_ring = RingP2P(cp_config.cp_outer_ranks, cp_config.cp_group, cp_config.cp_group_for_send_recv_overlap)
 
         # 计算每个rank上的所有子序列的和 以及 累加序列
-        total_len_per_cp_rank = None 
+        total_len_per_cp_rank = None
         if split_seq_lens_per_cp_rank is not None:
             total_len_per_cp_rank = split_seq_lens_per_cp_rank.sum(1).tolist()
             cu_seq_len_per_cp_rank = split_seq_lens_per_cp_rank.cumsum(1)
@@ -1354,7 +1354,7 @@ class AttentionWithCpTNDGeneral(torch.autograd.Function):
             # 使用压缩矩阵
             attn_mask = torch.ones((2048, 2048), dtype=torch.bool, device=q.device)
             attn_mask = torch.triu(attn_mask, diagonal=1)
-        
+
         # kv拼接用于通信
         cur_kv = torch.cat((k.unsqueeze(0), v.unsqueeze(0)), dim=0)  # [2, t, n, d]
         next_kv = torch.empty_like(cur_kv)
@@ -1380,7 +1380,7 @@ class AttentionWithCpTNDGeneral(torch.autograd.Function):
                 next_kv_block_id_outer = (kv_block_id_outer + cp_config.cp_size - cp_config.inner_size) % cp_config.cp_size
                 outer_ring.async_send_recv(cur_kv, next_round_kv, shapes=get_unaligned_cp_shapes(total_len_per_cp_rank, kv_block_id_outer, next_kv_block_id_outer))# shapes是各个rank上的序列长度
 
-            # Inner loop: process inner context parallelism windows 
+            # Inner loop: process inner context parallelism windows
             for i in range(cp_config.inner_size):
                 # wait until KV is received from recv_src
                 if i < cp_config.inner_size - 1:
@@ -1414,7 +1414,7 @@ class AttentionWithCpTNDGeneral(torch.autograd.Function):
         attn_mask = attn_mask if isinstance(attn_mask, list) else [attn_mask]
         # Extract final attention outputs
         attn_out, softmax_max, softmax_sum, cp_config.rng_states = cp_config.global_attn_outs
-        
+
         k_stack, v_stack = cache_manager.get_cache(cur_kv)
 
         # Save tensors for backward pass
@@ -1508,9 +1508,9 @@ class AttentionWithCpTNDGeneral(torch.autograd.Function):
                 elif i > 0: # receive dk dv from last step
                     intra_dkv_comm.wait()
                     cur_dkv, next_dkv = next_dkv, cur_dkv
-                
+
                 dk, dv = cur_dkv[0], cur_dkv[1]
-                
+
                 # update qkv grades
                 dq.add_(dq_step)
                 dk.add_(dk_step)
@@ -1523,7 +1523,7 @@ class AttentionWithCpTNDGeneral(torch.autograd.Function):
                 cp_config.kv_block_id = next_kv_block_id
                 # 更新cu_seq_kvlen
                 cp_config.actual_seq_kvlen = cu_seq_len_per_cp_rank[cp_config.kv_block_id] if split_seq_lens_per_cp_rank is not None else cp_config.actual_seq_kvlen
-            
+
             if intra_dkv_comm.wait():
                 cur_dkv, next_dkv = next_dkv, cur_dkv
 

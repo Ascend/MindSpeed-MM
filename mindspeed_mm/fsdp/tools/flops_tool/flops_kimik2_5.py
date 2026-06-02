@@ -10,11 +10,11 @@ from transformers import AutoConfig
 def random_pil_image(w, h):
     """
     生成指定宽高的纯色 PIL Image 图像
-    
+
     Args:
         w: 图像宽度（像素）
         h: 图像高度（像素）
-    
+
     Returns:
         PIL.Image.Image: 随机纯色的 RGB 图像
     """
@@ -85,7 +85,7 @@ def regularize_images(images, **kwargs):
     return results
 
 
-def get_mm_inputs(images, hf_ckpt_path, image_max_pixels=512 * 512, image_min_pixels=1024): 
+def get_mm_inputs(images, hf_ckpt_path, image_max_pixels=512 * 512, image_min_pixels=1024):
     """
     加载图像处理器 + 图像正则化 + 图像张量转换
 
@@ -94,7 +94,7 @@ def get_mm_inputs(images, hf_ckpt_path, image_max_pixels=512 * 512, image_min_pi
         hf_ckpt_path: HuggingFace模型权重路径
         image_max_pixels: 图像最大像素值上限，需与模型配置中的 image_max_pixels 参数对齐
         image_min_pixels: 图像最小像素值下限，需与模型配置中的 image_min_pixels 参数对齐
-    
+
     Returns:
         经过 image_processor 处理后的 PyTorch 张量格式图像输入
     """
@@ -116,7 +116,7 @@ def num_floating_image_encoder_point_operations(hf_cfg, seq_length=None):
     Args:
         hf_cfg: huggingface配置
         seq_length: 序列长度
-    
+
     Returns:
         ViT 部分的flops
     """
@@ -163,7 +163,7 @@ def _estimate_deepseek_v3_flops(text_cfg, tokens_sum, batch_seqlens):
         text_cfg: 文本部分的配置
         tokens_sum: 总token数量
         batch_seqlens: 列表, batch中每条样本的序列长度 [seq_len1, seq_len2, ..., seq_lenB]
-    
+
     Returns:
         LLM (deepseek V3) 部分的flops
     """
@@ -176,7 +176,7 @@ def _estimate_deepseek_v3_flops(text_cfg, tokens_sum, batch_seqlens):
     moe_num_expert = text_cfg.n_routed_experts  # 总专家数
     moe_topk = text_cfg.num_experts_per_tok  # 激活的专家数
     share_expert_num = text_cfg.n_shared_experts  # 共享专家数
-    
+
     # -------------------------------------- 1.MOE 部分--------------------------------------
     # self.gate 部分, 对应操作 F.linear(hidden_states.type(torch.float32), self.weight.type(torch.float32))
     # self.weight 形状: nn.Parameter(torch.empty((self.n_routed_experts, config.hidden_size)))
@@ -231,14 +231,14 @@ def _estimate_deepseek_v3_flops(text_cfg, tokens_sum, batch_seqlens):
     emd_and_lm_head_N = vocab_size * hidden_size
     # -------------------------------------- 3.lm head 部分 --------------------------------------
 
-    # -------------------------------------- Total Layers -------------------------------------- 
+    # -------------------------------------- Total Layers --------------------------------------
     # MOE 部分的 flops * MOE 层数 + Dense 部分的 flops * Dense 层数 + lm head 部分的 flops
     moe_N = (
         (moe_gate_N + moe_expert_mlp_N + attn_linear_N) * (num_hidden_layers - first_k_dense_replace)
         + (hidden_size * text_cfg.intermediate_size * 3 + attn_linear_N) * first_k_dense_replace
         + emd_and_lm_head_N
     )
-    # -------------------------------------- Total Layers -------------------------------------- 
+    # -------------------------------------- Total Layers --------------------------------------
 
     # -------------------------------------- Total Tokens --------------------------------------
     # moe_N 表示单个 token 的flops, 乘以总的 token 数量;
@@ -282,8 +282,8 @@ def main(args):
 
     # 文本解码器 FLOPs
     text_decoder_flops = _estimate_deepseek_v3_flops(
-        hf_cfg.text_config, 
-        args.batch_size * args.text_seq_length, 
+        hf_cfg.text_config,
+        args.batch_size * args.text_seq_length,
         [args.text_seq_length] * args.batch_size
     )
     print(f"Text decoder flops is: {text_decoder_flops}")

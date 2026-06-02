@@ -10,7 +10,7 @@ def weights_init(m):
         nn.init.normal_(m.weight.data, 1.0, 0.02)
         nn.init.constant_(m.bias.data, 0)
 
-    
+
 class NLayerDiscriminator3D(nn.Module):
     """Defines a 3D PatchGAN discriminator as in Pix2Pix but for 3D inputs."""
     def __init__(self, input_nc=1, ndf=64, kernel_size=3, padding_size=1, n_layers=3, use_actnorm=False):
@@ -34,7 +34,7 @@ class NLayerDiscriminator3D(nn.Module):
             use_bias = norm_layer != nn.BatchNorm3d
 
         sequence = [
-            nn.Conv3d(input_nc, ndf, kernel_size=kernel_size, stride=2, padding=padding_size), 
+            nn.Conv3d(input_nc, ndf, kernel_size=kernel_size, stride=2, padding=padding_size),
             nn.LeakyReLU(0.2, True)
         ]
         nf_mult = 1

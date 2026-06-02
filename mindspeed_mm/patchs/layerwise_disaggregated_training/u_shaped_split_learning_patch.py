@@ -108,7 +108,7 @@ def build_mm_dataset_ldt(dataset_param):
     preprocess_param = dataset_param["preprocess_parameters"]
     if dataset_type == "huggingface":
         return get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param)
-    
+
     return build_mm_dataset(dataset_param)
 
 
@@ -139,7 +139,7 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                                         streaming=data_args.streaming)
             if data_args.max_samples and not data_args.streaming:
                 train_dataset = train_dataset.select(range(data_args.max_samples))
-            
+
             if consumed_samples > 0:
                 logger.info(f"Skipping first {consumed_samples} samples to resume from checkpoint.")
                 train_dataset.skip(consumed_samples)
@@ -201,7 +201,7 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param):
                         **kwargs,
                     )
                     train_dataset = DistributedIterableDataset(train_dataset)
-            
+
             if val_dataset:
                 if data_args.async_preprocess:
                     val_dataset = DistributedIterableDataset(val_dataset)

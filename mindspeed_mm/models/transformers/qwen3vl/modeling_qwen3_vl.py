@@ -43,7 +43,7 @@ from mindspeed_mm.utils.utils import gather_forward_split_backward_with_megatron
 
 from ..cp_utils import get_seq_len, set_seq_len, split_visual_seqs_with_cp
 from .output import (
-    Qwen3VLCausalLMOutputWithPast, 
+    Qwen3VLCausalLMOutputWithPast,
     Qwen3VLModelOutputWithPast
 )
 from .modules import (
@@ -125,8 +125,8 @@ class Qwen3VLPreTrainedModel(PreTrainedModel):
         "hidden_states": Qwen3VLTextDecoderLayer,
         "attentions": Qwen3VLTextAttention,
     }
-    
-    
+
+
 class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
     config: Qwen3VLVisionConfig
     _no_split_modules = ["Qwen3VLVisionBlock"]
@@ -290,12 +290,12 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
             patch_weight_tensors_permute.append(weight_tensor)
         patch_idx_tensors_permute = torch.cat(patch_idx_tensors_permute, dim=1)  # [4, s1+s2+s3...]
         patch_weight_tensors_permute = torch.cat(patch_weight_tensors_permute, dim=1)
-        
+
         # Split tensors across context parallel ranks for distributed processing
         if mpu.get_context_parallel_world_size() > 1:
             patch_idx_tensors_permute = split_visual_seqs_with_cp(patch_idx_tensors_permute, dim=1)
             patch_weight_tensors_permute = split_visual_seqs_with_cp(patch_weight_tensors_permute, dim=1)
-        
+
 
         # embedding
         pos_embeds = self.pos_embed(patch_idx_tensors_permute) * patch_weight_tensors_permute[:, :, None]  # 4, total_visual_tokens//cp_size, hidden_size
@@ -324,7 +324,7 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
         rotary_pos_emb = self.rot_pos_emb(grid_thw)
 
         seq_len, _ = hidden_states.size()
-        
+
         sequence_lengths = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cpu()
 
         # Set global sequence length variables for context parallelism
@@ -396,7 +396,7 @@ class Qwen3VLVisionModel(Qwen3VLPreTrainedModel):
                 grad_scale="up",
                 gather_sizes=gather_sizes
             )
-        
+
 
         return hidden_states, deepstack_feature_lists
 
@@ -417,11 +417,11 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)        
-        
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+
         # Placeholder for FSDP2 hook registration on norm/gate params when align_fsdp_param_groups is enabled.
         self.norm_hook_module = Qwen3VLEmptyModule()
-        
+
         self.layers = nn.ModuleList(
             [Qwen3VLTextDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
@@ -527,9 +527,9 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
 
         # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
-        
+
         self.norm_hook_module(hidden_states)
-        
+
         # decoder layers
         for layer_idx, decoder_layer in enumerate(self.layers):
             if self.config.activation_offload:
@@ -601,7 +601,7 @@ class Qwen3VLTextModel(Qwen3VLPreTrainedModel):
             elif megatron_args.context_parallel_algo == "megatron_cp_algo":
                 hidden_states = gather_forward_split_backward_with_megatron_cp(hidden_states, mpu.get_context_parallel_group(), dim=1)
             elif megatron_args.context_parallel_algo == "hybrid_cp_algo":
-                # Calculate the sequence length per ring CP group for Ulysses processing. 
+                # Calculate the sequence length per ring CP group for Ulysses processing.
                 # Since padding is applied in ring groups, the division yields an integer.
                 actual_seq_len = get_actual_seq_len()
                 if actual_seq_len is not None:
@@ -1021,7 +1021,7 @@ class Qwen3VLForConditionalGeneration(Qwen3VLPreTrainedModel, GenerationMixin):
         super().__init__(config)
         self.model = Qwen3VLModel(config)
         self.lm_head = Qwen3VLLMHead(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
-        
+
         self.post_init()
 
     def get_input_embeddings(self):
@@ -1106,7 +1106,7 @@ class Qwen3VLForConditionalGeneration(Qwen3VLPreTrainedModel, GenerationMixin):
             logits, loss = self.lm_head(hidden_states[:, slice_indices, :])
             if labels is not None:
                 loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
-        
+
         return Qwen3VLCausalLMOutputWithPast(
             loss=loss,
             logits=logits,

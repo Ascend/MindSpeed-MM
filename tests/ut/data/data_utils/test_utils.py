@@ -42,5 +42,3 @@ class TestTextProcesser:
         for input_text, _ in test_cases:
             result = TextProcesser.clean_caption(input_text)
             judge_expression(isinstance(result, str))
-
-

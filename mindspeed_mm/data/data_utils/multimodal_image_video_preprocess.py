@@ -76,7 +76,7 @@ class InternvlImageVideoPreprocess(MultiModalImageVideoPreprocessBase):
         else:
             raise ValueError("Either image_path or video_path must be provided")
 
-    
+
     def image_to_pixel_values(self, image_path, mode="", num_image=1):
         image = self.image_reader(image_path)
         max_num = self.max_dynamic_patch // num_image if mode == "multi_image" else self.max_dynamic_patch
@@ -91,7 +91,7 @@ class InternvlImageVideoPreprocess(MultiModalImageVideoPreprocessBase):
         pixel_values = pixel_values if mode == "multi_image" else torch.stack(pixel_values)
 
         return {"pixel_values": pixel_values}
-    
+
     def video_to_pixel_values(self, video_path, clip):
         image_list = read_frames_decord(
             video_path=video_path,

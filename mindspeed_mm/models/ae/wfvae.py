@@ -19,8 +19,8 @@ from mindspeed_mm.models.common.wavelet import (
 from mindspeed_mm.models.common.conv import Conv2d, WfCausalConv3d
 from mindspeed_mm.models.common.resnet_block import ResnetBlock2D, ResnetBlock3D
 from mindspeed_mm.models.common.updownsample import (
-    Upsample, 
-    Downsample, 
+    Upsample,
+    Downsample,
     Spatial2xTime2x3DDownsample,
     CachedCausal3DUpsample
 )
@@ -91,7 +91,7 @@ class Encoder(MultiModalModule):
                 for _ in range(num_resblocks)
             ],
             model_name_to_cls(l1_dowmsample_block)(
-                in_channels=base_channels, 
+                in_channels=base_channels,
                 out_channels=base_channels,
                 conv_type="WfCausalConv3d"
             ),
@@ -365,7 +365,7 @@ class Decoder(MultiModalModule):
         h = self.activation(h)
         h = self.conv_out(h)
         h[:, :3] = h[:, :3] + l1
-        
+
         if not self.training:
             dec = self.inverse_wavelet_transform_out(h)
         else:

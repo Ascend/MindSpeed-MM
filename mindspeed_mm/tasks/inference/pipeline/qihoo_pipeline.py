@@ -47,7 +47,7 @@ class QihooPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
 
         # 1 check prompts
         self.text_prompt_checks(prompt, negative_prompt, prompt_embeds, negative_prompt_embeds)
-        
+
         prompt = self.preprocess_text(prompt, clean=clean_caption)
 
         # 2
@@ -80,7 +80,7 @@ class QihooPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             model_args.update(dict(encoder_hidden_states=prompt_embeds, encoder_attention_mask=prompt_embeds_attention_mask))
         else:
             model_args = dict(encoder_hidden_states=prompt_embeds, encoder_attention_mask=prompt_embeds_attention_mask)
-        
+
         model_args["fps"] = torch.tensor([fps], device=device, dtype=dtype).repeat(batch_size)
         model_args["height"] = torch.tensor([self.height], device=device, dtype=dtype).repeat(batch_size)
         model_args["width"] = torch.tensor([self.width], device=device, dtype=dtype).repeat(batch_size)
@@ -101,7 +101,7 @@ class QihooPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
                 math.ceil(int(self.width) / self.vae.vae_scale_factor[2]),
             )
             shape = (batch_size, self.predict_model.in_channels, *latent_size)
-        
+
         z = torch.randn(shape, device=device, dtype=dtype)
         latents = self.scheduler.sample(model=self.predict_model, shape=shape, clip_denoised=False, latents=z,
                                         mask=None,

@@ -338,5 +338,3 @@ def process_answer(answer):
     answer = process_punctuation(answer)
     answer = _process_digit_article(answer)
     return answer
-
-

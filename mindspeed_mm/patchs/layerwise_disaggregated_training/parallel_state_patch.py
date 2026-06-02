@@ -108,7 +108,7 @@ def initialize_model_parallel_wrapper(initialize_model_parallel):
         ] = None,
         create_gloo_process_groups: bool = True,
     ) -> None:
-        
+
         cli_args = get_args()
 
         global _LAYERWISE_DISAGGREGATED_TRAINING, _VDP_SIZE, _VDP_ENABLED
@@ -427,11 +427,11 @@ def initialize_model_parallel_wrapper(initialize_model_parallel):
         vdp_mp_ar_ranks = [r for r in range(0, torch.distributed.get_world_size(), tensor_model_parallel_size)]
         vdp_cross_cloud_tp_ranks = vdp_mp_ar_ranks[:2]
         vdp_cross_edge_cloud_ranks = vdp_mp_ar_ranks[1:]
-        vdp_cross_cloud_tp_group = create_group(ranks=vdp_cross_cloud_tp_ranks, timeout=timeout, 
+        vdp_cross_cloud_tp_group = create_group(ranks=vdp_cross_cloud_tp_ranks, timeout=timeout,
         pg_options=get_nccl_options('ctpg', nccl_comm_cfgs), group_desc='PIPELINE_MODEL_PARALLEL_GROUP_FOR_VDP_CROSS_CLOUD_TP')
         if rank in vdp_cross_cloud_tp_ranks:
             _PIPELINE_MODEL_PARALLEL_GROUP_FOR_VDP_CROSS_CLOUD_TP = vdp_cross_cloud_tp_group
-        vdp_cross_edge_cloud_group = create_group(ranks=vdp_cross_edge_cloud_ranks, timeout=timeout, 
+        vdp_cross_edge_cloud_group = create_group(ranks=vdp_cross_edge_cloud_ranks, timeout=timeout,
         pg_options=get_nccl_options('ecg', nccl_comm_cfgs), group_desc='PIPELINE_MODEL_PARALLEL_GROUP_FOR_VDP_CROSS_EDGE_CLOUD')
         if rank in vdp_cross_edge_cloud_ranks:
             _PIPELINE_MODEL_PARALLEL_GROUP_FOR_VDP_CROSS_EDGE_CLOUD = vdp_cross_edge_cloud_group
@@ -606,7 +606,7 @@ def initialize_model_parallel_wrapper(initialize_model_parallel):
                         _PIPELINE_GLOBAL_RANKS_FIRST_TO_LAST,
                         ranks,
                     ]
-        
+
         # VTP: initialize default (disabled) state.
         # Non-uniform VTP is fully handled by _initialize_vtp_static (early return
         # in the wrapper). This path only runs for uniform TP or no VTP.
@@ -654,7 +654,7 @@ def post_validate_args_for_vtp(args):
             dp_size = int(os.environ['LOCAL_WORLD_SIZE']) // (args.context_parallel_size * args.tensor_model_parallel_size)
         else:
             dp_size = int(os.environ['LOCAL_WORLD_SIZE']) // (args.context_parallel_size * args.tensor_model_parallel_size * ((args.pipeline_model_parallel_size - 1) / (int(os.environ['GROUP_WORLD_SIZE']) - 1)))
-    
+
     args.data_parallel_size = int(dp_size)
 
 
@@ -693,7 +693,7 @@ def _create_vtp_groups(stage_ranks, timeout, backend):
             group = torch.distributed.new_group(
                 ranks=stage, timeout=timeout, pg_options=get_nccl_options('tp', {}), group_desc='TENSOR_MODEL_PARALLEL_GROUP'
             )
- 
+
             if rank in stage:
                 _VTP_INTRA_STAGE_GROUP = group
 
@@ -791,7 +791,7 @@ def _auto_detect_vtp_sizes(args):
     cloud_size = tp * cp * ep * dp * (pp - 1)
     edge_size = world_size - cloud_size
     edge_tp = edge_size // cp // ep if edge_size != tp * cp * ep * dp else tp
-    
+
     _EDGE_TP_SIZE = edge_tp
     vtp_sizes = [edge_tp] + [tp] * (pp - 1)
 
@@ -876,14 +876,14 @@ def _initialize_vtp_static_vtp_vdp(fn, vtp_sizes, orig_args, orig_kwargs):
     rank = torch.distributed.get_rank()
     vtp_model_size = sum(vtp_sizes)
     pp_size = len(vtp_sizes)
-    
+
     data_parallel_size = get_vdp_size()
 
     modified_args = (max(vtp_sizes), pp_size, None) + orig_args[3:]
     modified_kwargs = dict(orig_kwargs)
     if 'expert_tensor_parallel_size' in modified_kwargs:
         modified_kwargs['expert_tensor_parallel_size'] = None
-    
+
 
     # override get_world_size to support layerwise_disaggregated_training
     ori_get_world_size = torch.distributed.get_world_size
@@ -921,7 +921,7 @@ def _initialize_vtp_static_vtp_vdp(fn, vtp_sizes, orig_args, orig_kwargs):
         all_domain_stages.append(stages)
 
     all_domain_stages = _transform_3d_list(all_domain_stages)
-    
+
     my_dp, my_stage_idx, my_intra_rank = find_3d_indices(all_domain_stages, rank)
     if my_stage_idx is None:
         raise RuntimeError(
@@ -954,7 +954,7 @@ def _initialize_vtp_static_vtp_vdp(fn, vtp_sizes, orig_args, orig_kwargs):
                 mpu._TENSOR_MODEL_PARALLEL_GLOBAL_RANKS = stage
     mpu._MPU_TENSOR_MODEL_PARALLEL_WORLD_SIZE = actual_tp
     mpu._MPU_TENSOR_MODEL_PARALLEL_RANK = my_intra_rank
-    
+
     # Override PP groups: per-TP-intra-rank PP chains.
     # For same-TP cloud stages, each TP intra-rank has its own PP group for
     # direct P2P (e.g., [1,9], [2,10], ...). For stages with fewer TP ranks
@@ -975,7 +975,7 @@ def _initialize_vtp_static_vtp_vdp(fn, vtp_sizes, orig_args, orig_kwargs):
         rank0_list = [s[0] for s in domain_stages]
         all_domain_ranks = [r for stage in domain_stages for r in stage]
         max_intra = max(len(stage) for stage in domain_stages)
-        
+
         for intra in range(max_intra):
             pp_chain = []
             for stage in domain_stages:
@@ -1329,7 +1329,7 @@ def transform_x_dimension(data: Union[List[List[int]], np.ndarray], x_dim: int) 
     arr = np.asarray(data)
     if arr.ndim != 2:
         raise ValueError("Input must be a 2D array")
-        
+
     rows, cols = arr.shape
     if not (0 < x_dim <= cols):
         raise ValueError(f"x_dim must be greater than 0 and not exceed the original column count {cols}")
@@ -1338,13 +1338,13 @@ def transform_x_dimension(data: Union[List[List[int]], np.ndarray], x_dim: int) 
 
     # 1. Flatten + reshape into continuous block view by x_dim (zero-copy)
     blocks = arr.ravel().reshape(-1, x_dim)
-    
+
     # 2. Take the first rows blocks (to ensure output row count remains unchanged)
     selected = blocks[:rows]
-    
+
     # 3. Tile horizontally to original column width while maintaining shape
     result = np.tile(selected, reps=(1, cols // x_dim))
-    
+
     return result
 
 
@@ -1352,7 +1352,7 @@ def transform_x_dimension(data: Union[List[List[int]], np.ndarray], x_dim: int) 
 class LDTRankGenerator(RankGenerator):
     def __init__(self, tp: int, ep: int, dp: int, pp: int, cp: int, order: str, rank_offset: int = 0):
         super().__init__(tp, ep, dp, pp, cp, order, rank_offset)
-    
+
     def get_ranks(self, token):
         """Get rank group by input token.
 
@@ -1373,7 +1373,7 @@ class LDTRankGenerator(RankGenerator):
                 raise ValueError("mod_value must be greater than 0.")
             arr = np.array(arr)
             return np.mod(arr, mod_value)
-        
+
         def get_edge_card_size():
             """Get edge card size."""
             edge_card_size = 0
@@ -1430,7 +1430,7 @@ def _init_vdp_state(tensor_model_parallel_size, context_parallel_size, vdp_size,
 
     if int(os.environ['GROUP_RANK']) == 0 or int(os.environ['RANK']) == 0:
         if int(os.environ['LOCAL_WORLD_SIZE']) % (context_parallel_size * edge_tp_size) == 0:
-            edge_dp_size = int(os.environ['LOCAL_WORLD_SIZE']) // (context_parallel_size * edge_tp_size) 
+            edge_dp_size = int(os.environ['LOCAL_WORLD_SIZE']) // (context_parallel_size * edge_tp_size)
             if edge_dp_size != vdp_size:
                 _VDP_ENABLED = True
             else:
@@ -1441,7 +1441,7 @@ def _init_vdp_state(tensor_model_parallel_size, context_parallel_size, vdp_size,
         # GROUP_WORLD_SIZE is NNODES
         edge_world_size = int(os.environ['WORLD_SIZE']) - int(os.environ['LOCAL_WORLD_SIZE']) * (int(os.environ['GROUP_WORLD_SIZE']) - 1)
         if edge_world_size % (context_parallel_size * edge_tp_size) == 0:
-            edge_dp_size = edge_world_size // (context_parallel_size * edge_tp_size) 
+            edge_dp_size = edge_world_size // (context_parallel_size * edge_tp_size)
             if edge_dp_size != vdp_size:
                 _VDP_ENABLED = True
             else:
@@ -1563,8 +1563,8 @@ def _sync_all_global_variables(megatron_mpu):
         '_MPU_EXPERT_MODEL_PARALLEL_RANK',
         '_MPU_EXPERT_TENSOR_PARALLEL_WORLD_SIZE',
         '_MPU_EXPERT_TENSOR_PARALLEL_RANK',
-        
-        # Virtual pipeline parallel 
+
+        # Virtual pipeline parallel
         '_VIRTUAL_PIPELINE_MODEL_PARALLEL_RANK',
         '_VIRTUAL_PIPELINE_MODEL_PARALLEL_WORLD_SIZE',
         '_PIPELINE_MODEL_PARALLEL_SPLIT_RANK',

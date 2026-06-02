@@ -721,7 +721,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                 )
             else:
                 conv_weight = self.conv1d.weight
-            
+
             cu_seqlens = None
             if "cu_seqlens" in kwargs and kwargs.get("cu_seqlens") is not None:
                 cu_seqlens = kwargs.get("cu_seq_lens_q").to(torch.int64)
@@ -1260,7 +1260,7 @@ class Qwen3_5VisionAttention(nn.Module):
             query_states = query_states.unsqueeze(0)
             key_states = key_states.unsqueeze(0)
             value_states = value_states.unsqueeze(0)
-            
+
             # Flash Attention 2: Use cu_seqlens for variable length attention
             max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
             attn_output, _ = attention_interface(
@@ -1284,7 +1284,7 @@ class Qwen3_5VisionAttention(nn.Module):
             query_states = query_states.transpose(0, 1).unsqueeze(0)
             key_states = key_states.transpose(0, 1).unsqueeze(0)
             value_states = value_states.transpose(0, 1).unsqueeze(0)
-            
+
             # Other implementations: Process each chunk separately
             lengths = cu_seqlens[1:] - cu_seqlens[:-1]
             splits = [
@@ -1670,7 +1670,7 @@ class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
         for layer_idx, decoder_layer in enumerate(self.layers[: self.config.num_hidden_layers]):
             layer_mask = linear_attn_mask if decoder_layer.layer_type == "linear_attention" else causal_mask
             new_kwargs = kwargs if decoder_layer.layer_type == "linear_attention" else kwargs_fa
-            
+
             hidden_states = decoder_layer(
                 hidden_states,
                 position_embeddings=position_embeddings,

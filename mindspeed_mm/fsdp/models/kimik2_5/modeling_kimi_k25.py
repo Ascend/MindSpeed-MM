@@ -946,7 +946,7 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
             target_dtype = self.language_model.dtype
             self.vision_tower = self.vision_tower.to(dtype=target_dtype)
             self.mm_projector = self.mm_projector.to(dtype=target_dtype)
-    
+
     def set_modules_to_prefetch(self, fsdp_plan, ep_plan):
         if fsdp_plan.num_to_forward_prefetch > 0:
             self.language_model.model.embed_tokens.set_modules_to_forward_prefetch([self.vision_tower])
@@ -956,19 +956,19 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
             self.vision_tower.encoder.blocks[-1].set_modules_to_forward_prefetch([self.mm_projector])
             self.mm_projector.set_modules_to_forward_prefetch([self.language_model.model.layers[0]])
             self.language_model.model.layers[0].set_modules_to_forward_prefetch([self.language_model.model.layers[1].mlp.experts, self.language_model.model.layers[1]])
-            
+
             for idx in range(1, len(self.language_model.model.layers)-1):
                 self.language_model.model.layers[idx].set_modules_to_forward_prefetch([self.language_model.model.layers[idx+1].mlp.experts, self.language_model.model.layers[idx+1]])
-            self.language_model.model.layers[-1].set_modules_to_forward_prefetch([self.language_model.model, self.language_model.lm_head]) 
-            
+            self.language_model.model.layers[-1].set_modules_to_forward_prefetch([self.language_model.model, self.language_model.lm_head])
+
         if fsdp_plan.num_to_backward_prefetch > 0:
             self.language_model.lm_head.set_modules_to_backward_prefetch([self.language_model.model, self.language_model.model.layers[-1].mlp.experts, self.language_model.model.layers[-1]])
-            
+
             for idx in range(len(self.language_model.model.layers)-2, 2, -1):
                 self.language_model.model.layers[idx].set_modules_to_backward_prefetch([self.language_model.model.layers[idx-1].mlp.experts, self.language_model.model.layers[idx-1]])
             self.language_model.model.layers[1].set_modules_to_backward_prefetch([self.language_model.model.layers[0]])
-            
-            self.language_model.model.layers[0].set_modules_to_backward_prefetch([self.mm_projector]) 
+
+            self.language_model.model.layers[0].set_modules_to_backward_prefetch([self.mm_projector])
             self.mm_projector.set_modules_to_backward_prefetch([self.vision_tower.encoder.blocks[-1]])
             for idx in range(len(self.vision_tower.encoder.blocks)-1, 0, -1):
                 self.vision_tower.encoder.blocks[idx].set_modules_to_backward_prefetch([self.vision_tower.encoder.blocks[idx-1]])

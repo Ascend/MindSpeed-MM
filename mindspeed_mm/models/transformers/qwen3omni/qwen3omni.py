@@ -134,7 +134,7 @@ class Qwen3OmniFSDP2Mixin(FSDP2Mixin):
             # ---- activation offload (text only) ----
             llm_activation_offload = getattr(model_cfg.text_decoder, "activation_offload", False)
             setattr(text_cfg, "activation_offload", llm_activation_offload)
-            
+
         return transformer_config
 
 

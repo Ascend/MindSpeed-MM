@@ -178,7 +178,7 @@ class Qwen3OmniMoeAudioAttention(nn.Module):
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
         # Support context parallel only when CP size < seq_len; reasons are as follows:
-        # 1) Data is most likely fake when CP size ≥ seq_len; 2) Splitting provides no benefit for short real sequences 
+        # 1) Data is most likely fake when CP size ≥ seq_len; 2) Splitting provides no benefit for short real sequences
         ps = get_parallel_state()
         skip_ulysses = False if ps.get_ulysses_group_size() < total_audio_seqlen else True
         attn_output, _ = attention_interface(
@@ -1637,18 +1637,18 @@ class Qwen3OmniMoeThinkerTextSparseMoeBlock(nn.Module):
         batch_size, sequence_length, hidden_dim = hidden_states.shape
         hidden_states_reshaped = hidden_states.view(-1, hidden_dim)
         router_logits = self.gate(hidden_states_reshaped)
-        
+
         # orresponding to the original route_tokens_to_experts function: start
         routing_weights = F.softmax(router_logits, dim=1, dtype=torch.float)
         top_k_weights, top_k_indices = torch.topk(routing_weights, self.num_experts_per_tok, dim=-1)
         full_routing_weights = torch.zeros_like(routing_weights)
         full_routing_weights.scatter_(1, top_k_indices, top_k_weights)
-        
+
         if self.norm_topk_prob:
             top_k_sum = full_routing_weights.sum(dim=-1, keepdim=True)
             top_k_sum = torch.clamp(top_k_sum, min=1e-9) # avoid division by zero
             full_routing_weights /= top_k_sum
-        
+
         full_routing_weights = full_routing_weights.to(hidden_states.dtype)
         # orresponding to the original route_tokens_to_experts function: end
 
@@ -2005,13 +2005,13 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(
 
         kwargs.update(load_kwargs)
         return super().from_pretrained(hf_path, **kwargs)
-    
+
     @classmethod
     def _from_config(cls, config, **kwargs):
         # thinker_config
         if config.thinker_config is not None:
             config = config.thinker_config
-        
+
         return super()._from_config(config, **kwargs)
 
     def get_input_embeddings(self):
@@ -2131,7 +2131,7 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(
         return special_image_mask, special_video_mask, special_audio_mask
 
     @can_return_tuple
-    @auto_docstring  
+    @auto_docstring
     def forward(
         self,
         input_ids=None,

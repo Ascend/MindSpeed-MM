@@ -14,7 +14,7 @@ class WanVideoTI2VProcessor(WanVideoI2VProcessor):
         # back vae tiling mode for video encode
         if vae_model.get_tiling_state() != vae_model_tiling_state:
             self.set_vae_tiling_state(vae_model, vae_model_tiling_state)
-        
+
         return {
             "i2v_clip_feature": clip_features,
             "i2v_vae_feature": vae_features,

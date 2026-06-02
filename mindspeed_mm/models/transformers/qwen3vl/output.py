@@ -91,4 +91,3 @@ class Qwen3VLMoeCausalLMOutputWithPast(ModelOutput):
     attentions: Optional[tuple[torch.FloatTensor]] = None
     rope_deltas: Optional[torch.LongTensor] = None
     aux_loss: Optional[torch.FloatTensor] = None
-

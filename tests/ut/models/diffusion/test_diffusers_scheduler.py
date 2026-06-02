@@ -16,7 +16,7 @@ from mindspeed_mm.models.diffusion.diffusers_scheduler import DiffusersScheduler
 from tests.ut.utils import initialize_model_parallel, judge_expression
 
 
-class TestDiffusersScheduler:    
+class TestDiffusersScheduler:
     @staticmethod
     def test_ddpm_init():
         config = {
@@ -105,7 +105,7 @@ class TestDiffusersScheduler:
         args.context_parallel_size = 1
         args.tensor_model_parallel_size = 1
         args.pipeline_model_parallel_size = 1
-        args.virtual_pipeline_model_parallel_size = None 
+        args.virtual_pipeline_model_parallel_size = None
         set_args(args)
         os.environ["MASTER_ADDR"] = "localhost"
         os.environ["MASTER_PORT"] = "6000"
@@ -122,7 +122,7 @@ class TestDiffusersScheduler:
         diffusion = DiffusersScheduler(config)
 
         x_start = torch.rand([1, 16, 16, 30, 50])
-        
+
         x_t, noise, t = diffusion.q_sample(x_start)
         judge = (x_t.shape == x_start.shape) and (noise.shape == x_start.shape) and isinstance(t, torch.Tensor)
         judge_expression(judge)

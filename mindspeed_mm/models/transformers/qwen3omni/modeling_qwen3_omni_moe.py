@@ -1009,12 +1009,12 @@ class Qwen3OmniMoeVisionEncoder(Qwen3OmniMoePreTrainedModel):
             patch_weight_tensors_permute.append(weight_tensor)
         patch_idx_tensors_permute = torch.cat(patch_idx_tensors_permute, dim=1)  # [4, s1+s2+s3...]
         patch_weight_tensors_permute = torch.cat(patch_weight_tensors_permute, dim=1)
-        
+
         # Split tensors across context parallel ranks for distributed processing
         if mpu.get_context_parallel_world_size() > 1:
             patch_idx_tensors_permute = split_visual_seqs_with_cp(patch_idx_tensors_permute, dim=1)
             patch_weight_tensors_permute = split_visual_seqs_with_cp(patch_weight_tensors_permute, dim=1)
-        
+
 
         # embedding
         pos_embeds = self.pos_embed(patch_idx_tensors_permute) * patch_weight_tensors_permute[:, :, None]  # 4, total_visual_tokens//cp_size, hidden_size
@@ -1652,13 +1652,13 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(
 
         kwargs.update(load_kwargs)
         return super().from_pretrained(hf_path, **kwargs)
-    
+
     @classmethod
     def _from_config(cls, config, **kwargs):
         # thinker_config
         if config.thinker_config is not None:
             config = config.thinker_config
-        
+
         return super()._from_config(config, **kwargs)
 
     def get_input_embeddings(self):
@@ -1779,7 +1779,7 @@ class Qwen3OmniMoeThinkerForConditionalGeneration(
 
     @check_model_inputs
     @can_return_tuple
-    @auto_docstring  
+    @auto_docstring
     def forward(
         self,
         input_ids=None,

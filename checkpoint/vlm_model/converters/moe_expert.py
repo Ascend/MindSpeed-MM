@@ -37,10 +37,10 @@ class ConfigType(Enum):
     DEFAULT = 0
     QWEN3_OMNI = 1
 
-    
+
 def get_config_type_from_class_name(save_dir: Path) -> ConfigType:
     """
-    Note: Since qwen3omni only the thinker model is fine-tuned, the configuration will include 
+    Note: Since qwen3omni only the thinker model is fine-tuned, the configuration will include
     the thinker, which needs to be handled separately.
     """
     config = AutoConfig.from_pretrained(save_dir, trust_remote_code=True)
@@ -71,7 +71,7 @@ def merge_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, n
             down_proj_weights.append(down_proj_weight.T)
         new_gate_up_proj_weight = torch.stack(gate_up_proj_weights)
         new_down_proj_weight = torch.stack(down_proj_weights)
-        
+
         # view experts weight: (expert_num, input_dim, output_dim) -> (expert_num * input_dim, output_dim)
         if config_type != ConfigType.QWEN3_OMNI: # Exclude QWEN3_OMNI config type
             new_gate_up_proj_weight = new_gate_up_proj_weight.view(-1, new_gate_up_proj_weight.shape[-1])
@@ -201,7 +201,7 @@ class ExpertMergeDcpConverter(DcpConverter):
         state_dict = load_from_hf(hf_dir)
         config_type = get_config_type_from_class_name(hf_dir)
         merge_moe_expert_weights(state_dict, num_hidden_layers, num_experts, expert_start_layer, config_type, weight_path=weight_path)
-        
+
         if config_type == ConfigType.QWEN3_OMNI: # support qwen3-omni
             weight_names = list(state_dict.keys())
             for weight_name in weight_names:

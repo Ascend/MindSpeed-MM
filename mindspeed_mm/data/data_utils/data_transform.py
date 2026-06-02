@@ -218,7 +218,7 @@ def rand_size_crop_arr(pil_image, image_size):
 def longsideresize(h, w, size, skip_low_resolution):
     if h <= size[0] and w <= size[1] and skip_low_resolution:
         return h, w
-    
+
     if h / w > size[0] / size[1]:
         # hxw 720x1280  size 320x640  hw_raito 9/16 > size_ratio 8/16  neww=320/720*1280=568  newh=320
         w = int(size[0] / h * w)
@@ -234,7 +234,7 @@ def longsideresize(h, w, size, skip_low_resolution):
 def shortsideresize(h, w, size, skip_low_resolution):
     if h <= size[0] and w <= size[1] and skip_low_resolution:
         return h, w
-    
+
     if h / w < size[0] / size[1]:
         w = int(size[0] / h * w)
         h = size[0]
@@ -246,13 +246,13 @@ def shortsideresize(h, w, size, skip_low_resolution):
 
 def calculate_centered_alignment(h: int, w: int, stride: int) -> tuple:
     """Calculate centered crop parameters for stride alignment.
-    
+
     Computes crop dimensions and offsets to maintain center position while
     ensuring the output dimensions are multiples of the specified stride.
 
     Args:
         h: Original height of the input
-        w: Original width of the input 
+        w: Original width of the input
         stride: Alignment requirement (must be > 0)
 
     Returns:
@@ -261,11 +261,11 @@ def calculate_centered_alignment(h: int, w: int, stride: int) -> tuple:
     # Calculate aligned dimensions
     aligned_h = h // stride * stride
     aligned_w = w // stride * stride
-    
+
     # Compute centering offsets
     vertical_offset = (h - aligned_h) // 2
     horizontal_offset = (w - aligned_w) // 2
-    
+
     return (vertical_offset, horizontal_offset, aligned_h, aligned_w)
 
 
@@ -490,7 +490,7 @@ class SpatialStrideCropVideo:
             torch.tensor: cropped video clip by stride.
                 size is (T, C, OH, OW)
         """
-        h, w = clip.shape[-2:] 
+        h, w = clip.shape[-2:]
         i, j, h, w = calculate_centered_alignment(h, w, self.stride)
         return crop(clip, i, j, h, w)
 
@@ -509,7 +509,7 @@ class LongSideResizeVideo:
             size,
             skip_low_resolution=False,
             interpolation_mode="bilinear",
-            align_corners=False, 
+            align_corners=False,
             antialias=False
     ):
         self.size = size
@@ -530,7 +530,7 @@ class LongSideResizeVideo:
         if h == tr_h and w == tr_w:
             return clip
         resize_clip = resize(
-            clip, 
+            clip,
             target_size=(tr_h, tr_w),
             interpolation_mode=self.interpolation_mode,
             align_corners=self.align_corners,
@@ -552,7 +552,7 @@ class MaxHWResizeVideo:
             self,
             transform_size=None,
             interpolation_mode="bilinear",
-            align_corners=False, 
+            align_corners=False,
             antialias=False
     ):
         if transform_size is None or "max_hxw" not in transform_size:
@@ -574,7 +574,7 @@ class MaxHWResizeVideo:
         if h == tr_h and w == tr_w:
             return clip
         resize_clip = resize(
-            clip, 
+            clip,
             target_size=(tr_h, tr_w),
             interpolation_mode=self.interpolation_mode,
             align_corners=self.align_corners,
@@ -636,7 +636,7 @@ class CenterCropResizeVideo:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(size={self.size}, interpolation_mode={self.interpolation_mode}"
-    
+
 
 class ResizeVideo:
     def __init__(
@@ -644,10 +644,10 @@ class ResizeVideo:
         transform_size="auto",
         interpolation_mode="bilinear",
         skip_low_resolution=False,
-        align_corners=False, 
+        align_corners=False,
         antialias=False,
         mode="resize"  # resize / longside / shortside / hxw
-    ):  
+    ):
         self.mode = mode
         if mode == 'hxw':
             self.transform_size = transform_size["max_hxw"] if isinstance(transform_size, dict) else transform_size
@@ -655,7 +655,7 @@ class ResizeVideo:
             self.transform_size = (transform_size["max_height"], transform_size["max_width"]) if isinstance(transform_size, dict) else transform_size
         else:
             raise NotImplementedError(f"ResizeVideo only support mode `resize` / `longside` / `shortside` / `hxw`, {mode} is not implemented.")
-        
+
         self.interpolation_mode = interpolation_mode
         self.align_corners = align_corners
         self.antialias = antialias
@@ -677,11 +677,11 @@ class ResizeVideo:
             tr_h, tr_w = longsideresize(h, w, self.transform_size, skip_low_resolution=self.skip_low_resolution)
         elif self.mode == "shortside":
             tr_h, tr_w = shortsideresize(h, w, self.transform_size, skip_low_resolution=self.skip_low_resolution)
-        
+
         if h == tr_h and w == tr_w:
             return clip
         resize_clip = resize(
-            clip, 
+            clip,
             target_size=(tr_h, tr_w),
             interpolation_mode=self.interpolation_mode,
             align_corners=self.align_corners,
@@ -691,7 +691,7 @@ class ResizeVideo:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(size={self.transform_size}, interpolation_mode={self.interpolation_mode})"
-        
+
 
 class UCFCenterCropVideo:
     """
@@ -989,7 +989,7 @@ class AffineVideo:
     def __init__(self, gamma=2.0, beta=-1.0):
         self.gamma = gamma
         self.beta = beta
-    
+
     def __call__(self, clip):
         clip = self.gamma * clip + self.beta
         return clip
@@ -1098,55 +1098,55 @@ class MaskGenerator:
 
 
 low_aesthetic_score_notices_video = [
-    "This video has a low aesthetic quality.", 
-    "The beauty of this video is minimal.", 
-    "This video scores low in aesthetic appeal.", 
-    "The aesthetic quality of this video is below average.", 
-    "This video ranks low for beauty.", 
-    "The artistic quality of this video is lacking.", 
-    "This video has a low score for aesthetic value.", 
-    "The visual appeal of this video is low.", 
-    "This video is rated low for beauty.", 
-    "The aesthetic quality of this video is poor.", 
+    "This video has a low aesthetic quality.",
+    "The beauty of this video is minimal.",
+    "This video scores low in aesthetic appeal.",
+    "The aesthetic quality of this video is below average.",
+    "This video ranks low for beauty.",
+    "The artistic quality of this video is lacking.",
+    "This video has a low score for aesthetic value.",
+    "The visual appeal of this video is low.",
+    "This video is rated low for beauty.",
+    "The aesthetic quality of this video is poor.",
 ]
 
 high_aesthetic_score_notices_video = [
-    "This video has a high aesthetic quality.", 
-    "The beauty of this video is exceptional.", 
-    "This video scores high in aesthetic value.", 
-    "With its harmonious colors and balanced composition.", 
-    "This video ranks highly for aesthetic quality", 
-    "The artistic quality of this video is excellent.", 
-    "This video is rated high for beauty.", 
-    "The aesthetic quality of this video is impressive.", 
-    "This video has a top aesthetic score.", 
-    "The visual appeal of this video is outstanding.", 
+    "This video has a high aesthetic quality.",
+    "The beauty of this video is exceptional.",
+    "This video scores high in aesthetic value.",
+    "With its harmonious colors and balanced composition.",
+    "This video ranks highly for aesthetic quality",
+    "The artistic quality of this video is excellent.",
+    "This video is rated high for beauty.",
+    "The aesthetic quality of this video is impressive.",
+    "This video has a top aesthetic score.",
+    "The visual appeal of this video is outstanding.",
 ]
 
 low_aesthetic_score_notices_image = [
-    "This image has a low aesthetic quality.", 
-    "The beauty of this image is minimal.", 
-    "This image scores low in aesthetic appeal.", 
-    "The aesthetic quality of this image is below average.", 
-    "This image ranks low for beauty.", 
-    "The artistic quality of this image is lacking.", 
-    "This image has a low score for aesthetic value.", 
-    "The visual appeal of this image is low.", 
-    "This image is rated low for beauty.", 
-    "The aesthetic quality of this image is poor.", 
+    "This image has a low aesthetic quality.",
+    "The beauty of this image is minimal.",
+    "This image scores low in aesthetic appeal.",
+    "The aesthetic quality of this image is below average.",
+    "This image ranks low for beauty.",
+    "The artistic quality of this image is lacking.",
+    "This image has a low score for aesthetic value.",
+    "The visual appeal of this image is low.",
+    "This image is rated low for beauty.",
+    "The aesthetic quality of this image is poor.",
 ]
 
 high_aesthetic_score_notices_image = [
-    "This image has a high aesthetic quality.", 
-    "The beauty of this image is exceptional", 
-    "This photo scores high in aesthetic value.", 
-    "With its harmonious colors and balanced composition.", 
-    "This image ranks highly for aesthetic quality.", 
-    "The artistic quality of this photo is excellent.", 
-    "This image is rated high for beauty.", 
-    "The aesthetic quality of this image is impressive.", 
-    "This photo has a top aesthetic score.", 
-    "The visual appeal of this image is outstanding.", 
+    "This image has a high aesthetic quality.",
+    "The beauty of this image is exceptional",
+    "This photo scores high in aesthetic value.",
+    "With its harmonious colors and balanced composition.",
+    "This image ranks highly for aesthetic quality.",
+    "The artistic quality of this photo is excellent.",
+    "This image is rated high for beauty.",
+    "The aesthetic quality of this image is impressive.",
+    "This photo has a top aesthetic score.",
+    "The visual appeal of this image is outstanding.",
 ]
 
 

@@ -27,7 +27,7 @@ class Qwen2VLModel(MultiModalModule):
         {
             "pre_process": (bool),  # Include the embedding leayer in the gpt decoder (used with pipeline parallelism).
             "post_process": (bool),  # Include an output layer and a layernorm in the gpt decoder (used with pipeline parallelism).
-            "add_text_encoder": (bool),  # Whether to construct the text encoder. not used now. 
+            "add_text_encoder": (bool),  # Whether to construct the text encoder. not used now.
             "add_image_encoder": (bool),  # Whether to construct the image encoder.
             "add_video_encoder": (bool),  # Whether to construct the video encoder. not used now.
             "add_text_decoder": (bool),  # Whether to construct the text decoder.
@@ -64,7 +64,7 @@ class Qwen2VLModel(MultiModalModule):
             raise NotImplementedError("Not support virtual_pipeline_model_parallel now")
         else:
             self.pp_rank = mpu.get_pipeline_model_parallel_rank()
-        
+
         if self.add_text_encoder:
             self.text_encoder = TextEncoder(config.text_encoder).get_model()
         if self.add_image_encoder:
@@ -89,7 +89,7 @@ class Qwen2VLModel(MultiModalModule):
             raise ValueError(f"length of vision_encoder.pipeline_num_layers must equal to pipeline-model-parallel-size, "
                              f"but got vision_encoder.pipeline_num_layers length:{len(config.vision_encoder.pipeline_num_layers)} "
                              f"and pipeline-model-parallel-size:{self.pp_size}.")
-        
+
         local_num_layers = config.vision_encoder.pipeline_num_layers[self.pp_rank]
         if local_num_layers == 0:
             self.add_image_encoder = False
@@ -97,10 +97,10 @@ class Qwen2VLModel(MultiModalModule):
 
         pipeline_start_index = sum(config.vision_encoder.pipeline_num_layers[:self.pp_rank])
         pipeline_end_index = sum(config.vision_encoder.pipeline_num_layers[:self.pp_rank + 1])
-        
+
         pre_process = pipeline_start_index == 0
         post_process = pipeline_end_index == config.vision_encoder.num_layers
-        
+
         print(
             f"image encoder pipeline config:\
             pp_rank:{self.pp_rank},\
@@ -132,7 +132,7 @@ class Qwen2VLModel(MultiModalModule):
                 pre_process=self.pre_process,
                 post_process=self.post_process
             )
-        
+
         if self.pp_size != len(config.pipeline_num_layers):
             raise ValueError(f"length of pipeline_num_layers must equal to pipeline-model-parallel-size, "
                              f"but got pipeline_num_layers length:{len(config.pipeline_num_layers)} "
@@ -145,7 +145,7 @@ class Qwen2VLModel(MultiModalModule):
 
         pipeline_start_index = sum(config.pipeline_num_layers[:self.pp_rank])
         pipeline_end_index = sum(config.pipeline_num_layers[:self.pp_rank + 1])
-        
+
         pre_process = pipeline_start_index == 0
         post_process = pipeline_end_index == config.num_layers
 
@@ -231,7 +231,7 @@ class Qwen2VLModel(MultiModalModule):
         shift_labels = labels[..., 1:].contiguous()
 
         # To align with torch.nn.CrossEntropyLoss, disable max normalization in vocab_parallel_cross_entropy (comment out)
-        loss = tensor_parallel.vocab_parallel_cross_entropy(shift_logits.float(), shift_labels) 
+        loss = tensor_parallel.vocab_parallel_cross_entropy(shift_logits.float(), shift_labels)
         loss = loss * (shift_labels > -1)
         loss = torch.sum(loss) / torch.sum(shift_labels > -1)
 
@@ -297,11 +297,11 @@ class Qwen2VLModel(MultiModalModule):
             input_embeds = None
             if self.text_decoder.pre_process:
                 input_embeds = self.text_decoder.embedding(input_ids=input_ids, position_ids=position_ids).clone()
-                
+
                 _input_ids = input_ids
                 if self.config.sequence_parallel:
                     _input_ids = scatter_to_sequence_parallel_region(_input_ids.transpose(0, 1)).transpose(0, 1)
-                    
+
                 if vit_embeds is not None:
                     input_embeds = input_embeds.transpose(0, 1)  # bsh
                     image_mask = torch.eq(_input_ids, self.img_context_token_id).unsqueeze(-1).expand_as(input_embeds)

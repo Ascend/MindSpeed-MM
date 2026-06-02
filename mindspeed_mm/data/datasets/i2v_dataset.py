@@ -120,7 +120,7 @@ class I2VDataset(T2VDataset):
             raise NotImplementedError(
                 f"Not support now: data_storage_mode={self.data_storage_mode}."
             )
-        
+
         # get video or img
         file_type = self.get_type(file_path)
         if file_type == "image":
@@ -134,7 +134,7 @@ class I2VDataset(T2VDataset):
                 video_value = self.get_vid_img_fusion(video_value)
             video_value = video_value.permute(1, 0, 2, 3)
             transforms_after_resize = self.video_transforms_after_resize
-        
+
         inpaint_cond_data = self.mask_processor(video_value, mask_type_ratio_dict=self.mask_type_ratio_dict_video)
         mask, masked_video = inpaint_cond_data['mask'], inpaint_cond_data['masked_pixel_values']
 
@@ -165,7 +165,7 @@ class I2VDataset(T2VDataset):
                 prompt_ids,
                 prompt_mask,
             )
-        
+
         # for feature extract, trace source file name
         examples[FILE_INFO] = file_path
 

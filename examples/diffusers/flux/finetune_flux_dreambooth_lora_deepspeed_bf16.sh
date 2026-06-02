@@ -1,6 +1,6 @@
 Network="FluxLora"
 
-model_name="black-forest-labs/FLUX.1-dev" 
+model_name="black-forest-labs/FLUX.1-dev"
 dataset_name="pokemon-blip-captions"
 batch_size=8
 num_processors=8

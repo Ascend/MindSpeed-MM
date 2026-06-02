@@ -33,19 +33,19 @@ class FeatureDataset(MMBaseDataset):
     ):
         """
         Initialize the FeatureDataset class, which is designed to handle feature data for multimodal models.
-        
+
         Args:
             basic_param (dict): A dictionary containing basic configuration parameters for the dataset.
         """
         super().__init__(**basic_param)
-    
+
     def __getitem__(self, index: int) -> dict:
         """
         Get the data sample at the specified index.
-        
+
         Args:
             index (int): The index of the data sample to retrieve.
-            
+
         Returns:
             dict: A dictionary containing the processed data sample with video features, masks, and text prompts.
         """
@@ -56,10 +56,10 @@ class FeatureDataset(MMBaseDataset):
         feature_file_path = sample[FILE_INFO]
         if self.data_folder:
             feature_file_path = os.path.join(self.data_folder, feature_file_path)
-        
+
         # Load feature data from the specified file
         feature_data = self.get_data_from_feature_data(feature_file_path)
-        
+
         # Extract video features
         examples[VIDEO] = feature_data.pop(VIDEO, None)
 
@@ -81,14 +81,14 @@ class FeatureDataset(MMBaseDataset):
 
         return examples
 
-    
+
     def get_data_from_feature_data(self, feature_path: str) -> dict:
         """
         Load feature data from a specified file path.
-        
+
         Args:
             feature_path (str): The path to the feature data file.
-            
+
         Returns:
             dict: A dictionary containing the loaded feature data.
         """

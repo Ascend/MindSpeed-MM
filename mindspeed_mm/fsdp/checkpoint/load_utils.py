@@ -204,4 +204,3 @@ def rank0_load_and_broadcast_weights(load_state, storage_reader):
     if len(params_to_load) > 0:
         print_rank(logger.warning, f"These weights were not loaded from the checkpoint, param keys: {params_to_load}.")
     print_rank(logger.info, f"Finished loading and broadcasting checkpoint tensors from rank 0.")
-

@@ -24,8 +24,8 @@ from mindspeed_mm.models.common.attention import FlashAttention, ParallelAttenti
 from mindspeed_mm.models.common.embeddings import TextProjection
 from mindspeed_mm.models.common.normalize import normalize, FP32LayerNorm
 from mindspeed_mm.models.common.fpdt_layer import (
-    FPDTFlashAttention, 
-    split_forward_gather_backward_FPDT_tensors, 
+    FPDTFlashAttention,
+    split_forward_gather_backward_FPDT_tensors,
     gather_forward_split_backward_FPDT_tensors)
 from mindspeed_mm.utils.utils import change_tensor_layout
 
@@ -111,7 +111,7 @@ class WanDiT(MultiModalModule):
         self.recompute_num_layers_skip_core_attention = args.recompute_num_layers_skip_core_attention
         self.attention_async_offload = attention_async_offload
         self.fp32_calculate = fp32_calculate
-        
+
         self.h2d_stream = torch_npu.npu.Stream() if attention_async_offload else None
         self.d2h_stream = torch_npu.npu.Stream() if attention_async_offload else None
 
@@ -141,7 +141,7 @@ class WanDiT(MultiModalModule):
             raise NotImplementedError(
                 f"Context_parallel_algo {self.context_parallel_algo} is not implemented"
             )
-        
+
         self.FPDT = args.mm.model.to_dict().get('predictor', {}).get('FPDT', False)
         self.FPDT_chunk_number = args.mm.model.to_dict().get('predictor', {}).get('FPDT_chunk_number', None)
 
@@ -164,7 +164,7 @@ class WanDiT(MultiModalModule):
             )
             if model_type in ["i2v", "flf2v"]:
                 self.img_emb = MLPProj(self.img_dim, self.hidden_size, model_type == 'flf2v', clip_token_len, self.fp32_calculate)
-            
+
             self.patch_embedding = nn.Conv3d(
                 self.in_dim,
                 self.hidden_size,
@@ -412,11 +412,11 @@ class WanDiT(MultiModalModule):
         if self.context_parallel_algo is not None:
             if self.pre_process:
                 if self.FPDT:
-                    embs = split_forward_gather_backward_FPDT_tensors(embs, seq_dim=1, chunk_number=self.FPDT_chunk_number, 
+                    embs = split_forward_gather_backward_FPDT_tensors(embs, seq_dim=1, chunk_number=self.FPDT_chunk_number,
                                               group=mpu.get_context_parallel_group(), grad_scale="down")
 
                     if time_emb.ndim == 4:
-                        time_emb = split_forward_gather_backward_FPDT_tensors(time_emb, seq_dim=1, chunk_number=self.FPDT_chunk_number, 
+                        time_emb = split_forward_gather_backward_FPDT_tensors(time_emb, seq_dim=1, chunk_number=self.FPDT_chunk_number,
                                                       group=mpu.get_context_parallel_group(), grad_scale="down")
                 else:
                     embs = split_forward_gather_backward(
@@ -428,7 +428,7 @@ class WanDiT(MultiModalModule):
                             time_emb, mpu.get_context_parallel_group(), dim=1, grad_scale="down"
                         )
             if self.FPDT:
-                rotary_pos_emb = split_forward_gather_backward_FPDT_tensors(rotary_pos_emb, seq_dim=0, chunk_number=self.FPDT_chunk_number, 
+                rotary_pos_emb = split_forward_gather_backward_FPDT_tensors(rotary_pos_emb, seq_dim=0, chunk_number=self.FPDT_chunk_number,
                                                     group=mpu.get_context_parallel_group(), grad_scale="down")
             else:
                 rotary_pos_emb = split_forward_gather_backward(
@@ -455,10 +455,10 @@ class WanDiT(MultiModalModule):
         if self.post_process:
             if self.context_parallel_algo is not None:
                 if self.FPDT:
-                    embs = gather_forward_split_backward_FPDT_tensors(embs, seq_dim=1, chunk_number=self.FPDT_chunk_number, 
+                    embs = gather_forward_split_backward_FPDT_tensors(embs, seq_dim=1, chunk_number=self.FPDT_chunk_number,
                                                    group=mpu.get_context_parallel_group(), grad_scale="up")
                     if time_emb.ndim == 4:
-                        time_emb = gather_forward_split_backward_FPDT_tensors(time_emb, seq_dim=1, chunk_number=self.FPDT_chunk_number, 
+                        time_emb = gather_forward_split_backward_FPDT_tensors(time_emb, seq_dim=1, chunk_number=self.FPDT_chunk_number,
                                                            group=mpu.get_context_parallel_group(), grad_scale="up")
                 else:
                     embs = gather_forward_split_backward(
@@ -566,7 +566,7 @@ class WanDiT(MultiModalModule):
                 {'shape': (1,), 'dtype': torch.float64},  # score_lose
             ]
             pipeline_tensor_shapes = pipeline_tensor_shapes[:6] + score_shape + pipeline_tensor_shapes[6:]
-        
+
         return pipeline_tensor_shapes
 
 
@@ -690,27 +690,27 @@ class WanDiTBlock(nn.Module):
             query, key, value, gate_msa, shift_mlp, scale_mlp, gate_mlp = tensor_parallel.checkpoint(
                 self._before_self_attention,
                 self.distribute_saved_activations,
-                time_emb, 
+                time_emb,
                 latents,
                 rotary_pos_emb,
             )
         else:
             query, key, value, gate_msa, shift_mlp, scale_mlp, gate_mlp = self._before_self_attention(
-                time_emb, 
+                time_emb,
                 latents,
                 rotary_pos_emb
             )
 
         # self attention
         attention_async_offload_param = (
-            self.attention_async_offload_param 
+            self.attention_async_offload_param
             if recompute_skip_core_attention
             else {}
         )
         self_attn_out = self.self_attn.core_attention_flash(
             query=query,
-            key=key, 
-            value=value, 
+            key=key,
+            value=value,
             **attention_async_offload_param
         )
 
@@ -729,12 +729,12 @@ class WanDiTBlock(nn.Module):
             )
         else:
             latents = self._after_self_attention(
-                self_attn_out, 
-                latents, 
-                prompt, 
-                gate_msa, 
-                shift_mlp, 
-                scale_mlp, 
+                self_attn_out,
+                latents,
+                prompt,
+                gate_msa,
+                shift_mlp,
+                scale_mlp,
                 gate_mlp
             )
 
@@ -776,7 +776,7 @@ class WanDiTBlock(nn.Module):
             query, key, value,
             gate_msa, shift_mlp, scale_mlp, gate_mlp
         )
-    
+
     def _after_self_attention(
         self,
         self_attn_out,
@@ -789,7 +789,7 @@ class WanDiTBlock(nn.Module):
     ):
         dtype = torch.float32 if self.fp32_calculate else latents.dtype
         self_attn_out = self.self_attn.function_after_core_attention(self_attn_out, output_layout="bsh")
-        
+
         latents = (latents + gate_msa * self_attn_out).to(latents.dtype)
 
         # cross attention
@@ -824,7 +824,7 @@ class WanDiTBlock(nn.Module):
             latents = ((latents.to(dtype)) + gate_mlp * self.ffn(modu_out).to(dtype)).to(latents.dtype)
 
         return latents
-    
+
     def fpdt_ffn(self, x):
         outs = []
         inputs = torch.chunk(x, dim=1, chunks=self.FPDT_chunk_number)
@@ -953,7 +953,7 @@ class WanVideoParallelAttention(ParallelAttention):
         self.FPDT = args.mm.model.to_dict().get('predictor', {}).get('FPDT', False)
         self.FPDT_chunk_number = args.mm.model.to_dict().get('predictor', {}).get('FPDT_chunk_number', None)
         self.FPDT_with_offload = args.mm.model.to_dict().get('predictor', {}).get('FPDT_with_offload', False)
-            
+
 
         if self.cp_size > 1 and attention_type == AttnType.self_attn \
             and args.context_parallel_algo in ["megatron_cp_algo", "hybrid_cp_algo"]:
@@ -972,8 +972,8 @@ class WanVideoParallelAttention(ParallelAttention):
             if args.context_parallel_algo == "hybrid_cp_algo":
                 ulysses_group = get_context_parallel_group_for_hybrid_ulysses()
             else:
-                ulysses_group = mpu.get_context_parallel_group()            
-            
+                ulysses_group = mpu.get_context_parallel_group()
+
             if self.FPDT:
                 self.core_attention_flash = FPDTFlashAttention(
                     ulysess_context_parallel_group=ulysses_group,
@@ -984,7 +984,7 @@ class WanVideoParallelAttention(ParallelAttention):
                 )
             else:
                 self.core_attention_flash = UlyssesContextAttention(self.core_attention_flash, ulysses_group)
-        
+
         if self.cp_size > 1 and attention_type == AttnType.cross_attn:
             # In the case of cross attention, it is equivalent to performing the raw npu_fusion_attention for the slicing q
             self.core_attention_flash.context_parallel_algo = "ulysses_cp_algo"
@@ -1045,7 +1045,7 @@ class WanVideoParallelAttention(ParallelAttention):
         self,
         core_attn_out,
         output_layout: str = "sbh"
-    ):  
+    ):
         if self.FPDT:
             chunk_number = self.FPDT_chunk_number
             core_attn_out_chunks = torch.chunk(core_attn_out, chunks=chunk_number, dim=0)
@@ -1061,7 +1061,7 @@ class WanVideoParallelAttention(ParallelAttention):
         output = self.dropout(output)
 
         return output
-    
+
     def get_query_key_value_tensors(self, hidden_states, key_value_states):
         """
         Derives `query` tensor from `hidden_states`, and `key`/`value` tensor

@@ -170,7 +170,7 @@ def _process_transformer_blocks(
 
     vx = video.x if video is not None else None
     ax = audio.x if audio is not None else None
-        
+
     # Process transformer blocks
     for block in self.transformer_blocks:
         vx, ax = block(

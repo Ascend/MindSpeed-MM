@@ -13,23 +13,23 @@ from mindspeed_mm.data.data_utils.multimodal_image_video_preprocess import find_
 
 class BucketManager:
     """
-    This class handles the organization and processing of images based on their aspect bucket range 
-    into various buckets, and then distributes these buckets into packages that can be used for 
-    further processing or training. The class manages both sharding and non-sharding modes, ensuring 
+    This class handles the organization and processing of images based on their aspect bucket range
+    into various buckets, and then distributes these buckets into packages that can be used for
+    further processing or training. The class manages both sharding and non-sharding modes, ensuring
     efficient use of data in distributed or single-machine setups.
 
-    Similar to a normal implementation of a distributed sampler, except the implementation is at 
-    the batch sampler level. This allows wrapping of arbitrary data samplers (sequential, random, 
+    Similar to a normal implementation of a distributed sampler, except the implementation is at
+    the batch sampler level. This allows wrapping of arbitrary data samplers (sequential, random,
     WeightedRandomSampler, etc.) with this batch sampler.
     """
     class Bucket:
         """
-        Represents a single bucket that stores samples (images) grouped by their aspect bucket range. 
-        Each bucket may have multiple groups, and each group holds a list of sample indices. 
-        The class provides functionality to shuffle the samples within each group and fetch samples 
-        based on their indices. 
+        Represents a single bucket that stores samples (images) grouped by their aspect bucket range.
+        Each bucket may have multiple groups, and each group holds a list of sample indices.
+        The class provides functionality to shuffle the samples within each group and fetch samples
+        based on their indices.
 
-        This is similar to a normal bucket used for data grouping in distributed systems, where 
+        This is similar to a normal bucket used for data grouping in distributed systems, where
         data is partitioned and accessed by different workers based on the group and bucket range.
         """
         def __init__(self, bucket_range: Tuple[int, int], num_groups: int = 1):
@@ -65,12 +65,12 @@ class BucketManager:
 
     class Package:
         """
-        Represents a data package that contains samples from one or more buckets. Packages can either 
-        be mixed (containing samples from multiple buckets) or single (containing samples from only one bucket). 
+        Represents a data package that contains samples from one or more buckets. Packages can either
+        be mixed (containing samples from multiple buckets) or single (containing samples from only one bucket).
         The package is used to organize and handle data when processing batches during training.
 
-        This class is an abstraction that allows for batching of data, ensuring that each batch either 
-        contains data from a single bucket or from a mixture of multiple buckets, depending on whether 
+        This class is an abstraction that allows for batching of data, ensuring that each batch either
+        contains data from a single bucket or from a mixture of multiple buckets, depending on whether
         the `mixed` flag is set. It provides flexibility for data processing and shuffling during training.
         """
         def __init__(self, mixed: bool = False, num_groups: int = 1):
@@ -137,11 +137,11 @@ class BucketManager:
         priority_mode: str = "data_bucketing_img"
     ):
         """
-        Initializes the BucketManager class, which is responsible for organizing image samples into 
-        buckets based on their aspect bucket range. The class can operate in both sharding and non-sharding 
+        Initializes the BucketManager class, which is responsible for organizing image samples into
+        buckets based on their aspect bucket range. The class can operate in both sharding and non-sharding
         modes, and it efficiently distributes data samples into batches or packages.
 
-        This is the entry point for setting up the bucket management system, where it configures how 
+        This is the entry point for setting up the bucket management system, where it configures how
         data will be grouped, batched, and potentially distributed across multiple workers.
         """
         if num_replicas is None:
@@ -237,7 +237,7 @@ class BucketManager:
         handler = priority_handlers.get(self.priority_mode)
         if handler is None:
             raise ValueError(f"Unknown priority mode: {self.priority_mode}")
-        
+
         return handler(condataset)
 
     @staticmethod
@@ -249,7 +249,7 @@ class BucketManager:
         for i in range(0, len(idx_range), sort_batch_size):
             batch_indices = idx_range[i:i + sort_batch_size]
 
-            # Retrieve the corresponding values from result_dict based on batch_indices, 
+            # Retrieve the corresponding values from result_dict based on batch_indices,
             # combine them into tuples in the form of (idx, value).
             batch_data = [(idx, final_results_dict.get(idx)) for idx in batch_indices]
 
@@ -270,7 +270,7 @@ class BucketManager:
             print(f"Bucket (bucket_range {bucket.bucket_range}): ")
             bucket_num = 0
             for group_id in range(bucket.num_groups):
-                group_sample_count = len(bucket.samples[group_id])  
+                group_sample_count = len(bucket.samples[group_id])
                 print(f"  Group {group_id}: {group_sample_count} samples", end="  |  ")
                 bucket_num += group_sample_count
                 total += group_sample_count
@@ -280,12 +280,12 @@ class BucketManager:
     def get_package_by_bucket(self, cur_bucket) -> List[Package]:
         """Generate data packets based on the group information in each bucket based on the specified bucket (cur_bucket)."""
         cur_packages = []
-        min_length = min(cur_bucket.lengths)  
-        num_package = min_length // self.batch_size  
+        min_length = min(cur_bucket.lengths)
+        num_package = min_length // self.batch_size
 
-        for package_index in range(num_package): 
-            package = BucketManager.Package(mixed=False, num_groups=self.num_groups)  
-            for group_id in range(cur_bucket.num_groups): 
+        for package_index in range(num_package):
+            package = BucketManager.Package(mixed=False, num_groups=self.num_groups)
+            for group_id in range(cur_bucket.num_groups):
                 startX = package_index * self.batch_size
                 samples_range = list(range(startX, startX + self.batch_size))
                 samples = [(group_id, sample) for sample in samples_range]
@@ -296,7 +296,7 @@ class BucketManager:
     def create_package_list(self) -> List[Package]:
         """Create a data packet list based on the group size in the bucket."""
         total_packages = []
-        remainder_data = [[] for _ in range(self.num_groups)]  
+        remainder_data = [[] for _ in range(self.num_groups)]
 
         for bucket in self.buckets:
             cur_packages = self.get_package_by_bucket(bucket)
@@ -313,9 +313,9 @@ class BucketManager:
         min_length = min(len(remainder_data[i]) for i in range(self.num_groups))
 
         cur_packages = []
-        num_package = min_length // self.batch_size  
+        num_package = min_length // self.batch_size
         for package_index in range(num_package):
-            package = BucketManager.Package(mixed=True, num_groups=self.num_groups)  
+            package = BucketManager.Package(mixed=True, num_groups=self.num_groups)
             samples = []
             for group_id in range(self.num_groups):
                 startX = package_index * self.batch_size
@@ -330,7 +330,7 @@ class BucketManager:
         """Regenerate the index of the data group from the package."""
         total_packages = self.total_packages
         index_packages = list(range(len(total_packages)))
-        
+
         if shuffle:
             random.seed(seed)
             random.shuffle(index_packages)
@@ -340,17 +340,17 @@ class BucketManager:
 
         index_list = []
         if self.sharding:
-            group_list = [[] for _ in range(self.num_groups)]  
+            group_list = [[] for _ in range(self.num_groups)]
             for idx in index_packages:
                 cur_list = total_packages[idx].get_samples(self.buckets)
                 for group_id in range(self.num_groups):
-                    group_list[group_id].extend(cur_list[group_id])  
+                    group_list[group_id].extend(cur_list[group_id])
             for idx in range(self.num_groups):
                 index_list.extend(group_list[idx])
         else:
             for idx in index_packages:
                 cur_list = total_packages[idx].get_samples(self.buckets)
-                index_list.extend(cur_list[0])  
+                index_list.extend(cur_list[0])
 
         return index_list
 
@@ -390,7 +390,7 @@ class BucketManager_qwen2vl(BucketManager):
             global_batch_size=global_batch_size,
             priority_mode=priority_mode,
         )
-        
+
     def create_buckets(self):
         merged_buckets = {}
         # Calculate tokens by image size
@@ -645,7 +645,7 @@ class BucketManager_internvl2(BucketManager):
         self.processes_num = self.suggest_thread_count(dataset)
         with Pool(processes=self.processes_num) as pool:
             results = pool.starmap(self.process_calculate_images_num, [(idx, dataset) for idx in indices])
-        
+
         # Merge all returned dictionaries
         for result in results:
             self.final_results_dict.update(result)
@@ -666,7 +666,7 @@ class BucketManager_internvl2(BucketManager):
             bfind = False
             for bucket in self.buckets:
                 if bucket.bucket_range == sorted_ratio:
-                    group_id = idx // group_length  
+                    group_id = idx // group_length
                     bucket.add_sample(group_id, idx)
                     self.image_info[idx] = (width, height)
                     self.bucket_info[idx] = closest_ratio

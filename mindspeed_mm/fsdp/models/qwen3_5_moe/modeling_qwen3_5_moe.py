@@ -345,7 +345,7 @@ class Qwen3_5MoeRMSNormGated(nn.Module):
             # Norm before gate
             hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
             hidden_states = self.weight * hidden_states.to(input_dtype)
-            hidden_states = hidden_states * F.silu(gate.to(torch.float32)).to(input_dtype) 
+            hidden_states = hidden_states * F.silu(gate.to(torch.float32)).to(input_dtype)
 
         return hidden_states
 
@@ -732,7 +732,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                 )
             else:
                 conv_weight = self.conv1d.weight
-            
+
             cu_seqlens = None
             if "cu_seqlens" in kwargs and kwargs.get("cu_seqlens") is not None:
                 cu_seqlens = kwargs.get("cu_seq_lens_q").to(torch.int64)
@@ -760,7 +760,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                 mixed_qkv = mixed_qkv.transpose(1, 2)
                 mixed_qkv = F.silu(F.conv1d(mixed_qkv, weight=conv_weight, bias=self.conv1d.bias, padding=self.conv_kernel_size - 1, groups=local_key_dim * 2 + local_value_dim)[:, :, :mixed_qkv.shape[-1]])
                 mixed_qkv = mixed_qkv.transpose(1, 2)
-        
+
         query, key, value = torch.split(
             mixed_qkv,
             [
@@ -883,7 +883,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     if IS_NPU_AVAILABLE:
         import torch_npu
         q_embed = torch_npu.npu_rotary_mul(q_rot, cos, sin)
-        k_embed = torch_npu.npu_rotary_mul(k_rot, cos, sin)        
+        k_embed = torch_npu.npu_rotary_mul(k_rot, cos, sin)
     else:
         q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
         k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
@@ -1102,7 +1102,7 @@ class Qwen3_5MoeExperts(nn.Module):
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
 
         from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward, ep_mc2_forward
-        
+
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
             "mc2": ep_mc2_forward
@@ -1121,7 +1121,7 @@ class Qwen3_5MoeExperts(nn.Module):
             )
         else:
             raise NotImplementedError(f"EP dispatcher {ep_plan.dispatcher} is not implenmented for Qwen3.5 MoE.")
-        
+
         return hidden_states
 
 
@@ -1432,7 +1432,7 @@ class Qwen3_5MoeVisionAttention(nn.Module):
             query_states = query_states.unsqueeze(0)
             key_states = key_states.unsqueeze(0)
             value_states = value_states.unsqueeze(0)
-            
+
             # Flash Attention 2: Use cu_seqlens for variable length attention
             max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
             attn_output, _ = attention_interface(
@@ -1456,7 +1456,7 @@ class Qwen3_5MoeVisionAttention(nn.Module):
             query_states = query_states.transpose(0, 1).unsqueeze(0)
             key_states = key_states.transpose(0, 1).unsqueeze(0)
             value_states = value_states.transpose(0, 1).unsqueeze(0)
-            
+
             # Other implementations: Process each chunk separately
             lengths = cu_seqlens[1:] - cu_seqlens[:-1]
             splits = [

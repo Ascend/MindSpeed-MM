@@ -125,7 +125,7 @@ class LPIPSWithDiscriminator3D(nn.Module):
     ):
         if optimizer_idx not in [0, 1]:
             raise ValueError(f"optimizer_idx must be equal to 0 or 1, but got {optimizer_idx}!")
-        
+
         bs = inputs.shape[0]
         t = inputs.shape[2]
         if optimizer_idx == 0:

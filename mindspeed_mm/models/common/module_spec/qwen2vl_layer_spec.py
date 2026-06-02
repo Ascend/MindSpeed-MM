@@ -80,7 +80,7 @@ def get_qwen2vl_llm_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
 
 def get_qwen2vl_layer_spec(config=None, is_vit=True, *args, **kwargs) -> ModuleSpec:
     attn_mask_type = AttnMaskType.no_mask if is_vit else AttnMaskType.causal
-    
+
     if get_args().hetero_parallel:
         from mindspeed_mm.utils.hetero_utils.hetero_CP_utils import get_hetero_dotproductattention
         DOTPRODUCTATTENTION = get_hetero_dotproductattention(config)

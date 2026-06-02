@@ -8,11 +8,11 @@ FSDP2 (fully_shard) Custom Patch for Layer-wise Hook Management and Multi-Stream
 
 This module extends PyTorch's native FSDP2 implementation to support:
 1. hook_module: Attaching all FSDP hooks to a specific parent module (e.g., a Transformer block)
-   instead of individual sub-modules, facilitating layer-wise management. 
-   
-   BEST PRACTICE: The `hook_module` should generally be the same module wrapped by 
-   `checkpoint_wrapper`. This alignment specifically resolves bugs where activation 
-   checkpointing conflicts with having separate FSDPStates for sub-modules within a 
+   instead of individual sub-modules, facilitating layer-wise management.
+
+   BEST PRACTICE: The `hook_module` should generally be the same module wrapped by
+   `checkpoint_wrapper`. This alignment specifically resolves bugs where activation
+   checkpointing conflicts with having separate FSDPStates for sub-modules within a
    wrapped block, ensuring hooks are correctly triggered at the block level.
 
 Usage:
@@ -21,15 +21,15 @@ Usage:
     >>> apply_fully_shard_patch()
     >>> from torch.distributed.fsdp import fully_shard
     >>> model = fully_shard(model, hook_module=layer_block)
-    
+
 --------
 Optimization 2:
 
-Refined FSDP2 multi-stream event dependencies to resolve the issue of an 
-extra block being prefetched in the timeline when prefetching is enabled, 
-resulting in a more rational pipeline layout. 
+Refined FSDP2 multi-stream event dependencies to resolve the issue of an
+extra block being prefetched in the timeline when prefetching is enabled,
+resulting in a more rational pipeline layout.
 
-In scenarios like EP, this prevents bandwidth contention caused by the 
+In scenarios like EP, this prevents bandwidth contention caused by the
 overlap between FSDP2 unshard communication and token dispatch communication.
 
 """
@@ -60,8 +60,8 @@ from torch.distributed.tensor import DeviceMesh, Shard
 from torch.distributed.fsdp._fully_shard._fsdp_api import MixedPrecisionPolicy, OffloadPolicy
 from torch.distributed.fsdp._fully_shard._fsdp_common import (
     _cast_fp_tensor,
-    FSDPMeshInfo, 
-    HSDPMeshInfo, 
+    FSDPMeshInfo,
+    HSDPMeshInfo,
     compiled_autograd_enabled,
     TrainingState
 )
@@ -76,15 +76,15 @@ from torch.distributed.fsdp._fully_shard._fsdp_init import (
 from torch.distributed.fsdp._fully_shard._fsdp_param_group import FSDPParamGroup, FSDPCommContext
 from torch.distributed.fsdp._fully_shard._fsdp_param import FSDPParam, alloc_storage
 from torch.distributed.fsdp._fully_shard._fsdp_state import (
-    FSDPState, 
-    logger, 
+    FSDPState,
+    logger,
     disable_if_config_true,
     _register_group_forward_hooks
 )
 from torch.distributed.fsdp._fully_shard._fully_shard import _unimplemented_deepcopy, FSDPModule
 from torch.distributed.fsdp._fully_shard._fsdp_collectives import (
-    foreach_all_gather_copy_out, 
-    foreach_reduce, 
+    foreach_all_gather_copy_out,
+    foreach_reduce,
     AllGatherResult
 )
 
@@ -121,7 +121,7 @@ class AllReduceState(NamedTuple):
 # Core API: fully_shard
 # -----------------------------------------------------------------------------
 
-@contract(state_cls=FSDPState) 
+@contract(state_cls=FSDPState)
 def fully_shard(
     module,
     *,
@@ -144,14 +144,14 @@ def fully_shard(
         mp_policy: Mixed precision policy.
         offload_policy: CPU offload policy.
         ignored_params: Set of parameters to ignore during sharding.
-        hook_module: 
-            The specific module to register forward/pre-forward hooks on. 
-            If None, hooks are registered on the 'module' itself. 
+        hook_module:
+            The specific module to register forward/pre-forward hooks on.
+            If None, hooks are registered on the 'module' itself.
             This allows grouping multiple FSDP units under a single logical layer hook.
     Returns:
         The sharded module.
     """
-    
+
     if isinstance(module, (nn.ModuleList, nn.ModuleDict)):
         raise ValueError(
             f"fully_shard does not support containers that do not implement forward: {module}"
@@ -180,7 +180,7 @@ def fully_shard(
 
     # Determine hook_module
     if hook_module:
-        _hook_module = hook_module 
+        _hook_module = hook_module
     else:
         _hook_module = (modules[0] if len(modules) > 0 else modules)
 
@@ -192,9 +192,9 @@ def fully_shard(
 
     # Initialize state with custom parameters
     state.init(
-        modules, device, mp_policy, 
-        hook_module=hook_module, 
-        comm_ctx_index=comm_ctx_index, 
+        modules, device, mp_policy,
+        hook_module=hook_module,
+        comm_ctx_index=comm_ctx_index,
     )
 
     managed_modules = _get_managed_modules(modules, ignored_params)
@@ -244,12 +244,12 @@ def hook_module_init(
 ) -> None:
     """
     Custom initialization for FSDPState.
-    
+
     Extends the default init to:
     1. Register hooks on a specific 'hook_module' (if provided) instead of the first managed module.
     2. Store the 'comm_ctx_index' for multi-stream management.
     """
-    
+
     for module in modules:
         _insert_module_state(module, self)
     self._modules = modules
@@ -286,8 +286,8 @@ def hook_module_init(
             )
             self._pre_forward_hook_handle = hook_handle
             self._post_forward_hook_handle = hook_handle
-        
-        self.hook_module = weakref.ref(modules[0])    
+
+        self.hook_module = weakref.ref(modules[0])
 
 
 def copy_fsdp_comm_ctx(new_comm_ctx: FSDPCommContext, comm_ctx: FSDPCommContext) -> FSDPCommContext:
@@ -295,7 +295,7 @@ def copy_fsdp_comm_ctx(new_comm_ctx: FSDPCommContext, comm_ctx: FSDPCommContext)
     Copies critical stream and state attributes from one communication context to another.
     Used to initialize additional global communication contexts based on the root context.
     """
-    
+
     new_comm_ctx.device_handle = comm_ctx.device_handle
 
     # # Copy streams
@@ -315,12 +315,12 @@ def copy_fsdp_comm_ctx(new_comm_ctx: FSDPCommContext, comm_ctx: FSDPCommContext)
 def hook_module_init_shared_state(self) -> None:
     """
     Initializes shared state across all FSDP states in the context.
-    
+
     Creates a global list of communication contexts (global_comm_ctx) to manage
-    multiple streams. It ensures that every unique comm_ctx_index used by any 
+    multiple streams. It ensures that every unique comm_ctx_index used by any
     state in the group has a corresponding initialized FSDPCommContext.
     """
-    
+
     self._comm_ctx.lazy_init(self._device)
     if not hasattr(self, "global_comm_ctx"):
         self.global_comm_ctx = [self._comm_ctx]
@@ -353,12 +353,12 @@ def hook_module_init_shared_state(self) -> None:
 def _root_post_backward_final_callback(self) -> None:
     """
     Custom callback executed after the final backward pass.
-    
-    Ensures that the main stream waits for ALL reduce-scatter events from 
+
+    Ensures that the main stream waits for ALL reduce-scatter events from
     ALL communication contexts (global_comm_ctx) to complete before finishing.
     This is crucial for correctness when using multiple streams.
     """
-    
+
     if not compiled_autograd_enabled():
         logger.debug("FSDP::root_post_backward")
     with torch.profiler.record_function("FSDP::root_post_backward_callback"):
@@ -419,18 +419,18 @@ def _pre_forward(
     for fsdp_state in self._states_to_forward_prefetch:
         if (target_param_group := fsdp_state._fsdp_param_group) is not None:
             prefetch_all_gather_copy_in_stream = target_param_group.comm_ctx.all_gather_copy_in_stream
- 
-            # Notice: 
-            # [Optimization 2] Refine multi-stream event dependencies to optimize 
+
+            # Notice:
+            # [Optimization 2] Refine multi-stream event dependencies to optimize
             # pipeline scheduling.
-            # Explicitly wait for the previous global communication event to complete 
-            # before triggering a new prefetch. This prevents an extra block from being 
-            # prefetched and avoids bandwidth contention (e.g., between FSDP unshard 
+            # Explicitly wait for the previous global communication event to complete
+            # before triggering a new prefetch. This prevents an extra block from being
+            # prefetched and avoids bandwidth contention (e.g., between FSDP unshard
             # and token dispatch in EP scenarios).
             for comm_ctx in self.global_comm_ctx:
                 if comm_ctx.all_gather_state and comm_ctx.all_gather_state.event:
                     prefetch_all_gather_copy_in_stream.wait_event(comm_ctx.all_gather_state.event)
- 
+
             FSDPParamGroup._prefetch_unshard(target_param_group, "forward")
     return args, kwargs
 
@@ -439,12 +439,12 @@ def _pre_forward(
 def _post_forward(self, module: nn.Module, input: Any, output: Any) -> Any:
     """
     Custom post-forward hook.
-    
+
     Waits for all All-Gather operations from ALL communication contexts to complete
     and frees their events before proceeding. This prevents memory leaks and ensures
     data readiness for subsequent operations.
     """
-    
+
     if self._training_state == TrainingState.PRE_BACKWARD:
         return output
     if self._fsdp_param_group:
@@ -464,7 +464,7 @@ def _post_forward(self, module: nn.Module, input: Any, output: Any) -> Any:
             comm_ctx.all_gather_state = None
 
         self._state_ctx.iter_forward_root = None
-        
+
     if self._mp_policy.output_dtype is not None:
         with torch.profiler.record_function("FSDP::cast_forward_outputs"):
             output = tree_map(
@@ -481,12 +481,12 @@ def _post_forward(self, module: nn.Module, input: Any, output: Any) -> Any:
 def param_group_wait_for_unshard_pt27(self):
     """
     Waits for preceding All-Gather operations to complete before unsharding.
-    
+
     Specifically checks global_comm_ctx for events generated by DIFFERENT hook_modules.
-    This enables overlapping communication: Layer N can start computing while Layer N+1 
+    This enables overlapping communication: Layer N can start computing while Layer N+1
     is still gathering, provided they use different streams/contexts.
     """
-    
+
     if not self._all_gather_result:
         return  # no preceding unshard
     async_op = self._all_gather_result.all_gather_work is not None
@@ -526,12 +526,12 @@ def param_group_wait_for_unshard_pt27(self):
 def param_group_wait_for_unshard_pt29(self):
     """
     Waits for preceding All-Gather operations to complete before unsharding.
-    
+
     Specifically checks global_comm_ctx for events generated by DIFFERENT hook_modules.
-    This enables overlapping communication: Layer N can start computing while Layer N+1 
+    This enables overlapping communication: Layer N can start computing while Layer N+1
     is still gathering, provided they use different streams/contexts.
     """
-    
+
     if not self._all_gather_result:
         return  # no preceding unshard
     async_op = self._all_gather_result.all_gather_work is not None
@@ -604,19 +604,19 @@ def param_group_wait_for_unshard_pt29(self):
 def param_group_post_backward_pt27(self, *unused: Any):
     """
     Custom post-backward logic for gradient reduction and resharding.
-    
-    Ensures that the current stream waits for Reduce-Scatter events from 
-    OTHER communication contexts (different hook_modules) before starting 
+
+    Ensures that the current stream waits for Reduce-Scatter events from
+    OTHER communication contexts (different hook_modules) before starting
     its own reduction. This maintains correctness in multi-stream setups.
     """
-    
+
     if not compiled_autograd_enabled():
         logger.debug("%s", self._with_fqn("FSDP::post_backward"))
     self._training_state = TrainingState.POST_BACKWARD
     with record_function(self._with_fqn("FSDP::post_backward_accumulate")):
         for fsdp_param in self.fsdp_params:
             fsdp_param.accumulate_unsharded_grad_if_needed()
-            
+
     with record_function(self._with_fqn("FSDP::post_backward_reshard")):
         if not self.reduce_grads:
             if self.reshard_after_backward:
@@ -654,7 +654,7 @@ def param_group_post_backward_pt27(self, *unused: Any):
                 self.comm_ctx.reduce_scatter_state.event
             )
             self.comm_ctx.reduce_scatter_state = None
-        
+
         # Wait for GLOBAL context reduce-scatters from DIFFERENT hook modules
         for comm_ctx in self.global_comm_ctx:
             if comm_ctx.reduce_scatter_state and comm_ctx.reduce_scatter_state.hook_module != self.hook_module:
@@ -697,7 +697,7 @@ def param_group_post_backward_pt27(self, *unused: Any):
             self._partial_reduce_output,
             self._all_reduce_hook,
         )
-        
+
         # Record the new reduce-scatter state
         self.comm_ctx.reduce_scatter_state = ReduceScatterState(
             reduce_scatter_input, reduce_scatter_event, self.hook_module
@@ -713,19 +713,19 @@ def param_group_post_backward_pt27(self, *unused: Any):
 def param_group_post_backward_pt29(self, *unused: Any):
     """
     Custom post-backward logic for gradient reduction and resharding.
-    
-    Ensures that the current stream waits for Reduce-Scatter events from 
-    OTHER communication contexts (different hook_modules) before starting 
+
+    Ensures that the current stream waits for Reduce-Scatter events from
+    OTHER communication contexts (different hook_modules) before starting
     its own reduction. This maintains correctness in multi-stream setups.
     """
-    
+
     if not compiled_autograd_enabled():
         logger.debug("%s", self._with_fqn("FSDP::post_backward"))
     self._training_state = TrainingState.POST_BACKWARD
     with record_function(self._with_fqn("FSDP::post_backward_accumulate")):
         for fsdp_param in self.fsdp_params:
             fsdp_param.accumulate_unsharded_grad_if_needed()
-            
+
     with record_function(self._with_fqn("FSDP::post_backward_reshard")):
         if not self.reduce_grads:
             if self.reshard_after_backward:
@@ -763,7 +763,7 @@ def param_group_post_backward_pt29(self, *unused: Any):
                 self.comm_ctx.reduce_scatter_state.event
             )
             self.comm_ctx.reduce_scatter_state = None
-        
+
         # Wait for GLOBAL context reduce-scatters from DIFFERENT hook modules
         for comm_ctx in self.global_comm_ctx:
             if comm_ctx.reduce_scatter_state and comm_ctx.reduce_scatter_state.hook_module != self.hook_module:
@@ -808,7 +808,7 @@ def param_group_post_backward_pt29(self, *unused: Any):
             self._all_reduce_hook,
             self.force_sum_reduction_for_comms,
         )
-        
+
         # Record the new reduce-scatter state
         self.comm_ctx.reduce_scatter_state = ReduceScatterState(
             reduce_scatter_input, reduce_scatter_event, self.hook_module
@@ -828,7 +828,7 @@ def apply_fully_shard_patch() -> None:
     """
     Applies all custom patches to the FSDPState and FSDPParamGroup classes.
     Call this function once at the beginning of your training script.
-    """    
+    """
     # Patch FSDPState methods
     FSDPState.init = hook_module_init
     FSDPState._init_shared_state = hook_module_init_shared_state

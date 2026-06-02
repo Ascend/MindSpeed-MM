@@ -82,7 +82,7 @@ def create_qwen3_vl_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_gr
                         ExpertSplitOp(raw_name=rf"model.language_model.layers.{idx}.mlp.experts.down_proj",
                                       new_name=rf"text_decoder.decoder.layers.{idx}.mlp.experts.local_experts.(\d+).linear_fc2.weight",
                                       num_experts=num_experts) for idx in range(num_hidden_layers)
-                       ]     
+                       ]
     deepstack_rename_op = [RenameOp(
                                 (
                                     (rf'model.visual.deepstack_merger_list.{idx}.linear_fc',
@@ -104,7 +104,7 @@ def create_qwen3_vl_ops(vit_embed_dim: int, vit_num_heads: int, llm_num_query_gr
 
                             )
                         )
-                      ]                  
+                      ]
     return ops + expert_split_ops + deepstack_rename_op + dense_merge_op + dense_rename_op
 
 

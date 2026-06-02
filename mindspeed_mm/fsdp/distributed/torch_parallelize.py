@@ -36,8 +36,8 @@ class ParallelApplier:
             model = expert_fully_shard_modules(model, self.parallel_state.get_efsdp_device_mesh(), self.config.ep_plan, self.config.fsdp_plan)
             # Remove modules already handled by efsdp from the standard FSDP plan to prevent duplicate fully_shard errors
             self.config.fsdp_plan.apply_modules = [x for x in self.config.fsdp_plan.apply_modules if x not in self.config.ep_plan.apply_efsdp_modules]
-        
-    def set_modules_to_prefetch(self, model):          
+
+    def set_modules_to_prefetch(self, model):
         if self.config.fsdp_plan.num_to_forward_prefetch > 0 or self.config.fsdp_plan.num_to_backward_prefetch > 0:
             ep_plan = self.config.ep_plan if self.config.expert_parallel_size > 1 and self.config.ep_plan.apply_modules else None
             set_modules_to_prefetch(model, fsdp_plan=self.config.fsdp_plan, ep_plan=ep_plan)

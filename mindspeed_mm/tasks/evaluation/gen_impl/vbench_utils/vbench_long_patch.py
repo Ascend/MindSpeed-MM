@@ -169,4 +169,3 @@ def patch_static_filter_load_model(self):
 
     self.model = self.model.module
     self.model.eval()
-

@@ -639,7 +639,7 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
         visual_generation_config = GenerationConfig(**generation_config.visual_generation_config)
         audio_generation_config = GenerationConfig(**generation_config.audio_generation_config)
         multimodal_generation_status = LongcatNextForCausalLMGenerationStatus(visual_generation_config, audio_generation_config)
-        
+
         pbar = tqdm(iter(int, 1), desc="Generating", unit="tok")
         while self._has_unfinished_sequences(this_peer_finished, synced_gpus, device=input_ids.device):
             # prepare model inputs

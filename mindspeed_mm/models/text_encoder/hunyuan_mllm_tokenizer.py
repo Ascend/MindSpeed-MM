@@ -14,7 +14,7 @@ class HunyuanMllmTokenizer:
             templates = json.load(f)
         self.template_info = templates[template_id]
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(**config)
-    
+
 
     @staticmethod
     def apply_template(text, template):
@@ -24,10 +24,10 @@ class HunyuanMllmTokenizer:
             return [template.format(t) for t in text]
         else:
             raise NotImplementedError(f"Not Support text type: {type(text)}")
-    
+
 
     def __call__(
-        self, 
+        self,
         prompt,
         padding: str = "max_length",
         max_length: int = 256,
@@ -49,7 +49,7 @@ class HunyuanMllmTokenizer:
             **kwargs,
         )
         return text_inputs
-    
+
     def __getattr__(self, name):
         if name in dir(self):
             return super().__getattr__(name)

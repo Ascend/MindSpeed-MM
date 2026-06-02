@@ -679,14 +679,14 @@ def main(args):
         args.pretrained_model_name_or_path,
         subfolder="tokenizer",
         revision=args.revision,
-        use_fast=False, 
+        use_fast=False,
         local_files_only=True,
     )
     tokenizer_two = AutoTokenizer.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="tokenizer_2",
         revision=args.revision,
-        use_fast=False, 
+        use_fast=False,
         local_files_only=True,
     )
 
@@ -707,14 +707,14 @@ def main(args):
         args.pretrained_model_name_or_path,
         subfolder="text_encoder",
         revision=args.revision,
-        variant=args.variant, 
+        variant=args.variant,
         local_files_only=True,
     )
     text_encoder_two = text_encoder_cls_two.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="text_encoder_2",
         revision=args.revision,
-        variant=args.variant, 
+        variant=args.variant,
         local_files_only=True,
     )
     vae_path = (
@@ -726,14 +726,14 @@ def main(args):
         vae_path,
         subfolder="vae" if args.pretrained_vae_model_name_or_path is None else None,
         revision=args.revision,
-        variant=args.variant, 
+        variant=args.variant,
         local_files_only=True,
     )
     unet = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path,
         subfolder="unet",
         revision=args.revision,
-        variant=args.variant, 
+        variant=args.variant,
         local_files_only=True,
     )
 
@@ -1140,7 +1140,7 @@ def main(args):
                 progress_bar.update(1)
                 global_step += 1
                 train_loss = 0.0
-                
+
                 if accelerator.is_main_process or accelerator.distributed_type == DistributedType.DEEPSPEED:
                     if global_step % args.checkpointing_steps == 0:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
@@ -1220,7 +1220,7 @@ def main(args):
             subfolder="vae" if args.pretrained_vae_model_name_or_path is None else None,
             revision=args.revision,
             variant=args.variant,
-            torch_dtype=weight_dtype, 
+            torch_dtype=weight_dtype,
             local_files_only=True,
         )
         pipeline = StableDiffusionXLPipeline.from_pretrained(
@@ -1231,7 +1231,7 @@ def main(args):
             text_encoder_2=text_encoder_2_bak,
             revision=args.revision,
             variant=args.variant,
-            torch_dtype=weight_dtype, 
+            torch_dtype=weight_dtype,
             local_files_only=True,
         )
         if args.prediction_type is not None:

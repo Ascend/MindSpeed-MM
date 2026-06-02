@@ -26,12 +26,12 @@ def get_selection_indices_for_tnd_softmax_update(t, n, sub_seq_len):
             end = seq_start + seq_len * 2 * (i + 1)
             indices.extend(full_indices[start:end])
         seq_start += seq_len * n * 2
-    
+
     return torch.tensor(indices)
 
 
 def flatten_softmax(x, sub_seq_len):
-    orig_shape = x.shape 
+    orig_shape = x.shape
     section_len = [s * orig_shape[1] for s in sub_seq_len]
     splits = x.view(-1, orig_shape[-1]).split(section_len, dim=0)
     merged = [item.view(orig_shape[1], -1, orig_shape[-1]).transpose(0, 1) for item in splits]
@@ -40,7 +40,7 @@ def flatten_softmax(x, sub_seq_len):
 
 
 def unflatten_softmax(x, sub_seq_len):
-    orig_shape = x.shape 
+    orig_shape = x.shape
     section_len = [s * orig_shape[1] for s in sub_seq_len]
     splits = x.view(-1, orig_shape[-1]).split(section_len, dim=0)
     # Modification: 下面reshape函数替换了core原先的view，否则会出现contiguous的报错
@@ -171,7 +171,7 @@ class RingP2P:
             # to prevent data races or corrupted memory.
             orig_recv_tensor[0] = recv_tensor[:k_numel].view(*k_shape)  # [k_numel] -> k_shape
             orig_recv_tensor[1] = recv_tensor[k_numel:].view(*v_shape)  # [v_numel] -> v_shape
-    
+
     def wait(self):
         if len(self.send_recv_ops) > 0:
             for op in self.send_recv_ops:
@@ -226,7 +226,7 @@ def forward_update(prev_attn_out, prev_softmax_max, prev_softmax_sum,
             np_array = np.array(input_list)
             cumsum_result = np.cumsum(np_array)
             return torch.tensor([0] + list(cumsum_result), dtype=torch.int64).to(prev_attn_out.device)
-        
+
         if layout == "TND":
             actual_seq_qlen = accumulate_list(actual_seq_qlen)
         return npu_ring_attention_update(prev_attn_out, prev_softmax_max, prev_softmax_sum, cur_attn_out,
@@ -269,7 +269,7 @@ def tnd_out_update(q_block_id, kv_block_id, cur_attn_outs, global_attn_outs, q_i
         softmax_max = softmax_max.view(-1, 8).index_copy(0, softmax_indices, softmax_max_updated.view(-1, 8)).view(-1, n, 8)
         softmax_sum = softmax_sum.view(-1, 8).index_copy(0, softmax_indices, softmax_sum_updated.view(-1, 8)).view(-1, n, 8)
 
-    
+
     return [attn_out, softmax_max, softmax_sum, rng_states]
 
 
@@ -312,7 +312,7 @@ def causal_out_update(q_block_id, kv_block_id, cur_attn_outs, global_attn_outs):
                                         softmax_max.shape[-1])
         softmax_sum = softmax_sum.view(softmax_sum.shape[0], softmax_sum.shape[1], -1,
                                         softmax_sum.shape[-1])
-    
+
     return [attn_out, softmax_max, softmax_sum, rng_states]
 
 
@@ -331,5 +331,5 @@ def general_out_update(q_block_id, kv_block_id, cur_attn_outs, global_attn_outs)
             cur_attn_out, cur_softmax_max, cur_softmax_sum, layout=layout
         )
         attn_out, softmax_max, softmax_sum = attn_out_updated, softmax_max_updated, softmax_sum_updated
-    
+
     return [attn_out, softmax_max, softmax_sum, rng_states]

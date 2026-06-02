@@ -13,7 +13,7 @@ import torch.utils.checkpoint
 import torch_npu
 from timm.models.layers import DropPath
 
-from megatron.core import mpu 
+from megatron.core import mpu
 from megatron.core.parallel_state import get_tensor_model_parallel_group
 from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_region
 from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
@@ -40,16 +40,16 @@ class InternVitTransformerLayer(TransformerLayer):
         output of the same size.
     """
     def __init__(
-        self, 
-        config: TransformerConfig, 
-        submodules: TransformerLayerSubmodules, 
-        layer_number: int = 1, 
+        self,
+        config: TransformerConfig,
+        submodules: TransformerLayerSubmodules,
+        layer_number: int = 1,
         hidden_dropout: float = None,
         drop_path_rate: float = 0.0
     ):
-        super().__init__(config=config, 
-                         submodules=submodules, 
-                         layer_number=layer_number, 
+        super().__init__(config=config,
+                         submodules=submodules,
+                         layer_number=layer_number,
                          hidden_dropout=hidden_dropout)
 
         # InternViT adds trainable parameters
@@ -153,16 +153,16 @@ class InternVitSelfAttention(SelfAttention):
     """
 
     def __init__(
-        self, 
-        config: TransformerConfig, 
-        submodules: SelfAttentionSubmodules, 
-        layer_number: int, 
+        self,
+        config: TransformerConfig,
+        submodules: SelfAttentionSubmodules,
+        layer_number: int,
         attn_mask_type=AttnMaskType.padding
     ):
         super().__init__(
-            config=config, 
-            submodules=submodules, 
-            layer_number=layer_number, 
+            config=config,
+            submodules=submodules,
+            layer_number=layer_number,
             attn_mask_type=attn_mask_type
         )
 
@@ -198,7 +198,7 @@ class InternVitSelfAttention(SelfAttention):
             )
         else:
             self.k_layernorm = None
-        
+
     def get_query_key_value_tensors(self, hidden_states, key_value_states=None):
         """
         Derives `query`, `key` and `value` tensors from `hidden_states`.
@@ -209,8 +209,8 @@ class InternVitSelfAttention(SelfAttention):
         N, B, C = mixed_qkv.shape
         mixed_qkv = mixed_qkv.reshape(N, B, 3, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head) # -> [N, B, 3, H, D]
 
-        query, key, value = mixed_qkv.unbind(2) 
-        
+        query, key, value = mixed_qkv.unbind(2)
+
         gather_sizes = cal_split_sizes(dim_size=self.config.num_attention_heads, world_size=self.config.tensor_model_parallel_size)
 
         if self.q_layernorm is not None:
@@ -366,7 +366,7 @@ class InternViT(MultiModalModule):
 
     def get_input_embeddings(self):
         return self.embeddings
-    
+
     def pixel_shuffle(self, x, scale_factor=0.5):
         n, w, h, c = x.size()
         # N, W, H, C --> N, W, H * scale, C // scale
@@ -382,7 +382,7 @@ class InternViT(MultiModalModule):
         else:
             x = x.permute(0, 2, 1, 3).contiguous()
         return x
-    
+
     def extract_feature(self, hidden_states):
         vit_embeds = hidden_states[:, 1:, :]
         h = w = int(vit_embeds.shape[1] ** 0.5)
@@ -390,7 +390,7 @@ class InternViT(MultiModalModule):
         vit_embeds = self.pixel_shuffle(vit_embeds, scale_factor=self.downsample_ratio)
         vit_embeds = vit_embeds.reshape(vit_embeds.shape[0], -1, vit_embeds.shape[-1])
         return vit_embeds
-    
+
     def forward(
         self,
         pixel_values: Optional[torch.FloatTensor] = None,
@@ -421,7 +421,7 @@ class InternViT(MultiModalModule):
             attention_mask = attention_mask < 0.5
 
         encoder_outputs = self.encoder(hidden_states, attention_mask)
-        
+
         if get_args().context_parallel_size is not None and get_args().context_parallel_size > 1 and get_args().context_parallel_algo == "ulysses_cp_algo":
             split_gather_sizes = cal_split_sizes(self.seq_length, get_args().context_parallel_size)
             encoder_outputs = gather_forward_split_backward(encoder_outputs, mpu.get_context_parallel_group(),

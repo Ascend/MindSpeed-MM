@@ -2,7 +2,7 @@ import torch
 from torch.distributed.distributed_c10d import ReduceOp
 
 """
-When using EP and the set_gradient_divide_factor/set_reduce_scatter_divide_factor function for gradient 
+When using EP and the set_gradient_divide_factor/set_reduce_scatter_divide_factor function for gradient
 reduction in MOE layers,it is necessary to manually import the apply_hccl_premul_sum_patch function in the file.
 TODO:When torch_npu supports the PreMul_Sum operator, the patch needs to be removed.
 """

@@ -1669,5 +1669,3 @@ def merge_kv_weights(provider: TransformerConfig, k: torch.Tensor, v: torch.Tens
 
     kv = torch.cat(pieces, dim=0)
     return kv.view(-1, hidden_size)
-
-

@@ -20,8 +20,8 @@ from megatron.training import get_args
 
 from mindspeed.core.context_parallel.ulysses_context_parallel.unaligned_cp.mapping import cal_split_sizes, split_forward_gather_backward, gather_forward_split_backward
 from mindspeed.core.context_parallel.model_parallel_utils import (
-    get_context_parallel_group_for_hybrid_ulysses, 
-    get_context_parallel_group_for_hybrid_ring, 
+    get_context_parallel_group_for_hybrid_ulysses,
+    get_context_parallel_group_for_hybrid_ring,
     get_context_parallel_for_hybrid_ulysses_world_size
 )
 from mindspeed.utils import set_actual_seq_len
@@ -254,7 +254,7 @@ class MMGPTModel(LanguageModule):
                 if self.pre_process:
                     decoder_input = split_forward_gather_backward(decoder_input, mpu.get_context_parallel_group(), 0,
                                                                 split_gather_sizes, "down")
-                    
+
             elif get_args().context_parallel_algo == "megatron_cp_algo":
                 input_ids = split_forward_gather_backward_with_megatron_cp(input_ids, mpu.get_context_parallel_group(), dim=1)
                 if position_ids is not None:

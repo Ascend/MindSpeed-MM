@@ -22,8 +22,8 @@ def zeropower_via_newtonschulz5(G, steps):
         raise ValueError(
             f"zeropower_via_newtonschulz5 expects a 2-D tensor, got shape {G.shape}"
         )
-    
-    # Coefficients a,b,c are used to ensure convergence 
+
+    # Coefficients a,b,c are used to ensure convergence
     # values are from the source code of Keller Jordan
     a, b, c = (3.4445, -4.7750, 2.0315)
     X = G
@@ -75,7 +75,7 @@ class Muon(torch.optim.Optimizer):
         adamw_eps: The epsilon for the internal AdamW.
         adamw_wd: The weight decay for the internal AdamW.
     """
-    def __init__(self, 
+    def __init__(self,
                  param_groups,
                  lr: float = 2e-2,
                  weight_decay: float = 0.1,
@@ -96,7 +96,7 @@ class Muon(torch.optim.Optimizer):
             adamw_betas=adamw_betas,
             adamw_eps=adamw_eps,
         )
-        
+
         super().__init__(param_groups, defaults)
 
     @torch.no_grad()
@@ -106,75 +106,75 @@ class Muon(torch.optim.Optimizer):
         for group in self.param_groups:
             if not group.get("use_muon", False):
                 continue
-            
+
             momentum = group['momentum']
             nesterov = group['nesterov']
-            
+
             for p in group["params"]:
                 if p.grad is None:
                     continue
-                
+
                 state = self.state[p]
-                
+
                 # Initialize momentum buffer
                 if "muon_buffer" not in state:
                     state["muon_buffer"] = torch.zeros_like(p.grad)
-                
+
                 buf = state["muon_buffer"]
                 buf.mul_(momentum).add_(p.grad)
-                
+
                 # Prepare for Newton-Schulz iteration
                 if nesterov:
                     g = p.grad.add(buf, alpha=momentum)
                 else:
                     g = buf
-                
+
                 state["ns_input"] = g.to(torch.bfloat16)
 
         # Second pass: apply updates
         for group in self.param_groups:
             if not group.get("use_muon", False):
                 continue
-            
+
             lr = group["lr"]
             ns_steps = group["ns_steps"]
             weight_decay = group["weight_decay"]
             matched_adamw_rms = group["matched_adamw_rms"]
-            
+
             for p in group["params"]:
                 if p.grad is None:
                     continue
-                
+
                 state = self.state[p]
                 ns_input = state.pop("ns_input", None)
                 if ns_input is None:
                     continue
-                
+
                 # Handle FSDP sharding
                 if hasattr(p, 'device_mesh'):
                     device_mesh = ns_input.device_mesh
-                    
+
                     # Gather to replica for computation
-                    new_placements = [Replicate() if isinstance(placement, Shard) 
+                    new_placements = [Replicate() if isinstance(placement, Shard)
                                      else placement for placement in ns_input.placements]
-                    
+
                     ns_input_full = ns_input.redistribute(device_mesh, new_placements)
                     ns_input_local = ns_input_full.to_local()
                 else:
                     ns_input_local = ns_input
-                
+
                 # Apply Newton-Schulz orthogonalization
                 update = zeropower_via_newtonschulz5(ns_input_local, steps=ns_steps)
-                
+
                 # Handle FSDP sharding for output
                 if hasattr(p, 'device_mesh'):
                     update_dtensor = DTensor.from_local(update, p.device_mesh, new_placements)
                     update_sharded = update_dtensor.redistribute(p.device_mesh, p.placements)
                     update = update_sharded
-                
+
                 # Apply weight decay
                 p.mul_(1 - lr * weight_decay)
-                
+
                 # Adjust LR and apply update
                 adjusted_lr = adjust_lr_wd_for_muon(lr, matched_adamw_rms, ns_input.shape)
                 p.data.add_(update, alpha=-adjusted_lr)

@@ -33,7 +33,7 @@ def get_beta_schedule(schedule_name: str, num_diffusion_timesteps: torch.int) ->
     elif schedule_name == "squaredcos_cap_v2":
         max_beta = 0.999
         betas = []
-        
+
         def alpha_bar(t):
             return torch.cos((t + 0.008) / 1.008 * torch.pi / 2) ** 2
 

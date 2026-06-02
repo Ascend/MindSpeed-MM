@@ -69,7 +69,7 @@ def prepare_base_dataloader(
         collate_fn = DATA_COLLATOR[data_collate_type](dataset_param=dataset_param, **collate_param)
     if persistent_workers is None:
         persistent_workers = True if num_workers > 0 else False
-    
+
     return StatefulDataLoader(
         dataset,
         pin_memory=pin_memory,

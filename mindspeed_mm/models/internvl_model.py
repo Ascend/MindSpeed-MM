@@ -65,7 +65,7 @@ class InternVLModel(MultiModalModule):
 
         self.vocab_size = config.text_decoder.vocab_size
         self.img_context_token_id = config.img_context_token_id
-        
+
         # initialize pipeline prarallel configs
         self.pp_size = mpu.get_pipeline_model_parallel_world_size()
         self.enable_vp = mpu.get_virtual_pipeline_model_parallel_world_size() is not None
@@ -126,7 +126,7 @@ class InternVLModel(MultiModalModule):
 
         pre_process = pipeline_start_index == 0
         post_process = pipeline_end_index == config.vision_encoder.num_layers
-        
+
         print(
             f"image encoder pipeline config:\
             pp_rank:{self.pp_rank},\
@@ -377,12 +377,12 @@ class InternVLModel(MultiModalModule):
                 input_embeds = input_embeds.reshape(B, S, H).transpose(0, 1)
 
             attention_mask = self._prepare_decoder_attention_mask(attention_mask)
-            
-            split_gather_sizes = None 
+
+            split_gather_sizes = None
             args = get_args()
             if args.context_parallel_size is not None and args.context_parallel_size > 1:
                 split_gather_sizes = cal_split_sizes(input_embeds.shape[0], args.context_parallel_size)
-                input_embeds = split_forward_gather_backward(input_embeds, mpu.get_context_parallel_group(), 
+                input_embeds = split_forward_gather_backward(input_embeds, mpu.get_context_parallel_group(),
                                                             dim=0, grad_scale="down", split_sizes=split_gather_sizes)
 
             output = self.text_decoder(
@@ -392,10 +392,10 @@ class InternVLModel(MultiModalModule):
                 decoder_input=input_embeds,
                 labels=None,
             )
-            
+
             if self.text_decoder.post_process:
                 if args.context_parallel_size is not None and args.context_parallel_size > 1:
-                    output = gather_forward_split_backward(output, mpu.get_context_parallel_group(), 
+                    output = gather_forward_split_backward(output, mpu.get_context_parallel_group(),
                                                             dim=1, grad_scale="up", gather_sizes=split_gather_sizes)
                 logits = output
                 logits = logits.float()
@@ -403,7 +403,7 @@ class InternVLModel(MultiModalModule):
                 loss = None
                 if labels is not None:
                     loss = self.compute_loss(logits, labels)
-                    
+
                 return {
                     "loss": loss,
                     "logits": logits

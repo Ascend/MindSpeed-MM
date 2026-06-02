@@ -6,9 +6,9 @@ from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParall
 from megatron.core.transformer.attention import SelfAttentionSubmodules
 from megatron.core.extensions.transformer_engine import (
     TENorm,
-    TEColumnParallelGroupedLinear, 
-    TELayerNormColumnParallelLinear, 
-    TERowParallelGroupedLinear, 
+    TEColumnParallelGroupedLinear,
+    TELayerNormColumnParallelLinear,
+    TERowParallelGroupedLinear,
     TERowParallelLinear
 )
 from megatron.core.transformer.mlp import MLP, MLPSubmodules

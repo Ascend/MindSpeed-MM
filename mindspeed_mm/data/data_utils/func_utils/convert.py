@@ -1133,4 +1133,3 @@ def load_reward_tokenizer(model_args) -> "TokenizerModule":
         processor = None
 
     return {"tokenizer": processor.tokenizer, "processor": processor}
-    

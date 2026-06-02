@@ -349,7 +349,7 @@ def validate_args(args, defaults=None):
     if args.optimizer == "muon":
         ensure_valid(not args.use_distributed_optimizer, \
             "--optimizer muon is not supported with MCore's distributed optimizer")
-            
+
     dtype_map = {
         'fp32': torch.float32, 'bf16': torch.bfloat16, 'fp16': torch.float16, 'fp8': torch.uint8,
     }
@@ -358,7 +358,7 @@ def validate_args(args, defaults=None):
         ensure_valid(args.tensor_model_parallel_size == 1 and \
                      args.pipeline_model_parallel_size == 1 and \
                      args.context_parallel_size == 1, \
-            """when enabling hetero-parallel, text decoder initialized by shell is not supported anymore, 
+            """when enabling hetero-parallel, text decoder initialized by shell is not supported anymore,
             please initial it by model.json and set parallelisms to 1 in shell""")
         ensure_valid(not args.tp_2d, "tp_2d is not supported by hetero-parallel")
         ensure_valid(hasattr(args, 'mm') and hasattr(args.mm, 'model') and hasattr(args.mm.model, 'text_decoder'), \
@@ -747,7 +747,7 @@ def validate_args(args, defaults=None):
               ' Use --no-ckpt-fully-parallel-save to disable parallel save.')
     use_dist_ckpt_and_not_ckpt_fully_parallel_save = args.use_dist_ckpt and not args.ckpt_fully_parallel_save
     use_distributed_optimizer_and_rank = args.use_distributed_optimizer and args.rank == 0
-    
+
     if use_dist_ckpt_and_not_ckpt_fully_parallel_save and use_distributed_optimizer_and_rank:
         print('Warning: With non-parallel ckpt save and DistributedOptimizer,'
               ' it will be impossible to resume training with different parallelism.'

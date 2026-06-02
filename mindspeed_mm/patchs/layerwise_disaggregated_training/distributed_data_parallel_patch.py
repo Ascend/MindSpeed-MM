@@ -35,7 +35,7 @@ def finish_grad_sync_ldt(bucket_group: _ParamAndGradBucketGroup):
     # vitural dp scenario, edge side skip grad sync
     if parallel_state.is_pipeline_first_stage(ignore_virtual=True):
         return
-        
+
     # If overlap_grad_reduce is False, start (and finish) synchronous communication call here.
     bucket_group.param_gather_dispatched = False
     if not bucket_group.ddp_config.overlap_grad_reduce:

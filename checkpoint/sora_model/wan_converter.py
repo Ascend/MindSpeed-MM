@@ -8,7 +8,7 @@ class LayerIndexConverter:
             idx = int(name.split('.')[1])
             return idx
         return None
-        
+
     @staticmethod
     def convert_layer_index(name, new_layer_index):
         if name.startswith("blocks"):
@@ -46,11 +46,11 @@ class WanConverter(SoraModelConverter):
         "condition_embedder.image_embedder.norm2.weight": "img_emb.proj.4.weight",
         "condition_embedder.image_embedder.norm2.bias": "img_emb.proj.4.bias",
         "condition_embedder.image_embedder.pos_embed": "img_emb.emb_pos",
-        "scale_shift_table": "head.modulation",    
+        "scale_shift_table": "head.modulation",
         "proj_out.bias": "head.head.bias",
         "proj_out.weight": "head.head.weight",
     }
-    
+
     hf_to_mm_str_replace_mapping = {
         "attn1.norm_q": "self_attn.q_norm",
         "attn1.norm_k": "self_attn.k_norm",
@@ -98,4 +98,4 @@ class WanConverter(SoraModelConverter):
         "img_emb.emb_pos"
     ] # pre_process layers for pp
     post_preprocess_weight_names = ['head.head.weight', 'head.head.bias', 'head.modulation'] # post_process layers for pp
-    layer_index_converter = LayerIndexConverter() 
+    layer_index_converter = LayerIndexConverter()

@@ -45,7 +45,7 @@ def pretrain_ae(
         train_valid_test_dataset_provider: a function that takes the size of
             train/valid/test dataset and returns `train, valid, test` datasets.
         model_provider: a function that returns vanilla version of the AE
-            generator and discriminator models. By vanilla we mean a simple 
+            generator and discriminator models. By vanilla we mean a simple
             model on cpu with no fp16 or ddp.
         forward_step_func: a function that takes a `data batch`, `AE generator`
             and `discriminator` models, and returns the loss of the corresponding
@@ -144,7 +144,7 @@ def pretrain_ae(
         print_rank_0(f"Start with EMA. EMA decay = {args.ema_decay}.")
         ema = EMA(ae_model, args.ema_decay)
         ema.register()
-    
+
     # Print setup timing.
     print_rank_0("done with setup ...")
 
@@ -264,7 +264,7 @@ def training_log(
         loss_name = "generator     loss"
     else:
         loss_name = "discriminator loss"
-    
+
     log_string = f" [{datetime.now(timezone.utc).astimezone(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')}]"
     log_string += ' iteration {:8d}/{:8d} |'.format(iteration, args.train_iters)
     log_string += ' elapsed time per iteration (s): {:.6f} |'.format(

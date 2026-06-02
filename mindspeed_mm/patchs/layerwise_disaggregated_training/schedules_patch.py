@@ -10,7 +10,7 @@ from megatron.core.enums import ModelType
 from megatron.core.parallel_state import (
     get_pipeline_model_parallel_next_rank,
     get_pipeline_model_parallel_prev_rank,
-    get_pipeline_model_parallel_group, 
+    get_pipeline_model_parallel_group,
     get_tensor_model_parallel_group
 )
 from megatron.core.pipeline_parallel.schedules import (
@@ -216,7 +216,7 @@ def forward_step_impl(data_iterator, model, batch=None):
     is_vit_last_stage = False
     if model.module.module.add_image_encoder:
         is_vit_last_stage = model.module.module.image_encoder.post_process
-    
+
     if batch is None:
         output_tensor = model(**get_batch(data_iterator, is_vit_last_stage))
     elif parallel_state.is_pipeline_first_stage(ignore_virtual=True):
@@ -570,7 +570,7 @@ def get_all_batchs(mbn, data_iterator, model, config, vit_hidden_size):
         """
         len_item = item.size(0)
         device = item.device
-        
+
         # gen all index
         indices = torch.arange(len_item, device=device)
         part_indices = indices % get_vdp_size()
@@ -592,7 +592,7 @@ def get_all_batchs(mbn, data_iterator, model, config, vit_hidden_size):
                         if not is_vtp_stage_rank0():
                             continue
                         torch.distributed.broadcast(split_item_list[i], parallel_state.get_pipeline_model_parallel_first_rank(), group=group)
-                        
+
                 elif is_vtp_stage_rank0():
                     # In VTP scenario, the item received by cloud side is already split
                     torch.distributed.broadcast(item, parallel_state.get_pipeline_model_parallel_first_rank(), group=parallel_state.get_pipeline_model_parallel_group())
@@ -605,7 +605,7 @@ def get_all_batchs(mbn, data_iterator, model, config, vit_hidden_size):
                         my_stage = get_vtp_my_stage_idx()
                         tp_group = parallel_state.get_tensor_model_parallel_group()
                         torch.distributed.broadcast(item, stage_ranks[my_stage][0], group=tp_group)
-                        
+
             elif is_vdp_enabled():
                 if isinstance(parallel_state.get_pipeline_model_parallel_group(), list):
                     split_item_list = _split_item(item)
@@ -629,7 +629,7 @@ def get_all_batchs(mbn, data_iterator, model, config, vit_hidden_size):
             else:
                 torch.distributed.broadcast(item, parallel_state.get_pipeline_model_parallel_first_rank(),
                     group=parallel_state.get_pipeline_model_parallel_group())
-    
+
     def get_batch_infos(attention_infos, thws, shapes, i_forward):
         seq_len, mbs = shapes[i_forward][0][0], shapes[i_forward][0][1]
         attention_mask = torch.ones(mbs, seq_len, device=device, dtype=data_type)
@@ -647,14 +647,14 @@ def get_all_batchs(mbn, data_iterator, model, config, vit_hidden_size):
 
         image_grid_thw = torch.tensor(thws[i_forward], device=device, dtype=data_type)
         return attention_mask, image_grid_thw
-    
+
     is_vit_last_stage = False
     if model.module.module.add_image_encoder:
         is_vit_last_stage = model.module.module.image_encoder.post_process
 
     if parallel_state.is_pipeline_first_stage(ignore_virtual=True):
         mbn = mbn * get_vdp_size()
-    
+
     tensor_shapes = torch.empty(
         mbn,
         5 + 5 * config.micro_batch_size,
@@ -725,7 +725,7 @@ def get_all_batchs(mbn, data_iterator, model, config, vit_hidden_size):
             all_batchs[0].append(batch)
             all_batchs[1].append(batch)
             all_batchs[2].append(batch)
-    
+
     return all_batchs, recv_tensor_shapes, vit_recv_tensor_shapes
 
 
@@ -746,7 +746,7 @@ def forward_backward_pipelining_without_interleaving(
     Run non-interleaved 1F1B schedule, with communication between pipeline
     stages. Returns dictionary with losses if the last stage, empty dict otherwise.
     """
-    
+
     if not isinstance(model, list):
         raise TypeError("cloud-edge pipeline parallelism expected model chunking")
     if not all(isinstance(chunk, torch.nn.Module) for chunk in model):
@@ -998,7 +998,7 @@ def forward_backward_pipelining_without_interleaving(
                     if kwargs.get("wait_on_reqs", True):
                         return [None]
                     return [None], []
-                
+
                 wait_on_reqs = kwargs.get("wait_on_reqs", True)
 
                 # VTP async path: irecv (non-blocking) + deferred broadcast
@@ -1008,7 +1008,7 @@ def forward_backward_pipelining_without_interleaving(
                     if wait_on_reqs:
                         # Synchronous: recv + broadcast, then sync
                         input_tensor = _vtp_recv_forward_wrapper(
-                            recv_tensor_shapes, config, 
+                            recv_tensor_shapes, config,
                             async_op=False, is_end_stage=is_end_stage, **kwargs
                         )
                         for input_tensor_i in input_tensor:
@@ -1020,13 +1020,13 @@ def forward_backward_pipelining_without_interleaving(
                     else:
                         # Async: irecv returns immediately, broadcast deferred to wait_helper
                         input_tensor, reqs_list = _vtp_recv_forward_wrapper(
-                            recv_tensor_shapes, config, 
+                            recv_tensor_shapes, config,
                             async_op=True, is_end_stage=is_end_stage, **kwargs
                         )
                         for input_tensor_i in input_tensor:
                             if input_tensor_i is not None:
                                 input_tensor_i.record_stream(default_stream)
-                        
+
                         return input_tensor, reqs_list
                 else:
                     # VTP async path: irecv (non-blocking) + deferred broadcast
@@ -1060,7 +1060,7 @@ def forward_backward_pipelining_without_interleaving(
                 for input_tensor_i in input_tensor:
                     if input_tensor_i is not None:
                         input_tensor_i.record_stream(default_stream)
-                        
+
         if "wait_on_reqs" in kwargs.keys():
             if kwargs["wait_on_reqs"] is True:
                 default_stream.wait_stream(receive_forward_stream)
@@ -1125,7 +1125,7 @@ def forward_backward_pipelining_without_interleaving(
                 if is_vdp_enabled():
                     if wait_on_reqs:
                         output_tensor_grad = _vtp_recv_backward_wrapper(
-                            recv_tensor_shapes, config, 
+                            recv_tensor_shapes, config,
                             async_op=False, is_end_stage=is_end_stage, **kwargs
                         )
                         for output_tensor_grad_i in output_tensor_grad:
@@ -1135,7 +1135,7 @@ def forward_backward_pipelining_without_interleaving(
                         return output_tensor_grad, []
                     else:
                         output_tensor_grad, reqs_list = _vtp_recv_backward_wrapper(
-                            recv_tensor_shapes, config, 
+                            recv_tensor_shapes, config,
                             async_op=True, is_end_stage=is_end_stage, **kwargs
                         )
                         for output_tensor_grad_i in output_tensor_grad:
@@ -1169,13 +1169,13 @@ def forward_backward_pipelining_without_interleaving(
                 for output_tensor_grad_i in output_tensor_grad:
                     if output_tensor_grad_i is not None:
                         output_tensor_grad_i.record_stream(default_stream)
-        
+
         if wait_on_reqs:
             default_stream.wait_stream(receive_backward_stream)
             return output_tensor_grad, []
 
         return output_tensor_grad, reqs_list
-    
+
     # 读取vit的隐藏层维度
     if hasattr(model[0], 'module'):
         float16_wrapper = model[0].module
@@ -1186,7 +1186,7 @@ def forward_backward_pipelining_without_interleaving(
         ldt_vlm_model = float16_wrapper.module
     else:
         ldt_vlm_model = float16_wrapper
-    
+
     vit_hidden_size = 0
     if hasattr(ldt_vlm_model, 'image_encoder'):
         try:
@@ -1205,7 +1205,7 @@ def forward_backward_pipelining_without_interleaving(
     pp_group = get_pipeline_model_parallel_group()
     if not isinstance(pp_group, list):
         pp_group = [pp_group]
-    
+
     # virtual dp scenario, get next_rank and prev_rank
     next_rank = get_pipeline_model_parallel_next_rank()
     if not isinstance(next_rank, list):
@@ -1218,7 +1218,7 @@ def forward_backward_pipelining_without_interleaving(
     num_forward_end_backward_start = int(
         (4 * parallel_state.get_pipeline_model_parallel_world_size() + 1) / 6 + .00001
     )
-    
+
     input_tensor_tmp = None
     vit_input_tensor_tmp = None
     vdp_input_tensor_tmp = None
@@ -1262,8 +1262,8 @@ def forward_backward_pipelining_without_interleaving(
                 if not parallel_state.is_pipeline_first_stage(ignore_virtual=True):
                     recv_tensor_shapes = vit_recv_fwd_tensor_shapes.pop(0)
                 input_tensor = recv_forward_with_stream(
-                    recv_tensor_shapes, 
-                    config, 
+                    recv_tensor_shapes,
+                    config,
                     group=rfg,
                     next_rank=nr,
                     prev_rank=pr,
@@ -1275,7 +1275,7 @@ def forward_backward_pipelining_without_interleaving(
             # 传算掩盖：对上一轮recv vit fwd进行wait
             reqs_list = reqs_queue.pop(0)
             wait_helper(reqs_list)
-            
+
             # 传算掩盖：提前recv下一轮vit fwd
             if i_group == 0 and not last_iteration:
                 for future_rfg, future_nr, future_pr in zip(receive_forward_group, next_rank, prev_rank):
@@ -1295,7 +1295,7 @@ def forward_backward_pipelining_without_interleaving(
                         )
                         input_tensor_queue.append(input_tensor_tmp)
                         reqs_queue.append(reqs_list)
-            
+
             # 传算掩盖：最后一轮提前接收warmup阶段的第一轮llm fwd
             set_vpp_rank(1)
             if i_group == 0 and last_iteration and num_warmup_microbatches > 0:
@@ -1339,12 +1339,12 @@ def forward_backward_pipelining_without_interleaving(
             )
             vit_fwd_num -= 1
             total_num_tokens += num_tokens
-            
+
             # vit send fwd
             send_forward_with_stream(
-                output_tensor, 
-                send_tensor_shapes, 
-                config, 
+                output_tensor,
+                send_tensor_shapes,
+                config,
                 group=sfg,
                 next_rank=nr,
                 prev_rank=pr,
@@ -1377,8 +1377,8 @@ def forward_backward_pipelining_without_interleaving(
 
             # 传算掩盖：第num_forward_end_backward_start轮llm fwd之后需要跟一个vit fwd，这里在llm fwd之前提前接收vit fwd
             if (
-                i_group == 0 
-                and i >= num_forward_end_backward_start - 1 
+                i_group == 0
+                and i >= num_forward_end_backward_start - 1
                 and vit_fwd_num > 0
             ):
                 set_vpp_rank(0)
@@ -1391,7 +1391,7 @@ def forward_backward_pipelining_without_interleaving(
                         recv_tensor_shapes = vit_recv_fwd_tensor_shapes.pop(0)
                         vit_input_tensor_tmp, vit_reqs_list = recv_forward_with_stream(
                             recv_tensor_shapes,
-                            config, 
+                            config,
                             group=future_rfg,
                             next_rank=future_nr,
                             prev_rank=future_pr,
@@ -1403,7 +1403,7 @@ def forward_backward_pipelining_without_interleaving(
 
             # 传算掩盖：提前接收下一轮llm fwd (如果不是首PP，最后一轮还需要提前接收2f2b阶段的第一轮llm fwd)
             if (
-                i_group == 0 
+                i_group == 0
                 and llm_fwd_num > 1
                 and (not last_iteration or (last_iteration and not parallel_state.is_pipeline_first_stage(ignore_virtual=True)))
             ):
@@ -1413,22 +1413,22 @@ def forward_backward_pipelining_without_interleaving(
                     else:
                         recv_tensor_shapes = recv_forward_tensor_shapes.pop(0)
                     input_tensor_tmp, reqs_list = recv_forward_with_stream(
-                        recv_tensor_shapes, 
-                        config, 
+                        recv_tensor_shapes,
+                        config,
                         group=future_rfg,
                         next_rank=future_nr,
                         prev_rank=future_pr,
-                        is_end_stage=True, 
+                        is_end_stage=True,
                         wait_on_reqs=False,
                     )
                     input_tensor_queue.append(input_tensor_tmp)
                     reqs_queue.append(reqs_list)
-        
+
             # 传算掩盖：首PP提前接收febs阶段的第一轮llm fwd (尾层)
             if (
-                i_group == 0 
-                and last_iteration 
-                and parallel_state.is_pipeline_first_stage(ignore_virtual=True) 
+                i_group == 0
+                and last_iteration
+                and parallel_state.is_pipeline_first_stage(ignore_virtual=True)
                 and num_forward_end_backward_start > 0
             ):
                 set_vpp_rank(2)
@@ -1470,9 +1470,9 @@ def forward_backward_pipelining_without_interleaving(
             total_num_tokens += num_tokens
             # llm send fwd
             send_forward_with_stream(
-                output_tensor, 
-                send_tensor_shapes, 
-                config, 
+                output_tensor,
+                send_tensor_shapes,
+                config,
                 group=sfg,
                 next_rank=nr,
                 prev_rank=pr,
@@ -1517,7 +1517,7 @@ def forward_backward_pipelining_without_interleaving(
                 send_forward_with_stream(
                     output_tensor,
                     send_tensor_shapes,
-                    config, 
+                    config,
                     group=sfg,
                     next_rank=nr,
                     prev_rank=pr,
@@ -1543,18 +1543,18 @@ def forward_backward_pipelining_without_interleaving(
                 # 传算掩盖：阻塞式接收llm fwd (尾层)
                 vdp_reqs_list = vdp_reqs_queue.pop(0)
                 wait_helper(vdp_reqs_list)
-            
+
                 # 传算掩盖：首PP提前接收下一轮llm fwd (尾层)
                 if i_group == 0 and not last_iteration:
                     for future_rfg, future_nr, future_pr in zip(receive_forward_group, next_rank, prev_rank):
                         recv_tensor_shapes = recv_forward_tensor_shapes.pop(0)
                         vdp_input_tensor_tmp, vdp_reqs_list = recv_forward_with_stream(
-                            recv_tensor_shapes, 
-                            config, 
+                            recv_tensor_shapes,
+                            config,
                             group=future_rfg,
                             next_rank=future_nr,
                             prev_rank=future_pr,
-                            is_end_stage=True, 
+                            is_end_stage=True,
                             wait_on_reqs=False,
                         )
                         vdp_input_tensor_queue.append(vdp_input_tensor_tmp)
@@ -1585,7 +1585,7 @@ def forward_backward_pipelining_without_interleaving(
 
                 if not forward_only:
                     output_tensor_grad_end = [None] * len(recv_tensor_shapes)
-                    
+
                     deallocate_output_tensor(output_tensor_end[0], config.deallocate_pipeline_outputs)
                     # llm bwd (尾层)
                     input_tensor_grad_end = backward_step(
@@ -1596,9 +1596,9 @@ def forward_backward_pipelining_without_interleaving(
                         input_tensor_end = None
                     # send llm bwd (尾层)
                     send_backward_with_stream(
-                        input_tensor_grad_end, 
-                        send_tensor_shapes, 
-                        config, 
+                        input_tensor_grad_end,
+                        send_tensor_shapes,
+                        config,
                         group=sbg,
                         next_rank=nr,
                         prev_rank=pr,
@@ -1620,9 +1620,9 @@ def forward_backward_pipelining_without_interleaving(
                 for rfg, nr, pr in zip(receive_forward_group, next_rank, prev_rank):
                     recv_tensor_shapes = vit_recv_fwd_tensor_shapes.pop(0)
                     input_tensor_tmp = recv_forward_with_stream(
-                        recv_tensor_shapes, 
-                        config, 
-                        group=rfg, 
+                        recv_tensor_shapes,
+                        config,
+                        group=rfg,
                         next_rank=nr,
                         prev_rank=pr,
                         is_end_stage=True
@@ -1657,17 +1657,17 @@ def forward_backward_pipelining_without_interleaving(
                 for rfg, nr, pr in zip(receive_forward_group, next_rank, prev_rank):
                     recv_tensor_shapes = recv_forward_tensor_shapes.pop(0)
                     vdp_input_tensor_tmp, vdp_reqs_list = recv_forward_with_stream(
-                        recv_tensor_shapes, 
+                        recv_tensor_shapes,
                         config,
                         group=rfg,
                         next_rank=nr,
                         prev_rank=pr,
-                        is_end_stage=True, 
+                        is_end_stage=True,
                         wait_on_reqs=False
                     )
                     vdp_input_tensor_queue.append(vdp_input_tensor_tmp)
                     vdp_reqs_queue.append(vdp_reqs_list)
-        
+
         # llm fwd
         if llm_fwd_num > 0:
             set_vpp_rank(1)
@@ -1728,32 +1728,32 @@ def forward_backward_pipelining_without_interleaving(
                 for future_rbg, future_nr, future_pr in zip(receive_backward_group, next_rank, prev_rank):
                     recv_tensor_shapes = recv_backward_tensor_shapes.pop(0)
                     output_tensor_grad_tmp, reqs_list = recv_backward_with_stream(
-                        recv_tensor_shapes, 
-                        config, 
-                        group=future_rbg, 
+                        recv_tensor_shapes,
+                        config,
+                        group=future_rbg,
                         next_rank=future_nr,
                         prev_rank=future_pr,
                         wait_on_reqs=False,
                     )
                     output_tensor_grad_queue.append(output_tensor_grad_tmp)
                     reqs_queue.append(reqs_list)
-        
+
             # 传算掩盖：提前接收vit bwd
             if i_group == 0 and vit_bwd_num > 0 and i >= num_forward_end_backward_start and not forward_only:
                 set_vpp_rank(0)
                 for future_rbg, future_nr, future_pr in zip(receive_backward_group, next_rank, prev_rank):
                     recv_tensor_shapes = vit_recv_bwd_tensor_shapes.pop(0)
                     vit_output_tensor_grad_tmp, vit_reqs_list = recv_backward_with_stream(
-                        recv_tensor_shapes, 
-                        config, 
-                        group=future_rbg, 
+                        recv_tensor_shapes,
+                        config,
+                        group=future_rbg,
                         next_rank=future_nr,
                         prev_rank=future_pr,
                         wait_on_reqs=False
                     )
                     vit_output_tensor_grad_queue.append(vit_output_tensor_grad_tmp)
                     vit_reqs_queue.append(vit_reqs_list)
-        
+
             # vit fwd
             vit_output_tensor = None
             if vit_fwd_num > 0 and i + num_warmup_microbatches >= num_forward_end_backward_start - 1:
@@ -1786,9 +1786,9 @@ def forward_backward_pipelining_without_interleaving(
                 # vit send fwd
                 if parallel_state.get_pipeline_model_parallel_world_size() > 2 or not parallel_state.is_pipeline_last_stage(ignore_virtual=True):
                     send_forward_with_stream(
-                        vit_output_tensor, 
-                        send_tensor_shapes, 
-                        config, 
+                        vit_output_tensor,
+                        send_tensor_shapes,
+                        config,
                         group=sfg,
                         next_rank=nr,
                         prev_rank=pr,
@@ -1797,7 +1797,7 @@ def forward_backward_pipelining_without_interleaving(
                         vit_input_tensors.append(input_tensor)
                         vit_output_tensors.append(vit_output_tensor)
                         deallocate_output_tensor(vit_output_tensor[0], config.deallocate_pipeline_outputs)
-        
+
         # llm 1f1b (尾层)
         if parallel_state.is_pipeline_first_stage(ignore_virtual=True) and last_stage_febs_num > 0:
             for sbg, nr, pr in zip(send_backward_group, next_rank, prev_rank):
@@ -1842,22 +1842,22 @@ def forward_backward_pipelining_without_interleaving(
 
                     # llm send bwd (尾层)
                     send_backward_with_stream(
-                        input_tensor_grad_end, 
-                        send_tensor_shapes, 
-                        config, 
+                        input_tensor_grad_end,
+                        send_tensor_shapes,
+                        config,
                         group=sbg,
                         next_rank=nr,
                         prev_rank=pr,
                         is_end_stage=True,
                     )
-        
+
         for i_group, sbg, nr, pr in zip(group_iter, send_backward_group, next_rank, prev_rank):
             # 传算掩盖：阻塞式接收llm bwd
             if llm_bwd_num > 0:
                 set_vpp_rank(1)
                 reqs_list = reqs_queue.pop(0)
                 wait_helper(reqs_list)
-        
+
             # 传算掩盖：提前接收llm fwd
             if i_group == 0 and not last_iteration and llm_fwd_num > 0:
                 set_vpp_rank(1)
@@ -1867,12 +1867,12 @@ def forward_backward_pipelining_without_interleaving(
                     else:
                         recv_tensor_shapes = recv_forward_tensor_shapes.pop(0)
                     input_tensor_tmp, reqs_list = recv_forward_with_stream(
-                        recv_tensor_shapes, 
-                        config, 
-                        group=future_rfg, 
+                        recv_tensor_shapes,
+                        config,
+                        group=future_rfg,
                         next_rank=future_nr,
                         prev_rank=future_pr,
-                        is_end_stage=True, 
+                        is_end_stage=True,
                         wait_on_reqs=False,
                     )
                     input_tensor_queue.append(input_tensor_tmp)
@@ -1893,10 +1893,10 @@ def forward_backward_pipelining_without_interleaving(
 
                 # send llm bwd
                 send_backward_with_stream(
-                    input_tensor_grad, 
-                    send_tensor_shapes, 
-                    config, 
-                    group=sbg, 
+                    input_tensor_grad,
+                    send_tensor_shapes,
+                    config,
+                    group=sbg,
                     next_rank=nr,
                     prev_rank=pr,
                     is_end_stage=True,
@@ -1923,14 +1923,14 @@ def forward_backward_pipelining_without_interleaving(
                             vit_input_tensor_tmp, vit_reqs_list = recv_forward_with_stream(
                                 recv_tensor_shapes,
                                 config,
-                                group=future_rfg, 
+                                group=future_rfg,
                                 next_rank=future_nr,
                                 prev_rank=future_pr,
                                 wait_on_reqs=False,
                             )
                             vit_input_tensor_queue.append(vit_input_tensor_tmp)
                             vit_reqs_queue.append(vit_reqs_list)
-                            
+
 
                 # 传算掩盖：首PP提前接收llm fwd (尾层)
                 if parallel_state.is_pipeline_first_stage(ignore_virtual=True) and last_stage_febs_num > 0:
@@ -1955,9 +1955,9 @@ def forward_backward_pipelining_without_interleaving(
                 for future_rbg, future_nr, future_pr in zip(receive_backward_group, next_rank, prev_rank):
                     recv_tensor_shapes = vit_recv_bwd_tensor_shapes.pop(0)
                     vit_output_tensor_grad_tmp, vit_reqs_list = recv_backward_with_stream(
-                        recv_tensor_shapes, 
-                        config, 
-                        group=future_rbg, 
+                        recv_tensor_shapes,
+                        config,
+                        group=future_rbg,
                         next_rank=future_nr,
                         prev_rank=future_pr,
                         wait_on_reqs=False,
@@ -1975,7 +1975,7 @@ def forward_backward_pipelining_without_interleaving(
 
                 input_tensor = vit_input_tensors.pop(0)
                 output_tensor = vit_output_tensors.pop(0)
-                
+
                 # vit bwd
                 output_tensor_grad = vit_output_tensor_grad_queue.pop(0)
                 input_tensor_grad = backward_step(
@@ -1985,9 +1985,9 @@ def forward_backward_pipelining_without_interleaving(
 
                 # vit send bwd
                 send_backward_with_stream(
-                    input_tensor_grad, 
-                    send_tensor_shapes, 
-                    config, 
+                    input_tensor_grad,
+                    send_tensor_shapes,
+                    config,
                     group=sbg,
                     next_rank=nr,
                     prev_rank=pr,
@@ -1995,8 +1995,8 @@ def forward_backward_pipelining_without_interleaving(
 
         # vit send fwd (pp==2 && is_last_stage)
         if (
-            vit_output_tensor is not None 
-            and parallel_state.get_pipeline_model_parallel_world_size() == 2 
+            vit_output_tensor is not None
+            and parallel_state.get_pipeline_model_parallel_world_size() == 2
             and parallel_state.is_pipeline_last_stage(ignore_virtual=True)
         ):
             set_vpp_rank(0)
@@ -2024,19 +2024,19 @@ def forward_backward_pipelining_without_interleaving(
             if last_iteration:
                 if config.grad_sync_func is None or rank == 0:
                     enable_grad_sync()
-            
+
             for i_group, sbg, nr, pr in zip(group_iter, send_backward_group, next_rank, prev_rank):
                 # 传算掩盖：阻塞式接收vit bwd
                 vit_reqs_list = vit_reqs_queue.pop(0)
                 wait_helper(vit_reqs_list)
-                
+
                 # 传算掩盖：提前接收下一轮vit bwd
                 if i_group == 0 and not last_iteration:
                     for future_rbg, future_nr, future_pr in zip(receive_backward_group, next_rank, prev_rank):
                         recv_tensor_shapes = vit_recv_bwd_tensor_shapes.pop(0)
                         vit_output_tensor_grad_tmp, vit_reqs_list = recv_backward_with_stream(
-                            recv_tensor_shapes, 
-                            config, 
+                            recv_tensor_shapes,
+                            config,
                             group=future_rbg,
                             next_rank=future_nr,
                             prev_rank=future_pr,
@@ -2044,7 +2044,7 @@ def forward_backward_pipelining_without_interleaving(
                         )
                         vit_output_tensor_grad_queue.append(vit_output_tensor_grad_tmp)
                         vit_reqs_queue.append(vit_reqs_list)
-                
+
                 input_tensor = vit_input_tensors.pop(0)
                 output_tensor = vit_output_tensors.pop(0)
 
@@ -2057,9 +2057,9 @@ def forward_backward_pipelining_without_interleaving(
 
                 # send vit bwd
                 send_backward_with_stream(
-                    input_tensor_grad, 
-                    send_tensor_shapes, 
-                    config, 
+                    input_tensor_grad,
+                    send_tensor_shapes,
+                    config,
                     group=sbg,
                     next_rank=nr,
                     prev_rank=pr,

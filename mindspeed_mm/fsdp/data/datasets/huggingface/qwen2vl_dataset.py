@@ -75,7 +75,7 @@ class AsyncPreprocessIterableDataset(IterableDataset):
 
         num_items = len(next(iter(processed.values())))
         return [{k: v[i] for k, v in processed.items()} for i in range(num_items)]
-    
+
     def __iter__(self):
         queue_size = max(self.buffer_size, self.num_workers)
         task_queue = queue.Queue(maxsize=queue_size)

@@ -296,7 +296,7 @@ class LTX2PrecomputedDataset(Dataset):
 
     def _prepare_training_inputs(self, batch: dict[str, Any]) -> dict[str, torch.Tensor]:
         """Prepare stochastic model inputs in upstream ltx-trainer style at train step time.
-        
+
         Expects batch to already have been processed by _prepare_base_inputs (i.e., contains
         'video_latent_clean', 'video_positions', 'context', 'context_mask', etc.).
         """
@@ -399,7 +399,7 @@ class LTX2PrecomputedDataset(Dataset):
             return values
 
         raw_batch = _collate_values(features, "")
-        
+
         # Two-stage preparation to mirror upstream ltx-trainer:
         # - Upstream `PrecomputedDataset` yields raw {"latents","conditions"}.
         # - Upstream `TextToVideoStrategy.prepare_training_inputs(...)` then patchifies latents, samples sigmas,
@@ -416,7 +416,7 @@ class LTX2PrecomputedDataset(Dataset):
             return torch.load(path, map_location="cpu", weights_only=True)
         except Exception:
             return torch.load(path, map_location="cpu")
-        
+
     @staticmethod
     def _normalize_video_latents(latent_data: dict[str, Any]) -> dict[str, Any]:
         data = dict(latent_data)

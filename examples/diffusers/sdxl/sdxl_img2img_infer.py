@@ -24,7 +24,7 @@ controlnet = ControlNetModel.from_pretrained(
          "diffusers/controlnet-depth-sdxl-1.0-small",
          variant="fp16",
          use_safetensors=True,
-         torch_dtype=torch.float16, 
+         torch_dtype=torch.float16,
          local_files_only=True,
 ).to("npu")
 vae = AutoencoderKL.from_pretrained(VAE_NAME, torch_dtype=torch.float16, local_files_only=True).to("npu")
@@ -34,7 +34,7 @@ pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
          vae=vae,
          variant="fp16",
          use_safetensors=True,
-         torch_dtype=torch.float16, 
+         torch_dtype=torch.float16,
          local_files_only=True,
 ).to("npu")
 pipe.enable_model_cpu_offload()
@@ -66,7 +66,7 @@ controlnet_conditioning_scale = 0.5  # recommended for good generalization
 depth_image = get_depth_map(pre_image)
 
 seed_list = [8, 23, 42, 1334]
-for i in seed_list:  
+for i in seed_list:
     generator = torch.Generator(device="cpu").manual_seed(i)
     images = pipe(
         prompt,
@@ -81,4 +81,3 @@ for i in seed_list:
 
 time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 print("end time: " + time)
-

@@ -129,7 +129,7 @@ class TorchFullyShardedDataParallel(_BaseDataParallel):
         **kwargs
     ):
         super().__init__(config=config, module=module)
-        
+
         if process_group is None:
             self.process_group = parallel_state.get_data_parallel_group(with_context_parallel=True)
         else:
@@ -153,7 +153,7 @@ class TorchFullyShardedDataParallel(_BaseDataParallel):
                 attrs = vars(param)
                 custom_attrs[name] = {k: v for k, v in attrs.items()}
             return custom_attrs
-        
+
         def restore_custom_attrs(module, custom_attrs):
             for name, param in module.named_parameters():
                 if name in custom_attrs:
@@ -184,7 +184,7 @@ class TorchFullyShardedDataParallel(_BaseDataParallel):
                         "tf32": torch.float,
                         "bf16": torch.bfloat16,
                         "fp16": torch.float16,
-                    }[fsdp_config.param_dtype], 
+                    }[fsdp_config.param_dtype],
                     reduce_dtype={
                         "fp32": torch.float,
                         "tf32": torch.float,
@@ -254,7 +254,7 @@ def fsdp1_get_model(model_provider_func, model_type=ModelType.encoder_or_decoder
             mpu.get_pipeline_model_parallel_rank(),
             sum([sum([p.nelement() for p in model_module.parameters()])
                  for model_module in model])), flush=True)
-    
+
      # Fp16 conversion.
     if args.fp16 or args.bf16:
         config = get_model_config(model[0])
@@ -280,11 +280,11 @@ def fsdp1_get_model(model_provider_func, model_type=ModelType.encoder_or_decoder
             fsdp_config=fsdp_config,
         )
         for (model_chunk_idx, model_chunk) in enumerate(model)]
-        
+
         torch.cuda.empty_cache()
         # Broadcast params from data parallel src rank to other data parallel ranks.
         if args.data_parallel_random_init:
             for model_module in model:
                 model_module.broadcast_params()
-    
+
     return model

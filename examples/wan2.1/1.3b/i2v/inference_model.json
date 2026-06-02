@@ -10,7 +10,7 @@
     "fps": 16,
     "pipeline_config": {
         "input_size": [81, 480, 832]
-    },    
+    },
     "ae": {
         "model_id": "wan_video_vae",
         "from_pretrained": "./weights/Wan-AI/Wan2.1-I2V-1.3B-Diffusers/vae/",

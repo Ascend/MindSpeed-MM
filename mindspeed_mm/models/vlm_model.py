@@ -635,15 +635,15 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         # MM_GRPO use, if vit_only is True, only calculate vit_embeds and return
         if kwargs.get('vit_only', False) and self.image_encoder.post_process:
             return {"vit_embeds": vit_embeds}
-        
+
         audio_embeds = None
         if self.add_audio_encoder and 'input_features' in kwargs and not hetero_pp:
             audio_embeds = self.audio_encoder(kwargs['input_features'], kwargs['feature_attention_mask'])
-        
+
         # hetero pipeline use
         if hasattr(mpu, "_IS_HETERO_PP_MOUDLE") and not mpu._IS_HETERO_PP_MOUDLE:
             change_parallel_state('image_encoder')
-            return [vit_embeds, audio_embeds] 
+            return [vit_embeds, audio_embeds]
 
         if self.add_text_decoder:
             if self.text_decoder.pre_process:
@@ -651,7 +651,7 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                 if kwargs.get('vit_embedings') is not None or kwargs.get('audio_embedings') is not None:
                     vit_embeds = kwargs.get('vit_embedings')
                     audio_embeds = kwargs.get('audio_embedings')
-                input_embeds, deepstack_visual_embeds = self.process_multimodal_embeddings(input_embeds, input_ids, 
+                input_embeds, deepstack_visual_embeds = self.process_multimodal_embeddings(input_embeds, input_ids,
                                                                                            vit_embeds, audio_embeds,
                                                                                            **kwargs)
             else:

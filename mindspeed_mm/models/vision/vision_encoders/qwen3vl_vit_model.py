@@ -117,7 +117,7 @@ class Qwen3VLViT(MultiModalModule):
         self.spatial_merge_size = config.spatial_merge_size
         self.pre_process = pre_process
         self.post_process = post_process
-        
+
         if self.pre_process:
             self.pos_embed = nn.Embedding(config.max_position_embeddings, config.hidden_size)
             self.num_grid_per_side = int(config.max_position_embeddings**0.5)

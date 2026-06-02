@@ -23,7 +23,7 @@ class OpenSoraConverter(SoraModelConverter):
         "vector_in.out_layer.bias": "vector_in.fc2.bias",
         "vector_in.out_layer.weight": "vector_in.fc2.weight",
     }
-    
+
     def __init__(self) -> None:
         super().__init__()
         double_stream_layers = 19

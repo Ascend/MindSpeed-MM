@@ -619,7 +619,7 @@ class HunyuanImage3Text2ImagePipeline(DiffusionPipeline):
             latent_scale_factor = (1,) * len(image_size)
         elif isinstance(self.latent_scale_factor, int):
             latent_scale_factor = (self.latent_scale_factor,) * len(image_size)
-        elif isinstance(self.latent_scale_factor, tuple) or isinstance(self.latent_scale_factor, list):      
+        elif isinstance(self.latent_scale_factor, tuple) or isinstance(self.latent_scale_factor, list):
             if len(self.latent_scale_factor) == len(image_size):
                 raise ValueError("len(latent_scale_factor) should be the same as len(image_size)")
             latent_scale_factor = self.latent_scale_factor

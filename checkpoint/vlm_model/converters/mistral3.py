@@ -110,7 +110,7 @@ class Mistral3Converter(DcpConverter):
         """
         Merges torch-dcp shards and converts them back into standard Hugging Face format.
 
-        This is typically used after training or inference in torch-dcp format to export 
+        This is typically used after training or inference in torch-dcp format to export
         a model that can be easily loaded with Hugging Face Transformers.
         """
         config = AutoConfig.from_pretrained(model_assets_dir)

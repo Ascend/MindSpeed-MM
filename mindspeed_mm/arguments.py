@@ -330,7 +330,7 @@ def _add_muon_optim_arguments(parser):
                 'Higher values give more weight to previous updates. '
                 'Range: 0.0-1.0. Default: 0.95'
     )
-    
+
     group.add_argument(
         '--ns-steps',
         type=int,

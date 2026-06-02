@@ -162,7 +162,7 @@ class LTX2ForTraining(torch.nn.Module, BaseModel):
     ) -> LTX2ModelOutput:
         audio_context = None
         audio_context_mask = None
-        
+
         if self.text_encoder is not None:
             if context_mask is None:
                 raise ValueError("`context_mask` is required when text connector is enabled.")
@@ -223,4 +223,3 @@ class LTX2ForTraining(torch.nn.Module, BaseModel):
         mask_f = mask.unsqueeze(-1).float()
         loss = diff.mul(mask_f).div(mask_f.mean())
         return loss.mean()
-

@@ -18,9 +18,9 @@
             "DownEncoderBlockCausal3D"
         ],
         "up_block_types": [
-            "UpDecoderBlockCausal3D", 
             "UpDecoderBlockCausal3D",
-            "UpDecoderBlockCausal3D", 
+            "UpDecoderBlockCausal3D",
+            "UpDecoderBlockCausal3D",
             "UpDecoderBlockCausal3D"
         ],
         "scaling_factor": 0.476986,
@@ -55,7 +55,7 @@
             "model_id": "HunyuanMLLmModel",
             "dtype": "bf16",
             "from_pretrained": "llava-llama-3-8b-v1_1-transformers",
-            "model_type": "LlavaForConditionalGeneration", 
+            "model_type": "LlavaForConditionalGeneration",
             "hub_backend": "hf",
             "use_attention_mask": true,
             "hidden_state_skip_layer": 2,

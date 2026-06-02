@@ -50,7 +50,7 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
     def generate_params_checks(frames, height, width):
         if height % 16 != 0 or width % 16 != 0 or (frames - 1) % 4 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 16 but are {height} and {width}.")
-        
+
     def enable_model_cpu_offload(self, npu_id: Optional[int] = 0, device: Union[torch.device, str] = "npu"):
         torch_device = torch.device(device)
 
@@ -67,7 +67,7 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         for cpu_offload_model in model_sequence:
             cpu_offload_model.cpu()
             _, hook = cpu_offload_with_hook(cpu_offload_model, device, prev_module_hook=hook)
-    
+
     def prepare_extra_func_kwargs(self, func, kwargs):
         extra_step_kwargs = {}
 
@@ -76,7 +76,7 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             if accepts:
                 extra_step_kwargs[k] = v
         return extra_step_kwargs
-    
+
     @torch.no_grad()
     def __call__(
         self,
@@ -98,13 +98,13 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         The call function to the pipeline for generation
 
         Inputs:
-            prompt (`str` or `List[str]`): 
+            prompt (`str` or `List[str]`):
                 The prompt or prompts to guide video/image generation.
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts to guide what to not include in video/image generation.
                 Ignored when not using guidance (`guidance_scale < 1`)
         Returns:
-            video (`torch.Tensor` or `List[torch.Tensor]`) 
+            video (`torch.Tensor` or `List[torch.Tensor]`)
         """
 
         # 1. Check inputs
@@ -218,15 +218,15 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         video = self.decode_latents(latents.to(self.vae.dtype))
 
         return video
-    
+
     def mllm_encode(
-            self, 
+            self,
             prompt,
             device,
             tokenizer,
             text_encoder,
             do_classifier_free_guidance=False,
-            negative_prompt=None, 
+            negative_prompt=None,
             image=None
     ):
         text_inputs = tokenizer(
@@ -264,7 +264,7 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
         if do_classifier_free_guidance:
             if negative_prompt is None:
                 negative_prompt = [""] * len(prompt)
-            
+
             uncond_inputs = tokenizer(
                 negative_prompt,
                 padding="max_length",
@@ -281,7 +281,7 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
                 image_input_kwargs = {"pixel_values": uncond_image_embeds}
             else:
                 image_input_kwargs = {}
-            
+
             uncond_input_ids = uncond_inputs.input_ids.to(device)
             uncond_attention_mask = uncond_inputs.attention_mask.to(device)
             uncond_prompt_embeds = text_encoder(
@@ -289,15 +289,15 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
                 attention_mask=uncond_attention_mask,
                 **image_input_kwargs
             )
-        
+
         else:
             uncond_prompt_embeds = None
             uncond_attention_mask = None
 
         return prompt_embeds, attention_mask, uncond_prompt_embeds, uncond_attention_mask
-    
+
     def prepare_latents(
-            self, 
+            self,
             batch_size,
             num_channels_latents,
             height,
@@ -332,10 +332,10 @@ class HunyuanVideoPipeline(MMPipeline, InputsCheckMixin, MMEncoderMixin):
             t = torch.tensor([0.999]).to(device=device)
             latents = x0 * t + x1 * (1 - t)
             latents = latents.to(dtype=dtype)
-        
+
         if latents is None:
             latents = super().prepare_latents(shape, generator=generator, device=device, dtype=dtype)
         else:
             latents.to(device=device, dtype=dtype)
-        
+
         return latents

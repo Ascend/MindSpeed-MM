@@ -249,7 +249,7 @@ class MultiHeadLatentAttention(SelfAttention):
         def mla_attention(hidden_states):
             args = get_args()
             tp_size = parallel_state.get_tensor_model_parallel_world_size()
-        
+
             # For self attention we just duplicate the rotary_pos_emb if it isn't already
             nonlocal rotary_pos_emb
             if rotary_pos_emb is not None and not isinstance(rotary_pos_emb, tuple):
@@ -270,7 +270,7 @@ class MultiHeadLatentAttention(SelfAttention):
                 ],
                 dim=-1,
             )
-            
+
             if self.mla_up_proj_tp_overlap:
                 query, key, value = mla_up_projection_overlap_tp_comm(q_a, compressed_kv, k_pe, rotary_pos_emb,
                                                                       packed_seq_params, self)
@@ -417,7 +417,7 @@ class MultiHeadLatentAttention(SelfAttention):
                 core_attn_out = core_attn_out.reshape(q_len, bsz, self.num_attention_heads_per_partition * self.v_head_dim)
 
             return core_attn_out
-        
+
 
         if self.mla_zero_memory:
             self.mla_checkpoint_manager = CheckpointWithoutOutput()
@@ -465,14 +465,14 @@ def recompute_mla(mla_checkpoint_manager):
             change_seq_len = True
             old_actual_seq_len = get_actual_seq_len()
             set_actual_seq_len(actual_seq_len)
-        
+
         mla_checkpoint_manager.recompute(grad)
-        
+
         if change_pos_id:
             set_position_ids(old_position_id)
         if change_seq_len:
             set_actual_seq_len(old_actual_seq_len)
-        
+
     return hook_fn
 
 
@@ -485,8 +485,8 @@ class LinearNoTP(torch.nn.Linear):
         **kwargs,
     ):
         super().__init__(
-            input_size, 
-            output_size, 
+            input_size,
+            output_size,
             bias=kwargs.get('bias', True),
             dtype=config.params_dtype,
         )

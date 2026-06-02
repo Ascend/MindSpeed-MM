@@ -105,7 +105,7 @@ class MultiModalChatDataset(MMBaseDataset):
 
     def __len__(self):
         return len(self.data_samples)
-    
+
     def _init_image_video_processor(self):
         return get_multimodal_image_video_preprocessor(
             template_name=self.template_name,
@@ -122,7 +122,7 @@ class MultiModalChatDataset(MMBaseDataset):
             max_num_frame=self.max_num_frame,
             sampling_method=self.sampling_method
             )
-            
+
     @staticmethod
     def _init_return_dict():
         return {
@@ -132,13 +132,13 @@ class MultiModalChatDataset(MMBaseDataset):
             "labels": None,
             "attention_mask": None
         }
-    
+
     def _filter_return_dict_keys(self, ret):
         allowed_keys = list(self._init_return_dict().keys())
         keys_to_remove = [key for key in list(ret.keys()) if key not in allowed_keys]
         for key in keys_to_remove:
             ret.pop(key, None)
-    
+
     def get_path(self, data_path):
         return os.path.join(self.data_folder, data_path)
 
@@ -203,7 +203,7 @@ class MultiModalChatDataset(MMBaseDataset):
         image_end_token_id = self.tokenizer.convert_tokens_to_ids(MODEL_CONSTANTS[self.template_name]["IMG_END_TOKEN"])
         if (ret["input_ids"] == image_end_token_id).sum() != num_images:
             raise ValueError(f"image tokens are truncated, this dataset is {self.data_path}")
-        
+
         return ret
 
     def pure_text_get_item(self, data_item):
@@ -289,10 +289,10 @@ class DeepSeekVLDataset(MMBaseDataset):
 
     def __getitem__(self, index):
         return self.getitem(index)
-    
+
     def __len__(self):
         return len(self.data_samples)
-    
+
     def load_pil_images(self, conversations: List[Dict[str, str]]):
         """
 
@@ -325,7 +325,7 @@ class DeepSeekVLDataset(MMBaseDataset):
                     pil_images.append(pil_img)
 
         return pil_images
-    
+
     def multi_modal_get_item(self, data_item):
         conversation = data_item["conversations"]
         pil_images = self.load_pil_images(conversation)
@@ -347,7 +347,7 @@ class DeepSeekVLDataset(MMBaseDataset):
             "images_seq_mask": rets.images_seq_mask,
             "images_spatial_crop": rets.images_spatial_crop
         }
-    
+
     def getitem(self, index):
         index = index % len(self.data_samples)
         try_cnt, max_try = 0, 10
