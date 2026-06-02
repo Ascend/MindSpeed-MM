@@ -1381,8 +1381,14 @@ def apply_rotary_pos_emb_vision(
     orig_k_dtype = k.dtype
     q, k = q.float(), k.float()
     cos, sin = cos.unsqueeze(-2).float(), sin.unsqueeze(-2).float()
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
+    if IS_NPU_AVAILABLE:
+        import torch_npu
+        # NPU optimized: fused rotary mul instead of separate rotate_half + multiply
+        q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
+        k_embed = torch_npu.npu_rotary_mul(k, cos, sin)
+    else:
+        q_embed = (q * cos) + (rotate_half(q) * sin)
+        k_embed = (k * cos) + (rotate_half(k) * sin)
     q_embed = q_embed.to(orig_q_dtype)
     k_embed = k_embed.to(orig_k_dtype)
     return q_embed, k_embed
@@ -1417,16 +1423,16 @@ class Qwen3_5MoeVisionAttention(nn.Module):
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb_vision(query_states, key_states, cos, sin)
 
-        query_states = query_states.transpose(0, 1).unsqueeze(0)
-        key_states = key_states.transpose(0, 1).unsqueeze(0)
-        value_states = value_states.transpose(0, 1).unsqueeze(0)
-
         attention_interface: Callable = ALL_ATTENTION_FUNCTIONS.get_interface(
             self.config._attn_implementation, eager_attention_forward
         )
 
         # Modification: pass total_visual_seqlen
         if self.config._attn_implementation == "flash_attention_2":
+            query_states = query_states.unsqueeze(0)
+            key_states = key_states.unsqueeze(0)
+            value_states = value_states.unsqueeze(0)
+            
             # Flash Attention 2: Use cu_seqlens for variable length attention
             max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
             attn_output, _ = attention_interface(
@@ -1443,9 +1449,14 @@ class Qwen3_5MoeVisionAttention(nn.Module):
                 max_length_k=max_seqlen,
                 is_causal=False,
                 total_seq_len=get_seq_len("visual"),
+                input_layout="1TND",
                 **kwargs,
             )
         else:
+            query_states = query_states.transpose(0, 1).unsqueeze(0)
+            key_states = key_states.transpose(0, 1).unsqueeze(0)
+            value_states = value_states.transpose(0, 1).unsqueeze(0)
+            
             # Other implementations: Process each chunk separately
             lengths = cu_seqlens[1:] - cu_seqlens[:-1]
             splits = [
