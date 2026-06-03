@@ -1,6 +1,6 @@
 # 并行策略
 parallel:
-  fully_shard_parallel_size: auto
+  fully_shard_parallel_size: auto  # 16机时该参数实际值为256
   fsdp_plan:
     apply_modules: # 如果要开prefetch的话，请不要随意修改apply_modules的顺序
       - model.visual
@@ -14,10 +14,12 @@ parallel:
       - mtp
     hook_modules:
       - model.language_model.layers.{*}
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
     param_dtype: bf16
     reduce_dtype: fp32
   ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
-  expert_parallel_size: 32
+  expert_parallel_size: 16
   ep_plan:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
@@ -100,33 +102,33 @@ features:
   # 重计算配置
   recompute: true
   recompute_plan:
-      apply_modules:
-        - model.visual.blocks.{*}
-        - model.language_model.layers.{*}
+    apply_modules:
+      - model.visual.blocks.{*}
+      - model.language_model.layers.{*}
   # chunkloss配置
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
     chunk_size: 1024
   # activation offload 配置
-  enable_activation_offload: false
+  enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
      - model.visual.blocks.{*}
      - model.language_model.layers.{*}
   # chunkmbs配置
-  enable_chunk_mbs: false
+  enable_chunk_mbs: true
   chunkmbs_plan:
     apply_modules:
      - model.language_model.layers.{*}
-    chunk_mbs: 2 # 这个表示的是chunk之后的micro batchsize
+    chunk_mbs: 2  # 这个表示的是chunk之后的micro batchsize
     batch_dim: 0
     chunk_arg_indexs: [0]
     chunk_kwarg_names: ["position_embeddings", "position_ids", "rope_deltas", "attention_mask"]
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  micro_batch_size: 2
   gradient_accumulation_steps: 1
   seed: 42
   lr: 1.0e-5

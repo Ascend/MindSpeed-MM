@@ -134,7 +134,9 @@ def num_floating_image_encoder_point_operations(hf_cfg, seq_length=None):
     # attention flops
     qkv_proj_flops = 2 * seq_length * (hidden_size ** 2) * 3 * num_layers
     output_proj_flops = 2 * seq_length * (hidden_size ** 2) * num_layers
-    full_attention_flops = 2 * 2 * (seq_length ** 2) * hidden_size * num_layers
+    # Q @ KT：前向包含一次矩阵乘法, 反向包含两次矩阵乘法, 且在反向重计算中需额外进行一次前向计算
+    # score @ V：前向包含一次矩阵乘法, 反向包含两次矩阵乘法
+    full_attention_flops = 2 * (1 + 2 + 1 + 1 + 2) * (seq_length ** 2) * hidden_size * num_layers
     attention_flops = qkv_proj_flops + full_attention_flops + output_proj_flops
 
     # mlp flops
@@ -250,12 +252,15 @@ def _estimate_deepseek_v3_flops(text_cfg, tokens_sum, batch_seqlens):
     # Attention 计算含两次矩阵乘法: Q @ KT 及 score @ V
     # Q: [B, N, S, Dq] KT: [B, N, Dq, S]  矩阵乘法: [B, N, S, Dq] × [B, N, Dq, S] ⇒ [B, N, S, S], 即 2bns^2d_q (乘法 + 加法)
     # score: [B, N, S, S] V: [B, N, S, Dv]  矩阵乘法: [B, N, S, S] × [B, N, S, Dv] ⇒ [B, N, S, Dv], 即 2bns^2d_v (乘法 + 加法)
-    # 前向计算一次矩阵乘法, 反向计算两次矩阵乘法, 共计 3 次；采用了casual mask，计算量减半，因此除以2
+    # Q @ KT：前向包含一次矩阵乘法, 反向包含两次矩阵乘法, 且在反向重计算中需额外进行一次前向计算
+    # score @ V：前向包含一次矩阵乘法, 反向包含两次矩阵乘法
+    # 采用了casual mask，计算量减半，因此除以2
     seqlen_square_sum = 0
     # for 循环相当于遍历 batch_size
     for seqlen in batch_seqlens:
         seqlen_square_sum += seqlen * seqlen * num_hidden_layers
-    attn_qkv_flops = 6 * seqlen_square_sum * (q_head_dim + text_cfg.v_head_dim) * num_query_heads / 2
+    attn_qkv_flops = (2 * (1 + 2 + 1) * seqlen_square_sum * q_head_dim * num_query_heads + \
+        2 * (1 + 2) * seqlen_square_sum * text_cfg.v_head_dim * num_query_heads) / 2
     # -------------------------------------- 4.Attention --------------------------------------
 
     # -------------------------------------- Sum --------------------------------------
