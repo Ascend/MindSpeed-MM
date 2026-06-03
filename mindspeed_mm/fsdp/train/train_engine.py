@@ -329,7 +329,6 @@ class TrainEngine:
                     save_path=args.training.save,
                     iteration=iteration,
                 )
-            return
 
         # Default save behavior (full model)
         state = {

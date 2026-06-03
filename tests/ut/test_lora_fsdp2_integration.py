@@ -32,6 +32,9 @@ import torch.nn as nn
 
 from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
 from mindspeed_mm.fsdp.utils.lora_utils import (
+    add_lora_to_model,
+    freeze_parameters,
+    load_state_dict,
     match_target_modules,
     validate_lora_config,
     get_lora_trainable_params,
@@ -328,6 +331,249 @@ tools:
                 assert params == num_params, f"Rank {i} has different parameter count"
 
         dist.barrier()
+
+
+class TestAddLoraToModel:
+    """Test add_lora_to_model function."""
+
+    def test_lora_injection(self) -> None:
+        model = SimpleModel()
+        freeze_parameters(model)
+        model = add_lora_to_model(
+            model, lora_rank=4, lora_alpha=8,
+            lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
+        )
+
+        lora_param_names = [
+            n for n, _ in model.named_parameters() if "lora" in n
+        ]
+        assert len(lora_param_names) > 0
+
+        has_lora_a = any("lora_A" in n for n in lora_param_names)
+        has_lora_b = any("lora_B" in n for n in lora_param_names)
+        assert has_lora_a
+        assert has_lora_b
+
+    def test_base_params_frozen_after_injection(self) -> None:
+        model = SimpleModel()
+        freeze_parameters(model)
+        model = add_lora_to_model(
+            model, lora_rank=4, lora_alpha=8,
+            lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
+        )
+
+        for name, param in model.named_parameters():
+            if "lora" in name:
+                assert param.requires_grad is True
+            else:
+                assert param.requires_grad is False
+
+    def test_lora_params_dtype_float32(self) -> None:
+        model = SimpleModel()
+        model = model.to(torch.float16)
+        freeze_parameters(model)
+        model = add_lora_to_model(
+            model, lora_rank=4, lora_alpha=8,
+            lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
+        )
+
+        for name, param in model.named_parameters():
+            if "lora" in name:
+                assert param.dtype == torch.float32
+
+    def test_lora_target_modules_support_valid(self) -> None:
+        model = SimpleModel()
+        freeze_parameters(model)
+        model = add_lora_to_model(
+            model, lora_rank=4, lora_alpha=8,
+            lora_target_modules=["linear1", "linear2"],
+            lora_target_modules_support=["linear1", "linear2", "linear3"],
+        )
+
+        lora_params = [n for n, _ in model.named_parameters() if "lora" in n]
+        assert len(lora_params) > 0
+
+    def test_lora_target_modules_support_invalid(self) -> None:
+        model = SimpleModel()
+        freeze_parameters(model)
+        with pytest.raises(ValueError, match="not in lora_target_modules_support"):
+            add_lora_to_model(
+                model, lora_rank=4, lora_alpha=8,
+                lora_target_modules=["linear1", "linear2"],
+                lora_target_modules_support=["linear1"],
+            )
+
+    def test_lora_alpha_stored_on_model(self) -> None:
+        model = SimpleModel()
+        freeze_parameters(model)
+        model = add_lora_to_model(
+            model, lora_rank=4, lora_alpha=32,
+            lora_target_modules=["linear1"],
+        )
+
+        assert model.lora_alpha == 32
+
+    def test_pretrained_lora_loading(self, tmp_path: pathlib.Path) -> None:
+        from safetensors.torch import save_file
+
+        model = SimpleModel()
+        freeze_parameters(model)
+        model = add_lora_to_model(
+            model, lora_rank=4, lora_alpha=8,
+            lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
+        )
+
+        lora_state = {}
+        for name, param in model.named_parameters():
+            if "lora" in name and "base_layer" not in name:
+                lora_state[f"base_model.model.{name}"] = param.data.clone()
+
+        pretrained_path = os.path.join(tmp_path, "pretrained_lora.safetensors")
+        save_file(lora_state, pretrained_path)
+
+        model2 = SimpleModel()
+        freeze_parameters(model2)
+        model2 = add_lora_to_model(
+            model2, lora_rank=4, lora_alpha=8,
+            lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
+            pretrained_lora_path=pretrained_path,
+        )
+
+        for name, param in model2.named_parameters():
+            if "lora" in name and "base_layer" not in name:
+                assert param.numel() > 0
+
+
+class TestLoraWeightManagerExtended:
+    """Extended tests for LoraWeightManager."""
+
+    def _create_lora_model(self) -> nn.Module:
+        model = SimpleModel()
+        freeze_parameters(model)
+        model = add_lora_to_model(
+            model, lora_rank=4, lora_alpha=8,
+            lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
+        )
+        return model
+
+    def test_verify_lora_weights_valid(self) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        assert manager.verify_lora_weights() is True
+
+    def test_verify_lora_weights_with_nan(self) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        for name, param in model.named_parameters():
+            if "lora_A" in name:
+                param.data.fill_(float("nan"))
+                break
+
+        assert manager.verify_lora_weights() is False
+
+    def test_verify_lora_weights_with_inf(self) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        for name, param in model.named_parameters():
+            if "lora_B" in name:
+                param.data.fill_(float("inf"))
+                break
+
+        assert manager.verify_lora_weights() is False
+
+    def test_get_lora_param_count_with_lora(self) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        num_params, num_elements = manager.get_lora_param_count()
+
+        assert num_params > 0
+        assert num_elements > 0
+
+    def test_get_lora_state_dict_with_lora(self) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        state_dict = manager.get_lora_state_dict()
+
+        assert len(state_dict) > 0
+        for name in state_dict:
+            assert "lora" in name
+            assert "base_layer" not in name
+
+    def test_save_lora_with_iteration(self, tmp_path: pathlib.Path) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        save_path = os.path.join(tmp_path, "lora_iter")
+        num_saved, num_elements = manager.save_lora_only(save_path, iteration=5)
+
+        assert num_saved > 0
+        assert num_elements > 0
+        assert os.path.exists(
+            os.path.join(save_path, "lora_adapter_iteration_5.safetensors")
+        )
+
+    def test_save_lora_without_iteration(self, tmp_path: pathlib.Path) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        save_path = os.path.join(tmp_path, "lora_default")
+        num_saved, _ = manager.save_lora_only(save_path)
+
+        assert num_saved > 0
+        assert os.path.exists(
+            os.path.join(save_path, "lora_adapter.safetensors")
+        )
+
+    def test_load_lora_weights(self, tmp_path: pathlib.Path) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        save_path = os.path.join(tmp_path, "lora_save")
+        manager.save_lora_only(save_path)
+
+        lora_file = os.path.join(save_path, "lora_adapter.safetensors")
+        loaded_state = manager._load_state_dict(lora_file)
+        assert len(loaded_state) > 0
+        for key in loaded_state:
+            assert "lora" in key
+
+        model2 = self._create_lora_model()
+        manager2 = LoraWeightManager(model2)
+        manager2.load_lora_weights(lora_file)
+
+    def test_load_lora_weights_file_not_found(self) -> None:
+        model = SimpleModel()
+        manager = LoraWeightManager(model)
+
+        with pytest.raises(FileNotFoundError):
+            manager.load_lora_weights("/nonexistent/path/lora.safetensors")
+
+    def test_merge_lora_to_base_non_peft_model(self) -> None:
+        model = SimpleModel()
+        manager = LoraWeightManager(model)
+
+        manager.merge_lora_to_base()
+
+    def test_save_load_roundtrip_values(self, tmp_path: pathlib.Path) -> None:
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        original_state = manager.get_lora_state_dict()
+
+        save_path = os.path.join(tmp_path, "roundtrip")
+        manager.save_lora_only(save_path)
+
+        lora_file = os.path.join(save_path, "lora_adapter.safetensors")
+        loaded_state = load_state_dict(lora_file)
+
+        for name in original_state:
+            assert name in loaded_state
+            assert torch.allclose(original_state[name], loaded_state[name])
 
 
 def run_tests() -> None:

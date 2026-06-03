@@ -36,7 +36,7 @@ training:
   save_interval: 20
   save: ./save_path
   # ... 其他训练参数
-  
+
   lora:
     enable: true
     rank: 8
@@ -149,6 +149,10 @@ python merge_lora_safetensors_to_base.py \
     --lora_safetensors ./save_path/lora_adapter_iteration_10.safetensors \
     --save_merged_hf_dir ./merged_qwen3_5_27B_lora
 ```
+
+## lora断点续训
+
+断点续训时，yaml配置文件中`load`路径需要指向上次训练保存的 checkpoint 路径。断点续训前一次的训练必须配置`no_save_optim`、`no_save_rng`为false，断点续训时`no_load_optim`、`no_load_rng`设置为false，才能恢复优化器状态。断点续训完成后可使用权重转换脚本，合并lora权重到HuggingFace权重。
 
 ## 注意事项
 
