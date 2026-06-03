@@ -71,7 +71,7 @@ commit id: 52f25651a2016ddede2283be17cf40c2c1b906ed
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
@@ -123,7 +123,7 @@ pip install librosa
 MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了huggingface权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](../../docs/zh/features/mm_convert.md)
 
 ```bash
-  
+
 # 7b
 mm-convert  Qwen2_5_OmniConverter hf_to_mm \
   --cfg.mm_dir "ckpt/mm_path/Qwen2.5-Omni-7B" \
@@ -406,7 +406,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 ### 3. 启动微调
 
-以Qwen2.5Omni-7B为例，启动微调训练任务。  
+以Qwen2.5Omni-7B为例，启动微调训练任务。
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 
 ```shell

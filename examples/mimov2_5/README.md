@@ -44,7 +44,7 @@ commit_id=13b5e3f
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
 
 ‼️ 部分特性依赖较新版本的CANN，请使用 8.5.0 以上版本:
 

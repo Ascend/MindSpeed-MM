@@ -37,7 +37,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 1. 三方件安装
 
@@ -46,7 +46,7 @@
     conda create -n kolors python=3.10
     conda activate kolors
 
-    # 安装 torch 
+    # 安装 torch
     pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
     # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装

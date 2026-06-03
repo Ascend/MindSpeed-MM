@@ -18,7 +18,7 @@
       - [准备工作](#准备工作)
       - [参数配置](#参数配置)
       - [启动训练](#启动训练)
-    - [LoRA微调](#LoRA微调)
+    - [LoRA微调](#lora微调)
       - [准备工作](#准备工作-1)
       - [参数配置](#参数配置-1)
       - [启动微调](#启动微调)
@@ -71,7 +71,7 @@ url=https://github.com/huggingface/diffusers/tree/v0.35.1
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 ### 仓库拉取
 
@@ -229,7 +229,7 @@ mm-convert WanConverter mm_to_hf \
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |      SAVE_PATH    | 训练过程中保存的权重路径                            |
 | examples/wan2.2/{model_size}/{task}/pretrain*.sh         |        CP         | 训练时的CP size（建议根据训练时设定的分辨率调整）   |
 
-**注**： 
+**注**：
 
 1. 当前LOAD_PATH路径无效时，MindSpeed会对模型随机初始化从头训练。为防止加载失败，请留意日志中的warning信息，或者自行确认路径合法。
 2. 使用断点续训功能时，需删去'--downcast-to-bf16'、'--no-load-optim'、'--no-load-rng'、'--no-save-optim'、'--no-save-rng'几项配置
@@ -239,9 +239,9 @@ mm-convert WanConverter mm_to_hf \
 - CP: 序列并行。
 
   - 使用场景：在视频序列（分辨率X帧数）较大时，可以开启来降低内存占用。
-  
+
   - 使能方式：在启动脚本中设置 CP > 1，如：CP=2；
-  
+
   - 限制条件：head 数量需要能够被CP整除（在`examples/wan2.2/{model_size}/{task}/pretrain_model*.json`中配置，参数为`num_heads`）
 
   - 默认使能方式为Ulysses序列并行。
@@ -255,7 +255,7 @@ mm-convert WanConverter mm_to_hf \
 - fsdp2
 
   - 使用场景：在模型参数规模较大时，可以通过开启fsdp2降低静态内存。
-  
+
   - 使能方式：`examples/wan2.2/{model_size}/{task}/pretrain.sh`的`GPT_ARGS`中加入`--use-torch-fsdp2`，`--fsdp2-config-path ${fsdp2_config}`，`--untie-embeddings-and-output-weights`以及`--ckpt-format torch_dcp`，其中fsdp2_config配置请参考：[FSDP2说明](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md)
   <a id="jump1"></a>
   - 训练权重后处理：使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：

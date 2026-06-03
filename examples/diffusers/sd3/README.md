@@ -36,7 +36,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 1. 软件与驱动安装
 
@@ -48,7 +48,7 @@
     # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
     pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
     pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
-    
+
     # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装
 
@@ -151,7 +151,7 @@
     ```shell
     scripts_path="./sd3" # 模型根目录（模型文件夹名称）
     model_name="stabilityai/stable-diffusion-3-medium-diffusers" # 预训练模型路径 （此为sd3）
-    dataset_name="pokemon-blip-captions" 
+    dataset_name="pokemon-blip-captions"
     batch_size=4
     num_processors=8 # 卡数（为计算FPS使用，yaml文件里需同步修改）
     max_train_steps=2000
@@ -214,7 +214,7 @@
     from accelerate import Accelerator, DistributedType
     # from accelerate import Accelerator # 原代码
     from accelerate.logging import get_logger # 原代码
-     
+
     if accelerator.is_main_process or accelerator.distributed_type == DistributedType.DEEPSPEED:
     # if accelerator.is_main_process: # 原代码 1681/1833行附近
       if global_step % args.checkpointing_steps == 0:  # 原代码 不进行修改
@@ -242,7 +242,7 @@
     本任务主要提供**混精fp16**和**混精bf16**dreambooth和dreambooth+lora的**8卡**训练脚本，使用与不使用**deepspeed**分布式训练。
 
     ```shell
-    bash sd3/finetune_sd3_dreambooth_deepspeed_**16.sh #使用deepspeed,dreambooth微调 
+    bash sd3/finetune_sd3_dreambooth_deepspeed_**16.sh #使用deepspeed,dreambooth微调
     bash sd3/finetune_sd3_dreambooth_lora_deepspeed_fp16.sh #使用deepspeed,dreambooth微调 (sd3.5)
     bash sd3/finetune_sd3_dreambooth_fp16.sh #无使用deepspeed,dreambooth微调
     bash sd3/finetune_sd3_dreambooth_lora_fp16.sh #无使用deepspeed,dreambooth+lora微调 (sd3)
@@ -346,7 +346,7 @@ vim infer_sd3_img2img.py # 进入运行I2I推理的Python文件
   ```
 
 - 启动分布式推理脚本
-  
+
   - 因使用accelerate进行分布式推理，config可设置：`--num_processes=卡数`，`num_machines=机器数`等
 
   ```shell

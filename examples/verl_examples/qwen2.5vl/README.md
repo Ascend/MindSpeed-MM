@@ -47,7 +47,7 @@ commit_id=97b65c63c729c61ca607315cf7084012aabc6bba
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../../docs/zh/pytorch/installation.md)
+请参考[安装指南](../../../docs/zh/pytorch/install_guide.md)
 
 > GRPO场景下，环境依赖如下：
 
@@ -247,10 +247,10 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
     ```
 
 7. 如需使用确定性计算，在[安装插件](#jump1.3)步骤中需添加`export DETERMINISTIC=True`：
-    
+
     ```bash
     # 添加：
-    export DETERMINISTIC=True 
+    export DETERMINISTIC=True
     # 添加后在进行如下操作：
     export MODEL_SELECT="Qwen2_5vl"
     # path_to_verl替换为verl源码路径 例如：/home/code/verl

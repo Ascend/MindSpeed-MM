@@ -43,7 +43,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 1. 软件与驱动安装
 
@@ -197,7 +197,7 @@
     启动微调脚本
 
     ```shell
-    bash finetune_kontext_dreambooth_lora_deepspeed_bf16.sh 
+    bash finetune_kontext_dreambooth_lora_deepspeed_bf16.sh
     ```
 
 ### 性能

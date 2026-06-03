@@ -70,7 +70,7 @@ commit_id=fa56dcc
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
@@ -129,7 +129,7 @@ mm-convert  Qwen2_5_VLConverter hf_to_mm \
   --cfg.parallel_config.llm_pp_layers [[36]] \
   --cfg.parallel_config.vit_pp_layers [[32]] \
   --cfg.parallel_config.tp_size 1
-  
+
 # 7b
 mm-convert  Qwen2_5_VLConverter hf_to_mm \
   --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
@@ -573,9 +573,9 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 【huggingface等价模型结构配置（可选）】
 
-Megatron框架下的qwen2.5VL模型结构相比于Hugging Face的模型结构实现有差异，对训练效果造成的影响。  
+Megatron框架下的qwen2.5VL模型结构相比于Hugging Face的模型结构实现有差异，对训练效果造成的影响。
 
-开启该功能可以使用完全与Hugging Face一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](../../docs/zh/features/canonical_model.md) 
+开启该功能可以使用完全与Hugging Face一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](../../docs/zh/features/canonical_model.md)
 
 开启方式：
 `model_xxb.json`使能`canonical_model`
@@ -668,7 +668,7 @@ GPT_ARGS="
 
 ### 3. 启动微调
 
-以Qwen2.5VL-7B为例，启动微调训练任务。  
+以Qwen2.5VL-7B为例，启动微调训练任务。
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 
 ```shell

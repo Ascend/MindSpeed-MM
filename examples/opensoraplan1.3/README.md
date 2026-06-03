@@ -48,14 +48,14 @@ commit_id=4b14d58
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 <a id="jump1.1"></a>
 
 ### 1. 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -160,7 +160,7 @@ mm-convert OpenSoraPlanConverter --version v1.3 hf_to_mm \
 | --cfg.source_path                      | 原始权重路径                                                 | /                |
 | --cfg.target_path                      | 转换或切分后权重保存路径                                     | /                |
 | --cfg.target_parallel_config.tp_size   | dit部分切分时的tp size                                       | 1                |
-| --cfg.target_parallel_config.pp_layers | dit部分切分时的pp_layer，`[]`表示不开PP，`[8,8,8,8]`表示PP size为4，每个stage 8层，[[4,4,4,4],[4,4,4,4]]表示PP size为4， vpp size为2 | []      
+| --cfg.target_parallel_config.pp_layers | dit部分切分时的pp_layer，`[]`表示不开PP，`[8,8,8,8]`表示PP size为4，每个stage 8层，[[4,4,4,4],[4,4,4,4]]表示PP size为4， vpp size为2 | []
 
 ---
 
@@ -230,9 +230,9 @@ mm-convert OpenSoraPlanConverter --version v1.3 hf_to_mm \
 + CP: 序列并行，当前支持Ulysses序列并行。
 
   - 使用场景：在视频序列（分辨率×帧数）较大时，可以开启来降低内存占用。
-  
+
   - 使能方式：在启动脚本中设置 CP > 1，如：CP=2。
-  
+
   - 限制条件：head数量需要能够被TP*CP整除。
 
 + TP: 张量模型并行
@@ -244,11 +244,11 @@ mm-convert OpenSoraPlanConverter --version v1.3 hf_to_mm \
   - 限制条件：head 数量需要能够被TP*CP整除。
 
 + SP: Megatron序列并行
-  
-  - 使用场景：在张量模型并行的基础上，进一步对 LayerNorm 和 Dropout 模块的序列维度进行切分，以降低动态内存。 
+
+  - 使用场景：在张量模型并行的基础上，进一步对 LayerNorm 和 Dropout 模块的序列维度进行切分，以降低动态内存。
 
   - 使能方式：在 GPT_ARGS 设置 --sequence-parallel。
-  
+
   - 限制条件：前置必要条件为开启TP。
 
 + PP：流水线并行
@@ -258,15 +258,15 @@ mm-convert OpenSoraPlanConverter --version v1.3 hf_to_mm \
   - 使用场景：模型参数较大时候，通过流水线方式切分并行，降低内存。
 
   - 使能方式：使用pp时需要在运行脚本GPT_ARGS中打开以下几个参数。
-  
+
   ```shell
-    PP = 4 # PP > 1 开启 
-  
+    PP = 4 # PP > 1 开启
+
     --optimization-level 2 \
     --use-multiparameter-pipeline-model-parallel \
     --variable-seq-lengths \
-  
-    # 同时pretrain_xx_model.json中修改相应配置 
+
+    # 同时pretrain_xx_model.json中修改相应配置
     "pipeline_num_layers": [8, 8, 8, 8],
   ```
 
@@ -311,7 +311,7 @@ mm-convert OpenSoraPlanConverter --version v1.3 hf_to_mm \
 
   ```shell
   CP=8
-  
+
   GPT_ARGS="
     --context-parallel-size ${CP} \
     --context-parallel-algo megatron_cp_algo \
@@ -332,7 +332,7 @@ mm-convert OpenSoraPlanConverter --version v1.3 hf_to_mm \
 
   ```shell
   CP=8
-  
+
   GPT_ARGS="
     --context-parallel-size ${CP} \
     --context-parallel-algo hybrid_cp_algo \
@@ -354,7 +354,7 @@ mm-convert OpenSoraPlanConverter --version v1.3 hf_to_mm \
 ```shell
     # 以t2v实例，使用动态分辨率训练
     MM_DATA="./examples/opensoraplan1.3/t2v/data_dynamic_resolution.json"
-    
+
     # 以t2v实例，使用固定分辨率训练
     MM_DATA="./examples/opensoraplan1.3/t2v/data_static_resolution.json"
 ```
@@ -365,8 +365,8 @@ mm-convert OpenSoraPlanConverter --version v1.3 hf_to_mm \
     GPUS_PER_NODE=8
     MASTER_ADDR=localhost
     MASTER_PORT=29501
-    NNODES=1  
-    NODE_RANK=0  
+    NNODES=1
+    NODE_RANK=0
     WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
 ```
 

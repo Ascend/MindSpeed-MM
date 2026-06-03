@@ -37,7 +37,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 1. 软件与驱动安装
 
@@ -294,7 +294,7 @@
     启动FLUX dreambooth微调脚本
 
     ```shell
-    bash finetune_flux_dreambooth_deepspeed_bf16.sh 
+    bash finetune_flux_dreambooth_deepspeed_bf16.sh
     ```
 
     启动FLUX dreambooth_lora微调脚本
@@ -378,7 +378,7 @@ vim infer_flux_text2img_bf16.py # 进入运行推理的Python文件
       ```shell
       python infer_flux_text2img_lora_bf16.py
       ```
-  
+
   【分布式推理】
 
   ```shell

@@ -40,7 +40,7 @@ commit_id=2149f36f22db601f9dbf70472fea11576f62a0f6
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../docs/zh/pytorch/installation.md)
+请参考[安装指南](../../docs/zh/pytorch/install_guide.md)
 
 > DanceGRPO场景下，Python版本推荐3.10
 
@@ -91,7 +91,7 @@ cd ..
 git clone https://github.com/tgxs002/HPSv2.git
 cd HPSv2
 git checkout 866735ecaae999fa714bd9edfa05aa2672669ee3
-pip install -e . 
+pip install -e .
 cd ..
 ```
 

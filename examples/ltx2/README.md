@@ -63,7 +63,7 @@ upstream=LTX2/packages/ltx-trainer
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
 > Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
 
 ‼️部分特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
@@ -109,7 +109,7 @@ pip install -e .
 
 ### 1. 数据格式（ltx2_precomputed）
 
-### 1.1 数据集数据格式 <a id="jump2.1.2"></a>
+### 1.1 数据集数据格式
 
 **`dataset.json` JSON 格式示例：**
 
@@ -170,7 +170,7 @@ uv run python scripts/process_dataset.py dataset.json \
 | `--lora-trigger` | LoRA 触发词（推理时需包含） |
 | `--decode` | 解码验证（生成视频预览） |
 
-### 2.3 预处理目录结构 <a id="jump2.1.1"></a>
+### 2.3 预处理目录结构
 
 `ltx2_precomputed` 默认读取 `preprocessed_data_root` 下的 `.precomputed` 子目录：
 

@@ -73,12 +73,12 @@ commit_id=806a7f6
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 ### 仓库拉取
 
 ```shell
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git 
+git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 git clone https://github.com/NVIDIA/Megatron-LM.git
 cd Megatron-LM
 git checkout core_v0.12.1
@@ -99,17 +99,17 @@ pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
 
 # apex for Ascend 参考 https://gitcode.com/Ascend/apex
-# 建议从原仓编译安装 
+# 建议从原仓编译安装
 
 # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
-source /usr/local/Ascend/cann/set_env.sh 
+source /usr/local/Ascend/cann/set_env.sh
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 # checkout commit from MindSpeed core_r0.12.1
 git checkout 5176c6f5f133111e55a404d82bd2dc14a809a6ab
-pip install -r requirements.txt 
+pip install -r requirements.txt
 pip install -e .
 cd ..
 
@@ -158,12 +158,12 @@ pip install decord==0.6.0
    │   ├── config.json
    │   ├── model-00001-of-00002.safetensors
    │   ├── model-00002-of-00002.safetensors
-   │   └── model.safetensors.index.json   
+   │   └── model.safetensors.index.json
    ├── tokenizer
    │   ├── added_tokens.json
    │   ├── special_tokens_map.json
    │   ├── spiece.model
-   │   └── tokenizer_config.json   
+   │   └── tokenizer_config.json
    ├── transformer
    │   ├── 1000 (or 1)
    │   │   └── mp_rank_00_model_states.pt
@@ -335,7 +335,7 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
     ```
 
     该特性和TP不能兼容，开启时TP必须设置为1，使用该特性训练时，保存的权重需要使用下面的转换脚本进行后处理才能用于推理：
-    
+
     ```bash
     # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/cann/set_env.sh
@@ -356,8 +356,8 @@ CogvideoX训练阶段的启动文件为shell脚本，主要分为如下4个：
     GPUS_PER_NODE=8
     MASTER_ADDR=localhost
     MASTER_PORT=29501
-    NNODES=1  
-    NODE_RANK=0  
+    NNODES=1
+    NODE_RANK=0
     WORLD_SIZE=$(($GPUS_PER_NODE * $NNODES))
     ```
 

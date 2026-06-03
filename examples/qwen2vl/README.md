@@ -72,7 +72,7 @@ commit_id=52f2565
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
@@ -437,7 +437,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 ### 3. 启动微调
 
-以Qwen2VL-7B为例，启动微调训练任务。  
+以Qwen2VL-7B为例，启动微调训练任务。
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
 
 ```shell

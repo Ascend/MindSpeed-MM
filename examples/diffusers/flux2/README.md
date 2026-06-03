@@ -40,7 +40,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 1. 软件与驱动安装
 
@@ -383,7 +383,7 @@ FLUX 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 进入运行T2I推理任務的Python文件
 
 ```shell
-vim infer_flux2_text2img.py 
+vim infer_flux2_text2img.py
 ```
 
 1. 修改路径
@@ -413,7 +413,7 @@ vim infer_flux2_text2img.py
 进入运行I2I推理任務的Python文件
 
 ```shell
-vim infer_flux2_img2img.py 
+vim infer_flux2_img2img.py
 ```
 
 1. 修改路径

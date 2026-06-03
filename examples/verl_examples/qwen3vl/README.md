@@ -45,7 +45,7 @@ commit_id=7df2afb936cd37b7b3a262edc119b2a57f070e3b
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../../docs/zh/pytorch/installation.md)
+请参考[安装指南](../../../docs/zh/pytorch/install_guide.md)
 
 > GRPO场景下，CANN推荐使用8.5.1及以上版本，其余环境依赖如下：
 

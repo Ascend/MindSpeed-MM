@@ -41,7 +41,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 1. 软件与驱动安装
 
@@ -53,7 +53,7 @@
     # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
     pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
     pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
-    
+
     # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装
 
@@ -144,7 +144,7 @@
     > **说明：**
     >该数据集的训练过程脚本只作为一种参考示例。
     >
-  
+
 2. 【配置 SDXL 预训练脚本与预训练模型】
 
     联网情况下，预训练模型可通过以下步骤下载。无网络时，用户可访问huggingface官网自行下载[sdxl-base模型](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) `model_name`模型与[sdxl-vae模型](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix) `vae_name`
@@ -314,9 +314,9 @@ SDXL 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 #### 获取预训练模型
 
    获取[sdxl-base模型](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) `model_name`模型与[sdxl-vae模型](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix) `vae_name`。
-  
+
    获取对应的预训练模型后，在`Controlnet微调`shell启动脚本中将`model_name`参数设置为本地预训练模型绝对路径，将`vae_name`参数设置为本地`vae`模型绝对路径。
-  
+
    ```shell
    sdxl/finetune_sdxl_controlnet_deepspeed_fp16.sh
    ```
@@ -349,7 +349,7 @@ SDXL 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
    ```python
   from patch_sdxl import save_Lora_Weights
   ```
-  
+
   并在train_text_to_image_lora_sdxl.py的1227行附近，`accelerator.save_state(save_path)`下方添加`save_Lora_Weights(unwrap_model, unet, text_encoder_one, text_encoder_two, args.train_text_encoder, save_path)`,如下：
 
   ```python
