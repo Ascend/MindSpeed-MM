@@ -8,6 +8,7 @@ from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.utils.device import create_stream, create_event, get_current_stream, switch_to_specified_stream
 from mindspeed_mm.fsdp.utils.decorators import Singleton
+from mindspeed_mm.fsdp.train.training_context import TrainingContext
 
 
 logger = logging.getLogger(__name__)
@@ -55,12 +56,12 @@ class GetCnt:
         if prefetch_block_idx is None:
             return []
 
-        prefetch_block_tensor_nums = self._block_tensor_nums[prefetch_block_idx]
         block_tensor_nums = self._block_tensor_nums[block_idx]
-        start = tensor_idx * prefetch_block_tensor_nums // block_tensor_nums
-        end = (tensor_idx + 1) * prefetch_block_tensor_nums // block_tensor_nums
-        prefetch_idxs = list(range(start, end))
+        prefetch_idxs = list(range(0, block_tensor_nums))
         return ["{}_{}".format(block_idx - 1, prefetch_idx) for prefetch_idx in prefetch_idxs]
+
+    def get_layer_tensor_nums(self, block_idx):
+        return self._block_tensor_nums[block_idx]
 
 
 class SwapTensor:
@@ -171,13 +172,29 @@ class OffloadManager(metaclass=Singleton):
             self.items[key] = OffloadItem(act, 1, event)
 
     def put_npu_tensor(self, act):
+        # Temporarily stores the tensor on the NPU.
+        # This can be used for various purposes, such as caching for recomputation.
         self.npu_item.append(act)
+
+    def pop_npu_tensor(self):
+        # Retrieves the temporarily stored tensor from the NPU.
+        return self.npu_item.pop()
 
     # Wait for Device-to-Host (D2H) transfer to complete for all tensors whose keys start with the given prefix.
     def del_npu_tensor(self, prefile_key):
         for key in self.items.keys():
             if key.startswith(prefile_key):
                 self.items[key].act.wait_d2h_finished()
+
+    def get_layer_items_keys(self, block_idx):
+        block_tensor_nums = self.getcnt.get_layer_tensor_nums(block_idx)
+        layer_items_keys = []
+
+        for tensor_id in range(block_tensor_nums):
+            key = f"{block_idx}_{tensor_id}"
+            if key in self.items.keys():
+                layer_items_keys.append(key)
+        return layer_items_keys
 
     # Retrieve tensor and decrement ref count; auto-remove when zero.
     def get(self, key):
@@ -189,8 +206,6 @@ class OffloadManager(metaclass=Singleton):
             item.get_event().wait()
 
         item.ref_cnt -= 1
-        if item.ref_cnt == 0:
-            self.clear(key)
         return act
 
     # Prefetch tensors needed for the current computation by loading them from host to device (H2D).
@@ -261,8 +276,12 @@ class async_save_on_cpu(saved_tensors_hooks):
             # make sure d2h copy is done before into backward
             get_current_stream().wait_event(swap_tensor.h2d_event)
 
+            block_idx, tensor_idx = swap_tensor.key.split("_")
+            OffloadManager().clear(swap_tensor.key)
+
+            TrainingContext().set_layer_index(int(block_idx))
+
             if prefetch:
-                block_idx, tensor_idx = swap_tensor.key.split("_")
                 OffloadManager().prefetch_get(int(block_idx), int(tensor_idx), h2d_stream, d2h_stream)
             return swap_tensor.tensor
 
@@ -339,6 +358,9 @@ def with_async_save_on_cpu(module_name, layer_idx, depth, prefetch=True, hidden_
                 custom_check_fn=lambda x: x.data_ptr() == hidden_states.data_ptr(),
                 prefetch=prefetch
             )
+
+            TrainingContext().set_model_depth(depth)
+            TrainingContext().set_layer_index(layer_idx)
 
             with context:
                 return forward_func(*args, **kwargs)

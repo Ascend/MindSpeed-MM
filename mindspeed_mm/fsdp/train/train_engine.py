@@ -21,6 +21,7 @@ from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
 from mindspeed_mm.fsdp.data.dataloader.dataloader import Preloader
 from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_checkpoint, looks_like_hf_weight_dir
 from mindspeed_mm.fsdp.utils.constants import MEMORY_REPORT_ITERATION
+from mindspeed_mm.fsdp.train.training_context import TrainingStage, TrainingContext
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,7 @@ class TrainEngine:
             configure_hsdp_gradient_sync(self.model, is_last_step)
 
             # forward step
+            TrainingContext().set_training_stage(TrainingStage.FORWARD)
             output = self.model(**batch_data, use_cache=False)
             loss = output.loss / args.training.gradient_accumulation_steps
             total_loss += loss
@@ -151,7 +153,9 @@ class TrainEngine:
                     all_mtp_loss = [torch.zeros_like(loss) for loss in mtp_loss]
                 for i in range(len(mtp_loss)):
                     all_mtp_loss[i] += mtp_loss[i] / args.training.gradient_accumulation_steps
+
             # Backward
+            TrainingContext().set_training_stage(TrainingStage.BACKWARD)
             loss.backward()
 
             if getattr(output, 'aux_loss', None) is not None:

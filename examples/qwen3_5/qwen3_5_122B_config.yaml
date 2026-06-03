@@ -88,6 +88,9 @@ model:
   gdn_implementation: triton
   causal_conv1d_implementation: eager
   use_grouped_expert_matmul: true
+  # skip_recompute
+  skip_gdn_recompute: false
+  skip_flash_attn_recompute: false
 
 # 优化特性配置
 features:

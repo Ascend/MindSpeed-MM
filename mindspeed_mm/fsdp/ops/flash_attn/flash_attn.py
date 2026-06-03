@@ -13,6 +13,7 @@ from ...distributed.parallel_state import get_parallel_state
 from ...utils.device import IS_NPU_AVAILABLE
 from ...distributed.context_parallel.utils import cal_split_sizes
 from ...distributed.context_parallel.communication import all_to_all
+from .skip_recompute_flash_attn import skip_recompute_flash_attention
 
 if IS_NPU_AVAILABLE:
     import torch_npu
@@ -168,6 +169,7 @@ def flash_attention_forward(
     skip_ulysses: bool = False,  # Skip ulysses for some ViT cases like internvl3.5
     total_seq_len: int = None,  # unaligned cp need this
     seq_split_lens: torch.Tensor = None,  # unaligned cp need this
+    skip_flash_attn_recompute: bool = False,
     **kwargs,
 ) -> tuple[torch.Tensor, None]:
     if kwargs.get("output_attentions", False) or kwargs.get("head_mask") is not None:
@@ -286,6 +288,9 @@ def flash_attention_forward(
     if is_ring_enabled:
         if not IS_NPU_AVAILABLE:
             raise ValueError(f"Ring Attention now only support in NPU.")
+
+        if skip_flash_attn_recompute:
+            raise ValueError(f"Not support skip_flash_attn_recompute for ring attention.")
 
         if use_npu_fusion_fa:
             if input_layout in ["1TND", "1NTD"]:
@@ -468,27 +473,50 @@ def flash_attention_forward(
             ):
                 attention_mask = get_attn_mask(device=query.device) if is_causal else None
 
-            attn_output = torch_npu.npu_fusion_attention(
-                query,
-                key,
-                value,
-                q_head_num,
-                layout,
-                pse=None,
-                padding_mask=None,
-                atten_mask=attention_mask,
-                actual_seq_qlen=cu_seq_lens_q,
-                actual_seq_kvlen=cu_seq_lens_k,
-                scale=scaling,
-                keep_prob=1 - dropout,
-                inner_precise=0,
-                sparse_mode=3 if is_causal else 0,
-            )[0]
+            if skip_flash_attn_recompute:
+                attn_output = skip_recompute_flash_attention(
+                    query,
+                    key,
+                    value,
+                    q_head_num,
+                    layout,
+                    pse=None,
+                    padding_mask=None,
+                    atten_mask=attention_mask,
+                    actual_seq_qlen=cu_seq_lens_q,
+                    actual_seq_kvlen=cu_seq_lens_k,
+                    scale=scaling,
+                    keep_prob=1 - dropout,
+                    inner_precise=0,
+                    sparse_mode=3 if is_causal else 0,
+                )
+            else:
+                attn_output = torch_npu.npu_fusion_attention(
+                    query,
+                    key,
+                    value,
+                    q_head_num,
+                    layout,
+                    pse=None,
+                    padding_mask=None,
+                    atten_mask=attention_mask,
+                    actual_seq_qlen=cu_seq_lens_q,
+                    actual_seq_kvlen=cu_seq_lens_k,
+                    scale=scaling,
+                    keep_prob=1 - dropout,
+                    inner_precise=0,
+                    sparse_mode=3 if is_causal else 0,
+                )[0]
 
             if input_layout in ["1TND", "1NTD"]:
                 attn_output = attn_output.unsqueeze(0)
 
         else:
+            if skip_flash_attn_recompute:
+                raise NotImplementedError(
+                    "Skipping flash_attn recompute is only supported on NPU when `_attn_implementation` is `flash_attention_2`."
+                )
+
             attn_output = _flash_attention_forward(
                 query,
                 key,

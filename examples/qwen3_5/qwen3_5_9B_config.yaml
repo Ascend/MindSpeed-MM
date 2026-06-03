@@ -77,6 +77,10 @@ model:
   # 融合算子配置
   gdn_implementation: triton
   causal_conv1d_implementation: eager
+  # skip_recompute
+  skip_gdn_recompute: false
+  skip_flash_attn_recompute: false
+
 
 # 优化特性配置
 features:

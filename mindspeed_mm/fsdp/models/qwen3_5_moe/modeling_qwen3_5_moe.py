@@ -600,6 +600,8 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                 )
         elif self.gdn_implementation == "eager":
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
+            if self.skip_gdn_recompute:
+                raise NotImplemented(f"gdn_implementation = `eager` not support `skip_gdn_recompute` now.")
         else:
             raise ValueError(
                 f"Invalid gdn_implementation='{self.gdn_implementation}'. Must be one of: 'eager', 'triton', 'AscendC'."
@@ -800,6 +802,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                     initial_state=None,
                     output_final_state=cache_params is not None,
                     use_qk_l2norm_in_kernel=True,
+                    skip_recompute=self.skip_gdn_recompute
                 )
             else:
                 core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
@@ -1006,6 +1009,7 @@ class Qwen3_5MoeAttention(nn.Module):
             is_causal=True,
             total_seq_len=total_seq_len,
             seq_split_lens=None,
+            skip_flash_attn_recompute=self.config.skip_flash_attn_recompute,
             **kwargs,
         )
 
@@ -1450,6 +1454,7 @@ class Qwen3_5MoeVisionAttention(nn.Module):
                 is_causal=False,
                 total_seq_len=get_seq_len("visual"),
                 input_layout="1TND",
+                skip_flash_attn_recompute=self.config.skip_flash_attn_recompute,
                 **kwargs,
             )
         else:
@@ -2440,16 +2445,31 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
 
     @staticmethod
     def overwrite_transformer_config(transformer_config, model_args, feature_args):
+        # gdn_implementation
         gdn_implementation = getattr(model_args, "gdn_implementation", "eager")
         if gdn_implementation not in ("eager", "triton", "AscendC"):
             raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'AscendC'.")
         transformer_config.text_config.gdn_implementation= gdn_implementation
+        # causal conv1d implementation
         causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", "eager")
         if causal_conv1d_implementation not in ("eager", "triton"):
             raise ValueError(f"Invalid causal_conv1d='{causal_conv1d_implementation}'. Must be one of: 'eager', 'triton'.")
         transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
+
+        # skip flash attn recompute
+        skip_flash_attn_recompute = getattr(model_args, "skip_flash_attn_recompute", False)
+        transformer_config.vision_config.skip_flash_attn_recompute = skip_flash_attn_recompute
+        transformer_config.text_config.skip_flash_attn_recompute = skip_flash_attn_recompute
+
+        # skip gdn recompute
+        skip_gdn_recompute = getattr(model_args, "skip_gdn_recompute", False)
+        transformer_config.text_config.skip_gdn_recompute = skip_gdn_recompute
+
+        # moe compute
         use_grouped_expert_matmul = getattr(model_args, "use_grouped_expert_matmul", False)
         transformer_config.text_config.use_grouped_expert_matmul = use_grouped_expert_matmul
+
+        # aux loss
         transformer_config.text_config.router_aux_loss_coef = feature_args.loss_cfg.router_aux_loss_coef
         transformer_config.text_config.router_aux_loss_offload = feature_args.loss_cfg.router_aux_loss_offload
         # mtp
@@ -2457,6 +2477,8 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         if mtp_num_layers not in (0, 1):
             raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be one of: 0, 1.")
         transformer_config.text_config.mtp_num_layers = mtp_num_layers
+
+        # chunkloss
         transformer_config.text_config.enable_chunk_loss = getattr(feature_args, "enable_chunk_loss", False)
         transformer_config.text_config.enable_dynamic_chunk_loss = getattr(feature_args, "enable_dynamic_chunk_loss", False)
         return transformer_config

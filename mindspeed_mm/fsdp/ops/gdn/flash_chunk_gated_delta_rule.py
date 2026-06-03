@@ -8,6 +8,10 @@ import math
 import torch
 
 from mindspeed_mm.fsdp.utils.import_utils import IS_FLA_NPU_AVAILABLE, IS_TRITON_AVAILABLE
+from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
+from mindspeed_mm.fsdp.features.memory.async_offload import OffloadManager, SwapTensor
+from mindspeed_mm.fsdp.utils.device import get_current_stream
+
 
 if IS_FLA_NPU_AVAILABLE:
     import fla_npu
@@ -310,21 +314,73 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
         cu_seqlens: Optional[torch.LongTensor] = None,
         use_qk_l2norm_in_kernel: bool = False,
         chunk_size: int = 64,
+        skip_recompute: bool = False
     ):
         q_rstd, k_rstd = None, None
 
-        g, o, A, final_state = chunk_gated_delta_rule_fwd(
-            q=q,
-            k=k,
-            v=v,
-            g=g,
-            beta=beta,
-            scale=scale,
-            initial_state=initial_state,
-            output_final_state=output_final_state,
-            cu_seqlens=cu_seqlens,
-            chunk_size=chunk_size
-        )
+        training_stage = TrainingContext().get_training_stage()
+        layer_idx, depth = TrainingContext().get_layer_index(), TrainingContext().get_model_depth()
+        h2d_stream = OffloadManager().swap_stream
+        d2h_stream = OffloadManager().swap_stream
+
+        if skip_recompute and training_stage == TrainingStage.BACKWARD:
+            if layer_idx == depth - 1:
+                if output_final_state:
+                    final_state = OffloadManager().pop_npu_tensor()
+                A = OffloadManager().pop_npu_tensor()
+                o = OffloadManager().pop_npu_tensor()
+                g = OffloadManager().pop_npu_tensor()
+
+            else:
+                layer_items_keys = OffloadManager().get_layer_items_keys(layer_idx)
+
+                swap_tensor_nums = 4 if output_final_state else 3
+                swap_tensors = []
+
+                for swap_key in reversed(layer_items_keys[-swap_tensor_nums:]):
+                    swap_tensor = OffloadManager().get(swap_key)
+                    swap_tensor.launch_h2d(h2d_stream)
+                    get_current_stream().wait_event(swap_tensor.h2d_event)
+
+                    swap_tensors.append(swap_tensor.tensor)
+                    OffloadManager().clear(swap_key)
+
+                if output_final_state:
+                    final_state, A, o, g = swap_tensors
+                else:
+                    A, o, g = swap_tensors
+                    final_state = None
+        else:
+            g, o, A, final_state = chunk_gated_delta_rule_fwd(
+                q=q,
+                k=k,
+                v=v,
+                g=g,
+                beta=beta,
+                scale=scale,
+                initial_state=initial_state,
+                output_final_state=output_final_state,
+                cu_seqlens=cu_seqlens,
+                chunk_size=chunk_size
+            )
+
+        if skip_recompute and training_stage == TrainingStage.FORWARD:
+            swap_tensors = [g, o, A]
+            if output_final_state:
+                swap_tensors.append(final_state)
+
+            for swap_tensor in swap_tensors:
+                key, after_block = OffloadManager().get_cnt(layer_idx)
+                if after_block:
+                    OffloadManager().del_npu_tensor("{}_".format(layer_idx - 1))
+
+                if layer_idx == depth - 1:
+                    OffloadManager().put_npu_tensor(SwapTensor(swap_tensor, key))
+                else:
+                    swap_tensor = SwapTensor(swap_tensor, key)
+                    swap_tensor.launch_d2h(d2h_stream)
+                    OffloadManager().put(key, swap_tensor)
+
         ctx.save_for_backward(q, q_rstd, k, k_rstd, v, g, beta, A, initial_state, cu_seqlens)
         ctx.scale = scale
         ctx.use_qk_l2norm_in_kernel = use_qk_l2norm_in_kernel
@@ -354,7 +410,7 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
             cu_seqlens=cu_seqlens,
             chunk_size=ctx.chunk_size,
         )
-        return dq.to(q), dk.to(k), dv.to(v), dg.to(g), db.to(beta), None, dh0, None, None, None, None
+        return dq.to(q), dk.to(k), dv.to(v), dg.to(g), db.to(beta), None, dh0, None, None, None, None, None
 
 
 @torch.compiler.disable
@@ -371,6 +427,7 @@ def chunk_gated_delta_rule(
     cu_seqlens: Optional[torch.LongTensor] = None,
     chunk_size: int = 64,
     head_first: bool = False,
+    skip_recompute: bool = False,
 ):
     r"""
     Args:
@@ -401,6 +458,8 @@ def chunk_gated_delta_rule(
         head_first (Optional[bool]):
             Whether the inputs are in the head-first format. Default: `False`.
             This argument has been deprecated.
+        skip_recompute (bool):
+            Whether skip recomupte and async offload the outputs to cpu.
 
     Returns:
         o (torch.Tensor):
@@ -497,6 +556,7 @@ def chunk_gated_delta_rule(
         output_final_state,
         cu_seqlens,
         use_qk_l2norm_in_kernel,
-        chunk_size
+        chunk_size,
+        skip_recompute
     )
     return o, final_state
