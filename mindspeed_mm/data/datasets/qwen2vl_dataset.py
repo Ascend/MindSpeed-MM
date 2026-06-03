@@ -65,9 +65,16 @@ class AsyncPreprocessIterableDataset(IterableDataset):
             normalized_num_workers = max(1, num_workers)
             normalized_buffer_size = normalized_num_workers
         else:
-            normalized_buffer_size = max(1, buffer_size)
             normalized_num_workers = max(1, num_workers)
-
+            normalized_buffer_size = max(1, buffer_size)
+            if normalized_buffer_size < normalized_num_workers:
+                logger.warning(
+                    "[AsyncPreprocessIterableDataset] buffer_size=%s is smaller than num_workers=%s. "
+                    "This may cause queue blocking and reduce preprocessing throughput. ",
+                    normalized_buffer_size,
+                    normalized_num_workers,
+                )
+            
         return normalized_buffer_size, normalized_num_workers
 
     def _preprocess_item(self, item):
@@ -80,30 +87,29 @@ class AsyncPreprocessIterableDataset(IterableDataset):
         return [{k: v[i] for k, v in processed.items()} for i in range(num_items)]
 
     def __iter__(self):
-        queue_size = max(self.buffer_size, self.num_workers)
-        task_queue = queue.Queue(maxsize=queue_size)
-        result_queue = queue.Queue(maxsize=queue_size)
+        task_queue = queue.Queue(maxsize=self.num_workers)
+        result_queue = queue.Queue(maxsize=self.buffer_size)
         stop_event = threading.Event()
         task_done = object()
 
-        def put_with_stop(target_queue, value, allow_after_stop=False):
-            while allow_after_stop or not stop_event.is_set():
+        def put_with_stop(target_queue, value):
+            while not stop_event.is_set():
                 try:
                     target_queue.put(value, timeout=0.1)
                     return True
                 except queue.Full:
-                    if not allow_after_stop and stop_event.is_set():
+                    if stop_event.is_set():
                         return False
-                    continue
             return False
 
         def get_with_stop(source_queue):
-            while True:
+            while not stop_event.is_set():
                 try:
                     return source_queue.get(timeout=0.1)
                 except queue.Empty:
                     if stop_event.is_set():
                         return None
+            return None
 
         def producer():
             try:
@@ -115,6 +121,7 @@ class AsyncPreprocessIterableDataset(IterableDataset):
                         return
             except Exception as exc:
                 put_with_stop(result_queue, ("error", "Failed to iterate dataset for preprocessing.", exc))
+                stop_event.set()
             finally:
                 for _ in range(self.num_workers):
                     if not put_with_stop(task_queue, task_done):
@@ -133,12 +140,8 @@ class AsyncPreprocessIterableDataset(IterableDataset):
                 try:
                     processed_items = self._preprocess_item(item)
                 except Exception as exc:
+                    put_with_stop(result_queue, ("error", "Preprocessing failed. Check input data and preprocessing function.", exc))
                     stop_event.set()
-                    put_with_stop(
-                        result_queue,
-                        ("error", "Preprocessing failed. Check input data and preprocessing function.", exc),
-                        allow_after_stop=True,
-                    )
                     return
 
                 if not put_with_stop(result_queue, ("result", sequence_idx, processed_items)):
