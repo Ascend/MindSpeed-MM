@@ -75,6 +75,14 @@ _VISUAL_SEQ_LEN = None
 _VISUAL_PER_SEQ_LEN = None
 IGNORE_INDEX = -100
 
+IMPL_EAGER = "eager"
+IMPL_TRITON = "triton"
+IMPL_TRITON_WITH_TRANSPOSE = "triton_with_transpose"
+IMPL_ASCENDC = "ascendc_without_transpose"
+IMPL_ASCENDC_LEGACY = "ascendc"
+IMPL_FOR_CAUSAL_CONV = (IMPL_EAGER, IMPL_TRITON, IMPL_TRITON_WITH_TRANSPOSE)
+IMPL_FOR_GDN = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC, IMPL_ASCENDC_LEGACY)
+
 
 def get_seq_len(seq_type: str = None) -> int:
     if seq_type == "total":
@@ -558,44 +566,62 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         self.out_proj = nn.Linear(self.value_dim, self.hidden_size, bias=False)
 
         self.causal_conv1d_implementation = config.causal_conv1d_implementation
-        if self.causal_conv1d_implementation == "triton" and IS_NPU_AVAILABLE:
+        self.gdn_implementation = config.gdn_implementation
+        self.skip_gdn_recompute = config.skip_gdn_recompute
+        if self.gdn_implementation == IMPL_ASCENDC and IS_NPU_AVAILABLE:
+            self.causal_conv1d_implementation = IMPL_TRITON_WITH_TRANSPOSE
+
+        if self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE and IS_NPU_AVAILABLE:
+            from mindspeed_mm.fsdp.ops.gdn.triton_core.causal_conv1d import causal_conv1d_triton
+            print_rank(logger.info, "Qwen3_5 causal_conv1d (with transpose) use NPU triton ops")
+            self.causal_conv1d_fn = causal_conv1d_triton
+        elif self.causal_conv1d_implementation == IMPL_TRITON and IS_NPU_AVAILABLE:
             from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
-            print_rank(logger.info, "Qwen3_5Moe causal_conv1d use NPU triton ops")
+            print_rank(logger.info, "Qwen3_5 causal_conv1d use NPU triton ops")
             self.causal_conv1d_fn = causal_conv1d
         else:
             self.causal_conv1d_fn = causal_conv1d_fn
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
 
-        self.gdn_implementation = config.gdn_implementation
-        self.skip_gdn_recompute = config.skip_gdn_recompute
-
-        if self.gdn_implementation == "triton":
+        if self.gdn_implementation == IMPL_TRITON:
             if IS_NPU_AVAILABLE:
                 from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule
+                print_rank(logger.info, "Qwen3_5GatedDeltaNet use NPU triton fused ops")
                 self.chunk_gated_delta_rule = chunk_gated_delta_rule
-            elif is_flash_linear_attention_available():
+            elif is_flash_linear_attention_available(): # fla on gpu
                 self.chunk_gated_delta_rule = fla_chunk_gated_delta_rule
             else:
                 raise ValueError(
                     f"gdn_implementation='triton' requires NPU or flash_linear_attention, "
                     f"but neither is available. Please install the required dependency or use gdn_implementation='eager'."
                 )
-        elif self.gdn_implementation == "AscendC":
+        elif self.gdn_implementation == IMPL_ASCENDC:
+            if IS_NPU_AVAILABLE:
+                from mindspeed_mm.fsdp.ops.gdn.flash_gated_delta_rule import flash_gated_delta_rule
+                print_rank(logger.info, "Qwen3_5GatedDeltaNet (without transpose) use NPU AscendC fused ops")
+                self.chunk_gated_delta_rule = flash_gated_delta_rule
+            else:
+                raise ValueError(
+                    f"gdn_implementation='ascendc' requires NPU, but NPU is not available. "
+                    f"Please use gdn_implementation='eager' or gdn_implementation='triton' instead."
+                )
+        elif self.gdn_implementation == IMPL_ASCENDC_LEGACY:
             if IS_NPU_AVAILABLE:
                 from mindspeed_mm.fsdp.ops.gdn.flash_chunk_gated_delta_rule import chunk_gated_delta_rule
+                print_rank(logger.info, "Qwen3_5GatedDeltaNet (with transpose) use NPU AscendC fused ops")
                 self.chunk_gated_delta_rule = chunk_gated_delta_rule
             else:
                 raise ValueError(
-                    f"gdn_implementation='AscendC' requires NPU, but NPU is not available. "
+                    f"gdn_implementation='ascendc' requires NPU, but NPU is not available. "
                     f"Please use gdn_implementation='eager' or gdn_implementation='triton' instead."
                 )
-        elif self.gdn_implementation == "eager":
+        elif self.gdn_implementation == IMPL_EAGER:
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
             if self.skip_gdn_recompute:
                 raise NotImplemented(f"gdn_implementation = `eager` not support `skip_gdn_recompute` now.")
         else:
             raise ValueError(
-                f"Invalid gdn_implementation='{self.gdn_implementation}'. Must be one of: 'eager', 'triton', 'AscendC'."
+                f"Invalid gdn_implementation='{self.gdn_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'."
             )
 
         self.recurrent_gated_delta_rule = fused_recurrent_gated_delta_rule or torch_recurrent_gated_delta_rule
@@ -730,7 +756,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
             if "cu_seqlens" in kwargs and kwargs.get("cu_seqlens") is not None:
                 cu_seqlens = kwargs.get("cu_seq_lens_q").to(torch.int64)
 
-            if self.causal_conv1d_implementation == "triton":
+            if self.causal_conv1d_implementation == IMPL_TRITON:
                 conv_weight = conv_weight.squeeze(1)
                 mixed_qkv, _ = self.causal_conv1d_fn(
                     x=mixed_qkv,
@@ -739,7 +765,17 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                     activation=self.activation,
                     cu_seqlens=cu_seqlens,
                 )
-            elif self.causal_conv1d_implementation == "eager" and self.causal_conv1d_fn is not None:  # for fla
+            elif self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
+                conv_weight = conv_weight.squeeze(1)
+                mixed_qkv, _ = self.causal_conv1d_fn(
+                    x=mixed_qkv,
+                    weight=conv_weight,
+                    H=2*local_num_k_heads + local_num_v_heads,
+                    bias=self.conv1d.bias,
+                    activation=self.activation,
+                    cu_seqlens=cu_seqlens,
+                )
+            elif self.causal_conv1d_implementation == IMPL_EAGER and self.causal_conv1d_fn is not None:  # for fla
                 conv_weight = conv_weight.squeeze(1)
                 mixed_qkv = self.causal_conv1d_fn(
                     x=mixed_qkv,
@@ -754,19 +790,30 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                 mixed_qkv = F.silu(F.conv1d(mixed_qkv, weight=conv_weight, bias=self.conv1d.bias, padding=self.conv_kernel_size - 1, groups=local_key_dim * 2 + local_value_dim)[:, :, :mixed_qkv.shape[-1]])
                 mixed_qkv = mixed_qkv.transpose(1, 2)
 
-        query, key, value = torch.split(
-            mixed_qkv,
-            [
-                local_key_dim,
-                local_key_dim,
-                local_value_dim,
-            ],
-            dim=-1,
-        )
+        if self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
+            query, key, value = torch.split(
+                mixed_qkv,
+                [
+                    local_num_k_heads,
+                    local_num_k_heads,
+                    local_num_v_heads,
+                ],
+                dim=1,
+            )
+        else:
+            query, key, value = torch.split(
+                mixed_qkv,
+                [
+                    local_key_dim,
+                    local_key_dim,
+                    local_value_dim,
+                ],
+                dim=-1,
+            )
 
-        query = query.reshape(query.shape[0], query.shape[1], local_num_k_heads, self.head_k_dim)
-        key = key.reshape(key.shape[0], key.shape[1], local_num_k_heads, self.head_k_dim)
-        value = value.reshape(value.shape[0], value.shape[1], local_num_v_heads, self.head_v_dim)
+            query = query.reshape(query.shape[0], query.shape[1], local_num_k_heads, self.head_k_dim)
+            key = key.reshape(key.shape[0], key.shape[1], local_num_k_heads, self.head_k_dim)
+            value = value.reshape(value.shape[0], value.shape[1], local_num_v_heads, self.head_v_dim)
 
         beta = b.sigmoid()
         # If the model is loaded in fp16, without the .float() here, A might be -inf
@@ -778,11 +825,15 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         else:
             g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
         if self.num_v_heads // self.num_k_heads > 1:
-            query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
-            key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
+            if self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
+                query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
+                key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
+            else:
+                query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
+                key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
 
         if not use_precomputed_states:
-            if self.gdn_implementation == "triton" or self.gdn_implementation == "AscendC":
+            if self.gdn_implementation in [IMPL_TRITON, IMPL_ASCENDC, IMPL_ASCENDC_LEGACY]:
                 core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
                     query,
                     key,
@@ -2166,13 +2217,13 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
     @staticmethod
     def overwrite_transformer_config(transformer_config, model_args, feature_args):
         # gdn implementation
-        gdn_implementation = getattr(model_args, "gdn_implementation", "eager")
-        if gdn_implementation not in ("eager", "triton", "AscendC"):
-            raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'AscendC'.")
+        gdn_implementation = getattr(model_args, "gdn_implementation", IMPL_EAGER).lower().strip()
+        if not any(gdn_implementation == impl for impl in IMPL_FOR_GDN):
+            raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'.")
         transformer_config.text_config.gdn_implementation= gdn_implementation
         # causal conv1d implementation
-        causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", "eager")
-        if causal_conv1d_implementation not in ("eager", "triton"):
+        causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()
+        if not any(causal_conv1d_implementation == impl for impl in IMPL_FOR_CAUSAL_CONV):
             raise ValueError(f"Invalid causal_conv1d='{causal_conv1d_implementation}'. Must be one of: 'eager', 'triton'.")
         transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
 

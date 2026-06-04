@@ -11,6 +11,7 @@
 - [环境安装](#环境安装)
   - [环境准备](#1-环境准备)
   - [环境搭建](#2-环境搭建)
+  - [安装fla-npu以适配AscendC](#3-安装fla-npu以适配ascendc)
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
 - [数据集准备及处理](#数据集准备及处理)
@@ -69,6 +70,24 @@ cd MindSpeed-MM
 
 ```bash
 bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensions.sh
+```
+
+### 3. 安装fla-npu以适配AscendC
+
+拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
+
+```bash
+git clone https://github.com/flashserve/flash-linear-attention-npu
+cd flash-linear-attention-npu
+git checkout 60a791f
+```
+
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu)
+
+检验fla-npu是否安装成功
+
+```bash
+pip list | grep fla-npu
 ```
 
 ---
