@@ -21,6 +21,7 @@ parallel:
   ep_plan:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
+    dispatcher: alltoall
 
 ### 数据相关配置
 data:

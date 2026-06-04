@@ -1105,11 +1105,12 @@ class Qwen3_5MoeExperts(nn.Module):
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
 
-        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward, ep_mc2_forward
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward, ep_mc2_forward, ep_allgather_forward
 
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
-            "mc2": ep_mc2_forward
+            "mc2": ep_mc2_forward,
+            "allgather": ep_allgather_forward
         }
         if ep_plan.dispatcher in ep_dispatcher_dict:
             dipatcher_func = ep_dispatcher_dict[ep_plan.dispatcher]

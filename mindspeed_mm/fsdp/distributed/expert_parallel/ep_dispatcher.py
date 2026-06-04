@@ -4,28 +4,21 @@ from typing import List, Optional
 import torch
 import torch.distributed as dist
 
-from mindspeed.fsdp.distributed.dist_ops import all_to_all as _all_to_all
 from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
 from mindspeed_mm.fsdp.ops.moe_ops.gemm_mc2 import grouped_matmul_all2all, all2all_grouped_matmul
 from mindspeed_mm.fsdp.ops.swiglu import swiglu, clamp_swiglu
-
+from mindspeed_mm.fsdp.distributed.expert_parallel.comm import (
+    all_to_all,
+    allgather_tokens_in_ep,
+    reduce_scatter_tokens_in_ep,
+)
 # Enable forced expert balance for debugging purposes only.
 # Set environment variable export MM_FORCE_EP_BALANCE=1 to activate.
 # MUST BE DISABLED during formal training.
 FORCE_EP_BALANCE = int(os.getenv("MM_FORCE_EP_BALANCE", "0")) == 1
 
-
-def all_to_all(
-    input_: torch.Tensor,
-    process_group: dist.ProcessGroup,
-    scatter_dim: int = 2,
-    gather_dim: int = 1,
-    scatter_sizes: List = None,
-    gather_sizes: List = None
-):
-    return _all_to_all(process_group, input_, gather_sizes, scatter_sizes)
 
 
 def force_ep_balance(
@@ -258,5 +251,103 @@ def ep_mc2_forward(
     hidden_states = unpermute(
         hidden_states, unpermute_indices, probs=routing_weights, fused=True
     )
+
+    return hidden_states
+
+def ep_allgather_forward(
+    num_experts: int,
+    routing_weights: torch.Tensor,
+    selected_experts: torch.Tensor,
+    hidden_states: torch.Tensor,
+    fc1_weight: torch.Tensor,
+    fc2_weight: torch.Tensor,
+    ep_group: Optional[dist.ProcessGroup] = None,
+    fused: bool = True,
+    swiglu_limit: float = 0.0,
+) -> torch.Tensor:
+    # Reshape hidden states to (batch_size * sequence_length, hidden_dim)
+    hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
+
+    # --- Expert Parallelism (EP) AllGather Phase ---
+    # In EP, each rank only holds a subset of experts.
+    # To ensure all tokens can be processed by their selected experts (which might reside on different ranks),
+    # we need to gather all tokens from the EP group.
+
+    # Handle force load balancing (for testing/debugging purposes)
+    # If FORCE_EP_BALANCE is enabled, we override the selected_experts to ensure a uniform distribution
+    # across experts, regardless of the actual routing weights.
+    if FORCE_EP_BALANCE:
+        selected_experts = force_ep_balance(num_experts, selected_experts)
+
+    # AllGather Operation: Collect tokens from all ranks in the EP group.
+    # After this operation:
+    #   - hidden_states: Contains ALL tokens from the global batch (N_total, D)
+    #   - selected_experts: Contains expert indices for ALL tokens
+    #   - routing_weights: Contains weights for ALL tokens
+    # This allows the current rank to process tokens that were originally on other ranks
+    # but are destined for the local experts.
+    with torch.no_grad():
+        selected_experts = allgather_tokens_in_ep(selected_experts, ep_group)
+    routing_weights = allgather_tokens_in_ep(routing_weights, ep_group)
+    hidden_states = allgather_tokens_in_ep(hidden_states, ep_group)
+
+    # --- Local Expert Processing Setup ---
+    # Calculate the number of experts assigned to the current rank (local experts)
+    num_experts_local = num_experts // dist.get_world_size(ep_group)
+    ep_rank = dist.get_rank(ep_group)
+
+    # Define the ID range of experts this rank is responsible for
+    start_expert_id, end_expert_id = num_experts_local * ep_rank, num_experts_local * (ep_rank + 1)
+
+    # Store the original shape for later restoration
+    hidden_shape_before_permute = hidden_states.shape
+
+    # Create a mask to identify tokens that should be processed by local experts
+    # Tokens not belonging to local experts will be masked out (assigned to a dummy expert ID)
+    mask = (selected_experts >= start_expert_id) & (selected_experts < end_expert_id)
+
+    # Remap expert IDs: Subtract start_expert_id to get local indices (0 to num_experts_local-1)
+    # Tokens not for local experts are mapped to a dummy ID (num_experts_local)
+    selected_experts = torch.where(mask, selected_experts - start_expert_id, num_experts_local)
+
+    # Count the number of tokens assigned to each local expert
+    # This is used for the grouped matrix multiplication
+    tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_experts, min=0, max=num_experts)[
+        :num_experts_local
+    ]
+
+    # --- Token Permutation and Computation ---
+    # Permute tokens based on expert assignment for efficient computation
+    # This groups tokens belonging to the same expert together in memory.
+    permuted_local_hidden_states, reversed_local_input_permutation_mapping = permute(
+        hidden_states, selected_experts.to(torch.int32), num_out_tokens=tokens_per_expert.sum().item(), fused=fused
+    )
+
+    # First Linear Layer (fc1) with Grouped Matmul
+    intermediate_hidden_states = grouped_matmul(permuted_local_hidden_states, fc1_weight, tokens_per_expert)
+
+    # Activation Function (SwiGLU)
+    if swiglu_limit > 0:
+        intermediate_activations = clamp_swiglu(intermediate_hidden_states, dim=-1, fused=fused, limit=swiglu_limit)
+    else:
+        intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+
+    # Second Linear Layer (fc2)
+    hidden_states = grouped_matmul(intermediate_activations, fc2_weight, tokens_per_expert)
+
+    # --- Result Unpermutation and Reduce-Scatter ---
+    # Unpermute the results back to the original token order
+    unpermuted_local_hidden_states = unpermute(
+        hidden_states,
+        reversed_local_input_permutation_mapping,
+        restore_shape=hidden_shape_before_permute,
+        probs=routing_weights,
+    )
+
+    # Reduce-Scatter Operation: Scatter the results back to the original ranks.
+    # After unpermuting, we need to send the computed results back to the ranks
+    # where the tokens originally came from.
+    # This is the inverse communication pattern of the initial AllGather.
+    hidden_states = reduce_scatter_tokens_in_ep(unpermuted_local_hidden_states, ep_group=ep_group)
 
     return hidden_states

@@ -91,7 +91,7 @@ def apply_grad_division_hook(module, ep_size):
 
 
 def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher="alltoall"):
-    from .ep_dispatcher import ep_forward, ep_mc2_forward
+    from .ep_dispatcher import ep_forward, ep_mc2_forward, ep_allgather_forward
 
     def experts_forward(self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor):
         batch_size = hidden_states.shape[0]
@@ -103,7 +103,8 @@ def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher
 
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
-            "mc2": ep_mc2_forward
+            "mc2": ep_mc2_forward,
+            "allgather": ep_allgather_forward
         }
 
         if dispatcher in ep_dispatcher_dict:
