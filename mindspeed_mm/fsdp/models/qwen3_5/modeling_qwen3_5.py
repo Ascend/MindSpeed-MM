@@ -567,6 +567,8 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
 
         self.gdn_implementation = config.gdn_implementation
+        self.skip_gdn_recompute = config.skip_gdn_recompute
+
         if self.gdn_implementation == "triton":
             if IS_NPU_AVAILABLE:
                 from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule
