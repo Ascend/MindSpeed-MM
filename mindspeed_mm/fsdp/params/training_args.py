@@ -1,14 +1,37 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
-from dataclasses import field
-from typing import List, Literal, Optional
+from dataclasses import field, dataclass
+from typing import List, Literal, Optional, Any
 import logging
 import os
 
 from mindspeed_mm.fsdp.params.lora_args import LoraArguments
 from mindspeed_mm.config.arguments.base_args import BaseArguments
-from mindspeed.fsdp.parallel_engine_config import QuantizeConfig
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class QuantizeConfig:
+    recipe_name: str = None
+    apply_modules: list[str] = field(default_factory=list)
+    ignored_modules: list[str] = field(default_factory=list)
+    quant_converters: list[str] = field(default_factory=list)
+    extra_args: dict[str, Any] = field(default_factory=dict)  # for future extensibility
+    enable_fsdp_low_precision_all_gather: bool = True
+    fsdp_low_precision_all_gather_mode: Literal["on-demand", "all"] = "on-demand"
+
+    @property
+    def recipe(self):
+        if hasattr(self, '_recipe'):
+            return self._recipe
+
+        from mindspeed.fsdp.quantization.config import QuantRecipe
+
+        self._recipe = QuantRecipe.from_recipe_name(self.recipe_name)
+        return self._recipe
+
+    def get_key_dtype(self, key: str):
+        return self.recipe().get_key_dtype(key)
 
 
 class Profiler(BaseArguments):
