@@ -1219,6 +1219,127 @@ class KimiK25Plugin(BasePlugin):
         return messages
 
 
+class Step3VLPlugin(BasePlugin):
+    """Image-only Step3-VL SFT adapter.
+
+    The current Step3-VL FSDP2 path reuses the upstream image split/patch APIs and does not build
+    video or audio tensors.
+    """
+
+    @override
+    def _validate_input(
+        self,
+        processor: Optional["MMProcessor"],
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+    ) -> None:
+        if len(images) != 0 and self.image_token is None:
+            raise ValueError("This model does not support image input. Please check whether the correct template is used.")
+        if len(videos) != 0:
+            raise ValueError("Step3-VL image-only SFT path does not support video input. See examples/step3_vl/README.md.")
+        if len(audios) != 0:
+            raise ValueError("Step3-VL image-only SFT path does not support audio input. See examples/step3_vl/README.md.")
+        if self.image_token is not None and processor is None:
+            raise ValueError("Processor was not found, please check and update your model file.")
+        if self.image_token is not None and not hasattr(processor, "image_preprocessor"):
+            raise ValueError("Step3-VL processor must provide `image_preprocessor`.")
+
+    @override
+    def process_messages(
+        self,
+        messages: List[Dict[str, str]],
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        processor: Optional["MMProcessor"],
+    ) -> List[Dict[str, str]]:
+        self._validate_input(processor, images, videos, audios)
+        self._validate_messages(messages, images, videos, audios)
+        image_repls = []
+        if len(images) != 0:
+            images = self._regularize_images(
+                images,
+                image_max_pixels=getattr(processor, "image_max_pixels", 768 * 768),
+                image_min_pixels=getattr(processor, "image_min_pixels", 32 * 32),
+            )["images"]
+            for _, img_patches, patch_newline_mask in processor._split_images(images):
+                image_repl, _ = processor._get_image_repl_features(1, len(img_patches), patch_newline_mask)
+                image_repls.append(image_repl)
+
+        image_idx = 0
+        messages = deepcopy(messages)
+        for message in messages:
+            content = message["content"]
+            while IMAGE_PLACEHOLDER in content:
+                content = content.replace(IMAGE_PLACEHOLDER, image_repls[image_idx], 1)
+                image_idx += 1
+            message["content"] = content
+        return messages
+
+    @override
+    def _get_mm_inputs(
+        self,
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        processor: "MMProcessor",
+    ) -> Dict[str, "torch.Tensor"]:
+        if len(images) == 0:
+            return {}
+        images = self._regularize_images(
+            images,
+            image_max_pixels=getattr(processor, "image_max_pixels", 768 * 768),
+            image_min_pixels=getattr(processor, "image_min_pixels", 32 * 32),
+        )["images"]
+        splitted_images_data = processor._split_images(images)
+        pixel_values_lst = []
+        patch_pixel_values_lst = []
+        patch_newline_mask_lst = []
+        num_patches = []
+        for raw_img, img_patches, patch_newline_mask in splitted_images_data:
+            pixel_values_lst.extend(processor._convert_images_to_pixel_values([raw_img]))
+            if len(img_patches) > 0:
+                patch_pixel_values_lst.extend(processor._convert_images_to_pixel_values(img_patches, is_patch=True))
+            num_patches.append(len(img_patches))
+            if patch_newline_mask is not None:
+                patch_newline_mask_lst.extend(patch_newline_mask)
+
+        # Keep a sentinel patch input so the patch branch is still exercised when an image has no patches.
+        if not patch_pixel_values_lst:
+            patch_size = getattr(processor, "patch_size", 504)
+            fake_patch = Image.new("RGB", (patch_size, patch_size), (255, 255, 255))
+            patch_pixel_values_lst.extend(processor._convert_images_to_pixel_values([fake_patch], is_patch=True))
+
+        image_inputs = {
+            "pixel_values": torch.cat(pixel_values_lst),
+            "num_patches": torch.tensor(num_patches, dtype=torch.long),
+        }
+        if patch_pixel_values_lst:
+            image_inputs["patch_pixel_values"] = torch.cat(patch_pixel_values_lst)
+        if patch_newline_mask_lst:
+            image_inputs["patch_newline_mask"] = torch.tensor(patch_newline_mask_lst, dtype=torch.bool)
+        return image_inputs
+
+    @override
+    def get_mm_inputs(
+        self,
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        imglens: List[int],
+        vidlens: List[int],
+        audlens: List[int],
+        batch_ids: List[List[int]],
+        processor: Optional["ProcessorMixin"],
+    ) -> Dict[str, Union[List[int], "torch.Tensor"]]:
+        self._validate_input(processor, images, videos, audios)
+        mm_inputs = self._get_mm_inputs(images, videos, audios, processor)
+        mm_inputs.pop("input_ids", None)
+        mm_inputs.pop("attention_mask", None)
+        return mm_inputs
+
+
 PLUGINS = {
     "base": BasePlugin,
     "qwen2_vl": Qwen2VLPlugin,
@@ -1227,6 +1348,7 @@ PLUGINS = {
     "glm4.1v": GLM4VPlugin,
     "qwen3_omni": Qwen3OmniPlugin,
     "kimi_k25": KimiK25Plugin,
+    "step3_vl": Step3VLPlugin,
 }
 
 

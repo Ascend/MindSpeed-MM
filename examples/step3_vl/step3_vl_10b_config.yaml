@@ -1,0 +1,129 @@
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - model.vision_model.transformer.resblocks.{*}
+      - model.vision_model.vit_downsampler1
+      - model.vision_model.vit_downsampler2
+      - model.vision_model
+      - model.vit_large_projector
+      - model.language_model.embed_tokens
+      - model.language_model.layers.{*}
+      - model.language_model
+      - lm_head
+    param_dtype: bf16
+    reduce_dtype: fp32
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  ep_plan:
+    apply_modules: []
+
+data:
+  dataset_param:
+    dataset_type: huggingface
+    attr:
+      images: images
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+    preprocess_parameters:
+      model_name_or_path: &STEP3_MODEL_PATH ./ckpt/hf_path/Step3-VL-10B
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      trust_remote_code: true
+      fix_mistral_regex: true
+      image_max_pixels: 589824
+      image_min_pixels: 1024
+    basic_parameters:
+      cutoff_len: 1024
+      template: step3_vl
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: /path/to/datasets
+      dataset: /path/to/datasets/jsonl
+      # cache_dir: ./cache_dir/step3_vl
+      overwrite_cache: false
+      preprocessing_batch_size: 16
+      preprocessing_num_workers: null
+
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 0
+    collate_param:
+      model_name: step3_vl
+      ignore_pad_token_for_loss: true
+      pad_to_multiple_of: 8
+
+model:
+  model_id: step3_vl
+  model_name_or_path: *STEP3_MODEL_PATH
+  trust_remote_code: true
+  attn_implementation: sdpa
+  freeze:
+    - model.vision_model
+  loss_cfg:
+    loss_type: default
+    router_aux_loss_coef: 0.0
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - model.language_model.layers.{*}
+  enable_chunk_loss: false
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 1024
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.1
+  weight_decay: 0.0
+  train_iters: 10
+  clip_grad: 1.0
+  clip_grad_foreach: false
+  init_model_with_meta_device: false
+  optimizer: adamw
+  adam_fused: true
+  save_interval: 1000
+  use_deter_comp: false
+  log_interval: 1
+  plugin:
+    - mindspeed_mm/fsdp/models/step3_vl
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+    enable: false
+    start_step: 1
+    end_step: 2
+    save_path: ./memory_snapshot
+    dump_ranks: [0]
+    stacks: all
+    max_entries: null
+    mem_info: false

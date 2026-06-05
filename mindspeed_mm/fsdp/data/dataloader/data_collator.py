@@ -72,6 +72,31 @@ class DataCollatorForQwen3Omni:
         return self.data_collator(*args, **kwargs)
 
 
+class DataCollatorForStep3VL:
+    def __init__(self, ignore_pad_token_for_loss: bool, dataset_param=None, **kwargs):
+        process_args = ProcessorArguments(**dataset_param.preprocess_parameters.to_dict())
+        tokenizer_module = load_tokenizer(process_args)
+        tokenizer = tokenizer_module.get('tokenizer')
+
+        chat_template_path = dataset_param.basic_parameters.chat_template
+        if chat_template_path is not None:
+            tokenizer = update_tokenizer_with_chat_template(tokenizer, chat_template_path)
+            template = get_template_and_fix_tokenizer(tokenizer, None)
+        else:
+            template = get_template_and_fix_tokenizer(tokenizer, dataset_param.basic_parameters.template)
+
+        self.data_collator = MultiModalDataCollatorForSeq2Seq(
+            template=template,
+            model=kwargs.get("model", None),
+            pad_to_multiple_of=kwargs.get("pad_to_multiple_of", 8),
+            label_pad_token_id=IGNORE_INDEX if ignore_pad_token_for_loss else tokenizer.pad_token_id,
+            **tokenizer_module,
+        )
+
+    def __call__(self, *args, **kwargs):
+        return self.data_collator(*args, **kwargs)
+
+
 class DataCollatorForLLMPretrain:
     def __init__(self, dataset_param=None, **kwargs):
         if dataset_param is None:
@@ -87,5 +112,6 @@ class DataCollatorForLLMPretrain:
 DATA_COLLATOR = {
     "qwen3vl": DataCollatorForQwen2vl,
     "qwen3omni": DataCollatorForQwen3Omni,
+    "step3_vl": DataCollatorForStep3VL,
     "llm_pretrain": DataCollatorForLLMPretrain,
 }
