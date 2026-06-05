@@ -84,6 +84,11 @@ class FeaturesApplier:
         chunk_mbs_modules = get_chunkmbs_modules(model, self.config.chunkmbs_plan.apply_modules)
         apply_chunkmbs_module(chunk_mbs_modules=chunk_mbs_modules, chunkmbs_cfg=self.config.chunkmbs_plan)
 
+    def apply_optimizer_hook(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer):
+        from mindspeed.fsdp.quantization.core.cache import hook_optimizer_step
+
+        hook_optimizer_step(model, optimizer)
+
     def pre_fully_shard_apply(self, model):
         # The order of these three operations is critical and must not be changed.
         # 1. Recompute: Wraps the forward pass to save memory by recomputing strategy.

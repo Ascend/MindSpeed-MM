@@ -114,8 +114,7 @@ class Qwen3VLMoeTextRouter(nn.Linear):
         routing_weights, router_indices = torch.topk(routing_weights, self.top_k, dim=-1)
         routing_weights = routing_weights / routing_weights.sum(dim=-1, keepdim=True)
         routing_weights = routing_weights.to(hidden_states.dtype)
-        router_weights = torch.zeros_like(router_logits).scatter_(1, router_indices, routing_weights) # NOTE: htwang
-        return router_weights, router_logits, router_indices
+        return routing_weights, router_logits, router_indices
 
 
 class Qwen3VLMoeTextExperts(nn.Module):
@@ -140,13 +139,11 @@ class Qwen3VLMoeTextExperts(nn.Module):
 
         Args:
             hidden_states (torch.Tensor): (batch_size * token_num, hidden_size)
-            routing_weights (torch.Tensor): (batch_size * token_num, num_experts)
+            routing_weights (torch.Tensor): (batch_size * token_num, top_k)
             router_indices (torch.Tensor): (batch_size * token_num, top_k)
         Returns:
             torch.Tensor
         """
-        batch_size = hidden_states.shape[0]
-        hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
         if self.training:
             next_states = torch.zeros_like(hidden_states, dtype=hidden_states.dtype, device=hidden_states.device)
             with torch.no_grad():
@@ -165,17 +162,17 @@ class Qwen3VLMoeTextExperts(nn.Module):
                 out = gated_output @ self.down_proj[expert_idx]
                 weighted_output = out[0] * routing_weights[token_idx, expert_idx, None]
                 next_states.index_add_(0, token_idx, weighted_output.to(hidden_states.dtype))
-            next_states = next_states.view(batch_size, -1, self.hidden_size)
         else:
             hidden_states = hidden_states.repeat(self.num_experts, 1)
-            hidden_states = hidden_states.view(self.num_experts, -1, self.hidden_size)
+            hidden_states = hidden_states.view(self.num_experts, hidden_states.shape[0], self.hidden_size)
+
             gate_up = torch.bmm(hidden_states, self.gate_up_proj)
-            gate, up = gate_up.chunk(2, dim=-1)  # not supported for DTensors
+            gate, up = gate_up.chunk(2, dim=-1)
             next_states = torch.bmm((up * self.act_fn(gate)), self.down_proj)
-            next_states = next_states.reshape(self.num_experts, batch_size, -1, self.hidden_size)
-            next_states = (
-                next_states * routing_weights.transpose(0, 1).view(self.num_experts, batch_size, -1)[..., None]
-            )
+
+            next_states = next_states.reshape(self.num_experts, hidden_states.shape[0], self.hidden_size)
+
+            next_states = next_states * routing_weights.transpose(0, 1).view(self.num_experts, hidden_states.shape[0], 1)[..., None]
             next_states = next_states.sum(dim=0)
         return next_states
 
@@ -189,8 +186,13 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         self.experts = Qwen3VLMoeTextExperts(config)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        batch_size = hidden_states.shape[0]
+        hidden_states = hidden_states.reshape(-1, self.hidden_size) # (num_tokens, hidden_size)
         router_weights, router_logits, router_indices = self.gate(hidden_states)
+        if not self.training:
+            router_weights = torch.zeros_like(router_logits).scatter_(1, router_indices, router_weights) # NOTE: htwang
         routed_out = self.experts(hidden_states, router_weights, router_indices)
+        routed_out = routed_out.view(batch_size, -1, self.hidden_size)
         return routed_out, router_logits
 
 

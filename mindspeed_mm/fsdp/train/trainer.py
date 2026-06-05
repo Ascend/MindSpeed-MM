@@ -81,6 +81,10 @@ class Trainer:
         # if set `train_epochs`,  `train_iters` will be updated after building dataset
         self.lr_scheduler = self.get_scheduler()
 
+        # must behind lr_schedule builder
+        if args.training.quantization_plan.recipe_name:
+            self.model_features_applier.apply_optimizer_hook(self.model, self.optimizer)
+
         # Create the training engine
         self.trainer = TrainEngine(
             args,

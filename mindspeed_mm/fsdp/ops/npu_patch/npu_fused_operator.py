@@ -78,17 +78,12 @@ def silu_forward_npu(self, hidden_states):
 def fused_moe_forward_npu(
     self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor
 ) -> torch.Tensor:
-    if routing_weights.size() != router_indices.size():
-        routing_weights = routing_weights.gather(1, router_indices)
-    batch_size = hidden_states.shape[0]
-    hidden_states = hidden_states.reshape(-1, self.hidden_size)  # (num_tokens, hidden_size)
     permuted_hidden_states, row_ids_map = permute(hidden_states, router_indices.to(torch.int32), fused=True)
     tokens_per_expert = torch.histc(router_indices, bins=self.num_experts, min=0, max=self.num_experts)
     intermediate_hidden_states = grouped_matmul(permuted_hidden_states, self.gate_up_proj, tokens_per_expert, fused=True)
     intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=True)
     output = grouped_matmul(intermediate_activations, self.down_proj, tokens_per_expert, fused=True)
     next_states = unpermute(output, row_ids_map, probs=routing_weights, fused=True)
-    next_states = next_states.view(batch_size, -1, self.hidden_size)
     return next_states
 
 

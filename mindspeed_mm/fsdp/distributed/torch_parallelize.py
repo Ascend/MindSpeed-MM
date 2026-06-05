@@ -43,9 +43,26 @@ class ParallelApplier:
             set_modules_to_prefetch(model, fsdp_plan=self.config.fsdp_plan, ep_plan=ep_plan)
         return model
 
+    def apply_quantization_modules(self, model):
+        """Apply quantization based on quantization_format + quantization_recipe"""
+        if not self.training_config.quantization_plan.recipe_name:
+            return
+        try:
+            # recompute must set all now, TODO fix this bug
+            if self.config.recompute:
+                self.training_config.quantization_plan.fsdp_low_precision_all_gather_mode = "all"
+
+            from mindspeed.fsdp.quantization.converter.model_converter import build_model_converter
+
+            model_converters = build_model_converter(self.training_config.quantization_plan)
+            model_converters.convert(model)
+        except Exception as e:
+            raise RuntimeError(f"Failed to convert quantization plan") from e
+
     def __call__(self, model):
         # Apply configuration-based parallel strategies
         # Order matters: TP -> EP -> Recompute -> FSDP
+        self.apply_quantization_modules(model=model) # must set before fully_shard
         self.apply_tp_modules(model=model)
         self.apply_ep_modules(model=model)
         model = self.apply_fsdp_modules(model=model, training_config=self.training_config)

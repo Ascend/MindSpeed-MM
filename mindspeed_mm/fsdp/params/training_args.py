@@ -6,6 +6,7 @@ import os
 
 from mindspeed_mm.fsdp.params.lora_args import LoraArguments
 from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed.fsdp.parallel_engine_config import QuantizeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -268,6 +269,11 @@ class TrainingArguments(BaseArguments):
     lr_scaling_plan: Optional[List[LearningRateScalingPlanArguments]] = field(
         default=None,
         metadata={"help": "Learning rate ratios for layers in the model. Each element is a regex pattern to match the layer name and a ratio to apply to the learning rate."},
+    )
+
+    quantization_plan: QuantizeConfig = field(
+        default_factory=QuantizeConfig,
+        metadata={"help": "Quantization plan."},
     )
 
     def model_post_init(self, __context):
