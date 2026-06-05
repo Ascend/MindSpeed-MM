@@ -36,6 +36,7 @@ from checkpoint.vlm_model.mm_to_hf import copy_files_except_suffix
 class ConfigType(Enum):
     DEFAULT = 0
     QWEN3_OMNI = 1
+    QWEN3_5 = 2
 
 
 def get_config_type_from_class_name(save_dir: Path) -> ConfigType:
@@ -73,7 +74,7 @@ def merge_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, n
         new_down_proj_weight = torch.stack(down_proj_weights)
 
         # view experts weight: (expert_num, input_dim, output_dim) -> (expert_num * input_dim, output_dim)
-        if config_type != ConfigType.QWEN3_OMNI: # Exclude QWEN3_OMNI config type
+        if config_type == ConfigType.DEFAULT: # only DEFAULT config type
             new_gate_up_proj_weight = new_gate_up_proj_weight.view(-1, new_gate_up_proj_weight.shape[-1])
             new_down_proj_weight = new_down_proj_weight.view(-1, new_down_proj_weight.shape[-1])
 
@@ -97,7 +98,7 @@ def split_moe_expert_weights(state_dict: STATE_DICT_T, num_hidden_layers: int, n
         merged_gate_up_proj = state_dict.pop(gate_up_proj)
         merged_down_proj = state_dict.pop(down_proj)
         # view experts weight: (expert_num * input_dim, output_dim) -> (expert_num, input_dim, output_dim)
-        if config_type != ConfigType.QWEN3_OMNI: # Exclude QWEN3_OMNI config type
+        if config_type == ConfigType.DEFAULT: # only DEFAULT config type
             merged_gate_up_proj = merged_gate_up_proj.view(num_experts, -1, merged_gate_up_proj.shape[-1])
             merged_down_proj = merged_down_proj.view(num_experts, -1, merged_down_proj.shape[-1])
 

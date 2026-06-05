@@ -106,7 +106,7 @@ pip list | grep fla-npu
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
 
-如果使用fsdp2的meta init初始化模型，需要先根据模型配置完成以下权重转换：
+如果使用fsdp2的meta init初始化模型或MoE模型需要支持mtp，都需要先根据模型配置完成以下权重转换：
 
 (1) 模型配置文件config.json中的`tie_word_embeddings`字段为`true`时（例如0.8B，2B，4B模型），使用以下转换脚本：
 
@@ -136,6 +136,7 @@ mm-convert Qwen35Converter hf_to_dcp \
 ```
 
 并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
+注意：如果MoE模型不支持mtp，可在执行`mm-convert`权重转换前将`ckpt/hf_path/xxxxxxx/config.json`中的`mtp_num_hidden_layers`设置为0，以跳过mtp专家权重合并，缩短转换时间，如397B模型可以缩短约5分钟。
 
 MindSpeed MM保存权重的格式也为dcp格式，可使用如下命令将dcp权重转换回HF权重：
 
@@ -153,6 +154,7 @@ mm-convert Qwen35Converter dcp_to_hf \
 ```
 
 其中，`--save_hf_dir`表示转换后的权重保存路径，`--dcp_dir`表示保存的权重路径，`iter_000xx`表示保存的第xx步的权重，`--origin_hf_dir`表示原始huggingface权重的路径，`--to_bf16`表示权重数据类型是否从fp32转换成bf16。
+注意：如果模型没有开启mtp（即，在`xxx_config.yaml`中model下的`mtp_num_layers`字段配置为0或没有配置），默认转换后的权重中不会包含mtp层的权重，可以通过设置`--keep_origin_mtp_weights true`来保留mtp层的权重。
 
 ---
 <a id="jump3"></a>

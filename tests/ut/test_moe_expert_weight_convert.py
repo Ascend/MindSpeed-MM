@@ -11,13 +11,9 @@ from checkpoint.vlm_model.converters.moe_expert import (
     merge_moe_expert_weights,
     split_moe_expert_weights,
     save_sharded_state_dict,
-    moe_expert
+    moe_expert,
+    ConfigType,
 )
-
-
-class ConfigType(Enum):
-    DEFAULT = 0
-    QWEN3_OMNI = 1
 
 
 @pytest.fixture

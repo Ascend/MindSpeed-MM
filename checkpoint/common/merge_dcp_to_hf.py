@@ -12,7 +12,7 @@ from torch.distributed.checkpoint.state_dict_loader import _load_state_dict
 from torch.distributed.checkpoint.default_planner import _EmptyStateDictLoadPlanner
 
 from transformers import AutoConfig, AutoProcessor
-from safetensors.torch import save_file
+from safetensors.torch import load_file, save_file
 
 from checkpoint.common.permissions import set_directory_permissions
 from checkpoint.common.dcp_utils import load_metadata, extract_metadata, partial_load_dcp_state_dict
@@ -76,6 +76,35 @@ def save_hf_weights(
         save_file(sd, save_path / name, metadata=metadata)
 
     set_directory_permissions(save_path)
+
+
+def update_safetensors_files(
+    save_dir: Path,
+    state_dict: Dict,
+    weight_map: Dict[str, str],
+):
+    """
+    Update existing safetensors files with new state_dict entries.
+
+    This function groups new entries by their target file (from weight_map),
+    loads each file, merges in the new entries, and saves back.
+
+    Args:
+        save_dir (Path): Directory containing existing HF safetensors checkpoint.
+        state_dict (Dict): New state dict entries to merge into existing files.
+        weight_map (Dict[str, str]): Mapping from key name to target safetensors filename.
+    """
+    file_to_new_weights: Dict[str, Dict] = {}
+    for key, tensor in state_dict.items():
+        if key in weight_map:
+            target_file = weight_map[key]
+            file_to_new_weights.setdefault(target_file, {})[key] = tensor
+
+    for target_file, new_weights in file_to_new_weights.items():
+        file_path = Path(save_dir) / target_file
+        existing_state_dict = load_file(file_path)
+        existing_state_dict.update(new_weights)
+        save_file(existing_state_dict, file_path, metadata={"format": "pt"})
 
 
 @validate_arguments

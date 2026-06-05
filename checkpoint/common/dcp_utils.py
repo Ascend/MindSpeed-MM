@@ -1,4 +1,5 @@
 from typing import Optional, List
+from pathlib import Path
 import inspect
 import warnings
 import dataclasses
@@ -322,3 +323,50 @@ def extract_metadata(
     )
 
     return partial_metadata
+
+
+def append_state_dict_to_dcp(
+    dcp_dir: Path,
+    state_dict: STATE_DICT_TYPE,
+    part_idx: int = 100,
+):
+    """
+    Append additional state_dict entries to an existing DCP checkpoint.
+
+    This function reads the existing checkpoint metadata, writes the new tensors
+    as an additional shard, merges the metadata, and saves the updated metadata
+    so that both old and new entries are discoverable.
+
+    Args:
+        dcp_dir (Path): Path to the DCP checkpoint directory (containing 'release' subdir).
+        state_dict (STATE_DICT_TYPE): New state dict entries to append.
+        part_idx (int): Storage prefix index for the new shard, to avoid filename
+                        collisions with existing shards.
+    """
+    import pickle
+    from torch.distributed.checkpoint import FileSystemWriter, FileSystemReader
+    from checkpoint.common.permissions import set_directory_permissions
+
+    save_path = Path(dcp_dir) / "release"
+
+    storage_reader = FileSystemReader(save_path)
+    existing_metadata = load_metadata(storage_reader)
+
+    metadata_path = save_path / ".metadata"
+    metadata_path.unlink(missing_ok=True)
+
+    storage_writer = FileSystemWriter(save_path)
+    save_dict = {"model": state_dict}
+    global_meta, all_write = partial_save_dcp_state_dict(save_dict, storage_writer, part_idx=part_idx)
+
+    merged_meta = merge_meta_info([existing_metadata, global_meta])
+
+    mtp_storage_data = {}
+    write_results = all_write if isinstance(all_write, list) else [all_write]
+    for wr in write_results:
+        mtp_storage_data[wr.index] = wr.storage_data
+    merged_meta.storage_data = {**existing_metadata.storage_data, **mtp_storage_data}
+
+    with open(metadata_path, "wb") as f:
+        pickle.dump(merged_meta, f)
+    set_directory_permissions(save_path)
