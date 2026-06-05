@@ -1909,13 +1909,10 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
         # Modification: For Ulysses, cu_seq_len needs to be calculated before position_ids split
         kwargs_fa = kwargs
         ps = get_parallel_state()
-        if ps.is_ulysses_enable():
-            if not use_packing:
-                kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
-            else:
-                kwargs_fa = kwargs.copy()
-                kwargs_fa["cu_seq_lens_q"] = kwargs_fa["cu_seq_lens_q"].cpu()
-                kwargs_fa["cu_seq_lens_k"] = kwargs_fa["cu_seq_lens_k"].cpu()
+        if ps.is_ulysses_enable() and use_packing:
+            kwargs_fa = kwargs.copy()
+            kwargs_fa["cu_seq_lens_q"] = kwargs_fa["cu_seq_lens_q"].cpu()
+            kwargs_fa["cu_seq_lens_k"] = kwargs_fa["cu_seq_lens_k"].cpu()
 
         # Modification: sequence parallel patch
         total_seq_len = inputs_embeds.shape[1]

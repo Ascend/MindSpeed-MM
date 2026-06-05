@@ -177,7 +177,7 @@ def build_loss_func(
             )
 
     else:
-        def loss_func(logits, labels=None, vocab_size=None):
+        def loss_func(logits, labels=None, vocab_size=None, **kwargs):
             labels = labels if labels is not None else outer_labels
             if labels is None:
                 raise ValueError("labels must be provided either in build_loss_func or in loss_func call.")

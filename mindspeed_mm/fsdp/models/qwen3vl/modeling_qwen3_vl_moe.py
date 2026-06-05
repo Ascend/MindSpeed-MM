@@ -339,7 +339,6 @@ class Qwen3VLMoeTextAttention(nn.Module):
             attention_mask,
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
-            input_layout="BNSD",
             ring_in_bnsd=True,
             is_causal=True,
             total_seq_len=total_seq_len,
@@ -633,7 +632,6 @@ class Qwen3VLMoeVisionAttention(nn.Module):
                 max_length_q=max_seqlen,
                 max_length_k=max_seqlen,
                 is_causal=False,
-                input_layout="1NTD",
                 ring_in_bnsd=False,
                 total_seq_len=get_seq_len("visual"),
                 seq_split_lens=cal_split_sizes_multi(get_seq_len("per_visual"), get_parallel_state().get_ring_group_size()),
@@ -1051,18 +1049,22 @@ class Qwen3VLMoeTextModel(Qwen3VLMoePreTrainedModel):
         else:
             text_position_ids = position_ids[0]
 
-        attention_mask = create_causal_mask(
-            config=self.config,
-            input_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            cache_position=cache_position,
-            past_key_values=past_key_values,
-            position_ids=text_position_ids,
-        )
+        use_packing = "cu_seqlens" in kwargs and kwargs["cu_seqlens"] is not None
+        if use_packing:
+            attention_mask = None
+        else:
+            attention_mask = create_causal_mask(
+                config=self.config,
+                input_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                cache_position=cache_position,
+                past_key_values=past_key_values,
+                position_ids=text_position_ids,
+            )
 
         # Modification: For Ulysses, cu_seq_len needs to be calculated before position_ids split
         ps = get_parallel_state()
-        if ps.is_ulysses_enable():
+        if ps.is_ulysses_enable() and use_packing:
             kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
 
         # Modification: sequence parallel patch
