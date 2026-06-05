@@ -8,7 +8,7 @@ from diffusers.utils import load_image
 
 DTYPE = torch.float16
 MODEL_PATH = (
-    "stabilityai/stable-diffusion-3-medium-diffusers"  # 模型权重路径 或 微调结果路径
+    "stabilityai/stable-diffusion-3.5-large"  # 模型权重路径 或 微调结果路径
 )
 DEVICE = "npu"
 

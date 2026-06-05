@@ -318,7 +318,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
   </thead>
   <tbody>
     <tr>
-      <td rowspan="46"> 多模态生成 </td>
+      <td rowspan="42"> 多模态生成 </td>
       </tr>
       <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/lumina">Lumina-mGPT 2.0</a></td>
@@ -675,17 +675,6 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="./examples/diffusers/sd3">SD3</a></td>
-      <td><a href="https://github.com/huggingface/diffusers/tree/5f724735437d91ed05304da478f3b2022fe3f6fb">2B</a></td>
-      <td> 全参微调 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-      <td> 16.09 (FPS)</td>
-      <td> 16.01 (FPS)</td>
-      <td> / </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
       <td rowspan="2"><a href="./examples/diffusers/sd3">SD3.5</a></td>
       <td><a href="https://github.com/huggingface/diffusers/tree/5f724735437d91ed05304da478f3b2022fe3f6fb"> 8.1B </a></td>
       <td> 全参微调 </td>
@@ -749,39 +738,6 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 2.00 (FPS) </td>
       <td> / </td>
       <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td><a href="./examples/diffusers/sana">Sana</a></td>
-      <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">1.6B</a></td>
-      <td> Lora微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td> 28.7 (FPS) </td>
-      <td> 32.8 (FPS) </td>
-      <td> / </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td><a href="./examples/diffusers/hidream">HiDream</a></td>
-      <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">17B</a></td>
-      <td> Lora微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td> 18.37 (FPS) </td>
-      <td> 19.61 (FPS) </td>
-      <td> / </td>
-      <td>【Pass】</td>
-    </tr>
-    <tr>
-      <td><a href="./examples/diffusers/kolors">Kolors</a></td>
-      <td><a href="https://github.com/Kwai-Kolors/Kolors">2.6B</a></td>
-      <td> 推理 </td>
-      <td> 1x1 </td>
-      <td> FP16 </td>
-      <td> / </td>
-      <td> / </td>
-      <td> / </td>
-      <td>【Test】</td>
     </tr>
     <tr>
       <td><a href="./examples/diffusers/qwen_image">Qwen-Image</a></td>

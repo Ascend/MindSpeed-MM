@@ -3,11 +3,11 @@
 <p align="left">
 </p>
 
-- [SD3/SD3.5](#stable-diffusion-3--stable-diffusion-35)
+- [SD3.5](#jump1)
   - [模型介绍](#模型介绍)
   - [微调](#微调)
     - [环境搭建](#环境搭建)
-    - [微调](#微调-1)
+    - [微调](#jump2)
     - [性能](#性能)
   - [推理](#推理)
     - [环境搭建及运行](#环境搭建及运行)
@@ -17,7 +17,7 @@
 
 <a id="jump1"></a>
 
-# Stable Diffusion 3 & Stable Diffusion 3.5
+# Stable Diffusion 3.5
 
 ## 模型介绍
 
@@ -36,7 +36,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
+请参考[安装指南](../../../docs/zh/pytorch/install_guide.md)
 
 1. 软件与驱动安装
 
@@ -64,7 +64,7 @@
 
 3. 模型搭建
 
-    3.1 【下载 SD3/SD3.5 [GitHub参考实现](https://github.com/huggingface/diffusers) 或 [适配昇腾AI处理器的实现](https://gitcode.com/Ascend/ModelZoo-PyTorch.git) 或 在模型根目录下执行以下命令，安装模型对应PyTorch版本需要的依赖】
+    3.1 【下载 SD3.5 [GitHub参考实现](https://github.com/huggingface/diffusers) 或 [适配昇腾AI处理器的实现](https://gitcode.com/Ascend/ModelZoo-PyTorch.git) 或 在模型根目录下执行以下命令，安装模型对应PyTorch版本需要的依赖】
 
     ```shell
     git clone https://github.com/huggingface/diffusers.git
@@ -97,7 +97,6 @@
 
     ```shell
     vim sd3/finetune_sd3_dreambooth_deepspeed_**16.sh
-    vim sd3/finetune_sd3_dreambooth_fp16.sh
     ```
 
     ```shell
@@ -130,14 +129,7 @@
     >该数据集的训练过程脚本只作为一种参考示例。
     >
 
-2. 【配置 SD3/SD3.5 微调脚本】
-
-    【SD3】
-    用户可访问huggingface官网自行下载[sd3-medium模型](https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers/tree/main) `model_name`模型
-
-    ```bash
-    export model_name="stabilityai/stable-diffusion-3-medium-diffusers" # 预训练模型路径
-    ```
+2. 【配置 SD3.5 微调脚本】
 
     【SD3.5】
     用户可访问huggingface官网自行下载[sd3.5-large模型](https://huggingface.co/stabilityai/stable-diffusion-3.5-large/tree/main) `model_name`模型
@@ -177,12 +169,12 @@
     | dog | input_dir="dog" | --instance_data_dir=$input_dir; --instance_prompt="A photo of sks dog" |
     | pokemon | dataset_name="pokemon-blip-captions" | --dataset_name=$dataset_name --caption_column="text"; --instance_prompt="A photo of pokemon" |
 
-    修改`fp16_accelerate_config.yaml`的`deepspeed_config_file`的路径:
+    修改`bf16_accelerate_config.yaml`的`deepspeed_config_file`的路径:
 
     ```shell
-    vim sd3/fp16_accelerate_config.yaml
+    vim sd3/bf16_accelerate_config.yaml
     # 修改：
-    deepspeed_config_file: ./sd3/deepspeed_fp16.json # deepspeed JSON文件路径
+    deepspeed_config_file: ./sd3/deepspeed_bf16.json # deepspeed JSON文件路径
     ```
 
 3. 【Optional】Ubuntu系统需在`train_dreambooth_sd3.py`1705行附近 与 `train_dreambooth_lora_sd3.py`1861行附近 添加 `accelerator.print("")`
@@ -237,33 +229,18 @@
     # pipeline = pipeline.to(accelerator.device) # 原代码
     ```
 
-6. 【启动 SD3 微调脚本】
+6. 【启动 SD3.5 微调脚本】
 
     本任务主要提供**混精fp16**和**混精bf16**dreambooth和dreambooth+lora的**8卡**训练脚本，使用与不使用**deepspeed**分布式训练。
 
     ```shell
-    bash sd3/finetune_sd3_dreambooth_deepspeed_**16.sh #使用deepspeed,dreambooth微调
-    bash sd3/finetune_sd3_dreambooth_lora_deepspeed_fp16.sh #使用deepspeed,dreambooth微调 (sd3.5)
-    bash sd3/finetune_sd3_dreambooth_fp16.sh #无使用deepspeed,dreambooth微调
-    bash sd3/finetune_sd3_dreambooth_lora_fp16.sh #无使用deepspeed,dreambooth+lora微调 (sd3)
+    bash sd3/finetune_sd3_dreambooth_deepspeed_bf16.sh #使用deepspeed,dreambooth微调 
+    bash sd3/finetune_sd3_dreambooth_lora_deepspeed_fp16.sh #使用deepspeed,dreambooth微调
     ```
 
 ### 性能
 
 #### 吞吐
-
-SD3 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
-
-| 芯片 | 卡数 |     任务     |  FPS  | batch_size | AMP_Type | Resolution | Torch_Version | deepspeed |
-|:---:|:---:|:----------:|:-----:|:----------:|:---:|:---:|:---:|:---:|
-| Atlas 900 A2 PODc | 8p | Dreambooth-全参微调  |   16.09 |     4      | bf16 | 1024 | 2.1 | ✔ |
-| 竞品A | 8p | Dreambooth-全参微调  |  16.01 |     4      | bf16 | 1024 | 2.1 | ✔ |
-| Atlas 900 A2 PODc | 8p | Dreambooth-全参微调 |  15.16 |     4      | fp16 | 1024 | 2.1 | ✔ |
-| 竞品A | 8p | Dreambooth-全参微调 |   15.53 |     4      | fp16 | 1024 | 2.1 | ✔ |
-| Atlas 900 A2 PODc |8p | Dreambooth-全参微调 | 3.11  | 1 | fp16 | 1024 | 2.1 | ✘ |
-| 竞品A | 8p | Dreambooth-全参微调 | 3.71 | 1 | fp16 | 1024 | 2.1 | ✘ |
-| Atlas 900 A2 PODc |8p | DreamBooth-LoRA | 108.8 | 8 | fp16 | 1024 | 2.1 | ✘ |
-| 竞品A | 8p | DreamBooth-LoRA | 110.69 | 8 | fp16 | 1024 | 2.1 | ✘ |
 
 SD3.5 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
@@ -287,10 +264,10 @@ SD3.5 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
   调用推理脚本
 
   ```shell
-  cd sd3/ # # 进入sd3目录
+  cd sd3/ # # 进入sd3.5目录
   ```
 
-【SD3/SD3.5模型推理】
+【SD3.5模型推理】
 
 ```shell
 vim infer_sd3_text2img.py # 进入运行T2I推理的Python文件
@@ -301,7 +278,7 @@ vim infer_sd3_img2img.py # 进入运行I2I推理的Python文件
   1. 修改路径
 
       ```python
-      MODEL_PATH = "stabilityai/stable-diffusion-3.5-large"  # 路径可选择sd3/sd3.5模型权重 或 Dreambooth 微调后输出模型
+      MODEL_PATH = "stabilityai/stable-diffusion-3.5-large"  # 路径可选择sd3.5模型权重 或 Dreambooth 微调后输出模型
       DTYPE = torch.float16 # 可选择混精模式
       ```
 
@@ -321,7 +298,7 @@ vim infer_sd3_img2img.py # 进入运行I2I推理的Python文件
   1. 修改路径
 
       ```python
-      MODEL_PATH = "stabilityai/stable-diffusion-3.5-large"  # 路径可选择sd3/sd3.5模型权重 或 Dreambooth 微调后输出模型
+      MODEL_PATH = "stabilityai/stable-diffusion-3.5-large"  # 路径可选择sd3.5模型权重 或 Dreambooth 微调后输出模型
       LORA_WEIGHTS = "./output/pytorch_lora_weights.safetensors"  # LoRA权重路径
       ```
 

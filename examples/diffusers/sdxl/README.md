@@ -3,19 +3,15 @@
 <p align="left">
 </p>
 
-- [SDXL](#stable-diffusion-xl)
+- [SDXL](#jump1)
   - [模型介绍](#模型介绍)
   - [预训练](#预训练)
     - [环境搭建](#环境搭建)
-    - [预训练](#预训练-1)
+    - [预训练](#jump2)
     - [性能](#性能)
-  - [微调](#微调)
-    - [环境搭建](#环境搭建-1)
-    - [微调](#微调-1)
-    - [性能](#性能-1)
   - [推理](#推理)
     - [环境搭建及运行](#环境搭建及运行)
-    - [性能](#性能-2)
+    - [性能](#jump4)
   - [环境变量声明](#环境变量声明)
 - [引用](#引用)
   - [公网地址说明](#公网地址说明)
@@ -41,7 +37,7 @@
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
+请参考[安装指南](../../../docs/zh/pytorch/install_guide.md)
 
 1. 软件与驱动安装
 
@@ -246,177 +242,11 @@ SDXL 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 | 竞品A | 8p | SDXL_pretrain_fp16 |  20.77 |     4      | fp16 | 2.1 | ✔ |
 | Atlas 900 A2 PODc | 8p | SDXL_pretrain_fp16 | 19.67 |     4      | fp16 | 2.1 | ✔ |
 
-## 微调
-
-<a id="jump3"></a>
-
-### 环境搭建
-
-#### LORA微调-数据集
-
-   > **说明：**
-   > 环境搭建同预训练。数据集同预训练的`pokemon-blip-captions`，请参考预训练章节。
-   >
-
-  ```shell
-  sdxl/finetune_sdxl_lora_deepspeed_fp16.sh
-  ```
-
-#### Controlnet微调-数据集
-
-   用户需自行获取[fill50k](https://huggingface.co/datasets/fusing/fill50k)数据集，并在以下启动shell脚本中将`dataset_name`参数设置为本地数据集的绝对路径，以及需要修改里面fill50k.py文件
-
-   ```shell
-   sdxl/finetune_sdxl_controlnet_deepspeed_fp16.sh
-   ```
-
-   deepspeed版本需改成0.14.4版本
-
-   参考如下修改controlnet/train_controlnet_sdxl.py, 追加trust_remote_code=True
-
-   ```shell
-   dataset = load_dataset(
-            args.dataset_name,
-            args.dataset_config_name,
-            cache_dir=args.cache_dir,
-            trust_remote_code=True
-          )
-   ```
-
-   > **注意：**
-   >需要修改数据集下面的fill50k.py文件中的57到59行，修改示例如下:
->
-   > ```python
-   > metadata_path = "数据集路径/fill50k/train.jsonl"
-   > images_dir = "数据集路径/fill50k"
-   > conditioning_images_dir = "数据集路径/fill50k"
-   >```
->
-   fill50k数据集格式如下:
-
-   ```shell
-   fill50k
-   ├── images
-   ├── conditioning_images
-   ├── train.jsonl
-   └── fill50k.py
-   ```
-
-   > **说明：**
-   >该数据集的训练过程脚本只作为一种参考示例。
-
-#### 全参微调-数据集
-
-   > **说明：**
-   > 数据集同Lora微调，请参考Lora章节。
-   >
-
-#### 获取预训练模型
-
-   获取[sdxl-base模型](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) `model_name`模型与[sdxl-vae模型](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix) `vae_name`。
-
-   获取对应的预训练模型后，在`Controlnet微调`shell启动脚本中将`model_name`参数设置为本地预训练模型绝对路径，将`vae_name`参数设置为本地`vae`模型绝对路径。
-
-   ```shell
-   sdxl/finetune_sdxl_controlnet_deepspeed_fp16.sh
-   ```
-
-   `Lora微调`与`全参微调`shell启动脚本中将`model_name`参数设置为本地预训练模型绝对路径
-
-   ```shell
-   sdxl/finetune_sdxl_deepspeed_fp16.sh
-   sdxl/finetune_sdxl_lora_deepspeed_fp16.sh
-   ```
-
-   > **说明：**
-   > 预训练模型同预训练，请参考预训练章节。
-   >
-
-<a id="jump3.1"></a>
-
-### 微调
-
-   【Optional】如是Ubuntu系统需在 `examples/text_to_image/train_text_to_image_lora_sdxl.py` 与 `examples/controlnet/train_controlnet_sdxl.py` 添加 `accelerator.print("")`：[参考](#jump2.1)
-
-   > **注意**
-   > train_text_to_image_lora_sdxl 在1235行附近添加; train_controlnet_sdxl 在1307行附近添加
-   >
-
-  【Lora断点推理权重保存】
-
-   如需保存checkpointing steps中的Lora_weights，须在代码上方（同sdxl预训练中的patch修改）添加如下：
-
-   ```python
-  from patch_sdxl import save_Lora_Weights
-  ```
-
-  并在train_text_to_image_lora_sdxl.py的1227行附近，`accelerator.save_state(save_path)`下方添加`save_Lora_Weights(unwrap_model, unet, text_encoder_one, text_encoder_two, args.train_text_encoder, save_path)`,如下：
-
-  ```python
-  accelerator.save_state(save_path)
-  save_Lora_Weights(unwrap_model, unet, text_encoder_one, text_encoder_two, args.train_text_encoder, save_path)
-  logger.info(f"Saved state to {save_path}")
-  ```
-
-   【运行微调的脚本】
-
-    ```shell
-    # 单机八卡微调
-    # finetune_sdxl_controlnet_deepspeed_fp16.sh 中依赖的图片，可以通过下面命令下载
-    # wget https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/diffusers/controlnet_training/conditioning_image_1.png
-    # wget https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/diffusers/controlnet_training/conditioning_image_2.png
-    bash sdxl/finetune_sdxl_controlnet_deepspeed_fp16.sh      #8卡deepspeed训练 sdxl_controlnet fp16
-    bash sdxl/finetune_sdxl_lora_deepspeed_fp16.sh            #8卡deepspeed训练 sdxl_lora fp16
-    bash sdxl/finetune_sdxl_deepspeed_fp16.sh        #8卡deepspeed训练 sdxl_finetune fp16
-    ```
-
-<a id="jump3.2"></a>
-
-### 性能
-
-| 芯片 | 卡数 |     任务     |  FPS  | batch_size | AMP_Type | Torch_Version | deepspeed |
-|:---:|:---:|:----------:|:-----:|:----------:|:---:|:---:|:---:|
-| 竞品A | 8p |    LoRA    | 31.74 |     7      | fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc |8p |    LoRA    | 26.40 |     7      | fp16 | 2.1 | ✔ |
-| 竞品A | 8p | Controlnet | 32.44  |     5      | fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc |8p | Controlnet | 29.98 |     5      | fp16 | 2.1 | ✔ |
-| 竞品A | 8p |  Finetune  | 164.66 |     24     | fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc |8p |  Finetune  | 166.71 |     24     | fp16 | 2.1 | ✔ |
-
-**注**：Finetune任务中的FPS会在散热器性能较弱时波动幅度增大
-
 ## 推理
 
 ### 环境搭建及运行
 
   **同微调对应章节**
-
- 【运行推理的脚本】
-
-- 单机单卡推理,脚本配置
-  - sdxl/sdxl_text2img_lora_infer.py
-    - model_path配置为lora微调的输出目录 ，即用户在sdxl_text2img_lora_deepspeed.sh中指定的output_path
-    - "stabilityai/stable-diffusion-xl-base-1.0"，无网络时，用户可访问huggingface官网自行[下载](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
-  - sdxl/sdxl_text2img_controlnet_infer.py
-    - base_model_path配置为"stabilityai/stable-diffusion-xl-base-1.0"，无网络时，用户可访问huggingface官网自行[下载](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
-    - controlnet_path配置为controlnet微调输出的结果路径，即用户在sdxl_text2img_controlnet_deepspeed.sh中指定的output_path
-  - sdxl/sdxl_text2img_infer.py
-    - "/diffusion/sdxl/pretrained/"配置为"stabilityai/stable-diffusion-xl-base-1.0"，无网络时，用户可访问huggingface官网自行[下载](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
-    - "/diffusion/sdxl/pretrained/"也可以配置为微调输出的结果路径, 即微调脚本中指定的output_path
-  - sdxl/sdxl_img2img_infer.py
-    - MODEL_NAME配置为 "stabilityai/stable-diffusion-xl-base-1.0"，无网络时，用户可访问huggingface官网自行[下载](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
-    - VAE_NAME 配置为 "madebyollin/sdxl-vae-fp16-fix", 无网络时，用户可访问huggingface官网自行[下载](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix)
-    - "Intel/dpt-hybrid-midas", 无网络时，用户可访问huggingface官网自行[下载](https://huggingface.co/Intel/dpt-hybrid-midas)
-    - "diffusers/controlnet-depth-sdxl-1.0-small", 无网络时，用户可访问huggingface官网自行[下载](https://huggingface.co/diffusers/controlnet-depth-sdxl-1.0-small)
-
-- 调用推理脚本
-
-  ```shell
-  python sdxl/sdxl_text2img_lora_infer.py        # 混精fp16 文生图lora微调任务推理
-  python sdxl/sdxl_text2img_controlnet_infer.py  # 混精fp16 文生图controlnet微调任务推理
-  python sdxl/sdxl_text2img_infer.py             # 混精fp16 文生图全参微调任务推理
-  python sdxl/sdxl_img2img_infer.py              # 混精fp16 图生图微调任务推理
-  ```
 
 【分布式推理】
 
@@ -448,14 +278,8 @@ SDXL 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
 | 芯片 | 卡数 |     任务     |  E2E（it/s）  |  AMP_Type | Torch_Version | deepspeed |
 |:---:|:---:|:----------:|:-----:|:---:|:---:|:---:|
-| 竞品A | 1p |    文生图lora    | 1.45 |  fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc |8p |    文生图lora    | 2.61 |  fp16 | 2.1 | ✔ |
-| 竞品A | 1p | 文生图controlnet | 1.41  |  fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc |1p | 文生图controlnet | 2.97 |  fp16 | 2.1 | ✔ |
 | 竞品A | 1p |  文生图全参  | 1.55 | fp16 | 2.1 | ✔ |
 | Atlas 900 A2 PODc |1p |  文生图全参  | 3.02 | fp16 | 2.1 | ✔ |
-| 竞品A | 1p |  图生图  | 3.56 | fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc |1p |  图生图  | 3.94 | fp16 | 2.1 | ✔ |
 
 ## 环境变量声明
 
