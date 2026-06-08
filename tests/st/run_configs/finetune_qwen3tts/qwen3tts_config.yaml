@@ -1,0 +1,93 @@
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  pregather: true
+  fsdp_plan:
+    param_dtype: bf16
+    reduce_dtype: fp32
+  recompute: false
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+
+data:
+  dataset_param:
+    dataset_type: qwen3tts
+
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH /home/ci_resource/models/Qwen3-TTS-12Hz-1.7B-Base
+
+    basic_parameters:
+      dataset_dir: &DATASET_PATH /home/ci_resource/data/qwen3tts/train_with_codes.jsonl
+      dataset: *DATASET_PATH
+      max_samples: 50
+
+  dataloader_param:
+    pin_memory: true
+    shuffle: false
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 0
+    collate_param:
+      model_name: qwen3tts
+
+model:
+  model_id: qwen3_tts
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  attn_implementation: eager
+
+features:
+  loss_cfg:
+    loss_type: raw
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1e-6
+  lr_decay_style: constant
+  lr_warmup_ratio: 0
+  weight_decay: 0.01
+  train_iters: 5
+  clip_grad: 1.0
+  init_model_with_meta_device: false
+  optimizer: adamw
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_eps: 1e-8
+  adam_fused: false
+  save_interval: 10000
+  use_deter_comp: false
+  allow_hf32: false
+  plugin:
+    - mindspeed_mm/fsdp/models/qwen3tts
+    - mindspeed_mm/fsdp/data/datasets/qwen3tts
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false
