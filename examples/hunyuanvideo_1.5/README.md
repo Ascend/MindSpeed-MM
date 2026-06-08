@@ -20,6 +20,7 @@
     - [准备工作](#准备工作-1)
     - [参数配置](#参数配置-1)
     - [启动推理](#启动推理)
+  - [SSTA稀疏注意力配置](#ssta稀疏注意力配置)
   - [环境变量声明](#环境变量声明)
 
 ## 版本说明
@@ -288,6 +289,34 @@ bash examples/hunyuanvideo_1.5/t2v/inference_*.sh
 ```shell
 bash examples/hunyuanvideo_1.5/i2v/inference_*.sh
 ```
+
+## SSTA稀疏注意力配置
+
+SSTA（Selective and Sliding Tile Attention）是HunyuanVideo1.5中提出的一种在DiT注意力计算中应用块稀疏计算的方法，通过融合STA（局部时空邻域）和MOBA（全局动态路由）实现3D结构感知，并依赖NPU融合算子提升计算效率。
+
+训练和推理均通过`model_xx.json`配置文件中的`predictor`字段配置SSTA。推理依赖官方提供的稀疏权重，可在`examples/hunyuanvideo_1.5/i2v/inference_model_cfg_distill_sparse.json`中配置官方使用SSTA蒸馏训练的权重进行推理。开启SSTA时，默认核心配置如下：
+
+```json
+"attn_mode": "flex-block-attn",
+"attn_param": {
+    "win_size": [[3, 3, 3]],
+    "tile_size": [6, 8, 8],
+    "ssta_topk": 64,
+    "ssta_threshold": 0.0,
+    "ssta_lambda": 0.7,
+    "ssta_sampling_type": "importance",
+    "ssta_adaptive_pool": null,
+    "attn_sparse_type": "ssta",
+    "attn_pad_type": "zero",
+    "attn_use_text_mask": 1,
+    "attn_mask_share_within_head": 0
+}
+```
+
+【使用约束】：
+
+- SSTA依赖`torch_npu.npu_block_sparse_attention`，需要在支持该算子的Ascend NPU环境中运行。
+- 建议保持默认的`tile_size`、`win_size`和`ssta_topk`等相关参数，若修改参数需要重新进行模型训练。如需调整参数，需要确保BlockSize（即`tile_size`的乘积）为128的倍数。
 
 ## 环境变量声明
 

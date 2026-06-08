@@ -25,20 +25,11 @@ from PIL import Image
 from einops import rearrange, repeat
 from torch import nn
 from torch.distributed.device_mesh import init_device_mesh
+from mindspeed_mm.utils.utils import get_device, is_npu_available
 
 
-def is_sparse_attn_supported():
-    return 'nvidia h' in torch.cuda.get_device_properties(0).name.lower()
-
-
-def is_sparse_attn_available():
-    if not is_sparse_attn_supported():
-        return False
-    try:
-        from flex_block_attn import flex_block_attn_func  # noqa: F401
-        return True
-    except Exception:
-        return False
+def is_sparse_attn_available() -> bool:
+    return is_npu_available() and hasattr(torch_npu, "npu_block_sparse_attention")
 
 
 def is_angelslim_available():

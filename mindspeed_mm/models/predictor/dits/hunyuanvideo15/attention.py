@@ -1,3 +1,4 @@
+
 # Licensed under the TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,6 +15,7 @@
 # of rights and permissions under this agreement.
 # See the License for the specific language governing permissions and limitations under the License.
 
+
 from typing import Optional
 
 import einops
@@ -21,10 +23,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch_npu
+import numpy as np
 
 from .utils import flash_attn_no_pad, flash_attn_no_pad_v3
 from .utils import get_parallel_state
 from .utils import maybe_fallback_attn_mode
+from .ssta_attention import ssta_3d_attention
 from .communications import (
     all_gather,
     all_to_all_4D,
@@ -217,6 +221,72 @@ def sequence_parallel_attention(q, k, v,
         qkv = torch.stack([query, key, value], dim=2)
         attn_mask = F.pad(text_mask, (sequence_length, 0), value=True)
         hidden_states = flash_attn_no_pad_v3(qkv, attn_mask, causal=False, dropout_p=0.0, softmax_scale=None)
+
+    elif attn_mode == "flex-block-attn":
+        sparse_type = attn_param["attn_sparse_type"]  # sta/block_attn/ssta
+        ssta_threshold = attn_param["ssta_threshold"]
+        ssta_lambda = attn_param["ssta_lambda"]
+        ssta_sampling_type = attn_param["ssta_sampling_type"]
+        ssta_adaptive_pool = attn_param["ssta_adaptive_pool"]
+
+        attn_pad_type = attn_param["attn_pad_type"]  # repeat/zero
+        attn_use_text_mask = attn_param["attn_use_text_mask"]
+        attn_mask_share_within_head = attn_param["attn_mask_share_within_head"]
+
+        ssta_topk = attn_param["ssta_topk"]
+        thw = attn_param["thw"]
+        tile_size = attn_param["tile_size"]
+        win_size = attn_param["win_size"][0].copy()
+
+        def get_image_tile(tile_size):
+            block_size = np.prod(tile_size)
+            if block_size == 384:
+                tile_size = (1, 16, 24)
+            elif block_size == 128:
+                tile_size = (1, 16, 8)
+            elif block_size == 64:
+                tile_size = (1, 8, 8)
+            elif block_size == 16:
+                tile_size = (1, 4, 4)
+            else:
+                raise ValueError(f"Error tile_size {tile_size}, only support in [16, 64, 128, 384]")
+            return tile_size
+
+        if thw[0] == 1:
+            tile_size = get_image_tile(tile_size)
+            win_size = [1, 1, 1]
+        elif thw[0] <= 31:
+            ssta_topk = ssta_topk // 2
+
+        # Concatenate and permute query, key, value to (B, H, S, D)
+        query = torch.cat([query, encoder_query], dim=1).permute(0, 2, 1, 3)
+        key = torch.cat([key, encoder_key], dim=1).permute(0, 2, 1, 3)
+        value = torch.cat([value, encoder_value], dim=1).permute(0, 2, 1, 3)
+
+        assert (
+            query.shape[-1] == 128
+        ), "The last dimension of query, key and value must be 128 for flex-block-attn."
+
+        hidden_states = ssta_3d_attention(
+            query,
+            key,
+            value,
+            thw,
+            topk=ssta_topk,
+            tile_thw=tile_size,
+            kernel_thw=win_size,
+            text_len=encoder_sequence_length,
+            sparse_type=sparse_type,
+            threshold=ssta_threshold,
+            lambda_=ssta_lambda,
+            pad_type=attn_pad_type,
+            text_mask=text_mask if attn_use_text_mask else None,
+            sampling_type=ssta_sampling_type,
+            adaptive_pool=ssta_adaptive_pool,
+            mask_share_within_head=attn_mask_share_within_head,
+        )
+        hidden_states, sparse_ratio = hidden_states
+        hidden_states = hidden_states.permute(0, 2, 1, 3)
     else:
         raise NotImplementedError(
             f'Unsupported attention mode: {attn_mode}. Only torch, flash, flash3, sageattn and flex-block-attn are supported.'
