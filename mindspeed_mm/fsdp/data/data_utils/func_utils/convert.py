@@ -60,6 +60,24 @@ class TokenizerModule(TypedDict):
     processor: Optional["ProcessorMixin"]
 
 
+def merge_consecutive_tools(messages:List[Dict[str, Any]], role_key: str = "role", 
+                            content_key: str = "content", sep: str = "\n") -> List[Dict[str, Any]]:
+    if not messages:
+        return messages
+    
+    merged = []
+    for msg in messages:
+        role = msg.get(role_key)
+        if (merged and role == merged[-1].get(role_key) and role in (Role.TOOL_CALL.value, Role.TOOL_RESPONSE.value)):
+            prev = merged[-1]
+            prev_content = prev.get(content_key) or ""
+            new_content = msg.get(content_key) or ""
+            prev[content_key] = f"{prev_content}{sep}{new_content}" if prev_content else new_content
+        else:
+            merged.append(dict(msg))
+    return merged
+
+
 @dataclass
 class DatasetConverter:
     dataset_attr: "DatasetAttr"
@@ -233,7 +251,11 @@ class MultiModalToolDatasetConverter(DatasetConverter):
         else:
             system = example[self.dataset_attr.system] if self.dataset_attr.system else ""
 
-        aligned_messages = messages
+        aligned_messages = merge_consecutive_tools(
+                                                    messages,
+                                                    role_key=self.dataset_attr.role_tag or "role",
+                                                    content_key=self.dataset_attr.content_tag or "content",
+                                                    )
 
         prompt = aligned_messages[:-1]
         response = aligned_messages[-1:]
