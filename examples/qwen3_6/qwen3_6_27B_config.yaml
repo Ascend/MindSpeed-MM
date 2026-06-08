@@ -74,7 +74,8 @@ model:
   freeze:
     - model.visual
   # 融合算子配置
-  use_triton_gdn: true
+  gdn_implementation: triton
+  causal_conv1d_implementation: eager
 
 # 优化特性配置
 features:
