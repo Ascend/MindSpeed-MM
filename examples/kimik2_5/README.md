@@ -1,4 +1,4 @@
-# Kimi-K2.5 使用指南
+# Kimi-K2.5 / K2.6 使用指南
 
 <p align="left">
 </p>
@@ -16,7 +16,8 @@
   - [数据混合数据集处理](#2纯文本或有图无图混合训练数据-以llava-instruct-150k为例)
 - [训练](#训练)
   - [准备工作](#1-准备工作)
-  - [启动训练](#2-启动训练)
+  - [配置参数](#2-配置参数)
+  - [启动训练](#3-启动训练)
 - [环境变量声明](#环境变量声明)
 - [注意事项](#注意事项)
 
@@ -24,14 +25,25 @@
 
 ### 参考实现
 
+**Kimi-K2.5**
+
 ```shell
 url=https://huggingface.co/moonshotai/Kimi-K2.5/tree/main
 commit_id=3367c8d
 ```
 
+**Kimi-K2.6**
+
+```shell
+url=https://huggingface.co/moonshotai/Kimi-K2.6/tree/main
+commit_id=7eb5002
+```
+
 ### 变更记录
 
 2026.02.13: 首次支持Kimi-K2.5模型
+
+2026.06.05: 首次支持Kimi-K2.6模型
 
 ---
 <a id="jump1"></a>
@@ -143,7 +155,14 @@ pip install tiktoken==0.12.0
 
 ### 1. 准备工作
 
-从Huggingface库 （[Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)） 下载下列文件并放置于本地`mindspeed_mm/fsdp/models/kimik2_5`路径下；
+从Huggingface库下载下列文件并放置于本地`mindspeed_mm/fsdp/models/kimik2_5`路径下：
+
+- Kimi-K2.5: [Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)
+- Kimi-K2.6: [Kimi-K2.6](https://huggingface.co/moonshotai/Kimi-K2.6/tree/main)
+
+> **说明**：Kimi-K2.6 与 Kimi-K2.5 共用相同的模型代码目录 `mindspeed_mm/fsdp/models/kimik2_5`，仅权重文件不同。
+
+以 Kimi-K2.5 为例：
 
 ```shell
 # HF_PATH配置为HuggingFace库下载文件的存放路径
@@ -168,7 +187,7 @@ cp -f \
 cd ${MM_PATH}
 ```
 
-Kimi-K2.5模型需要配置多机训练，如需拉起多机训练，请修改启动脚本下的 `MASTER_ADDR`、`NNODES` 以及 `NODE_RANK` 变量：
+Kimi-K2.5/K2.6 模型需要配置多机训练，如需拉起多机训练，请修改启动脚本下的 `MASTER_ADDR`、`NNODES` 以及 `NODE_RANK` 变量：
 
 ``` shell
 MASTER_ADDR: 主节点IP地址
@@ -180,9 +199,27 @@ NODE_RANK: 当前节点序号
 
 <a id="jump3.2"></a>
 
-### 2. 启动训练
+### 2. 配置参数
 
-在 `kimik2_5_config.yaml` 文件中配置好数据集路径后，使用如下命令，即可实现Kimi-K2.5的训练：
+以下配置项在 `kimik2_5_config.yaml` 中设置：
+
+| 配置项 | 配置路径 | 参数说明 | 调整说明 |
+|--------|----------|----------|----------|
+| `ulysses_parallel_size` | `parallel` | ulysses-cp 并行度 | 值为1时不开启，根据实际情况调整 |
+| `num_to_forward_prefetch` | `parallel->fsdp_plan` | 前向计算时预取后续层参数 | 减少通信等待开销 |
+| `num_to_backward_prefetch` | `parallel->fsdp_plan` | 反向计算时预取后续层参数 | 减少通信等待开销 |
+| `enable_preload` | `data->dataloader_param` | 数据预加载开关 | 开启后数据加载与计算重叠，减少训练等待时间 |
+| `enable_activation_offload` | `features` | 激活值卸载到Host侧内存开关 | 开启后降低Device显存占用，`apply_modules`指定需要开启该特性的module |
+| `enable_chunk_mbs` | `features` | 是否开启chunkmbs特性 | 需与`chunkmbs_plan`关联使用，开启后将MicroBatch维度切分为多个微块依次计算，可压缩激活显存峰值并提升训练吞吐 |
+| `chunkmbs_plan` | `features` | chunkmbs切分策略配置 | 仅在`enable_chunk_mbs`启用时生效，包含`chunk_mbs`、`batch_dim`、`chunk_arg_indexs`、`chunk_kwarg_names`等子字段，详细说明请参考[chunkmbs文档](../../docs/zh/features/chunkmbs.md) |
+
+<a id="jump3.3"></a>
+
+### 3. 启动训练
+
+(1) 修改 `kimik2_5_config.yaml` 中 `data->dataset_param->basic_parameters->dataset` 字段，配置实际的数据集路径；
+
+(2) 启动训练：
 
 ```shell
 bash examples/kimik2_5/finetune_kimik2_5.sh
