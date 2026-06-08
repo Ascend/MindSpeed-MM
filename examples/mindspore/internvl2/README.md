@@ -31,7 +31,7 @@
 | 昇腾NPU驱动固件  | [在研版本](https://www.hiascend.com/hardware/firmware-drivers/community?product=1&model=30&cann=8.0.RC3.alpha002&driver=1.0.26.alpha) |
 | 昇腾 CANN        | [在研版本](https://www.hiascend.com/zh/developer/download/community/result?module=cann) |
 | MindSpore        | [2.7.1](https://www.mindspore.cn/install/)         |
-| Python           | >=3.9                                                        |                                          |
+| Python           | >=3.9                                                        |
 
 ### 仓库拉取及环境搭建
 

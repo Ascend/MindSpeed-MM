@@ -31,8 +31,8 @@ MindSpeed MM MindSpore后端的依赖配套如下表，安装步骤参考[基础
 | 昇腾NPU驱动固件  | [在研版本](https://www.hiascend.com/hardware/firmware-drivers/community?product=1&model=30&cann=8.3.RC1&driver=Ascend+HDK+25.3.RC1) |
 | 昇腾 CANN        | [8.3.rc1](https://www.hiascend.com/developer/download/community/result?module=cann&cann=8.3.RC1)                                |
 | MindSpore        | [2.7.2](https://www.mindspore.cn/install/)                                                                                      |
-| Python           | >=3.9                                                                                                                           |                                          |
-|transformers     | [v4.53.0](https://github.com/huggingface/transformers/tree/v4.53.0)                                                             |    |
+| Python           | >=3.9                                                                                                                           |
+|transformers     | [v4.53.0](https://github.com/huggingface/transformers/tree/v4.53.0)                                                             |
 
 <a id="jump1.1"></a>
 

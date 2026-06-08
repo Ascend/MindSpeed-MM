@@ -30,23 +30,15 @@ PR合入前都须通过全量CI门禁用例测试。
 
 | Module | Features | Scripts |
 | :------- | :--------- | :-------- |
-| **Pretrain** | CogVideoX T2V, TP=2, CP=2, Ulysses CP | [pretrain_cogvideox_t2v_1_0.sh](st/shell_scripts/pretrain_cogvideox_t2v_1_0.sh) |
-| | CogVideoX I2V, TP=2, PP=2, CP=2, Ulysses CP | [pretrain_cogvideox_i2v_1.5.sh](st/shell_scripts/pretrain_cogvideox_i2v_1.5.sh) |
-| | HunyuanVideo T2V, TP=4, CP=1 | [pretrain_hunyuanvideo_t2v.sh](st/shell_scripts/pretrain_hunyuanvideo_t2v.sh) |
-| | OpenSoraPlan 1.3, TP=2, CP=2 | [pretrain_opensoraplan1_3.sh](st/shell_scripts/pretrain_opensoraplan1_3.sh) |
-| | Wan2.1 T2V, FSDP2 | [pretrain_wan2.1_t2v.sh](st/shell_scripts/pretrain_wan2.1_t2v.sh) |
+| **Pretrain** | Wan2.1 T2V, FSDP2 | [pretrain_wan2.1_t2v.sh](st/shell_scripts/pretrain_wan2.1_t2v.sh) |
+| | Wan2.1 T2V, FSDP2, Megatron-Bridge | [pretrain_wan2.1_t2v_use_bridge.sh](st/shell_scripts/pretrain_wan2.1_t2v_use_bridge.sh) |
 | | Wan2.2 I2V, FSDP2 | [pretrain_wan2.2_i2v.sh](st/shell_scripts/pretrain_wan2.2_i2v.sh) |
-| **Finetune** | Qwen2VL 7B, TP=1, PP=4 | [finetune_qwen2vl_7B.sh](st/shell_scripts/finetune_qwen2vl_7B.sh) |
-| | Qwen2.5VL 7B, TP=2, PP=2 | [finetune_qwen2_5_vl_7b.sh](st/shell_scripts/finetune_qwen2_5_vl_7b.sh) |
-| | DeepSeekVL2, TP=2, PP=2 | [finetune_deepseekvl2.sh](st/shell_scripts/finetune_deepseekvl2.sh) |
+| **Finetune** | Qwen2.5VL 7B, TP=2, PP=2 | [finetune_qwen2_5_vl_7b.sh](st/shell_scripts/finetune_qwen2_5_vl_7b.sh) |
 | | Qwen3Omni, FSDP2 | [finetune_qwen3omni.sh](st/shell_scripts/finetune_qwen3omni.sh) |
 | | Qwen3VL 30B, FSDP2 | [finetune_qwen3vl_30B.sh](st/shell_scripts/finetune_qwen3vl_30B.sh) |
-| **Posttrain** | Qwen2VL, DPO, TP=2, PP=4 | [posttrain_qwen2vl_dpo.sh](st/shell_scripts/posttrain_qwen2vl_dpo.sh) |
-| **Inference** | Qwen2VL 7B, PP=1 | [inference_qwen2vl_7b_pp1.sh](st/shell_scripts/inference_qwen2vl_7b_pp1.sh) |
-| | Qwen2VL 7B, PP=4 | [inference_qwen2vl_7b_pp4.sh](st/shell_scripts/inference_qwen2vl_7b_pp4.sh) |
-| | CogVideoX T2V 1.5 | [inference_cogvideox_t2v_1.5.sh](st/shell_scripts/inference_cogvideox_t2v_1.5.sh) |
-| | InternVL2.5 | [inference_internvl2_5.sh](st/shell_scripts/inference_internvl2_5.sh) |
-| | Wan2.2 T2V, CP=2 | [inference_wan2.2_t2v.sh](st/shell_scripts/inference_wan2.2_t2v.sh) |
+| | Qwen3VL 30B, FSDP2, Megatron-Bridge | [finetune_qwen3vl_30B_use_bridge.sh](st/shell_scripts/finetune_qwen3vl_30B_use_bridge.sh) |
+| | Kimi-K2.5, FSDP2 | [finetune_kimik2_5.sh](st/shell_scripts/finetune_kimik2_5.sh) |
+| **Inference** | Wan2.2 T2V, CP=2 | [inference_wan2.2_t2v.sh](st/shell_scripts/inference_wan2.2_t2v.sh) |
 
 ### 2.2 UT（单元测试）看护列表
 
@@ -74,13 +66,11 @@ PR合入前都须通过全量CI门禁用例测试。
 | | CogVideoX扩散模型 | [test_cogvideo_diffusion.py](ut/models/diffusion/test_cogvideo_diffusion.py) |
 | | Hunyuan I2V扩散模型 | [test_hunyuan_i2v_diffusion.py](ut/models/diffusion/test_hunyuan_i2v_diffusion.py) |
 | **Models - Common** | 激活函数 | [test_activations.py](ut/models/common/test_activations.py) |
-| | 注意力机制 | [test_attention.py](ut/models/common/test_attention.py) |
 | | 非对齐分割 | [test_unaligned_split.py](ut/models/common/test_unaligned_split.py) |
 | | 位置编码 | [test_pos_embeddings.py](ut/models/common/embeddings/test_pos_embeddings.py) |
 | | CogVideoX位置编码 | [test_cogvideox_pos_emb.py](ut/models/common/embeddings/test_cogvideox_pos_emb.py) |
 | **Tasks** | Sora GRPO Trainer | [test_sora_grpo_trainer.py](ut/tasks/dancegrpo/test_sora_grpo_trainer.py) |
 | | Flux GRPO Trainer | [test_flux_grpo_trainer.py](ut/tasks/dancegrpo/test_flux_grpo_trainer.py) |
-| **FSDP** | Chunk Gated Delta Rule (Qwen3.5) | [test_chunk_gated_delta_rule.py](ut/fsdp/models/qwen3_5/test_chunk_gated_delta_rule.py) |
 | **Checkpoint** | 权重转换 | [test_weight_convert.py](ut/test_weight_convert.py) |
 | | Encoder Balance Comm | [test_encoder_balance_comm.py](ut/test_encoder_balance_comm.py) |
 | | MoE Expert Weight Convert | [test_moe_expert_weight_convert.py](ut/test_moe_expert_weight_convert.py) |

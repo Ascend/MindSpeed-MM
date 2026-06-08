@@ -23,7 +23,7 @@ MindSpeed MM 仓库中的训练脚本、安装文档等均使用了硬编码的 
 | 文件类型 | 说明 | 典型路径示例 |
 |---------|------|-------------|
 | Shell 脚本（`.sh`）| 训练/测试启动脚本 | `examples/*/pretrain_*.sh`、`scripts/install.sh` |
-| Markdown 文档（`.md`）| 安装指南、模型使用说明 | `docs/zh/install_guide.md`、`docker/OVERVIEW.md` |
+| Markdown 文档（`.md`）| 安装指南、模型使用说明 | `docs/zh/pytorch/install_guide.md`、`docker/OVERVIEW.md` |
 | RST 文档（`.rst`）| 用户指南 | `UserGuide/quick_start/环境搭建.rst` |
 | Python 文件（`.py`）| 源码（如有路径引用） | 各模块源文件 |
 | Dockerfile | Docker 镜像构建脚本 | `docker/Dockerfile` |
