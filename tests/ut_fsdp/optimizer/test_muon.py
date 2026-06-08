@@ -3,18 +3,15 @@ import torch
 
 from mindspeed_mm.fsdp.optimizer.optimizer import _mark_muon_param_groups
 from mindspeed_mm.optimizer.muon import zeropower_via_newtonschulz5
+from tests.ut_fsdp.utils.utils import judge_expression
 
 
-class TinyMuonModel:
+class TinyMuonModel(torch.nn.Module):
     def __init__(self):
+        super().__init__()
         self.linear = torch.nn.Linear(4, 4)
         self.embedding = torch.nn.Embedding(8, 4)
         self.output_layer = torch.nn.Linear(4, 8, bias=False)
-
-    def named_parameters(self):
-        yield from self.linear.named_parameters(prefix="linear")
-        yield from self.embedding.named_parameters(prefix="embedding")
-        yield from self.output_layer.named_parameters(prefix="output_layer")
 
 
 class TestZeroPowerViaNewtonSchulz5:
@@ -24,8 +21,8 @@ class TestZeroPowerViaNewtonSchulz5:
 
             result = zeropower_via_newtonschulz5(matrix, steps=2)
 
-            assert result.shape == matrix.shape
-            assert result.dtype == matrix.dtype
+            judge_expression(result.shape == matrix.shape)
+            judge_expression(result.dtype == matrix.dtype)
 
     def test_rejects_non_2d_input(self):
         with pytest.raises(ValueError, match="expects a 2-D tensor"):
@@ -60,10 +57,10 @@ class TestMarkMuonParamGroups:
 
         muon_names = {name for name, param in named_params.items() if id(param) in muon_param_ids}
         fallback_names = {name for name, param in named_params.items() if id(param) in fallback_param_ids}
-        assert muon_names == {"linear.weight"}
-        assert fallback_names == {
+        judge_expression(muon_names == {"linear.weight"})
+        judge_expression(fallback_names == {
             "linear.bias",
             "embedding.weight",
             "output_layer.weight",
-        }
-        assert all(group["weight_decay"] == 0.1 for group in marked_groups)
+        })
+        judge_expression(all(group["weight_decay"] == 0.1 for group in marked_groups))

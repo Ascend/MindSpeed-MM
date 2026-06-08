@@ -31,6 +31,7 @@
 ### 参考实现
 
 upstream=LTX2/packages/ltx-trainer
+commit_id=28c3c73fe557666c3de176e1e50a5220152ccfca
 
 ### 变更记录
 

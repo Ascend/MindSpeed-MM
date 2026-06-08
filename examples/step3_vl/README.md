@@ -51,18 +51,14 @@ url=https://huggingface.co/stepfun-ai/Step3-VL-10B
 
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
-git clone https://github.com/NVIDIA/Megatron-LM.git
-cd Megatron-LM
-git checkout core_v0.12.1
-cp -r megatron ../MindSpeed-MM/
-cd ../MindSpeed-MM
 
+# 安装mindspeed及依赖
 git clone https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
-pip install -r requirements.txt
-pip install -e .
-cd ..
+cp -r mindspeed ../MindSpeed-MM/
 
+# 安装mindspeed mm及依赖
+cd ../MindSpeed-MM
 pip install -e .
 ```
 
