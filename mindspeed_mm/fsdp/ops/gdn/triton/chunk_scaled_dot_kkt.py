@@ -14,7 +14,7 @@ from .utils import prepare_chunk_indices
     'USE_G': lambda args: args['g'] is not None,
     'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
 })
-@triton.jit(do_not_specialize=['T'])
+@triton.jit(do_not_specialize=['T', 'NT', 'TOTAL_TASKS'])
 def chunk_scaled_dot_kkt_fwd_kernel(
     k,
     g,

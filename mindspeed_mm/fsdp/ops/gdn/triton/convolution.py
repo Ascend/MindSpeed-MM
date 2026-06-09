@@ -38,7 +38,7 @@ from .utils import get_vector_num, input_guard, prepare_chunk_indices
         "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
     }
 )
-@triton.jit
+@triton.jit(do_not_specialize=['T', 'NUM_CHKS'])
 def causal_conv1d_fwd_kernel(
     x,
     y,
@@ -190,7 +190,7 @@ def causal_conv1d_fwd_kernel(
         "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
     }
 )
-@triton.jit
+@triton.jit(do_not_specialize=['T', 'NUM_CHKS'])
 def causal_conv1d_bwd_kernel(
     x,
     y,
@@ -720,7 +720,7 @@ def causal_conv1d_bwd_impl(
         "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
     }
 )
-@triton.jit
+@triton.jit(do_not_specialize=['T'])
 def causal_conv1d_states_fwd_kernel(
     x,
     initial_state,

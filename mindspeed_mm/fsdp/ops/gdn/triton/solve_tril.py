@@ -158,7 +158,7 @@ def solve_tril_16x16_loop_kernel_paral_v3(
 
 
 @triton.heuristics({"IS_VARLEN": lambda args: args["cu_seqlens"] is not None})
-@triton.jit(do_not_specialize=["T"])
+@triton.jit(do_not_specialize=["T", "NT"])
 def merge_16x16_to_32x32_loop_inverse_kernel(
         A,
         Ad,
@@ -166,10 +166,10 @@ def merge_16x16_to_32x32_loop_inverse_kernel(
         cu_seqlens,
         chunk_indices,
         T,
+        NT,
         H: tl.constexpr,
         BT: tl.constexpr,
         IS_VARLEN: tl.constexpr,
-        NT: tl.constexpr,
         BH: tl.constexpr,
 ):
     worker_id = tl.program_id(0)
@@ -245,7 +245,7 @@ def merge_16x16_to_32x32_loop_inverse_kernel(
         "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
     }
 )
-@triton.jit(do_not_specialize=["T"])
+@triton.jit(do_not_specialize=["T", "NT"])
 def merge_32x32_to_64x64_loop_inverse_kernel(
         A,
         Ad,
@@ -253,10 +253,10 @@ def merge_32x32_to_64x64_loop_inverse_kernel(
         cu_seqlens,
         chunk_indices,
         T,
+        NT,
         H: tl.constexpr,
         BT: tl.constexpr,
         IS_VARLEN: tl.constexpr,
-        NT: tl.constexpr,
         BH: tl.constexpr,
 ):
     worker_id = tl.program_id(0)
