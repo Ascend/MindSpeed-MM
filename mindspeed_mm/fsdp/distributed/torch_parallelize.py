@@ -1,7 +1,5 @@
 import torch
 
-from mindspeed.fsdp.distributed.tensor_parallel.tensor_parallel import tensor_parallel_modules
-
 from .expert_parallel.expert_parallel import expert_parallelize_modules
 from .expert_parallel.expert_fully_shard_parallel import expert_fully_shard_modules
 from .fully_shard_parallel import fully_shard_parallel_modules, set_modules_to_prefetch
@@ -23,8 +21,8 @@ class ParallelApplier:
 
     def apply_tp_modules(self, model):
         if self.config.tensor_parallel_size == 1:
-            return
-        model = tensor_parallel_modules(model, self.parallel_state.get_tp_device_mesh(), self.config.tp_plan)
+            return model
+        raise NotImplementedError("Tensor parallelization is not implemented yet.")
 
     def apply_ep_modules(self, model):
         if not self.config.ep_plan.apply_efsdp_modules:
@@ -36,6 +34,7 @@ class ParallelApplier:
             model = expert_fully_shard_modules(model, self.parallel_state.get_efsdp_device_mesh(), self.config.ep_plan, self.config.fsdp_plan)
             # Remove modules already handled by efsdp from the standard FSDP plan to prevent duplicate fully_shard errors
             self.config.fsdp_plan.apply_modules = [x for x in self.config.fsdp_plan.apply_modules if x not in self.config.ep_plan.apply_efsdp_modules]
+        return model
 
     def set_modules_to_prefetch(self, model):
         if self.config.fsdp_plan.num_to_forward_prefetch > 0 or self.config.fsdp_plan.num_to_backward_prefetch > 0:
@@ -62,9 +61,12 @@ class ParallelApplier:
     def __call__(self, model):
         # Apply configuration-based parallel strategies
         # Order matters: TP -> EP -> Recompute -> FSDP
-        self.apply_quantization_modules(model=model) # must set before fully_shard
-        self.apply_tp_modules(model=model)
-        self.apply_ep_modules(model=model)
+
+        # must set before fully_shard, inplace operation
+        self.apply_quantization_modules(model=model)
+
+        model = self.apply_tp_modules(model=model)
+        model = self.apply_ep_modules(model=model)
         model = self.apply_fsdp_modules(model=model, training_config=self.training_config)
         model = self.set_modules_to_prefetch(model=model)
         return model

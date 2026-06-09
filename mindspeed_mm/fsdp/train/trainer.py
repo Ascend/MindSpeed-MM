@@ -98,6 +98,7 @@ class Trainer:
 
     def _validate_and_set_train_iters(self, args: Arguments):
         # Calculate total training iterations based on epochs if specified
+
         if args.training.train_epochs is not None:
             if not hasattr(self.train_dataloader, "__len__"):
                 raise ValueError(
@@ -117,7 +118,17 @@ class Trainer:
                     f"Please check your dataset or dataloader setup."
                 )
             else:
-                args.training.train_iters = args.training.train_epochs * len(self.train_dataloader)
+                drop_last = getattr(getattr(args.data, "dataloader_param", {}), "drop_last", True)
+                iters_per_epoch = len(self.train_dataloader) // args.training.global_batch_size
+                if drop_last:
+                    args.training.train_iters = args.training.train_epochs * iters_per_epoch
+                else:
+                    total_micro_batch_num = len(self.train_dataloader) // args.training.micro_batch_size
+                    total_samples = total_micro_batch_num * args.training.micro_batch_size
+                    args.training.train_iters = total_samples * args.training.train_epochs // args.training.global_batch_size
+                print_rank(logger.info, f"Total samples in training dataset: {len(self.train_dataloader)}")
+                print_rank(logger.info, f"Training iterations per epoch: {iters_per_epoch}")
+                print_rank(logger.info, f"Total training iterations: {args.training.train_iters}")
 
     def initialize(self):
         """Initialize training environment: logging, random seeds, distributed groups."""
