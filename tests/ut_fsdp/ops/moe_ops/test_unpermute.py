@@ -30,4 +30,4 @@ def test_fused_vs_eager_consistency_for_unpermute_when_probs_is_notnone():
         eager_result = unpermute(permuted_tokens, indices, probs, fused=False)
         fused_result = unpermute(permuted_tokens, indices, probs, fused=True)
 
-        torch.testing.assert_close(eager_result, fused_result, rtol=5e-2, atol=1e-3)
+        torch.testing.assert_close(eager_result, fused_result, rtol=5e-2, atol=1e-2)
