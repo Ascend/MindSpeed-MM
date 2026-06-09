@@ -20,7 +20,14 @@ class DataSetArguments(BaseArguments):
 
 
 class CollateArguments(BaseArguments):
-    model_name: str = field(metadata={"help": "Name of the model for which collation is configured."})
+    collator_id: Optional[str] = field(
+        default=None,
+        metadata={"help": "Registered data collator class name."}
+    )
+    model_name: Optional[str] = field(
+        default=None,
+        metadata={"help": "This argument is deprecated. Use collator_id to select a registered data collator."},
+    )
     ignore_pad_token_for_loss: bool = field(
         default=False,
         metadata={"help": ""}

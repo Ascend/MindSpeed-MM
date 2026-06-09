@@ -24,7 +24,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 
 from mindspeed_mm.fsdp.data.data_utils.utils import get_seed_worker
 from mindspeed_mm.fsdp.data.dataloader.sampler import BaseRandomBatchSampler
-from mindspeed_mm.fsdp.data.dataloader.data_collator import DATA_COLLATOR
+from mindspeed_mm.fsdp.data.dataloader.data_collator import resolve_data_collator
 from mindspeed_mm.fsdp.utils.constants import GLOBAL_STEP_TOKEN_NUM, AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
@@ -65,8 +65,8 @@ def prepare_base_dataloader(
     """
     collate_fn = None
     if collate_param:
-        data_collate_type = collate_param.pop("model_name")
-        collate_fn = DATA_COLLATOR[data_collate_type](dataset_param=dataset_param, **collate_param)
+        data_collator, collate_kwargs = resolve_data_collator(collate_param, dataset_param)
+        collate_fn = data_collator(dataset_param=dataset_param, **collate_kwargs)
     if persistent_workers is None:
         persistent_workers = True if num_workers > 0 else False
 
@@ -136,17 +136,14 @@ def prepare_sampler_dataloader(
             drop_last=drop_last,
             data_sharding=data_sharding,
         )
-        if collate_param is None:
-            collate_fn = None
-        elif "model_name" not in collate_param:
-            raise ValueError("collate_param with model_name must be provided.")
+        collate_fn = None
 
         if collate_param:
-            data_collate_type = collate_param.pop("model_name")
             if hasattr(dataset, 'collate_fn') and callable(getattr(dataset, 'collate_fn')):
                 collate_fn = dataset.collate_fn
             else:
-                collate_fn = DATA_COLLATOR[data_collate_type](**collate_param, dataset_param=dataset_param, model=model)
+                data_collator, collate_kwargs = resolve_data_collator(collate_param, dataset_param)
+                collate_fn = data_collator(**collate_kwargs, dataset_param=dataset_param, model=model)
 
         return StatefulDataLoader(
             dataset,

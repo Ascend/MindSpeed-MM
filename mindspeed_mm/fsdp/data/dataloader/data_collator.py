@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, Sequence, Any
+import logging
 
 import torch
 from transformers import DataCollatorForLanguageModeling
@@ -10,6 +11,7 @@ from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArg
 from mindspeed_mm.fsdp.data.data_utils.func_utils.template import get_template_and_fix_tokenizer
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 
+logger = logging.getLogger(__name__)
 
 class DataCollatorForQwen2vl:
     def __init__(self, ignore_pad_token_for_loss: bool, dataset_param=None, **kwargs):
@@ -109,9 +111,64 @@ class DataCollatorForLLMPretrain:
     def __call__(self, *args, **kwargs):
         return self.data_collator(*args, **kwargs)
 
-DATA_COLLATOR = {
-    "qwen3vl": DataCollatorForQwen2vl,
-    "qwen3omni": DataCollatorForQwen3Omni,
-    "step3_vl": DataCollatorForStep3VL,
-    "llm_pretrain": DataCollatorForLLMPretrain,
-}
+
+DATA_COLLATOR = {}
+
+
+def _register_data_collator(name: str, collator_cls) -> None:
+    if name in DATA_COLLATOR:
+        raise ValueError(f"Data collator with name {name} is already registered.")
+    DATA_COLLATOR[name] = collator_cls
+
+
+def resolve_data_collator(collate_param, dataset_param):
+    collate_kwargs = dict(collate_param or {})
+    collator_id = collate_kwargs.pop("collator_id", None)
+    model_name = collate_kwargs.pop("model_name", None)
+
+    if model_name is not None:
+        logger.warning(
+            "model_name is deprecated and will be removed in a future version. "
+            "Please use collator_id instead. "
+            f"Available collator_ids: {', '.join(sorted(DATA_COLLATOR))}."
+        )
+
+    if collator_id is not None and model_name is not None and collator_id != model_name:
+        raise ValueError(
+            "collator_id and deprecated model_name refer to different data collators: "
+            f"{collator_id} != {model_name}."
+        )
+
+    data_collate_type = collator_id or model_name
+
+    if data_collate_type is None:
+        raise ValueError(
+            "No data collator is specified. Please set "
+            "data.dataloader_param.collate_param.collator_id "
+            "(or deprecated model_name)."
+        )
+
+    if data_collate_type not in DATA_COLLATOR:
+        raise ValueError(
+            f"No data collator is registered as {data_collate_type}. "
+            f"Available collators: {', '.join(sorted(DATA_COLLATOR))}."
+        )
+    return DATA_COLLATOR[data_collate_type], collate_kwargs
+
+
+_register_data_collator(
+    "qwen3vl",
+    DataCollatorForQwen2vl,
+)
+_register_data_collator(
+    "qwen3omni",
+    DataCollatorForQwen3Omni,
+)
+_register_data_collator(
+    "llm_pretrain",
+    DataCollatorForLLMPretrain,
+)
+_register_data_collator(
+    "step3_vl",
+    DataCollatorForStep3VL,
+)
