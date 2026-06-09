@@ -1,6 +1,6 @@
 # Lumina-mGPT2使用指南
 
-- [Lumina-mGPT2使用指南](#Lumina-mGPT2使用指南)
+- [Lumina-mGPT2使用指南](#lumina-mgpt2使用指南)
   - [版本说明](#版本说明)
     - [参考实现](#参考实现)
     - [变更记录](#变更记录)
@@ -41,7 +41,7 @@ commit_id=978feb32473b57b79ea6a709687d01107e630478
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/installation.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
 ### 仓库拉取
 
