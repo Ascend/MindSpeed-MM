@@ -4,21 +4,14 @@ import warnings
 from pathlib import Path
 from typing import Dict, Optional
 
-# Large default smoke shapes can exceed Triton-NPU's default launch-grid limit.
-os.environ["TRITON_ALL_BLOCKS_PARALLEL"] = "1"
-
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
 import torch
 import torch_npu
 import fla_npu
 
 from mindspeed_mm.fsdp.ops.gdn.triton_core.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
-from mindspeed_mm.fsdp.ops.gdn.triton_core.cumsum import chunk_local_cumsum
 from mindspeed_mm.fsdp.ops.gdn.triton_core.l2norm import l2norm_bwd, l2norm_fwd
-from mindspeed_mm.fsdp.ops.gdn.triton_core.solve_tril_fast import solve_tril_npu as solve_tril
+from mindspeed_mm.fsdp.ops.gdn.triton.solve_tril import solve_tril
+from mindspeed_mm.fsdp.ops.gdn.triton.cumsum import chunk_local_cumsum
 from mindspeed_mm.fsdp.ops.gdn.triton_core.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
 from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
 from mindspeed_mm.fsdp.features.memory.async_offload import OffloadManager, SwapTensor
@@ -172,7 +165,6 @@ def flash_chunk_gated_delta_rule_fwd(
         g,
         chunk_size=chunk_size,
         cu_seqlens=cu_seqlens,
-        chunk_indices_out=chunk_indices,
         head_first=False,
     )
 
@@ -190,7 +182,6 @@ def flash_chunk_gated_delta_rule_fwd(
     A = solve_tril(
         A=A,
         cu_seqlens=cu_seqlens,
-        chunk_indices_out=chunk_indices,
         output_dtype=k.dtype,
     )
 
@@ -389,7 +380,6 @@ def flash_chunk_gated_delta_rule_bwd(
         chunk_size=chunk_size,
         reverse=True,
         cu_seqlens=cu_seqlens,
-        chunk_indices_out=chunk_indices,
         head_first=False,
     )
 

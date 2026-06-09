@@ -14,13 +14,6 @@ BT_LIST = [8, 16, 32, 64, 128]
 NUM_WARPS_AUTOTUNE = [1, 2, 4, 8, 16] if is_amd else [1, 2, 4, 8, 16, 32]
 
 
-@triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in NUM_WARPS_AUTOTUNE
-    ],
-    key=['D']
-)
 @triton.jit
 def l2norm_fwd_kernel1(
     x,
@@ -44,13 +37,6 @@ def l2norm_fwd_kernel1(
     tl.store(rstd + i_t, b_rstd)
 
 
-@triton.autotune(
-    configs=[
-        triton.Config({}, num_warps=num_warps)
-        for num_warps in NUM_WARPS_AUTOTUNE
-    ],
-    key=['D']
-)
 @triton.jit
 def l2norm_bwd_kernel1(
     y,
@@ -75,14 +61,6 @@ def l2norm_bwd_kernel1(
     tl.store(dx + cols, b_dx, mask=mask)
 
 
-@triton.autotune(
-    configs=[
-        triton.Config({'BT': BT}, num_warps=num_warps)
-        for num_warps in [1, 2, 4, 8, 16]
-        for BT in BT_LIST
-    ],
-    key=['D', 'NB']
-)
 @triton.jit
 def l2norm_fwd_kernel(
     x,
@@ -112,14 +90,6 @@ def l2norm_fwd_kernel(
             tl.store(p_rstd, b_rstd.to(p_rstd.dtype.element_ty), boundary_check=(0,))
 
 
-@triton.autotune(
-    configs=[
-        triton.Config({'BT': BT}, num_warps=num_warps)
-        for num_warps in [1, 2, 4, 8, 16]
-        for BT in BT_LIST
-    ],
-    key=['D', 'NB']
-)
 @triton.jit
 def l2norm_bwd_kernel(
     y,
@@ -202,6 +172,7 @@ def l2norm_fwd(
             D=D,
             BD=BD,
             NB=NB,
+            BT=32,
             bt_size=bt_size,
         )
     else:
@@ -248,6 +219,7 @@ def l2norm_bwd(
             D=D,
             BD=BD,
             NB=NB,
+            BT=64,
             bt_size=bt_size,
         )
     else:

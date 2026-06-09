@@ -524,10 +524,11 @@ def causal_conv1d_bwd_kernel(
             K: tl.constexpr = D // H
             HEADS_PER_BLOCK: tl.constexpr = BD // K
             head_start = (i_d * BD) // K
-            # B T H K
+            batch_off = 0 if IS_VARLEN else i_b * T * D
+            bos_off = bos if IS_VARLEN else 0
             # B H T K
             p_dy = tl.make_block_ptr(
-                dy + bos * K  + head_start * T * K,
+                dy + batch_off + head_start * T * K + bos_off * K,
                 (T_len, HEADS_PER_BLOCK, K),
                 (K, T * K, 1),
                 (i_t * BT, 0, 0),
