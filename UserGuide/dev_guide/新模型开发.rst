@@ -477,7 +477,7 @@ CustomDiT构建
 Step4: 配置文件
 -----------------
 
-配置文件主要包括模型配置(model.json)，数据配置(data.json)，FSDP2配置(fsdp2.yaml)，配置文件内容可以参考 `配置说明 <https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/基础配置.html>`_ , 这里Diffusion、AE和text_encoder使用Wan2.2的模型。
+配置文件主要包括模型配置(model.json)，数据配置(data.json)，FSDP2配置(fsdp2.yaml)，配置文件内容可以参考 `配置说明 <https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/%E9%85%8D%E7%BD%AE%E6%A6%82%E8%A7%88.html>`_ , 这里Diffusion、AE和text_encoder使用Wan2.2的模型。
 
 新建 ``examples/custom_model/model.json`` ``examples/custom_model/data.json`` ``examples/custom_model/fsdp2.yaml``
 
