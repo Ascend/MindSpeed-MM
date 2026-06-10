@@ -2,6 +2,37 @@
 
 set -e
 
+# Record the original package version and restore it after the test case is completed
+declare -A PKG_ORIGINAL_VERSIONS
+for pkg in transformers triton-ascend accelerate; do
+    version=$(pip show "$pkg" 2>/dev/null | grep "^Version:" | awk '{print $2}')
+    if [ -n "$version" ]; then
+        PKG_ORIGINAL_VERSIONS["$pkg"]="$version"
+        echo "Saved $pkg version: $version"
+    else
+        PKG_ORIGINAL_VERSIONS["$pkg"]=""
+        echo "$pkg is not installed"
+    fi
+done
+
+restore_pip_packages() {
+    echo "Restoring pip packages to original versions..."
+    for pkg in "${!PKG_ORIGINAL_VERSIONS[@]}"; do
+        orig_version="${PKG_ORIGINAL_VERSIONS[$pkg]}"
+        if [ -n "$orig_version" ]; then
+            echo "Restoring $pkg to $orig_version"
+            pip install "${pkg}==${orig_version}" -q
+        else
+            echo "Uninstalling $pkg (was not installed before)"
+            pip uninstall "$pkg" -y -q
+        fi
+    done
+}
+
+pip install transformers==5.2.0
+pip install triton-ascend==3.2.0
+pip install accelerate==1.2.0
+
 BASEPATH=$(cd `dirname $0`; cd ../../../; pwd)
 echo "BASEPATH = $BASEPATH"
 
@@ -89,7 +120,7 @@ DISTRIBUTED_ARGS="
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
 torchrun $DISTRIBUTED_ARGS $BASEPATH/mindspeed_mm/fsdp/train/trainer.py \
-    $BASEPATH/tests/st/run_configs/finetune_qwen3vl_30B/qwen3vl_30B_config_v1.yaml \
+    $BASEPATH/tests/st/run_configs/finetune_qwen3_5_35B/qwen3_5_35B_config.yaml \
     2>&1 | tee logs/train_${logfile}.log
 
 STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
@@ -107,3 +138,6 @@ if [ "$need_restore" = true ]; then
     # Move the backup back to its original name
     mv "$BASEPATH/mindspeed-bak" "$BASEPATH/mindspeed"
 fi
+
+# Restore the pip package to its original version
+restore_pip_packages

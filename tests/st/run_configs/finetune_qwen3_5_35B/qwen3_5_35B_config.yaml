@@ -1,25 +1,27 @@
 # 并行策略
 parallel:
-  tensor_parallel_size: 1
   fully_shard_parallel_size: auto
   fsdp_plan:
     apply_modules:
-      - model.visual.blocks.{*}
-      - model.visual.merger
-      - model.visual.deepstack_merger_list.{*}
       - model.visual
+      - model.visual.blocks.{*}
+      - model.language_model
       - model.language_model.embed_tokens
       - model.language_model.layers.{*}
-      - model.language_model
+      - model.language_model.layers.{*}.linear_attn
+      - model.language_model.layers.{*}.mlp.experts
       - lm_head
+      - mtp
+    hook_modules:
+      - model.language_model.layers.{*}
     param_dtype: bf16
     reduce_dtype: fp32
-  ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 8
   ep_plan:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
+    dispatcher: alltoall
 
 ### 数据相关配置
 data:
@@ -36,7 +38,7 @@ data:
 
     # 数据预处理
     preprocess_parameters:
-      model_name_or_path: &HF_MODEL_LOAD_PATH /home/ci_resource/models/Qwen3-VL-30B-A3B-Instruct
+      model_name_or_path: &HF_MODEL_LOAD_PATH /home/ci_resource/models/Qwen3.5-35B-A3B
       use_fast_tokenizer: true
       split_special_tokens: false
       image_max_pixels: 262144
@@ -52,7 +54,7 @@ data:
       enable_thinking: false
       train_on_prompt: false
       mask_history: false
-      dataset_dir: /home/ci_resource/data/qwen2.5vl/
+      dataset_dir: /data
       dataset: &DATASET_PATH /home/ci_resource/data/qwen2.5vl/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false
@@ -75,28 +77,50 @@ data:
 
 # 模型配置
 model:
-  model_id: qwen3_vl_moe
+  model_id: qwen3_5_moe
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   attn_implementation: flash_attention_2
+  # 融合算子配置
+  gdn_implementation: triton
+  causal_conv1d_implementation: eager
+  use_grouped_expert_matmul: true
+  # skip_recompute
+  skip_gdn_recompute: false
+  skip_flash_attn_recompute: false
 
 # 优化特性配置
 features:
+  # loss 配置
   loss_cfg:
     loss_type: default
     router_aux_loss_coef: 0.0
+  # 重计算配置
   recompute: true
   recompute_plan:
-    apply_modules:
-      - model.visual.blocks.{*}
-      - model.language_model.layers.{*}
+      apply_modules:
+        - model.visual.blocks.{*}
+        - model.language_model.layers.{*}
+  # chunkloss配置
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
     chunk_size: 1024
+  # activation offload 配置
+  enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
-      - model.language_model.layers.{*}
+     - model.visual.blocks.{*}
+     - model.language_model.layers.{*}
+  # chunkmbs配置
+  enable_chunk_mbs: true
+  chunkmbs_plan:
+    apply_modules:
+     - model.language_model.layers.{*}
+    chunk_mbs: 2
+    batch_dim: 0
+    chunk_arg_indexs: [0]
+    chunk_kwarg_names: ["position_embeddings", "position_ids", "rope_deltas", "attention_mask"]
 
 # 训练配置
 training:
@@ -113,8 +137,9 @@ training:
   optimizer: adamw
   adam_fused: true
   use_deter_comp: false
+  load_rank0_and_broadcast: false
   plugin:
-    - mindspeed_mm/fsdp/models/qwen3vl
+    - mindspeed_mm/fsdp/models/qwen3_5_moe
     - mindspeed_mm/fsdp/data/datasets/huggingface
 
 # 工具配置
