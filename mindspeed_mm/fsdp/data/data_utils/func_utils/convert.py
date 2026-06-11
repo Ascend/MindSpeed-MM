@@ -14,6 +14,7 @@
 
 import bisect
 import os
+import re
 import copy
 from abc import abstractmethod, ABC
 from collections import defaultdict
@@ -58,6 +59,116 @@ if TYPE_CHECKING:
 class TokenizerModule(TypedDict):
     tokenizer: "PreTrainedTokenizer"
     processor: Optional["ProcessorMixin"]
+
+
+TOOL_CALL_PATTERN = re.compile(r"<tool_call>.*?</tool_call>", re.DOTALL)
+
+ROLE_ALIASES = {
+    "tool": Role.TOOL_RESPONSE.value,
+    "function": Role.TOOL_CALL.value,
+    "observation": Role.TOOL_RESPONSE.value,
+}
+
+AGENT_ODD_ROLES = frozenset({Role.USER.value, Role.TOOL_RESPONSE.value})
+AGENT_EVEN_ROLES = frozenset({Role.TOOL_CALL.value, Role.ASSISTANT.value})
+
+
+def normalize_message_keys(
+        messages: List[Dict[str, Any]],
+        role_key: str = "role",
+        content_key: str = "content",
+) -> List[Dict[str, Any]]:
+    normalized = []
+    for msg in messages:
+        normalized.append({
+            "role": msg.get(role_key),
+            "content": msg.get(content_key) or "",
+        })
+    return normalized
+
+
+def normalize_tool_roles(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    normalized = []
+    for msg in messages:
+        role = msg.get("role")
+        if role in ROLE_ALIASES:
+            role = ROLE_ALIASES[role]
+        normalized.append({"role": role, "content": msg.get("content") or ""})
+    return normalized
+
+
+def promote_assistant_tool_calls(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    promoted = []
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content") or ""
+        if role == Role.ASSISTANT.value and TOOL_CALL_PATTERN.search(content):
+            role = Role.TOOL_CALL.value
+        promoted.append({"role": role, "content": content})
+    return promoted
+
+
+def merge_consecutive_tools(
+        messages: List[Dict[str, Any]],
+        role_key: str = "role",
+        content_key: str = "content",
+) -> List[Dict[str, Any]]:
+    if not messages:
+        return messages
+
+    merge_seps = {
+        Role.TOOL_CALL.value: "\n",
+        Role.TOOL_RESPONSE.value: "\n\n",
+    }
+    merged = []
+    for msg in messages:
+        role = msg.get(role_key)
+        if (
+                merged
+                and role == merged[-1].get(role_key)
+                and role in merge_seps
+        ):
+            prev = merged[-1]
+            prev_content = prev.get(content_key) or ""
+            new_content = msg.get(content_key) or ""
+            sep = merge_seps[role]
+            prev[content_key] = f"{prev_content}{sep}{new_content}" if prev_content else new_content
+        else:
+            merged.append(dict(msg))
+    return merged
+
+
+def validate_agent_messages(messages: List[Dict[str, Any]]) -> bool:
+    if len(messages) < 2:
+        logger.warning_rank0(f"Invalid agent message count (need >= 2): {len(messages)}")
+        return False
+
+    prompt = messages[:-1]
+    if len(prompt) % 2 != 1:
+        logger.warning_rank0(f"Invalid agent prompt length (expected odd): {len(prompt)}")
+        return False
+
+    for idx, msg in enumerate(prompt):
+        role = msg.get("role")
+        expected_roles = AGENT_ODD_ROLES if idx % 2 == 0 else AGENT_EVEN_ROLES
+        if role not in expected_roles:
+            logger.warning_rank0(
+                f"Invalid agent role at index {idx}: {role!r}, expected one of {expected_roles}"
+            )
+            return False
+
+    return True
+
+def normalize_agent_messages(
+        messages: List[Dict[str, Any]],
+        role_key: str = "role",
+        content_key: str = "content",
+) -> List[Dict[str, Any]]:
+    messages = normalize_message_keys(messages, role_key, content_key)
+    messages = normalize_tool_roles(messages)
+    messages = promote_assistant_tool_calls(messages)
+    messages = merge_consecutive_tools(messages, role_key="role", content_key="content")
+    return messages
 
 
 @dataclass
@@ -233,10 +344,18 @@ class MultiModalToolDatasetConverter(DatasetConverter):
         else:
             system = example[self.dataset_attr.system] if self.dataset_attr.system else ""
 
-        aligned_messages = messages
+        aligned_messages = normalize_agent_messages(
+            messages,
+            role_key=self.dataset_attr.role_tag or "role",
+            content_key=self.dataset_attr.content_tag or "content",
+        )
 
-        prompt = aligned_messages[:-1]
-        response = aligned_messages[-1:]
+        if not validate_agent_messages(aligned_messages):
+            logger.warning_rank0("Skipping this abnormal agent example.")
+            prompt, response = [], []
+        else:
+            prompt = aligned_messages[:-1]
+            response = aligned_messages[-1:]
 
         output = {
             "_prompt": prompt,
@@ -245,7 +364,7 @@ class MultiModalToolDatasetConverter(DatasetConverter):
             "_images": self._find_media_files(example[self.dataset_attr.images]) if self.dataset_attr.images else None,
             "_videos": self._find_media_files(example[self.dataset_attr.videos]) if self.dataset_attr.videos else None,
             "_audios": self._find_media_files(example[self.dataset_attr.audios]) if self.dataset_attr.audios else None,
-            "_tools": example['tools'] or None
+            "_tools": example.get("tools") or None,
         }
         return output
 
