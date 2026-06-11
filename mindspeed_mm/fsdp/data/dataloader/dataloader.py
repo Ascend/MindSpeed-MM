@@ -169,21 +169,30 @@ class PrefetchGradAccDataLoader:
     This is Used for calculate per-token-loss
     """
 
-    def __init__(self, base_dataloader: StatefulDataLoader, grad_acc_step: int):
+    def __init__(self, base_dataloader: StatefulDataLoader, grad_acc_step: int, cyclic: bool = True):
         """
         Args:
             base_dataloader: The underlying PyTorch DataLoader to wrap.
             grad_acc_step (int): Number of batches to accumulate gradients over.
+            cyclic (bool): Whether to cycle over the underlying dataloader indefinitely.
         """
         if grad_acc_step <= 0:
             raise ValueError("grad_acc_step must be a positive integer.")
         self.grad_acc_step = grad_acc_step
         self.base_dataloader = base_dataloader
-        self.base_iter, _, _ = build_iterations(self.base_dataloader)
+        self.cyclic = cyclic
+        self.base_iter = self._build_base_iter()
         self._current_iterator = None  # Holds the active generator
+
+    def _build_base_iter(self):
+        if self.cyclic:
+            base_iter, _, _ = build_iterations(self.base_dataloader)
+            return base_iter
+        return iter(self.base_dataloader)
 
     def __iter__(self):
         # Start a new iteration (reset state)
+        self.base_iter = self._build_base_iter()
         self._current_iterator = self._generate_batches()
         return self  # Return self as the iterator
 

@@ -72,7 +72,9 @@ class Trainer:
         # Build core training components
         self.model = self.get_model(model_provider)
         self.optimizer = self.get_optimizer()
-        self.train_dataloader = self.get_dataloader() if dataloader_provider is None else dataloader_provider(args)
+        dataloader_result = self.get_dataloader() if dataloader_provider is None else dataloader_provider(args)
+        self.train_dataloader = dataloader_result[0] if isinstance(dataloader_result, tuple) else dataloader_result
+        self.val_dataloader = dataloader_result[1] if isinstance(dataloader_result, tuple) else None
         self.checkpointer = self.get_checkpointer()
 
         # Validate and calculate training iterations
@@ -93,6 +95,7 @@ class Trainer:
             self.optimizer,
             self.lr_scheduler,
             self.checkpointer,
+            val_dataloader=self.val_dataloader,
             lora_weight_manager=self.lora_weight_manager,
         )
 
@@ -321,15 +324,35 @@ class Trainer:
         return lr_scheduler
 
     def get_dataloader(self):
-        """Build training dataloader with proper parallel partitioning."""
+        """Build training dataloader with proper parallel partitioning.
+        Returns:
+            tuple: (train_dataloader, val_dataloader) where val_dataloader may be None
+        """
         args = self.args
         print_rank(logger.info, "Prepare data")
         data_config = args.data
         ps = get_parallel_state()
 
         datasets = build_mm_dataset(data_config.dataset_param)
-        dataloader_param = data_config.dataloader_param.to_dict()
-        dataloader_param.update(
+
+        # datasets can be (train_dataset, val_dataset) or just train_dataset
+        if isinstance(datasets, tuple):
+            train_dataset = datasets[0]
+            val_dataset = datasets[1] if len(datasets) > 1 else None
+        else:
+            train_dataset, val_dataset = datasets, None
+
+        val_enabled = args.training.val_interval > 0
+
+        # Explicit validation dataset from config has higher priority.
+        val_dataset_param = data_config.val_dataset_param if val_enabled else None
+        if val_enabled and val_dataset_param is not None:
+            val_dataset = build_mm_dataset(val_dataset_param)
+            if isinstance(val_dataset, tuple):
+                val_dataset = val_dataset[0]
+
+        train_dataloader_param = data_config.dataloader_param.to_dict()
+        train_dataloader_param.update(
             {
                 "batch_size": args.training.micro_batch_size,
                 "seed": args.training.seed,
@@ -337,19 +360,58 @@ class Trainer:
         )
         build_dataloader = partial(
             build_mm_dataloader,
-            dataloader_param=dataloader_param,
+            dataloader_param=train_dataloader_param,
             process_group=ps.get_dp_group(),
             dataset_param=data_config.dataset_param,
             model=self.model,
         )
-        train_dataloader = build_dataloader(datasets)
+        train_dataloader = build_dataloader(train_dataset)
 
         if args.features.loss_cfg.loss_type == "per_token_loss":
             train_dataloader = PrefetchGradAccDataLoader(
                 train_dataloader, grad_acc_step=args.training.gradient_accumulation_steps
             )
 
-        return train_dataloader
+        # Build validation dataloader if available.
+        val_dataloader = None
+        if val_enabled and val_dataset is not None:
+            val_dataloader_param = data_config.dataloader_param.to_dict()
+            val_dataloader_param.update(
+                {
+                    "batch_size": args.training.val_micro_batch_size or args.training.micro_batch_size,
+                    "seed": args.training.seed,
+                    "shuffle": False,
+                    "drop_last": False,
+                }
+            )
+
+            if val_dataloader_param.get("sampler_type") == "BaseRandomBatchSampler":
+                raise ValueError(
+                    "Validation requires drop_last=False, but BaseRandomBatchSampler does not support "
+                    "drop_last=False yet. Please use a sampler that supports keeping the tail batch for validation."
+                )
+
+            val_build_dataloader = partial(
+                build_mm_dataloader,
+                dataloader_param=val_dataloader_param,
+                process_group=ps.get_dp_group(),
+                dataset_param=val_dataset_param or data_config.dataset_param,
+                model=self.model,
+            )
+            val_dataloader = val_build_dataloader(val_dataset)
+            if args.features.loss_cfg.loss_type == "per_token_loss":
+                val_dataloader = PrefetchGradAccDataLoader(
+                    val_dataloader,
+                    grad_acc_step=args.training.gradient_accumulation_steps,
+                    cyclic=False,
+                )
+        if args.training.val_interval > 0 and val_dataloader is None:
+            raise ValueError(
+                "`val_interval > 0` but no validation dataloader is found. "
+                "Please set `data.val_dataset_param` or make build_mm_dataset return "
+                "(train_dataset, val_dataset)."
+            )
+        return train_dataloader, val_dataloader
 
     def get_checkpointer(self):
         """Return checkpointing class (can be overridden for different checkpoint formats)."""

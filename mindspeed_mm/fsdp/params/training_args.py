@@ -277,6 +277,16 @@ class TrainingArguments(BaseArguments):
         default=1,
         metadata={"help": "Number of steps between checkpoint saves."},
     )
+    # Validation configuration
+    val_interval: int = field(
+        default=0,
+        metadata={"help": "Number of steps between validations. If 0, validation is disabled."},
+    )
+
+    val_micro_batch_size: Optional[int] = field(
+        default=None,
+        metadata={"help": "Micro batch size for validation. If None, use micro_batch_size."},
+    )
     use_deter_comp: bool = field(
         default=False,
         metadata={"help": "Whether to use deterministic computation for reproducibility."},
@@ -304,6 +314,12 @@ class TrainingArguments(BaseArguments):
         self.local_rank = int(os.getenv("LOCAL_RANK"))
         self.global_rank = int(os.getenv("RANK"))
         self.world_size = int(os.getenv("WORLD_SIZE"))
+
+        if self.val_interval < 0:
+            raise ValueError("val_interval must be >= 0.")
+
+        if self.val_micro_batch_size is not None and self.val_micro_batch_size <= 0:
+            raise ValueError("val_micro_batch_size must be > 0 when set.")
 
         if self.lr < self.lr_start:
             raise ValueError(f"Learning rate {self.lr} < starting lr {self.lr_start}. Check scheduler configuration.")

@@ -38,12 +38,14 @@ class TrainEngine:
         scheduler,
         checkpointer,
         lora_weight_manager=None,
+        val_dataloader=None,
         **kwargs,
     ):
         self.args = args
 
         self.model = model
         self.train_dataloader = train_dataloader
+        self.val_dataloader = val_dataloader
         self.optimizer = optimizer
         self.lr_scheduler = scheduler
         self.checkpointer = checkpointer
@@ -179,9 +181,49 @@ class TrainEngine:
 
         return loss_dict
 
+    @torch.no_grad()
+    def evaluate(self):
+        if self.val_dataloader is None:
+            return None, 0
+
+        loss_sum = 0.0
+        local_steps = 0
+
+        was_training = self.model.training
+        self.model.eval()
+
+        try:
+            for batch_data in self.val_dataloader:
+                param_dtype = self.args.parallel.fsdp_plan.param_dtype
+                batch_data = move_to_device(batch_data, get_dtype(param_dtype) if param_dtype else None)
+                self.set_loss_func(batch_data)
+
+                output = self.model(**batch_data, use_cache=False)
+                loss_sum = loss_sum + output.loss.detach().float()
+                local_steps += 1
+
+        finally:
+            if was_training:
+                self.model.train()
+
+        if local_steps == 0:
+            return None, 0
+
+        ps = get_parallel_state()
+        val_stats = torch.stack([loss_sum, loss_sum.new_tensor(local_steps)])
+        torch.distributed.all_reduce(val_stats, group=ps.get_dp_group())
+        val_loss = val_stats[0] / val_stats[1]
+
+        return val_loss, int(val_stats[1].item())
+
     def train(self):
         """Main training loop."""
         args = self.args
+        if args.training.val_interval > 0 and self.val_dataloader is None:
+            raise ValueError(
+                "`val_interval > 0` but val_dataloader is None. "
+                "Please provide validation dataset or set val_interval to 0."
+            )
 
         # Get data iterator
         train_dataloader_iter, _, _ = build_iterations(self.train_dataloader)
@@ -249,6 +291,13 @@ class TrainEngine:
                 and self.iteration % args.training.save_interval == 0
             ):
                 self.save(self.iteration, self.consumed_train_samples)
+            # Validation at specified intervals
+            if (
+                args.training.val_interval > 0
+                and self.val_dataloader is not None
+                and self.iteration % args.training.val_interval == 0
+            ):
+                self._run_validation(self.iteration)
 
         # Stop profiling if enabled
         self.profiler.stop()
@@ -256,6 +305,21 @@ class TrainEngine:
         # Final save after training completes
         if args.training.save:
             self.save(self.iteration, self.consumed_train_samples)
+
+    def _run_validation(self, iteration):
+        print_rank(logger.info, f"Running validation at iteration {iteration}...")
+
+        val_loss, val_steps = self.evaluate()
+
+        if val_loss is not None:
+            log_string = f" [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
+            log_string += f" ** validation after iteration {iteration} **"
+            log_string += f" | validation steps: {val_steps} |"
+            log_string += f" validation loss: {val_loss.item():.6E} |"
+
+            print_rank(logger.info, log_string)
+        else:
+            print_rank(logger.warning, f"Validation returned no results at iteration {iteration}")
 
     def training_log(
         self, iteration, elapsed_time_per_iteration, curr_step_lr, consumed_train_samples, loss_dict, grad_norm
