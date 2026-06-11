@@ -55,6 +55,8 @@ commit_id=fc91372
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
 - [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/docs/zh/installation_guide/installation_description.md)
 
+‼️gdn部分特性依赖在研版本的triton-ascend，具体安装链接将在正式版本发布后提供。
+
 <a id="jump1.2"></a>
 
 ### 2. 环境搭建
@@ -84,10 +86,10 @@ git checkout 60a791f
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu)
 
-检验fla-npu是否安装成功
+检验fla_npu是否安装成功
 
 ```bash
-pip list | grep fla-npu
+pip list | grep fla_npu
 ```
 
 ---
