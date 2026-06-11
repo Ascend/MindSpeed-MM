@@ -87,9 +87,14 @@ pip install -e .
 
  将下载的模型权重保存到本地的`ckpt/Qwen3-VL-*B-Instruct`目录下。(*表示对应的尺寸)
 
+如果使用随机初始化参数，保持`load`参数注释即可。
+
 如果使用fsdp2的meta init初始化模型，需要先完成以下权重转换
 
 ```bash
+# 根据实际情况修改 ascend-toolkit 路径
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+# 执行权重转换
 mm-convert GenericDCPConverter hf_to_dcp \
 --hf_dir ckpt/Qwen3-VL-30B-Instruct \
 --dcp_dir ckpt/Qwen3-VL-30B-Instruct-dcp
@@ -100,7 +105,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
 #   |—— latest_checkpointed_iteration.txt
 ```
 
-并在`qwen3vl_30B_config_v1.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
+并在`qwen3vl_30B_config_v1.yaml`中将`init_model_with_meta_device`参数配置为`true`（当前默认值），并取消`load`参数注释，将`load`配置成转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 
 ---
 <a id="jump3"></a>
@@ -159,6 +164,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
 【模型保存加载及日志信息配置】
 
 根据实际情况配置`qwen3vl_30B_config_v1.yaml`的`training`参数，包括保存路径以及保存间隔`save`、`save_interval`。
+注意：`save`参数当前被注释，不会保存模型，如果需要保存模型请配置保存路径。
 
 【单机运行配置】
 以Qwen3-VL-30B模型为例：
@@ -191,8 +197,9 @@ NNODES: 一共几个节点
 
 ### 3. 启动微调
 
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
-可在`qwen3vl_30B_config_v1.yaml`的`model`参数中配置上述文档中的`loss_type`。
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，根据`FSDP2后端`选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)，在`qwen3vl_30B_config_v1.yaml`配置`loss_type`参数，可以设置成default（默认）、per_sample_loss、per_token_loss这3个值。
+
+在代码仓根目录（MindSpeed-MM）下执行以下命令启动微调任务：
 
 ```shell
 bash examples/qwen3vl/finetune_qwen3vl_30B_v1.sh
