@@ -13,7 +13,6 @@
 │  ├─en
 │  └─zh                                            # 中文文档目录
 │      ├─features                                  # 特性说明文档
-│      ├─mindspore                                 # mindspore后端迁移文档
 │      └─pytorch                                   # pytorch后端迁移文档
 ├─examples                                         # 所有模型运行脚本和README目录
 │  ├─<model_name>                                  # 某个模型的脚本    
@@ -26,7 +25,6 @@
 ├─mindspeed_mm                                     # 核心代码目录
 │  ├─configs                                       # 配置文件读取和处理代码
 │  ├─data                                          # 数据处理代码
-│  ├─mindspore                                     # mindspore适配代码
 │  ├─models                                        # 模型结构代码
 │  ├─optimizer                                     # 优化器代码
 │  ├─patchs                                        # patch目录

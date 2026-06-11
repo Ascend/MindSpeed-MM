@@ -2,9 +2,8 @@
 
 ## 背景
 
-出海版本中，CANN/HDK 的默认安装路径已由 `/usr/local/Ascend` 变更为 `/usr/local/npu`。
 MindSpeed MM 仓库中的训练脚本、安装文档等均使用了硬编码的 `/usr/local/Ascend` 路径。
-若出海版本机器上的实际安装路径为 `/usr/local/npu`，需在使用前完成批量替换，确保环境变量可以正常加载。
+如您使用的HDK/CANN的实际安装路径为 `/usr/local/npu`，需在使用前完成批量替换，确保环境变量可以正常加载。
 
 本指南提供使用 `replace_ascend_path.py` 脚本进行批量路径替换的完整步骤。
 

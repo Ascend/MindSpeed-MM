@@ -15,7 +15,7 @@
     | adaptor   | 模型源码合入               |
     | chore   | 单独提交的测试用例         |
 
-    括号中的 backend/ops 项可填写 torch、mindspore、triton，不填写默认为 torch。
+    括号中的 backend/ops 项可填写 torch、triton，不填写默认为 torch。
 
     下面是两个 PR 标题的示例：
     - feat(triton): optimize solve_tril of GDN （表示提交了 triton 算子的性能优化）

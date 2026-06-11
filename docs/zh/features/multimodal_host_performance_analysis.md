@@ -98,7 +98,6 @@
 
 - **PyTorch**：`torch.profiler`、`torch.utils.bottleneck`
 - **TensorFlow**：`tf.profiler`、TensorBoard
-- **MindSpore**：MindSpore Profiler
 
 #### 3.2.3 自定义 Profiler
 
