@@ -49,7 +49,6 @@ except ImportError:
 from mindspeed.te.pytorch.utils import get_tensor_model_parallel_group_if_none
 from mindspeed_mm.mcore.process_group_configs import ProcessGroupCollection
 from mindspeed_mm.models.common.module import MultiModalModule
-from mindspeed_mm.mcore.models.qwen3_5.rope import apply_rotary_pos_emb_absolute
 
 
 class Qwen3_5MultimodalRotaryEmbedding(nn.Module):
@@ -385,7 +384,6 @@ class Qwen3_5SelfAttention(SelfAttention):
             submodules=submodules,
             layer_number=layer_number,
             attn_mask_type=attention_type,
-            pg_collection=pg_collection,
             cp_comm_type=cp_comm_type
         )
         if pg_collection is None:

@@ -33,10 +33,9 @@ from megatron.core.transformer.utils import (
 from megatron.core.utils import deprecate_inference_params
 
 from mindspeed_mm.mcore.process_group_configs import ProcessGroupCollection
-from mindspeed_mm.mcore.models.qwen3_5.gdn import torch_chunk_gated_delta_rule
 from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule
 from mindspeed_mm.fsdp.ops.gdn.flash_chunk_gated_delta_rule import chunk_gated_delta_rule as flash_chunk_gated_delta_rule
-from mimdspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
+from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
 
 
 def l2norm(x: torch.FloatTensor, dim: int = -1, eps: float = 1e-6):

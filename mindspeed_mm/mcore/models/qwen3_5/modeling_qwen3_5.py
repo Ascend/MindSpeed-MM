@@ -39,7 +39,8 @@ from mindspeed_mm.mcore.models.qwen3_5.modules import (
     Qwen3_5VisionPatchMerger,
     Qwen3_5VisionRotaryEmbedding,
     Qwen3_5TextTransformerBlock,
-    Qwen3_5MultimodalRotaryEmbedding
+    Qwen3_5MultimodalRotaryEmbedding,
+    get_rope_index
 )
 from mindspeed_mm.mcore.models.qwen3_5.utils import (
     AllGatherVisionEmbeddings,
@@ -53,7 +54,7 @@ from mindspeed_mm.mcore.models.qwen3_5.utils import (
     is_using_quantization_scales,
     process_mtp_loss
 )
-from mindspeed_mm.mcore.models.qwen3_5.spec import get_qwe3_5_vit_layer_local_spec, get_vision_patch_merger_spec
+from mindspeed_mm.mcore.models.qwen3_5.spec import get_qwen3_5_vit_layer_local_spec, get_vision_patch_merger_spec
 
 
 class Qwen3_5Model(MegatronModule):
@@ -106,8 +107,8 @@ class Qwen3_5Model(MegatronModule):
         self.image_token_id = language_transformer_config.image_token_id
         self.video_token_id = language_transformer_config.video_token_id
         self.vision_start_token_id = language_transformer_config.vision_start_token_id
-
-        self.square_merge_size = language_transformer_config.spatial_merge_size**2
+        self.spatial_merge_size = vision_transformer_config.spatial_merge_size
+        self.square_merge_size = vision_transformer_config.spatial_merge_size**2
 
         # This attribute is needed to check if an all-reduce is required
         # on the word embeddings inside `finalize_model_grads._allreduce_word_embedding_grads`.
@@ -132,7 +133,7 @@ class Qwen3_5Model(MegatronModule):
         self.vp_size = self.config.virtual_pipeline_model_parallel_size
 
         if self.pre_process:
-            vision_transformer_layer_spec = get_qwe3_5_vit_layer_local_spec(vision_transformer_config)
+            vision_transformer_layer_spec = get_qwen3_5_vit_layer_local_spec(vision_transformer_config)
             vision_patch_merger_spec = get_vision_patch_merger_spec(vision_transformer_config)
 
             self.vision_model = Qwen3_5VisionModel(
@@ -148,7 +149,7 @@ class Qwen3_5Model(MegatronModule):
             config=language_transformer_config,
             transformer_layer_spec=language_transformer_layer_spec,
             vocab_size=language_transformer_config.vocab_size,
-            max_sequence_length=language_transformer_config.language_max_sequence_length,
+            max_sequence_length=language_transformer_config.seq_length,
             parallel_output=parallel_output,
             position_embedding_type="mrope",
             rotary_percent=language_transformer_config.rotary_percent,
@@ -275,7 +276,7 @@ class Qwen3_5Model(MegatronModule):
         """
 
         del inference_context, runtime_gather_output, mm_token_type_ids  # Unused, kept for API compatibility
-        if inference_params is None:
+        if inference_params is not None:
             raise ValueError("not support inference")
 
         vision_grid_thw = None
@@ -411,7 +412,7 @@ class Qwen3_5Model(MegatronModule):
             # Megatron uses 4D bool masks ([B|1,1,S,S], True=masked); HF uses 2D keep masks ([B,S], 1=keep)
             # For simplicity, we set hf_attention_mask to None.
             position_ids, _ = get_rope_index(
-                self.config.spatial_merge_size,
+                self.spatial_merge_size,
                 self.image_token_id,
                 self.video_token_id,
                 self.vision_start_token_id,

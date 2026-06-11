@@ -1,23 +1,27 @@
 # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+import warnings
 from typing import Optional
 
+import torch
+import torch_npu
 from torch import nn
 
-from megatron.legacy.model.rms_norm import RMSNorm
-
-from megatron.core.transformer.enums import AttnMaskType, LayerType
+from megatron.legacy.model.enums import LayerType
+from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import (
     TransformerLayer,
     TransformerLayerSubmodules,
     get_transformer_layer_offset,
 )
-
 from megatron.core.transformer.transformer_block import (
     TransformerBlockSubmodules,
     get_num_layers_to_build,
 )
-
+from megatron.core.transformer.mlp import MLPSubmodules
+from megatron.core.transformer.moe.moe_layer import MoELayer, MoESubmodules
+from megatron.core.transformer.moe.experts import GroupedMLP, SequentialMLP, TEGroupedMLP
+from megatron.core.transformer.moe.shared_experts import SharedExpertMLP
 from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
 from megatron.core.transformer.attention import SelfAttentionSubmodules
@@ -25,24 +29,39 @@ from megatron.core.extensions.transformer_engine import TENorm, TERowParallelLin
 from megatron.core.models.gpt.gpt_layer_specs import get_mlp_module_spec
 from megatron.core.transformer.transformer_block import TENorm
 from megatron.core.transformer.dot_product_attention import DotProductAttention
-from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.identity_op import IdentityOp
 from megatron.core.transformer.spec_utils import ModuleSpec
-from megatron.core.transformer.transformer_layer import (
-    TransformerLayer,
-    TransformerLayerSubmodules,
-)
+from megatron.core.utils import is_te_min_version, get_te_version
 
 try:
     from megatron.core.extensions.transformer_engine import (
+        TEColumnParallelGroupedLinear,
         TEColumnParallelLinear,
-        TEDotProductAttention
+        TERowParallelGroupedLinear,
+        TERowParallelLinear,
+        TEDotProductAttention,
     )
+    HAVE_TE = True
 except ImportError:
-    pass
+    HAVE_TE = False
 
 from mindspeed_mm.mcore.models.qwen3_5.modules import Qwen3_5SelfAttention, PatchMergerSubmodules, Qwen3_5SelfAttentionSubmodules
 from mindspeed_mm.mcore.models.qwen3_5.gated_delta_net import GatedDeltaNet, GatedDeltaNetSubmodules, Qwen3_5GatedRMSNorm
+
+class RMSNorm(nn.Module):
+    def __init__(self, dim: int, eps: float = 1e-6, sequence_parallel: bool = False):
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.zeros(dim))
+
+        setattr(self.weight, 'sequence_parallel', sequence_parallel)
+
+    def forward(self, x):
+        output = torch_npu.npu_rms_norm(x.float(), 1.0 + self.weight.float(), self.eps)[0]
+        return output.type_as(x)
+
+    def extra_repr(self):
+        return f"{tuple(self.weight.shape)}, eps={self.eps}"
 
 
 class PTNorm:
@@ -69,6 +88,65 @@ class PTNorm:
             raise Exception('Only LayerNorm and RMSNorm are curently supported')
 
         return instance
+
+
+def get_moe_module_spec(
+    use_te: Optional[bool] = True,
+    num_experts: Optional[int] = None,
+    moe_grouped_gemm: Optional[bool] = False,
+    moe_use_legacy_grouped_gemm: Optional[bool] = False,
+    moe_shared_expert_gate: Optional[bool] = False,
+
+) -> ModuleSpec:
+    """Helper function to get module spec for MoE"""
+    assert num_experts is not None
+
+    mlp = MLPSubmodules(
+        linear_fc1=TEColumnParallelLinear if use_te else ColumnParallelLinear,
+        linear_fc2=TERowParallelLinear if use_te else RowParallelLinear,
+    )
+
+    # experts spec
+    if moe_grouped_gemm:
+        ## use GroupedMLP
+        if use_te and TEColumnParallelGroupedLinear is not None and not moe_use_legacy_grouped_gemm:
+            ## use TEGroupedLinear
+            expert_module = TEGroupedMLP
+            expert_submodule = MLPSubmodules(
+                linear_fc1=TEColumnParallelGroupedLinear, linear_fc2=TERowParallelGroupedLinear
+            )
+        else:
+            ## use legacy GroupedMLP
+            expert_module = GroupedMLP
+            expert_submodule = None
+            warnings.warn(
+                'The legacy GroupedMLP will be deprecated in Megatron-Core v0.12.0. '
+                'Please update the TransformerEngine to version>=1.7.0 and use TEGroupedMLP.'
+            )
+    else:
+        ## use SequentialMLP
+        expert_module = SequentialMLP
+        if use_te and not is_te_min_version("1.7.0.dev0"):
+            warnings.warn(
+                "Only transformer-engine>=1.7.0 supports MoE experts, "
+                f"but your version is {get_te_version()}. Use local linear implementation instead."
+            )
+            expert_submodule = MLPSubmodules(
+                linear_fc1=ColumnParallelLinear, linear_fc2=RowParallelLinear
+            )
+        else:
+            expert_submodule = mlp
+
+    experts = ModuleSpec(module=expert_module, submodules=expert_submodule)
+
+    # shared experts spec
+    shared_experts = ModuleSpec(module=SharedExpertMLP, params={"gate": moe_shared_expert_gate}, submodules=mlp)
+
+    # MoE module spec
+    moe_module_spec = ModuleSpec(
+        module=MoELayer, submodules=MoESubmodules(experts=experts, shared_experts=shared_experts)
+    )
+    return moe_module_spec
 
 
 def get_gated_delta_net_module_spec(config: TransformerConfig) -> ModuleSpec:
@@ -142,10 +220,11 @@ def get_qwen3_5_text_block_spec(
             if (layer_number + 1) % config.linear_attention_freq == 0
             else get_gated_delta_net_module_spec(config)
         )
-        mlp = get_mlp_module_spec(
+        mlp = get_moe_module_spec(
             use_te=config.use_te,
             num_experts=config.num_moe_experts,
-            moe_grouped_gemm=config.moe_grouped_gemm
+            moe_grouped_gemm=config.moe_grouped_gemm,
+            moe_shared_expert_gate=config.moe_shared_expert_gate
         )
 
         layer_specs.append(
@@ -179,7 +258,7 @@ def get_qwen3_5_text_block_spec(
     return TransformerBlockSubmodules(layer_specs=layer_specs, layer_norm=PTNorm)
 
 
-def get_qwe3_5_vit_layer_local_spec(config=None) -> ModuleSpec:
+def get_qwen3_5_vit_layer_local_spec(config=None) -> ModuleSpec:
     '''
     Returns ViT layer spec
     '''
@@ -187,6 +266,7 @@ def get_qwe3_5_vit_layer_local_spec(config=None) -> ModuleSpec:
     return ModuleSpec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
+            input_layernorm=PTNorm,
             self_attention=ModuleSpec(
                 module=Qwen3_5SelfAttention,
                 params={"attn_mask_type": AttnMaskType.no_mask, "attention_type": "self"},
@@ -197,7 +277,7 @@ def get_qwe3_5_vit_layer_local_spec(config=None) -> ModuleSpec:
                 ),
             ),
             self_attn_bda=get_bias_dropout_add,
-            pre_mlp_layernorm=IdentityOp,
+            pre_mlp_layernorm=PTNorm,
             mlp=mlp,
             mlp_bda=get_bias_dropout_add,
         ),
@@ -206,7 +286,7 @@ def get_qwe3_5_vit_layer_local_spec(config=None) -> ModuleSpec:
 
 def get_vision_patch_merger_spec(config=None) -> ModuleSpec:
     return PatchMergerSubmodules(
-        patch_norm=TENorm,
+        patch_norm=PTNorm,
         linear_fc1=ColumnParallelLinear if not config.use_te else TEColumnParallelLinear,
         linear_fc2=RowParallelLinear if not config.use_te else TERowParallelLinear,
     )

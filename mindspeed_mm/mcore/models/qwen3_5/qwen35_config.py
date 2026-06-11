@@ -74,6 +74,10 @@ class MindSpeedArgsRequired:
 
     qk_l2_norm: bool = False
     batch_invariant_mode: bool = False
+    v_head_dim: int = 0
+
+    use_ascend_coc: bool = False
+    use_ascend_mc2: bool = False
 
 
 @dataclass
@@ -201,6 +205,23 @@ class Qwen3_5MoEModelConfig(TransformerConfig, MindSpeedArgsRequired):
     hetereogenous_dist_checkpoint: bool = True  # Megatron spelling error, consistent with Megatron to avoid load failure
     mtp_num_layers: Optional[int] = None
     no_rope_freq: Optional[Union[int, List[int]]] = None
+
+    # =========================================================================
+    # Compatibility with later versions of Megatron
+    # =========================================================================
+    use_mup: bool = False
+    """
+    Enable Maximal Update Parameterization (MuP) for hyperparameter transfer across
+    model widths. When enabled, learning rates and initialization are scaled according
+    to the width multiplier to ensure consistent training dynamics.
+    """
+    mup_output_mult: float = 1.0
+    """
+    Multiplier for output logits before softmax. When MuP is enabled and this is left
+    at 1.0, it is auto-set to 1/mup_width_mult to keep output variance stable across
+    widths. Override to customize output scaling.
+    Default: 1.0.
+    """
 
 
 @dataclass
