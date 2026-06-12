@@ -116,7 +116,14 @@ pip list | grep fla_npu
 mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
 --dcp_dir ckpt/dcp_path/xxxxxxx \
---tie_weight_mapping '{"lm_head.weight":"model.language_model.embed_tokens.weight"}'
+--tie_weight_mapping '{"lm_head.weight":"model.language_model.embed_tokens.weight"}' \
+--num_workers 0
+
+# 其中：
+# hf_dir: huggingface权重目录
+# dcp_dir: 转换后DCP格式的权重保存目录
+# tie_weight_mapping: 权重绑定映射关系
+# num_workers: 并行工作线程数，0表示串行执行，若存储IO性能允许，可适当调大并发数以提升转换效率，推荐设置为4
 
 # 转换后的目录结构为：
 # ———— xxxxxxx
@@ -129,7 +136,13 @@ mm-convert Qwen35Converter hf_to_dcp \
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
---dcp_dir ckpt/dcp_path/xxxxxxx
+--dcp_dir ckpt/dcp_path/xxxxxxx \
+--num_workers 0
+
+# 其中：
+# hf_dir: huggingface权重目录
+# dcp_dir: 转换后DCP格式的权重保存目录
+# num_workers: 并行工作线程数，0表示串行执行，若存储IO性能允许，可适当调大并发数以提升转换效率，推荐设置为4
 
 # 转换后的目录结构为：
 # ———— xxxxxxx

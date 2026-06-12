@@ -44,6 +44,7 @@ class Qwen35Converter(Converter):
         hf_prefix: str = "",
         tie_weight_mapping: Dict[str, str] = None,
         fused_linear_names: List[str] = None,
+        num_workers: int = 0,
     ):
         """
         Converts a Hugging Face formatted model checkpoint to torch-dcp format.
@@ -58,6 +59,7 @@ class Qwen35Converter(Converter):
                 Used when output head shares weights with input embeddings.
             fused_linear_names (str): Names of MoE (Mixture of Experts) expert parameters
                 in comma-separated format. These parameters will be reshaped during conversion.
+            num_workers (int): Number of parallel workers for conversion. Default is 0 (serial).
 
         Steps:
         1. Load the state dict from HF format.
@@ -103,7 +105,8 @@ class Qwen35Converter(Converter):
         hf_to_dcp_sharded(
             hf_dir=hf_dir,
             dcp_dir=dcp_dir,
-            state_dict_convert_func=state_dict_convert_func
+            state_dict_convert_func=state_dict_convert_func,
+            num_workers=num_workers
         )
 
         if mtp_num_hidden_layers > 0 and num_experts > 0 and mtp_expert_collector:

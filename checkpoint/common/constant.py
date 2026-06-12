@@ -7,3 +7,4 @@ IMAGE_ENCODER = "image_encoder"
 AUDIO_ENCODER = "audio_encoder"
 TEXT_DECODER = "text_decoder"
 LORA_CKPT_NAME = "adapter_model.safetensors"
+DCP_CHECKPOINT_VERSION = 3.0
