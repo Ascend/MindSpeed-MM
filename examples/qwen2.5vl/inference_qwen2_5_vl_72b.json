@@ -172,6 +172,6 @@
     },
     "min_pixels": 1003520,
     "max_pixels": 12845056,
-    "image_path": "examples/qwen2vl/demo.jpeg",
+    "image_path": "sources/images/demo/demo.jpeg",
     "prompts": "Describe this image and keep it within 100 words."
 }
