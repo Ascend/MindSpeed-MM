@@ -791,4 +791,4 @@ MindSpeed-MM 支持通过 YAML 配置文件灵活管理 FSDP2 训练策略，实
 精度工具使用
 ^^^^^^^^^^^^^^^^^
 
-在解决模型训练中的精度问题时，可借助 `精度工具 msprobe <https://gitcode.com/Ascend/mstt/tree/master/debug/accuracy_tools/msprobe>`__\ 来对不同功能和场景分析和定位。
+在解决模型训练中的精度问题时，可借助 `精度工具 msprobe <https://gitcode.com/Ascend/mstt/tree/26.0.0/debug/accuracy_tools/msprobe>`__\ 来对不同功能和场景分析和定位。

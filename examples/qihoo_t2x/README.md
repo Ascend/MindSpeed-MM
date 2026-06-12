@@ -54,7 +54,7 @@
 
 ### 2. 环境搭建
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/docs/zh/pytorch/install_guide.md)
 
 ```bash
     # python3.10

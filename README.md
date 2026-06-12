@@ -1083,7 +1083,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tbody>
 </table>
 
-大语言模型（稠密模型、稀疏模型和状态空间模型）由MindSpeed-LLM专项维护，如果需要进行大语言模型的训练，请访问大语言模型仓库[MindSpeed-LLM](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/zh/pytorch/models/supported_models.md)获取详细的适用说明，当前MindSpeed-LLM已支持以下的主流模型：
+大语言模型（稠密模型、稀疏模型和状态空间模型）由MindSpeed-LLM专项维护，如果需要进行大语言模型的训练，请访问大语言模型仓库[MindSpeed-LLM](https://gitcode.com/Ascend/MindSpeed-LLM/blob/26.0.0/docs/zh/pytorch/models/supported_models.md)获取详细的适用说明，当前MindSpeed-LLM已支持以下的主流模型：
 
 <table>
   <thead>
@@ -1320,7 +1320,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/internlm">InternLM3</a></td>
       <td><a href="https://huggingface.co/internlm/internlm3-8b-instruct/tree/main">8B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/internlm3">internlm3</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/internlm3">internlm3</a></td>
       <td> 8K </td>
       <th> Mcore </th>
       <td> 1x8 </td>
@@ -1369,7 +1369,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="5"><a href="https://huggingface.co/meta-llama">LLaMA2</a></td>
       <td><a href="https://huggingface.co/daryl149/llama-2-7b-hf/tree/main">7B</a></td>
-      <td rowspan="5"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/llama2">llama2</a></td>
+      <td rowspan="5"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/llama2">llama2</a></td>
       <td>4K</td>
       <th>Mcore</th>
       <td>1x8</td>
@@ -1435,7 +1435,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="8"><a href="https://modelscope.cn/organization/LLM-Research">LLaMA3.1</a></td>
       <td rowspan="2"><a href="https://modelscope.cn/models/LLM-Research/Meta-Llama-3.1-8B">8B</a></td>
-      <td rowspan="8"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/llama31">llama31</a></td>
+      <td rowspan="8"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/llama31">llama31</a></td>
       <td> 8K </td>
       <th>Mcore</th>
       <td>1x8</td>
@@ -1705,7 +1705,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="7"><a href="https://huggingface.co/Qwen">Qwen2.5</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-0.5B/tree/main">0.5B</a></td>
-      <td rowspan="7"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/qwen25">qwen25</a></td>
+      <td rowspan="7"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/qwen25">qwen25</a></td>
       <td> 32K </td>
       <th>Mcore</th>
       <td>1x8</td>
@@ -1768,7 +1768,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="7"> <a href="https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f">Qwen3</a> </td>
       <td><a href="https://huggingface.co/Qwen/Qwen3-0.6B-Base">0.6B</a></td>
-      <td rowspan="6"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/qwen3">qwen3</a></td>
+      <td rowspan="6"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/qwen3">qwen3</a></td>
       <td> 4K </td>
       <th> Mcore </th>
       <td> 1x8 </td>
@@ -1823,7 +1823,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen3-32B">32B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/fsdp2/qwen3">qwen3</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/fsdp2/qwen3">qwen3</a></td>
       <td> 4K </td>
       <th> FSDP2 </th>
       <td> 1x16 </td>
@@ -1960,7 +1960,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="2"><a href="https://huggingface.co/google">Gemma2</a></td>
       <td><a href="https://huggingface.co/google/gemma-2-9b/tree/main">9B</a></td>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/gemma2">gemma2</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/gemma2">gemma2</a></td>
       <td> 8K </td>
       <th>Mcore</th>
       <td>1x8</td>
@@ -2002,7 +2002,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/microsoft">Phi3.5</a></td>
       <td> <a href="https://huggingface.co/microsoft/Phi-3.5-mini-instruct/tree/main">mini-instruct</a> </td>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/phi35">phi35</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/phi35">phi35</a></td>
       <td> 4K </td>
       <th>Mcore</th>
       <td> 1x8 </td>
@@ -2078,7 +2078,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/ByteDance-Seed">Seed-OSS</a></td>
       <td><a href="https://huggingface.co/ByteDance-Seed/Seed-OSS-36B-Base/tree/main">36B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/seed_oss">seed_oss</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/seed_oss">seed_oss</a></td>
       <td> 2K </td>
       <th> Mcore </th>
       <td> 1x8 </td>
@@ -2089,7 +2089,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/mistralai">Magistral</a></td>
       <td><a href="https://huggingface.co/mistralai/Magistral-Small-2506/tree/main">24B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/magistral">magistral</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/magistral">magistral</a></td>
       <td> 4K </td>
       <th> Mcore </th>
       <td> 1x8 </td>
@@ -2100,7 +2100,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/PLM-Team">PLM</a></td>
       <td><a href="https://huggingface.co/PLM-Team/PLM-1.8B-Base/tree/main">1.8B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/plm">plm</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/plm">plm</a></td>
       <td> 2K </td>
       <th> Mcore </th>
       <td> 1x8 </td>
@@ -2112,7 +2112,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td rowspan="30"> 稀疏模型 </td>
       <td rowspan="4"> <a href="https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f">Qwen3</a> </td>
       <td rowspan="2"><a href="https://huggingface.co/Qwen/Qwen3-30B-A3B-Base">30B-A3B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/qwen3_moe">qwen3_moe</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/qwen3_moe">qwen3_moe</a></td>
       <td> 4K </td>
       <th> Mcore </th>
       <td> 2x8 </td>
@@ -2121,7 +2121,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/fsdp2/qwen3_moe">qwen3_moe</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/fsdp2/qwen3_moe">qwen3_moe</a></td>
       <td> 4K </td>
       <th> FSDP2 </th>
       <td> 1x16 </td>
@@ -2131,7 +2131,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     </tr>
     <tr>
       <td rowspan="2"><a href="https://huggingface.co/Qwen/Qwen3-235B-A22B">235B-A22B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/qwen3_moe">qwen3_moe</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/qwen3_moe">qwen3_moe</a></td>
       <td> 4K </td>
       <th> Mcore </th>
       <td> 16x16 </td>
@@ -2140,7 +2140,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/fsdp2/qwen3_moe">qwen3_moe</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/fsdp2/qwen3_moe">qwen3_moe</a></td>
       <td> 4K </td>
       <th> FSDP2 </th>
       <td> 16x16 </td>
@@ -2151,7 +2151,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="2"><a href="https://huggingface.co/collections/Qwen/qwen3-next">Qwen3-Next</a></td>
       <td rowspan="2"><a href="https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct">80B-A3B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/qwen3_next">qwen3_next</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/qwen3_next">qwen3_next</a></td>
       <td> 16K </td>
       <th> Mcore </th>
       <td> 4x16 </td>
@@ -2160,7 +2160,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Pass】</td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/fsdp2/qwen3_next">qwen3_next</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/fsdp2/qwen3_next">qwen3_next</a></td>
       <td> 16K </td>
       <th> FSDP2 </th>
       <td> 4x16 </td>
@@ -2171,11 +2171,11 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/Qwen/Qwen3-Coder-Next/tree/main">Qwen3-Coder-Next</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen3-Coder-Next/tree/main">80B-A3B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/qwen3_coder_next">qwen3_coder_next</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/qwen3_coder_next">qwen3_coder_next</a></td>
       <td> 16K </td>
       <th>Mcore</th>
       <td>4x16</td>
-      <td rowspan="1"> <a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/qwen3_coder_next"></a> </td>
+      <td rowspan="1"> <a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/qwen3_coder_next"></a> </td>
       <td>【Ascend】</td>
       <td>【Test】</td>
     </tr>
@@ -2252,7 +2252,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite">DeepSeek-V2-Lite</a></td>
       <td><a href="https://huggingface.co/deepseek-ai/DeepSeek-V2-Lite/tree/main">16B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/deepseek2_lite">deepseek2_lite</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/deepseek2_lite">deepseek2_lite</a></td>
       <td> 8K </td>
       <th>Mcore</th>
       <td> 1x8 </td>
@@ -2274,7 +2274,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/deepseek-ai/DeepSeek-V3">DeepSeek-V3</a></td>
       <td><a href="https://huggingface.co/deepseek-ai/DeepSeek-V3/tree/main">671B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/deepseek3">deepseek3</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/deepseek3">deepseek3</a></td>
       <td> 4K </td>
       <th>Mcore</th>
       <td> 64x8 </td>
@@ -2285,7 +2285,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <tr>
       <td rowspan="1"><a href="https://huggingface.co/deepseek-ai/DeepSeek-V3.2-Exp">DeepSeek-V3.2</a></td>
       <td><a href="https://huggingface.co/deepseek-ai/DeepSeek-V3.2-Exp/tree/main">671B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/deepseek32">deepseek3.2</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/deepseek32">deepseek3.2</a></td>
       <td> 4K </td>
       <th>Mcore</th>
       <td> 32x16 </td>
@@ -2307,7 +2307,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/inclusionAI/Ling-mini-2.0">Ling-mini-2.0</a></td>
       <td> <a href="https://huggingface.co/inclusionAI/Ling-mini-2.0/tree/main">16B</a> </td>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/ling_v2">ling_v2</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/ling_v2">ling_v2</a></td>
       <td> 4K </td>
       <th>Mcore</th>
       <td> 1x8 </td>
@@ -2328,7 +2328,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/microsoft">Phi3.5</a></td>
       <td> <a href="https://huggingface.co/microsoft/Phi-3.5-MoE-instruct">MoE-instruct</a> </td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/phi35">phi35</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/phi35">phi35</a></td>
       <td> 4K </td>
       <th> Mcore </th>
       <td> 2x8 </td>
@@ -2361,7 +2361,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/zai-org">GLM4.5-Air</a></td>
       <td> <a href="https://huggingface.co/zai-org/GLM-4.5-Air/tree/main">MoE-106B</a> </td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/glm45-air">glm45-air</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/glm45-moe">glm45-moe</a></td>
       <td> 4K </td>
       <th> Mcore </th>
       <td> 8x8 </td>
@@ -2372,7 +2372,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/THUDM">GLM5</a></td>
       <td><a href="https://huggingface.co/THUDM/GLM-5">MoE-744B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/glm5">glm5</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/glm5">glm5</a></td>
       <td> 4K </td>
       <th> Mcore </th>
       <td> 32x16 </td>
@@ -2383,7 +2383,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/stepfun-ai">Step3.5-Flash</a></td>
       <td><a href="https://huggingface.co/stepfun-ai/Step-3.5-Flash">MoE-196B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/fsdp2/step35">step35</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/fsdp2/step35">step35</a></td>
       <td> 4K </td>
       <th> FSDP2 </th>
       <td> 12x16 </td>
@@ -2394,7 +2394,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/meituan-longcat">LongCat</a></td>
       <td><a href="https://huggingface.co/meituan-longcat/LongCat-Flash-Chat">MoE-560B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/longcat">longcat</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/longcat">longcat</a></td>
       <td> 4K </td>
       <th> Mcore </th>
       <td> 8x16 </td>
@@ -2405,7 +2405,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="1"><a href="https://huggingface.co/openai">GPT-OSS</a></td>
       <td><a href="https://modelscope.cn/models/unsloth/gpt-oss-20b-BF16/">MoE-20B</a></td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/fsdp2/gpt_oss">gpt_oss</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/fsdp2/gpt_oss">gpt_oss</a></td>
       <td> 4K </td>
       <th> FSDP2 </th>
       <td> 1x16 </td>
@@ -2417,7 +2417,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td rowspan="5"> 状态空间模型 </td>
       <td rowspan="2">Mamba2</td>
       <td><a href="https://huggingface.co/state-spaces/mamba2-2.7b/tree/main">2.7B</a></td>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/mamba2">mamba2</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/mamba2">mamba2</a></td>
       <td>4K</td>
       <th>Mcore</th>
       <td> 1x8</td>
@@ -2437,7 +2437,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
     <tr>
       <td rowspan="2">Mamba2Hybrid</td>
       <td><a href="https://huggingface.co/nvidia/mamba2-hybrid-8b-3t-4k/tree/main">8B</a></td>
-       <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/master/examples/mcore/mamba2">mamba2</a></td>
+       <td><a href="https://gitcode.com/Ascend/MindSpeed-LLM/tree/26.0.0/examples/mcore/mamba2">mamba2</a></td>
       <td> 4K</td>
       <th>Mcore</th>
       <td>1x8</td>
