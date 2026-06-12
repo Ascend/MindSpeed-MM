@@ -23,11 +23,11 @@ parallel:
     apply_modules:
       - language_model.model.layers.{*}.mlp.experts
 
-### 数据相关配置
+# 数据相关配置
 data:
   dataset_param:
     dataset_type: huggingface
-    #数据集属性
+    # 数据集属性
     attr:
       images: images
       messages: messages
@@ -74,7 +74,7 @@ data:
     collate_param:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
-    enable_preload: false
+    enable_preload: true
 
 # 模型配置
 model:
@@ -96,7 +96,7 @@ features:
       - vision_tower.encoder.blocks.{*}
       - language_model.model.layers.{*}
   # activation offload 配置
-  enable_activation_offload: false
+  enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
      - vision_tower.encoder.blocks.{*}
@@ -106,10 +106,10 @@ features:
   chunkmbs_plan:
     apply_modules:
       - language_model.model.layers.{*}
-    chunk_mbs: 1 # 这个表示的是chunk之后的micro batchsize
+    chunk_mbs: 1  # 这个表示的是chunk之后的micro batchsize
     batch_dim: 0
     chunk_arg_indexs: [ 0 ]
-    chunk_kwarg_names: [ "position_embeddings", "position_ids", "rope_deltas", "attention_mask" ]
+    chunk_kwarg_names: [ "position_ids", "attention_mask" ]
 
 # 训练配置
 training:
@@ -126,7 +126,7 @@ training:
   optimizer: adamw
   adam_fused: true
   use_deter_comp: false
-  load_rank0_and_broadcast: false # 从rank0加载checkpoint并广播到其他rank
+  load_rank0_and_broadcast: false  # 从rank0加载checkpoint并广播到其他rank
   plugin:
     - mindspeed_mm/fsdp/models/kimik2_5
     - mindspeed_mm/fsdp/data/datasets/huggingface
