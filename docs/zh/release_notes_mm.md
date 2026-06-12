@@ -40,11 +40,12 @@
 
 **表 1**  MindSpeed MM配套表
 
-|MindSpeed MM代码分支名称|Megatron版本|CANN版本|Ascend Extension for PyTorch版本|Python版本|PyTorch版本|
-|--|--|--|--|--|--|
-|26.0.0|core_v0.12.1|9.0.0|26.0.0|Python3.10|2.7.1|
-|2.3.0|core_v0.12.1|8.5.0|7.3.0|Python3.10|2.7.1|
-|2.2.0|core_v0.12.1|8.3.RC1|7.2.0|Python3.10|2.7.1|
+|MindSpeed MM代码分支名称|Megatron版本|CANN版本|Ascend Extension for PyTorch版本|Triton-Ascend版本|Python版本|PyTorch版本|
+|--|--|--|--|--|--|--|
+|master（在研版本）|core_v0.12.1|在研版本|在研版本|在研版本|Python3.10|2.7.1|
+|26.0.0|core_v0.12.1|9.0.0|26.0.0|3.2.1|Python3.10|2.7.1|
+|2.3.0|core_v0.12.1|8.5.0|7.3.0|3.2.0|Python3.10|2.7.1|
+|2.2.0|core_v0.12.1|8.3.RC1|7.2.0|-|Python3.10|2.7.1|
 
 >[!NOTE]
 >
@@ -57,6 +58,11 @@
 |26.0.0|CANN 9.0.0<br>CANN 8.5.0<br>CANN 8.3.RC1<br>CANN 8.2.RC1<br>CANN 8.1.RC1<br>|26.0.0|
 |2.3.0|CANN 8.5.0<br>CANN 8.3.RC1<br>CANN 8.2.RC1<br>CANN 8.1.RC1<br>CANN 8.0.0<br>|7.3.0|
 |2.2.0|CANN 8.3.RC1<br>CANN 8.2.RC1<br>CANN 8.1.RC1<br>CANN 8.0.0<br>CANN 8.0.RC3<br>CANN 8.0.RC2|7.2.0|
+
+|CANN版本|Triton-Ascend版本|
+|--|--|
+|CANN 9.0.0|3.2.1|
+|CANN8.5.0|3.2.0|
 
 ## 版本使用注意事项
 

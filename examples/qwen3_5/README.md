@@ -11,7 +11,8 @@
 - [环境安装](#环境安装)
   - [环境准备](#1-环境准备)
   - [环境搭建](#2-环境搭建)
-  - [安装fla-npu以适配AscendC](#3-安装fla-npu以适配ascendc)
+  - [安装配套版本的TriTon-Ascend](#3-安装配套版本的triton-ascend)
+  - [安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc)
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
 - [数据集准备及处理](#数据集准备及处理)
@@ -55,8 +56,6 @@ commit_id=fc91372
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
 - [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/docs/zh/installation_guide/installation_description.md)
 
-‼️gdn部分特性依赖在研版本的triton-ascend，具体安装链接将在正式版本发布后提供。
-
 <a id="jump1.2"></a>
 
 ### 2. 环境搭建
@@ -74,7 +73,18 @@ cd MindSpeed-MM
 bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensions.sh
 ```
 
-### 3. 安装fla-npu以适配AscendC
+### 3. 安装配套版本的Triton-Ascend
+
+安装配套版本的Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
+
+可参考如下安装命令：
+
+```shell
+# 注意：triton-ascend 3.2.0 及以下 Triton-Ascend和Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
+pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+```
+
+### 4. 安装fla-npu以适配AscendC
 
 拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
 
