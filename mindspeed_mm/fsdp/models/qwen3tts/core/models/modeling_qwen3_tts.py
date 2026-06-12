@@ -56,6 +56,30 @@ logger = logging.get_logger(__name__)
 IGNORE_INDEX = -100
 
 
+def compute_distributed_loss(logits, labels, vocab_size, loss_function, **kwargs):
+    if dist.is_initialized():
+        world_size = dist.get_world_size()
+
+        labels = nn.functional.pad(labels, (0, 1), value=IGNORE_INDEX)
+        shift_labels = labels[..., 1:].contiguous()
+        local_valid_tokens = (shift_labels > IGNORE_INDEX).sum()
+
+        global_valid_tokens = torch.tensor([local_valid_tokens], dtype=torch.long, device=logits.device)
+        dist.all_reduce(global_valid_tokens, op=dist.ReduceOp.SUM)
+        global_valid_tokens = global_valid_tokens.item()
+
+        logits_flat = logits.view(-1, logits.shape[-1]).float()
+        labels_flat = shift_labels.view(-1)
+
+        loss_sum = F.cross_entropy(logits_flat, labels_flat, ignore_index=IGNORE_INDEX, reduction='sum')
+
+        loss = loss_sum / global_valid_tokens
+        loss = loss * world_size
+    else:
+        loss = loss_function(logits=logits, labels=labels, vocab_size=vocab_size, **kwargs)
+    return loss
+
+
 def download_weights_from_hf_specific(
         model_name_or_path: str,
         cache_dir: str | None,
@@ -1236,27 +1260,7 @@ class Qwen3TTSTalkerCodePredictorModelForConditionalGeneration(Qwen3TTSPreTraine
 
         loss = None
         if labels is not None:
-            # Modified：分布式场景下，loss计算跟原仓对齐，需要以全局的有效label数量作为分母算平均
-            if dist.is_initialized():
-                world_size = dist.get_world_size()
-
-                labels = nn.functional.pad(labels, (0, 1), value=IGNORE_INDEX)
-                shift_labels = labels[..., 1:].contiguous()
-                local_valid_tokens = (shift_labels > IGNORE_INDEX).sum()
-
-                global_valid_tokens = torch.tensor([local_valid_tokens], dtype=torch.long, device=logits.device)
-                dist.all_reduce(global_valid_tokens, op=dist.ReduceOp.SUM)
-                global_valid_tokens = global_valid_tokens.item()
-
-                logits_flat = logits.view(-1, logits.shape[-1]).float()
-                labels_flat = shift_labels.view(-1)
-
-                loss_sum = F.cross_entropy(logits_flat, labels_flat, ignore_index=IGNORE_INDEX, reduction='sum')
-
-                loss = loss_sum / global_valid_tokens
-                loss = loss * world_size
-            else:
-                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size, **kwargs)
+            loss = compute_distributed_loss(logits, labels, self.config.vocab_size, self.loss_function, **kwargs)
 
         return Qwen3TTSTalkerCodePredictorOutputWithPast(
             loss=loss,
@@ -1317,27 +1321,7 @@ class Qwen3TTSTalkerCodePredictorModelForConditionalGeneration(Qwen3TTSPreTraine
 
         loss = None
         if labels is not None:
-            # Modified：分布式场景下，loss计算跟原仓对齐，需要以全局的有效label数量作为分母算平均
-            if dist.is_initialized():
-                world_size = dist.get_world_size()
-
-                labels = nn.functional.pad(labels, (0, 1), value=IGNORE_INDEX)
-                shift_labels = labels[..., 1:].contiguous()
-                local_valid_tokens = (shift_labels > IGNORE_INDEX).sum()
-
-                global_valid_tokens = torch.tensor([local_valid_tokens], dtype=torch.long, device=logits.device)
-                dist.all_reduce(global_valid_tokens, op=dist.ReduceOp.SUM)
-                global_valid_tokens = global_valid_tokens.item()
-
-                logits_flat = logits.view(-1, logits.shape[-1]).float()
-                labels_flat = shift_labels.view(-1)
-
-                loss_sum = F.cross_entropy(logits_flat, labels_flat, ignore_index=IGNORE_INDEX, reduction='sum')
-
-                loss = loss_sum / global_valid_tokens
-                loss = loss * world_size
-            else:
-                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size, **kwargs)
+            loss = compute_distributed_loss(logits, labels, self.config.vocab_size, self.loss_function, **kwargs)
 
         return Qwen3TTSTalkerCodePredictorOutputWithPast(
             loss=loss,
@@ -1776,27 +1760,7 @@ class Qwen3TTSTalkerForConditionalGeneration(Qwen3TTSTalkerTextPreTrainedModel, 
 
         loss = None
         if labels is not None:
-            # Modified：分布式场景下，loss计算跟原仓对齐，需要以全局的有效label数量作为分母算平均
-            if dist.is_initialized():
-                world_size = dist.get_world_size()
-
-                labels = nn.functional.pad(labels, (0, 1), value=IGNORE_INDEX)
-                shift_labels = labels[..., 1:].contiguous()
-                local_valid_tokens = (shift_labels > IGNORE_INDEX).sum()
-
-                global_valid_tokens = torch.tensor([local_valid_tokens], dtype=torch.long, device=logits.device)
-                dist.all_reduce(global_valid_tokens, op=dist.ReduceOp.SUM)
-                global_valid_tokens = global_valid_tokens.item()
-
-                logits_flat = logits.view(-1, logits.shape[-1]).float()
-                labels_flat = shift_labels.view(-1)
-
-                loss_sum = F.cross_entropy(logits_flat, labels_flat, ignore_index=IGNORE_INDEX, reduction='sum')
-
-                loss = loss_sum / global_valid_tokens
-                loss = loss * world_size
-            else:
-                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size, **kwargs)
+            loss = compute_distributed_loss(logits, labels, self.config.vocab_size, self.loss_function, **kwargs)
 
         return Qwen3TTSTalkerOutputWithPast(
             loss=loss,
