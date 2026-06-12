@@ -85,7 +85,7 @@ pip install -e .
 
 - 模型地址: [Qwen3-VL-*B](https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe)；
 
- 将下载的模型权重保存到本地的`ckpt/Qwen3-VL-*B-Instruct`目录下。(*表示对应的尺寸)
+ 建议将下载的模型权重保存到上述搭建好的工程目录下，如`ckpt/Qwen3-VL-*B-Instruct`。(*表示对应的尺寸)
 
 如果使用随机初始化参数，保持`load`参数注释即可。
 
@@ -147,26 +147,26 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 ### 2. 配置参数
 
-【数据目录配置】
+【权重与数据目录配置】（必选）
 
-根据实际情况修改`qwen3vl_30B_config_v1.yaml`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段，建议均配置为绝对路径。
+根据实际情况修改当前工程目录下的`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`中的权重和数据集路径，包括`data`参数下的`model_name_or_path`、`dataset_dir`、`dataset`等字段，建议均配置为绝对路径。
 
-示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/video_data_path.json，此时配置如下：
+示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/mllm_format_llava_instruct_data.json，此时配置如下：
 `dataset_dir`配置为/home/user/data/;
-`dataset`配置为/home/user/data/video_data_path.json
+`dataset`配置为/home/user/data/mllm_format_llava_instruct_data.json
 
-**注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。
+**注意：配置`data`参数下的`cache_dir`目录时，如果是多机运行，不要配置成同一个挂载目录，避免写入同一个文件导致冲突**。
 
-【模块冻结配置】
+【模块冻结配置】（可选）
 
-当前支持自定义冻结模块，在`qwen3vl_30B_config_v1.yaml`中model->freeze字段中配置需要冻结的模块即可实现相应模块冻结。
+当前支持自定义冻结模块，在`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`中model->freeze字段中配置需要冻结的模块即可实现相应模块冻结。
 
-【模型保存加载及日志信息配置】
+【模型保存加载及日志信息配置】（可选）
 
-根据实际情况配置`qwen3vl_30B_config_v1.yaml`的`training`参数，包括保存路径以及保存间隔`save`、`save_interval`。
+根据实际情况配置`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`的`training`参数，包括保存路径以及保存间隔`save`、`save_interval`。
 注意：`save`参数当前被注释，不会保存模型，如果需要保存模型请配置保存路径。
 
-【单机运行配置】
+【单机运行配置】（根据实际情况选择单机/多机）
 以Qwen3-VL-30B模型为例：
 配置`examples/qwen3vl/finetune_qwen3vl_30B_v1.sh`参数如下
 
@@ -181,7 +181,7 @@ NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 ```
 
-【多机运行配置】
+【多机运行配置】（根据实际情况选择单机/多机） 
 如需拉起多机训练，修改启动脚本下 MASTER_ADDR、NODE_ADDR、NODES以及NODE_RANK变量
 
 ``` shell
@@ -197,7 +197,7 @@ NNODES: 一共几个节点
 
 ### 3. 启动微调
 
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，根据`FSDP2后端`选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)，在`qwen3vl_30B_config_v1.yaml`配置`loss_type`参数，可以设置成default（默认）、per_sample_loss、per_token_loss这3个值。
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，根据`FSDP2后端`选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)，在`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`配置`loss_type`参数，可以设置成default（默认）、per_sample_loss、per_token_loss这3个值。
 
 在代码仓根目录（MindSpeed-MM）下执行以下命令启动微调任务：
 
