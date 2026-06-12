@@ -66,20 +66,10 @@ commit_id=7eb5002
 
 ### 2. 环境搭建
 
+执行如下指令一键安装：
+
 ```bash
-git clone https://gitcode.com/Ascend/MindSpeed-MM.git
-
-# 安装mindspeed及依赖
-git clone https://gitcode.com/Ascend/MindSpeed.git
-cd MindSpeed
-cp -r mindspeed ../MindSpeed-MM/
-
-# 安装mindspeed mm及依赖
-cd ../MindSpeed-MM
-pip install -e .
-
-# 安装三方库依赖
-pip install tiktoken==0.12.0
+bash scripts/install.sh && bash pip install tiktoken==0.12.0
 ```
 
 ---

@@ -7,7 +7,7 @@ Usage: $0 [OPTIONS]
 
 Options:
     -t, --torchversion VERSION   PyTorch version to install (default: 2.7.1)
-    -m, --msid COMMIT_ID    MindSpeed commit ID [required]
+    -m, --msid COMMIT_ID    MindSpeed commit ID (optional, use latest if not specified)
     -y, --yes               Auto confirm all reinstallations
     -n, --no                Auto skip all reinstallations
     -mt, --megatron         Install Megatron-LM
@@ -15,7 +15,10 @@ Options:
     -h, --help              Display this help message and exit
 
 Examples:
-    # Install everything including CANN
+    # Install with latest MindSpeed (no commit ID)
+    bash $0 --torchversion 2.7.1 --install-cann
+
+    # Install with specific commit ID
     bash $0 --torchversion 2.7.1 --msid 93c45456c7044bacddebc5072316c01006c938f9 --install-cann
 
     # Install without CANN
@@ -53,18 +56,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check required parameters
-if [ -z "$MINDSPEED_COMMIT_ID" ]; then
-    echo "Error: MindSpeed commit ID parameter is required"
-    show_help
-    exit 1
-fi
-
 echo "========================================"
 echo "Installation Configuration"
 echo "========================================"
 echo "PyTorch Version: $TORCH_VERSION"
-echo "MindSpeed Commit ID: $MINDSPEED_COMMIT_ID"
+echo "MindSpeed Commit ID: ${MINDSPEED_COMMIT_ID:-"latest"}"
 echo "Auto Confirm Mode: ${AUTO_CONFIRM:-"interactive"}"
 echo "Install Megatron-LM: $INSTALL_MEGATRON"
 echo "Install CANN: $INSTALL_CANN"
@@ -559,12 +555,21 @@ else
 fi
 
 # Install mindspeed with retry mechanism
-echo "[INFO] Installing MindSpeed with commit ID: $MINDSPEED_COMMIT_ID"
+if [ -z "$MINDSPEED_COMMIT_ID" ]; then
+    echo "[INFO] Installing MindSpeed with latest version (no commit ID specified)"
+else
+    echo "[INFO] Installing MindSpeed with commit ID: $MINDSPEED_COMMIT_ID"
+fi
+
 if [ ! -d "MindSpeed" ]; then
     git clone https://gitcode.com/Ascend/MindSpeed.git
 fi
 cd MindSpeed
-git checkout "$MINDSPEED_COMMIT_ID"
+
+# Only checkout specific commit if COMMIT_ID is provided
+if [ -n "$MINDSPEED_COMMIT_ID" ]; then
+    git checkout "$MINDSPEED_COMMIT_ID"
+fi
 
 # Install MindSpeed with retry mechanism
 if ! install_with_retry "mindspeed" "pip3 install -e ."; then
@@ -572,7 +577,11 @@ if ! install_with_retry "mindspeed" "pip3 install -e ."; then
     exit 1
 fi
 
-echo "[INFO] MindSpeed with commit ID: $MINDSPEED_COMMIT_ID successfully installed!"
+if [ -z "$MINDSPEED_COMMIT_ID" ]; then
+    echo "[INFO] MindSpeed latest version successfully installed!"
+else
+    echo "[INFO] MindSpeed with commit ID: $MINDSPEED_COMMIT_ID successfully installed!"
+fi
 
 cd ..
 

@@ -96,7 +96,7 @@ features:
       - vision_tower.encoder.blocks.{*}
       - language_model.model.layers.{*}
   # activation offload 配置
-  enable_activation_offload: true
+  enable_activation_offload: false
   activation_offload_plan:
     apply_modules:
      - vision_tower.encoder.blocks.{*}
