@@ -85,7 +85,7 @@ pip install -e .
 
 - 模型地址: [Qwen3-VL-*B](https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe)；
 
- 建议将下载的模型权重保存到上述搭建好的工程目录下，如`ckpt/Qwen3-VL-*B-Instruct`。(*表示对应的尺寸)
+ 建议将下载的模型权重保存到上述搭建好的工程目录（MindSpeed-MM）下，如`ckpt/Qwen3-VL-*B-Instruct`。(*表示对应的尺寸)
 
 如果使用随机初始化参数，保持`load`参数注释即可。
 
@@ -105,7 +105,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
 #   |—— latest_checkpointed_iteration.txt
 ```
 
-并在`qwen3vl_30B_config_v1.yaml`中将`init_model_with_meta_device`参数配置为`true`（当前默认值），并取消`load`参数注释，将`load`配置成转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
+并在当前工程目录下的`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`中将`init_model_with_meta_device`参数配置为`true`（当前默认值），并取消`load`参数注释，将`load`配置成转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 
 ---
 <a id="jump3"></a>
@@ -151,8 +151,12 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 根据实际情况修改当前工程目录下的`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`中的权重和数据集路径，包括`data`参数下的`model_name_or_path`、`dataset_dir`、`dataset`等字段，建议均配置为绝对路径。
 
-示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/mllm_format_llava_instruct_data.json，此时配置如下：
-`dataset_dir`配置为/home/user/data/;
+权重路径填写示例：如果下载的模型权重路径为/home/data/Qwen3-VL-30B-A3B-Instruct，此时配置如下：
+`model_name_or_path`配置为&HF_MODEL_LOAD_PATH /home/data/Qwen3-VL-30B-A3B-Instruct
+其中&HF_MODEL_LOAD_PATH 是框架约定的固定锚点标记，请勿修改名称
+
+数据集路径填写示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/mllm_format_llava_instruct_data.json，此时配置如下：
+`dataset_dir`配置为/home/user/data/
 `dataset`配置为/home/user/data/mllm_format_llava_instruct_data.json
 
 **注意：配置`data`参数下的`cache_dir`目录时，如果是多机运行，不要配置成同一个挂载目录，避免写入同一个文件导致冲突**。
