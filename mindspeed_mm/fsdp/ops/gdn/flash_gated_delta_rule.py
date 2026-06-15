@@ -10,12 +10,17 @@ import fla_npu
 
 from mindspeed_mm.fsdp.ops.gdn.triton_core.chunk_scaled_dot_kkt import chunk_scaled_dot_kkt_fwd
 from mindspeed_mm.fsdp.ops.gdn.triton_core.l2norm import l2norm_bwd, l2norm_fwd
-from mindspeed_mm.fsdp.ops.gdn.triton.solve_tril import solve_tril
 from mindspeed_mm.fsdp.ops.gdn.triton.cumsum import chunk_local_cumsum
 from mindspeed_mm.fsdp.ops.gdn.triton_core.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
 from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
 from mindspeed_mm.fsdp.features.memory.async_offload import OffloadManager, SwapTensor
 from mindspeed_mm.fsdp.utils.device import get_current_stream
+
+from mindspeed_mm.fsdp.ops.gdn.triton.utils import is_arch35
+if is_arch35():
+    from mindspeed_mm.fsdp.ops.gdn.triton_core.solve_tril import solve_tril
+else:
+    from mindspeed_mm.fsdp.ops.gdn.triton.solve_tril import solve_tril
 
 _disable_compile = getattr(getattr(torch, "compiler", None), "disable", lambda fn: fn)
 _DEFAULT_VARLEN_CHUNK_SIZES = (16, 32, 64, 128, 608 * 2)
@@ -179,11 +184,19 @@ def flash_chunk_gated_delta_rule_fwd(
         output_dtype=torch.float32,
     )
 
-    A = solve_tril(
-        A=A,
-        cu_seqlens=cu_seqlens,
-        output_dtype=k.dtype,
-    )
+    if is_arch35():
+        A = solve_tril(
+            A=A,
+            cu_seqlens=cu_seqlens,
+            chunk_indices = chunk_indices,
+            output_dtype=k.dtype,
+        )
+    else:
+        A = solve_tril(
+            A=A,
+            cu_seqlens=cu_seqlens,
+            output_dtype=k.dtype,
+        )
 
     g = g.transpose(1, 2).contiguous()
     beta = beta.transpose(1, 2).contiguous().float()

@@ -16,6 +16,8 @@ parallel:
       - model.language_model.layers.{*}
     param_dtype: bf16
     reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
   ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
   expert_parallel_size: 8
   ep_plan:
@@ -82,8 +84,8 @@ model:
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   attn_implementation: flash_attention_2
-  freeze:
-    - model.visual
+  # freeze:
+  #   - model.visual
   # 融合算子配置
   gdn_implementation: triton
   causal_conv1d_implementation: eager

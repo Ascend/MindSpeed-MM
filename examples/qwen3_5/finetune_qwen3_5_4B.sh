@@ -8,6 +8,10 @@ export ACLNN_CACHE_LIMIT=100000
 export CPU_AFFINITY_CONF=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
+# 删除triton的cache
+# export TRITON_CACHE_DIR=./triton_cache
+# rm -rf $TRITON_CACHE_DIR/*
+
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
