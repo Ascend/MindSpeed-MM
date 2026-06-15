@@ -70,6 +70,7 @@ from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
+from mindspeed_mm.fsdp.distributed.expert_parallel.comm import set_ep_rank_seq_lens
 
 from mindspeed_mm.utils.aux_loss import load_balancing_loss_func_optimized
 from mindspeed_mm.fsdp.features.memory.grad_offload import clear_offload_grad
@@ -1267,6 +1268,7 @@ class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
         self.mlp = Qwen3_5MoeSparseMoeBlock(config)
         self.input_layernorm = Qwen3_5MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = Qwen3_5MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.layer_idx = layer_idx
 
     def forward(
         self,
@@ -1278,6 +1280,11 @@ class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
         cache_position: torch.LongTensor | None = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> torch.FloatTensor:
+        bs, seq_len, _ = hidden_states.shape
+        ps = get_parallel_state()
+        if ps.is_ep_enable() and self.layer_idx == 0:
+            set_ep_rank_seq_lens(bs * seq_len, ep_group=ps.get_ep_group(), device=hidden_states.device)
+
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)

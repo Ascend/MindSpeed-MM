@@ -13,7 +13,6 @@ def eager_permute(tokens, indices, num_out_tokens=None):
     sorted_indices1 = torch.argsort(sorted_indices.float(), stable=True).to(indices_dtype)
     if num_out_tokens:
         permuted_tokens = permuted_tokens[:num_out_tokens]
-        sorted_indices1 = sorted_indices1[:num_out_tokens]
     return permuted_tokens, sorted_indices1
 
 
@@ -25,4 +24,4 @@ def permute(tokens, indices, num_out_tokens=None, fused=True):
     if fused and IS_NPU_AVAILABLE:
         return fused_permute(tokens, indices, num_out_tokens)
     else:
-        return eager_permute(tokens, indices)
+        return eager_permute(tokens, indices, num_out_tokens)

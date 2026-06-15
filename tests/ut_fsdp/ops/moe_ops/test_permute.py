@@ -10,6 +10,7 @@ def test_fused_vs_eager_consistency_for_permute():
     hidden_size = 32
     topk_list = [1, 2]
     num_experts = 8
+    num_out_tokens = 8
 
     tokens = torch.randn(num_tokens, hidden_size, dtype=torch.bfloat16, device=device)
     for topk in topk_list:
@@ -18,6 +19,12 @@ def test_fused_vs_eager_consistency_for_permute():
 
         eager_result = permute(tokens, indices, fused=False)
         fused_result = permute(tokens, indices, fused=True)
+        judge_expression(len(eager_result) == len(fused_result))
+        torch.testing.assert_close(eager_result[0], fused_result[0])
+        torch.testing.assert_close(eager_result[1], fused_result[1])
+
+        eager_result = permute(tokens, indices, num_out_tokens=num_out_tokens, fused=False)
+        fused_result = permute(tokens, indices, num_out_tokens=num_out_tokens, fused=True)
         judge_expression(len(eager_result) == len(fused_result))
         torch.testing.assert_close(eager_result[0], fused_result[0])
         torch.testing.assert_close(eager_result[1], fused_result[1])

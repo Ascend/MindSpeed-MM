@@ -6,10 +6,11 @@ if IS_NPU_AVAILABLE:
 
 
 def eager_unpermute(permuted_tokens, sorted_indices, probs, restore_shape):
+    num_tokens, topk = (permuted_tokens.size(0), 1) if probs is None else (probs.numel(), probs.size(1))
     if restore_shape:
         unpermuted_tokens = torch.zeros(restore_shape, dtype=permuted_tokens.dtype, device=permuted_tokens.device)
+        permuted_tokens = permuted_tokens[:restore_shape[0]]
     else:
-        num_tokens, topk = (permuted_tokens.size(0), 1) if probs is None else (probs.numel(), probs.size(1))
         unpermuted_tokens = torch.zeros(
             [num_tokens, permuted_tokens.shape[-1]], dtype=permuted_tokens.dtype, device=permuted_tokens.device
         )
