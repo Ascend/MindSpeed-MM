@@ -394,6 +394,20 @@ _register_template(
 )
 
 
+_register_template(
+    name="qwen3_vl_passthrough",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["{{content}}"]),
+        format_assistant=StringFormatter(slots=["{{content}}"]),
+        format_system=StringFormatter(slots=["{{content}}"]),
+        format_observation=StringFormatter(slots=["{{content}}"]),
+        format_prefix=EmptyFormatter(),
+        stop_words=["<|im_end|>"],
+        replace_eos=True,
+    ),
+    mm_plugin=get_mm_plugin(name="qwen3_vl", image_token="<|image_pad|>", video_token="<|video_pad|>"),
+)
+
 # copied from qwen template
 _register_template(
     name="qwen2_omni",
