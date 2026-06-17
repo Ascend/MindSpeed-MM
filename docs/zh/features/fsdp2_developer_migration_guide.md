@@ -13,7 +13,7 @@ MindSpeed MM 仓内同时存在两套容易混淆的 FSDP2 使用方式。它们
 | 项目 | 新版插件式 FSDP2（本文主线） | Megatron 桥接式 FSDP2（旧路线） |
 |---|---|---|
 | 常见入口 | `mindspeed_mm/fsdp/train/trainer.py`，或 `mindspeed_mm/fsdp/tasks/*` 下的任务专用入口 | `pretrain_transformers.py`、`pretrain_vlm.py`、`pretrain_omni.py` 等 |
-| 配置形态 | 一个顶层 YAML，包含 `parallel`、`data`、`model`、`training`、`tools` 等顶层配置块 | 主训练配置 + 额外 `fsdp2_config.yaml` |
+| 配置形态 | 一个顶层 YAML，包含 `parallel`、`data`、`model`、`features`、`training`、`tools` 等顶层配置块 | 主训练配置 + 额外 `fsdp2_config.yaml` |
 | 启用方式 | 启动脚本直接传入顶层 YAML；通过 `training.plugin` 导入模型、数据等插件 | 命令行传入 `--use-torch-fsdp2`、`--fsdp2-config-path` |
 | 模型接入 | `model_register` + `ModelHub.build` | `model_provider`、`forward_step`、`loss_func` |
 | 数据接入 | `data_register` + `build_mm_dataset/build_mm_dataloader` | `train_valid_test_datasets_provider`、`get_batch` |
@@ -115,7 +115,7 @@ class XxxForTraining(torch.nn.Module, BaseModel):
 - 自定义模型链路向 `from_pretrained` 传入完整 `ModelArguments`，而不是单独的路径字符串。
 - `_from_config` 必须构建完整模块结构，供 `training.init_model_with_meta_device: true` 使用。
 - `forward` 需要能接收 dataloader 产出的 batch 字段，并兼容 `**kwargs`。
-- 当 `model.loss_cfg.loss_type: raw` 时，模型输出必须包含 `.loss`；如果源模型返回 tuple 或 dict，建议封装成带 `.loss` 的对象。
+- 当 `features.loss_cfg.loss_type: raw` 时，模型输出必须包含 `.loss`；如果源模型返回 tuple 或 dict，建议封装成带 `.loss` 的对象。
 - MoE 辅助损失需要模型原生支持。若从 Transformers 代码复制 MoE 模型，需确认原模型已支持 aux loss 计算，并参考 `mindspeed_mm/fsdp/models/qwen3_5_moe/modeling_qwen3_5_moe.py` 中 `Qwen3_5MoeForConditionalGeneration.overwrite_transformer_config` 覆盖 transformer config；同时确认需要捕获的 router logits 已配置在 `_can_record_outputs` 中，并且相关模块已正确使用 Transformers 的 `capture_outputs`。
 - 特殊 token、embedding resize、`config.use_cache=False` 等逻辑只在源模型训练确实需要时添加，避免在迁移层引入不可追踪的行为差异。
 
@@ -234,6 +234,8 @@ model:
   model_name_or_path: <model_path>
   trust_remote_code: true
   freeze: []
+
+features:
   loss_cfg:
     loss_type: raw
   recompute: false
@@ -304,9 +306,14 @@ tools:
 |---|---|
 | `model.model_id` | 模型注册名，必须与 `@model_register.register("<model_id>")` 一致。|
 | `model.model_name_or_path` | HF/第三方权重、config 或本地模型目录路径。 |
-| `model.loss_cfg.loss_type` | 默认为 `raw`，表示直接使用模型输出的 `.loss`；|
 | `model.freeze` | 按模块路径模式冻结参数。 |
-| `model.recompute` / `recompute_plan.apply_modules` | 重计算配置，以计算换显存；模块路径同样来自 `named_modules()`。 |
+
+特性字段：
+
+| 字段 | 说明 |
+|---|---|
+| `features.loss_cfg.loss_type` | 默认为 `raw`，表示直接使用模型输出的 `.loss`。 |
+| `features.recompute` / `features.recompute_plan.apply_modules` | 重计算配置，以计算换显存；模块路径同样来自 `named_modules()`。 |
 
 训练与检查点字段：
 
@@ -416,4 +423,4 @@ torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
 
 ## 8. 运行
 
-完成上述模型、数据、 YAML 配置和启动脚本开发后，即可使用 `bash examples/<model_name>/finetune_<model_name>.sh` 启动训练。
+完成上述模型、数据、YAML 配置和启动脚本开发后，即可使用 `bash examples/<model_name>/finetune_<model_name>.sh` 启动训练。
