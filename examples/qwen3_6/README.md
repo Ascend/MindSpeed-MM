@@ -14,7 +14,6 @@
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
 - [数据集准备及处理](#数据集准备及处理)
-  - [数据集下载](#1-数据集下载以coco2017数据集为例)
 - [微调](#微调)
   - [准备工作](#1-准备工作)
   - [配置参数](#2-配置参数)
@@ -109,31 +108,7 @@ mm-convert Qwen35Converter dcp_to_hf \
 
 ## 数据集准备及处理
 
-### 1. 数据集下载(以coco2017数据集为例)
-
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
-
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
-
-(3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
-
-   ```shell
-   $playground
-   ├── data
-       ├── COCO2017
-           ├── train2017
-
-       ├── llava_instruct_150k.json
-       ├── mllm_format_llava_instruct_data.json
-       ...
-   ```
-
----
-当前支持读取多个以`,`（注意不要加空格）分隔的数据集，配置方式为相应xxx_config.yaml中
-data->dataset_param->basic_parameters->dataset
-从"./data/mllm_format_llava_instruct_data.json"修改为"./data/mllm_format_llava_instruct_data.json,./data/mllm_format_llava_instruct_data2.json"
-
-同时注意`data->dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
+可以使用真实数据集进行训练，或者使用虚构的数据进行功能/性能测试，详见[针对VL模型的数据构造](../../docs/zh/features/building_data_for_VLModel.md)。
 
 ## 微调
 

@@ -57,7 +57,7 @@ data:
       train_on_prompt: false
       mask_history: false
       # tool_format: null
-      dataset_dir: ./data
+      dataset_dir: ./data/COCO2017
       dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false

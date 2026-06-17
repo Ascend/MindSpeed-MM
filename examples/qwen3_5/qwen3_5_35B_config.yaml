@@ -51,13 +51,13 @@ data:
       video_maxlen: 64
 
     basic_parameters: &TRAIN_BASIC_PARAMETERS
-      cutoff_len: 1024
+      cutoff_len: 16384
       template: qwen3_vl_nothink
       enable_thinking: false
       train_on_prompt: false
       mask_history: false
       # tool_format: null
-      dataset_dir: ./data
+      dataset_dir: ./data/COCO2017
       dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false
@@ -91,6 +91,7 @@ model:
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   attn_implementation: flash_attention_2
+  # 冻结部分模块
   # freeze:
   #   - model.visual
   # 融合算子配置
@@ -98,8 +99,8 @@ model:
   causal_conv1d_implementation: triton
   use_grouped_expert_matmul: true
   # skip_recompute
-  skip_gdn_recompute: false
-  skip_flash_attn_recompute: false
+  skip_gdn_recompute: true
+  skip_flash_attn_recompute: true
 
 # 优化特性配置
 features:
@@ -117,15 +118,15 @@ features:
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
-    chunk_size: 1024
+    chunk_size: 512
   # activation offload 配置
-  enable_activation_offload: false
+  enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
      - model.visual.blocks.{*}
      - model.language_model.layers.{*}
   # chunkmbs配置
-  enable_chunk_mbs: false
+  enable_chunk_mbs: true
   chunkmbs_plan:
     apply_modules:
      - model.language_model.layers.{*}
@@ -136,7 +137,7 @@ features:
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  micro_batch_size: 4
   gradient_accumulation_steps: 1
   seed: 42
   lr: 1.0e-5

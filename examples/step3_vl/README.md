@@ -15,8 +15,6 @@
   - [模型下载](#1-模型下载)
   - [当前接入说明](#2-当前接入说明)
 - [数据集准备及处理](#数据集准备及处理)
-  - [数据格式](#1-数据格式)
-  - [示例数据下载及处理](#2-示例数据下载及处理)
 - [微调](#微调)
   - [准备工作](#1-准备工作)
   - [配置参数](#2-配置参数)
@@ -94,58 +92,7 @@ model-*.safetensors
 
 ## 数据集准备及处理
 
-### 1. 数据格式
-
-当前示例复用 `dataset_type: huggingface` 数据链路，数据格式使用本地多模态 ShareGPT 风格字段：
-
-- 图片字段：`images`
-- 对话字段：`messages`
-- 角色字段：`role`
-- 内容字段：`content`
-
-示例：
-
-```json
-{
-  "images": ["train2017/000000000009.jpg"],
-  "messages": [
-    {"role": "user", "content": "<image>请描述图片内容。"},
-    {"role": "assistant", "content": "这是一张..."}
-  ]
-}
-```
-
-### 2. 示例数据下载及处理
-
-以下以 COCO2017 数据集为例。
-
-(1) 用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
-
-(2) 获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
-
-(3) 运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
-
-   ```shell
-   $playground
-   ├── data
-       ├── COCO2017
-           ├── train2017
-
-       ├── llava_instruct_150k.json
-       ├── mllm_format_llava_instruct_data.json
-       ...
-   ```
-
-当前示例配置：
-
-```shell
-dataset_dir=/path/to/datasets
-dataset=/path/to/datasets/jsonl
-```
-
-如果 JSON 中图片路径为相对路径，`dataset_dir` 需要指向图片根目录。
-
----
+可以使用真实数据集进行训练，或者使用虚构的数据进行功能/性能测试，详见[针对VL模型的数据构造](../../docs/zh/features/building_data_for_VLModel.md)。
 
 ## 微调
 

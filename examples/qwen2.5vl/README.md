@@ -20,8 +20,6 @@
   - [权重下载](#1-权重下载-1)
   - [权重加载](#2-在线加载)
 - [数据集准备及处理](#数据集准备及处理)
-  - [数据集下载](#1-数据集下载以coco2017数据集为例)
-  - [混合数据集处理](#2纯文本或有图无图混合训练数据以llava-instruct-150k为例)
 - [微调](#微调)
   - [长序列支持](#长序列支持)
   - [准备工作](#1-准备工作)
@@ -339,66 +337,7 @@ LOAD_PATH="ckpt/hf_path/Qwen2.5-VL-7B-Instruct"
 
 ## 数据集准备及处理
 
-<a id="jump4.1"></a>
-
-### 1. 数据集下载（以COCO2017数据集为例）
-
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
-
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
-
-(3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
-
-   ```shell
-   $playground
-   ├── data
-       ├── COCO2017
-           ├── train2017
-
-       ├── llava_instruct_150k.json
-       ├── mllm_format_llava_instruct_data.json
-       ...
-   ```
-
----
-当前支持读取多个以`,`（注意不要加空格）分隔的数据集，配置方式为`data.json`中
-dataset_param->basic_parameters->dataset
-从"./data/mllm_format_llava_instruct_data.json"修改为"./data/mllm_format_llava_instruct_data.json,./data/mllm_format_llava_instruct_data2.json"
-
-同时注意`data.json`中`dataset_param->basic_parameters->max_samples`的配置，会限制数据只读`max_samples`条，这样可以快速验证功能。如果正式训练时，可以把该参数去掉则读取全部的数据。
-
-<a id="jump4.2"></a>
-
-### 2.纯文本或有图无图混合训练数据(以LLaVA-Instruct-150K为例)
-
-现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
-
-在数据构造时，对于包含图片的数据，需要保留`image`这个键值。
-
-```python
-{
-  "id": your_id,
-  "image": your_image_path,
-  "conversations": [
-      {"from": "human", "value": your_query},
-      {"from": "gpt", "value": your_response},
-  ],
-}
-```
-
-在数据构造时，对于纯文本数据，可以去除`image`这个键值。
-
-```python
-{
-  "id": your_id,
-  "conversations": [
-      {"from": "human", "value": your_query},
-      {"from": "gpt", "value": your_response},
-  ],
-}
-```
-
-<a id="jump5"></a>
+可以使用真实数据集进行训练，或者使用虚构的数据进行功能/性能测试，详见[针对VL模型的数据构造](../../docs/zh/features/building_data_for_VLModel.md)。
 
 ## 微调
 

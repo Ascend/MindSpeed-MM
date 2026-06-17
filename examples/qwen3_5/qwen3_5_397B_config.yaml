@@ -51,13 +51,13 @@ data:
       video_maxlen: 64
 
     basic_parameters:
-      cutoff_len: 1024
+      cutoff_len: 16384
       template: qwen3_vl_nothink
       enable_thinking: false
       train_on_prompt: false
       mask_history: false
       # tool_format: null
-      dataset_dir: ./data
+      dataset_dir: ./data/COCO2017
       dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false
@@ -76,7 +76,7 @@ data:
     collate_param:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
-    enable_preload: false
+    enable_preload: true
 
 # 模型配置
 model:
@@ -91,8 +91,8 @@ model:
   causal_conv1d_implementation: eager
   use_grouped_expert_matmul: true
   # skip_recompute
-  skip_gdn_recompute: false
-  skip_flash_attn_recompute: false
+  skip_gdn_recompute: true
+  skip_flash_attn_recompute: true
 
 # 优化特性配置
 features:

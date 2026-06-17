@@ -128,6 +128,7 @@ class TrainEngine:
         total_loss = 0
         total_aux_loss = None
         all_mtp_loss = None
+        ps = get_parallel_state()
         # Gradient accumulation
         for step in range(args.training.gradient_accumulation_steps):
             # Wait for the preloaded batch to be ready
@@ -137,8 +138,9 @@ class TrainEngine:
             self.set_loss_func(batch_data)
 
             # Determine if this is the last step of gradient accumulation
-            is_last_step = step == args.training.gradient_accumulation_steps - 1
-            configure_hsdp_gradient_sync(self.model, is_last_step)
+            if ps.fully_shard_parallel_size > 1 or args.training.init_model_with_meta_device:
+                is_last_step = step == args.training.gradient_accumulation_steps - 1
+                configure_hsdp_gradient_sync(self.model, is_last_step)
 
             # forward step
             TrainingContext().set_training_stage(TrainingStage.FORWARD)
