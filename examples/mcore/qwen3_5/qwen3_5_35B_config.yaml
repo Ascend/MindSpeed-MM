@@ -1,3 +1,5 @@
+MM_TOOL_PATH: ./mindspeed_mm/tools/tools.json
+
 ### GPT args
 gpt_args:
   ## parallel: （TP/PP/CP/)
@@ -9,7 +11,6 @@ gpt_args:
   pipeline_model_parallel_size: 1
 
   ## training:
-  # use_deter_comp: true
   clip_grad: 1.0
   micro_batch_size: 1
   global_batch_size: 16  #默认16卡配置， global_batch_sizes=micro_batch_size*grad_acc_step*dp=micro_batch_size*grad_acc_step*(world_size/cp)
@@ -49,7 +50,6 @@ gpt_args:
   use_flash_attn: true
   moe_grouped_gemm: true
   moe_permute_fusion: true
-  moe_shared_expert_gate: true
   moe_token_dispatcher_type: alltoall
   vocab_size: 152064
   seq_length: 1024
