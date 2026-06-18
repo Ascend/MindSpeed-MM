@@ -24,6 +24,8 @@ from typing import Callable, Optional, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributed.distributed_c10d import ProcessGroup
+from torch.distributed.tensor import DTensor
 
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache
@@ -39,6 +41,11 @@ from transformers.models.qwen2.modeling_qwen2 import Qwen2Model
 from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs, can_return_tuple, logging
 
+from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.distributed.expert_parallel.comm import set_ep_rank_seq_lens
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from mindspeed_mm.fsdp.utils.register import model_register
 
 from .configuration_mimo_v2 import MiMoV2Config
@@ -205,6 +212,8 @@ class PatchMiMoV2TopkRouter(nn.Module):
 class PatchMiMoV2NaiveMoe(nn.Module):
     """Collection of expert weights stored as 3D tensors."""
 
+    _ep_dispatcher_dict = None
+
     def __init__(self, config):
         super().__init__()
         self.num_experts = config.n_routed_experts
@@ -214,6 +223,25 @@ class PatchMiMoV2NaiveMoe(nn.Module):
         self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts, self.hidden_size, self.intermediate_dim * 2))
         self.down_proj = nn.Parameter(torch.empty(self.num_experts, self.intermediate_dim, self.hidden_size))
         self.act_fn = ACT2FN[config.hidden_act]
+        self.use_grouped_expert_matmul = getattr(config, "use_grouped_expert_matmul", True)
+        if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE:
+            print_rank(logger.info, "PatchMiMoV2NaiveMoe enable grouped expert matmul on NPU")
+
+    @classmethod
+    def _get_ep_dispatcher(cls):
+        if cls._ep_dispatcher_dict is None:
+            from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import (
+                ep_allgather_forward,
+                ep_forward,
+                ep_mc2_forward,
+            )
+
+            cls._ep_dispatcher_dict = {
+                "alltoall": ep_forward,
+                "mc2": ep_mc2_forward,
+                "allgather": ep_allgather_forward,
+            }
+        return cls._ep_dispatcher_dict
 
     def forward(
         self,
@@ -221,27 +249,75 @@ class PatchMiMoV2NaiveMoe(nn.Module):
         top_k_weights: torch.Tensor,
         top_k_index: torch.Tensor,
     ) -> torch.Tensor:
-        final_hidden_states = torch.zeros_like(hidden_states)
+        if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE and hidden_states.device.type == "npu":
+            import torch_npu
+            from mindspeed_mm.models.common.gmm import npu_group_gemm
 
-        with torch.no_grad():
-            expert_mask = torch.nn.functional.one_hot(top_k_index, num_classes=self.num_experts)
-            expert_mask = expert_mask.permute(2, 1, 0)
-            expert_hit = torch.greater(expert_mask.sum(dim=(-1, -2)), 0).nonzero()
+            selected_experts = top_k_index
+            routing_weights = top_k_weights
+            permuted_hidden_states, row_ids_map = torch_npu.npu_moe_token_permute(
+                hidden_states, selected_experts.to(torch.int32)
+            )
+            tokens_per_expert = torch.histc(selected_experts, bins=self.num_experts, min=0, max=self.num_experts)
+            intermediate_hidden_states = npu_group_gemm(permuted_hidden_states, self.gate_up_proj, tokens_per_expert)
+            intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
+            output = npu_group_gemm(intermediate_activations, self.down_proj, tokens_per_expert)
+            final_hidden_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=routing_weights)
+            return final_hidden_states
+        else:
+            gate_up_proj = self.gate_up_proj.permute(0, 2, 1).contiguous()
+            down_proj = self.down_proj.permute(0, 2, 1).contiguous()
+            final_hidden_states = torch.zeros_like(hidden_states)
 
-        for expert_idx in expert_hit:
-            expert_idx = expert_idx[0]
-            if expert_idx == self.num_experts:
-                continue
-            top_k_pos, token_idx = torch.where(expert_mask[expert_idx])
-            current_state = hidden_states[token_idx]
-            gate_up = current_state @ self.gate_up_proj[expert_idx]
-            gate, up = gate_up.chunk(2, dim=-1)
-            gated_output = self.act_fn(gate) * up
-            current_hidden_states = gated_output @ self.down_proj[expert_idx]
-            current_hidden_states = current_hidden_states * top_k_weights[token_idx, top_k_pos, None]
-            final_hidden_states.index_add_(0, token_idx, current_hidden_states.to(final_hidden_states.dtype))
+            with torch.no_grad():
+                expert_mask = torch.nn.functional.one_hot(top_k_index, num_classes=self.num_experts)
+                expert_mask = expert_mask.permute(2, 1, 0)
+                expert_hit = torch.greater(expert_mask.sum(dim=(-1, -2)), 0).nonzero()
 
-        return final_hidden_states
+            for expert_idx in expert_hit:
+                expert_idx = expert_idx[0]
+                if expert_idx == self.num_experts:
+                    continue
+                top_k_pos, token_idx = torch.where(expert_mask[expert_idx])
+                current_state = hidden_states[token_idx]
+                gate, up = nn.functional.linear(current_state, gate_up_proj[expert_idx]).chunk(2, dim=-1)
+                current_hidden_states = self.act_fn(gate) * up
+                current_hidden_states = nn.functional.linear(current_hidden_states, down_proj[expert_idx])
+                current_hidden_states = current_hidden_states * top_k_weights[token_idx, top_k_pos, None]
+                final_hidden_states.index_add_(0, token_idx, current_hidden_states.to(final_hidden_states.dtype))
+
+            return final_hidden_states
+
+    def ep_forward(
+        self,
+        hidden_states: torch.Tensor,
+        top_k_weights: torch.Tensor,
+        top_k_index: torch.Tensor,
+        ep_group: ProcessGroup,
+        ep_plan: EPPlanConfig,
+    ) -> torch.Tensor:
+        gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
+        down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
+
+        ep_dispatcher_dict = self._get_ep_dispatcher()
+        if ep_plan.dispatcher in ep_dispatcher_dict:
+            dispatcher_func = ep_dispatcher_dict[ep_plan.dispatcher]
+            hidden_states = dispatcher_func(
+                self.num_experts,
+                top_k_weights,
+                top_k_index,
+                hidden_states,
+                fc1_weight=gate_up_proj,
+                fc2_weight=down_proj,
+                ep_group=ep_group,
+                fused=ep_plan.use_npu_fused_ops,
+            )
+        else:
+            raise NotImplementedError(
+                f"EP dispatcher {ep_plan.dispatcher} is not implemented for MiMoV2.5 MoE."
+            )
+
+        return hidden_states
 
 
 class PatchMiMoV2MoE(nn.Module):
@@ -510,6 +586,7 @@ class MiMoV2DecoderLayer(nn.Module):
 
     def __init__(self, config, layer_idx: int, attention_projection_layout: Optional[str] = None):
         super().__init__()
+        self.layer_idx = layer_idx
         attention_projection_layout = attention_projection_layout or self.attention_projection_layout
         is_swa_layer = config.hybrid_layer_pattern[layer_idx] == 1
         self.attention_type = "sliding_window_attention" if is_swa_layer else "full_attention"
@@ -535,6 +612,11 @@ class MiMoV2DecoderLayer(nn.Module):
         position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> torch.Tensor:
+        bs, seq_len, _ = hidden_states.shape
+        ps = get_parallel_state()
+        if ps.is_ep_enable() and self.layer_idx == 0:
+            set_ep_rank_seq_lens(bs * seq_len, ep_group=ps.get_ep_group(), device=hidden_states.device)
+
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         hidden_states, _ = self.self_attn(
