@@ -145,7 +145,8 @@ class Trainer:
         set_accelerator_compatible(get_torch_device())
         set_log_level()
         # Set device index for current process
-        torch.accelerator.set_device_index(int(os.environ['LOCAL_RANK']))
+        local_rank = int(os.environ['LOCAL_RANK'])
+        torch.accelerator.set_device_index(local_rank)
         # Set random seeds for reproducibility
         set_seed(args.training.seed, set_deterministic=args.training.use_deter_comp)
 
@@ -154,7 +155,10 @@ class Trainer:
 
         # Initialize process group for distributed training
         if not torch.distributed.is_initialized():
-            torch.distributed.init_process_group(backend=get_dist_comm_backend(cpu=args.parallel.fsdp_plan.cpu_offload))
+            torch.distributed.init_process_group(
+                backend=get_dist_comm_backend(cpu=args.parallel.fsdp_plan.cpu_offload),
+                device_id=torch.device(f"{get_device_type()}:{local_rank}")
+            )
 
         # Initialize parallel communication groups and mesh
         init_parallel_state(**args.parallel.to_dict())
