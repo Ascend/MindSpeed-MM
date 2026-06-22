@@ -40,6 +40,21 @@ def find_safetensors_index(directory: Path) -> Optional[FilePath]:
     return None
 
 
+def get_single_safetensors_filename(directory: Path) -> str:
+    """Return the single HF safetensors filename when no index file exists."""
+    if directory.is_dir():
+        safetensor_files = sorted(
+            file.name
+            for file in directory.iterdir()
+            if file.is_file()
+            and file.name.endswith(".safetensors")
+            and not file.name.endswith(".safetensors.index.json")
+        )
+        if len(safetensor_files) == 1:
+            return safetensor_files[0]
+    return "model.safetensors"
+
+
 @validate_arguments
 def save_hf_weights(
     save_path: Path,
@@ -151,25 +166,29 @@ def merge_dcp_to_hf_sharded(
     config.save_pretrained(save_dir)
     processor.save_pretrained(save_dir)
 
-    index_file: Optional[FilePath] = find_safetensors_index(Path(model_assets_dir))
-    if index_file is None:
-        raise FileNotFoundError(f"Could not find safetensors index file in directory {model_assets_dir}")
-
-    shutil.copy2(index_file, save_dir)
-    with open(index_file, "r", encoding="utf-8") as f:
-        weight_map = json.load(f)["weight_map"]
-
     storage_reader = FileSystemReader(load_dir)
     metadata = load_metadata(storage_reader)
     hf_metadata = {"format": "pt"}
 
-    safetensor_files = set(weight_map.values())
-    for safetensor_file in tqdm(safetensor_files, desc="Processing files"):
-        selected_keys = [
-            select_key_convert_func(k) if select_key_convert_func else k
-            for k, v in weight_map.items()
-            if v == safetensor_file
-        ]
+    index_file: Optional[FilePath] = find_safetensors_index(Path(model_assets_dir))
+    if index_file is not None:
+        shutil.copy2(index_file, save_dir)
+        with open(index_file, "r", encoding="utf-8") as f:
+            weight_map = json.load(f)["weight_map"]
+
+        file_to_selected_keys = {
+            safetensor_file: [
+                select_key_convert_func(k) if select_key_convert_func else k
+                for k, v in weight_map.items()
+                if v == safetensor_file
+            ]
+            for safetensor_file in set(weight_map.values())
+        }
+    else:
+        safetensor_file = get_single_safetensors_filename(Path(model_assets_dir))
+        file_to_selected_keys = {safetensor_file: list(metadata.state_dict_metadata.keys())}
+
+    for safetensor_file, selected_keys in tqdm(file_to_selected_keys.items(), desc="Processing files"):
 
         partial_metadata = extract_metadata(selected_keys, metadata)
         partial_state_dict = partial_load_dcp_state_dict(partial_metadata, storage_reader)
