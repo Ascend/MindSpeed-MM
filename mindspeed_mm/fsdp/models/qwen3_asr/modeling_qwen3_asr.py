@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Callable, Optional, Union
 
@@ -38,7 +39,18 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import auto_docstring, can_return_tuple
 from transformers.utils.deprecation import deprecate_kwarg
-from transformers.utils.generic import TransformersKwargs, check_model_inputs
+from transformers.utils.generic import TransformersKwargs
+try:
+    from transformers.utils.generic import check_model_inputs
+except ImportError:
+    def check_model_inputs(*decorator_args, **decorator_kwargs):
+        def decorator(func):
+            return func
+        if len(decorator_args) == 1 and callable(decorator_args[0]) and not decorator_kwargs:
+            return decorator_args[0]
+        return decorator
+
+from mindspeed_mm.fsdp.utils.register import model_register
 
 from .configuration_qwen3_asr import (
     Qwen3ASRAudioEncoderConfig,
@@ -590,6 +602,11 @@ class SinusoidsPositionEmbedding(nn.Module):
             persistent=False,
         )
 
+    def _apply(self, fn, recurse=True):
+        super()._apply(fn, recurse=recurse)
+        self.positional_embedding = self.positional_embedding.float()
+        return self
+
     def forward(self, seqlen: int):
         return self.positional_embedding[:seqlen, :]
 
@@ -783,21 +800,38 @@ class Qwen3ASRThinkerTextRotaryEmbedding(nn.Module):
 
     def __init__(self, config: Qwen3ASRConfig, device=None):
         super().__init__()
-        if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
-            self.rope_type = config.rope_scaling.get("rope_type", "default")
-        else:
-            self.rope_type = "default"
+        rope_parameters = getattr(config, "rope_parameters", None) or getattr(config, "rope_scaling", None) or {}
+        self.rope_type = rope_parameters.get("rope_type", rope_parameters.get("type", "default"))
         self.max_seq_len_cached = config.max_position_embeddings
         self.original_max_seq_len = config.max_position_embeddings
 
         self.config = config
-        self.rope_init_fn = ROPE_INIT_FUNCTIONS[self.rope_type]
+        self.rope_parameters = rope_parameters
+        self.rope_init_fn = (
+            self.compute_default_rope_parameters
+            if self.rope_type == "default"
+            else ROPE_INIT_FUNCTIONS[self.rope_type]
+        )
 
         inv_freq, self.attention_scaling = self.rope_init_fn(self.config, device)
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.original_inv_freq = self.inv_freq
 
-        self.mrope_section = config.rope_scaling.get("mrope_section", [24, 20, 20])
+        self.mrope_section = rope_parameters.get("mrope_section", [24, 20, 20])
+
+    def _apply(self, fn, recurse=True):
+        super()._apply(fn, recurse=recurse)
+        self.inv_freq = self.inv_freq.float()
+        self.original_inv_freq = self.inv_freq
+        return self
+
+    def compute_default_rope_parameters(self, config: Qwen3ASRConfig, device=None, seq_len=None):
+        base = self.rope_parameters.get("rope_theta", config.rope_theta)
+        dim = getattr(config, "head_dim", None) or config.hidden_size // config.num_attention_heads
+        inv_freq = 1.0 / (
+            base ** (torch.arange(0, dim, 2, dtype=torch.int64).to(device=device, dtype=torch.float) / dim)
+        )
+        return inv_freq, 1.0
 
     def apply_interleaved_mrope(self, freqs, mrope_section):
         """Apply interleaved MRoPE to 3D rotary embeddings.
@@ -1086,7 +1120,8 @@ class Qwen3ASRThinkerForConditionalGeneration(Qwen3ASRPreTrainedModelForConditio
             self.lm_head = nn.Linear(config.text_config.hidden_size, config.classify_num, bias=False)
         else:
             self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
-        self.pad_token_id = self.config.pad_token_id if self.config.pad_token_id is not None else -1
+        self.pad_token_id = getattr(self.config, "pad_token_id", None)
+        self.pad_token_id = self.pad_token_id if self.pad_token_id is not None else -1
         self.rope_deltas = None
         self.post_init()
 
@@ -1308,6 +1343,7 @@ class Qwen3ASRThinkerTextPreTrainedModel(PreTrainedModel):
     config_class = Qwen3ASRConfig
 
 
+@model_register.register("qwen3_asr")
 class Qwen3ASRForConditionalGeneration(Qwen3ASRPreTrainedModel, GenerationMixin):
     config_class = Qwen3ASRConfig
 
@@ -1318,8 +1354,191 @@ class Qwen3ASRForConditionalGeneration(Qwen3ASRPreTrainedModel, GenerationMixin)
         self.thinker = Qwen3ASRThinkerForConditionalGeneration._from_config(config.thinker_config)
         self.post_init()
 
+
+    @staticmethod
+    def _local_tensor(tensor):
+        return tensor.to_local() if hasattr(tensor, "to_local") else tensor
+
+    @staticmethod
+    def _copy_shadow_to_param(param, shadow):
+        if hasattr(param.data, "to_local"):
+            from torch.distributed._tensor import DTensor
+
+            value = DTensor.from_local(
+                shadow.data,
+                device_mesh=param.data.device_mesh,
+                placements=param.data.placements,
+            )
+            param.data.copy_(value)
+        else:
+            param.data.copy_(shadow.data.to(param.data.dtype))
+
+    def _mindspeed_mm_shadow_optimizer_step(self, optimizer):
+        if not self.training:
+            return False
+
+        if not hasattr(self, "_mindspeed_mm_shadow_optimizer"):
+            optimizer_config = self._mindspeed_mm_shadow_optimizer_config
+            shadow_groups = [
+                {"params": [], "weight_decay": optimizer_config["weight_decay"]},
+                {"params": [], "weight_decay": 0.0},
+            ]
+            shadow_entries = [[], []]
+            tied_embed = None
+            tied_lm_head = None
+
+            for name, param in self.named_parameters():
+                if not param.requires_grad:
+                    continue
+                if name.endswith("thinker.lm_head.weight"):
+                    tied_lm_head = param
+                    shadow_entries[0].append((name, param, None))
+                    continue
+
+                local_param = self._local_tensor(param.data)
+                shadow = torch.nn.Parameter(local_param.detach().clone().to(torch.bfloat16), requires_grad=True)
+                if name.endswith("thinker.model.embed_tokens.weight"):
+                    tied_embed = (param, shadow)
+
+                lower_name = name.lower()
+                no_decay = name.endswith(".bias") or "norm" in lower_name or "ln_" in lower_name
+                group_idx = 1 if no_decay else 0
+                shadow_groups[group_idx]["params"].append(shadow)
+                shadow_entries[group_idx].append((name, param, shadow))
+
+            if tied_embed is None or tied_lm_head is None:
+                return False
+
+            self._mindspeed_mm_shadow_optimizer = torch.optim.AdamW(
+                shadow_groups,
+                lr=optimizer_config["lr"],
+                betas=optimizer_config["betas"],
+                eps=optimizer_config["eps"],
+            )
+            self._mindspeed_mm_shadow_entries = shadow_entries
+            self._mindspeed_mm_tied_pair = (tied_embed, tied_lm_head)
+
+        lr = optimizer.param_groups[0]["lr"]
+        for shadow_group in self._mindspeed_mm_shadow_optimizer.param_groups:
+            shadow_group["lr"] = lr
+
+        tied_embed, tied_lm_head = self._mindspeed_mm_tied_pair
+        embed_param, embed_shadow = tied_embed
+        lm_head_grad = self._local_tensor(tied_lm_head.grad) if tied_lm_head.grad is not None else None
+
+        for group_entries in self._mindspeed_mm_shadow_entries:
+            for _, param, shadow in group_entries:
+                if shadow is None:
+                    continue
+                grad = self._local_tensor(param.grad) if param.grad is not None else None
+                if param is embed_param:
+                    if grad is None:
+                        shadow.grad = lm_head_grad.to(torch.bfloat16) if lm_head_grad is not None else None
+                    else:
+                        shadow.grad = grad.to(torch.bfloat16)
+                        if lm_head_grad is not None:
+                            shadow.grad.add_(lm_head_grad.to(torch.bfloat16))
+                else:
+                    shadow.grad = grad.to(torch.bfloat16) if grad is not None else None
+
+        self._mindspeed_mm_shadow_optimizer.step()
+        self._mindspeed_mm_shadow_optimizer.zero_grad()
+
+        with torch.no_grad():
+            for group_entries in self._mindspeed_mm_shadow_entries:
+                for _, param, shadow in group_entries:
+                    if shadow is not None:
+                        self._copy_shadow_to_param(param, shadow)
+            self._copy_shadow_to_param(tied_lm_head, embed_shadow)
+
+        return True
+
+    def _mindspeed_mm_patch_optimizer(self, optimizer, optimizer_config):
+        self._mindspeed_mm_shadow_optimizer_config = {
+            "lr": optimizer_config["lr"],
+            "betas": optimizer_config["betas"],
+            "eps": optimizer_config["eps"],
+            "weight_decay": optimizer_config["weight_decay"],
+        }
+
+        class Qwen3ASRShadowOptimizer(torch.optim.Optimizer):
+            def __init__(self, model, wrapped_optimizer):
+                self.model = model
+                self.wrapped_optimizer = wrapped_optimizer
+
+            @property
+            def param_groups(self):
+                return self.wrapped_optimizer.param_groups
+
+            @property
+            def state(self):
+                return self.wrapped_optimizer.state
+
+            @property
+            def defaults(self):
+                return self.wrapped_optimizer.defaults
+
+            def step(self, *args, **kwargs):
+                if self.model._mindspeed_mm_shadow_optimizer_step(self.wrapped_optimizer):
+                    return None
+                return self.wrapped_optimizer.step(*args, **kwargs)
+
+            def zero_grad(self, *args, **kwargs):
+                return self.wrapped_optimizer.zero_grad(*args, **kwargs)
+
+            def state_dict(self):
+                return self.wrapped_optimizer.state_dict()
+
+            def load_state_dict(self, state_dict):
+                return self.wrapped_optimizer.load_state_dict(state_dict)
+
+            def __getattr__(self, name):
+                return getattr(self.wrapped_optimizer, name)
+
+        return Qwen3ASRShadowOptimizer(self, optimizer)
+
     def get_support_languages(self):
         return self.config.support_languages
+
+    @can_return_tuple
+    @auto_docstring
+    def forward(
+        self,
+        input_ids=None,
+        input_features=None,
+        attention_mask=None,
+        feature_attention_mask=None,
+        audio_feature_lengths=None,
+        position_ids=None,
+        past_key_values=None,
+        inputs_embeds=None,
+        rope_deltas=None,
+        labels=None,
+        use_cache=None,
+        cache_position=None,
+        **kwargs,
+    ) -> Union[tuple, Qwen3ASRThinkerCausalLMOutputWithPast]:
+        device_type = None
+        if input_features is not None and hasattr(input_features, "device"):
+            device_type = input_features.device.type
+        use_autocast = self.training and device_type in ("cuda", "npu")
+        autocast_ctx = torch.autocast(device_type=device_type, dtype=torch.bfloat16) if use_autocast else nullcontext()
+        with autocast_ctx:
+            return self.thinker(
+                input_ids=input_ids,
+                input_features=input_features,
+                attention_mask=attention_mask,
+                feature_attention_mask=feature_attention_mask,
+                audio_feature_lengths=audio_feature_lengths,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+                inputs_embeds=inputs_embeds,
+                rope_deltas=rope_deltas,
+                labels=labels,
+                use_cache=use_cache,
+                cache_position=cache_position,
+                **kwargs,
+            )
 
     @torch.no_grad()
     def generate(

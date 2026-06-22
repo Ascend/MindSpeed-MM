@@ -1163,6 +1163,115 @@ class Qwen3OmniPlugin(Qwen2VLPlugin):
         return messages
 
 
+@dataclass
+class Qwen3ASRPlugin(BasePlugin):
+    r"""Plugin for preparing Qwen3-ASR audio inputs.
+
+    Supports Qwen3-ASR processors with a Whisper-style feature extractor and Qwen audio special tokens.
+    """
+
+    audio_bos_token: str = "<|audio_start|>"
+    audio_eos_token: str = "<|audio_end|>"
+
+    @override
+    def _get_mm_inputs(
+            self,
+            images: List["ImageInput"],
+            videos: List["VideoInput"],
+            audios: List["AudioInput"],
+            processor: "MMProcessor",
+    ) -> Dict[str, "torch.Tensor"]:
+        feature_extractor: SequenceFeatureExtractor = getattr(processor, "feature_extractor", None)
+        mm_inputs = {}
+        if len(audios) == 0:
+            return mm_inputs
+        if feature_extractor is None:
+            raise ValueError(
+                "Qwen3ASRPlugin requires a processor with `feature_extractor`. "
+                "Please configure a valid Qwen3-ASR processor."
+            )
+        audio_sampling_rate = getattr(processor, "audio_sampling_rate", 16000)
+
+        audios = self._regularize_audios(
+            audios,
+            sampling_rate=audio_sampling_rate,
+        )["audios"]
+        if audio_sampling_rate != feature_extractor.sampling_rate:
+            import librosa
+            audios = [
+                librosa.resample(
+                    audio,
+                    orig_sr=audio_sampling_rate,
+                    target_sr=feature_extractor.sampling_rate,
+                )
+                for audio in audios
+            ]
+
+        mm_inputs.update(
+            feature_extractor(
+                audios,
+                sampling_rate=feature_extractor.sampling_rate,
+                return_attention_mask=True,
+                padding=True,
+                return_tensors="pt",
+            )
+        )
+        feature_attention_mask = mm_inputs.pop("attention_mask", None)
+        if feature_attention_mask is None:
+            raise ValueError(
+                "Qwen3ASRPlugin expects the Qwen3-ASR feature extractor to return `attention_mask`. "
+                "Please check that the processor supports `return_attention_mask=True`."
+            )
+        mm_inputs["feature_attention_mask"] = feature_attention_mask
+        return mm_inputs
+
+    @staticmethod
+    def _get_audio_output_lengths(input_lengths: "torch.Tensor") -> "torch.Tensor":
+        input_lengths_leave = input_lengths % 100
+        feature_lengths = (input_lengths_leave - 1) // 2 + 1
+        return ((feature_lengths - 1) // 2 + 1 - 1) // 2 + 1 + (input_lengths // 100) * 13
+
+    @override
+    def process_messages(
+            self,
+            messages: List[Dict[str, str]],
+            images: List["ImageInput"],
+            videos: List["VideoInput"],
+            audios: List["AudioInput"],
+            processor: Optional["MMProcessor"],
+    ) -> List[Dict[str, str]]:
+        self._validate_input(processor, images, videos, audios)
+        self._validate_messages(messages, images, videos, audios)
+        messages = deepcopy(messages)
+
+        if self.expand_mm_tokens and len(audios) != 0:
+            mm_inputs = self._get_mm_inputs(images, videos, audios, processor)
+            audio_lengths = self._get_audio_output_lengths(mm_inputs["feature_attention_mask"].sum(-1))
+        else:
+            audio_lengths = [None] * len(audios)
+
+        audio_token = getattr(processor, "audio_token", self.audio_token)
+        audio_bos_token = getattr(processor, "audio_bos_token", self.audio_bos_token)
+        audio_eos_token = getattr(processor, "audio_eos_token", self.audio_eos_token)
+        num_audio_tokens = 0
+        for message in messages:
+            content = message["content"]
+            while AUDIO_PLACEHOLDER in content:
+                # Non-expanded mode delegates length expansion to Qwen3ASRProcessor.
+                audio_seqlen = audio_lengths[num_audio_tokens] if self.expand_mm_tokens else 1
+                audio_seqlen = int(audio_seqlen)
+                content = content.replace(
+                    AUDIO_PLACEHOLDER,
+                    f"{audio_bos_token}{audio_token * audio_seqlen}{audio_eos_token}",
+                    1,
+                )
+                num_audio_tokens += 1
+
+            message["content"] = content
+
+        return messages
+
+
 class KimiK25Plugin(BasePlugin):
     @override
     def _get_mm_inputs(
@@ -1347,6 +1456,7 @@ PLUGINS = {
     "qwen3_vl": Qwen3VLPlugin,
     "glm4.1v": GLM4VPlugin,
     "qwen3_omni": Qwen3OmniPlugin,
+    "qwen3_asr": Qwen3ASRPlugin,
     "kimi_k25": KimiK25Plugin,
     "step3_vl": Step3VLPlugin,
 }

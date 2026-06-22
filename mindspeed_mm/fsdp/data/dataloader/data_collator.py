@@ -99,6 +99,52 @@ class DataCollatorForStep3VL:
         return self.data_collator(*args, **kwargs)
 
 
+class DataCollatorForQwen3ASR:
+    def __init__(self, ignore_pad_token_for_loss: bool, dataset_param=None, **kwargs):
+        process_args = ProcessorArguments(**dataset_param.preprocess_parameters.to_dict())
+        tokenizer_module = load_tokenizer(process_args)
+        self.processor = tokenizer_module["processor"]
+        self.tokenizer = tokenizer_module["tokenizer"]
+        self.ignore_pad_token_for_loss = ignore_pad_token_for_loss
+        self.sampling_rate = getattr(dataset_param.preprocess_parameters, "audio_sampling_rate", 16000)
+
+    def __call__(self, features):
+        import librosa
+
+        prefix_texts = [feature["prefix_text"] for feature in features]
+        targets = [feature["target"] for feature in features]
+        audios = [librosa.load(feature["audio"], sr=self.sampling_rate, mono=True)[0] for feature in features]
+
+        eos = self.tokenizer.eos_token or ""
+        full_texts = [prefix + target + eos for prefix, target in zip(prefix_texts, targets)]
+        full_inputs = self.processor(
+            text=full_texts,
+            audio=audios,
+            return_tensors="pt",
+            padding=True,
+            truncation=False,
+        )
+        prefix_inputs = self.processor(
+            text=prefix_texts,
+            audio=audios,
+            return_tensors="pt",
+            padding=True,
+            truncation=False,
+        )
+
+        labels = full_inputs["input_ids"].clone()
+        prefix_lens = prefix_inputs["attention_mask"].sum(dim=1).tolist()
+        for idx, prefix_len in enumerate(prefix_lens):
+            labels[idx, :prefix_len] = IGNORE_INDEX
+
+        pad_id = self.tokenizer.pad_token_id
+        if self.ignore_pad_token_for_loss and pad_id is not None:
+            labels[labels == pad_id] = IGNORE_INDEX
+
+        full_inputs["labels"] = labels
+        return full_inputs
+
+
 class DataCollatorForLLMPretrain:
     def __init__(self, dataset_param=None, **kwargs):
         if dataset_param is None:
@@ -167,6 +213,10 @@ _register_data_collator(
 _register_data_collator(
     "llm_pretrain",
     DataCollatorForLLMPretrain,
+)
+_register_data_collator(
+    "qwen3asr",
+    DataCollatorForQwen3ASR,
 )
 _register_data_collator(
     "step3_vl",
