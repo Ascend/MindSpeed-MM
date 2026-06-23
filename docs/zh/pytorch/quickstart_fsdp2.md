@@ -67,7 +67,7 @@ pip install -e .
 
    ```bash
    # 该脚本对 Qwen2-VL / Qwen3-VL 通用，可直接运行
-   python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py
+   python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py
    ```
 
    该脚本**无需传参，直接运行即可**；但脚本内的读写路径是写死的：

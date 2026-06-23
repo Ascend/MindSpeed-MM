@@ -111,7 +111,8 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 ## 数据集准备及处理
 
-可以使用真实数据集进行训练，或者使用虚构的数据进行功能/性能测试，详见[针对VL模型的数据构造](../../docs/zh/features/building_data_for_VLModel.md)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
 
 ## 微调
 

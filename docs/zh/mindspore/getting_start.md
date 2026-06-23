@@ -70,7 +70,7 @@
     执行如下数据转换脚本：
 
     ```python
-    python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py
+    python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py
     ```
 
     转换后参考数据目录结构如下：
@@ -87,7 +87,7 @@
     ```
 
     > [!NOTE]  
-    > 由于Qwen2_5_VL和Qwen2_VL在数据转换逻辑上保持一致，因此采用了Qwen2_VL下的数据转换脚本来满足当前需求。
+    > 由于Qwen2_5_VL和Qwen2_VL在数据转换逻辑上保持一致，使用上述通用数据转换脚本即可满足当前需求。
 
 ### 启动微调
 

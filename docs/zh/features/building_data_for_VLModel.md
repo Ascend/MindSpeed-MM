@@ -2,10 +2,11 @@
 
 当前数据处理方式参考[LLaMAFactory](https://github.com/hiyouga/LLaMAFactory)仓库实现。
 
-## 1. 模型支持度
+## 1. 适用范围
 
-该数据构造当前支持如下模型：
-[Qwen3.6](../../../examples/qwen3_6)，[Qwen3.5](../../../examples/qwen3_5)，[Qwen3VL](../../../examples/qwen3vl)，[Qwen2.5VL](../../../examples/qwen2.5vl)，[GLM4.5V](../../../examples/glm4.5v)，[Kimi-K2.5](../../../examples/kimik2_5)，[Step3-VL](../../../examples/step3_vl)
+本文所述数据构造方式通用于仓库内大多数 VL 模型（如 [Qwen3.6](../../../examples/qwen3_6)、[Qwen3.5](../../../examples/qwen3_5)、[Qwen3VL](../../../examples/qwen3vl)、[Qwen2.5VL](../../../examples/qwen2.5vl)、[GLM4.5V](../../../examples/glm4.5v)、[Kimi-K2.5](../../../examples/kimik2_5)、[Step3-VL](../../../examples/step3_vl) 等）。各模型若有特殊数据要求（如视频、音频等），以其 README 为准。
+
+<a id="real-data"></a>
 
 ## 2. 使用真实数据集
 
@@ -155,6 +156,8 @@ data:
   ],
 }
 ```
+
+<a id="mock-data"></a>
 
 ## 3. 使用虚构数据进行功能/性能测试
 

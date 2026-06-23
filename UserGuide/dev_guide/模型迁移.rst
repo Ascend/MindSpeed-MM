@@ -218,7 +218,7 @@ MindSpeed-MM 框架对数据模块提供了高度兼容性，用户现有的 `Da
 
 .. code:: shell
 
-    python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py
+    python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py
 
 
 原生数据组件使用

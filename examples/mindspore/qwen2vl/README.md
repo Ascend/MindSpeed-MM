@@ -214,7 +214,7 @@ mm-convert  Qwen2VLConverter resplit \
 
 (2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下;
 
-(3)运行数据转换脚本python examples/mindspore/qwen2vl/llava_instruct_2_mllm_demo_format.py;
+(3)运行数据转换脚本python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py;
 
    ```shell
    $playground

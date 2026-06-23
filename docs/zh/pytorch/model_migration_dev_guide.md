@@ -170,7 +170,7 @@ def get_batch(data_iterator, args):
 **转换脚本示例：**
 
 ```shell
-python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py
+python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py
 ```
 
 #### 原生数据组件使用

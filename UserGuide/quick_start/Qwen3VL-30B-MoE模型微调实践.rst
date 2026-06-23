@@ -97,7 +97,7 @@ Step 3: 数据集下载及预处理
 下载图片数据集的描述文件 `LLaVA-Instruct-150K <https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K>`_  至./data/路径下。
 
 2. **数据集预处理**
-运行数据转换脚本`python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py`，转换后参考数据目录结构如下：
+运行数据转换脚本`python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py`，转换后参考数据目录结构如下：
 
 .. code:: text
 

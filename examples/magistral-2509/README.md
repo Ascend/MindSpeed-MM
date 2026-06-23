@@ -15,7 +15,6 @@
   - [权重下载](#权重下载)
   - [权重转换](#权重转换)
 - [数据集准备及处理](#数据集准备及处理)
-  - [数据集下载](#1-数据集下载以coco2017数据集为例)
 - [微调](#微调)
   - [准备工作](#1-准备工作)
   - [配置参数](#2-配置参数)
@@ -107,26 +106,8 @@ mm-convert Mistral3Converter hf_to_dcp --hf_dir "ckpt/hf_path/Magistral-Small-25
 
 ## 数据集准备及处理
 
-<a id="jump3.1"></a>
-
-### 1. 数据集下载（以COCO2017数据集为例）
-
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到项目目录下的./data/COCO2017文件夹中。
-
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
-
-(3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，转换后参考数据目录结构如下：
-
-   ```shell
-   $playground
-   ├── data
-       ├── COCO2017
-           ├── train2017
-
-       ├── llava_instruct_150k.json
-       ├── mllm_format_llava_instruct_data.json
-       ...
-   ```
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
 
 ## 微调
 

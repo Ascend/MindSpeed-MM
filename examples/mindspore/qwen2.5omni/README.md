@@ -166,7 +166,7 @@ mm-convert  Qwen2_5_OmniConverter mm_to_hf \
 
 (2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下;
 
-(3)运行数据转换脚本python examples/qwen2vl/llava_instruct_2_mllm_demo_format.py，在./data路径下将生成文件mllm_format_llava_instruct_data.json(如果该文件已存在，请先移除或重命名备份);
+(3)运行数据转换脚本python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py，在./data路径下将生成文件mllm_format_llava_instruct_data.json(如果该文件已存在，请先移除或重命名备份);
 
    ```shell
    $playground
