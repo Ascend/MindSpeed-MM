@@ -116,16 +116,24 @@ class Template:
 
             if i == 0:
                 elements += self.format_prefix.apply()
-                if system:
-                    # add tool schema to the end of system prompt
-                    if tools is not None and len(tools) > 0:
-                        tool_schema = []
-                        for t in tools:
-                            tool_schema.append(t)
-                        tool_schema = '\n'.join(tool_schema)
-                        tools_prompt = self.format_tool.apply(content=tool_schema)
-                        system += tools_prompt[0]
-                    elements += self.format_system.apply(content=system)
+                # Emit the system slot when there is a system prompt OR tools to
+                # declare. The original logic only ran when `system` was set, so
+                # a tools-only sample (no system message) silently dropped its
+                # tool schema. Compose tool schema first, then append the system.
+                # Guard on self.format_tool: templates that do not configure a
+                # tool_prompt (e.g. qwen3_vl) have format_tool=None, so a sample
+                # carrying tools must not enter the tool branch or it would crash
+                # on self.format_tool.apply(...). In that case tools are ignored.
+                has_tools = tools is not None and len(tools) > 0 and self.format_tool is not None
+                if has_tools or system:
+                    composed = ""
+                    if has_tools:
+                        tool_schema = '\n'.join(tools)
+                        composed = self.format_tool.apply(content=tool_schema)[0]
+                    if system:
+                        composed = (composed + "\n\n" + system) if composed else system
+                    if composed:
+                        elements += self.format_system.apply(content=composed)
 
             if message["role"] == Role.USER.value:
                 elements += self.format_user.apply(
@@ -377,6 +385,73 @@ _register_template(
         tool_prompt=StringFormatter(slots=[tools_slot])
     ),
     mm_plugin=get_mm_plugin(name="qwen3_vl", image_token="<|image_pad|>", video_token="<|video_pad|>"),
+)
+
+
+# Qwen3.6 / Qwen3.5-MoE official tools system prompt (XML-style function call).
+# Mirrors chat_template.jinja in the model repo so SFT formatting matches inference.
+qwen3_6_tools_slot = (
+    "# Tools\n\n"
+    "You have access to the following functions:\n\n"
+    "<tools>\n{{content}}\n</tools>\n\n"
+    "If you choose to call a function ONLY reply in the following format with NO suffix:\n\n"
+    "<tool_call>\n<function=example_function_name>\n"
+    "<parameter=example_parameter_1>\nvalue_1\n</parameter>\n"
+    "<parameter=example_parameter_2>\n"
+    "This is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n"
+    "</function>\n</tool_call>\n\n"
+    "<IMPORTANT>\nReminder:\n"
+    "- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n"
+    "- Required parameters MUST be specified\n"
+    "- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n"
+    "- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n"
+    "</IMPORTANT>"
+)
+
+_register_template(
+    name="qwen3_6",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n"]),
+        format_assistant=StringFormatter(slots=["{{content}}<|im_end|>\n"]),
+        format_system=StringFormatter(slots=["<|im_start|>system\n{{content}}<|im_end|>\n"]),
+        format_observation=StringFormatter(
+            slots=["<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
+        ),
+        stop_words=["<|im_end|>"],
+        replace_eos=True,
+        tool_prompt=StringFormatter(slots=[qwen3_6_tools_slot]),
+    ),
+    mm_plugin=get_mm_plugin(name="qwen3_vl", image_token="<|image_pad|>", video_token="<|video_pad|>"),
+    template_class=ReasoningTemplate,
+)
+
+# qwen3_6 non-thinking variant: assistant turns are rendered without any <think>
+# block. Use this when training on agent trajectories whose assistant content is
+# direct output (e.g. terminal traces using a JSON-as-text protocol). The tool
+# prompt slot is reused so tool-calling data is also supported when the dataset
+# carries a tools column; tools is silently ignored otherwise.
+#
+# mm_plugin is intentionally `base` here, not `qwen3_vl`. Qwen3VLPlugin always
+# runs _validate_messages, which counts literal `<image>` substrings against the
+# supplied images list. Pure-text terminal traces frequently contain literal
+# `<image>` in command examples (e.g. `docker tag <image> ...`), which would
+# raise under Qwen3VLPlugin even though no images are intended. BasePlugin skips
+# that validation. To train Qwen3.6 on vision+text data, register a separate
+# `qwen3_6_nothink_vl` variant with `name="qwen3_vl"`.
+_register_template(
+    name="qwen3_6_nothink",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n"]),
+        format_assistant=StringFormatter(slots=["{{content}}<|im_end|>\n"]),
+        format_system=StringFormatter(slots=["<|im_start|>system\n{{content}}<|im_end|>\n"]),
+        format_observation=StringFormatter(
+            slots=["<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
+        ),
+        stop_words=["<|im_end|>"],
+        replace_eos=True,
+        tool_prompt=StringFormatter(slots=[qwen3_6_tools_slot]),
+    ),
+    mm_plugin=get_mm_plugin(name="base"),
 )
 
 

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import bisect
+import json
 import os
 import copy
 from abc import abstractmethod, ABC
@@ -150,7 +151,7 @@ class SharegptDatasetConverter(DatasetConverter):
                 and len(messages) != 0
                 and messages[0][self.dataset_attr.role_tag] == self.dataset_attr.system_tag
         ):
-            system = messages[0][self.dataset_attr.content_tag]
+            system = (messages[0].get(self.dataset_attr.content_tag) or "").strip()
             messages = messages[1:]
         else:
             system = example[self.dataset_attr.system] if self.dataset_attr.system else ""
@@ -159,25 +160,39 @@ class SharegptDatasetConverter(DatasetConverter):
         broken_data = False
         for turn_idx, message in enumerate(messages):
             if message[self.dataset_attr.role_tag] not in accept_tags[turn_idx % 2]:
-                logger.warning_rank0(f"Invalid role tag in {messages}.")
+                # Report only what is needed to diagnose (turn index, the bad role
+                # tag, expected tags) instead of dumping the full conversation,
+                # which can be tens of KB per sample for long agent traces.
+                logger.warning_rank0(
+                    f"Skipping sample: invalid role tag at turn {turn_idx} "
+                    f"(got {message[self.dataset_attr.role_tag]!r}, "
+                    f"expected one of {accept_tags[turn_idx % 2]})."
+                )
                 broken_data = True
                 break
 
             aligned_messages.append(
                 {
                     "role": tag_mapping.get(message.get(self.dataset_attr.role_tag)),
-                    "content": message.get(self.dataset_attr.content_tag),
+                    # Match the inference chat_template's `render_content(...)|trim`:
+                    # strip leading/trailing whitespace on every message content.
+                    # Agent traces (e.g. terminal SFT) often carry trailing '\n'
+                    # on user turns that the jinja template would discard; without
+                    # the trim the training tokens diverge from inference output.
+                    "content": (message.get(self.dataset_attr.content_tag) or "").strip(),
                 }
             )
 
         is_invalid_message_count = (not self.dataset_attr.ranking and len(aligned_messages) % 2 != 0) or \
                                    (self.dataset_attr.ranking and len(aligned_messages) % 2 == 0)
         if is_invalid_message_count:
-            logger.warning_rank0(f"Invalid message count in {messages}.")
+            logger.warning_rank0(
+                f"Skipping sample: invalid message count {len(aligned_messages)} "
+                f"(ranking={self.dataset_attr.ranking})."
+            )
             broken_data = True
 
         if broken_data:
-            logger.warning_rank0("Skipping this abnormal example.")
             prompt, response = [], []
         elif (
                 self.dataset_attr.ranking
@@ -190,18 +205,23 @@ class SharegptDatasetConverter(DatasetConverter):
                     chosen[self.dataset_attr.role_tag] not in accept_tags[-1]
                     or rejected[self.dataset_attr.role_tag] not in accept_tags[-1]
             ):
-                logger.warning_rank0(f"Invalid role tag in {[chosen, rejected]}.")
+                logger.warning_rank0(
+                    f"Skipping pairwise sample: invalid chosen/rejected role tag "
+                    f"(chosen={chosen.get(self.dataset_attr.role_tag)!r}, "
+                    f"rejected={rejected.get(self.dataset_attr.role_tag)!r}, "
+                    f"expected one of {accept_tags[-1]})."
+                )
                 broken_data = True
 
             prompt = aligned_messages
             response = [
                 {
                     "role": tag_mapping.get(chosen.get(self.dataset_attr.role_tag)),
-                    "content": chosen.get(self.dataset_attr.content_tag),
+                    "content": (chosen.get(self.dataset_attr.content_tag) or "").strip(),
                 },
                 {
                     "role": tag_mapping.get(rejected.get(self.dataset_attr.role_tag)),
-                    "content": rejected.get(self.dataset_attr.content_tag),
+                    "content": (rejected.get(self.dataset_attr.content_tag) or "").strip(),
                 },
             ]
         else:  # normal example
@@ -250,10 +270,241 @@ class MultiModalToolDatasetConverter(DatasetConverter):
         return output
 
 
+@dataclass
+class OpenAIDatasetConverter(DatasetConverter):
+    r"""Convert OpenAI ChatCompletion-style data into Role-tagged messages.
+
+    Supports:
+      - assistant.tool_calls (structured field; arguments may be dict or JSON string)
+      - assistant.reasoning_content (Qwen3 thinking; merged as <think>...</think>)
+      - role: "tool" responses (consecutive tool messages merged into one TOOL_RESPONSE)
+      - tools schema column (rendered as list[str], joined with newlines downstream)
+
+    Tool calls are serialized in Qwen3.6 XML form:
+        <tool_call>
+        <function=NAME>
+        <parameter=KEY>
+        VALUE
+        </parameter>
+        ...
+        </function>
+        </tool_call>
+    """
+
+    THINK_OPEN = "<think>\n"
+    THINK_CLOSE = "\n</think>\n\n"
+    TOOL_RESP_SEP = "\n</tool_response>\n<tool_response>\n"
+
+    def _serialize_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> Optional[str]:
+        """Serialize tool calls into Qwen3.6 XML. Returns None if any tool call
+        is malformed (not a dict, or missing the function name), so the caller
+        can drop the whole sample rather than crash or emit a corrupted turn."""
+        blocks = []
+        for tc in tool_calls:
+            fn = tc.get("function", tc) if isinstance(tc, dict) else tc
+            if not isinstance(fn, dict) or "name" not in fn:
+                logger.warning_rank0(
+                    "Skipping sample: malformed tool_call (missing function name)."
+                )
+                return None
+            name = fn["name"]
+            args = fn.get("arguments", {})
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except (TypeError, ValueError):
+                    args = {}
+            # Function-call arguments must be a JSON object. Anything else
+            # (None from "null", a list, a number, an empty string, etc.) is
+            # treated as "no arguments" — this both avoids silently dropping a
+            # falsy value into {} inconsistently and prevents an AttributeError
+            # on the args.items() call below for truthy non-dict values.
+            if not isinstance(args, dict):
+                args = {}
+            param_lines = []
+            for k, v in args.items():
+                v_str = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
+                param_lines.append(f"<parameter={k}>\n{v_str}\n</parameter>")
+            params_block = "\n".join(param_lines)
+            if params_block:
+                body = f"<function={name}>\n{params_block}\n</function>"
+            else:
+                body = f"<function={name}>\n</function>"
+            blocks.append(f"<tool_call>\n{body}\n</tool_call>")
+        return "\n".join(blocks)
+
+    def _merge_thinking(self, content: str, reasoning: Optional[str]) -> str:
+        content = content or ""
+        if not reasoning:
+            return content
+        return self.THINK_OPEN + reasoning.strip("\n") + self.THINK_CLOSE + content
+
+    def _extract_system(self, example: Dict[str, Any]) -> Tuple[str, List[Dict[str, Any]]]:
+        """Pull a leading system message out of the trajectory, if present.
+
+        Returns ``(system_text, remaining_messages)``.
+        """
+        messages = example[self.dataset_attr.messages]
+        if (
+                self.dataset_attr.system_tag
+                and len(messages) > 0
+                and messages[0].get(self.dataset_attr.role_tag) == self.dataset_attr.system_tag
+        ):
+            return (messages[0].get(self.dataset_attr.content_tag) or "").strip(), messages[1:]
+        system = example[self.dataset_attr.system] if self.dataset_attr.system else ""
+        return (system or "").strip(), messages
+
+    def _build_assistant_turn(self, msg: Dict[str, Any], content: str) -> Optional[Dict[str, str]]:
+        """Build a single ASSISTANT or TOOL_CALL turn from an assistant message.
+
+        Returns the turn dict, or ``None`` if the message carries a malformed
+        tool call (the caller drops the whole sample in that case).
+        """
+        tool_calls = msg.get("tool_calls")
+        reasoning = msg.get("reasoning_content") or ""
+        if not tool_calls:
+            return {"role": Role.ASSISTANT.value, "content": self._merge_thinking(content, reasoning)}
+
+        tc_block = self._serialize_tool_calls(tool_calls)
+        if tc_block is None:
+            # _serialize_tool_calls already logged the reason.
+            return None
+        if content.strip():
+            body = content.rstrip() + "\n\n" + tc_block
+        else:
+            body = tc_block
+        return {"role": Role.TOOL_CALL.value, "content": self._merge_thinking(body, reasoning)}
+
+    def _flatten_messages(self, messages: List[Dict[str, Any]]) -> Optional[List[Dict[str, str]]]:
+        """Flatten OpenAI messages into Role.{USER, TOOL_CALL, TOOL_RESPONSE, ASSISTANT} turns.
+
+        Returns the aligned turn list, or ``None`` if the trajectory is
+        malformed (unknown role, or a malformed tool call).
+        """
+        aligned: List[Dict[str, str]] = []
+        pending_tool_responses: List[str] = []
+
+        def flush_tool_responses():
+            if pending_tool_responses:
+                aligned.append({
+                    "role": Role.TOOL_RESPONSE.value,
+                    "content": self.TOOL_RESP_SEP.join(pending_tool_responses),
+                })
+                pending_tool_responses.clear()
+
+        for msg in messages:
+            role = msg.get(self.dataset_attr.role_tag)
+            # Match the inference chat_template's `render_content(...)|trim`: trim
+            # every message's content before further processing. Without this,
+            # trailing whitespace in tool outputs causes byte-level divergence vs
+            # the official chat_template.
+            content = (msg.get(self.dataset_attr.content_tag, "") or "").strip()
+
+            if role == self.dataset_attr.observation_tag:
+                pending_tool_responses.append(content)
+                continue
+
+            # Agent traces often inject role="user" messages mid-trajectory
+            # (system reminders, follow-up instructions, harness hook output).
+            # Without this branch they land at an odd slot in aligned[] -> the
+            # alternation check trips and the whole sample is dropped. Fold them
+            # into the surrounding input stream instead so alternation holds.
+            if role == self.dataset_attr.user_tag and (
+                pending_tool_responses
+                or (aligned and aligned[-1]["role"] in (Role.TOOL_RESPONSE.value, Role.USER.value))
+            ):
+                if pending_tool_responses:
+                    # Treat the user interjection as another tool_response-style
+                    # block; it is wrapped by TOOL_RESP_SEP at flush time.
+                    pending_tool_responses.append(content)
+                else:
+                    # Last aligned entry is already a user-side block — concatenate.
+                    sep = "\n" if aligned[-1]["content"] else ""
+                    aligned[-1]["content"] = aligned[-1]["content"] + sep + content
+                continue
+
+            flush_tool_responses()
+
+            if role == self.dataset_attr.user_tag:
+                aligned.append({"role": Role.USER.value, "content": content})
+            elif role == self.dataset_attr.assistant_tag:
+                turn = self._build_assistant_turn(msg, content)
+                if turn is None:
+                    return None
+                aligned.append(turn)
+            else:
+                logger.warning_rank0(f"Unknown role {role!r} in OpenAI sample, dropping example.")
+                return None
+
+        flush_tool_responses()
+        return aligned
+
+    def _is_valid_alignment(self, aligned: List[Dict[str, str]]) -> bool:
+        """Validate strict role alternation and an even turn count ending in
+        assistant. Logs the specific failing rule and returns False if invalid.
+        """
+        odd_roles = (Role.USER.value, Role.TOOL_RESPONSE.value)
+        even_roles = (Role.ASSISTANT.value, Role.TOOL_CALL.value)
+        accept = (odd_roles, even_roles)
+        for idx, m in enumerate(aligned):
+            if m["role"] not in accept[idx % 2]:
+                logger.warning_rank0(
+                    f"Role alternation broken at turn {idx} role={m['role']!r}; dropping example."
+                )
+                return False
+        if len(aligned) == 0 or len(aligned) % 2 != 0:
+            logger.warning_rank0(
+                f"Sample has {len(aligned)} aligned turns; SFT requires even count ending in assistant. Dropping."
+            )
+            return False
+        return True
+
+    def _build_tools(self, example: Dict[str, Any]) -> Optional[List[str]]:
+        """Render the tools schema column into list[str] (one JSON-serialized
+        tool per element, matching '\\n'.join in the template), or None when
+        the column is absent or empty.
+        """
+        tools_field = self.dataset_attr.tools
+        raw_tools = example.get(tools_field) if tools_field else None
+        if not raw_tools:
+            return None
+        return [
+            t if isinstance(t, str) else json.dumps(t, ensure_ascii=False)
+            for t in raw_tools
+        ]
+
+    def __call__(self, example: Dict[str, Any]) -> Dict[str, Any]:
+        # 1) extract leading system message (if data carries one)
+        system, messages = self._extract_system(example)
+
+        # 2) flatten messages into aligned turns; None means the trajectory is
+        #    malformed and the sample is dropped.
+        aligned = self._flatten_messages(messages)
+
+        # 3) validate; on any failure the sample yields empty prompt/response.
+        if aligned is None or not self._is_valid_alignment(aligned):
+            prompt: List[Dict[str, str]] = []
+            response: List[Dict[str, str]] = []
+        else:
+            prompt = aligned[:-1]
+            response = aligned[-1:]
+
+        return {
+            "_prompt": prompt,
+            "_response": response,
+            "_system": system,
+            "_images": self._find_media_files(example[self.dataset_attr.images]) if self.dataset_attr.images else None,
+            "_videos": self._find_media_files(example[self.dataset_attr.videos]) if self.dataset_attr.videos else None,
+            "_audios": self._find_media_files(example[self.dataset_attr.audios]) if self.dataset_attr.audios else None,
+            "_tools": self._build_tools(example),
+        }
+
+
 DATASET_CONVERTERS = {
     "alpaca": AlpacaDatasetConverter,
     "sharegpt": SharegptDatasetConverter,
     "multimodal_tool": MultiModalToolDatasetConverter,
+    "openai": OpenAIDatasetConverter,
 }
 
 
@@ -325,6 +576,7 @@ class DatasetAttr(BaseArguments):
     history: Optional[str] = None
     # sharegpt columns
     messages: Optional[str] = "conversations"
+    tools: Optional[str] = None
     # sharegpt tags
     role_tag: Optional[str] = "from"
     content_tag: Optional[str] = "value"
@@ -336,7 +588,7 @@ class DatasetAttr(BaseArguments):
     # rlhf columns
     chosen: Optional[str] = None
     rejected: Optional[str] = None
-    formatting: Literal["alpaca", "sharegpt", "multimodal_tool"] = "sharegpt"
+    formatting: Literal["alpaca", "sharegpt", "multimodal_tool", "openai"] = "sharegpt"
 
 
 class DataArguments(BaseArguments):
@@ -575,11 +827,21 @@ class SupervisedDatasetProcessor(DatasetProcessor):
     def preprocess_dataset(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         # build inputs with format `<bos> X Y <eos>` and labels with format `<ignore> ... <ignore> Y <eos>`
         # for multiturn examples, we only mask the prompt part in each prompt-response pair.
-        model_inputs = defaultdict(list)
+        # Pre-seed every expected key so an all-broken batch still returns a dict whose
+        # schema matches non-empty batches. With defaultdict(list), datasets.map(batched=True)
+        # establishes the arrow schema from the first non-empty batch, and a later batch that
+        # never wrote any key returns {}, which pyarrow rejects ("Schema and number of arrays
+        # unequal").
+        model_inputs: Dict[str, List[Any]] = {
+            "input_ids": [], "attention_mask": [], "labels": [],
+            "images": [], "videos": [], "audios": [],
+        }
         for i in range(len(examples["_prompt"])):
             if len(examples["_prompt"][i]) % 2 != 1 or len(examples["_response"][i]) != 1:
                 logger.warning_rank0(
-                    "Dropped invalid example: {}".format(examples["_prompt"][i] + examples["_response"][i])
+                    f"Dropped invalid example: prompt_turns={len(examples['_prompt'][i])} "
+                    f"response_turns={len(examples['_response'][i])} "
+                    f"(expected odd prompt + 1 response)."
                 )
                 continue
 
@@ -659,7 +921,9 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
         for i in range(len(examples["_prompt"])):
             if len(examples["_prompt"][i]) % 2 != 1 or len(examples["_response"][i]) != 1:
                 logger.warning_rank0(
-                    "Dropped invalid example: {}".format(examples["_prompt"][i] + examples["_response"][i])
+                    f"Dropped invalid example: prompt_turns={len(examples['_prompt'][i])} "
+                    f"response_turns={len(examples['_response'][i])} "
+                    f"(expected odd prompt + 1 response)."
                 )
                 continue
 
@@ -690,7 +954,12 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
                 batch_audios.append(examples["_audios"][i] or [])
                 valid_num += 1
 
-        model_inputs = defaultdict(list)
+        # Same pyarrow schema-stability fix as SupervisedDatasetProcessor: pre-seed all
+        # keys so an all-broken batch still satisfies the arrow schema check.
+        model_inputs: Dict[str, List[Any]] = {
+            "input_ids": [], "attention_mask": [], "position_ids": [], "labels": [],
+            "images": [], "videos": [], "audios": [], "cu_seqlens": [],
+        }
         knapsacks = greedy_knapsack(lengths, self.data_args.cutoff_len)
         for knapsack in knapsacks:
             packed_input_ids, packed_attention_masks, packed_position_ids, packed_labels = [], [], [], []
@@ -763,11 +1032,18 @@ class PairwiseDatasetProcessor(DatasetProcessor):
 
     def preprocess_dataset(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         # build input pairs with format `<bos> X`, `Y1 <eos>` and `Y2 <eos>`
-        model_inputs = defaultdict(list)
+        # Same pyarrow schema-stability fix as SupervisedDatasetProcessor.
+        model_inputs: Dict[str, List[Any]] = {
+            "chosen_input_ids": [], "chosen_attention_mask": [], "chosen_labels": [],
+            "rejected_input_ids": [], "rejected_attention_mask": [], "rejected_labels": [],
+            "images": [], "videos": [], "audios": [],
+        }
         for i in range(len(examples["_prompt"])):
             if len(examples["_prompt"][i]) % 2 != 1 or len(examples["_response"][i]) < 2:
                 logger.warning_rank0(
-                    "Dropped invalid example: {}".format(examples["_prompt"][i] + examples["_response"][i])
+                    f"Dropped invalid pairwise example: prompt_turns={len(examples['_prompt'][i])} "
+                    f"response_turns={len(examples['_response'][i])} "
+                    f"(expected odd prompt + >=2 responses)."
                 )
                 continue
 

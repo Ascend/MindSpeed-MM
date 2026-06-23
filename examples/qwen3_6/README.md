@@ -14,6 +14,7 @@
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
 - [数据集准备及处理](#数据集准备及处理)
+  - [Agentical Trace（OpenAI 格式）数据集](#agentical-traceopenai-格式数据集)
 - [微调](#微调)
   - [准备工作](#1-准备工作)
   - [配置参数](#2-配置参数)
@@ -110,6 +111,123 @@ mm-convert Qwen35Converter dcp_to_hf \
 
 - 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
 - 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+
+### Agentical Trace（OpenAI 格式）数据集
+
+除常规的 `alpaca` / `sharegpt` 格式外，Qwen3.6 支持直接使用 **OpenAI ChatCompletion 风格的智能体轨迹（agentical trace）数据集**进行 SFT。该格式可无损表达多轮工具调用轨迹，包含函数调用 `tool_calls`、思考过程 `reasoning_content`、工具返回 `tool` 以及本轮可用的函数 schema `tools`。
+
+#### 1. 数据格式
+
+每条样本是一个 JSON 对象，核心字段为 `messages`（必选）与 `tools`（可选）。一个完整示例如下：
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful coding agent."
+    },
+    {
+      "role": "user",
+      "content": "查看当前目录有哪些文件"
+    },
+    {
+      "role": "assistant",
+      "reasoning_content": "用户想列出目录内容，调用 run_shell 工具执行 ls。",
+      "content": "我来帮你查看。",
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "type": "function",
+          "function": {
+            "name": "run_shell",
+            "arguments": {"command": "ls -la"}
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "content": "total 0\ndrwxr-xr-x  2 user user 4096 ...\n-rw-r--r--  1 user user   12 README.md"
+    },
+    {
+      "role": "assistant",
+      "content": "当前目录下有 1 个文件：README.md。"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "run_shell",
+        "description": "Run a shell command and return its stdout/stderr.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "command": {"type": "string", "description": "The shell command to run"}
+          },
+          "required": ["command"]
+        }
+      }
+    }
+  ]
+}
+```
+
+字段说明：
+
+| 字段 | 位置 | 必选 | 说明 |
+|---|---|---|---|
+| `messages` | 顶层 | 是 | 对话消息列表，按时间顺序排列 |
+| `tools` | 顶层 | 否 | 本轮可用的函数 schema 列表（OpenAI function 格式）。无工具调用的数据可省略 |
+| `role` | 每条消息 | 是 | 取值 `system` / `user` / `assistant` / `tool` |
+| `content` | 每条消息 | 是 | 文本内容。`tool` 角色表示工具/环境的返回结果 |
+| `tool_calls` | `assistant` 消息 | 否 | 函数调用列表，每项含 `function.name` 与 `function.arguments`；`arguments` 可为 dict 或 JSON 字符串 |
+| `reasoning_content` | `assistant` 消息 | 否 | 模型思考过程，转换时会合并为 `<think>...</think>` 块拼接在回答前 |
+
+数据组织约束（不满足的样本会被自动跳过并打印精简告警）：
+
+- 轨迹须以 `assistant` 轮**结束**；
+- 连续的多个 `tool` 返回会被**自动合并**为一个工具响应轮；
+- 轨迹中途穿插的 `user` 消息（如系统提醒、追加指令）会被**自动折叠**进相邻的输入流，不会因打破角色交替而丢弃整条样本；
+- 工具调用按 **Qwen3.6 官方 XML 格式**序列化，因此须搭配 `qwen3_6` 或 `qwen3_6_nothink` 模板，token 序列才能与推理端一致。
+
+数据可保存为 `json` / `jsonl` 文件（与现有数据集加载方式一致）。
+
+#### 2. 配置使用
+
+在 `xxx_config.yaml` 的 `dataset_param` 下，将数据格式声明为 `openai`、指定 `tools` 列，并选用 Qwen3.6 模板：
+
+```yaml
+dataset:
+  dataset_param:
+    dataset_type: huggingface
+    attr:
+      images: null                 # 纯文本 agent trace 置 null
+      messages: messages           # 对话字段名
+      tools: tools                 # 工具 schema 字段名（无工具时可省略）
+      role_tag: role               # 角色字段名
+      content_tag: content         # 内容字段名
+      user_tag: user               # 用户角色标识
+      assistant_tag: assistant     # 助手角色标识
+      system_tag: system           # 系统角色标识
+      observation_tag: tool        # 工具返回对应的 role（OpenAI 格式为 "tool"）
+      formatting: openai           # 关键：选用 OpenAI 转换器
+    basic_parameters:
+      template: qwen3_6            # 或 qwen3_6_nothink（不带 thinking 的变体）
+      enable_thinking: true        # 训练含 reasoning_content 的思考数据时置 true
+      cutoff_len: 32768            # agent 轨迹通常较长，按需调大
+      dataset_dir: ./data
+      dataset: ./data/your_agent_trace.json
+      cache_dir: ./cache_dir/
+```
+
+模板选择：
+
+- `qwen3_6`：带 thinking，渲染 `reasoning_content` 为 `<think>` 块，适合含思考过程的轨迹；
+- `qwen3_6_nothink`：不带 thinking，助手回复为直接输出，适合纯文本终端类轨迹（如命令行 trace）。
+
+> 说明：完整可运行的示例配置可参考 `examples/qwen3_6/agentical_ascendc_sft/` 目录。
 
 ## 微调
 
