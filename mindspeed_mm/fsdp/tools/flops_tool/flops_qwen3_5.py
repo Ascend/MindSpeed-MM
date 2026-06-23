@@ -96,7 +96,7 @@ class Qwen35FlopsCounter:
             linear_v_size = linear_num_value_heads * linear_value_head_dim
 
         This only counts projection and conv1d parameter FLOPs. The GatedDeltaNet
-        recurrence FLOPs are computed separately by _compute_gdn_recurrence_flops.
+        recurrence FLOPs are computed separately by _compute_gdn_chunk_flops.
         """
         hidden_size = config.hidden_size
         num_attention_heads = config.num_attention_heads
@@ -164,6 +164,45 @@ class Qwen35FlopsCounter:
             * tokens_sum
             * num_gdn_layers
         )
+
+
+    @staticmethod
+    def _compute_gdn_chunk_flops(config, tokens_sum, num_full_attn_layers, chunk_size=64):
+        """
+        Compute FLOPs for the GatedDeltaNet chunked implementation across all GDN layers.
+        Refer to `torch_chunk_gated_delta_rule` function in Qwen35 open source code.
+        In training mode, GDN is implemented using the chunked method rather than recurrent method.
+        Here are 8 types of matmul calculations involved in the chunked GDN:
+            KKT: B * N * S * 2 * d_v * chunk_size
+            value: B * N * S * 2 * d_v * chunk_size
+            k_cumdecay: B * N * S * 2 * d_k * chunk_size
+            chunk_attn: B * N * S * 2 * d_k * chunk_size
+            chunk_v_prime: B * N * S * 2 * d_k  * d_v
+            chunk_attn_inter: B * N * S * 2 * d_k * d_v
+            chunk_core_attn_out: B * N * S * 2 * d_v * chunk_size
+            chunk_last_recurrent_state: B * N * S * 2 * d_k  * d_v
+        where B is batch_size, S is the sequence length, N = linear_num_value_heads,
+        d_v = linear_value_head_dim, d_k = linear_key_head_dim.
+
+        Following the same convention as quadratic attention (Q@K + attn@V):
+            fwd: 2 * B * N * S * (3 * d_v * chunk_size + 2 * d_k * chunk_size + 3 * d_v * d_k)
+            fwd + bwd (3x): 2 * 3 * B * N * S * (3 * d_v * chunk_size + 2 * d_k * chunk_size + 3 * d_v * d_k)
+
+        """
+        gdn_flops = (
+            2
+            * 3
+            * tokens_sum
+            * config.linear_num_value_heads
+            *   (
+                    config.linear_value_head_dim * chunk_size * 3 + \
+                    config.linear_key_head_dim * chunk_size * 2 + \
+                    config.linear_value_head_dim * config.linear_key_head_dim * 3
+                )
+            )
+        num_gdn_layers = config.num_hidden_layers - num_full_attn_layers
+        return gdn_flops * num_gdn_layers
+
 
     def _estimate_qwen3_5_family_flops(self, tokens_sum, batch_seqlens, **kargs):
         """
@@ -241,8 +280,8 @@ class Qwen35FlopsCounter:
         # This implementation applies to both GPU and NPU.
         attn_qkv_flops = 7 * seqlen_square_sum * head_dim * num_attention_heads * num_full_attn_layers
 
-        # GatedDeltaNet recurrence flops (state update + query, for all GDN layers)
-        gdn_recurrence_flops = self._compute_gdn_recurrence_flops(text_config, tokens_sum, num_full_attn_layers)
+        # GatedDeltaNet chunked flops (for all GDN layers)
+        gdn_flops = self._compute_gdn_chunk_flops(text_config, tokens_sum, num_full_attn_layers)
 
         # vit flops (Qwen3-VL ViT)
         images_seqlens = kargs.get("images_seqlens", None)
@@ -252,7 +291,7 @@ class Qwen35FlopsCounter:
             vit_flops = 0
 
         # all_layer & all_token fwd & bwd flops
-        flops_all_token = dense_N_flops + attn_qkv_flops + gdn_recurrence_flops + vit_flops
+        flops_all_token = dense_N_flops + attn_qkv_flops + gdn_flops + vit_flops
 
         return flops_all_token
 
@@ -282,6 +321,7 @@ def get_args():
     parser.add_argument("--device_num", type=int, default=1, help="Device num")
     parser.add_argument("--gbs", type=int, default=1, help="global batchsize")
     parser.add_argument("--step_time", type=float, help="Step time (s)")
+    parser.add_argument('--hardware_flops', type=float, default=None, help='Hardware FLOPs')
     return parser.parse_args()
 
 
@@ -293,6 +333,13 @@ if __name__ == "__main__":
     )
     flops = flops * args.gbs / args.device_num
     print(f"flops: {flops:.4e}")
+
+    if args.hardware_flops is not None:
+        if args.hardware_flops > 0:
+            mfu = flops / args.hardware_flops
+            print(f"MFU is: {mfu*100:.2f}%")
+        else:
+            raise ValueError("Hardware FLOPs must be a positive value.")
 
 
 """

@@ -301,6 +301,13 @@ def main(args):
 
     print(f"Average FLOPs is: {average_flops}")
 
+    if args.hardware_flops is not None:
+        if args.hardware_flops > 0:
+            mfu = average_flops / args.hardware_flops
+            print(f"MFU is: {mfu*100:.2f}%")
+        else:
+            raise ValueError("Hardware FLOPs must be a positive value.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kimi-K2.5 FLOPs Calculation Tool")
@@ -312,6 +319,7 @@ if __name__ == "__main__":
     parser.add_argument('--hf_ckpt_path', type=str, help='HuggingFace config path')
     parser.add_argument('--n_npu', type=int, help='Number of NPU')
     parser.add_argument('--latency', type=float, help='Elapsed time per iteration (s)')
+    parser.add_argument('--hardware_flops', type=float, default=None, help='Hardware FLOPs')
 
     args = parser.parse_args()
     main(args)
