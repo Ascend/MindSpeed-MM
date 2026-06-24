@@ -1103,6 +1103,20 @@ class Qwen3_5MoeExperts(nn.Module):
         if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE:
             print_rank(logger.info, "Qwen3_5MoeExperts use NPU fused ops")
 
+        ps = get_parallel_state()
+        self.enable_ep_balance = config.enable_ep_balance and ps.is_ep_enable()
+        if self.enable_ep_balance:
+            from mindspeed_mm.fsdp.distributed.expert_parallel.ep_balance.ep_balance_strategy import EPBalanceStrategy
+            self.ep_balance_strategy = EPBalanceStrategy(
+                ep_group=ps.get_ep_group(),
+                num_experts=self.num_experts,
+                max_dup_experts_num=config.max_dup_experts_num,
+            )
+
+            def hook_fn(*args, **kwargs):
+                self.ep_balance_strategy.planner.clear_record_planner_result()
+            self.register_full_backward_hook(hook_fn)
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -1164,6 +1178,14 @@ class Qwen3_5MoeExperts(nn.Module):
             "mc2": ep_mc2_forward,
             "allgather": ep_allgather_forward
         }
+
+        if self.enable_ep_balance:
+            self.ep_balance_strategy.executor.register_backward_dup_experts_grad_acc_hook(gate_up_proj, name="fc1")
+            self.ep_balance_strategy.executor.register_backward_dup_experts_grad_acc_hook(down_proj, name="fc2")
+
+            if ep_plan.dispatcher in ["mc2", "allgather"]:
+                raise NotImplementedError("EP load balancing strategy currently only supports alltoall dispatch.")
+
         if ep_plan.dispatcher in ep_dispatcher_dict:
             dipatcher_func = ep_dispatcher_dict[ep_plan.dispatcher]
             hidden_states = dipatcher_func(
@@ -1174,7 +1196,8 @@ class Qwen3_5MoeExperts(nn.Module):
                 fc1_weight=gate_up_proj,
                 fc2_weight=down_proj,
                 ep_group=ep_group,
-                fused=ep_plan.use_npu_fused_ops
+                fused=ep_plan.use_npu_fused_ops,
+                ep_balance_strategy=self.ep_balance_strategy if self.enable_ep_balance else None,
             )
         else:
             raise NotImplementedError(f"EP dispatcher {ep_plan.dispatcher} is not implenmented for Qwen3.5 MoE.")
@@ -1226,7 +1249,9 @@ class Qwen3_5MoeSparseMoeBlock(nn.Module):
 
         shared_expert_output = F.sigmoid(self.shared_expert_gate(hidden_states_reshaped)) * shared_expert_output
 
-        expert_output += shared_expert_output
+        # NOTE: Replaced in-place += with out-of-place addition because the in-place operation
+        # breaks the autograd graph during backward pass when enable_ep_balance is enabled.
+        expert_output = expert_output + shared_expert_output
         expert_output = expert_output.reshape(batch_size, sequence_length, hidden_dim)
         return expert_output
 
@@ -2537,6 +2562,11 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         # chunkloss
         transformer_config.text_config.enable_chunk_loss = getattr(feature_args, "enable_chunk_loss", False)
         transformer_config.text_config.enable_dynamic_chunk_loss = getattr(feature_args, "enable_dynamic_chunk_loss", False)
+
+        # ep balance
+        transformer_config.text_config.enable_ep_balance = getattr(feature_args, "enable_ep_balance", False)
+        transformer_config.text_config.max_dup_experts_num = getattr(feature_args.ep_balance_plan, "max_dup_experts_num", 2)
+
         return transformer_config
 
     def get_input_embeddings(self):

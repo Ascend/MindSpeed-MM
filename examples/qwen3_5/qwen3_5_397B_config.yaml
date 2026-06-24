@@ -126,6 +126,10 @@ features:
     batch_dim: 0
     chunk_arg_indexs: [0]
     chunk_kwarg_names: ["position_embeddings", "position_ids", "rope_deltas", "attention_mask"]
+  # ep balance
+  enable_ep_balance: false
+  ep_balance_plan:
+    max_dup_experts_num: 2
 
 # 训练配置
 training:

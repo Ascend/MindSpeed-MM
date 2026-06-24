@@ -75,6 +75,13 @@ class ChunkMbsPlanConfig(BaseArguments):
     )
 
 
+class EPBalancePlanConfig(BaseArguments):
+    max_dup_experts_num: int = field(
+        default=2,
+        metadata={"help": "max dup experts num"},
+    )
+
+
 class FeatureArguments(BaseArguments):
     recompute_plan: RecomputePlanConfig = field(default_factory=RecomputePlanConfig)
 
@@ -101,3 +108,9 @@ class FeatureArguments(BaseArguments):
         metadata={"help": "Whether apply chunk_mbs"}
     )
     chunkmbs_plan: ChunkMbsPlanConfig = field(default_factory=ChunkMbsPlanConfig)
+
+    enable_ep_balance: bool = field(
+        default=False,
+        metadata={"help": "Whether apply ep balance strategy"}
+    )
+    ep_balance_plan: EPBalancePlanConfig = field(default_factory=EPBalancePlanConfig)

@@ -1,3 +1,4 @@
+
 import os
 from typing import List, Optional
 
@@ -47,6 +48,7 @@ def ep_forward(
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
     swiglu_limit: float = 0.0,
+    ep_balance_strategy = None,
 ) -> torch.Tensor:
     if FORCE_EP_BALANCE:
         selected_experts = force_ep_balance(num_experts, selected_experts)
@@ -55,9 +57,19 @@ def ep_forward(
         routing_weights = routing_weights.gather(1, selected_experts)
 
     hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
-    input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert = (
-        dispatch_preprocess(selected_experts, num_experts, ep_group)
-    )
+    enable_ep_balance = ep_balance_strategy
+    if enable_ep_balance:
+        input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert = (
+            dispatch_preprocess_with_ep_balance(selected_experts, num_experts, ep_group, ep_balance_planner=ep_balance_strategy.planner)
+        )
+        dup_fc1 = ep_balance_strategy.executor.async_experts_param_comm(ep_balance_strategy.planner.dup_experts_map, fc1_weight, name="fc1")
+        num_experts = (ep_balance_strategy.planner.num_local_experts + ep_balance_strategy.planner.max_dup_experts_num) * dist.get_world_size(ep_group)
+        selected_experts = ep_balance_strategy.planner.selected_experts_with_dup
+    else:
+        input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert = (
+            dispatch_preprocess(selected_experts, num_experts, ep_group)
+        )
+
     hidden_states, unpermute_indices, post_dispatch_unpermute_indices = alltoall_dispatch(
         hidden_states,
         selected_experts,
@@ -69,6 +81,12 @@ def ep_forward(
         fused=fused,
     )
 
+    if enable_ep_balance:
+        ep_balance_strategy.executor.wait_async_works_finished(name="fc1")
+        fc1_weight = torch.cat([fc1_weight, dup_fc1], dim=0)
+        dup_fc2 = ep_balance_strategy.executor.async_experts_param_comm(ep_balance_strategy.planner.dup_experts_map, fc2_weight, name="fc2")
+        ep_balance_strategy.executor.register_backward_dup_experts_grad_comm_hook(ep_balance_strategy.planner.dup_experts_map, fc1_weight, name="fc1")
+
     # If no tokens are assigned to the expert in the current EP shard, no computation is performed
     if hidden_states.shape[0] > 0:
         intermediate_hidden_states = grouped_matmul(hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert, fused=fused)
@@ -76,6 +94,12 @@ def ep_forward(
             intermediate_activations = clamp_swiglu(intermediate_hidden_states, dim=-1, fused=fused, limit=swiglu_limit)
         else:
             intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+
+        if enable_ep_balance:
+            ep_balance_strategy.executor.wait_async_works_finished(name="fc2")
+            fc2_weight = torch.cat([fc2_weight, dup_fc2], dim=0)
+            ep_balance_strategy.executor.register_backward_dup_experts_grad_comm_hook(ep_balance_strategy.planner.dup_experts_map, fc2_weight, name="fc2")
+
         hidden_states = grouped_matmul(
             intermediate_activations, fc2_weight, num_global_sum_tokens_per_local_expert, fused=fused
         )
@@ -83,6 +107,12 @@ def ep_forward(
         # empty operation to avoid no grads for experts' weights
         intermediate_hidden_states = hidden_states @ fc1_weight.sum(0)
         gate_output, down_output = torch.chunk(intermediate_hidden_states, 2, dim=-1)
+
+        if enable_ep_balance:
+            ep_balance_strategy.executor.wait_async_works_finished(name="fc2")
+            fc2_weight = torch.cat([fc2_weight, dup_fc2], dim=0)
+            ep_balance_strategy.executor.register_backward_dup_experts_grad_comm_hook(ep_balance_strategy.planner.dup_experts_map, fc2_weight, name="fc2")
+
         hidden_states = (gate_output + down_output) @ fc2_weight.sum(0) * 0.
 
     hidden_states = alltoall_combine(
@@ -96,6 +126,7 @@ def ep_forward(
         num_global_tokens_per_local_expert,
         ep_group,
     )
+
     return hidden_states
 
 
@@ -136,6 +167,51 @@ def dispatch_preprocess(
     output_splits = num_global_tokens_per_local_expert.sum(dim=1).tolist()
 
     num_global_sum_tokens_per_local_expert = num_global_tokens_per_local_expert.sum(dim=0)
+    return input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert
+
+
+def dispatch_preprocess_with_ep_balance(
+    selected_experts: torch.Tensor,
+    num_global_experts: int,
+    ep_group: Optional[dist.ProcessGroup] = None,
+    ep_balance_planner = None,
+):
+    if ep_group is None:
+        ep_size = 1
+        ep_rank = 0
+    else:
+        ep_size = dist.get_world_size(ep_group)
+        ep_rank = dist.get_rank(ep_group)
+    if num_global_experts % ep_size != 0:
+        raise ValueError(
+            f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
+    )
+    num_local_experts = num_global_experts // ep_size
+
+    if ep_balance_planner.dup_experts_map is not None:
+        # 如果开启负载均衡策略的话，这部分的规划结果可以直接读取
+        num_global_tokens_per_expert = ep_balance_planner.num_global_tokens_per_local_expert
+    else:
+        num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_global_experts, min=0, max=num_global_experts)
+
+        if ep_group is None or ep_size <= 1:
+            num_global_tokens_per_expert = num_local_tokens_per_expert.view(1, -1)
+        else:
+            num_global_tokens_per_expert = torch.zeros(
+                ep_size,
+                num_global_experts,
+                dtype=num_local_tokens_per_expert.dtype,
+                device=num_local_tokens_per_expert.device,
+            )
+            dist.all_gather_into_tensor(num_global_tokens_per_expert, num_local_tokens_per_expert, group=ep_group)
+
+    with torch.no_grad():
+        ep_balance_planner.select_dup_experts_and_rearrange_experts(num_global_tokens_per_expert, selected_experts)
+    input_splits = ep_balance_planner.input_splits.tolist()
+    output_splits = ep_balance_planner.output_splits.tolist()
+    num_global_tokens_per_local_expert = ep_balance_planner.num_global_tokens_per_local_expert
+    num_global_sum_tokens_per_local_expert = ep_balance_planner.num_global_sum_tokens_per_local_expert
+
     return input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert
 
 
@@ -208,6 +284,7 @@ def ep_mc2_forward(
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
     swiglu_limit: float = 0.0,
+    **kwargs,
 ) -> torch.Tensor:
     if FORCE_EP_BALANCE:
         selected_experts = force_ep_balance(num_experts, selected_experts)
@@ -264,6 +341,7 @@ def ep_allgather_forward(
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
     swiglu_limit: float = 0.0,
+    **kwargs,
 ) -> torch.Tensor:
     # Reshape hidden states to (batch_size * sequence_length, hidden_dim)
     hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
