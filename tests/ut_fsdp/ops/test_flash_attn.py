@@ -13,7 +13,13 @@ def _init_pg(rank: int, world_size: int, init_file: str):
     if hasattr(torch, "npu"):
         torch.npu.set_device(rank)
 
-    dist.init_process_group(backend="hccl", init_method=f"file://{init_file}", rank=rank, world_size=world_size)
+    dist.init_process_group(
+        backend="hccl",
+        init_method=f"file://{init_file}",
+        rank=rank,
+        world_size=world_size,
+        device_id=torch.device(f"npu:{rank}")
+    )
 
 
 def _destroy_pg():
@@ -24,7 +30,7 @@ def _destroy_pg():
 class TestFlashAttention:
     @staticmethod
     def _test_flash_attention_forward(module, q, k, v, attn_mask, common_kwargs):
-        from mindspeed_mm.fsdp.ops.flash_attn.flash_attn_refactor import flash_attention_forward
+        from mindspeed_mm.fsdp.ops.flash_attn.flash_attn import flash_attention_forward
 
         with torch.no_grad():
             output, _ = flash_attention_forward(

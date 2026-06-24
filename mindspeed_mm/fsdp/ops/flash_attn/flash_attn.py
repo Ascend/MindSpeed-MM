@@ -399,7 +399,7 @@ def flash_attention_forward(
             value,
             q_head_num,
             softmax_scale=scaling,
-            is_caual=is_causal,
+            is_causal=is_causal,
             fa_layout=ring_cal_layout,
             attn_mask=attention_mask,
             dropout_p=dropout,
