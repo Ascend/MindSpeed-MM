@@ -481,7 +481,7 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td>【Test】</td>
     </tr>
     <tr>
-      <td rowspan="25"> 多模态理解 </td>
+      <td rowspan="28"> 多模态理解 </td>
     </tr>
     <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/glm4.1v">GLM-4.1V</a></td>
@@ -701,6 +701,37 @@ Samples per Second 为 (SPS); Frames per Second 为 (FPS); Tokens per Second 为
       <td> 598.05 (TPS) </td>
       <td> / </td>
       <td> 16116 </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td rowspan="3"><a href="../../../examples/qwen3_5">Qwen3.5</a></td>
+      <td><a href="https://huggingface.co/Qwen/Qwen3.5-27B">27B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 (A3) </td>
+      <td> BF16 </td>
+      <td> 0.80 (SPS) </td>
+      <td> / </td>
+      <td> 16384 </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td><a href="https://huggingface.co/Qwen/Qwen3.5-35B-A3B">35B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 (A3) </td>
+      <td> BF16 </td>
+      <td> 3.41 (SPS) </td>
+      <td> / </td>
+      <td> 16384 </td>
+      <td>【Test】</td>
+    </tr>
+    <tr>
+      <td><a href="https://huggingface.co/Qwen/Qwen3.5-397B-A17B">397B</a></td>
+      <td> 微调 </td>
+      <td> 16x8 (A3) </td>
+      <td> BF16 </td>
+      <td> 12.21 (SPS) </td>
+      <td> / </td>
+      <td> 16384 </td>
       <td>【Test】</td>
     </tr>
     <tr>
