@@ -48,7 +48,8 @@ dependencies = [
     "scipy",
     "pytest-mock",
     "scikit-learn",
-    "SQLAlchemy"
+    "SQLAlchemy",
+    "numba"
 ]
 
 [build-system]
