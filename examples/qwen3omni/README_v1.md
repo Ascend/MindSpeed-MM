@@ -283,6 +283,12 @@ data->dataset_param->basic_parameters->dataset
     total_chunk_size: 4096
 ```
 
+【preload配置】
+
+使用preload，即数据预加载开关，开启后数据加载与计算重叠，减少训练等待时间。配置方式为在`xxx_config_v1.yaml`中的`data->dataloader_param`参数下的`enable_preload`字段改为`true`。
+
+优化效果示例：16K数据（含30s音频）未开启`enable_preload`时，迭代过程会间隔产生数据加载开销，带来明显耗时波动；启用该配置后，峰值单步迭代耗时可降低6%，同时消除耗时波动的问题。
+
 【模块冻结配置】
 
 当前支持自定义冻结模块，在`xxx_config_v1.yaml`中model->freeze字段中配置需要冻结的模块即可实现相应模块冻结。
