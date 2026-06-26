@@ -224,9 +224,41 @@ mm-convert Qwen35Converter dcp_to_hf \
 
 **注意在开启ulysses-cp时，请将`xxx_config.yaml`中的`attn_implementation`配置为`flash_attention_2`**
 
+【EP并行配置】
+
+根据实际的需求配置`xxx_config.yaml`中的`expert_parallel_size`（注意仅对MoE模型生效）
+
+根据`expert_parallel_size`可以自行选择更合适的`ep_plan.dispatcher`，推荐`expert_parallel_size`小于`topk`时，`dispatcher`选择`allgather`，`expert_parallel_size`大于`topk`时选择`alltoall`。
+
+【MoE aux loss配置】
+
+针对MoE模型，如果训练的过程中需要在交叉熵损失的基础上增加`router_aux_loss`使得训练过程中的专家负载分配区域平衡的话，可以配置`xxx_config.yaml`中的`features.loss_cfg.router_aux_loss_coef`字段，该字段表示负载均衡损失的系数。
+
 【mtp配置】
 当前模型支持配置mtp模块，在`xxx_config.yaml`中model下的`mtp_num_layers`字段配置为1，默认为0；`mtp_loss_scaling_factor`字段也支持配置，默认为0.1
 注意：qwen3.5的mtp layer目前只支持配置1层。
+
+【性能优化配置】
+
+- 重计算
+  - 在`features.recompute`配置，`true`表示开启，`false`表示关闭，默认开启。
+  - 开启后可以节省显存占用
+- [chunkloss](../../docs/zh/features/chunkloss.md)
+  - 在`features.enable_chunk_loss`配置，`true`表示开启，`false`表示关闭
+  - `features.chunkloss_plan.chunk_size`表示计算loss的时候在seq维度切分成大小为`chunk_size`的小块进行计算。
+  - 开启后可以大幅降低loss计算时的显存尖刺，节省整体显存占用
+- [async activation offload](../../docs/zh/features/async_activation_offload.md)
+  - 在`features.enable_activation_offload`配置，`true`表示开启，`false`表示关闭
+  - 开启后可以异步将重计算入口的激活值offload至host侧，在开启了重计算的场景下可以进一步节省显存。
+- [chunkmbs](../../docs/zh/features/chunkmbs.md)
+  - 在`features.enable_chunk_mbs`配置，`true`表示开启，`false`表示关闭
+  - `features.chunkmbs_plan.chunk_mbs`表示切分以后单次计算的`micro_batch_size`
+  - 开启该特性时需要同时使能重计算和async activation offload特性，可以增加FSDP2单次unshard对应的计算密度，提高整网吞吐。
+- 选择性重计算
+  - 在开启重计算的场景下，可以跳过linear attention层的gdn重计算，或者full attention层的flash attention重计算，并异步offload中间保存的tensor，在显存占用不变的条件下，减少计算量，提升训练吞吐
+  - 在`model.skip_gdn_recompute`配置是否跳过linear attention层gdn的重计算，`true`表示跳过，`false`表示不跳过
+  - 在`model.skip_flash_attn_recompute`配置是否跳过full attention层的flash attention的重计算，`true`表示跳过，`false`表示不跳过
+  - 开启该特性时需要同时使能重计算和async activation offload特性
 
 【单机运行配置】
 以qwen3_5模型为例：
