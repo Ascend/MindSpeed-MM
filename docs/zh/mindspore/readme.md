@@ -6,7 +6,7 @@ MindSpeed MM已支持接入华为自研AI套件MindSpore，旨在提供华为全
 
 ## 🔥🔥🔥Latest News
 
-🚀🚀🚀 MindSpore后端已支持[CogVideoX](../../../examples/mindspore/cogvideox)、[Qwen2.5VL](../../../examples/mindspore/qwen2.5vl/README.md)、[Qwen25Omni](../../../examples/mindspore/qwen2.5omni/README.md)、[Qwen3VL](../../../examples/mindspore/qwen3vl/README.md)模型。
+🚀🚀🚀 MindSpore后端已支持[Qwen2.5VL](../../../examples/mindspore/qwen2.5vl/README.md)、[Qwen25Omni](../../../examples/mindspore/qwen2.5omni/README.md)、[Qwen3VL](../../../examples/mindspore/qwen3vl/README.md)模型。
 
 ## 版本配套
 
@@ -35,13 +35,11 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 |     模型 \ 特性     | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/sequence-parallel.md) | [VPP](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/pipeline-parallel.md) | CP | EP |  [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md) | [LoRA](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md) |
 |:---------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:-------:|:------:|:------:|:------:|
-| CogVideoX系列-T2V | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
-| CogVideoX系列-I2V | ✔ | ✔ |  |                                                                                         | CP (Ulysses) |   | ✔ | ✔ |  |
-|  Qwen2.5VL-7B   | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
-|  Qwen2.5VL-72B  | ✔ |  |  |                                            ✔                                            |  |   | ✔ |  |  |
-| Qwen2.5Omni-7B  |  |  |  |                                            ✔                                            |  |   | ✔ |  |  |
-|   Qwen3VL-8B    |  | ✔ |  |                                            ✔                                            |  |   | ✔ |  |  |
-|   Qwen3VL-30B   |  | ✔ |  |                                            ✔                                            |  | ✔ | ✔ |  |  |
+|  Qwen2.5VL-7B   | ✔ | | | ✔ | | | ✔ | | |
+|  Qwen2.5VL-72B  | ✔ | | | ✔ | | | ✔ | | |
+| Qwen2.5Omni-7B  | | | | ✔ | | | ✔ | | |
+|   Qwen3VL-8B    | | ✔ | | ✔ | | | ✔ | | |
+|   Qwen3VL-30B   | | ✔ | | ✔ | | ✔ | ✔ | | |
 
 备注：
 
@@ -78,75 +76,7 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
   </thead>
   <tbody>
     <tr>
-      <td rowspan="10"> 多模态生成 </td>
-    </tr>
-    <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-T2V</a></td>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 0.46 (SPS) </td>
-      <td> / </td>
-      <td>✅</td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
-    </tr>
-    <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX-I2V</a></td>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 0.46 (SPS) </td>
-      <td> / </td>
-      <td>✅</td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
-    </tr>
-  <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 2.09 (SPS) </td>
-      <td> / </td>
-      <td>✅</td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
-      <td> Lora微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 3.03 (SPS) </td>
-      <td> / </td>
-      <td>支持中</td>
-    </tr>
-    <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/cogvideox">CogVideoX 1.5-I2V</a></td>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 2.01 (SPS) </td>
-      <td> / </td>
-      <td>✅</td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
-      <td> Lora微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-      <td>  </td>
-      <td> 3.92 (SPS) </td>
-      <td> / </td>
-      <td>支持中</td>
+      <td rowspan="3"> 多模态生成 </td>
     </tr>
     <tr>
       <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/wan2.1">Wan2.1-I2V</a></td>

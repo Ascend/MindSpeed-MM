@@ -11,7 +11,6 @@ from mindspeed_mm.mindspore.data.datasets.utils import process_in_cpu_wrapper
 from mindspeed_mm.mindspore.data.data_utils.func_utils.convert import preprocess_dataset
 from mindspeed_mm.mindspore.models.common.communications import _gather
 from mindspeed_mm.mindspore.utils.transformer_model_config import get_model_config
-from mindspeed_mm.mindspore.models.predictor.dits.sparseu_mmdit import block_forward, sparsemmditblock_forward
 
 
 def ms_linear_wrapper(fn):
@@ -73,10 +72,6 @@ def apply_mindspore_patch():
         from transformers.masking_utils import ALL_MASK_ATTENTION_FUNCTIONS
         ALL_MASK_ATTENTION_FUNCTIONS._global_mapping['sdpa'] = sdpa_mask_older_torch
 
-    # patch opensoraplan1.5t2v
-    aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseUMMDiT.block_forward', block_forward)
-    aspm.register_patch('mindspeed_mm.models.predictor.dits.sparseu_mmdit.SparseMMDiTBlock.forward',
-                        sparsemmditblock_forward)
     # patch matmul&&linear input requir same stype
     aspm.register_patch('torch.nn.functional.linear', ms_linear_wrapper)
     aspm.register_patch('mindspore.mint.matmul', ms_matmul_wrapper)
