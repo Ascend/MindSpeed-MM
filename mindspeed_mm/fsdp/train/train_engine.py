@@ -414,7 +414,12 @@ class TrainEngine:
             state["optimizer"] = self.optimizer
         if not args.training.no_save_rng:
             state["extra_state"]["torch_rng_state"] = torch.get_rng_state()
-        self.checkpointer.save(args.training.save, state=state, iteration=iteration)
+        self.checkpointer.save(
+            args.training.save,
+            state=state,
+            iteration=iteration,
+            enable_lora=args.training.lora.enable,
+        )
 
         # Synchronize all processes after saving
         torch.distributed.barrier()

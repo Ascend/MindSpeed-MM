@@ -154,6 +154,7 @@ class DistributedCheckpointer(CheckpointerBase):
         save_async: bool = False,
         iteration: int = None,
         storage_writer: Optional[FileSystemWriter] = None,
+        enable_lora: bool = False,
     ) -> None:
         """
         save training state to distributed checkpoint
@@ -164,6 +165,7 @@ class DistributedCheckpointer(CheckpointerBase):
             save_async: whether to save asynchronously
             iteration: global steps
             storage_writer: storage writer backend for dcp.save and dcp.async_save. If None, will use FileSystemWriter
+            enable_lora: whether to use LoraModelState for key transformation
         return:
             None
         """
@@ -175,7 +177,7 @@ class DistributedCheckpointer(CheckpointerBase):
         # saving extra_state first to gurantee that every saved model/optimizer ckpts have their extra_state saved before them
         cls._save_extra_state(checkpoint_dir=checkpoint_dir, state=state)
 
-        save_state = {"model": ModelState(state["model"])}
+        save_state = {"model": LoraModelState(state["model"])} if enable_lora else {"model": ModelState(state["model"])}
         if "optimizer" in state:
             save_state["optimizer"] = OptimizerState(model=state["model"], optimizer=state["optimizer"])  # type: ignore[index]
 
