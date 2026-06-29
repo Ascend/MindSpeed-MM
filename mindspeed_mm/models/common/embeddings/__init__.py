@@ -19,7 +19,7 @@
 # --------------------------------------------------------
 
 __all__ = [
-    "CaptionEmbedder", "LabelEmbedder", "TimestepEmbedder", "SizeEmbedder",
+    "LabelEmbedder", "TimestepEmbedder", "SizeEmbedder",
     "OverlapPatchEmbed2D", "OverlapPatchEmbed3D", "PatchEmbed3D", "VideoPatchEmbed2D", "PatchEmbed2D_3DsincosPE", "PatchEmbed2D",
     "PositionEmbedding2D", "get_1d_sincos_pos_embed", "get_2d_sincos_pos_embed", "get_3d_sincos_pos_embed", "get_nd_rotary_pos_embed",
     "TextProjection", "SingleTokenRefiner",
@@ -27,7 +27,7 @@ __all__ = [
     "CombinedTimestepTextProjEmbeddings",
 ]
 
-from .common_embeddings import CaptionEmbedder, LabelEmbedder, TimestepEmbedder, SizeEmbedder
+from .common_embeddings import LabelEmbedder, TimestepEmbedder, SizeEmbedder
 from .patch_embeddings import (
     OverlapPatchEmbed2D,
     OverlapPatchEmbed3D,

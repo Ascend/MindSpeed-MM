@@ -10,20 +10,16 @@ from .projectors.internvl_mlp import InternVLMLP
 from .projectors.multimodal_projector import MultimodalProjector
 from .projectors.glm_mlp import GlmMLP
 from .vision_encoders.clip_vit_model import CLIPViT
-from .vision_encoders.internvit_model import InternViT
 from .vision_encoders.qwen2vl_vit_model import Qwen2VLViT
 from .vision_encoders.qwen3vl_vit_model import Qwen3VLViT
-from .vision_encoders.siglip_vit_model import create_siglip_vit
 from .vision_encoders.glm4v_vl_vit_model import GlmViT
 
 VISION_ENCODER_MAPPINGS = {
     "clip": CLIPViT,
-    "InternViT": InternViT,
     "qwen2vit": Qwen2VLViT,
     "qwen2_5_vit": Qwen2VLViT,
     "qwen3vit": Qwen3VLViT,
     "videoalign_vit": Qwen2VLViT,
-    "SigLip": create_siglip_vit,
     "glm4v_vit": GlmViT,
 }
 

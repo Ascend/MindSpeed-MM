@@ -3,7 +3,6 @@ from einops import rearrange
 
 import torch
 from torch import nn
-from timm.models.vision_transformer import Mlp
 
 
 class TimestepEmbedder(nn.Module):
@@ -90,57 +89,6 @@ class LabelEmbedder(nn.Module):
             labels = self.token_drop(labels, force_drop_ids)
         embeddings = self.embedding_table(labels)
         return embeddings
-
-
-class CaptionEmbedder(nn.Module):
-    """
-    Embeds class labels into vector representations. Also handles label dropout for classifier-free guidance.
-    """
-
-    def __init__(
-        self,
-        in_channels,
-        hidden_size,
-        uncond_prob,
-        act_layer=nn.GELU(approximate="tanh"),
-        token_num=120,
-    ):
-        super().__init__()
-        self.y_proj = Mlp(
-            in_features=in_channels,
-            hidden_features=hidden_size,
-            out_features=hidden_size,
-            act_layer=act_layer,
-            drop=0,
-        )
-        self.register_buffer(
-            "y_embedding",
-            nn.Parameter(torch.randn(token_num, in_channels) / in_channels**0.5),
-        )
-        self.uncond_prob = uncond_prob
-
-    def token_drop(self, caption, force_drop_ids=None):
-        """
-        Drops labels to enable classifier-free guidance.
-        """
-        if force_drop_ids is None:
-            drop_ids = torch.rand(caption.shape[0]).cuda() < self.uncond_prob
-        else:
-            drop_ids = force_drop_ids == 1
-        caption = torch.where(drop_ids[:, None, None, None], self.y_embedding, caption)
-        return caption
-
-    def forward(self, caption, train, force_drop_ids=None):
-        if train:
-            if not caption.shape[2:] == self.y_embedding.shape:
-                raise ValueError(
-                    "caption embedding shape must same as y embedding shape"
-                )
-        use_dropout = self.uncond_prob > 0
-        if (train and use_dropout) or (force_drop_ids is not None):
-            caption = self.token_drop(caption, force_drop_ids)
-        caption = self.y_proj(caption)
-        return caption
 
 
 class SizeEmbedder(TimestepEmbedder):

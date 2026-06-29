@@ -397,4 +397,16 @@ def apply_patches():
     from peft.tuners.lora.tp_layer import LoraParallelLinear
     LoraParallelLinear.forward = patched_lora_forward
 
+    # Fix: dispatch_megatron reads "fan_in_fan_out" from kwargs, but _create_and_replace
+    # never puts it there, causing KeyError. Inject it from config before dispatch.
+    import peft.tuners.lora.model as _lora_model
+    if hasattr(_lora_model, 'dispatch_megatron'):
+        _orig_dispatch_megatron = _lora_model.dispatch_megatron
+
+        def _patched_dispatch_megatron(target, adapter_name, config, **kwargs):
+            kwargs.setdefault("fan_in_fan_out", config.fan_in_fan_out)
+            return _orig_dispatch_megatron(target, adapter_name, config=config, **kwargs)
+
+        _lora_model.dispatch_megatron = _patched_dispatch_megatron
+
 apply_patches()

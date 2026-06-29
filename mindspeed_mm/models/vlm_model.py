@@ -126,8 +126,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
         return None
 
     def _build_image_encoder_model(self, config):
-        self.encoder_dp_enable = config.vision_encoder.model_id == "InternViT"
-
         if get_args().hetero_parallel:
             change_parallel_state('image_encoder')
 
@@ -614,12 +612,6 @@ class VLMModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
                 kwargs["deepstack_image_embeds"] = deepstack_image_embeds
             else:
                 vit_embeds = encoder_out
-            if get_args().encoder_dp_balance and self.encoder_dp_enable:
-                vit_embeds = EncoderBalanceComm.apply(
-                    vit_embeds,
-                    mpu.get_data_parallel_group(),
-                    transfer
-                )
 
             if image_flags is not None:
                 if self.image_encoder.post_process:

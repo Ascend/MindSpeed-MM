@@ -8,7 +8,6 @@ from megatron.core.transformer.identity_op import IdentityOp
 from megatron.core.transformer.mlp import MLP, MLPSubmodules
 from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
-from mindspeed_mm.models.vision.vision_encoders.internvit_model import InternVitSelfAttention, InternVitTransformerLayer
 
 
 def get_language_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
@@ -37,31 +36,6 @@ def get_language_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
                 'input_layernorm.': 'self_attention.linear_qkv_layer_norm_',
                 'pre_mlp_layernorm.': 'mlp.linear_fc1.layer_norm_'
             }
-        )
-    )
-
-
-def get_vit_layer_spec(config=None, *args, **kwargs) -> ModuleSpec:
-    mlp = get_mlp_layer_spec()
-    return ModuleSpec(
-        module=InternVitTransformerLayer,
-        submodules=TransformerLayerSubmodules(
-            input_layernorm=TENorm,
-            self_attention=ModuleSpec(
-                module=InternVitSelfAttention,
-                params={"attn_mask_type": AttnMaskType.causal},
-                submodules=SelfAttentionSubmodules(
-                    linear_qkv=ColumnParallelLinear,
-                    core_attention=DotProductAttention,
-                    linear_proj=RowParallelLinear,
-                    q_layernorm=TENorm if config.qk_layernorm else IdentityOp,
-                    k_layernorm=TENorm if config.qk_layernorm else IdentityOp,
-                ),
-            ),
-            self_attn_bda=get_bias_dropout_add,
-            pre_mlp_layernorm=TENorm,
-            mlp=mlp,
-            mlp_bda=get_bias_dropout_add,
         )
     )
 
