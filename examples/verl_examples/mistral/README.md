@@ -57,6 +57,10 @@ cd MindSpeed-MM
 
 ## 权重下载
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - [Magistral-Small-2509](https://huggingface.co/unsloth/Magistral-Small-2509)
 
 ## 数据集下载

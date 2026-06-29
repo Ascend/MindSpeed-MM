@@ -134,6 +134,10 @@
     【SD3.5】
     用户可访问huggingface官网自行下载[sd3.5-large模型](https://huggingface.co/stabilityai/stable-diffusion-3.5-large/tree/main) `model_name`模型
 
+    > [!NOTE]
+    >
+    > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
     ```bash
     export model_name="stabilityai/stable-diffusion-3.5-large" # 预训练模型路径
     ```

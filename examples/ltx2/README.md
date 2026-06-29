@@ -44,6 +44,10 @@ commit_id=28c3c73fe557666c3de176e1e50a5220152ccfca
 
 训练前需要下载以下模型文件：
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 <a id="jump0.1"></a>
 
 ### 1. 下载模型文件

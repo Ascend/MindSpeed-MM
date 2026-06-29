@@ -145,6 +145,10 @@
 
     联网情况下，预训练模型可通过以下步骤下载。无网络时，用户可访问huggingface官网自行下载[sdxl-base模型](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) `model_name`模型与[sdxl-vae模型](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix) `vae_name`
 
+    > [!NOTE]
+    >
+    > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
     ```bash
     export model_name="stabilityai/stable-diffusion-xl-base-1.0" # 预训练模型路径
     export vae_name="madebyollin/sdxl-vae-fp16-fix" # vae模型路径

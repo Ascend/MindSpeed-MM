@@ -210,6 +210,10 @@ export CPU_AFFINITY_CONF=<mode>,npu<value1>:<value2>-<value3>
     将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2-VL-*B-Instruct`目录下。
     注意：(*表示对应的尺寸)。
 
+    > [!NOTE]
+    >
+    > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 2. 权重转换(hf2mm)
 
     MindSpeed MM修改了部分原始网络的结构名称，使用`mm-convert`工具对原始预训练权重进行转换。该工具实现了Hugging Face权重和MindSpeed MM权重的互相转换以及PP（Pipeline Parallel）权重的重切分。参考[权重转换工具](../features/mm_convert.md)

@@ -149,6 +149,10 @@ cd ../../verl/
 
 从Hugging Face库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [Qwen3-VL-8B](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct/tree/main)；
 - 模型地址: [Qwen3-VL-30B](https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Instruct/tree/main)；
 

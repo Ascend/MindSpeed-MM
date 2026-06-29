@@ -68,6 +68,10 @@ pip install -e .
 
 从 Hugging Face 下载 Step3-VL-10B 模型：
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - [stepfun-ai/Step3-VL-10B](https://huggingface.co/stepfun-ai/Step3-VL-10B)
 
 ### 2. 当前接入说明

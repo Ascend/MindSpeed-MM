@@ -133,6 +133,10 @@ pip install decord==0.6.0
 
 ### 权重下载
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 | 模型               | Hugging Face下载链接                                            |
 |------------------|------------------------------------------------------------|
 | Wan2.1-VACE-1.3B | <https://huggingface.co/Wan-AI/Wan2.1-VACE-1.3B> |

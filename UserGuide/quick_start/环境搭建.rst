@@ -5,7 +5,7 @@ Last updated: 12/08/2025. Author: cxiaolong
 
 环境要求
 ------------
-- **基础设施**: 当前仅支持昇腾A2、A3
+- **基础设施**: 当前支持昇腾A2、A3、Ascend 950 系列产品
 - **Python版本**: 推荐使用Python3.10
 - **CANN版本**: 推荐使用8.3.RC1
 

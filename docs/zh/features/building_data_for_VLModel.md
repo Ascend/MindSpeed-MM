@@ -16,6 +16,10 @@
 
 (2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至本地，如`./data/`路径下。
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 该数据格式使用本地多模态 ShareGPT 风格字段：
 
 - 图片字段：`images`

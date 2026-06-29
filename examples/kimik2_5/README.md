@@ -87,6 +87,10 @@ bash scripts/install.sh && bash pip install tiktoken==0.12.0
 
 从Huggingface库下载下列文件并放置于本地`mindspeed_mm/fsdp/models/kimik2_5`路径下：
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - Kimi-K2.5: [Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)
 - Kimi-K2.6: [Kimi-K2.6](https://huggingface.co/moonshotai/Kimi-K2.6/tree/main)
 

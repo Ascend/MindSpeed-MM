@@ -14,7 +14,7 @@ Last updated: 12/08/2025. Author: cxiaolong
 
 1. 硬件准备
 
-   昇腾 A3 或 A2 加速卡，建议 8 卡或以上
+   昇腾Atlas A2、Atlas A3、Ascend 950 训练系列产品，建议8卡或以上
 
 2. 参考 [环境搭建](https://mindspeed-mm.readthedocs.io/zh-cn/latest/quick_start/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA.html) 章节，完成 HDK、CANN、PyTorch 和 TorchNPU 基础环境搭建；
 

@@ -28,7 +28,7 @@ Step 1: 搭建开发环境
 
 1. 硬件准备
 
-昇腾A3或A2加速卡，建议8卡或以上
+昇腾Atlas A2、Atlas A3、Ascend 950 训练系列产品，建议8卡或以上
 
 2. 参考 `环境搭建 <https://mindspeed-mm.readthedocs.io/zh-cn/latest/quick_start/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA.html>`_ 章节，完成HDK、CANN、PyTorch和TorchNPU基础环境搭建；
 
@@ -92,6 +92,10 @@ Step 2: 权重下载及转换
 
 从Huggingface库下载模型权重: `Wan2.2-T2V-A14B-Diffusers <https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers>`_
 保存在 ``MindSpeed-MM/ckpt/hf_path/Wan2.2-T2V-A14B-Diffusers`` 文件夹中。
+
+.. note::
+
+   如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
 
 
 2. **权重转换**

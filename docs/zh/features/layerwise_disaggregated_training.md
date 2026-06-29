@@ -110,6 +110,10 @@
 
 2. 从Hugging Face库下载对应的模型权重[Qwen2.5-VL-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct)，放至./ckpt/hf_path路径下。
 
+   > [!NOTE]
+   >
+   > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 3. 进行权重转换，将HF权重转换成Megatron-Mcore格式。
 
     开启边云特性后，支持边侧卡数小于云侧TP size，此时边侧TP size即为边侧卡数。在进行权重转换时，边侧和云侧分别使用各自的TP size来进行转换。

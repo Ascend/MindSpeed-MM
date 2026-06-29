@@ -70,6 +70,10 @@ mkdir logs
 
 从Hugging Face等网站下载开源模型权重
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - [InternVL2-2B](https://huggingface.co/OpenGVLab/InternVL2-2B/tree/main)；
 - [InternVL2-8B](https://huggingface.co/OpenGVLab/InternVL2-8B/tree/main)；
 - [InternVL2-26B](https://huggingface.co/OpenGVLab/InternVL2-26B/tree/main)；

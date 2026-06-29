@@ -23,6 +23,10 @@
 
     从Hugging Face库下载对应的模型权重[Qwen2.5-VL-7B](https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct/tree/main)。
 
+    > [!NOTE]
+    >
+    > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 2. 权重文件保存
 
    创建`ckpt/hf_path/Qwen2.5-VL-7B-Instruct`目录并将下载的模型权重保存到该目录下

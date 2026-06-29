@@ -115,6 +115,10 @@ pip install decord==0.6.0
 
 创建保存权重的目录：
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 ```bash
 cd MindSpeed-MM
 mkdir ckpt/flux

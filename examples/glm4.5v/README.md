@@ -98,6 +98,10 @@ pip install -e .
 
 从Hugging Face库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [GLM-4.5V](https://huggingface.co/zai-org/GLM-4.5V)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/GLM-4.5V`目录下。(*表示对应的尺寸)

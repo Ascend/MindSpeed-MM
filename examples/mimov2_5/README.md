@@ -81,6 +81,10 @@ bash scripts/install.sh --msid eb10b92 && bash examples/mimov2_5/install_extensi
 
 (2) 获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至./data/路径下。
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 (3) 运行数据转换脚本`python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py`，转换后参考数据目录结构如下：
 
    ```shell

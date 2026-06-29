@@ -82,6 +82,10 @@ pip install -e .
 
 从Hugging Face库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [Qwen3-VL-*B](https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe)；
 
  建议将下载的模型权重保存到上述搭建好的工程目录（MindSpeed-MM）下，如`ckpt/Qwen3-VL-*B-Instruct`。(*表示对应的尺寸)

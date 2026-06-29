@@ -47,6 +47,10 @@ pip install -e .
 
 1. **下载权重**：从 HuggingFace 下载 [Qwen3-VL-30B-A3B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Instruct)，保存到 `ckpt/Qwen3-VL-30B-A3B-Instruct`。
 
+   > [!NOTE]
+   >
+   > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 2. **转换为 DCP 格式**：使用 meta init 初始化时需要 DCP 权重（**Qwen3-VL-30B / 235B 必须使用 meta init，仓库默认开启**）：
 
    ```bash

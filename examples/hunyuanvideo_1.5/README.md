@@ -90,6 +90,10 @@ pip install decord==0.6.0
 
 1. 下载预训练的DiT和VAE权重
 
+    > [!NOTE]
+    >
+    > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
     ``` bash
     mkdir HunyuanVideo1.5
     hf download tencent/HunyuanVideo-1.5 --local-dir ./HunyuanVideo1.5

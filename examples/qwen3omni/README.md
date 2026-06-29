@@ -103,6 +103,10 @@ pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
 从Hugging Face库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [Qwen3-Omni-30B-A3B-Instruct](https://huggingface.co/collections/Qwen/qwen3-omni)；
 
 将下载的模型权重保存到本地的`ckpt/hf_path/Qwen3-Omni-30B-A3B-Instruct`目录下。

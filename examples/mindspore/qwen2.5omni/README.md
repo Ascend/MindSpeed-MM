@@ -91,6 +91,10 @@ mkdir logs
 
 从Hugging Face库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [Qwen2.5-Omni-7B](https://huggingface.co/Qwen/Qwen2.5-Omni-7B/tree/main)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen2.5-Omni-7B`目录下。

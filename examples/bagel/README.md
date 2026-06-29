@@ -75,6 +75,10 @@ bash scripts/install.sh --arch arm --msid 93c45456c7044bacddebc5072316c01006c938
 
 从Huggingface库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [BAGEL-7B-MoT](https://huggingface.co/ByteDance-Seed/BAGEL-7B-MoT/tree/main)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/BAGEL-7B-MoT`目录下。

@@ -69,6 +69,10 @@ pip install transformers==5.2.0 triton-ascend==3.2.0 accelerate==1.2.0
 
 从Huggingface库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [Qwen3.6-*B](https://huggingface.co/collections/Qwen/qwen36)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)

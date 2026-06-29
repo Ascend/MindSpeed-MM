@@ -80,6 +80,10 @@ bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac44
 
 从Hugging Face库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [Qwen3-VL-*B](https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/Qwen3-VL-*B-Instruct`目录下。(*表示对应的尺寸)

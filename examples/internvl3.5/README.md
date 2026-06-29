@@ -101,6 +101,10 @@ pip install -e .
 
 从Hugging Face等网站下载开源模型权重
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - [InternVL3_5-30B-A3B-Instruct](https://huggingface.co/OpenGVLab/InternVL3_5-30B-A3B-Instruct)
 
 将模型权重保存在`ckpt/hf_path/`目录下，例如`ckpt/hf_path/InternVL3_5-30B-A3B-Instruct`。

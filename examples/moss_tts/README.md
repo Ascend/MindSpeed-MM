@@ -83,6 +83,10 @@ pip install -r examples/moss_tts/requirements.txt
 
 从Huggingface库下载对应的模型权重:
 
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
 - 模型地址: [MOSS-TTS](https://huggingface.co/OpenMOSS-Team/MOSS-TTS)；
 
 将下载的模型权重保存到本地目录下.

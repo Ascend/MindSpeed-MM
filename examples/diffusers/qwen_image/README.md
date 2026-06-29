@@ -133,6 +133,10 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
 
     联网情况下，微调模型可通过以下步骤下载。无网络时，用户可访问huggingface官网自行下载[Qwen Image模型](https://huggingface.co/Qwen/Qwen-Image) `model_name`模型
 
+    > [!NOTE]
+    >
+    > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
     ```shell
     model_name="Qwen/Qwen-Image" # 预训练模型路径
     ```
