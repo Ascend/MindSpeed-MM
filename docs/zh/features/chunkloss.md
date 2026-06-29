@@ -10,9 +10,36 @@
 
 ## 使用方法
 
-当前MindSpeed MM支持的理解模型loss计算公式详见[文档](vlm_model_loss_calculate_type.md)，当前chunkloss功能已支持其中的默认方式、按样本粒度计算（per sample loss）以及按token粒度计算（per token loss）
+ChunkLoss 当前仅支持 FSDP2 后端，有两种配置方式：原生 FSDP2（native FSDP2，推荐）与基于 Megatron 的 FSDP2（megatron-FSDP2，过渡态，将退出）。ChunkLoss 不改变 loss 的计算方式，可与默认、按样本粒度（per sample loss）、按 token 粒度（per token loss）配合使用，这三种计算方式的说明详见 [VLM 模型 loss 计算方式](vlm_model_loss_calculate_type.md)。
 
-在每个支持chunkloss的理解模型配置文件model.json中，可通过 loss_cfg 字段进行相关设置，示例如下：
+### 原生 FSDP2（推荐）
+
+在模型 YAML 配置文件的 `features` 段开启 ChunkLoss：
+
+```yaml
+features:
+  enable_chunk_loss: true
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 1024
+```
+
+`enable_chunk_loss`（静态分块）与 `enable_dynamic_chunk_loss`（动态分块）二选一，分别对应 `chunkloss_plan` 中不同的块大小参数，请勿混用：
+
+- `enable_chunk_loss`：开启静态分块 ChunkLoss，按固定块大小切分，默认 `false`；块大小由 `chunkloss_plan.chunk_size` 指定。
+- `enable_dynamic_chunk_loss`：开启动态分块 ChunkLoss，按总量自适应分块，默认 `false`；总量由 `chunkloss_plan.total_chunk_size` 指定。
+- `chunkloss_plan`：
+  - `apply_module`：应用 ChunkLoss 的模块，默认 `lm_head`。
+  - `chunk_size`：静态分块时每块的大小（token 数），默认 `1024`（仅 `enable_chunk_loss` 生效）。
+  - `total_chunk_size`：动态分块时单次计算的总 token 上限，默认 `4096`（仅 `enable_dynamic_chunk_loss` 生效，每块大小按批大小自动推导）。
+
+可参考 `examples/qwen3_5/qwen3_5_4B_config.yaml`。
+
+### 基于 Megatron 的 FSDP2（过渡态，将退出）
+
+> 基于 Megatron 的 FSDP2 为过渡方案，后续将逐步退出，新增模型请优先使用原生 FSDP2。
+
+在支持 ChunkLoss 的理解模型配置文件 `model.json` 中，通过 `loss_cfg` 字段进行设置，示例如下：
 
 ```json
 "loss_cfg": {

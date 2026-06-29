@@ -131,14 +131,14 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
     --save_path             # 特征数据存储路径
     ```
 
-2. 使用前按需修改[feature_extraction_t2v.sh](../../examples/cogvideox/feature_extract/feature_extraction_t2v.sh)文件中对应模型数据集和配置文件（VAE、T5）路径。
+2. 使用前按需修改[feature_extraction.sh](../../examples/wan2.1/feature_extract/feature_extraction.sh)文件中对应模型数据集和配置文件（VAE、T5）路径。
 
     ```bash
     --MM_DATA       # 数据配置文件路径(.json)
     --MM_MODEL      # 模型配置文件路径(.json)
     ```
 
-3. 配置完成后，调用[feature_extraction_t2v.sh](../../examples/cogvideox/feature_extract/feature_extraction_t2v.sh)即可提取数据特征。
+3. 配置完成后，调用[feature_extraction.sh](../../examples/wan2.1/feature_extract/feature_extraction.sh)即可提取数据特征。
 
 ## 内存快照提取
 

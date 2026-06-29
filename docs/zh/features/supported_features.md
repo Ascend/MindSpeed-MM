@@ -94,7 +94,7 @@
     <td class="tg-citn" rowspan="2">loss优化</td>
     <td class="tg-i1fi"><a href="chunkloss.md">Chunk Loss</a></td>
     <td class="tg-fr9f">✓</td>
-    <td class="tg-fr9f">✓</td>
+    <td class="tg-fr9f"></td>
   </tr>
   <tr>
     <td class="tg-i1fi"><a href="vlm_model_loss_calculate_type.md">VLM Model Loss Calculate Type</a></td>
@@ -116,8 +116,8 @@
   <tr>
     <td class="tg-citn">数据处理</td>
     <td class="tg-jajh"><a href="seqpack.md">SeqPack</a></td>
-    <td class="tg-fr9f"></td>
     <td class="tg-fr9f">✓</td>
+    <td class="tg-fr9f"></td>
   </tr>
   <tr>
     <td class="tg-citn">确定性计算</td>

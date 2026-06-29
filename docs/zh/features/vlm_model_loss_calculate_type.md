@@ -77,19 +77,31 @@ GPT_ARGS="
 
 ### FSDP2后端
 
-对于训练入口为`pretrain_transformers.py`的模型，使能方式为在model.json中添加如下字段：
+FSDP2 后端通过 `loss_cfg` 的 `loss_type` 字段设置，可取以下三个值（两种配置方式一致）：
+
+- `default`：默认计算方式
+- `per_sample_loss`：按样本粒度计算 loss
+- `per_token_loss`：按 token 粒度计算 loss
+
+#### 原生 FSDP2（native FSDP2，推荐）
+
+在模型 YAML 配置文件的 `features.loss_cfg` 段设置：
+
+```yaml
+features:
+  loss_cfg:
+    loss_type: default   # 可选 default / per_sample_loss / per_token_loss
+```
+
+#### 基于 Megatron 的 FSDP2（megatron-FSDP2，过渡态，将退出）
+
+对于训练入口为`pretrain_transformers.py`的模型，在 model.json 中添加如下字段：
 
 ```json
 "loss_cfg": {
     "loss_type": "default/per_sample_loss/per_token_loss"
 }
 ```
-
-其中`loss_type`可以设为以下几个值
-
-- `default`：默认计算方式
-- `per_sample_loss`：按样本粒度计算 loss
-- `per_token_loss`：按 token 粒度计算 loss
 
 ### 注意事项
 

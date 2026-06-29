@@ -14,14 +14,10 @@
 
 ### 主要方法
 
-在MindSpeed MM中，可以通过以下方式启用确定性计算：
+在MindSpeed MM中，根据训练后端启用确定性计算：
 
-**推荐方式：**
-在训练脚本中添加参数：
-
-```bash
---use-deter-comp
-```
+- **原生 FSDP2（native FSDP2）**：在模型 YAML 配置文件的 `training` 段设置 `use_deter_comp: true`。
+- **MCORE / 基于 Megatron 的 FSDP2（megatron-FSDP2）**：在训练脚本中添加 `--use-deter-comp` 参数。
 
 ### 替代方案
 
@@ -36,7 +32,7 @@
 
 2. **使用msprobe工具**  
    通过MindStudio Training Tools工具链中的msprobe包启用确定性计算。  
-   使用说明请参考：[msprobe文档](https://gitcode.com/Ascend/mstt/blob/master/debug/accuracy_tools/msprobe/docs/zh/dump/pytorch_data_dump_instruct.md#18-seed_all)
+   使用说明请参考：[msprobe文档](https://gitcode.com/Ascend/msprobe/blob/master/docs/zh/dump/pytorch_data_dump_instruct.md#seed_all)
 
 ## 必需的环境变量配置
 

@@ -8,9 +8,65 @@ PyTorch的完全分片数据并行（FSDP）旨在提供一个高性能的即时
 
 基于上述局限性，FSDP2移除了FlatParameter，采用沿0维分片的DTensor表示分片参数，支持对单个参数的便捷操作、免通信的分片状态字典，以及更简化的初始化流程。
 
-## 使用方法
+MindSpeed MM 提供两条 FSDP2 使用路线：
 
-在mindspeed中FSDP2的入口是一个配置文件，通过生成配置文件，传入命令行参数即可使用该特性。
+- **原生 FSDP2（native FSDP2，推荐）**：以独立的训练入口和一份 YAML 配置运行，不依赖 Megatron 命令行参数，是新模型的推荐方式。
+- **基于 Megatron 的 FSDP2（megatron-FSDP2，不推荐，将淘汰）**：复用 Megatron 训练入口，通过命令行开关启用，仅供存量模型过渡。该路线后续将停止维护并淘汰，新增模型请勿使用，一律采用原生 FSDP2。
+
+## 原生 FSDP2（native FSDP2，推荐）
+
+### 使用方法
+
+原生 FSDP2 的训练入口是 `mindspeed_mm/fsdp/train/trainer.py`，由一份 YAML 配置文件驱动。启动脚本需先设置 `export NON_MEGATRON=true`，再用 torchrun 拉起，并将配置文件路径作为入口脚本的唯一参数传入：
+
+```shell
+export NON_MEGATRON=true
+
+torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
+    ${config_path}
+```
+
+其中 `config_path` 指向模型的 YAML 配置文件。可参考 `examples/qwen3_5/finetune_qwen3_5_4B.sh` 与 `examples/qwen3_5/qwen3_5_4B_config.yaml`。
+
+配置文件采用六段式结构，各段职责如下：
+
+| 配置段 | 作用 |
+| --- | --- |
+| `parallel` | 并行与分片策略（FSDP 分片、张量并行、序列并行、专家并行） |
+| `model` | 模型来源、注意力实现、融合算子等 |
+| `data` | 数据集、预处理与 DataLoader |
+| `features` | loss、重计算、激活值卸载、Chunk Loss 等优化特性 |
+| `training` | 优化器、学习率、迭代步数、权重加载/保存等 |
+| `tools` | profiling、内存分析等工具 |
+
+各配置段的字段含义，可参考示例配置 `examples/qwen3_5/qwen3_5_4B_config.yaml`，以及 [FSDP2 开发者迁移指南](fsdp2_developer_migration_guide.md)。
+
+### 权重转换
+
+原生 FSDP2 以 DCP 格式保存权重。以 meta device 初始化模型（`training.init_model_with_meta_device: true`）时需加载 DCP 权重，可先用 `mm-convert` 将 HuggingFace 权重转换为 DCP，并将 `training.load` 指向转换输出（`release` 文件夹的上一级目录）：
+
+```shell
+mm-convert GenericDCPConverter hf_to_dcp \
+    --hf_dir ckpt/hf_path/xxx \
+    --dcp_dir ckpt/dcp_path/xxx
+```
+
+训练后导出 HF 权重（`dcp_to_hf`）、完整参数说明，以及个别模型的专用转换器，详见[权重转换](../pytorch/weight_conversion.md)。
+
+### 注意事项
+
+1. 启动脚本必须设置 `export NON_MEGATRON=true`，否则不会启用原生 FSDP2 所需的算子适配。
+2. 原生 FSDP2 与基于 Megatron 的 FSDP2 配置体系不通用：后者使用 Megatron 命令行参数加 `fsdp2_config.yaml`，前者使用六段式 YAML，二者字段不可混用。
+
+## 基于 Megatron 的 FSDP2（megatron-FSDP2，不推荐，将淘汰）
+
+> 基于 Megatron 的 FSDP2 已不推荐使用，后续将停止维护并淘汰。新增模型请使用原生 FSDP2，不要再使用该路线。
+
+基于 Megatron 的 FSDP2 复用 Megatron 训练入口（`pretrain_*.py`），通过命令行开关 `--use-torch-fsdp2` 启用，分片相关参数由单独的 `fsdp2_config.yaml` 提供。
+
+### 使用方法
+
+在入口脚本中传入如下命令行参数即可使用该特性：
 
 ```shell
 export CUDA_DEVICE_MAX_CONNECTIONS=2 # 设置不能为1
@@ -21,7 +77,7 @@ export CUDA_DEVICE_MAX_CONNECTIONS=2 # 设置不能为1
 # 注意不能打开分布式优化器
 ```
 
-### 参数详解
+#### 参数详解
 
 fsdp2_config.yaml的配置项如下：
 
@@ -56,10 +112,10 @@ fsdp2_config.yaml的配置项如下：
   - 取值：`True`或`False`
 
 - **`reshard_after_forward`**
-  - 描述：控制何时重新聚合分片参数
+  - 描述：控制前向结束后是否对参数重新分片
   - 取值：
-    - `True`：前向传播后立即重新分片参数（节省内存，ZeRO3）
-    - `False`：保持参数聚合直到反向传播（更好性能，ZeRO2）
+    - `True`：前向后立即重新分片，反向再次 all-gather（更省显存）
+    - `False`：前向后保留聚合的参数，反向不再 all-gather（省通信但更占显存）
 
 - **`param_dtype`**
   - 描述：参数存储和计算的数据类型
@@ -91,7 +147,7 @@ fsdp2_config.yaml的配置项如下：
   - 描述：是否锁定CPU内存以提高数据传输效率，只有在开启`offload_to_cpu`才生效
   - 取值：`True`或`False`
 
-### 配置实例
+#### 配置实例
 
 ```shell
 sharding_size: auto
@@ -112,11 +168,11 @@ num_to_backward_prefetch: 2
 offload_to_cpu: False
 ```
 
-## 使用效果
+### 使用效果
 
 针对Llama-7B，FSDP2相比FSDP1实现了更高的MFU，峰值内存降低7%，且保持相同的损失曲线。
 
-## 注意事项
+### 注意事项
 
 1、当开启fsdp2训练时，需关闭分布式优化器及其相关配置
 

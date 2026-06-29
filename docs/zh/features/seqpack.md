@@ -10,7 +10,7 @@
 
 ## 使用方法
 
-当前Seqpack支持Qwen3 VL模型，可在对应的模型配置文件中的`gpt_args`部分设置如下参数：
+当前 SeqPack 通过基于 Megatron 的 FSDP2（megatron-FSDP2）后端使用（该路线为过渡方案，后续将逐步退出），以 Qwen3 VL 模型为例，可在其配置文件的 `gpt_args` 段设置如下参数：
 
 ```shell
 gpt_args:
