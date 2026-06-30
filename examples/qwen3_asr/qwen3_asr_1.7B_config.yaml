@@ -1,0 +1,132 @@
+# 并行策略
+parallel:
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules: # 如果要开prefetch的话，请不要随意修改apply_modules的顺序
+      - thinker.audio_tower
+      - thinker.audio_tower.positional_embedding
+      - thinker.audio_tower.layers.{*}
+      - thinker.model
+      - thinker.model.embed_tokens
+      - thinker.model.layers.{*}
+      - thinker.lm_head
+    param_dtype: bf16
+    reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+
+data:
+  dataset_param:
+    dataset_type: qwen3_asr
+    attr:
+      audios: audio
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH ./ckpt/hf_path/Qwen3-ASR-1.7B
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      audio_sampling_rate: 16000
+    basic_parameters:
+      cutoff_len: 8192
+      template: qwen3_asr
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: ./data
+      dataset: &DATASET_PATH ./qwen3_asr_sft.json
+      val_dataset: null
+      cache_dir: ./data/cache_dir/qwen3_asr
+      overwrite_cache: true
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+      val_max_samples: 0
+  dataloader_param:
+    pin_memory: false
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      model_name: qwen3asr
+      ignore_pad_token_for_loss: true
+
+model:
+  model_id: qwen3_asr
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  attn_implementation: sdpa
+  freeze: []
+
+features:
+  loss_cfg:
+    loss_type: default
+  recompute: false
+  recompute_plan:
+    apply_modules:
+      - thinker.model.layers.{*}
+  enable_chunk_loss: false
+  chunkloss_plan:
+    apply_module: thinker.lm_head
+    chunk_size: 1024
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  enable_full_determinism: false
+  lr: 2.0e-05
+  lr_decay_style: linear
+  lr_warmup_ratio: 0.1
+  weight_decay: 0
+  clip_grad: 0.0
+  init_model_with_meta_device: true
+  optimizer: adamw
+  adam_fused: false
+  save_interval: 10000
+  load: ./ckpt/mm_path/Qwen3-ASR-1.7B-dcp-tie-noprefix
+  save: ./save_dir/qwen3_asr
+  use_deter_comp: false
+  plugin:
+    - mindspeed_mm/fsdp/models/qwen3_asr
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+  no_load_optim: true
+  no_load_rng: true
+  no_save_optim: true
+  no_save_rng: true
+  train_iters: 10000
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks:
+      - 0
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+    enable: false
+    start_step: 1
+    end_step: 2
+    save_path: ./memory_snapshot
+    dump_ranks:
+      - 0
+    stacks: all
+    max_entries: null
+    mem_info: false
