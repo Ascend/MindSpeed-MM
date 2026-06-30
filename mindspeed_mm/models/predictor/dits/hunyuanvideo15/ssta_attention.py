@@ -17,11 +17,13 @@
 
 
 import math
+from functools import lru_cache
+
 import torch
 import torch_npu
 import numpy as np
 from einops import rearrange
-from functools import lru_cache
+
 
 def tile(x, canvas_thw, tile_thw, sp_size=1):
     b, head_num, s, d = x.shape
@@ -54,6 +56,7 @@ def tile(x, canvas_thw, tile_thw, sp_size=1):
     x = x.reshape(b, head_num, s, d)
     return x
 
+
 def untile(x, canvas_thw, tile_thw, sp_size=1):
     b, head_num, s, d = x.shape
     t, height, width = canvas_thw
@@ -80,6 +83,7 @@ def untile(x, canvas_thw, tile_thw, sp_size=1):
 
     return x
 
+
 def get_tile_t_h_w(tile_id, tile_thw_dim):
     """Extract temporal, height, and width indices from a flattened tile ID."""
     tile_t_dim, tile_h_dim, tile_w_dim = tile_thw_dim
@@ -88,6 +92,7 @@ def get_tile_t_h_w(tile_id, tile_thw_dim):
     tile_w = tile_id % tile_w_dim
 
     return tile_t, tile_h, tile_w
+
 
 def importance_sampling(q, k, topk, threshold=0.0, lambda_=0.9, adaptive_pool=None):
     r"""Select top-k blocks based on importance scores considering both similarity and redundancy.
@@ -122,6 +127,7 @@ def importance_sampling(q, k, topk, threshold=0.0, lambda_=0.9, adaptive_pool=No
     topk = min(topk, importance_scores.size(-1))
     _, top_block_indices = importance_scores.topk(k=topk, dim=-1, sorted=False)
     return top_block_indices
+
 
 def similarity_sampling(q, k, topk,
                         threshold=0.0,
@@ -166,6 +172,7 @@ def similarity_sampling(q, k, topk,
         topk = min(topk, gate.size(-1))
         _, top_block_indices = gate.topk(k=topk, dim=-1, sorted=False)
     return top_block_indices
+
 
 def create_moba_3d_mask(q,
                         k,
@@ -251,7 +258,7 @@ def create_moba_3d_mask(q,
         return x_block_means
 
     if (sampling_type == "similarity" and threshold > 0.0) and adaptive_pool is None:
-        adaptive_pool = (2,2,2)
+        adaptive_pool = (2, 2, 2)
 
     k_block_means = get_block_avg_feat(k, adaptive_pool)
 
@@ -323,6 +330,7 @@ def create_moba_3d_mask(q,
 
     return moba_3d_mask
 
+
 @lru_cache(maxsize=4096)
 def create_sta_3d_mask_optimize(canvas_thw, tile_thw, kernel_thw):
     r"""Create optimized STA (Spatio-Temporal Attention) 3D mask using vectorized operations.
@@ -346,7 +354,7 @@ def create_sta_3d_mask_optimize(canvas_thw, tile_thw, kernel_thw):
     block_num = int(seq_len / block_size)
 
     block_mask = np.full((block_num, block_num), False, dtype=bool)
-    tile_thw_num=(canvas_thw[0] // tile_thw[0], canvas_thw[1] // tile_thw[1], canvas_thw[2] // tile_thw[2])
+    tile_thw_num = (canvas_thw[0] // tile_thw[0], canvas_thw[1] // tile_thw[1], canvas_thw[2] // tile_thw[2])
 
     i_indices = np.arange(block_num)
     j_indices = np.arange(block_num)
@@ -373,6 +381,7 @@ def create_sta_3d_mask_optimize(canvas_thw, tile_thw, kernel_thw):
 
     block_mask = torch.tensor(block_mask, dtype=torch.bool)
     return block_mask
+
 
 @torch.no_grad()
 def create_sta_3d_mask(canvas_thw, tile_thw, kernel_thw, text_block_num=0):
@@ -403,6 +412,7 @@ def create_sta_3d_mask(canvas_thw, tile_thw, kernel_thw, text_block_num=0):
     else:
         sta_mask = block_mask
     return sta_mask
+
 
 @torch.no_grad()
 def create_ssta_3d_mask(q,
@@ -462,9 +472,10 @@ def create_ssta_3d_mask(q,
         pad_start_index = block_num + text_mask_index
         ssta_3d_mask[:, pad_start_index:, :] = False
         ssta_3d_mask[:, :, pad_start_index:] = False
-        eye_mask = torch.eye(ssta_3d_mask.shape[1]-pad_start_index, dtype=torch.bool, device=ssta_3d_mask.device).unsqueeze(0)
+        eye_mask = torch.eye(ssta_3d_mask.shape[1] - pad_start_index, dtype=torch.bool, device=ssta_3d_mask.device).unsqueeze(0)
         ssta_3d_mask[:, pad_start_index:, pad_start_index:] = ssta_3d_mask[:, pad_start_index:, pad_start_index:] | eye_mask
     return ssta_3d_mask
+
 
 # BSA required block_size can be divisible by 128
 def run_npu_block_sparse_attention(q, k, v, H, N_CTX, BM, BN, sm_scale, block_mask):
@@ -478,12 +489,13 @@ def run_npu_block_sparse_attention(q, k, v, H, N_CTX, BM, BN, sm_scale, block_ma
         q, k, v, block_mask, block_shape,
         q_input_layout="BNSD", kv_input_layout="BNSD",
         num_key_value_heads=num_kv_heads, scale_value=scale_value, inner_precise=0,
-        actual_seq_lengths = [S] * B ,
-        actual_seq_lengths_kv = [S] * B,
+        actual_seq_lengths=[S] * B,
+        actual_seq_lengths_kv=[S] * B,
         softmax_lse_flag=1
     )
 
     return attention_out
+
 
 def ssta_3d_attention(all_q,
                      all_k,
@@ -529,7 +541,7 @@ def ssta_3d_attention(all_q,
 
     assert pad_type in ["zero", "repeat"]
     assert sampling_type in ["similarity", "importance"]
-    assert (lambda_ is not None and sampling_type=="importance") or sampling_type == "similarity"
+    assert (lambda_ is not None and sampling_type == "importance") or sampling_type == "similarity"
 
     if text_len > 0:
         image_q = all_q[:, :, :-text_len, :]
@@ -551,7 +563,7 @@ def ssta_3d_attention(all_q,
     block_size = np.prod(tile_thw)
 
     need_pad = False
-    if t % tile_t != 0 or h % tile_h !=0 or w % tile_w != 0:
+    if t % tile_t != 0 or h % tile_h != 0 or w % tile_w != 0:
         need_pad = True
         pad_image_q = image_q.reshape(b, hd, t, h, w, d)
         pad_image_k = image_k.reshape(b, hd, t, h, w, d)
@@ -672,7 +684,7 @@ def ssta_3d_attention(all_q,
     if text_len > 0:
         image_o = o[:, :, :-text_target_size, :]
         if need_pad_text:
-            text_o = o[:, :, -text_target_size : -text_pad_size, :]
+            text_o = o[:, :, -text_target_size: -text_pad_size, :]
         else:
             text_o = o[:, :, -text_target_size:, :]
     else:

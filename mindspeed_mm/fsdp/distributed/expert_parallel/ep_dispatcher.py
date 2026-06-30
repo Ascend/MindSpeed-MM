@@ -48,7 +48,7 @@ def ep_forward(
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
     swiglu_limit: float = 0.0,
-    ep_balance_strategy = None,
+    ep_balance_strategy=None,
 ) -> torch.Tensor:
     if FORCE_EP_BALANCE:
         selected_experts = force_ep_balance(num_experts, selected_experts)
@@ -174,7 +174,7 @@ def dispatch_preprocess_with_ep_balance(
     selected_experts: torch.Tensor,
     num_global_experts: int,
     ep_group: Optional[dist.ProcessGroup] = None,
-    ep_balance_planner = None,
+    ep_balance_planner=None,
 ):
     if ep_group is None:
         ep_size = 1
@@ -330,6 +330,7 @@ def ep_mc2_forward(
     )
 
     return hidden_states
+
 
 def ep_allgather_forward(
     num_experts: int,

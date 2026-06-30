@@ -2,8 +2,6 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-# For a list of all contributors, visit:
-#   https://github.com/fla-org/flash-linear-attention/graphs/contributors
 
 import os
 
@@ -43,11 +41,11 @@ def solve_tril_16x16_kernel(
     m_A = o_i[:, None] > o_i[None, :]
     m_I = o_i[:, None] == o_i[None, :]
 
-    A = A + (bos*H + i_h) * BT
-    Ai = Ai + (bos*H + i_h) * 16
+    A = A + (bos * H + i_h) * BT
+    Ai = Ai + (bos * H + i_h) * 16
 
     offset = (i_t * 16) % BT
-    p_A = tl.make_block_ptr(A, (T, BT), (H*BT, 1), (i_t * 16, offset), (16, 16), (1, 0))
+    p_A = tl.make_block_ptr(A, (T, BT), (H * BT, 1), (i_t * 16, offset), (16, 16), (1, 0))
     # [16, 16]
     b_A = tl.load(p_A, boundary_check=(0, 1)).to(tl.float32)
     b_A = tl.where(m_A, b_A, 0)
@@ -55,12 +53,12 @@ def solve_tril_16x16_kernel(
 
     for i in range(2, min(16, T - i_t * 16)):
         # [16]
-        b_a = -tl.load(A + (i_t * 16 + i) * H*BT + o_i + offset)
+        b_a = -tl.load(A + (i_t * 16 + i) * H * BT + o_i + offset)
         b_a = tl.where(o_i < i, b_a, 0.)
         b_a = b_a + tl.sum(b_a[:, None] * b_A, 0)
         b_A = tl.where((o_i == i)[:, None], b_a, b_A)
     b_A += m_I
-    p_Ai = tl.make_block_ptr(Ai, (T, 16), (H*16, 1), (i_t * 16, 0), (16, 16), (1, 0))
+    p_Ai = tl.make_block_ptr(Ai, (T, 16), (H * 16, 1), (i_t * 16, 0), (16, 16), (1, 0))
     tl.store(p_Ai, b_A.to(p_Ai.dtype.element_ty, fp_downcast_rounding="rtne"), boundary_check=(0, 1))
 
 
@@ -95,8 +93,8 @@ def merge_16x16_to_32x32_inverse_kernel(
     A += (bos * H + i_h) * BT
     Ai += (bos * H + i_h) * BT
 
-    p_A_11 = tl.make_block_ptr(A, (T, BT), (H*BT, 1), (i_t * BT, 0), (16, 16), (1, 0))
-    p_A_22 = tl.make_block_ptr(A, (T, BT), (H*BT, 1), (i_t * BT + 16, 16), (16, 16), (1, 0))
+    p_A_11 = tl.make_block_ptr(A, (T, BT), (H * BT, 1), (i_t * BT, 0), (16, 16), (1, 0))
+    p_A_22 = tl.make_block_ptr(A, (T, BT), (H * BT, 1), (i_t * BT + 16, 16), (16, 16), (1, 0))
     b_Ai_11 = tl.load(p_A_11, boundary_check=(0, 1)).to(tl.float32)
     b_Ai_22 = tl.load(p_A_22, boundary_check=(0, 1)).to(tl.float32)
 
@@ -105,28 +103,29 @@ def merge_16x16_to_32x32_inverse_kernel(
     b_Ai_22 = -tl.where(m_A, b_Ai_22, 0)
 
     for i in range(2, min(16, T - i_t * BT)):
-        b_a_11 = -tl.load(A + (i_t * BT + i) * H*BT + o_i)
+        b_a_11 = -tl.load(A + (i_t * BT + i) * H * BT + o_i)
         b_a_11 += tl.sum(b_a_11[:, None] * b_Ai_11, 0)
         b_Ai_11 = tl.where((o_i == i)[:, None], b_a_11, b_Ai_11)
     for i in range(16 + 2, min(32, T - i_t * BT)):
-        b_a_22 = -tl.load(A + (i_t * BT + i) * H*BT + o_i + 16)
+        b_a_22 = -tl.load(A + (i_t * BT + i) * H * BT + o_i + 16)
         b_a_22 += tl.sum(b_a_22[:, None] * b_Ai_22, 0)
         b_Ai_22 = tl.where((o_i == i - 16)[:, None], b_a_22, b_Ai_22)
 
     b_Ai_11 += m_I
     b_Ai_22 += m_I
 
-    p_A_21 = tl.make_block_ptr(A, (T, BT), (H*BT, 1), (i_t * BT + 16, 0), (16, 16), (1, 0))
+    p_A_21 = tl.make_block_ptr(A, (T, BT), (H * BT, 1), (i_t * BT + 16, 0), (16, 16), (1, 0))
     b_A_21 = tl.load(p_A_21, boundary_check=(0, 1)).to(tl.float32)
 
     b_Ai_21 = -tl.dot(tl.dot(b_Ai_22, b_A_21, input_precision=DOT_PRECISION), b_Ai_11, input_precision=DOT_PRECISION)
 
-    p_Ai_11 = tl.make_block_ptr(Ai, (T, BT), (H*BT, 1), (i_t * BT, 0), (16, 16), (1, 0))
-    p_Ai_21 = tl.make_block_ptr(Ai, (T, BT), (H*BT, 1), (i_t * BT + 16, 0), (16, 16), (1, 0))
-    p_Ai_22 = tl.make_block_ptr(Ai, (T, BT), (H*BT, 1), (i_t * BT + 16, 16), (16, 16), (1, 0))
+    p_Ai_11 = tl.make_block_ptr(Ai, (T, BT), (H * BT, 1), (i_t * BT, 0), (16, 16), (1, 0))
+    p_Ai_21 = tl.make_block_ptr(Ai, (T, BT), (H * BT, 1), (i_t * BT + 16, 0), (16, 16), (1, 0))
+    p_Ai_22 = tl.make_block_ptr(Ai, (T, BT), (H * BT, 1), (i_t * BT + 16, 16), (16, 16), (1, 0))
     tl.store(p_Ai_11, b_Ai_11.to(p_Ai_11.dtype.element_ty, fp_downcast_rounding="rtne"), boundary_check=(0, 1))
     tl.store(p_Ai_22, b_Ai_22.to(p_Ai_22.dtype.element_ty, fp_downcast_rounding="rtne"), boundary_check=(0, 1))
     tl.store(p_Ai_21, b_Ai_21.to(p_Ai_21.dtype.element_ty, fp_downcast_rounding="rtne"), boundary_check=(0, 1))
+
 
 @triton.heuristics({
     'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
@@ -196,7 +195,7 @@ def merge_16x16_to_64x64_inverse_kernel(
         b_Ai_11 = X_11
     else:
         for i in range(2, min(16, T - i_t * BT)):
-            b_a_11 = -tl.load(A + (i_t * BT + i) * H*BT + o_i)
+            b_a_11 = -tl.load(A + (i_t * BT + i) * H * BT + o_i)
             b_a_11 = tl.where(o_i < i, b_a_11, 0.)
             b_a_11 += tl.sum(b_a_11[:, None] * b_Ai_11, 0)
             b_Ai_11 = tl.where((o_i == i)[:, None], b_a_11, b_Ai_11)
@@ -214,7 +213,7 @@ def merge_16x16_to_64x64_inverse_kernel(
         b_Ai_22 = X_22
     else:
         for i in range(16 + 2, min(32, T - i_t * BT)):
-            b_a_22 = -tl.load(A + (i_t * BT + i) * H*BT + o_i + 16)
+            b_a_22 = -tl.load(A + (i_t * BT + i) * H * BT + o_i + 16)
             b_a_22 = tl.where(o_i < i - 16, b_a_22, 0.)
             b_a_22 += tl.sum(b_a_22[:, None] * b_Ai_22, 0)
             b_Ai_22 = tl.where((o_i == i - 16)[:, None], b_a_22, b_Ai_22)
@@ -232,7 +231,7 @@ def merge_16x16_to_64x64_inverse_kernel(
         b_Ai_33 = X_33
     else:
         for i in range(32 + 2, min(48, T - i_t * BT)):
-            b_a_33 = -tl.load(A + (i_t * BT + i) * H*BT + o_i + 32)
+            b_a_33 = -tl.load(A + (i_t * BT + i) * H * BT + o_i + 32)
             b_a_33 = tl.where(o_i < i - 32, b_a_33, 0.)
             b_a_33 += tl.sum(b_a_33[:, None] * b_Ai_33, 0)
             b_Ai_33 = tl.where((o_i == i - 32)[:, None], b_a_33, b_Ai_33)
@@ -250,7 +249,7 @@ def merge_16x16_to_64x64_inverse_kernel(
         b_Ai_44 = X_44
     else:
         for i in range(48 + 2, min(64, T - i_t * BT)):
-            b_a_44 = -tl.load(A + (i_t * BT + i) * H*BT + o_i + 48)
+            b_a_44 = -tl.load(A + (i_t * BT + i) * H * BT + o_i + 48)
             b_a_44 = tl.where(o_i < i - 48, b_a_44, 0.)
             b_a_44 += tl.sum(b_a_44[:, None] * b_Ai_44, 0)
             b_Ai_44 = tl.where((o_i == i - 48)[:, None], b_a_44, b_Ai_44)
@@ -362,7 +361,6 @@ def solve_tril(
         limit_auto_multi_buffer_of_local_buffer="no-limit",
         sync_solver=True,
         num_stages=2,
-        # enable_flatten=False,
         enable_dynamic_cv_pipeline=True,
     )
     return Ai

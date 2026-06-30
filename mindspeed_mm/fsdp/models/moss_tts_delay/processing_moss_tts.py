@@ -509,11 +509,11 @@ class MossTTSDelayProcessor(ProcessorMixin):
             j = i
             while (
                 j + 1 < len(matches)
-                and content[matches[j].end() : matches[j + 1].start()].strip() == ""
+                and content[matches[j].end(): matches[j + 1].start()].strip() == ""
             ):
                 j += 1
 
-            new_parts.append(content[last_pos : matches[i].start()])
+            new_parts.append(content[last_pos: matches[i].start()])
             new_parts.append(AUDIO_PLACEHOLDER)
             last_pos = matches[j].end()
 
@@ -521,7 +521,7 @@ class MossTTSDelayProcessor(ProcessorMixin):
                 new_audio_codes_list.append(audio_codes_list[i])
             else:
                 new_audio_codes_list.append(
-                    torch.cat(audio_codes_list[i : j + 1], dim=0)
+                    torch.cat(audio_codes_list[i: j + 1], dim=0)
                 )
 
             i = j + 1
@@ -538,7 +538,7 @@ class MossTTSDelayProcessor(ProcessorMixin):
             dtype=codes.dtype,
         )
         for i in range(codes.shape[1]):
-            delayed_tokens[i : i + codes.shape[0], i] = codes[:, i]
+            delayed_tokens[i: i + codes.shape[0], i] = codes[:, i]
         return delayed_tokens
 
     @staticmethod
@@ -550,7 +550,7 @@ class MossTTSDelayProcessor(ProcessorMixin):
             dtype=delay_codes.dtype,
         )
         for i in range(delay_codes.shape[1]):
-            tokens[:, i] = delay_codes[i : i + tokens.shape[0], i]
+            tokens[:, i] = delay_codes[i: i + tokens.shape[0], i]
         return tokens
 
     def _get_unified_codes(
@@ -660,7 +660,7 @@ class MossTTSDelayProcessor(ProcessorMixin):
     def _parse_text_codes(self, start_length, text_codes):
         text = cast(str, self.tokenizer.decode(text_codes))
         prefix = cast(str, self.tokenizer.decode(text_codes[:start_length]))
-        text = text[len(prefix) :]
+        text = text[len(prefix):]
 
         AUDIO_PATTERN = re.compile(
             rf"(?:{self.audio_start_token})?"

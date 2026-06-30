@@ -120,9 +120,9 @@ class DupExpertExecutor:
         for send_recv_plan in send_recv_plans:
             src_local_id, src_rank, dst_rank, dup_id = send_recv_plan["src_local_id"], send_recv_plan["src_rank"], send_recv_plan["dst_rank"], send_recv_plan["dup_id"]
             if src_rank == dist.get_rank():
-                dist.isend(local_experts_param[src_local_id:src_local_id+1], dst=dst_rank, tag=src_local_id)
+                dist.isend(local_experts_param[src_local_id: src_local_id + 1], dst=dst_rank, tag=src_local_id)
             if dst_rank == dist.get_rank():
-                recv_work = dist.irecv(dup_experts[dup_id:dup_id+1], src=src_rank, tag=src_local_id)
+                recv_work = dist.irecv(dup_experts[dup_id: dup_id + 1], src=src_rank, tag=src_local_id)
                 recv_works.append(recv_work)
         return dup_experts, recv_works
 
@@ -146,7 +146,7 @@ class DupExpertExecutor:
             # 梯度的send和recv关系和param是反的
             src_local_id, dst_rank, src_rank, dup_id = param_send_recv_plan["src_local_id"], param_send_recv_plan["src_rank"], param_send_recv_plan["dst_rank"], param_send_recv_plan["dup_id"]
             if src_rank == dist.get_rank():
-                dist.isend(dup_experts_grad[dup_id:dup_id+1], dst=dst_rank, tag=src_local_id)
+                dist.isend(dup_experts_grad[dup_id: dup_id + 1], dst=dst_rank, tag=src_local_id)
             if dst_rank == dist.get_rank():
                 dup_experts_grad_dict[src_local_id] = torch.empty((1, input_dim, output_dim), device=dup_experts_grad.device, dtype=dup_experts_grad.dtype)
                 recv_work = dist.irecv(dup_experts_grad_dict[src_local_id], src=src_rank, tag=src_local_id)
@@ -179,7 +179,7 @@ class DupExpertExecutor:
         local_experts_grad_shape = local_experts_grad.shape
         local_experts_grad = local_experts_grad.view(self.num_local_experts, -1, local_experts_grad.shape[-1])
         for src_local_id, grad in self.dup_experts_grad[name].items():
-            local_experts_grad[src_local_id:src_local_id+1] += grad
+            local_experts_grad[src_local_id: src_local_id + 1] += grad
 
         local_experts_grad = local_experts_grad.view(local_experts_grad_shape)
         self.dup_experts_grad[name] = {} # free

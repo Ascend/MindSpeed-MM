@@ -33,11 +33,13 @@ from mindspeed_mm.fsdp.models.ltx2.ltx2_fsdp2.modified import _process_transform
 from mindspeed_mm.fsdp.models.ltx2.ltx2_fsdp2.modified import block_forward
 from mindspeed_mm.fsdp.models.ltx2.ltx2_fsdp2.modified import model_forward
 
+
 @dataclass
 class LTX2ModelOutput:
     loss: torch.Tensor
     video_pred: torch.Tensor | None = None
     audio_pred: torch.Tensor | None = None
+
 
 @model_register.register("ltx2")
 class LTX2ForTraining(torch.nn.Module, BaseModel):

@@ -13,6 +13,7 @@ from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 
 logger = logging.getLogger(__name__)
 
+
 class DataCollatorForQwen2vl:
     def __init__(self, ignore_pad_token_for_loss: bool, dataset_param=None, **kwargs):
         process_args = ProcessorArguments(**dataset_param.preprocess_parameters.to_dict())

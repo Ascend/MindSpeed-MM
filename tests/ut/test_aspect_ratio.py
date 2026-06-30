@@ -31,12 +31,14 @@ Specifically:
     expected pixel counts.
 """
 
-import pytest
-
 # Import the module file directly to avoid triggering mindspeed_mm/__init__.py
 # (which depends on megatron).  This keeps the UT CPU-runnable.
 import importlib.util as _importlib_util
 import os as _os
+
+import pytest
+
+
 _AR_PATH = _os.path.join(
     _os.path.dirname(_os.path.abspath(__file__)),
     "../../mindspeed_mm/data/data_utils/aspect_ratio.py",

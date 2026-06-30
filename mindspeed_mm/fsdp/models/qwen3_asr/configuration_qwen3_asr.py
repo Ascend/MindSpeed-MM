@@ -26,8 +26,6 @@ class Qwen3ASRAudioEncoderConfig(PretrainedConfig):
     configuration with the defaults will yield a similar configuration to that of the audio encoder of the Qwen2-Audio
     architecture.
 
-    e.g. [Qwen/Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)
-
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
 
@@ -128,7 +126,7 @@ class Qwen3ASRTextConfig(PretrainedConfig):
     This is the configuration class to store the configuration of a [`Qwen3ASRTextModel`]. It is used to instantiate a
     Qwen3-ASR model according to the specified arguments, defining the model architecture. Instantiating a configuration
     with the defaults will yield a similar configuration to that of
-    Qwen3-ASR-1.7B [Qwen/Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)
+    Qwen3-ASR-1.7B.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
@@ -150,8 +148,7 @@ class Qwen3ASRTextConfig(PretrainedConfig):
             `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
             `num_key_value_heads=1` the model will use Multi Query Attention (MQA) otherwise GQA is used. When
             converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
-            by meanpooling all the original heads within that group. For more details, check out [this
-            paper](https://huggingface.co/papers/2305.13245). If it is not specified, will default to `32`.
+            by meanpooling all the original heads within that group. If it is not specified, will default to `32`.
         head_dim (`int`, *optional*, defaults to 128):
             The dimension of the head. If not specified, will default to `hidden_size // num_attention_heads`.
         hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
@@ -284,8 +281,6 @@ class Qwen3ASRThinkerConfig(PretrainedConfig):
     configuration with the defaults will yield a similar configuration to that of the thinker component of the Qwen3-Omni
     architecture.
 
-    e.g. [Qwen/Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)
-
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
 
@@ -356,12 +351,11 @@ class Qwen3ASRThinkerConfig(PretrainedConfig):
 
 
 class Qwen3ASRConfig(PretrainedConfig):
-    """
-    This is the configuration class to store the configuration of a [`Qwen3ASRForConditionalGeneration`]. It is used to instantiate a Qwen3ASR
+    """This is the configuration class to store the configuration of a [`Qwen3ASRForConditionalGeneration`]. It is used to instantiate a Qwen3ASR
     model according to the specified sub-models configurations, defining the model architecture.
 
     Instantiating a configuration with the defaults will yield a similar configuration to that of the
-    [Qwen/Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) architecture.
+    Qwen/Qwen3-ASR-1.7B architecture.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
@@ -387,7 +381,8 @@ class Qwen3ASRConfig(PretrainedConfig):
 
     >>> # Accessing the model configuration
     >>> configuration = model.config
-    ```"""
+    ```
+    """
 
     model_type = "qwen3_asr"
     sub_configs = {

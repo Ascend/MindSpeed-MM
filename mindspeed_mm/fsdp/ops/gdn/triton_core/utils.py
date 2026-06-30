@@ -86,7 +86,7 @@ def prepare_chunk_indices_list(
 
     for i in range(len(cu_seqlens) - 1):
         start = cu_seqlens[i]
-        end = cu_seqlens[i+1]
+        end = cu_seqlens[i + 1]
         length = end - start
 
         if length <= 0:

@@ -269,7 +269,7 @@ class MossTTSSFTDataset(Dataset):
             raise ValueError("Prompt length must be shorter than the packed teacher-forcing sequence.")
 
         loss_mask = torch.zeros(full_input_ids.shape[0] - 1, dtype=torch.bool)
-        loss_mask[prompt_length - 1 :] = True
+        loss_mask[prompt_length - 1:] = True
 
         return {
             "input_ids": full_input_ids,

@@ -194,11 +194,11 @@ class Qwen35FlopsCounter:
             * 3
             * tokens_sum
             * config.linear_num_value_heads
-            *   (
-                    config.linear_value_head_dim * chunk_size * 3 + \
-                    config.linear_key_head_dim * chunk_size * 2 + \
-                    config.linear_value_head_dim * config.linear_key_head_dim * 3
-                )
+            * (
+                config.linear_value_head_dim * chunk_size * 3 + \
+                config.linear_key_head_dim * chunk_size * 2 + \
+                config.linear_value_head_dim * config.linear_key_head_dim * 3
+              )
             )
         num_gdn_layers = config.num_hidden_layers - num_full_attn_layers
         return gdn_flops * num_gdn_layers

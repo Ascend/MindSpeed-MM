@@ -3,10 +3,11 @@ Unit tests for mask_utils.py module.
 Tests all mask generators and mask processor functionality.
 """
 
-import torch
 import random
 from unittest.mock import patch, MagicMock
 from abc import ABC, abstractmethod
+
+import torch
 
 from tests.ut.utils import judge_expression, TestConfig
 from mindspeed_mm.utils.mask_utils import (

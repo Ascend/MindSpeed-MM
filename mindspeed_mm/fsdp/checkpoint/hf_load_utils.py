@@ -361,7 +361,7 @@ def rank0_load_and_broadcast_hf_weights(
         for info in param_info_list:
             key = convert_weight_key(info.name, model)
             key = lora_base_map.get(key, key)  # bare -> base_layer for LoRA targets
-            if rank0:
+            if rank0 and info.name in shard_state:
                 tensor = shard_state[info.name].to(torch_device, non_blocking=True)
             else:
                 tensor = torch.empty(info.shape, dtype=info.dtype, device=torch_device)

@@ -58,6 +58,8 @@ SIG_SELECT_MIN = nb_types.Tuple([nb_types.int64, nb_types.boolean])(
     nb_types.Array(nb_types.int64, 2, 'C'),
     nb_types.int64
 )
+
+
 @njit(SIG_SELECT_MIN, nopython=True, cache=True)
 def select_min_workload_rank_numba(
     ep_size: int,
@@ -126,6 +128,7 @@ SIG_REARRANGE_RANK = nb_types.Tuple([
     nb_types.ListType(nb_types.UniTuple(nb_types.int64, 4)) # update_experts_lists
 )
 
+
 @njit(SIG_REARRANGE_RANK, nopython=True, cache=True)
 def rearrange_rank_select_expert_ids_np(
     num_local_experts,
@@ -187,6 +190,8 @@ SIG_REARRANGE_TOKENS = nb_types.Tuple([
     nb_types.int64,       # dup_experts_id
     nb_types.ListType(nb_types.UniTuple(nb_types.int64, 4)) # update_experts_lists
 )
+
+
 @njit(SIG_REARRANGE_TOKENS, nopython=True, cache=True)
 def rearrange_select_expert_ids_np(
     num_local_experts,
@@ -261,6 +266,8 @@ SIG_GREEDY_PLAN = nb_types.Tuple([
     nb_types.Array(nb_types.int64, 1, 'C'), # input_splits
     nb_types.ListType(nb_types.UniTuple(nb_types.int64, 4)) # update_experts_lists
 )
+
+
 @njit(SIG_GREEDY_PLAN, nopython=True, cache=True)
 def greedy_plan(
     np_workload_per_rank,

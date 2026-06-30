@@ -4,6 +4,7 @@ from ltx_core.model.transformer.transformer_args import TransformerArgs
 from ltx_core.utils import rms_norm
 from ltx_core.model.transformer.modality import Modality
 
+
 def block_forward(  # noqa: PLR0915
         self,
         vx: torch.Tensor | None,
@@ -160,6 +161,7 @@ def block_forward(  # noqa: PLR0915
 
     return vx, ax
 
+
 def _process_transformer_blocks(
     self,
     video: TransformerArgs | None,
@@ -196,6 +198,7 @@ def _process_transformer_blocks(
         )
 
     return vx, ax
+
 
 def model_forward(
     self, video: Modality | None, audio: Modality | None, perturbations: BatchedPerturbationConfig

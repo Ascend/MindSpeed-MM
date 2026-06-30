@@ -42,7 +42,7 @@ if __name__ == '__main__':
     repeat_times = text_length // (len(tokenizer.encode(seed_text)) * 2) + 1
     text = seed_text * repeat_times
 
-    image_prompt = "<image>\n"*num_pics
+    image_prompt = "<image>\n" * num_pics
 
     mock_data = {
         "messages": [

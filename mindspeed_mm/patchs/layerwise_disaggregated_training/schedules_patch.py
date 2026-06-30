@@ -1193,7 +1193,7 @@ def forward_backward_pipelining_without_interleaving(
             mlp_linear = ldt_vlm_model.image_encoder.encoder.blocks.layers[0].mlp.linear_fc1
             vit_hidden_size = mlp_linear.input_size
         except Exception as e:
-            raise AssertionError(f"Failed to read hidden size from VIT: {str(e)}")
+            raise AssertionError(f"Failed to read hidden size from VIT: {str(e)}") from e
 
     # 提前获得本轮迭代的所有数据信息
     all_batchs, recv_forward_tensor_shapes, vit_recv_fwd_tensor_shapes = get_all_batchs(

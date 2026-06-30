@@ -48,7 +48,7 @@ def causal_conv1d_ref(
 
     y = torch.zeros_like(x, dtype=torch.float32)
     for w in range(W):
-        y += x_padded[:, w : w + T, :] * weight[w].float()
+        y += x_padded[:, w: w + T, :] * weight[w].float()
 
     if bias is not None:
         y = y + bias.float()
@@ -67,7 +67,7 @@ def causal_conv1d_ref_no_state(x, weight, bias=None, residual=None, activation=N
     x_padded = torch.nn.functional.pad(x.float(), (0, 0, W - 1, 0), value=0.0)
     y = torch.zeros_like(x, dtype=torch.float32)
     for w in range(W):
-        y += x_padded[:, w : w + T, :] * weight[w].float()
+        y += x_padded[:, w: w + T, :] * weight[w].float()
 
     if bias is not None:
         y = y + bias.float()
@@ -116,7 +116,7 @@ def causal_conv1d_update_bdt_ref(x, conv_state, weight, bias=None, activation=No
     state_len = conv_state.shape[2]
 
     prefix_len = min(W - 1, state_len)
-    prefix = conv_state[:, :, state_len - prefix_len :].float()  # [B, D, prefix_len]
+    prefix = conv_state[:, :, state_len - prefix_len:].float()  # [B, D, prefix_len]
     if prefix_len < W - 1:
         prefix = F.pad(prefix, (W - 1 - prefix_len, 0))  # [B, D, W-1]
 

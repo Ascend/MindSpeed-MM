@@ -355,8 +355,8 @@ def get_npu_properties():
 def get_vector_num() -> int:
     import torch_npu
 
-    device = torch_npu.npu.current_device()
-    properties = driver.active.utils.get_device_properties(device)
+    current_device = torch_npu.npu.current_device()
+    properties = driver.active.utils.get_device_properties(current_device)
     return properties["num_vectorcore"]
 
 

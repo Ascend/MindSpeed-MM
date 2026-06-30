@@ -770,7 +770,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                 mixed_qkv, _ = self.causal_conv1d_fn(
                     x=mixed_qkv,
                     weight=conv_weight,
-                    H=2*local_num_k_heads + local_num_v_heads,
+                    H=2 * local_num_k_heads + local_num_v_heads,
                     bias=self.conv1d.bias,
                     activation=self.activation,
                     cu_seqlens=cu_seqlens,
@@ -2220,7 +2220,7 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
         gdn_implementation = getattr(model_args, "gdn_implementation", IMPL_EAGER).lower().strip()
         if not any(gdn_implementation == impl for impl in IMPL_FOR_GDN):
             raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'.")
-        transformer_config.text_config.gdn_implementation= gdn_implementation
+        transformer_config.text_config.gdn_implementation = gdn_implementation
         # causal conv1d implementation
         causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()
         if not any(causal_conv1d_implementation == impl for impl in IMPL_FOR_CAUSAL_CONV):

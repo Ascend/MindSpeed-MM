@@ -79,7 +79,7 @@ def get_loss_func_params(
                 mask = (sample_ids == i)
                 valid_per_sample[:, i] = loss_mask[mask].sum()
             result = torch.repeat_interleave(valid_per_sample, lengths[0], dim=1).float()  # [1, total_seq_len]
-            alpha = torch.nn.functional.pad(result, (0, max(0, total_seq_len-result.size(1))), value=1 / lengths.size(1)) * lengths.size(1)
+            alpha = torch.nn.functional.pad(result, (0, max(0, total_seq_len - result.size(1))), value=1 / lengths.size(1)) * lengths.size(1)
 
             ps = get_parallel_state()
             if ps.is_cp_enable():

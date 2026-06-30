@@ -121,7 +121,7 @@ def reorganize_inputs(
                 assert token_id == image_token_id
                 seqlen += (end - start) * square_merge_size
             assert seqlen == thw[0] * thw[1] * thw[2]
-            vision_values.append(pixel_values[image_seqlen : (image_seqlen + seqlen)])
+            vision_values.append(pixel_values[image_seqlen: (image_seqlen + seqlen)])
             vision_grid_thw.append(thw)
 
             image_idx += 1
@@ -135,7 +135,7 @@ def reorganize_inputs(
                 assert token_id == video_token_id
                 seqlen += (end - start) * square_merge_size
             assert seqlen == thw[0] * thw[1] * thw[2]
-            vision_values.append(pixel_values_videos[video_seqlen : (video_seqlen + seqlen)])
+            vision_values.append(pixel_values_videos[video_seqlen: (video_seqlen + seqlen)])
             vision_grid_thw.append(thw)
 
             video_idx += 1
@@ -172,12 +172,12 @@ def split_data_cp_rank(val: torch.Tensor, cp_size: int, seq_dim: int, cp_rank: i
         *val.shape[0:seq_dim],
         2 * cp_size,
         val.shape[seq_dim] // (2 * cp_size),
-        *val.shape[(seq_dim + 1) :],
+        *val.shape[(seq_dim + 1):],
     )
 
     index = torch.tensor([cp_rank, (2 * cp_size - cp_rank - 1)], device=val.device)
     val = val.index_select(seq_dim, index)
-    val = val.view(*val.shape[0:seq_dim], -1, *val.shape[(seq_dim + 2) :])
+    val = val.view(*val.shape[0:seq_dim], -1, *val.shape[(seq_dim + 2):])
 
     return val
 
@@ -362,7 +362,7 @@ def get_vision_cp_data(
 
         vision_grid_thw_list.append(vision_grid_thw[start_idx:end_idx])
         if images_padded[i]:
-            seqlens_list.append(seqlens[start_idx : end_idx - 1])
+            seqlens_list.append(seqlens[start_idx: end_idx - 1])
         else:
             seqlens_list.append(seqlens[start_idx:end_idx])
         data_start_idx = seqlens[:start_idx].sum()
@@ -423,7 +423,6 @@ def preprocess_packed_seqs(
     Preprocess packed sequences
     CP splits sequence into CP*2 chunks, and each GPU gets 2 chunks (GPU0 gets first and last chunks, GPU1
     gets second and second last chunks, and so on), this is for load balancing with causal masking.
-    See https://github.com/NVIDIA/TransformerEngine/issues/1368
     """
     batch_size = input_ids.shape[0]
 
@@ -466,7 +465,7 @@ def preprocess_packed_seqs(
             if cp_size <= 1:
                 seqlen = seqlens_in_batch_cpu[i]
                 start_idx = cu_seqlens_padded_cpu[i]
-                input_ids_rmpad[start_idx : start_idx + seqlen] = input_ids[i, attention_mask[i]]
+                input_ids_rmpad[start_idx: start_idx + seqlen] = input_ids[i, attention_mask[i]]
                 continue
 
             seqlen_padded_i = seqlens_in_batch_padded_cpu[i]
@@ -475,8 +474,8 @@ def preprocess_packed_seqs(
             start_idx = cu_seqlens_padded_cpu[i] // cp_size
             # split to 2 chunks
             d = input_ids[i, attention_mask[i]]
-            input_ids_rmpad[start_idx : start_idx + half_seqlen] = d[
-                half_seqlen * cp_rank : half_seqlen * (cp_rank + 1)
+            input_ids_rmpad[start_idx: start_idx + half_seqlen] = d[
+                half_seqlen * cp_rank: half_seqlen * (cp_rank + 1)
             ]
 
             remain_start = seqlen_padded_i - half_seqlen * (cp_rank + 1)
@@ -484,7 +483,7 @@ def preprocess_packed_seqs(
             remain_end = min(remain_end, d.shape[0])
             remain_len = remain_end - remain_start
             if remain_len > 0:
-                input_ids_rmpad[start_idx + half_seqlen : start_idx + half_seqlen + remain_len] = d[
+                input_ids_rmpad[start_idx + half_seqlen: start_idx + half_seqlen + remain_len] = d[
                     remain_start:remain_end
                 ]
 

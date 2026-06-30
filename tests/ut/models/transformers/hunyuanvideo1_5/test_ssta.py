@@ -5,6 +5,7 @@ import torch_npu
 from mindspeed_mm.models.predictor.dits.hunyuanvideo15.ssta_attention import ssta_3d_attention
 from tests.ut.utils import judge_expression
 
+
 def _build_sparse_block_mask(batch_size, num_heads, ceil_q, ceil_kv, device):
     q_block_idx = torch.arange(ceil_q, device=device).view(ceil_q, 1)
     kv_block_idx = torch.arange(ceil_kv, device=device).view(1, ceil_kv)
@@ -13,6 +14,7 @@ def _build_sparse_block_mask(batch_size, num_heads, ceil_q, ceil_kv, device):
     block_sparse_mask = block_sparse_mask.expand(batch_size, num_heads, -1, -1).contiguous()
 
     return block_sparse_mask
+
 
 def _npu_fusion_attention_with_expanded_block_mask(
     query, key, value, num_heads, seq_len, block_m, block_n, scale_value, block_sparse_mask
@@ -44,6 +46,7 @@ def _npu_fusion_attention_with_expanded_block_mask(
         sparse_mode=0,
     )[0]
     return fusion_out
+
 
 def test_ssta_3d_attention_shape():
     """test HunyuanVideo 1.5 SSTA function and output shape"""
@@ -78,6 +81,7 @@ def test_ssta_3d_attention_shape():
     judge_expression(output.shape == query.shape)
     judge_expression(output.dtype == query.dtype)
     judge_expression(0.0 < sparse_ratio < 1.0)
+
 
 def test_npu_block_sparse_attention_bnsd():
     """test npu_block_sparse_attention BNSD forward against token-mask npu_fusion_attention"""

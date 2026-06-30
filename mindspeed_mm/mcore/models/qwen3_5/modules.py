@@ -1,9 +1,9 @@
 from contextlib import nullcontext
 from typing import Optional, Union, List
 from dataclasses import dataclass
-from einops import rearrange
 import copy
 
+from einops import rearrange
 import torch
 from torch import Tensor, nn
 
@@ -326,7 +326,7 @@ def apply_rotary_pos_emb_thd_absolute(
 def apply_rotary_pos_emb_absolute(
     t: Tensor,
     freqs: Tensor,
-    config = None,
+    config=None,
     cu_seqlens: Optional[Tensor] = None,
 ):
     """
@@ -781,7 +781,7 @@ class Qwen3_5SelfAttention(SelfAttention):
                 self.world_size // self.config.num_query_groups
             )
             size = mixed_qkv.size()[-1] // self.config.num_query_groups
-            mixed_qkv = mixed_qkv[:, :, idx * size : (idx + 1) * size]
+            mixed_qkv = mixed_qkv[:, :, idx * size: (idx + 1) * size]
 
         # If no output gate: [sq, b, hp] --> [sq, b, ng, (np/ng + 2) * hn]
         # If have output gate: [sq, b, hp] --> [sq, b, ng, (2 * np/ng + 2) * hn]
@@ -841,7 +841,7 @@ class Qwen3_5SelfAttention(SelfAttention):
             size = self.num_attention_heads_per_partition // (
                 self.world_size // self.config.num_query_groups
             )
-            query = query[:, :, idx * size : (idx + 1) * size, :]
+            query = query[:, :, idx * size: (idx + 1) * size, :]
 
         if self.q_layernorm is not None:
             query = self.q_layernorm(query)
@@ -862,7 +862,7 @@ class Qwen3_5SelfAttention(SelfAttention):
                 size = self.num_attention_heads_per_partition // (
                     self.world_size // self.config.num_query_groups
                 )
-                gate = gate[:, :, idx * size : (idx + 1) * size, :]
+                gate = gate[:, :, idx * size: (idx + 1) * size, :]
             return query, key, value, gate
 
         return query, key, value

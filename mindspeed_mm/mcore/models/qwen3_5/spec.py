@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 import warnings
 from typing import Optional
 
@@ -47,6 +47,7 @@ except ImportError:
 
 from mindspeed_mm.mcore.models.qwen3_5.modules import Qwen3_5SelfAttention, PatchMergerSubmodules, Qwen3_5SelfAttentionSubmodules
 from mindspeed_mm.mcore.models.qwen3_5.gated_delta_net import GatedDeltaNet, GatedDeltaNetSubmodules, Qwen3_5GatedRMSNorm
+
 
 class RMSNorm(nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6, sequence_parallel: bool = False):
@@ -247,8 +248,6 @@ def get_qwen3_5_text_block_spec(
             layer_type=LayerType.decoder, vp_stage=vp_stage, pp_rank=pp_rank
         )
     else:
-        # offset = get_transformer_layer_offset(config, vp_stage=vp_stage, pp_rank=pp_rank)
-        # num_layers_to_build = get_num_layers_to_build(config, vp_stage=vp_stage, pp_rank=pp_rank)
         offset = get_transformer_layer_offset(config)
         num_layers_to_build = get_num_layers_to_build(config)
         local_layer_ids = range(offset, offset + num_layers_to_build)

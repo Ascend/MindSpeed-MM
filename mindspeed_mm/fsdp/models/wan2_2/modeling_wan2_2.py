@@ -25,10 +25,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributed.tensor import DTensor
-try:
-    import torch_npu
-except ImportError:
-    pass
 
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all

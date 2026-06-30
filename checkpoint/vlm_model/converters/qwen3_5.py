@@ -230,7 +230,7 @@ class Qwen35Converter(Converter):
     ) -> Dict[str, torch.Tensor]:
         from torch.distributed.checkpoint import FileSystemReader
         from checkpoint.common.dcp_utils import load_metadata, extract_metadata, partial_load_dcp_state_dict
-        from checkpoint.vlm_model.converters.moe_expert import split_moe_expert_weights, ConfigType
+        from checkpoint.vlm_model.converters.moe_expert import split_moe_expert_weights
 
         storage_reader = FileSystemReader(Path(dcp_dir))
         metadata = load_metadata(storage_reader)

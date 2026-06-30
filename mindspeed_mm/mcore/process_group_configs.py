@@ -260,7 +260,6 @@ class ProcessGroupCollection:
                 - intra_dp_cp_group_gloo: Gloo version of intra_dp_cp_group (may be None)
                 - intra_expt_dp_group_gloo: Gloo version of intra_expt_dp_group (may be None)
         """
-        from megatron.core import parallel_state
         from megatron.core.utils import get_model_config
 
         if pg_collection is None:
@@ -438,9 +437,6 @@ class ProcessGroupCollection:
         """
         import logging
 
-        import torch
-
-        from megatron.core import parallel_state
         from megatron.core.utils import log_single_rank
 
         logger = logging.getLogger(__name__)

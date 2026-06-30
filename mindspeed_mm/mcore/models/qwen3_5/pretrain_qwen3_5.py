@@ -113,7 +113,7 @@ def loss_func(loss_mask: torch.Tensor, output_tensor: torch.Tensor):
         op=torch.distributed.ReduceOp.AVG
     )
 
-    report  = {"loss": report_loss, "num_tokens": num_tokens.view(1)}
+    report = {"loss": report_loss, "num_tokens": num_tokens.view(1)}
     return loss, report
 
 

@@ -1,7 +1,8 @@
+from unittest.mock import patch
+
 import pytest
 import torch
 import numpy as np
-from unittest.mock import patch
 from numba.typed import List
 from numba import types as nb_types
 

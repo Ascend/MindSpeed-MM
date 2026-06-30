@@ -1,9 +1,9 @@
 import os
-import pytest
-import torch
 import inspect
 from unittest.mock import patch, MagicMock
 
+import pytest
+import torch
 
 from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.loss.loss_func import (
@@ -12,6 +12,7 @@ from mindspeed_mm.fsdp.loss.loss_func import (
     build_loss_func,
 )
 from tests.ut_fsdp.utils.utils import judge_expression
+
 
 @pytest.fixture(autouse=True)
 def mock_parallel_state():

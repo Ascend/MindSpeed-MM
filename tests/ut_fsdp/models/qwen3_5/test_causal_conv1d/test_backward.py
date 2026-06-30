@@ -343,7 +343,7 @@ class TestCausalConv1dState:
 
         # Far-enough timesteps should be identical (when T >> W)
         if T > 2 * W:
-            tail_diff = (y_no_state[:, 2 * W :, :] - y_with_state[:, 2 * W :, :]).abs().max()
+            tail_diff = (y_no_state[:, 2 * W:, :] - y_with_state[:, 2 * W:, :]).abs().max()
             torch.testing.assert_close(tail_diff, torch.tensor(0.0, device=DEVICE), atol=1e-5, rtol=0)
 
         # Numerically match the reference (initial_state path)

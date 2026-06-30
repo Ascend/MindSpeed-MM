@@ -219,8 +219,8 @@ def eager_attention(
     for i in range(1, len(q_cu_seqlens)):
         attention_mask[
             ...,
-            q_cu_seqlens[i - 1] : q_cu_seqlens[i],
-            q_cu_seqlens[i - 1] : q_cu_seqlens[i],
+            q_cu_seqlens[i - 1]: q_cu_seqlens[i],
+            q_cu_seqlens[i - 1]: q_cu_seqlens[i],
         ] = True
     q = q.transpose(0, 1)
     k = k.transpose(0, 1)
@@ -722,7 +722,7 @@ def tpool_patch_merger(
     pre_sum = 0
     for t, h, w in grid_thws_list:
         # Get the current sequence
-        seq = x[pre_sum : pre_sum + t * h * w]
+        seq = x[pre_sum: pre_sum + t * h * w]
         # Reshape along self.merge_kernel_size and concat to the last dimension
         kernel_height, kernel_width = merge_kernel_size
         new_height, new_width = h // kernel_height, w // kernel_width
@@ -951,27 +951,27 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
         if fsdp_plan.num_to_forward_prefetch > 0:
             self.language_model.model.embed_tokens.set_modules_to_forward_prefetch([self.vision_tower])
             self.vision_tower.set_modules_to_forward_prefetch([self.vision_tower.encoder.blocks[0]])
-            for idx in range(len(self.vision_tower.encoder.blocks)-1):
-                self.vision_tower.encoder.blocks[idx].set_modules_to_forward_prefetch([self.vision_tower.encoder.blocks[idx+1]])
+            for idx in range(len(self.vision_tower.encoder.blocks) - 1):
+                self.vision_tower.encoder.blocks[idx].set_modules_to_forward_prefetch([self.vision_tower.encoder.blocks[idx + 1]])
             self.vision_tower.encoder.blocks[-1].set_modules_to_forward_prefetch([self.mm_projector])
             self.mm_projector.set_modules_to_forward_prefetch([self.language_model.model.layers[0]])
             self.language_model.model.layers[0].set_modules_to_forward_prefetch([self.language_model.model.layers[1].mlp.experts, self.language_model.model.layers[1]])
 
-            for idx in range(1, len(self.language_model.model.layers)-1):
-                self.language_model.model.layers[idx].set_modules_to_forward_prefetch([self.language_model.model.layers[idx+1].mlp.experts, self.language_model.model.layers[idx+1]])
+            for idx in range(1, len(self.language_model.model.layers) - 1):
+                self.language_model.model.layers[idx].set_modules_to_forward_prefetch([self.language_model.model.layers[idx + 1].mlp.experts, self.language_model.model.layers[idx + 1]])
             self.language_model.model.layers[-1].set_modules_to_forward_prefetch([self.language_model.model, self.language_model.lm_head])
 
         if fsdp_plan.num_to_backward_prefetch > 0:
             self.language_model.lm_head.set_modules_to_backward_prefetch([self.language_model.model, self.language_model.model.layers[-1].mlp.experts, self.language_model.model.layers[-1]])
 
-            for idx in range(len(self.language_model.model.layers)-2, 2, -1):
-                self.language_model.model.layers[idx].set_modules_to_backward_prefetch([self.language_model.model.layers[idx-1].mlp.experts, self.language_model.model.layers[idx-1]])
+            for idx in range(len(self.language_model.model.layers) - 2, 2, -1):
+                self.language_model.model.layers[idx].set_modules_to_backward_prefetch([self.language_model.model.layers[idx - 1].mlp.experts, self.language_model.model.layers[idx - 1]])
             self.language_model.model.layers[1].set_modules_to_backward_prefetch([self.language_model.model.layers[0]])
 
             self.language_model.model.layers[0].set_modules_to_backward_prefetch([self.mm_projector])
             self.mm_projector.set_modules_to_backward_prefetch([self.vision_tower.encoder.blocks[-1]])
-            for idx in range(len(self.vision_tower.encoder.blocks)-1, 0, -1):
-                self.vision_tower.encoder.blocks[idx].set_modules_to_backward_prefetch([self.vision_tower.encoder.blocks[idx-1]])
+            for idx in range(len(self.vision_tower.encoder.blocks) - 1, 0, -1):
+                self.vision_tower.encoder.blocks[idx].set_modules_to_backward_prefetch([self.vision_tower.encoder.blocks[idx - 1]])
             self.vision_tower.encoder.blocks[0].set_modules_to_backward_prefetch([self.vision_tower])
             self.vision_tower.set_modules_to_backward_prefetch([self.language_model.model.embed_tokens])
         return True
@@ -1320,18 +1320,18 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
             # some of the inputs are exclusively passed as part of the cache (e.g. when passing input_embeds as
             # input)
             if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
-                input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+                input_ids = input_ids[:, -(attention_mask.shape[1] - past_length):]
             # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
             # input_ids based on the past_length.
             elif past_length < input_ids.shape[1]:
                 input_ids = input_ids[:, past_length:]
             # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
             elif self.config.media_placeholder_token_id in input_ids:
-                input_ids = input_ids[:, input_ids.shape[1] - 1 :]
+                input_ids = input_ids[:, input_ids.shape[1] - 1:]
             # If the cache has seen more tokens than it can hold, then the cache has a size limit. Let's discard the
             # older attention values, as their corresponding values are not part of the input.
             if cache_length < past_length and attention_mask is not None:
-                attention_mask = attention_mask[:, -(cache_length + input_ids.shape[1]) :]
+                attention_mask = attention_mask[:, -(cache_length + input_ids.shape[1]):]
 
         position_ids = kwargs.get("position_ids", None)
         if attention_mask is not None and position_ids is None:
@@ -1339,7 +1339,7 @@ class KimiK25ForConditionalGeneration(WeightInitMixin, KimiK25PreTrainedModel):
             position_ids = attention_mask.long().cumsum(-1) - 1
             position_ids.masked_fill_(attention_mask == 0, 1)
             if past_key_values:
-                position_ids = position_ids[:, -input_ids.shape[1] :]
+                position_ids = position_ids[:, -input_ids.shape[1]:]
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:

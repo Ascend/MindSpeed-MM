@@ -1,6 +1,7 @@
 import os
-import pytest
 import tempfile
+
+import pytest
 import torch
 import torch_npu
 import torch.distributed as dist
@@ -83,7 +84,7 @@ class TestFlashAttention:
                 target_output = target_output.unsqueeze(0)
 
             class DummyModule:
-                def __init__(self):
+                def __init__(self, is_causal):
                     self.config = type(
                         "obj",
                         (object,),
@@ -94,7 +95,7 @@ class TestFlashAttention:
                     self.is_causal = is_causal
                     self.layer_idx = 0
 
-            module = DummyModule()
+            module = DummyModule(is_causal=is_causal)
             common_kwargs = {
                 "dropout": 0.0,
                 "scaling": 1.0 / (head_dim**0.5),
@@ -202,7 +203,7 @@ class TestFlashAttention:
                 local_v = split_forward_gather_backward_with_cp(v, dim=1)
 
             class DummyModule:
-                def __init__(self):
+                def __init__(self, is_causal):
                     self.config = type(
                         "obj",
                         (object,),
@@ -213,7 +214,7 @@ class TestFlashAttention:
                     self.is_causal = is_causal
                     self.layer_idx = 0
 
-            module = DummyModule()
+            module = DummyModule(is_causal=is_causal)
             common_kwargs = {
                 "dropout": 0.0,
                 "scaling": 1.0 / (head_dim**0.5),

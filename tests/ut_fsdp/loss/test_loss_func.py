@@ -1,6 +1,7 @@
+from unittest.mock import patch, MagicMock
+
 import pytest
 import torch
-from unittest.mock import patch, MagicMock
 
 from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.loss.loss_func import (

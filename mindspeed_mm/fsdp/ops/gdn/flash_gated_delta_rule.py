@@ -188,7 +188,7 @@ def flash_chunk_gated_delta_rule_fwd(
         A = solve_tril(
             A=A,
             cu_seqlens=cu_seqlens,
-            chunk_indices = chunk_indices,
+            chunk_indices=chunk_indices,
             output_dtype=k.dtype,
         )
     else:

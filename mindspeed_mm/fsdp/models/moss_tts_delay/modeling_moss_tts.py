@@ -34,10 +34,10 @@ from transformers.cache_utils import Cache
 from transformers.models.qwen3 import Qwen3Model
 from transformers import initialization as init
 
-from .configuration_moss_tts import MossTTSDelayConfig
-from .inference_utils import sample_token, find_last_equal_C
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from mindspeed_mm.fsdp.utils.register import model_register
+from .configuration_moss_tts import MossTTSDelayConfig
+from .inference_utils import sample_token, find_last_equal_C
 
 try:
     from .processing_moss_tts import UserMessage, AssistantMessage, MossTTSDelayProcessor
@@ -345,7 +345,7 @@ class MossTTSDelayModel(MossTTSDelayPreTrainedModel):
 
                 # Reshape back to [B, S] and sum over Sequence dimension to get per-sample loss
                 per_token_loss = per_token_loss.view(batch_size, -1)
-                per_sample_loss = torch.sum(per_token_loss.to(torch.float32),dim=-1)
+                per_sample_loss = torch.sum(per_token_loss.to(torch.float32), dim=-1)
 
                 all_sum_losses_list.append(per_sample_loss)
 

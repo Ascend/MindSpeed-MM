@@ -220,7 +220,7 @@ class UnifiedMSRoPE(nn.Module):
             axis_positions = position_ids_3d[:, axis_idx]
 
             axis_freqs = self.rope_params(axis_positions, axis_idx)
-            freqs_result[:, dim_offset : dim_offset + axis_dim] = axis_freqs
+            freqs_result[:, dim_offset: dim_offset + axis_dim] = axis_freqs
 
             dim_offset += axis_dim
 
@@ -1601,7 +1601,7 @@ class InternVLUDoubleStreamFlashAttnProcessor:
 
         if kv_seq_len != attention_mask.shape[-1]:
             attention_mask_num_tokens = attention_mask.shape[-1]
-            attention_mask = attention_mask[:, attention_mask_num_tokens - kv_seq_len :]
+            attention_mask = attention_mask[:, attention_mask_num_tokens - kv_seq_len:]
 
         indices_k, cu_seqlens_k, max_seqlen_in_batch_k = _get_unpad_data(attention_mask)
 

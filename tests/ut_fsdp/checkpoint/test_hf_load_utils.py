@@ -73,11 +73,11 @@ class TestPrimitives:
             _resolve_leaf(nn.Linear(4, 4), "no.such.path.weight")
 
     @pytest.mark.parametrize("mapping,key,expected", [
-        (None,                          "x.weight",  "x.weight"),  # no attribute
-        ({},                            "x.weight",  "x.weight"),  # empty
-        ({r"^foo": "bar"},              "x.weight",  "x.weight"),  # no match
-        ({r"^model": "language_model"}, "model.x",   "language_model.x"),
-        ({r"^foo": "^bar(group)"},      "foo.x",     "bar.x"),     # strips ^ and ()
+        (None, "x.weight", "x.weight"),  # no attribute
+        ({}, "x.weight", "x.weight"),  # empty
+        ({r"^foo": "bar"}, "x.weight", "x.weight"),  # no match
+        ({r"^model": "language_model"}, "model.x", "language_model.x"),
+        ({r"^foo": "^bar(group)"}, "foo.x", "bar.x"),     # strips ^ and ()
     ])
     def test_convert_weight_key(self, mapping, key, expected):
         from mindspeed_mm.fsdp.checkpoint.hf_load_utils import convert_weight_key
@@ -125,12 +125,12 @@ class TestPrimitives:
 # ===========================================================================
 class TestLocateAndDetect:
     @pytest.mark.parametrize("setup,expected", [
-        ("none",        False),  # path is None
+        ("none", False),  # path is None
         ("nonexistent", False),
-        ("empty",       False),
-        ("single",      True),   # has model.safetensors
-        ("index",       True),   # has model.safetensors.index.json
-        ("dcp",         False),  # DCP tracker only
+        ("empty", False),
+        ("single", True),   # has model.safetensors
+        ("index", True),   # has model.safetensors.index.json
+        ("dcp", False),  # DCP tracker only
     ])
     def test_looks_like_hf_weight_dir(self, setup, expected, tmp_path):
         from mindspeed_mm.fsdp.checkpoint.hf_load_utils import looks_like_hf_weight_dir
@@ -482,8 +482,8 @@ class TestRank0LoadAndBroadcast:
             _make_single_safetensors(hf_dir, {
                 "embed.weight": torch.randn(8, 4),
                 "layer.weight": torch.randn(4, 4),
-                "layer.bias":   torch.randn(4),
-                "head.weight":  torch.randn(8, 4),
+                "layer.bias": torch.randn(4),
+                "head.weight": torch.randn(8, 4),
             })
             with tempfile.NamedTemporaryFile(delete=False) as f:
                 init_file = f.name

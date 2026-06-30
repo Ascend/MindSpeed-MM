@@ -52,14 +52,14 @@ from transformers.utils import (
 )
 from transformers.utils.import_utils import is_torch_fx_available
 
-from .configuration_deepseek import DeepseekV3Config
-
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
     split_forward_gather_backward_with_cp,
     all_to_all,
 )
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+
+from .configuration_deepseek import DeepseekV3Config
 
 if IS_NPU_AVAILABLE:
     import torch_npu
@@ -479,7 +479,7 @@ class DeepseekV3YarnRotaryEmbedding(DeepseekV3RotaryEmbedding):
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2 :]
+    x2 = x[..., x.shape[-1] // 2:]
     return torch.cat((-x2, x1), dim=-1)
 
 
@@ -682,7 +682,7 @@ class DeepseekV3MoE(nn.Module):
             gatherd_idxs = np.zeros(shape=(gathered_tokens.shape[0],), dtype=np.int32)
             s = 0
             for i, k in enumerate(tokens_per_expert_group.cpu().numpy()):
-                gatherd_idxs[s : s + k] = i % self.experts_per_rank
+                gatherd_idxs[s: s + k] = i % self.experts_per_rank
                 s += k
             gatherd_idxs = gatherd_idxs.argsort()
             sorted_tokens = gathered_tokens[gatherd_idxs]
@@ -912,11 +912,11 @@ class DeepseekV3Attention(nn.Module):
 
         query_states = k_pe.new_empty(bsz, self.num_heads, q_len, self.q_head_dim)
         query_states[:, :, :, : self.qk_nope_head_dim] = q_nope
-        query_states[:, :, :, self.qk_nope_head_dim :] = q_pe
+        query_states[:, :, :, self.qk_nope_head_dim:] = q_pe
 
         key_states = k_pe.new_empty(bsz, self.num_heads, q_len, self.q_head_dim)
         key_states[:, :, :, : self.qk_nope_head_dim] = k_nope
-        key_states[:, :, :, self.qk_nope_head_dim :] = k_pe
+        key_states[:, :, :, self.qk_nope_head_dim:] = k_pe
         if past_key_value is not None:
             cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
             key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
@@ -1095,11 +1095,11 @@ class DeepseekV3FlashAttention2(DeepseekV3Attention):
 
         query_states = k_pe.new_empty(bsz, self.num_heads, q_len, self.q_head_dim)
         query_states[:, :, :, : self.qk_nope_head_dim] = q_nope
-        query_states[:, :, :, self.qk_nope_head_dim :] = q_pe
+        query_states[:, :, :, self.qk_nope_head_dim:] = q_pe
 
         key_states = k_pe.new_empty(bsz, self.num_heads, q_len, self.q_head_dim)
         key_states[:, :, :, : self.qk_nope_head_dim] = k_nope
-        key_states[:, :, :, self.qk_nope_head_dim :] = k_pe
+        key_states[:, :, :, self.qk_nope_head_dim:] = k_pe
 
         if self.q_head_dim != self.v_head_dim:
             value_states = F.pad(value_states, [0, self.q_head_dim - self.v_head_dim])
@@ -1791,7 +1791,7 @@ class DeepseekV3ForCausalLM(DeepseekV3PreTrainedModel):
             # some of the inputs are exclusively passed as part of the cache (e.g. when passing input_embeds as
             # input)
             if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
-                input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+                input_ids = input_ids[:, -(attention_mask.shape[1] - past_length):]
             # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
             # input_ids based on the past_length.
             elif past_length < input_ids.shape[1]:
@@ -1812,7 +1812,7 @@ class DeepseekV3ForCausalLM(DeepseekV3PreTrainedModel):
             position_ids = attention_mask.long().cumsum(-1) - 1
             position_ids.masked_fill_(attention_mask == 0, 1)
             if past_key_values:
-                position_ids = position_ids[:, -input_ids.shape[1] :]
+                position_ids = position_ids[:, -input_ids.shape[1]:]
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:

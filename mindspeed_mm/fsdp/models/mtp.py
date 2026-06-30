@@ -30,6 +30,7 @@ from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import split_forward_gather_backward_with_cp, gather_forward_split_backward
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, generate_ulysses_cu_seqlen_params
 
+
 def shift_tensor(tensor, shifts=-1, dims=-1, fill_value=0):
     shifted = torch.roll(tensor, shifts=shifts, dims=dims)
     shifted.select(dims, shifts).fill_(fill_value)

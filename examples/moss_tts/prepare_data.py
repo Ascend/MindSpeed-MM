@@ -107,7 +107,7 @@ def batch_encode(
 ) -> List[torch.Tensor]:
     all_codes: List[torch.Tensor] = []
     for start in tqdm(range(0, len(paths), batch_size), desc=desc):
-        batch_paths = paths[start : start + batch_size]
+        batch_paths = paths[start: start + batch_size]
         all_codes.extend(processor.encode_audios_from_path(batch_paths, n_vq=n_vq))
     return all_codes
 

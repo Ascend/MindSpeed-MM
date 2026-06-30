@@ -167,7 +167,8 @@ class Qwen3_5Model(MegatronModule):
 
     def shared_embedding_or_output_weight(self):
         """This is a convenience method to surface the language model's word embeddings, which is
-        necessary for `finalize_model_grads._allreduce_word_embedding_grads`."""
+        necessary for `finalize_model_grads._allreduce_word_embedding_grads`.
+        """
         if self.add_decoder:
             return self.language_model.shared_embedding_or_output_weight()
         return None
@@ -420,7 +421,7 @@ class Qwen3_5Model(MegatronModule):
                 image_grid_thw=image_grid_thw,
                 video_grid_thw=video_grid_thw,
                 attention_mask=None,
-            )  #  [3*b*s]
+            )  # [3*b*s]
             if packed_seq_params is not None:
                 # convert position_ids to THD format
                 position_ids = (

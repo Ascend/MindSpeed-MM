@@ -4,9 +4,6 @@ import time
 import torch
 from torch.distributed.tensor import DTensor, Replicate
 
-from .constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
-from .device import get_device_type, get_torch_device
-
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.utils.device import (
     get_memory_reserved,
@@ -14,6 +11,9 @@ from mindspeed_mm.fsdp.utils.device import (
     get_memory_allocated,
     get_max_memory_allocated,
 )
+
+from .constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
+from .device import get_device_type, get_torch_device
 
 
 def to_empty_if_needed(model, device: torch.device | str | int | None, recurse: bool = True):

@@ -1886,6 +1886,7 @@ class FusedGatedExpertMapping(AutoMapping):
     def group_key(self) -> str:
         """Tasks sharing the same group_key are merged during export."""
         return self.hf_param
+
     def hf_to_megatron(self, hf_weights: torch.Tensor, megatron_module: nn.Module) -> torch.Tensor:
         """
         HF:        [E_global, 2*I, H]

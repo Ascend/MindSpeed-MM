@@ -29,6 +29,7 @@ else:
     autocast_custom_fwd = _identity_decorator
     autocast_custom_bwd = _identity_decorator
 
+
 def prepare_chunk_indices(
     cu_seqlens: list[int],
     chunk_size: int
@@ -50,7 +51,7 @@ def prepare_chunk_indices(
     # 遍历每个序列段
     for i in range(len(cu_seqlens) - 1):
         start = cu_seqlens[i]
-        end = cu_seqlens[i+1]
+        end = cu_seqlens[i + 1]
         length = end - start
 
         if length <= 0:
@@ -67,6 +68,7 @@ def prepare_chunk_indices(
             indices.append((chunk_id))
 
     return indices
+
 
 def chunk_gated_delta_rule_fwd(
     q: torch.Tensor,
@@ -116,8 +118,8 @@ def chunk_gated_delta_rule_fwd(
             beta,
             A,
             chunk_size,
-            g = g,
-            gk = None,
+            g=g,
+            gk=None,
             cu_seqlens=cu_seqlens1,
             chunk_indices=chunk_indices
         )
@@ -186,8 +188,8 @@ def chunk_gated_delta_rule_bwd(
             beta,
             A,
             chunk_size,
-            g = g,
-            gk = None,
+            g=g,
+            gk=None,
             cu_seqlens=cu_seqlens1,
             chunk_indices=chunk_indices
         )

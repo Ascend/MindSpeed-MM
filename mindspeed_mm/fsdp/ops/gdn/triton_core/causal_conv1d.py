@@ -276,6 +276,7 @@ def causal_conv1d_fwd_kernel_old(
         p_y = tl.make_block_ptr(y + bos * D, (T_len, D), (D, 1), (i_t * BT, i_d * BD), (BT, BD), (1, 0))
         tl.store(p_y, tl.cast(b_y, dtype=p_y.dtype.element_ty, fp_downcast_rounding="rtne"), boundary_check=(0, 1))
 
+
 @triton.heuristics(
     {
         "HAS_WEIGHT": lambda args: args["weight"] is not None,
@@ -683,6 +684,7 @@ def causal_conv1d_bwd_kernel(
         p_dx = tl.make_block_ptr(dx + bos * D, (T_len, D), (D, 1), (i_t * BT, i_d * BD), (BT, BD), (1, 0))
         tl.store(p_dx, tl.cast(b_dx, dtype=p_dx.dtype.element_ty, fp_downcast_rounding="rtne"), boundary_check=(0, 1))
 
+
 @triton.heuristics(
     {
         "USE_INITIAL_STATE": lambda args: args["initial_state"] is not None,
@@ -909,7 +911,7 @@ def causal_conv1d_bwd_impl(
     assert x.shape[-1] == weight.shape[-1], "x [B, T, D], weight [W, D], please check."
 
     B, T, D = x.shape
-    _,H,_,_ = dy.shape
+    _, H, _, _ = dy.shape
     W = weight.shape[0] if weight is not None else None
 
     NUM_CORES = get_num_cores()

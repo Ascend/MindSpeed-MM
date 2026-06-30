@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: (c) 2026 Tenstorrent AI ULC
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 from collections import OrderedDict
 from logging import getLogger
@@ -172,7 +175,8 @@ class TikTokenTokenizer(PreTrainedTokenizer):
         if len(kwargs) > 0:
             return super().encode(text, **kwargs)
 
-        assert type(text) is str
+        if type(text) is not str:
+            raise AssertionError("The input to be encoded is not string.")
 
         # The tiktoken tokenizer can handle <=400k chars without
         # pyo3_runtime.PanicException.

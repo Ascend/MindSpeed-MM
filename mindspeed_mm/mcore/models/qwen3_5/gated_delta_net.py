@@ -1,7 +1,6 @@
 # Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 # Copyright (c) 2025, Songlin Yang, Jan Kautz, Ali Hatamizadeh.
 
-# Some of this code was adopted from https://github.com/huggingface/transformers
 # This source code is licensed under the Apache license found in the
 # LICENSE file in the root directory of this source tree.
 
@@ -458,7 +457,7 @@ class GatedDeltaNet(MegatronModule):
                 weight=conv1d_weight.transpose(-1, -2).contiguous(),
                 bias=conv1d_bias,
                 activation='silu',
-                cu_seqlens = None
+                cu_seqlens=None
             )
 
         query, key, value, gate, beta, alpha = self._prepare_qkv_for_gated_delta_rule(
@@ -497,33 +496,17 @@ class GatedDeltaNet(MegatronModule):
         )
 
         # Output projection
-        # nvtx_range_push(suffix="out_proj")
         out, out_bias = self.out_proj(norm_out)
-        # nvtx_range_pop(suffix="out_proj")
-
-        # if torch.distributed.get_rank() == 0:
-        #     breakpoint()
-        # torch.distributed.barrier()
 
         return out, out_bias
 
     @jit_fuser
     def _apply_gated_norm(self, x, gate):
         # Output Norm
-        # x_dtype = x.dtype
         x = x.reshape(-1, x.shape[-1])
         gate = gate.reshape(-1, gate.shape[-1])
-        # if torch.distributed.get_rank() == 0:
-        #     breakpoint()
-        # torch.distributed.barrier()
-        # self.out_norm.weight = torch.load("/mnt/sfs_turbo/c00685853/tmp/norm_weight.pt")
         y = self.out_norm(x, gate)
 
-        # y = y * self.act_fn(gate)
-        # Output gate
-        # gate = gate.reshape(-1, gate.shape[-1])
-        # y = y * self.act_fn(gate.float())
-        # y = y.to(x_dtype)
         return y
 
     @jit_fuser
@@ -593,12 +576,8 @@ class GatedDeltaNet(MegatronModule):
                 "dt_bias": 0,
             },  # parameters sharded across TP
             sharded_offsets=sharded_offsets,
-            # tp_group=(tp_group if tp_group is not None else self.pg_collection.tp),
-            # tp_group=(tp_group if tp_group is not None else self.tp_group),
-            # dp_cp_group=metadata['dp_cp_group'],
         )
         # Submodules
-        # tp_group = tp_group if tp_group is not None else self.pg_collection.tp
         tp_group = tp_group if tp_group is not None else self.tp_group
         for name, module in self.named_children():
             if name == "conv1d":
@@ -612,8 +591,6 @@ class GatedDeltaNet(MegatronModule):
                     f"{prefix}{name}.",
                     tp_sharding_map,
                     sharded_offsets,
-                    # tp_group=tp_group,
-                    # dp_cp_group=metadata['dp_cp_group'],
                 )
             else:
                 module_sharded_sd = sharded_state_dict_default(

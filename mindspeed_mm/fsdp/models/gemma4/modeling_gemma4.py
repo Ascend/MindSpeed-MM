@@ -68,7 +68,7 @@ if is_accelerate_available():
 class Gemma4ModelOutputWithPast(BaseModelOutputWithPast):
     r"""
     past_key_values (`Cache`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
-        It is a [`~cache_utils.Cache`] instance. For more details, see our [kv cache guide](https://huggingface.co/docs/transformers/en/kv_cache).
+        It is a [`~cache_utils.Cache`] instance.
 
         Contains pre-computed hidden-states (key and values in the self-attention blocks) that can be used (see
         `past_key_values` input) to speed up sequential decoding.
@@ -103,7 +103,7 @@ class Gemma4CausalLMOutputWithPast(ModelOutput):
     logits (`torch.FloatTensor` of shape `(batch_size, sequence_length, config.text_config.vocab_size)`):
         Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
     past_key_values (`Cache`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
-        It is a [`~cache_utils.Cache`] instance. For more details, see our [kv cache guide](https://huggingface.co/docs/transformers/en/kv_cache).
+        It is a [`~cache_utils.Cache`] instance.
 
         Contains pre-computed hidden-states (key and values in the self-attention blocks) that can be used (see
         `past_key_values` input) to speed up sequential decoding.
@@ -284,7 +284,7 @@ class Gemma4AudioAttention(nn.Module):
         return hidden_states.contiguous()
 
     def _rel_shift(self, x: torch.Tensor) -> torch.Tensor:
-        """Relative position shift for blocked attention. See appendix B of https://huggingface.co/papers/1901.02860."""
+        """Relative position shift for blocked attention."""
         batch_size, num_heads, num_blocks, block_size, position_length = x.shape
         context_size = self.context_size
         x = F.pad(x, (0, context_size + 1 - position_length))
@@ -739,7 +739,7 @@ class Gemma4VisionRotaryEmbedding(nn.Module):
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2 :]
+    x2 = x[..., x.shape[-1] // 2:]
     return torch.cat((-x2, x1), dim=-1)
 
 
@@ -1552,7 +1552,7 @@ class Gemma4TextModel(Gemma4PreTrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        # Gemma4 downcasts the below to bfloat16, causing sqrt(3072)=55.4256 to become 55.5. See https://github.com/huggingface/transformers/pull/29402
+        # Gemma4 downcasts the below to bfloat16, causing sqrt(3072)=55.4256 to become 55.5.
         self.embed_tokens = Gemma4TextScaledWordEmbedding(
             config.vocab_size, config.hidden_size, self.padding_idx, embed_scale=self.config.hidden_size**0.5
         )
@@ -1663,7 +1663,6 @@ class Gemma4TextModel(Gemma4PreTrainedModel):
 
         # Initialize as empty dict, or reuse past shared states. We use a UserDict instead of built-in dict (it behaves
         # the same) for fsdp2 support (otherwise, `_apply_to_tensors` rebuilds every dict it recurses into, and `shared_kv_states`
-        # is not correctly shared, see https://github.com/pytorch/pytorch/blob/v2.10.0/torch/distributed/utils.py#L223-L255)
         shared_kv_states = kwargs.pop("shared_kv_states", UserDict())
 
         # decoder layers
@@ -1879,7 +1878,7 @@ def sliding_window_mask_function(sliding_window: tuple[int, int]) -> Callable:
 
 
 class Gemma4AudioModel(Gemma4PreTrainedModel):
-    """An audio encoder based on the [Universal Speech Model](https://huggingface.co/papers/2303.01037) architecture."""
+    """An audio encoder based on the Universal Speech Model architecture."""
 
     config: Gemma4AudioConfig
     main_input_name = "input_features"
