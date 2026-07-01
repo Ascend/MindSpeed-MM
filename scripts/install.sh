@@ -220,8 +220,9 @@ if [ "$INSTALL_CANN" = true ]; then
     # Call install_cann.sh and pass ARCH parameter
     echo "Calling install_cann.sh with architecture: $ARCH"
     # Execute CANN installation script
-    if ! "$CANN_INSTALL_SCRIPT" "$ARCH"; then
-        cann_exit_code=$?
+    "$CANN_INSTALL_SCRIPT" "$ARCH"
+    cann_exit_code=$?
+    if [ $cann_exit_code -ne 0 ]; then
         echo "Error: CANN installation failed with exit code: $cann_exit_code"
         echo "Aborting installation due to CANN installation failure."
         exit 1
