@@ -87,7 +87,6 @@ def _test_param_p2p_comm():
         for i in range(executor.num_local_experts)
     ])
 
-    # dup_experts_map[dst_rank][dup_id] = global_src_expert_id
     # Rank0 wants expert3 (from rank1), Rank1 wants expert0 (from rank0)
     dup_map = [
         [3],   # rank0: dup0 ← expert3
