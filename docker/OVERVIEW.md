@@ -61,7 +61,17 @@ The `docker/build.sh` script will during the build process:
 
 ## 1. Image Usage Guide
 
-**Important Note:** Due to differences in dependencies between models, the image only pre-installs basic dependencies including torch, torch_npu, and decord. After pulling the image and starting a container, users need to manually install the dependencies required for their target model in the base environment according to the model's README file.
+**Important Note:** 
+
+1. Due to differences in dependencies between models, the image only pre-installs basic dependencies including torch, torch_npu, and decord. After pulling the image and starting a container, users need to manually install the dependencies required for their target model in the base environment according to the model's README file.
+2. If the NPU driver is not installed in the default path (/usr/local/Ascend/driver), you must specify the actual path in the Docker run command. For example, if the driver is located at /usr/local/npu/driver, adjust the command accordingly.
+
+    ```bash
+    # Basic run
+    docker run -it --rm \
+        -e LD_LIBRARY_PATH="/usr/local/npu/driver/lib64/driver:/usr/local/npu/driver/lib64/common:$LD_LIBRARY_PATH" \
+        mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
+    ```
 
 ### Running the Image
 
