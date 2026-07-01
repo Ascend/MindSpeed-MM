@@ -99,7 +99,17 @@ docker/
 
 ## 1. 镜像使用指导
 
-**重要提示：** 由于不同模型的依赖环境存在差异，镜像中仅预安装了 torch、torch_npu 和 decord 基础依赖包。用户在拉取镜像并启动容器后，需根据目标模型的 README 文件，在 base 环境中手动安装该模型所需的依赖环境。
+**重要提示：** 
+
+1. 由于不同模型的依赖环境存在差异，镜像中仅预安装了 torch、torch_npu 和 decord 基础依赖包。用户在拉取镜像并启动容器后，需根据目标模型的 README 文件，在 base 环境中手动安装该模型所需的依赖环境。
+2. 如果环境NPU驱动程序未安装在默认路径(/usr/local/Ascend/driver), 在执行下列docker运行命令时，需在命令中补充路径信息。以路径"/usr/local/npu/driver"为例:
+
+    ```bash
+    # 基本运行
+    docker run -it --rm \
+        -e LD_LIBRARY_PATH="/usr/local/npu/driver/lib64/driver:/usr/local/npu/driver/lib64/common:$LD_LIBRARY_PATH" \
+        mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
+    ```
 
 ### 运行镜像
 

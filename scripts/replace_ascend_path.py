@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # Copyright 2026 Huawei Technologies Co., Ltd
 """
-Batch-replace CANN/Ascend install paths in the MindSpeed-MM repository.
+Batch-replace HDK install paths in the MindSpeed-MM repository.
 
 Background:
-  In the international release, the CANN/HDK install path has changed from
-  /usr/local/Ascend to /usr/local/npu. This script replaces all occurrences
+  In the international release, the HDK install path has changed from
+  /usr/local/Ascend/driver to /usr/local/npu/driver. This script replaces all occurrences
   of the old path across the repository in one pass.
+  Note: This script will not modify itself.
 
 Usage:
   python3 scripts/replace_ascend_path.py [options]
@@ -15,7 +16,7 @@ Examples:
   # Preview changes without modifying any files
   python3 scripts/replace_ascend_path.py --dry-run
 
-  # Apply replacement: /usr/local/Ascend -> /usr/local/npu (default)
+  # Apply replacement: /usr/local/Ascend/driver -> /usr/local/npu/driver (default)
   python3 scripts/replace_ascend_path.py
 """
 
@@ -93,13 +94,13 @@ def main():
     )
     parser.add_argument(
         '--source',
-        default='/usr/local/Ascend',
-        help='Source path (default: /usr/local/Ascend)'
+        default='/usr/local/Ascend/driver',
+        help='Source path (default: /usr/local/Ascend/driver)'
     )
     parser.add_argument(
         '--target',
-        default='/usr/local/npu',
-        help='Target path (default: /usr/local/npu)'
+        default='/usr/local/npu/driver',
+        help='Target path (default: /usr/local/npu/driver)'
     )
     parser.add_argument(
         '--dir',
