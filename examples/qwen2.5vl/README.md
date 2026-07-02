@@ -763,9 +763,36 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh
 
 <a id="jump8.2"></a>
 
+### 权重转换
+
+由于训练与推理通常采用不同的并行切分策略，模型训练完成后，需要将权重转换为适配推理配置的格式。例如，7B 模型的默认训练脚本使用 PP=2，而推理评测时不开启 PP 或 TP，因此必须对训练后的权重进行重新切分。
+具体操作请参考[训练后重新切分权重](#jump2.4)章节。若您使用的是默认训练脚本，可参考以下命令进行权重转换。  
+注意！[训练后重新切分权重](#jump2.4)不支持VPP场景，如果设置VPP，可以先将megatron权重转为hf权重，再转为megatron权重。
+
+```bash
+mm-convert  Qwen2_5_VLConverter resplit \
+  --cfg.source_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
+  --cfg.target_dir "ckpt/mm_resplit_pp/Qwen2.5-VL-7B-Instruct" \
+  --cfg.source_parallel_config.llm_pp_layers [12,16] \
+  --cfg.source_parallel_config.vit_pp_layers [32,0] \
+  --cfg.source_parallel_config.tp_size 1 \
+  --cfg.target_parallel_config.llm_pp_layers [28] \
+  --cfg.target_parallel_config.vit_pp_layers [32] \
+  --cfg.target_parallel_config.tp_size 1
+# 其中:
+# source_dir: 微调后保存的权重目录
+# target_dir: 希望重新pp切分后保存的目录
+# source_parallel_config.llm_pp_layers: 微调时llm的pp配置
+# source_parallel_config.vit_pp_layers: 微调时vit的pp配置
+# source_parallel_config.tp_size: 微调时tp并行配置
+# target_parallel_config.llm_pp_layers: 期望的重切分llm模块切分层数
+# target_parallel_config.vit_pp_layers: 期望的重切分vit模块切分层数
+# target_parallel_config.tp_size: 期望的tp并行配置（tp_size不能超过原仓config.json中的num_key_value_heads）
+```
+
 ### 参数配置
 
-如果要进行评测需要将要评测的数据集名称和路径传到examples/qwen2.5vl/evaluate_qwen2_5_vl_7b.json
+如果要进行评测需要将要评测的数据集名称和路径传到examples/qwen2.5vl/evaluate_qwen2_5_vl_7b.json  
 需要更改的字段有
 
 - `tokenizer`中的`from_pretrained`为huggingface的Qwen2.5-VL的权重，参考readme上面链接自行下载传入
