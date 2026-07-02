@@ -14,7 +14,7 @@
 | 10 | LLM PP 切分为 0 层时出现 `learning_rate=None` assertion 报错 | 训练启动后立即崩溃 | PP 切分配置中 LLM 部分不能出现 0 层的 stage，例如 `llm=[0,8,10,10]` 会导致该问题，需调整为 `llm=[1,7,10,10]` 等确保每个 stage 均有 LLM 层 | 优化学习率加载逻辑以支持 0 层 stage | - |
 | 11 | 数据预处理超时或同步报错 | 大数据集训练无法启动 | 可增大超时参数 `--distributed-timeout-minutes`；对于超大数据集（百万级以上），建议分批预处理或使用更高性能存储 | 优化数据预处理并行效率 | - |
 | 12 | 网卡名称错误导致通信超时 | 多机训练无法启动 | 使用 `ifconfig` 检查网卡名称，设置对应环境变量：`export HCCL_SOCKET_IFNAME=<网卡名>`、`export TP_SOCKET_IFNAME=<网卡名>`、`export GLOO_SOCKET_IFNAME=<网卡名>` | - | - |
-| 13 | 保存 checkpoint 时超时报错 | 训练完成后保存权重失败 | 确保磁盘 IO 带宽正常，单个节点最大约 60G 文件需在 36 分钟内保存完成；也可忽略该报错，不影响已保存的权重 | - | - |
+| 13 | 保存 checkpoint 时超时报错 | 训练完成后保存权重失败 | 确保磁盘 IO 带宽正常，单个节点最大约60GB文件需在36分钟内保存完成；也可忽略该报错，不影响已保存的权重 | - | - |
 | 14 | 复制脚本后出现 `syntax error near unexpected token` | 脚本无法执行 | 从 Windows 复制脚本到 Linux 时换行符不匹配，执行 `dos2unix xxx.sh` 或在 vim 中设置 `:set ff=unix` | - | - |
 | 15 | 不同 CANN 版本环境变量冲突 | 多版本环境下训练异常 | 不同版本的 CANN 包建议使用 Docker 隔离，避免环境变量互相干扰 | - | - |
 | 16 | 多模态模型训练中快慢卡负载不均衡 | 训练效率低下 | 使用多模态异构 PP 切分，将视觉编码器、音频编码器和 LLM 分别配置不同的 PP 层数分布，避免某些卡负载过重 | - | [异构并行](./features/hetero_parallel.md) |

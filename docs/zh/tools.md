@@ -27,9 +27,9 @@ prof.stop()
 
 ### 静态采集
 
-`Static Profile`静态采集功能为执行模型训练过程中，针对指定的steps区间进行采集，操作步骤如下：
+`Static Profile`静态采集功能在执行模型训练过程中，针对指定的steps区间进行采集，操作步骤如下：
 
-1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 static, 设置 `ranks`。
+1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 static，设置 `ranks`。
 
 2. 配置静态采集的相关参数。
 
@@ -84,7 +84,7 @@ prof.stop()
     - 动态采集通过识别`profiler_config.json`文件的状态判断文件是否被修改，若感知到`profiler_config.json`文件被修改，`dynamic_profile`会在下一个step时开启Profiling任务
     - `config_path`目录下会自动记录`dynamic_profile`的维测日志
 
-动态采集的具体参数、入参表、及具体操作步骤等请参考《CANN性能调优工具用户指南》的“[Ascend PyTorch Profiler接口采集](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)”章节。
+动态采集的具体参数、入参表及具体操作步骤等请参考《CANN性能调优工具用户指南》的“[Ascend PyTorch Profiler接口采集](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)”章节。
 
 ### 离线解析命令参数说明
 
@@ -117,7 +117,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 
 此命令将解析指定路径下的所有profiling数据，具体可参考《CANN性能调优工具用户指南》的“[离线解析](https://www.hiascend.com/document/detail/zh/canncommercial/900/devaids/Profiling/atlasprofiling_16_0034.html)”章节。
 
-对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以节约训练时资源占用。
+对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以降低训练时资源占用。
 
 ## Sora类模型特征提取
 
