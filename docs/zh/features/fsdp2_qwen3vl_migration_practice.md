@@ -13,9 +13,9 @@
 
 若仅需使用现成样例跑通 Qwen3-VL 微调、而非接入新模型，请参考 [Qwen3VL README](../../../examples/qwen3vl/README_v1.md)。
 
-## 1. 源模型与迁移目标
+## 源模型与迁移目标
 
-### 1.1 源模型结构
+### 源模型结构
 
 Qwen3-VL 的参考实现在 Hugging Face Transformers 仓库的 [src/transformers/models/qwen3_vl_moe](https://github.com/huggingface/transformers/tree/main/src/transformers/models/qwen3_vl_moe) 目录，顶层类为 `Qwen3VLMoeForConditionalGeneration`，主要由视觉编码器、语言模型、输出头三部分组成，结构如下：
 
@@ -33,7 +33,7 @@ Qwen3VLMoeForConditionalGeneration
 
 建议先梳理该模块树：后续的 FSDP 分片计划、冻结配置、重计算配置，填写的都是这些模块路径。样例 [`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`](../../../examples/qwen3vl/qwen3vl_30B_config_v1.yaml) 的 `parallel.fsdp_plan.apply_modules` 即按这些路径配置，可对照参考。
 
-### 1.2 迁移目标：插件式 FSDP2 后端
+### 迁移目标：插件式 FSDP2 后端
 
 MindSpeed MM 新模型基于**插件式 FSDP2 后端**接入：训练入口为 `mindspeed_mm/fsdp/train/trainer.py`，通过一份顶层 YAML 驱动训练。本文即以该后端为准，使用启动脚本 `finetune_qwen3vl_30B_v1.sh` 与配置 `qwen3vl_30B_config_v1.yaml`。
 
@@ -41,14 +41,14 @@ MindSpeed MM 新模型基于**插件式 FSDP2 后端**接入：训练入口为 `
 
 | 工作项 | 落点 | Qwen3VL 的做法 |
 |---|---|---|
-| 模型接入 | `mindspeed_mm/fsdp/models/qwen3vl/` | 拷贝 HF modeling 进仓改造（见第 2 节） |
-| 数据接入 | 无新增文件 | 复用通用 `huggingface` 数据集 + 内置 collator（见第 3 节） |
-| 训练配置 | `qwen3vl_30B_config_v1.yaml` | 一份顶层 YAML（见第 4 节） |
-| 启动脚本 | `examples/qwen3vl/finetune_qwen3vl_30B_v1.sh` | 通过 torchrun 启动训练器（见第 5 节） |
+| 模型接入 | `mindspeed_mm/fsdp/models/qwen3vl/` | 拷贝 HF modeling 进仓改造|
+| 数据接入 | 无新增文件 | 复用通用 `huggingface` 数据集 + 内置 collator |
+| 训练配置 | `qwen3vl_30B_config_v1.yaml` | 一份顶层 YAML|
+| 启动脚本 | `examples/qwen3vl/finetune_qwen3vl_30B_v1.sh` | 通过 torchrun 启动训练器|
 
-## 2. 模型接入
+## 模型接入
 
-### 2.1 插件式 FSDP2 核心文件概览
+### 插件式 FSDP2 核心文件概览
 
 模型接入的本质，是让模型类被框架的训练流程识别、构建并施加 FSDP2 策略。下表列出接入过程中涉及的核心文件，了解其职责有助于理解后续步骤（均位于 `mindspeed_mm/fsdp/` 下）：
 
@@ -63,9 +63,7 @@ MindSpeed MM 新模型基于**插件式 FSDP2 后端**接入：训练入口为 `
 | `train/train_engine.py` | 单步训练逻辑（`TrainEngine`） | 以 `model(**batch, use_cache=False)` 调用模型并读取 `output.loss`，模型 forward 需匹配此调用方式 |
 | `checkpoint/dcp_checkpointer.py` | 检查点读写（`DistributedCheckpointer`） | 训练检查点的保存与加载走 DCP 格式（meta init 加载 DCP 权重亦经此） |
 
-后续 2.2~2.4 节的接入动作，都是围绕这几个文件展开。
-
-### 2.2 接入方式的选择
+### 接入方式的选择
 
 模型接入有三种方式：自定义模型接入、Transformers 模型接入、第三方模型适配封装。**Qwen3VL 属于第二种"Transformers 模型接入"**：模型类保持继承 HF `PreTrainedModel`，沿用 HF 体系的构建与权重加载方式。
 
@@ -84,7 +82,7 @@ MindSpeed MM 新模型基于**插件式 FSDP2 后端**接入：训练入口为 `
 | 属 HF 体系，但需深入 forward 改造（Qwen3VL 即此类） | Transformers 接入：拷贝 modeling 进仓改造，并尽量保持与上游文件的 diff 最小，便于后续跟随上游升级 |
 | 非 HF 体系，或结构不便修改 | 自定义模型接入，或第三方适配封装 |
 
-### 2.3 拷贝、注册与框架识别
+### 拷贝、注册与框架识别
 
 模型文件放在约定目录下，Qwen3VL 只有两个文件：
 
@@ -108,17 +106,17 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
 
 另一个要点：改造后的类**仍然继承 HF 的 `PreTrainedModel`**，因此框架会自动按 Transformers 方式构建模型并加载权重，无需自行实现加载逻辑（仅非 HF 体系的自定义模型才需实现 `_from_config`/`from_pretrained`）。
 
-### 2.4 模型改造：必做项与可选增强
+### 模型改造：必做项与可选增强
 
 仓内版本的改动分为必做项和可选增强两类。建议先完成必做项、把模型以最朴素的形态跑通，可选增强按场景再叠加，不必一开始就全部完成。
 
 必做项是让模型能被训练引擎正常调用：`forward` 接收 dataloader 产出的 batch 字段、并返回带 `.loss` 的输出对象（训练引擎以 `model(**batch_data, use_cache=False)` 调用并读取 `output.loss`）。继承自 HF `PreTrainedModel` 的模型还需设置 `accepts_loss_kwargs = False`（Qwen3VL 已自带，迁移其他 HF 模型时确认保留即可）。
 
-完成必做项后，配合第 3、4 节的数据与 YAML 配置，模型即可正常训练。除此之外的改造都是可选的，仅在命中对应场景时才需要：需要**长序列训练**时，模型 forward 要适配序列并行（CP）的切分/聚合通信，否则保持 `parallel.ulysses_parallel_size: 1` 即可；追求**极致性能**时，可将热点算子替换为 `mindspeed_mm/fsdp/ops/` 下的融合算子；**MoE 模型需要专家负载均衡**时，模型要支持辅助损失。若你的模型不涉及这些场景，可跳过；Qwen3VL 同时涉及上述几类，其 `modeling_qwen3_vl_moe.py` 与 `npu_patch.py` 可作参考实现。
+完成必做项后，配合之前配置的数据与 YAML 配置，模型即可正常训练。除此之外的改造都是可选的，仅在命中对应场景时才需要：需要**长序列训练**时，模型 forward 要适配序列并行（CP）的切分/聚合通信，否则保持 `parallel.ulysses_parallel_size: 1` 即可；追求**极致性能**时，可将热点算子替换为 `mindspeed_mm/fsdp/ops/` 下的融合算子；**MoE 模型需要专家负载均衡**时，模型要支持辅助损失。若你的模型不涉及这些场景，可跳过；Qwen3VL 同时涉及上述几类，其 `modeling_qwen3_vl_moe.py` 与 `npu_patch.py` 可作参考实现。
 
-## 3. 数据接入
+## 数据接入
 
-### 3.1 数据处理的复用与适配
+### 数据处理的复用与适配
 
 原始数据（对话 json、图像/视频）按实际任务准备；迁移时需要判断**数据处理链路能否复用、还是要适配**。该链路由三部分组成，是否复用各看条件：
 
@@ -128,7 +126,7 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
 
 Qwen3VL 三部分的实际选择：**数据集构建**复用通用 `huggingface`；**多模态打包**用 `Qwen3VLPlugin`（继承 `Qwen2VLPlugin`，按 Qwen3-VL 的视觉 token 占位、视频时间戳等覆写，把 `<image>`/`<video>` 占位符展开为带 vision 特殊 token 的序列并产出 `pixel_values`/`image_grid_thw`）；**collator** 复用 `DataCollatorForQwen2vl`，在 `data_collator.py` 注册为 `qwen3vl`。
 
-### 3.2 数据接入的配置方式
+### 数据接入的配置方式
 
 数据集、Plugin、collator 就位后，数据接入主要体现在 YAML 的 `data` 段中（其中 `template` 字段会选定对应的 Plugin）。Qwen3VL 的关键配置（节选，其中路径均为示例、需按实际情况修改，完整内容见 `qwen3vl_30B_config_v1.yaml`）：
 
@@ -162,14 +160,14 @@ data:
 
 两个易错点：
 
-- `model_name_or_path` 在这里**只用来加载 tokenizer 和 processor**，不加载训练权重（权重由 `training.load` 指定，见 4.4 节）；
+- `model_name_or_path` 在这里**只用来加载 tokenizer 和 processor**，不加载训练权重（权重由 `training.load` 指定）。
 - `template` 填错会导致 prompt 拼接与模型预训练格式不一致，loss 正常下降但效果差，迁移新模型时务必确认模板。
 
-## 4. 训练 YAML 配置
+## 训练 YAML 配置
 
 插件式 FSDP2 的全部训练行为由一份 YAML 驱动。下面按配置段说明 Qwen3VL 的选择，完整字段以样例 `qwen3vl_30B_config_v1.yaml` 为准。
 
-### 4.1 parallel 段：分片计划的制定
+### parallel 段：分片计划的制定
 
 ```yaml
 parallel:
@@ -193,9 +191,9 @@ parallel:
       - model.language_model.layers.{*}.mlp.experts   # 预留：EP 开启时按专家切分
 ```
 
-`apply_modules` 的取值来自第 1.1 节的模块树，`{*}` 通配层号；框架会对其中列出的每个模块、以及最外层 model 依次执行 `fully_shard` 分片（`apply_modules` 为空时只分片最外层 model）。常规微调直接沿用样例的这份配置即可；如需自定义，模块路径须取自模型 `named_modules()`，且开启 prefetch 时不要随意调整已验证配置中的模块顺序。
+`apply_modules` 的取值来自[源模型结构](#源模型结构)的模块树，`{*}` 通配层号；框架会对其中列出的每个模块、以及最外层 model 依次执行 `fully_shard` 分片（`apply_modules` 为空时只分片最外层 model）。常规微调直接沿用样例的这份配置即可；如需自定义，模块路径须取自模型 `named_modules()`，且开启 prefetch 时不要随意调整已验证配置中的模块顺序。
 
-### 4.2 model 段：冻结决策
+### model 段：冻结决策
 
 ```yaml
 model:
@@ -208,7 +206,7 @@ model:
 
 `freeze` 列出的模块会被设为 `requires_grad=False`，不参与训练，也不再为其保存梯度与优化器状态（节省相应显存）。样例冻结了视觉编码器 `model.visual`；若任务需要训练视觉编码器，删除该行即可。
 
-### 4.3 features 段：显存与 loss 策略
+### features 段：显存与 loss 策略
 
 ```yaml
 features:
@@ -224,11 +222,11 @@ features:
 
 样例默认启用重计算（`recompute: true`，以计算换显存）。注意这些字段**必须放在顶层 `features:` 段**，放在 `model:` 段不会报错但完全不生效。
 
-`recompute_plan` 中的 `model.visual.blocks`：视觉编码器被冻结后（见 4.2），反向不经过它，重计算对其不省显存；此处保留是为了在放开视觉编码器训练时无需改动该配置，确定不训练也可删去。
+`recompute_plan` 中的 `model.visual.blocks`：视觉编码器被冻结后，反向不经过它，重计算对其不省显存；此处保留是为了在放开视觉编码器训练时无需改动该配置，确定不训练也可删去。
 
 显存仍紧张时，可在 `features` 段进一步开启 ChunkLoss（`enable_chunk_loss`）、异步激活值卸载（`enable_activation_offload`）等特性，样例 YAML 已预留对应配置块。
 
-### 4.4 training 段：权重加载方式
+### training 段：权重加载方式
 
 ```yaml
 training:
@@ -257,9 +255,9 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 然后把 YAML 里 `training.load` 取消注释，填转换得到的 DCP 目录 `ckpt/Qwen3-VL-30B-A3B-Instruct-dcp`。转换工具的更多用法见 [权重转换](../pytorch/weight_conversion.md)。
 
-`plugin` 列表则把第 2、3 节的成果接进框架：启动时按顺序导入这两个目录，模型与数据集完成注册，`model_id`/`dataset_type` 才找得到对应实现。
+`plugin` 列表则把[模型接入](#模型接入)与[数据接入](#数据接入)的成果接进框架：启动时按顺序导入这两个目录，模型与数据集完成注册，`model_id`/`dataset_type` 才找得到对应实现。
 
-## 5. 启动脚本与运行
+## 启动脚本与运行
 
 启动脚本 `examples/qwen3vl/finetune_qwen3vl_30B_v1.sh` 的骨架：
 
@@ -292,7 +290,7 @@ torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
 
 注意 torchrun 的入口是统一训练器 `mindspeed_mm/fsdp/train/trainer.py`，唯一参数就是那份 YAML，这意味着迁移新模型时启动脚本几乎可以原样复制，只改 YAML 路径和卡数。各环境变量的含义见脚本内注释。
 
-卡数按实际硬件调整 `NPUS_PER_NODE` 即可，YAML 中 `fully_shard_parallel_size: auto` 会按总卡数自动设定分片组；卡数较少时可同步调小 `micro_batch_size`、`cutoff_len` 或开启更多显存优化（见 4.3 节）以适配显存。
+卡数按实际硬件调整 `NPUS_PER_NODE` 即可，YAML 中 `fully_shard_parallel_size: auto` 会按总卡数自动设定分片组；卡数较少时可同步调小 `micro_batch_size`、`cutoff_len` 或开启更多显存优化以适配显存。
 
 确认数据与权重就绪后，在仓库根目录启动：
 
@@ -302,7 +300,7 @@ bash examples/qwen3vl/finetune_qwen3vl_30B_v1.sh
 
 日志输出到 `logs/` 目录。权重下载、COCO 数据集准备等通用操作步骤本文不重复，按 [Qwen3VL README](../../../examples/qwen3vl/README_v1.md) 执行即可。
 
-**如何确认跑通**：启动后训练日志会按 `log_interval` 周期打印每个 iteration 的关键指标，形如：
+**如何确认训练成功启动**：启动后训练日志会按 `log_interval` 周期打印每个 iteration 的关键指标，形如：
 
 ```text
 iteration 1/10000 | consumed samples: 8 | elapsed time per iteration (ms): 6603.7 | learning rate: 0.000000E+00 | global batch size: 8 | loss: 1.016570E+01 | grad norm: 50.001 |
@@ -311,7 +309,7 @@ iteration 2/10000 | consumed samples: 16 | elapsed time per iteration (ms): 2231
 
 只要日志能持续按 iteration 打印、`loss` 在合理范围且随训练总体下降、`grad norm` 未出现 NaN/Inf，即说明已正常跑通（首个 iteration 通常较慢，因包含编译与初始化开销，属正常现象）。若启动报错或卡住，可查阅 [FAQ](../FAQ.md)。
 
-## 6. 训练跑通之后
+## 训练成功启动后
 
 - **精度对齐**：迁移的模型跑通后，建议与源仓（GPU/参考框架）对齐精度。具体做法是开启确定性计算（`training.use_deter_comp: true`）、固定随机种子、关闭数据 shuffle，消除随机性后对比两边的 loss 曲线是否一致；
 - **性能调优**：采集 Profiling、定位瓶颈、按需开启序列并行/预取/ChunkLoss 等，见 [性能调优](../pytorch/performance_tuning.md)；

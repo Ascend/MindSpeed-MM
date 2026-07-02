@@ -34,35 +34,83 @@
 
 > [!NOTE]
 >
-> 有关MindSpeed的版本维护，具体请参见[分支维护策略](https://gitcode.com/Ascend/MindSpeed/tree/26.0.0_core_r0.12.1#%E5%88%86%E6%94%AF%E7%BB%B4%E6%8A%A4%E7%AD%96%E7%95%A5)。
+> 有关MindSpeed MM的版本维护策略，具体请参见[版本维护](https://gitcode.com/Ascend/MindSpeed-MM#%E7%89%88%E6%9C%AC%E7%BB%B4%E6%8A%A4)。
 
 ### 相关产品版本配套说明
 
 **表 1**  MindSpeed MM配套表
 
-|MindSpeed MM代码分支名称|Megatron版本|CANN版本|Ascend Extension for PyTorch版本|Triton-Ascend版本|Python版本|PyTorch版本|
-|--|--|--|--|--|--|--|
-|master（在研版本）|core_v0.12.1|在研版本|在研版本|在研版本|Python3.10|2.7.1|
-|26.0.0|core_v0.12.1|9.0.0|26.0.0|3.2.1|Python3.10|2.7.1|
-|2.3.0|core_v0.12.1|8.5.0|7.3.0|3.2.0|Python3.10|2.7.1|
-|2.2.0|core_v0.12.1|8.3.RC1|7.2.0|-|Python3.10|2.7.1|
+| MindSpeed MM版本 | MindSpeed Core代码分支名称 | Megatron版本 | PyTorch版本  | Ascend Extension for PyTorch版本 | CANN版本 | Triton-Ascend版本 | Python版本     |
+| ---------------- | ------------------ | ------------ | -----------  | ------------- |--------------------- |-----------------| ------------------- |
+| master（在研版本）| master（在研版本）  | core_v0.12.1  | 2.7.1       | 在研版本       | 在研版本  | 在研版本            | Python3.10      |
+| 26.0.0           | 26.0.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.0.0        | 9.0.0  | 3.2.1           | Python3.10      |
 
 >[!NOTE]
 >
->用户可根据需要选择MindSpeed MM代码分支下载源码并进行安装。
+>- 用户可根据需要选择MindSpeed MM代码分支下载源码并进行安装。
+>- Triton-Ascend版本与CANN版本强绑定，Triton-Ascend的使用应该与CANN版本一一对应，详见[Triton-Ascend兼容性](https://gitcode.com/Ascend/triton-ascend#%E5%85%BC%E5%AE%B9%E6%80%A7)。
 
 ## 版本兼容性说明
 
-|MindSpeed MM版本|CANN版本|Ascend Extension for PyTorch版本|
-|--|--|--|
-|26.0.0|CANN 9.0.0<br>CANN 8.5.0<br>CANN 8.3.RC1<br>CANN 8.2.RC1<br>CANN 8.1.RC1<br>|26.0.0|
-|2.3.0|CANN 8.5.0<br>CANN 8.3.RC1<br>CANN 8.2.RC1<br>CANN 8.1.RC1<br>CANN 8.0.0<br>|7.3.0|
-|2.2.0|CANN 8.3.RC1<br>CANN 8.2.RC1<br>CANN 8.1.RC1<br>CANN 8.0.0<br>CANN 8.0.RC3<br>CANN 8.0.RC2|7.2.0|
+> [!NOTE]
+>
+> 本节表格中“/”表示不可配套，“Y”表示可配套。
 
-|CANN版本|Triton-Ascend版本|
-|--|--|
-|CANN 9.0.0|3.2.1|
-|CANN8.5.0|3.2.0|
+**表 2**  MindSpeed MM与Ascend Extention for PyTorch版本兼容
+
+<table style="table-layout: fixed; width: 433px"><colgroup>
+<col style="width: 156px">
+<col style="width: 88px">
+<col style="width: 91px">
+<col style="width: 98px">
+</colgroup>
+<thead>
+  <tr>
+    <th rowspan="2">MindSpeed MM</th>
+    <th colspan="3">Ascend Extention for PyTorch版本</th>
+  </tr>
+  <tr>
+    <th>7.2.0</th>
+    <th>7.3.0</th>
+    <th>26.0.0</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td>26.0.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+</tbody>
+</table>
+
+**表 3**  MindSpeed MM与CANN版本兼容
+
+<table style="table-layout: fixed; width: 449px"><colgroup>
+<col style="width: 162px">
+<col style="width: 91px">
+<col style="width: 94px">
+<col style="width: 102px">
+</colgroup>
+<thead>
+  <tr>
+    <th rowspan="2">MindSpeed MM</th>
+    <th colspan="3">CANN版本</th>
+  </tr>
+  <tr>
+    <th>8.3.RC1</th>
+    <th>8.5.0</th>
+    <th>9.0.0</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td>26.0.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+</tbody>
+</table>
 
 ## 版本使用注意事项
 
