@@ -414,11 +414,13 @@ class TrainEngine:
             state["optimizer"] = self.optimizer
         if not args.training.no_save_rng:
             state["extra_state"]["torch_rng_state"] = torch.get_rng_state()
+        save_ckpt_dtype = get_dtype(args.training.save_ckpt_dtype) if args.training.save_ckpt_dtype else None
         self.checkpointer.save(
             args.training.save,
             state=state,
             iteration=iteration,
             enable_lora=args.training.lora.enable,
+            save_ckpt_dtype=save_ckpt_dtype
         )
 
         # Synchronize all processes after saving

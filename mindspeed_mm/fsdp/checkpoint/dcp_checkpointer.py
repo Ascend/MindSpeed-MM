@@ -48,7 +48,7 @@ class ModelState(Stateful):
         model (Model): model to wrap.
     """
 
-    def __init__(self, model):
+    def __init__(self, model, save_ckpt_dtype: Optional[torch.dtype] = None):
         self.model = model
 
         # Determine whether this is EP+FSDP2 case
@@ -56,10 +56,15 @@ class ModelState(Stateful):
         # For FSDP1, it is implemented by FSDPExtension and state_dict hooks
         # which is aumatically triggered by get_model_state_dict
         self.parallel_state = get_parallel_state()
+        self.save_ckpt_dtype = save_ckpt_dtype
 
     @torch.no_grad()
     def state_dict(self):
         model_state_dict = get_model_state_dict(model=self.model)
+        if self.save_ckpt_dtype is not None:
+            for k, v in model_state_dict.items():
+                if isinstance(v, torch.Tensor) and torch.is_floating_point(v):
+                    model_state_dict[k] = v.to(self.save_ckpt_dtype)
         return model_state_dict
 
     @torch.no_grad()
@@ -79,13 +84,13 @@ class LoraModelState(ModelState):
         model (Model): lora model to wrap.
     """
 
-    def __init__(self, model):
-        super().__init__(model)
+    def __init__(self, model, save_ckpt_dtype: Optional[torch.dtype] = None):
+        super().__init__(model, save_ckpt_dtype=save_ckpt_dtype)
         self.key_mapping = None
 
     @torch.no_grad()
     def state_dict(self):
-        model_state_dict = get_model_state_dict(model=self.model)
+        model_state_dict = super().state_dict()
         self.key_mapping = remove_base_layer_keys(model_state_dict)
         return model_state_dict
 
@@ -155,6 +160,7 @@ class DistributedCheckpointer(CheckpointerBase):
         iteration: int = None,
         storage_writer: Optional[FileSystemWriter] = None,
         enable_lora: bool = False,
+        save_ckpt_dtype: Optional[torch.dtype] = None,
     ) -> None:
         """
         save training state to distributed checkpoint
@@ -166,6 +172,7 @@ class DistributedCheckpointer(CheckpointerBase):
             iteration: global steps
             storage_writer: storage writer backend for dcp.save and dcp.async_save. If None, will use FileSystemWriter
             enable_lora: whether to use LoraModelState for key transformation
+            save_ckpt_dtype: optional dtype to cast model weights to before saving. None keeps current dtype.
         return:
             None
         """
@@ -177,7 +184,8 @@ class DistributedCheckpointer(CheckpointerBase):
         # saving extra_state first to gurantee that every saved model/optimizer ckpts have their extra_state saved before them
         cls._save_extra_state(checkpoint_dir=checkpoint_dir, state=state)
 
-        save_state = {"model": LoraModelState(state["model"])} if enable_lora else {"model": ModelState(state["model"])}
+        model_state_cls = LoraModelState if enable_lora else ModelState
+        save_state = {"model": model_state_cls(state["model"], save_ckpt_dtype)}
         if "optimizer" in state:
             save_state["optimizer"] = OptimizerState(model=state["model"], optimizer=state["optimizer"])  # type: ignore[index]
 
@@ -230,7 +238,8 @@ class DistributedCheckpointer(CheckpointerBase):
         if "model" not in state:
             raise ValueError("Model must be provided to load a distributed checkpoint.")
 
-        load_state = {"model": LoraModelState(state["model"])} if enable_lora else {"model": ModelState(state["model"])}
+        model_state_cls = LoraModelState if enable_lora else ModelState
+        load_state = {"model": model_state_cls(state["model"])}
         if not release and "optimizer" in state:
             load_state["optimizer"] = OptimizerState(model=state["model"], optimizer=state["optimizer"])  # type: ignore[index]
 

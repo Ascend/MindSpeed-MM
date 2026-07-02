@@ -200,6 +200,13 @@ class TrainingArguments(BaseArguments):
         default=False,
         metadata={"help": "Whether to save checkpoint asynchronously."},
     )
+    save_ckpt_dtype: Optional[Literal["fp32", "fp16", "bf16"]] = field(
+        default=None,
+        metadata={"help": "Cast model weights to the corresponding dtype when saving checkpoint. "
+                        "None (default) keeps the model's current dtype. "
+                        "Warning: casting to fp16/bf16 is lossy and may cause "
+                        "numerical divergence when resuming training."},
+    )
     load_checkpoint_path: Optional[str] = field(
         default=None,
         metadata={"help": "Path to checkpoint to resume from."},
