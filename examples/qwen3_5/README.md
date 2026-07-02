@@ -122,29 +122,6 @@ pip list | grep fla_npu
 
 如果使用fsdp2的meta init初始化模型或MoE模型需要支持mtp，都需要先根据模型配置完成以下权重转换：
 
-(1) 模型配置文件config.json中的`tie_word_embeddings`字段为`true`时（例如0.8B，2B，4B模型），使用以下转换脚本：
-
-```bash
-mm-convert Qwen35Converter hf_to_dcp \
---hf_dir ckpt/hf_path/xxxxxxx \
---dcp_dir ckpt/dcp_path/xxxxxxx \
---tie_weight_mapping '{"lm_head.weight":"model.language_model.embed_tokens.weight"}' \
---num_workers 0
-
-# 其中：
-# hf_dir: huggingface权重目录
-# dcp_dir: 转换后DCP格式的权重保存目录
-# tie_weight_mapping: 权重绑定映射关系
-# num_workers: 并行工作线程数，0表示串行执行，若存储IO性能允许，可适当调大并发数以提升转换效率，推荐设置为4
-
-# 转换后的目录结构为：
-# ———— xxxxxxx
-#   |—— release
-#   |—— latest_checkpointed_iteration.txt
-```
-
-(2) 其它场景:
-
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \

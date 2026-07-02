@@ -173,8 +173,13 @@ def _retie_embeddings(model: torch.nn.Module) -> None:
         return
 
     try:
-        input_embeddings = model.get_input_embeddings()
-        output_embeddings = model.get_output_embeddings()
+        try:
+            input_embeddings = model.get_input_embeddings()
+            output_embeddings = model.get_output_embeddings()
+        except NotImplementedError:
+            input_embeddings = None
+            output_embeddings = None
+
         if input_embeddings is None or output_embeddings is None:
             return
         # Object-reference assignment -- after this both modules share the same
@@ -220,8 +225,6 @@ def post_process_after_load(
             len(missing),
             sorted(missing),
         )
-
-    _retie_embeddings(model)
 
 
 @torch.no_grad()

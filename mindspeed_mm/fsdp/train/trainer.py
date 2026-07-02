@@ -41,6 +41,7 @@ from mindspeed_mm.fsdp.utils.lora_utils import (
 )
 from mindspeed_mm.fsdp.utils.lora_weight_manager import LoraWeightManager
 from mindspeed_mm.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _retie_embeddings
 
 
 logger = logging.getLogger(__name__)
@@ -210,6 +211,9 @@ class Trainer:
         if args.training.lora.enable:
             self.lora_weight_manager = LoraWeightManager(model)
             self.lora_weight_manager.verify_lora_weights()
+
+        # Re-tie embed_tokens and lm_head weights when tie_word_embeddings is true
+        _retie_embeddings(model)
 
         return model
 
