@@ -1,3 +1,7 @@
+# Copyright (c) 2025, Bytedance Ltd. and/or its affiliates
+# Copyright (c) 2024, Huawei Technologies Co., Ltd
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+
 import os
 os.environ["USE_TF"] = "FALSE"
 

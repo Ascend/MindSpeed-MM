@@ -175,7 +175,7 @@ class TikTokenTokenizer(PreTrainedTokenizer):
         if len(kwargs) > 0:
             return super().encode(text, **kwargs)
 
-        if type(text) is not str:
+        if not isinstance(text, str):
             raise AssertionError("The input to be encoded is not string.")
 
         # The tiktoken tokenizer can handle <=400k chars without
