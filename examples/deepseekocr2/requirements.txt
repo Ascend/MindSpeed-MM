@@ -1,4 +1,4 @@
-transformers==4.46.3
+transformers==4.57.0
 tokenizers==0.20.3
 addict
 easydict

@@ -4,7 +4,6 @@ from enum import Enum
 from typing import Optional, Union, Callable
 
 import torch
-from diffusers.training_utils import compute_density_for_timestep_sampling
 from torch import nn
 from tqdm.auto import tqdm
 
