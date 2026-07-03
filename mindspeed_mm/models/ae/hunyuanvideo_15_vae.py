@@ -23,11 +23,9 @@ import torch.distributed as dist
 import torch.nn.functional as F
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.autoencoders.vae import BaseOutput
-from diffusers.models.modeling_outputs import AutoencoderKLOutput
 from diffusers.models.modeling_utils import ModelMixin
 from einops import rearrange
 from torch import Tensor, nn
-from torch.distributed.device_mesh import init_device_mesh
 from torch.nn import Conv3d
 
 from mindspeed_mm.models.common.checkpoint import load_checkpoint

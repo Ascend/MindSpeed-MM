@@ -190,7 +190,7 @@
     vim examples/text_to_image/train_text_to_image_sdxl.py
     ```
 
-    1. 在文件58行修改修改version
+    1. 在文件58行修改version
 
         ```python
         # 讲minimum version从0.31.0修改为0.30.0
@@ -216,6 +216,47 @@
         ```
 
     4. 【FPS打印方式请参考train_text_to_image_sdxl_pretrain.py】
+
+        ```python
+        import time # 新增代码
+        for epoch in range(first_epoch, args.num_train_epochs):
+          train_loss = 0.0
+          step_end_time = time.time() # 新增代码
+          for step, batch in enumerate(train_dataloader):
+            step_data_time = time.time() - step_end_time # 新增代码
+            with accelerator.accumulate(unet):
+              ... ...
+
+            if global_step >= args.max_train_steps:
+                break
+
+            # 以下是新增代码
+            accelerator.print(f"step_train_time: {step_total_time}")
+            accelerator.print(f"step_data_time: {step_data_time}")
+            accelerator.print(
+                f"FPS: {args.train_batch_size * accelerator.num_processes / (step_total_time - step_data_time)}"
+            )
+            step_end_time = time.time()
+        ```
+
+    修改`src/diffusers/pipelines/pipeline_loading_utils.py`文件
+
+    ```bash
+    vim src/diffusers/pipelines/pipeline_loading_utils.py
+    ```
+
+    1. 在文件697行附近添加加以下代码
+
+        ```python
+        # 以下是新增代码
+        from ..utils import is_transformers_version
+        if is_transformers_model and is_transformers_version(">=", "4.57.0"):
+          loading_kwargs.pop("offload_state_dict")
+
+        # 以下是原始代码
+        # check if the module is in a subdirectory
+        # ... ...
+        ```
 
 3. 【启动 SDXL 预训练脚本】
 

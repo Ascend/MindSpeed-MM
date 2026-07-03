@@ -64,7 +64,7 @@ GPT_ARGS="
     --lr 1.0e-5 \
     --lr-decay-style cosine \
     --weight-decay 0 \
-    --train-iters 2 \
+    --train-iters 3 \
     --lr-warmup-fraction 0.1 \
     --clip-grad 0.0 \
     --adam-beta1 0.9 \
