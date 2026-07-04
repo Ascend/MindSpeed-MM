@@ -21,6 +21,7 @@
   - [配置参数](#2-配置参数)
   - [启动微调](#3-启动微调)
 - [环境变量声明](#环境变量声明)
+- [注意事项](#注意事项)
 
 ## 版本说明
 
@@ -301,3 +302,10 @@ bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
 ---
+<a id="jump11"></a>
+
+## 注意事项
+
+1. 在加载 processor 过程中，会因 `mistral_common` 三方库版本的兼容性问题导致无法找到 processor，进而训练报错退出，可通过以下方式解决：
+   - 卸载`mistral_common` 三方库：pip uninstall -y mistral_common
+   - 升级`mistral_common` 三方库至最新版本：pip install --upgrade mistral_common
