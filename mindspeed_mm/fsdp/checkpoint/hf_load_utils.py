@@ -173,13 +173,8 @@ def _retie_embeddings(model: torch.nn.Module) -> None:
         return
 
     try:
-        try:
-            input_embeddings = model.get_input_embeddings()
-            output_embeddings = model.get_output_embeddings()
-        except NotImplementedError:
-            input_embeddings = None
-            output_embeddings = None
-
+        input_embeddings = model.get_input_embeddings()
+        output_embeddings = model.get_output_embeddings()
         if input_embeddings is None or output_embeddings is None:
             return
         # Object-reference assignment -- after this both modules share the same
