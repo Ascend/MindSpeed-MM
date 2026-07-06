@@ -87,7 +87,7 @@ cd MindSpeed-MM
 执行如下指令：
 
 ```bash
-bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/wan2.2/requirements.txt
+bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b
 ```
 
 ### Decord搭建

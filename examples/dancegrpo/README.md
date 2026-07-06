@@ -13,8 +13,7 @@
 - [数据集准备及处理](#数据集准备及处理)
 - [训练](#训练)
     - [准备工作](#1-准备工作)
-    - [三方库修改](#2-三方库修改)
-    - [启动训练](#3-启动训练)
+    - [启动训练](#2-启动训练)
 - [性能数据](#性能数据)
 - [FAQ](#faq)
 
@@ -169,73 +168,7 @@ bash examples/dancegrpo/preprocess_flux_rl_embeddings.sh
 
 <a id="jump4.2"></a>
 
-### 2. 三方库修改
-
-找到使用的Python环境的根目录，对于使用conda安装的环境，可以使用如下指令找到：
-
-```bash
-echo $(conda info --envs | grep test) | awk '{print $NF}'
-```
-
-1. 将文件`lib/python3.10/site-packages/diffusers/models/embeddings.py`中`FluxPosEmbed`类的`forward`函数的如下代码：
-
-    ```python
-    is_mps = ids.device.type == "mps"
-    freqs_dtype = torch.float32 if is_mps else torch.float64
-    ```
-
-    修改为：
-
-    ```python
-    is_mps = ids.device.type == "mps"
-    is_npu = ids.device.type == "npu"
-    freqs_dtype = torch.float32 if is_mps or is_npu else torch.float64
-    ```
-
-2. 将文件`lib/python3.10/site-packages/diffusers/models/embeddings.py`中的`get_1d_rotary_pos_embed`函数的如下代码：
-
-    ```python
-    freqs_cos = freqs.cos().repeat_interleave(2, dim=1).float()  # [S, D]
-    freqs_sin = freqs.sin().repeat_interleave(2, dim=1).float()  # [S, D]
-    ```
-
-    修改为：
-
-    ```python
-    freqs_cos = freqs.cos().T.repeat_interleave(2, dim=0).T.contiguous().float()
-    freqs_sin = freqs.sin().T.repeat_interleave(2, dim=0).T.contiguous().float()
-    ```
-
-3. 将文件`lib/python3.10/site-packages/diffusers/models/attention_processor.py`中`Attention`类的`__init__`函数的如下代码：
-
-    ```python
-    elif qk_norm == "rms_norm":
-        self.norm_q = RMSNorm(dim_head, eps=eps)
-        self.norm_k = RMSNorm(dim_head, eps=eps)
-    ```
-
-    修改为：
-
-    ```python
-    elif qk_norm == "rms_norm":
-        self.norm_q = NpuFusedRMSNorm(dim_head, eps=eps)
-        self.norm_k = NpuFusedRMSNorm(dim_head, eps=eps)
-    ```
-
-    增加如下类：
-
-    ```python
-    class NpuFusedRMSNorm(torch.nn.Module):
-        def __init__(self, hidden_size, eps=1e-6):
-            super().__init__()
-            self.weight = nn.Parameter(torch.ones(hidden_size))
-            self.eps = eps
-
-        def forward(self, x):
-            return torch_npu.npu_rms_norm(x.to(self.weight.dtype), self.weight, epsilon=self.eps)[0]
-    ```
-
-### 3. 启动训练
+### 2. 启动训练
 
 以 FLUX 模型为例，在启动训练之前，可根据自身训练配置需要修改[启动脚本](./posttrain_flux_dancegrpo.sh)的配置：
 

@@ -278,14 +278,14 @@ SDXL 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
 | 芯片 | 卡数 |     任务     |  FPS  | batch_size | AMP_Type | Torch_Version | deepspeed |
 |:---:|:---:|:----------:|:-----:|:----------:|:---:|:---:|:---:|
-| 竞品A | 8p | SDXL_train_bf16  |  30.65 |     4      | bf16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc | 8p | SDXL_train_bf16  | 29.92 |     4      | bf16 | 2.1 | ✔ |
-| 竞品A | 8p | SDXL_train_fp16 |  30.23 |     4      | fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc | 8p | SDXL_train_fp16 | 28.51 |     4      | fp16 | 2.1 | ✔ |
-| 竞品A | 8p | SDXL_pretrain_bf16  |  21.14 |     4      | bf16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc | 8p | SDXL_pretrain_bf16  | 19.79 |     4      | bf16 | 2.1 | ✔ |
-| 竞品A | 8p | SDXL_pretrain_fp16 |  20.77 |     4      | fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc | 8p | SDXL_pretrain_fp16 | 19.67 |     4      | fp16 | 2.1 | ✔ |
+| 竞品A | 8p | SDXL_train_bf16  |  30.65 |     4      | bf16 | 2.7.1 | ✔ |
+| Atlas 900 A2 PODc | 8p | SDXL_train_bf16  | 29.92 |     4      | bf16 | 2.7.1 | ✔ |
+| 竞品A | 8p | SDXL_train_fp16 |  30.23 |     4      | fp16 | 2.7.1 | ✔ |
+| Atlas 900 A2 PODc | 8p | SDXL_train_fp16 | 28.51 |     4      | fp16 | 2.7.1 | ✔ |
+| 竞品A | 8p | SDXL_pretrain_bf16  |  21.14 |     4      | bf16 | 2.7.1 | ✔ |
+| Atlas 900 A2 PODc | 8p | SDXL_pretrain_bf16  | 19.79 |     4      | bf16 | 2.7.1 | ✔ |
+| 竞品A | 8p | SDXL_pretrain_fp16 |  20.77 |     4      | fp16 | 2.7.1 | ✔ |
+| Atlas 900 A2 PODc | 8p | SDXL_pretrain_fp16 | 19.67 |     4      | fp16 | 2.7.1 | ✔ |
 
 ## 推理
 
@@ -323,8 +323,8 @@ SDXL 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
 | 芯片 | 卡数 |     任务     |  E2E（it/s）  |  AMP_Type | Torch_Version | deepspeed |
 |:---:|:---:|:----------:|:-----:|:---:|:---:|:---:|
-| 竞品A | 1p |  文生图全参  | 1.55 | fp16 | 2.1 | ✔ |
-| Atlas 900 A2 PODc |1p |  文生图全参  | 3.02 | fp16 | 2.1 | ✔ |
+| 竞品A | 1p |  文生图全参  | 1.55 | fp16 | 2.7.1 | ✔ |
+| Atlas 900 A2 PODc |1p |  文生图全参  | 3.02 | fp16 | 2.7.1 | ✔ |
 
 ## 环境变量声明
 

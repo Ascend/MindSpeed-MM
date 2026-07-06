@@ -472,7 +472,6 @@ def resize_and_center_crop(image, target_width, target_height):
 
 @contextmanager
 def auto_offload_model(models, device='npu', enabled=True):
-    from diffusers.hooks.group_offloading import _is_group_offload_enabled
     if models is None:
         enabled = False
     if enabled:

@@ -36,7 +36,8 @@ class DiffusersAEModel(nn.Module):
         self.norm_mode = config.pop("norm_mode", "value_shift_scale")
 
     def enable_tiling(self, tiling_param=None):
-        if hasattr(self.model, "enable_tiling"):
+        has_custom_tiling_key = "tile_size" in tiling_param or "tile_stride" in tiling_param
+        if hasattr(self.model, "enable_tiling") and not has_custom_tiling_key:
             if tiling_param:
                 self.model.enable_tiling(**tiling_param)
                 self.tiling_param = tiling_param

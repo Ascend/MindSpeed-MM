@@ -211,13 +211,15 @@ mm-convert WanConverter mm_to_hf \
 LOAD_PATH="./weights/Wan-AI/Wan2.1-T2V-14B-Diffusers/transformer/"
 ```
 
-同时，将`examples/wan2.1/14b/t2v/pretrain_fsdp2.sh`中的`bridge_patch`置为`true`
+同时，将`examples/wan2.1/14b/t2v/pretrain_model_fsdp2.json`中的`bridge_patch`置为`true`
 
 ```shell
     "patch": {
         "bridge_patch": true
     }
 ```
+
+*注意: 该功能是可选功能*
 
 ---
 

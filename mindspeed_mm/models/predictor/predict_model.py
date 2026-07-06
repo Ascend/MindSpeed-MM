@@ -4,33 +4,15 @@ from megatron.core import mpu
 
 from mindspeed_mm.models.common.checkpoint import load_checkpoint
 from .dits import (
-    Latte,
-    VideoDitSparse,
-    SatDiT,
-    VideoDitSparseI2V,
-    PTDiT,
-    HunyuanVideoDiT,
     HunyuanVideo15DiT,
     WanDiT,
-    StepVideoDiT,
-    SparseUMMDiT,
-    MMDiT,
     VACEModel
 )
 
 
 PREDICTOR_MODEL_MAPPINGS = {
-    "videoditsparse": VideoDitSparse,
-    "videoditsparsei2v": VideoDitSparseI2V,
-    "latte": Latte,
-    "satdit": SatDiT,
-    "ptdit": PTDiT,
-    "hunyuanvideodit": HunyuanVideoDiT,
     "hunyuanvideo15dit": HunyuanVideo15DiT,
     "wandit": WanDiT,
-    "stepvideodit": StepVideoDiT,
-    "SparseUMMDiT": SparseUMMDiT,
-    "mmdit": MMDiT,
     "vace": VACEModel
 }
 
