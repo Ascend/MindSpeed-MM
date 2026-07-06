@@ -184,8 +184,8 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
   --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-VL-7B-Instruct" \
   --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
   --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-7B-Instruct" \
-  --cfg.parallel_config.llm_pp_layers [1,10,10,7] \
-  --cfg.parallel_config.vit_pp_layers [32,0,0,0] \
+  --cfg.parallel_config.llm_pp_layers [12,16] \
+  --cfg.parallel_config.vit_pp_layers [32,0] \
   --cfg.parallel_config.tp_size 1
 
 # 采用和huggingface一致的模型结构
@@ -193,8 +193,8 @@ mm-convert  Qwen2_5_VLConverter mm_to_hf \
   --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-VL-7B-Instruct" \
   --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct" \
   --cfg.hf_config.hf_dir "ckpt/hf_path/Qwen2.5-VL-7B-Instruct" \
-  --cfg.parallel_config.llm_pp_layers [1,10,10,7] \
-  --cfg.parallel_config.vit_pp_layers [32,0,0,0] \
+  --cfg.parallel_config.llm_pp_layers [12,16] \
+  --cfg.parallel_config.vit_pp_layers [32,0] \
   --cfg.parallel_config.tp_size 1 \
   --cfg.common_model_config.enable_canonical_hf_struct true
 # 其中：
@@ -282,8 +282,8 @@ MindSpeed-MM修改了LoRA网络的结构名称，在微调后，如果需要将L
 mm-convert  Qwen2_5_VLConverter lora_mm_to_hf \
   --cfg.save_hf_dir "ckpt/mm_to_hf/Qwen2.5-VL-7B-Instruct-lora/" \
   --cfg.mm_dir "ckpt/mm_path/Qwen2.5-VL-7B-Instruct-lora/" \
-  --cfg.parallel_config.llm_pp_layers [1,10,10,7] \
-  --cfg.parallel_config.vit_pp_layers [32,0,0,0] \
+  --cfg.parallel_config.llm_pp_layers [12,16] \
+  --cfg.parallel_config.vit_pp_layers [32,0] \
   --cfg.parallel_config.tp_size 1 \
   --cfg.common_model_config.enable_canonical_hf_struct true \
   --cfg.common_model_config.model_prefix "base_model.model." \
@@ -657,6 +657,11 @@ bash examples/qwen2.5vl/finetune_qwen2_5_vl_7b.sh
 bash examples/qwen2.5vl/finetune_qwen2_5_vl_72b_fsdp.sh
 ```
 
+> [!NOTE]
+>
+> 当使用FSDP(Megatron)后端进行训练并启用--use-torch-fsdp2参数时，必须同时携带--untie-embeddings-and-output-weights。
+>
+> **已知限制**: 对于原本采用权重绑定设计的模型，该配置会导致权重绑定机制失效。当前框架不支持该场景，需用户在转换权重时手动复制lm_head和embeddings。请注意此时模型结构可能改变，产生变化。
 ---
 <a id="jump6"></a>
 
@@ -870,7 +875,7 @@ bash examples/qwen2.5vl/evaluate_qwen2_5_vl_7b.sh
 | `MULTI_STREAM_MEMORY_REUSE`   | 配置多流内存复用是否开启 | `0`: 关闭多流内存复用<br>`1`: 开启多流内存复用                                                               |
 | `NPU_ASD_ENABLE`   | 控制是否开启Ascend Extension for PyTorch的特征值检测功能 | 设置`0`或未设置: 关闭特征值检测<br>`1`: 表示开启特征值检测，只打印异常日志，不告警<br>`2`:开启特征值检测，并告警<br>`3`:开启特征值检测，并告警，同时会在device侧info级别日志中记录过程数据 |
 | `ASCEND_LAUNCH_BLOCKING`   | 控制算子执行时是否启动同步模式 | `0`: 采用异步方式执行<br>`1`: 强制算子采用同步模式运行                                                               |
-| `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
+| `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量。MindSpeed MM支持Ascend 950 系列产品、Atlas A3 训练系列产品和Atlas A2 训练系列产品，且要求单NPU的片上内存为64GB及以上。如果示例脚本中NPUS_PER_NODE=8, 表示需要8个NPU，如果实际情况低于此配置，可能遇到OOM问题                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
 ---
 <a id="jump10"></a>
@@ -878,5 +883,17 @@ bash examples/qwen2.5vl/evaluate_qwen2_5_vl_7b.sh
 ## 注意事项
 
 1. 在 `finetune_xx.sh`里，与模型结构相关的参数并不生效，以`examples/qwen2.5vl/model_xb.json`里同名参数配置为准，非模型结构的训练相关参数在 `finetune_xx.sh`修改。
-2. 在使用单卡进行3B模型训练时，如果出现Out Of Memory，可以使用多卡并开启分布式优化器进行训练。
+2. 在使用单卡进行3B模型训练时，如果出现Out Of Memory，可以使用多卡并开启分布式优化器（`--use-distributed-optimizer`）进行训练。需注意：分布式优化器（ZeRO-1）只沿 **DP 组**分片优化器状态，`DP = WORLD_SIZE /（TP × PP × CP）`，**仅当 DP≥2 时才降低单卡显存**；若并行度（TP×PP×CP）已占满全部卡导致 DP=1，该参数为空操作，优化器建好后仍会 OOM。例如 7B 默认 `PP=2`，仅用 2 卡时 DP=1，需 ≥4 卡才有收益。各规格最小卡数见下表。
 3. `model.json`设置use_remove_padding为true时，在`examples/qwen2vl/dot_product_attention.py`中，attention_mask形状当前固定为[2048, 2048]，如需更改请参考[昇腾官网FlashAttentionScore](https://www.hiascend.com/document/detail/zh/Pytorch/600/ptmoddevg/trainingmigrguide/performance_tuning_0027.html)的替换指南
+
+### 各规格最小卡数与分布式优化器生效门槛
+
+各规格脚本的默认并行配置决定了最小卡数（`= TP × PP × CP`，低于此数无法启动）以及分布式优化器的生效门槛（需 `DP≥2`，即卡数 ≥ 最小卡数的 2 倍）：
+
+| 模型规模 | 默认并行 TP/PP/CP | 最小卡数 | 分布式优化器生效（DP≥2）所需卡数 | 默认卡数 |
+| --- | --- | --- | --- | --- |
+| 3B | 1/1/1 | 1 | ≥2 | 8 |
+| 7B | 1/2/1 | 2 | ≥4 | 8 |
+| 32B | 2/8/1 | 16 | ≥32 | 多机（每节点 8） |
+
+> 显存参考：7B 在 A2（64GB）、TP=1 时单卡约 50 GB（来源 `UserGuide/features/tensor-parallel.rst`）；其余规格随序列长度、图像分辨率、micro-batch 等变化较大，请以实际为准。

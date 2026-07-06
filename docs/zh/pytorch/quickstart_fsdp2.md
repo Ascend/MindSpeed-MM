@@ -154,7 +154,7 @@ parallel:
    ```bash
    source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
-   NPUS_PER_NODE=16        # 单机卡数
+   NPUS_PER_NODE=16        # 单机卡数(MindSpeed MM支持Ascend 950 系列产品、Atlas A3 训练系列产品和Atlas A2 训练系列产品，且要求单NPU的片上内存为64GB及以上。当前示例脚本中NPUS_PER_NODE=16 表示需要16个NPU，如果实际情况低于此配置，可能遇到OOM问题)
    MASTER_ADDR=localhost   # 多机时改为主节点IP
    MASTER_PORT=6000
    NNODES=1                # 多机时改为节点总数
