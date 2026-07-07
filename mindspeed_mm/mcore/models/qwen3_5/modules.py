@@ -7,6 +7,7 @@ from einops import rearrange
 import torch
 from torch import Tensor, nn
 
+import megatron.core.parallel_state as mpu
 from megatron.core import tensor_parallel
 from megatron.core.transformer.attention import (
     BaseInferenceContext,
@@ -23,14 +24,17 @@ from megatron.core.fp8_utils import get_fp8_context
 from megatron.core.transformer.transformer_block import TransformerBlock, TransformerBlockSubmodules
 from megatron.core.utils import WrappedTensor, deprecate_inference_params, make_viewless_tensor, divide, is_te_min_version
 from megatron.core.inference.contexts import BaseInferenceContext
+from megatron.core.tensor_parallel import get_cuda_rng_tracker, get_expert_parallel_rng_tracker_name
 from megatron.core.tensor_parallel.mappings import all_gather_last_dim_from_tensor_parallel_region
 from megatron.core.parallel_state import get_tensor_model_parallel_rank
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.enums import AttnMaskType
+from megatron.core.transformer.moe.moe_layer import MoELayer, MoESubmodules
 from megatron.core.models.common.embeddings.rope_utils import (
     _apply_rotary_pos_emb_bshd,
     get_pos_emb_on_this_cp_rank,
 )
+from megatron.core.transformer.moe.router import TopKRouter as Mcore_TopKRouter
 
 
 try:
@@ -49,6 +53,8 @@ except ImportError:
 from mindspeed.te.pytorch.utils import get_tensor_model_parallel_group_if_none
 from mindspeed_mm.mcore.process_group_configs import ProcessGroupCollection
 from mindspeed_mm.models.common.module import MultiModalModule
+
+from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward, ep_mc2_forward
 
 
 class Qwen3_5MultimodalRotaryEmbedding(nn.Module):
@@ -1565,3 +1571,140 @@ class Qwen3_5TextTransformerBlock(TransformerBlock):
             hidden_states = hidden_states.clone()
 
         return hidden_states
+
+
+class RandomSTE(torch.autograd.Function):
+    """
+    Straight-Through Estimator(STE) function that returns random values
+    with different seed for each rank.
+
+    This is used to generate random logits of router for load-balanced benchmark.
+    """
+
+    @staticmethod
+    def forward(ctx, logits: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass returns random logits with rank-specific seed.
+
+        Args:
+            logits (torch.Tensor): The logits.
+
+        Returns:
+            torch.Tensor: The random logits.
+        """
+        with get_cuda_rng_tracker().fork(get_expert_parallel_rng_tracker_name()):
+            random_logits = logits.clone().normal_()
+        return random_logits
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor) -> torch.Tensor:
+        """
+        Backward pass propagates the gradient for logits.
+
+        Args:
+            grad_output (torch.Tensor): The gradient output.
+
+        Returns:
+            torch.Tensor: The gradient input.
+        """
+        return grad_output
+
+
+def apply_random_logits(logits: torch.Tensor) -> torch.Tensor:
+    """
+    Apply the RandomSTE function to the logits.
+
+    Args:
+        logits (torch.Tensor): The logits.
+
+    Returns:
+        torch.Tensor: The random logits.
+    """
+    return RandomSTE.apply(logits)
+
+
+class TopKRouter(Mcore_TopKRouter):
+    def forward(self, input: torch.Tensor):
+        """
+        Forward pass of the router.
+
+        Args:
+            input (torch.Tensor): Input tensor.
+        """
+        logits = nn.functional.linear(input, self.weight)
+
+        if self.config.moe_router_force_load_balancing:
+            # Apply force load balancing with random logits for benchmark
+            logits = apply_random_logits(logits)
+
+        router_probs = nn.functional.softmax(logits, dtype=torch.float, dim=-1)
+        router_top_value, router_indices = torch.topk(router_probs, self.topk, dim=-1)  # (seq_len, top_k)
+        router_top_value /= router_top_value.sum(dim=-1, keepdim=True)
+        router_top_value = router_top_value.to(logits.dtype)
+        router_scores = router_top_value
+        return logits, router_scores, router_indices
+
+
+class MM_MoELayer(MoELayer):
+    """Mixture of experts Layer **currently only supports no token dropping**.
+
+    Args:
+        BaseMoELayer (MegatronModule): Base class for MoE layers
+    """
+
+    def __init__(
+        self,
+        config: TransformerConfig,
+        submodules: Optional[MoESubmodules] = None,
+        layer_number: Optional[int] = None,
+    ):
+        self.config = config
+        self.submodules = submodules
+        super(MoELayer, self).__init__(config=config, layer_number=layer_number)
+        self.moe_layer_recompute = (
+            config.recompute_granularity == 'selective' and "moe" in config.recompute_modules
+        )
+        # Initialize router
+        self.router = TopKRouter(config=self.config)
+
+        if config.moe_token_dispatcher_type not in ["alltoall", "alltoall_mc2"]:
+            raise ValueError(
+                f"Unsupported token dispatcher type: {config.moe_token_dispatcher_type}"
+            )
+        # Initialize experts
+        self.experts = build_module(self.submodules.experts, self.num_local_experts, self.config)
+
+        # # Initialize shared experts
+        if self.use_shared_expert:
+            self.shared_experts = build_module(self.submodules.shared_experts, config=self.config)
+
+    def forward(self, hidden_states: torch.Tensor):
+        if (
+            self.training
+            and self.config.tensor_model_parallel_size > 1
+            and not self.config.sequence_parallel
+        ):
+            raise ValueError(
+                "During training, performance may degrade if MoE and tensor parallelism"
+                "are enabled without also enabling sequence parallelism."
+            )
+
+            # process MoE
+        def custom_forward(hidden_states, routing_weights, selected_experts, num_experts):
+            fc1_weight = self.experts.weight1.view(self.num_local_experts, self.config.hidden_size, -1)
+            fc2_weight = self.experts.weight2.view(self.num_local_experts, -1, self.config.hidden_size)
+            ep_group = mpu.get_expert_model_parallel_group()
+
+            if self.config.moe_token_dispatcher_type == "alltoall":
+                return ep_forward(num_experts, routing_weights, selected_experts, hidden_states, fc1_weight, fc2_weight, ep_group, fused=True)
+            elif self.config.moe_token_dispatcher_type == "alltoall_mc2":
+                return ep_mc2_forward(num_experts, routing_weights, selected_experts, hidden_states, fc1_weight, fc2_weight, ep_group, fused=True)
+
+        hidden_shape = hidden_states.shape
+        hidden_states = hidden_states.view(-1, hidden_shape[-1])
+        shared_expert_output = self.shared_experts(hidden_states)
+        _, routing_weights, selected_experts = self.router(hidden_states)
+        output = custom_forward(hidden_states, routing_weights, selected_experts, self.config.num_moe_experts)
+        output += shared_expert_output
+
+        return output.reshape(hidden_shape), None

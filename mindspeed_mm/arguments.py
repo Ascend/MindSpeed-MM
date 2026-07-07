@@ -135,6 +135,10 @@ def _add_training_args(parser):
     group.add_argument('--optimizer', type=str, default='adam',
                        choices=['adam', 'sgd', 'muon'],
                        help='Optimizer function')
+    group.add_argument('--moe-token-dispatcher-type', type=str,
+                       choices=['allgather', 'alltoall', 'flex', 'alltoall_seq', 'alltoall_mc2'],
+                       default='allgather',
+                       help="The type of token dispatcher to use.")
     return parser
 
 

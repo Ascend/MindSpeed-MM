@@ -32,6 +32,7 @@ from megatron.core.inference.contexts import BaseInferenceContext
 from megatron.core.utils import deprecate_inference_params, WrappedTensor
 
 from mindspeed_mm.models.common.module import MultiModalModule
+from mindspeed_mm.models.common.chunkloss import chunk_loss, calculate_lm_loss
 from mindspeed_mm.mcore.process_group_configs import ProcessGroupCollection
 from mindspeed_mm.mcore.models.qwen3_5.modules import (
     Qwen3_5VisionTransformerBlock,
@@ -1102,6 +1103,10 @@ class Qwen3_5TextModel(GPTModel):
                 reshaped = hidden_states.squeeze(1).unsqueeze(0)
                 hidden_states = inference_context.last_token_logits(reshaped).unsqueeze(1)
 
+        # Chunk Loss
+        if self.config.use_chunk_loss:
+            return self.compute_chunk_loss(hidden_states, self.output_layer, labels, chunk_size=self.config.chunk_size)
+
         logits, _ = self.output_layer(
             hidden_states, weight=output_weight, runtime_gather_output=runtime_gather_output
         )
@@ -1137,6 +1142,33 @@ class Qwen3_5TextModel(GPTModel):
 
         loss = self.compute_language_model_loss(labels, logits)
         return loss
+
+    def compute_chunk_loss(self, hidden_states, lm_head, labels, chunk_size=512, ignore_index=-100):
+        labels = F.pad(labels, (0, 1), value=ignore_index)
+        shift_labels = labels[..., 1:].contiguous()
+        loss_mask = shift_labels > -1
+        alpha = loss_mask.sum().float()
+        torch.distributed.all_reduce(alpha, op=torch.distributed.ReduceOp.AVG)
+        chunk_labels = torch.split(shift_labels, chunk_size, dim=1)
+
+        loss_ctx_kwargs = [
+            {
+                "shift_labels": chunk_labels[i],
+                "ignore_index": ignore_index,
+                "reduction": "none",
+                "alpha": alpha,
+            }
+            for i in range(len(chunk_labels))
+        ]
+
+        return chunk_loss(
+            hidden_states.transpose(0,1),
+            lm_head.weight,
+            lm_head.bias,
+            loss_forward=calculate_lm_loss,
+            loss_kwargs_chunks=loss_ctx_kwargs,
+            chunk_size=chunk_size
+        )
 
     def _scale_logits(self, logits: Tensor) -> Tensor:
         """Apply MuP output scaling to logits.

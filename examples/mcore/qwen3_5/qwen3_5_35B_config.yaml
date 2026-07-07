@@ -96,7 +96,7 @@ model:
     pipeline_model_parallel_size: 1
     sequence_parallel: true
 
-    causal_conv1d_implementation: triton
+    causal_conv1d_implementation: triton_with_transpose
     gdn_implementation: AscendC
 
     image_token_id: 248056
@@ -128,6 +128,7 @@ model:
     moe_router_pre_softmax: true
     moe_token_dispatcher_type: alltoall
     moe_permute_fusion: true
+    moe_router_force_load_balancing: false
     # Common LLM config
     share_embeddings_and_output_weights: false
     normalization: RMSNorm
@@ -154,6 +155,8 @@ model:
     recompute_num_layers: 0
     recompute_granularity: full
     recompute_method: block
+    use_chunk_loss: false
+    chunk_size: 512
   patch:
       clip_grad_async: true
       bridge_patch: true

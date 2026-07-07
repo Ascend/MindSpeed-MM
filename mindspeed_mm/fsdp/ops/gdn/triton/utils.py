@@ -143,6 +143,10 @@ else:
         return None
 
 
+def _cpu_device_warning():
+    warnings.warn(('Triton is not supported on current platform, roll back to CPU.'), stacklevel=1)
+
+
 @lru_cache(maxsize=None)
 def get_available_device() -> str:
     try:
@@ -233,10 +237,6 @@ def input_guard(fn: Callable[..., torch.Tensor]) -> Callable[..., torch.Tensor]:
             return fn(*contiguous_args, **contiguous_kwargs)
 
     return wrapper
-
-
-def _cpu_device_warning():
-    warnings.warn(('Triton is not supported on current platform, roll back to CPU.'), stacklevel=1)
 
 
 @tensor_cache

@@ -19,7 +19,8 @@ from megatron.core.transformer.transformer_block import (
     get_num_layers_to_build,
 )
 from megatron.core.transformer.mlp import MLPSubmodules
-from megatron.core.transformer.moe.moe_layer import MoELayer, MoESubmodules
+from megatron.core.transformer.moe.moe_layer import MoESubmodules
+from megatron.core.transformer.moe.moe_layer import MoELayer as Mcore_MoELayer
 from megatron.core.transformer.moe.experts import GroupedMLP, SequentialMLP, TEGroupedMLP
 from megatron.core.transformer.moe.shared_experts import SharedExpertMLP
 from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
@@ -45,7 +46,7 @@ try:
 except ImportError:
     HAVE_TE = False
 
-from mindspeed_mm.mcore.models.qwen3_5.modules import Qwen3_5SelfAttention, PatchMergerSubmodules, Qwen3_5SelfAttentionSubmodules
+from mindspeed_mm.mcore.models.qwen3_5.modules import Qwen3_5SelfAttention, PatchMergerSubmodules, Qwen3_5SelfAttentionSubmodules, MM_MoELayer
 from mindspeed_mm.mcore.models.qwen3_5.gated_delta_net import GatedDeltaNet, GatedDeltaNetSubmodules, Qwen3_5GatedRMSNorm
 
 
@@ -97,6 +98,7 @@ def get_moe_module_spec(
     moe_grouped_gemm: Optional[bool] = False,
     moe_use_legacy_grouped_gemm: Optional[bool] = False,
     moe_shared_expert_gate: Optional[bool] = False,
+    tp_size: int = 1
 
 ) -> ModuleSpec:
     """Helper function to get module spec for MoE"""
@@ -144,6 +146,8 @@ def get_moe_module_spec(
     shared_experts = ModuleSpec(module=SharedExpertMLP, params={"gate": moe_shared_expert_gate}, submodules=mlp)
 
     # MoE module spec
+    # MM_MoELayer get better performce, but not support TP > 1, will support in future.
+    MoELayer = Mcore_MoELayer if tp_size > 1 else MM_MoELayer
     moe_module_spec = ModuleSpec(
         module=MoELayer, submodules=MoESubmodules(experts=experts, shared_experts=shared_experts)
     )
@@ -225,7 +229,8 @@ def get_qwen3_5_text_block_spec(
             use_te=config.use_te,
             num_experts=config.num_moe_experts,
             moe_grouped_gemm=config.moe_grouped_gemm,
-            moe_shared_expert_gate=config.moe_shared_expert_gate
+            moe_shared_expert_gate=config.moe_shared_expert_gate,
+            tp_size=config.tensor_model_parallel_size
         )
 
         layer_specs.append(

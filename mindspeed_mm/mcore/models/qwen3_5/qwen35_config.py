@@ -133,6 +133,7 @@ class Qwen3_5MoEModelConfig(TransformerConfig, MindSpeedArgsRequired):
     moe_permute_fusion: bool = True
     moe_aux_loss_coeff: float = 1e-3
     use_fused_moe_token_permute_and_unpermute: bool = False
+    moe_router_force_load_balancing: bool = False
 
     # =========================================================================
     # GDN implementation choice (PyTorch vs. custom Triton/AscendC kernels)
@@ -205,6 +206,9 @@ class Qwen3_5MoEModelConfig(TransformerConfig, MindSpeedArgsRequired):
     hetereogenous_dist_checkpoint: bool = True  # Megatron spelling error, consistent with Megatron to avoid load failure
     mtp_num_layers: Optional[int] = None
     no_rope_freq: Optional[Union[int, List[int]]] = None
+
+    use_chunk_loss: bool = False
+    chunk_size: int = 512
 
     # =========================================================================
     # Compatibility with later versions of Megatron

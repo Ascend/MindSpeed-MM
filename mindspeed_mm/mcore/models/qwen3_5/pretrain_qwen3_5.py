@@ -99,7 +99,7 @@ def loss_func(loss_mask: torch.Tensor, output_tensor: torch.Tensor):
             the data parallel ranks
     """
     loss = output_tensor
-    num_tokens = loss_mask.sum().clone().detach().to(torch.int)
+    num_tokens = loss_mask.sum().clone().detach().float()
 
     report_loss = loss.clone().detach().view(1)
     torch.distributed.all_reduce(

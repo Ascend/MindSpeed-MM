@@ -33,7 +33,7 @@ from megatron.core.utils import deprecate_inference_params
 
 from mindspeed_mm.mcore.process_group_configs import ProcessGroupCollection
 from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule
-from mindspeed_mm.fsdp.ops.gdn.flash_chunk_gated_delta_rule import chunk_gated_delta_rule as flash_chunk_gated_delta_rule
+from mindspeed_mm.fsdp.ops.gdn.flash_gated_delta_rule import flash_gated_delta_rule
 from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
 
 
@@ -143,11 +143,9 @@ class Qwen3_5GatedRMSNorm(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, hidden_states, gate=None):
-        input_dtype = hidden_states.dtype
-        hidden_states = torch_npu.npu_rms_norm(hidden_states.float(), self.weight.float(), self.variance_epsilon)[0]
-        hidden_states = hidden_states * F.silu(gate.to(torch.float32))
-
-        return hidden_states.to(input_dtype)
+        hidden_states = torch_npu.npu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+        hidden_states = hidden_states * F.silu(gate)
+        return hidden_states
 
 
 @dataclass
@@ -219,6 +217,8 @@ class GatedDeltaNet(MegatronModule):
         self.value_head_dim = config.linear_value_head_dim
         self.num_key_heads = config.linear_num_key_heads
         self.num_value_heads = config.linear_num_value_heads
+        self.local_num_k_heads = self.num_key_heads // self.tp_size // self.cp_size
+        self.local_num_v_heads = self.num_value_heads // self.tp_size // self.cp_size
         self.qk_dim = self.key_head_dim * self.num_key_heads
         self.v_dim = self.value_head_dim * self.num_value_heads
         self.qk_dim_local_tp = self.qk_dim // self.tp_size
@@ -290,7 +290,7 @@ class GatedDeltaNet(MegatronModule):
         elif self.config.gdn_implementation == "triton":
             self.gated_delta_rule = chunk_gated_delta_rule
         elif self.config.gdn_implementation == "AscendC":
-            self.gated_delta_rule = flash_chunk_gated_delta_rule
+            self.gated_delta_rule = flash_gated_delta_rule
 
         # Output layernorm before projection
         self.out_norm = build_module(
@@ -459,6 +459,17 @@ class GatedDeltaNet(MegatronModule):
                 activation='silu',
                 cu_seqlens=None
             )
+        elif self.config.causal_conv1d_implementation == "triton_with_transpose":
+            from mindspeed_mm.fsdp.ops.gdn.triton_core.causal_conv1d import causal_conv1d_triton
+            conv1d_weight = conv1d_weight.squeeze(1)
+            qkv, _  = causal_conv1d_triton(
+                x=qkv,
+                weight=conv1d_weight,
+                H=2*self.local_num_k_heads+self.local_num_v_heads,
+                bias=conv1d_bias,
+                activation='silu',
+                cu_seqlens=None
+            )
 
         query, key, value, gate, beta, alpha = self._prepare_qkv_for_gated_delta_rule(
             qkv, gate, beta, alpha, batch, seq_len
@@ -479,7 +490,7 @@ class GatedDeltaNet(MegatronModule):
             beta=beta,
             initial_state=None,
             output_final_state=False,
-            use_qk_l2norm_in_kernel=False,
+            use_qk_l2norm_in_kernel=True
         )
 
         # RMSNorm
@@ -492,12 +503,11 @@ class GatedDeltaNet(MegatronModule):
 
         # CP all to all: HP to CP
         norm_out = tensor_a2a_hp2cp(
-            norm_out, seq_dim=0, head_dim=-1, cp_group=self.cp_group  # cp_group=self.pg_collection.cp
+            norm_out, seq_dim=0, head_dim=-1, cp_group=self.cp_group
         )
 
         # Output projection
         out, out_bias = self.out_proj(norm_out)
-
         return out, out_bias
 
     @jit_fuser
@@ -506,7 +516,6 @@ class GatedDeltaNet(MegatronModule):
         x = x.reshape(-1, x.shape[-1])
         gate = gate.reshape(-1, gate.shape[-1])
         y = self.out_norm(x, gate)
-
         return y
 
     @jit_fuser
@@ -516,29 +525,30 @@ class GatedDeltaNet(MegatronModule):
         Fuses split, reshape, L2 norm, repeat_interleave, and contiguous operations.
         """
         # Split qkv into query_key and value
-        query_key, value = torch.split(
-            qkv,
-            [2 * self.qk_dim_local_tp // self.cp_size, self.v_dim_local_tp // self.cp_size],
-            dim=-1,
-        )
+        if self.config.causal_conv1d_implementation == "triton_with_transpose":
+            query, key, value = torch.split(
+                qkv,
+                [self.local_num_k_heads, self.local_num_k_heads, self.local_num_v_heads],
+                dim=1,
+            )
+        else:
+            query, key, value = torch.split(
+                qkv,
+                [self.qk_dim_local_tp // self.cp_size, self.qk_dim_local_tp // self.cp_size, self.v_dim_local_tp // self.cp_size],
+                dim=-1,
+            )
 
-        # Reshape query_key and value
-        query_key = query_key.reshape(batch, seq_len, -1, self.key_head_dim)
-        value = value.reshape(batch, seq_len, -1, self.value_head_dim)
-
-        # Apply L2 norm to query and key
-        if self.use_qk_l2norm:
-            query_key = l2norm(query_key.contiguous())
-
-        # Split query and key
-        split_size = self.qk_dim_local_tp // self.key_head_dim // self.cp_size
-        query, key = torch.split(query_key, [split_size, split_size], dim=2)
+            # Reshape query_key and value
+            query = query.reshape(batch, seq_len, -1, self.key_head_dim)
+            key = key.reshape(batch, seq_len, -1, self.key_head_dim)
+            value = value.reshape(batch, seq_len, -1, self.value_head_dim)
 
         # Expand query and key if needed (grouped query attention)
         if self.num_value_heads // self.num_key_heads > 1:
+            repeat_dim = 1 if self.config.causal_conv1d_implementation == "triton_with_transpose" else 2
             repeat_factor = self.num_value_heads // self.num_key_heads
-            query = query.repeat_interleave(repeat_factor, dim=2)
-            key = key.repeat_interleave(repeat_factor, dim=2)
+            query = query.repeat_interleave(repeat_factor, dim=repeat_dim)
+            key = key.repeat_interleave(repeat_factor, dim=repeat_dim)
 
         # Make all tensors contiguous
         query = query.contiguous()
