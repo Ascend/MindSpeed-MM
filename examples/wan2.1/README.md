@@ -117,9 +117,6 @@ cd ..
 
 # 安装其余依赖库
 pip install -e .
-
-# 源码安装Diffusers
-pip install diffusers==0.33.1
 ```
 
 ### Decord搭建
