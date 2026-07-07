@@ -4,9 +4,6 @@ import math
 import torch
 import numpy as np
 from diffusers.utils import load_image
-from PIL import Image
-from torchvision.io import write_video
-from torchvision.io import write_png
 from einops import rearrange
 import imageio
 
@@ -19,7 +16,7 @@ from torchvision.transforms import Compose, Lambda
 
 from mindspeed_mm.data.data_utils.data_transform import CenterCropResizeVideo, SpatialStrideCropVideo, \
     ToTensorAfterResize, maxhwresize
-from mindspeed_mm.utils.mask_utils import STR_TO_TYPE, TYPE_TO_STR, MaskType
+from mindspeed_mm.utils.mask_utils import STR_TO_TYPE, MaskType
 
 
 def save_videos(videos, start_index, save_path, fps):

@@ -1,5 +1,5 @@
 tqdm==4.67.1
-peft==0.17.0
+peft
 openai==2.8.0
 einops==0.8.0
 loguru==0.7.3

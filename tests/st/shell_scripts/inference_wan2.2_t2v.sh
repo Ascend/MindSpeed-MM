@@ -62,8 +62,4 @@ GPT_ARGS="
     --context-parallel-algo ulysses_cp_algo \
 "
 
-pip install diffusers==0.35.1 peft==0.17.1
-
 torchrun $DISTRIBUTED_ARGS $BASEPATH/inference_sora.py $MM_ARGS $GPT_ARGS
-
-pip install diffusers==0.30.3 peft==0.7.1

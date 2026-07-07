@@ -61,11 +61,11 @@ wandb==0.18.5
 pydantic==2.9.2
 watch==0.2.7
 gpustat==1.1.1
-peft==0.13.2
+peft
 einops==0.8.0
 wheel==0.44.0
 loguru==0.7.3
-diffusers==0.32.0
+diffusers
 
 
 # type checking

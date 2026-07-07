@@ -90,12 +90,8 @@ OUTPUT_ARGS="
     --ckpt-format torch_dcp \
 "
 
-pip install diffusers==0.35.1 peft==0.17.1
-
 torchrun $DISTRIBUTED_ARGS $BASEPATH/pretrain_sora.py \
     $GPT_ARGS \
     $MM_ARGS \
     $OUTPUT_ARGS \
     --distributed-backend nccl
-
-pip install diffusers==0.30.3 peft==0.7.1

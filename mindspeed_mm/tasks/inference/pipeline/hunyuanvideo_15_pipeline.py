@@ -11,12 +11,9 @@ import torch
 import torch.distributed as dist
 import torch_npu
 import torchvision.transforms as transforms
-import transformers
 from PIL.Image import Image
-from accelerate import cpu_offload_with_hook
-from diffusers.video_processor import VideoProcessor, VaeImageProcessor
+from diffusers.video_processor import VaeImageProcessor
 from megatron.core import mpu
-from transformers import CLIPImageProcessor
 
 from mindspeed_mm.models.predictor.dits.hunyuanvideo15.utils import get_parallel_state, generate_crop_size_list, \
     get_closest_ratio, resize_and_center_crop, auto_offload_model

@@ -11,9 +11,11 @@
 import json
 import os
 import random
+import builtins
 
 import torch
 from torch.utils.data import Dataset
+from torch.serialization import safe_globals
 
 
 class LatentDataset(Dataset):
@@ -47,25 +49,26 @@ class LatentDataset(Dataset):
         if random.random() < self.cfg_rate:
             prompt_embed = self.uncond_prompt_embed
         else:
-            prompt_embed = torch.load(
-                os.path.join(self.prompt_embed_dir, prompt_embed_file),
-                map_location="cpu",
-                weights_only=True,
-            )
-            pooled_prompt_embeds = torch.load(
-                os.path.join(
-                    self.pooled_prompt_embeds_dir, pooled_prompt_embeds_file
-                ),
-                map_location="cpu",
-                weights_only=True,
-            )
-            text_ids = torch.load(
-                os.path.join(
-                    self.text_ids_dir, text_ids_file
-                ),
-                map_location="cpu",
-                weights_only=True,
-            )
+            with safe_globals([builtins.getattr]):
+                prompt_embed = torch.load(
+                    os.path.join(self.prompt_embed_dir, prompt_embed_file),
+                    map_location="cpu",
+                    weights_only=True,
+                )
+                pooled_prompt_embeds = torch.load(
+                    os.path.join(
+                        self.pooled_prompt_embeds_dir, pooled_prompt_embeds_file
+                    ),
+                    map_location="cpu",
+                    weights_only=True,
+                )
+                text_ids = torch.load(
+                    os.path.join(
+                        self.text_ids_dir, text_ids_file
+                    ),
+                    map_location="cpu",
+                    weights_only=True,
+                )
         return prompt_embed, pooled_prompt_embeds, text_ids, self.data_anno[idx]['caption']
 
     def __len__(self):
