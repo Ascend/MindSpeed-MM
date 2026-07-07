@@ -171,7 +171,7 @@ mm-convert WanConverter hf_to_mm \
 | :---------------- | :----------------------- | :----------------------------------------------------------- |
 | --cfg.source_path | 原始权重路径             | /                                                            |
 | --cfg.target_path | 转换或切分后权重保存路径 | /                                                            |
-| --pp_layers   | PP/VPP层数               | 开启PP时, 使用PP和VPP需要指定各stage的层数并转换, 默认为`[]`，即不使用 |
+| --cfg.target_parallel_config.pp_layers | PP/VPP层数               | 开启PP时, 使用PP和VPP需要指定各stage的层数并转换, 默认为`[]`，即不使用 |
 
 如需转回Hugging Face格式，需运行权重转换脚本：
 

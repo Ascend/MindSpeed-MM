@@ -15,6 +15,7 @@ export NPU_ASD_ENABLE=0
 export ASCEND_LAUNCH_BLOCKING=0
 export ACLNN_CACHE_LIMIT=100000
 
+# NPUS_PER_NODE可根据硬件型号调整数值
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
@@ -28,7 +29,7 @@ MM_MODEL="./examples/qwen2.5vl/model_7b.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-7B-Instruct"
 SAVE_PATH="save_dir"
-
+# TP/PP/CP/MBS等参数会影响显存等性能, 可根据序列长度自行调整
 TP=1
 PP=2
 CP=1

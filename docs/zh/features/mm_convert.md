@@ -71,6 +71,9 @@ mm-convert  Qwen2VLConverter hf_to_mm \
   --cfg.parallel_config.tp_size 1
 ```
 
+> 转换的并行配置（`tp_size`、`llm_pp_layers`/`vit_pp_layers`）必须与训练脚本保持一致，否则生成的权重目录命名与切分对不上会导致加载失败。
+> 例如：只有 PP>1 时权重目录才带 stage 后缀（如 `mp_rank_00_000`）；PP=1 时为 `mp_rank_00`，此时 `llm_pp_layers` 应配成单段（如 `[[28]]`）。
+
 ## yaml文件
 
 1. yaml配置文件可自动生成基础版本，然后手动修改必要的配置

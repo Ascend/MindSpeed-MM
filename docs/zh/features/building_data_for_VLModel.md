@@ -13,31 +13,13 @@
 ### 2.1. 数据集下载(以coco2017数据集为例)
 
 (1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到本地路径，如`./data/COCO2017`。
+  > [!NOTE]
+  >
+  > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
 
 (2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至本地，如`./data/`路径下。
 
-> [!NOTE]
->
-> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
-
-该数据格式使用本地多模态 ShareGPT 风格字段：
-
-- 图片字段：`images`
-- 对话字段：`messages`
-- 角色字段：`role`
-- 内容字段：`content`
-
-示例：
-
-```json
-{
-  "images": ["train2017/000000000009.jpg"],
-  "messages": [
-    {"role": "user", "content": "<image>请描述图片内容。"},
-    {"role": "assistant", "content": "这是一张..."}
-  ]
-}
-```
+下载得到的是原始格式数据，采用本地多模态 ShareGPT 风格的字段（示例见 2.3），使用前需参考 2.2 转换为训练实际读取的目标格式。
 
 ### 2.2. 数据格式转换
 
@@ -112,7 +94,7 @@ data:
       }
     ],
     "videos": [
-      "demo_video.jpg"
+      "demo_video.mp4"
     ]
   },
   ...
@@ -136,7 +118,15 @@ data:
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
 
+> **注意：以下示例为转换前的源格式（LLaVA 原始风格），并非训练直接读取的格式。** 准备好后仍需参照上一章节转换为目标格式后再用于训练。
+
 在数据构造时，对于包含图片的数据，需要保留`image`这个键值。
+各字段含义如下：
+
+- 图片字段：`image`
+- 对话字段：`conversations`
+- 角色字段：`from`
+- 内容字段：`value`
 
 ```python
 {

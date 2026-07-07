@@ -14,6 +14,7 @@ export ACLNN_CACHE_LIMIT=100000
 export PYTORCH_NPU_ALLOC_CONF="expandable_segments:True"
 
 # 当前脚本多机拉起配置仅作参考，请根据实际情况修改
+# NPUS_PER_NODE可根据硬件型号调整数值
 NPUS_PER_NODE=8
 # 注意，当前为多机运行，根据实际的机器ip创建examples/qwen2.5vl/hostfile.txt文件，其中每行为一台机器的ip地址
 HOSTFILE="examples/qwen2.5vl/hostfile.txt"
@@ -34,7 +35,7 @@ MM_MODEL="./examples/qwen2.5vl/model_32b.json"
 MM_TOOL="./mindspeed_mm/tools/tools.json"
 LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-32B-Instruct"
 SAVE_PATH="save_dir"
-
+# TP/PP/CP/MBS等参数会影响显存等性能, 可根据序列长度自行调整
 TP=2
 PP=8
 CP=1
