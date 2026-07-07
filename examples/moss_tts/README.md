@@ -68,6 +68,7 @@ cd ../MindSpeed-MM
 pip install -e .
 
 # 安装其它依赖
+pip install transformers==5.9.0
 pip install -r examples/moss_tts/requirements.txt
 ```
 
