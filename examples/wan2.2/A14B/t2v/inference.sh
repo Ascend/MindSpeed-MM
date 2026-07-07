@@ -58,6 +58,7 @@ GPT_ARGS="
     --attention-mask-type general \
     --load $LOAD_PATH \
     --context-parallel-algo ulysses_cp_algo \
+    --finetune \
 "
 
 torchrun $DISTRIBUTED_ARGS inference_sora.py $MM_ARGS $GPT_ARGS
