@@ -78,11 +78,11 @@ model:
   # freeze:
   #   - model.visual
   # 融合算子配置
-  gdn_implementation: triton
-  causal_conv1d_implementation: eager
+  gdn_implementation: ascendc
+  causal_conv1d_implementation: triton
   # skip_recompute
-  skip_gdn_recompute: false
-  skip_flash_attn_recompute: false
+  skip_gdn_recompute: true
+  skip_flash_attn_recompute: true
 
 
 # 优化特性配置
@@ -103,7 +103,7 @@ features:
     apply_module: lm_head
     chunk_size: 1024
   # activation offload 配置
-  enable_activation_offload: false
+  enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
      - model.visual.blocks.{*}

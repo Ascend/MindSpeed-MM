@@ -11,19 +11,23 @@ parallel:
       - model.language_model.layers.{*}.linear_attn
       - model.language_model.layers.{*}.mlp.experts
       - lm_head
+      - mtp
     hook_modules:
       - model.language_model.layers.{*}
     param_dtype: bf16
     reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
   ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
   expert_parallel_size: 1
   ep_plan:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
+    dispatcher: alltoall
 
 ### 数据相关配置
 data:
-  dataset_param:
+  dataset_param: &TRAIN_DATASET_PARAM
     dataset_type: huggingface
     #数据集属性
     attr:
@@ -46,25 +50,33 @@ data:
       video_fps: 2.0
       video_maxlen: 64
 
-    basic_parameters:
-      cutoff_len: 1024
+    basic_parameters: &TRAIN_BASIC_PARAMETERS
+      cutoff_len: 16384
       template: qwen3_vl_nothink
       enable_thinking: false
       train_on_prompt: false
       mask_history: false
       # tool_format: null
-      dataset_dir: ./data
+      dataset_dir: ./data/COCO2017
       dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false
+      preprocess_on_fly: true
       preprocessing_batch_size: 1000
       preprocessing_num_workers: 16
       max_samples: null
 
+  val_dataset_param:
+    <<: *TRAIN_DATASET_PARAM
+    basic_parameters:
+      <<: *TRAIN_BASIC_PARAMETERS
+      dataset: ./data/mllm_format_llava_instruct_data_val.json
+      cache_dir: ./cache_dir/val
+
   # 数据加载
   dataloader_param:
     pin_memory: true
-    shuffle: false
+    shuffle: true
     dataloader_mode: sampler
     drop_last: true
     sampler_type: BaseRandomBatchSampler
@@ -80,12 +92,16 @@ model:
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   attn_implementation: flash_attention_2
-  freeze:
-    - model.visual
+  # 冻结部分模块
+  # freeze:
+  #   - model.visual
   # 融合算子配置
-  gdn_implementation: triton
-  causal_conv1d_implementation: eager
+  gdn_implementation: ascendc
+  causal_conv1d_implementation: triton
   use_grouped_expert_matmul: true
+  # skip_recompute
+  skip_gdn_recompute: true
+  skip_flash_attn_recompute: true
 
 # 优化特性配置
 features:
@@ -97,23 +113,37 @@ features:
   recompute: true
   recompute_plan:
       apply_modules:
-        - model.language_model.layers.{*}
         - model.visual.blocks.{*}
+        - model.language_model.layers.{*}
   # chunkloss配置
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
-    chunk_size: 1024
+    chunk_size: 512
   # activation offload 配置
-  enable_activation_offload: false
+  enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
      - model.visual.blocks.{*}
      - model.language_model.layers.{*}
+  # chunkmbs配置
+  enable_chunk_mbs: true
+  chunkmbs_plan:
+    apply_modules:
+     - model.language_model.layers.{*}
+    chunk_mbs: 2 # 这个表示的是chunk之后的micro batchsize
+    batch_dim: 0
+    chunk_arg_indexs: [0]
+    chunk_kwarg_names: ["position_embeddings", "position_ids", "rope_deltas", "attention_mask"]
+
+  # ep balance
+  enable_ep_balance: false
+  ep_balance_plan:
+    max_dup_experts_num: 2
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  micro_batch_size: 4
   gradient_accumulation_steps: 1
   seed: 42
   lr: 1.0e-5
@@ -121,6 +151,8 @@ training:
   lr_warmup_ratio: 0.1
   weight_decay: 0
   train_iters: 10000
+  val_interval: 0
+  val_micro_batch_size: 1
   clip_grad: 0.0
   init_model_with_meta_device: true
   optimizer: adamw
