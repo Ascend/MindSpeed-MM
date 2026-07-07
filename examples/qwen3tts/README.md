@@ -66,6 +66,7 @@ cd ../MindSpeed-MM
 pip install -e .
 
 # 安装其它依赖
+pip install transformers==4.57.3
 pip install -r examples/qwen3tts/requirements.txt
 ```
 

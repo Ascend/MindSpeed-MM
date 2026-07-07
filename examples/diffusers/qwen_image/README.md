@@ -82,6 +82,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
 
     ```shell
     pip install -e .
+    pip install transformers==4.56.1
     pip install -r examples/dreambooth/requirements_qwen_image.txt # 安装对应依赖
     ```
 

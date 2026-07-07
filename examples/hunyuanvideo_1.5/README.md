@@ -67,7 +67,7 @@ cd MindSpeed-MM
 执行如下指令：
 
 ```bash
-bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install -r examples/hunyuanvideo_1.5/requirements.txt
+bash scripts/install.sh --megatron --msid 96bc0a3bf3398bf45ac26e0bded95ee174ac449b && pip install transformers==4.57.1 && pip install -r examples/hunyuanvideo_1.5/requirements.txt
 ```
 
 ### 3. Decord搭建

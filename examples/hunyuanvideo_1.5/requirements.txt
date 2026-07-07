@@ -13,7 +13,6 @@ omegaconf>=2.3.0
 safetensors>=0.5.3
 qwen-vl-utils==0.0.8
 huggingface-hub==0.34.0
-transformers==4.57.1
 huggingface_hub[cli]
 wheel
 psutil
