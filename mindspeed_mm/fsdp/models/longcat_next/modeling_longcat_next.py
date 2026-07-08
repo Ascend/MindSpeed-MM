@@ -3,13 +3,13 @@
 # This code is licensed under the MIT License, for details, see the ./LICENSE file.
 
 import os
-from typing import Optional, Union
 from dataclasses import dataclass
+from tqdm import tqdm
+from typing import Optional, Union
 
 import torch
 import torch.nn.functional as F
 from torch import nn
-from tqdm import tqdm
 
 from transformers.cache_utils import Cache
 from transformers.generation.configuration_utils import GenerationConfig
@@ -76,6 +76,9 @@ class LongcatNextForCausalLMGenerationStatus:
         self.audio_parallel_decoding = audio_generation_config.audio_parallel_decoding
 
     def switch_to(self, modal):
+
+        if modal not in ["text", "visual", "audio"]:
+            raise AssertionError("modal should in 'text', 'visual', 'audio' ")
         self.mode = modal
         self.current_image_token_num = 0 if modal == "visual" else -1
         self.is_audio_text_end = False
@@ -124,21 +127,21 @@ class LongcatNextModel(LongcatFlashNgramModel):
         print(f"{self.audio_offset_vals=}")
 
     def forward(
-        self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        visual_inputs=None,
-        visual_ids=None,
-        audio_inputs=None,
-        audio_ids=None,
-        audio_text_ids=None,
-        multimodal_generation_status=None,
-        **kwargs
+            self,
+            input_ids: Optional[torch.LongTensor] = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            past_key_values: Optional[Cache] = None,
+            inputs_embeds: Optional[torch.FloatTensor] = None,
+            cache_position: Optional[torch.LongTensor] = None,
+            use_cache: Optional[bool] = None,
+            visual_inputs=None,
+            visual_ids=None,
+            audio_inputs=None,
+            audio_ids=None,
+            audio_text_ids=None,
+            multimodal_generation_status=None,
+            **kwargs
     ) -> BaseModelOutputWithPast:
 
         if input_ids is None:
@@ -149,12 +152,16 @@ class LongcatNextModel(LongcatFlashNgramModel):
         if isinstance(past_key_values, NgramCache) and past_key_values.ngram_context is not None:
             ngram_context = past_key_values.ngram_context
 
-        special_visual_mask, special_audio_mask, special_audio_text_start_mask, special_audio_text_pad_mask = self.get_placeholder_mask(input_ids[:1]) # seq-dim
+        # assert input_ids.size(0) == 1, "only support bs=1 for now" # but when bs=2, idx=1 is for uncond_image_generation
+        special_visual_mask, special_audio_mask, special_audio_text_start_mask, special_audio_text_pad_mask = self.get_placeholder_mask(
+            input_ids[:1])  # seq-dim
 
         if inputs_embeds is None:
-            input_ids[:, special_visual_mask | special_audio_mask | special_audio_text_pad_mask | special_audio_text_start_mask] = 0
+            input_ids[:,
+            special_visual_mask | special_audio_mask | special_audio_text_pad_mask | special_audio_text_start_mask] = 0
             filled_text_pad_mask = torch.ones_like(special_audio_mask)
-            audio_text_position_mask = (special_audio_text_pad_mask | special_audio_text_start_mask | special_audio_mask)
+            audio_text_position_mask = (
+                        special_audio_text_pad_mask | special_audio_text_start_mask | special_audio_mask)
 
             if audio_text_ids is not None and audio_text_ids.size(1) > 0 and audio_text_position_mask.sum() > 0:
                 filled_text = audio_text_ids[:, -audio_text_position_mask.sum():]
@@ -167,27 +174,27 @@ class LongcatNextModel(LongcatFlashNgramModel):
 
         if special_audio_text_start_mask.sum() > 0:
             audio_text_start_embedding = self.embed_tokens(self.audiotext_start_token_id)
-            if multimodal_generation_status.last_step_mode is None: # prefill
+            if multimodal_generation_status.last_step_mode is None:  # prefill
                 inputs_embeds[:1, special_audio_text_start_mask] += audio_text_start_embedding
             else:
                 inputs_embeds[:, special_audio_text_start_mask] += audio_text_start_embedding
 
         if visual_inputs is not None:
-            visual_ids = self.get_visual_ids(**visual_inputs) # [<bs=1>*seq, lev]
+            visual_ids = self.get_visual_ids(**visual_inputs)  # [<bs=1>*seq, lev]
 
         if visual_ids is not None and special_visual_mask.sum() > 0:
-            visual_embeddings = self.get_visual_embeddings(visual_ids[-special_visual_mask.sum():]) # -> [seq, dim]
-            if multimodal_generation_status.last_step_mode is None: # prefill
+            visual_embeddings = self.get_visual_embeddings(visual_ids[-special_visual_mask.sum():])  # -> [seq, dim]
+            if multimodal_generation_status.last_step_mode is None:  # prefill
                 inputs_embeds[:1, special_visual_mask] = visual_embeddings.to(inputs_embeds.device)
             else:
                 inputs_embeds[:, special_visual_mask] = visual_embeddings.to(inputs_embeds.device)
 
         if audio_inputs is not None:
-            audio_ids = self.get_audio_ids(**audio_inputs) # -> [<bs=1>*seq, lev]
+            audio_ids = self.get_audio_ids(**audio_inputs)  # -> [<bs=1>*seq, lev]
 
         if audio_ids is not None and special_audio_mask.sum() > 0:
-            audio_embeddings = self.get_audio_embeddings(audio_ids[-special_audio_mask.sum():]) # -> [seq, dim]
-            if multimodal_generation_status.last_step_mode is None: # prefill
+            audio_embeddings = self.get_audio_embeddings(audio_ids[-special_audio_mask.sum():])  # -> [seq, dim]
+            if multimodal_generation_status.last_step_mode is None:  # prefill
                 inputs_embeds[:1, special_audio_mask] += audio_embeddings.to(inputs_embeds.device)
             else:
                 inputs_embeds[:, special_audio_mask] += audio_embeddings.to(inputs_embeds.device)
@@ -225,12 +232,12 @@ class LongcatNextModel(LongcatFlashNgramModel):
 
     @torch.no_grad()
     def decode_visual_ids_and_save(
-        self,
-        visual_ids,
-        save_prefix,
-        token_h,
-        token_w,
-        **kwargs,
+            self,
+            visual_ids,
+            save_prefix,
+            token_h,
+            token_w,
+            **kwargs,
     ):
         visual_ids -= self.visual_offset_vals.to(visual_ids.device)
 
@@ -241,12 +248,12 @@ class LongcatNextModel(LongcatFlashNgramModel):
 
     @torch.no_grad()
     def decode_audio_ids_and_save(
-        self,
-        audio_ids,
-        save_prefix,
-        sampling_rate,
-        wave_concat_overlap,
-        **kwargs,
+            self,
+            audio_ids,
+            save_prefix,
+            sampling_rate,
+            wave_concat_overlap,
+            **kwargs,
     ):
         audio_ids -= self.audio_offset_vals.to(audio_ids.device)
 
@@ -258,7 +265,7 @@ class LongcatNextModel(LongcatFlashNgramModel):
         return [save_path]
 
     def get_visual_embeddings(self, visual_ids):
-        visual_embeddings = self.embed_tokens(visual_ids).sum(dim=1) # [seq, lev] -> [seq, lev, dim] -> [seq, dim]
+        visual_embeddings = self.embed_tokens(visual_ids).sum(dim=1)  # [seq, lev] -> [seq, lev, dim] -> [seq, dim]
         visual_embeddings = self.visual_tokenizer.visual_embedding_layer(visual_embeddings)
         return visual_embeddings
 
@@ -308,25 +315,25 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
     @can_return_tuple
     @auto_docstring
     def forward(
-        self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        logits_to_keep: Union[int, torch.Tensor] = 0,
-        visual_inputs=None,
-        visual_ids=None,
-        audio_inputs=None,
-        audio_ids=None,
-        audio_text_ids=None,
-        multimodal_generation_status: LongcatNextForCausalLMGenerationStatus = None,
-        visual_generation_config: GenerationConfig = None,
-        audio_generation_config: GenerationConfig = None,
-        **kwargs: Unpack[TransformersKwargs],
+            self,
+            input_ids: Optional[torch.LongTensor] = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            past_key_values: Optional[Cache] = None,
+            inputs_embeds: Optional[torch.FloatTensor] = None,
+            labels: Optional[torch.LongTensor] = None,
+            use_cache: Optional[bool] = None,
+            cache_position: Optional[torch.LongTensor] = None,
+            logits_to_keep: Union[int, torch.Tensor] = 0,
+            visual_inputs=None,
+            visual_ids=None,
+            audio_inputs=None,
+            audio_ids=None,
+            audio_text_ids=None,
+            multimodal_generation_status: LongcatNextForCausalLMGenerationStatus = None,
+            visual_generation_config: GenerationConfig = None,
+            audio_generation_config: GenerationConfig = None,
+            **kwargs: Unpack[TransformersKwargs],
     ) -> CausalLMOutputWithPast:
         r"""
         visual_inputs (`BatchFeature`, *optional*):
@@ -350,7 +357,8 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
             `temperature`, `top_k`, `top_p`, `repetition_penalty`, and `audio_parallel_decoding`.
         """
 
-        if multimodal_generation_status.mode == "visual" and visual_generation_config.custom_params["cfg_scale"] != 1.0 and input_ids.size(0) == 1:
+        if multimodal_generation_status.mode == "visual" and visual_generation_config.custom_params[
+            "cfg_scale"] != 1.0 and input_ids.size(0) == 1:
             input_ids = input_ids.repeat((2, 1))
 
         outputs: BaseModelOutputWithPast = self.model(
@@ -377,7 +385,7 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
 
         loss, logits = None, None
         if multimodal_generation_status.mode == "visual" and \
-            (not multimodal_generation_status.is_img_newline) and (not multimodal_generation_status.is_img_end):
+                (not multimodal_generation_status.is_img_newline) and (not multimodal_generation_status.is_img_end):
             visual_ids = self.get_multimodal_logits_and_ids(
                 self.visual_head,
                 visual_ids,
@@ -412,37 +420,40 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
         )
 
     def get_multimodal_logits_and_ids(
-        self,
-        head_model,
-        multimodal_ids,
-        hidden_states,
-        multimodal_embedding_layer,
-        codebook_sizes,
-        offset_vals,
-        multimodal_generation_config,
+            self,
+            head_model,
+            multimodal_ids,
+            hidden_states,
+            multimodal_embedding_layer,
+            codebook_sizes,
+            offset_vals,
+            multimodal_generation_config,
     ):
-        next_token_ids = torch.zeros(hidden_states.size(0), len(codebook_sizes), dtype=torch.long, device=hidden_states.device)
+        next_token_ids = torch.zeros(hidden_states.size(0), len(codebook_sizes), dtype=torch.long,
+                                     device=hidden_states.device)
         multimodal_embedding_layer = multimodal_embedding_layer.to(hidden_states.device)
 
         for level, _ in enumerate(codebook_sizes):
-            logits = head_model(hidden_states, next_token_ids, multimodal_embedding_layer, level) # -> (bs, 1, dim)
-            next_token_id = self.inner_sample(logits, multimodal_ids[None, :, level] - offset_vals[level], multimodal_generation_config) # (bs, 1)
+            logits = head_model(hidden_states, next_token_ids, multimodal_embedding_layer, level)  # -> (bs, 1, dim)
+            next_token_id = self.inner_sample(logits, multimodal_ids[None, :, level] - offset_vals[level],
+                                              multimodal_generation_config)  # (bs, 1)
             next_token_id += offset_vals[level]
             next_token_ids[:, level] = next_token_id
 
         return next_token_ids[:1]
 
     def inner_sample(
-        self,
-        next_token_logits: torch.Tensor,
-        multimodal_ids: torch.LongTensor,
-        generation_config: GenerationConfig,
+            self,
+            next_token_logits: torch.Tensor,
+            multimodal_ids: torch.LongTensor,
+            generation_config: GenerationConfig,
     ) -> torch.Tensor:
         logits_processor = self._get_logits_processor(generation_config)
 
         if "cfg_scale" in generation_config.custom_params and generation_config.custom_params["cfg_scale"] != 1.0:
             cond_logits, uncond_logits = next_token_logits.chunk(2, dim=0)
-            next_token_logits = generation_config.custom_params["cfg_scale"] * (cond_logits - uncond_logits) + uncond_logits
+            next_token_logits = generation_config.custom_params["cfg_scale"] * (
+                        cond_logits - uncond_logits) + uncond_logits
 
         next_token_scores = logits_processor(multimodal_ids, next_token_logits.to(multimodal_ids.device))
         if generation_config.do_sample:
@@ -465,22 +476,24 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
         )
 
     def prepare_inputs_for_generation(
-        self,
-        input_ids,
-        visual_ids,
-        audio_ids,
-        audio_text_ids,
-        multimodal_generation_status,
-        generation_config,
-        attention_mask,
-        cache_position,
-        **kwargs,
+            self,
+            input_ids,
+            visual_ids,
+            audio_ids,
+            audio_text_ids,
+            multimodal_generation_status,
+            generation_config,
+            attention_mask,
+            cache_position,
+            **kwargs,
     ):
         extra_new_tokens = torch.empty(input_ids.size(0), 0, dtype=torch.long, device=input_ids.device)
         if visual_ids is None:
-            visual_ids = torch.empty(0, len(self.config.visual_config.vq_config.codebook_sizes), dtype=torch.long, device=input_ids.device)
+            visual_ids = torch.empty(0, len(self.config.visual_config.vq_config.codebook_sizes), dtype=torch.long,
+                                     device=input_ids.device)
         if audio_ids is None:
-            audio_ids = torch.empty(0, len(self.config.audio_config.vq_config.codebook_sizes), dtype=torch.long, device=input_ids.device)
+            audio_ids = torch.empty(0, len(self.config.audio_config.vq_config.codebook_sizes), dtype=torch.long,
+                                    device=input_ids.device)
         if audio_text_ids is None:
             audio_text_ids = torch.empty(input_ids.size(0), 0, dtype=torch.long, device=input_ids.device)
 
@@ -505,11 +518,13 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
 
         if (input_ids[:, -1] == self.config.visual_config.image_start_token_id).all():
             multimodal_generation_status.switch_to("visual")
-            anyres_prefix_ids = self.text_tokenizer.encode(multimodal_generation_status.anyres_prefix, return_tensors="pt")
+            anyres_prefix_ids = self.text_tokenizer.encode(multimodal_generation_status.anyres_prefix,
+                                                           return_tensors="pt")
             anyres_prefix_ids = anyres_prefix_ids.to(input_ids.device)
             extra_new_tokens = torch.cat([extra_new_tokens, anyres_prefix_ids], dim=1)
-            input_ids, attention_mask, cache_position = insert_ids(anyres_prefix_ids, input_ids, attention_mask, cache_position, position=-1)
-            if input_ids.size(0) == 1: # cfg, change bs=1 -> 2
+            input_ids, attention_mask, cache_position = insert_ids(anyres_prefix_ids, input_ids, attention_mask,
+                                                                   cache_position, position=-1)
+            if input_ids.size(0) == 1:  # cfg, change bs=1 -> 2
                 input_ids = input_ids.repeat((2, input_ids.size(1)))
                 input_ids[1, :-(anyres_prefix_ids.size(-1) + 1)] = 0
                 print(f"change to cfg, input_ids: {input_ids}")
@@ -521,7 +536,8 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
         elif (input_ids[:, -1] == self.config.audio_config.audiotext_start_token_id).all():
             multimodal_generation_status.is_audio_start = True
 
-        elif ((input_ids[:, -1] == self.config.visual_config.image_end_token_id) | (input_ids[:, -1] == self.config.audio_config.audiogen_end_token_id)).all():
+        elif ((input_ids[:, -1] == self.config.visual_config.image_end_token_id) | (
+                input_ids[:, -1] == self.config.audio_config.audiogen_end_token_id)).all():
             multimodal_generation_status.switch_to("text")
 
         model_inputs = super().prepare_inputs_for_generation(
@@ -541,22 +557,21 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
         return model_inputs, multimodal_generation_status, extra_new_tokens
 
     def _sample(
-        self,
-        input_ids: torch.LongTensor,
-        logits_processor: LogitsProcessorList,
-        stopping_criteria: StoppingCriteriaList,
-        generation_config: GenerationConfig,
-        synced_gpus: bool = False,
-        streamer: Optional["BaseStreamer"] = None,
-        visual_ids=None,
-        audio_ids=None,
-        audio_text_ids=None,
-        **model_kwargs,
+            self,
+            input_ids: torch.LongTensor,
+            logits_processor: LogitsProcessorList,
+            stopping_criteria: StoppingCriteriaList,
+            generation_config: GenerationConfig,
+            synced_gpus: bool = False,
+            streamer: Optional["BaseStreamer"] = None,
+            visual_ids=None,
+            audio_ids=None,
+            audio_text_ids=None,
+            **model_kwargs,
     ) -> Union[GenerateNonBeamOutput, torch.LongTensor]:
         r"""
         Generates sequences of token ids for models with a language modeling head using **multinomial sampling** and
         can be used for text-decoder, text-to-text, speech-to-text, and vision-to-text models.
-
         Parameters:
             input_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`):
                 The sequence used as a prompt for the generation.
@@ -577,7 +592,6 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
             model_kwargs:
                 Additional model specific kwargs will be forwarded to the `forward` function of the model. If model is
                 an encoder-decoder model the kwargs should include `encoder_outputs`.
-
         Return:
             [`~generation.GenerateDecoderOnlyOutput`], [`~generation.GenerateEncoderDecoderOutput`] or `torch.LongTensor`:
             A `torch.LongTensor` containing the generated tokens (default behaviour) or a
@@ -638,7 +652,8 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
 
         visual_generation_config = GenerationConfig(**generation_config.visual_generation_config)
         audio_generation_config = GenerationConfig(**generation_config.audio_generation_config)
-        multimodal_generation_status = LongcatNextForCausalLMGenerationStatus(visual_generation_config, audio_generation_config)
+        multimodal_generation_status = LongcatNextForCausalLMGenerationStatus(visual_generation_config,
+                                                                              audio_generation_config)
 
         pbar = tqdm(iter(int, 1), desc="Generating", unit="tok")
         while self._has_unfinished_sequences(this_peer_finished, synced_gpus, device=input_ids.device):
@@ -669,10 +684,16 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
             audio_text_ids = model_inputs["audio_text_ids"]
 
             if is_prefill:
-                outputs = self(**model_inputs, return_dict=True, multimodal_generation_status=multimodal_generation_status, visual_generation_config=visual_generation_config, audio_generation_config=audio_generation_config)
+                outputs = self(**model_inputs, return_dict=True,
+                               multimodal_generation_status=multimodal_generation_status,
+                               visual_generation_config=visual_generation_config,
+                               audio_generation_config=audio_generation_config)
                 is_prefill = False
             else:
-                outputs = model_forward(**model_inputs, return_dict=True, multimodal_generation_status=multimodal_generation_status, visual_generation_config=visual_generation_config, audio_generation_config=audio_generation_config)
+                outputs = model_forward(**model_inputs, return_dict=True,
+                                        multimodal_generation_status=multimodal_generation_status,
+                                        visual_generation_config=visual_generation_config,
+                                        audio_generation_config=audio_generation_config)
 
             # synced_gpus: don't waste resources running the code we don't need; kwargs must be updated before skipping
             model_kwargs = self._update_model_kwargs_for_generation(
@@ -684,10 +705,10 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
             if synced_gpus and this_peer_finished:
                 continue
 
-
             # multimodal generation
             if multimodal_generation_status.mode == "text" or \
-                (multimodal_generation_status.mode == "audio" and not multimodal_generation_status.is_audio_text_end):
+                    (
+                            multimodal_generation_status.mode == "audio" and not multimodal_generation_status.is_audio_text_end):
                 # Copy is needed to avoid keeping a hanging ref to outputs.logits which may be very large for first iteration
                 # (the clone itself is always small)
                 next_token_logits = outputs.logits[:, -1, :].to(copy=True, dtype=torch.float32, device=input_ids.device)
@@ -718,12 +739,14 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
                 # token selection
                 if do_sample:
                     probs = nn.functional.softmax(next_token_scores, dim=-1)
+                    # TODO (joao): this OP throws "skipping cudagraphs due to ['incompatible ops']", find solution
                     next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
                 else:
                     next_tokens = torch.argmax(next_token_scores, dim=-1)
 
                 # audio_text_ids done
-                if multimodal_generation_status.mode == "audio" and (next_tokens == self.config.audio_config.audiotext_pad_token_id).all():
+                if multimodal_generation_status.mode == "audio" and (
+                        next_tokens == self.config.audio_config.audiotext_pad_token_id).all():
                     multimodal_generation_status.is_audio_text_end = True
 
             elif multimodal_generation_status.mode == "visual":
@@ -734,12 +757,11 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
                     next_tokens = self.model.image_newline_token_id.to(input_ids.device)
 
                 else:
-                    visual_ids = torch.cat([visual_ids, outputs.visual_ids], dim=0) # [seq, lev]
+                    visual_ids = torch.cat([visual_ids, outputs.visual_ids], dim=0)  # [seq, lev]
                     next_tokens = self.model.image_pad_token_id.to(input_ids.device)
 
-            else: # mode == "audio" and multimodal_generation_status.is_audio_text_end
+            else:  # mode == "audio" and multimodal_generation_status.is_audio_text_end
                 next_tokens = self.model.audio_pad_token_id.to(input_ids.device)
-
 
             if multimodal_generation_status.mode == "audio":
                 # audio_text_ids update
@@ -750,16 +772,16 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
 
                 # audio_ids update
                 if multimodal_generation_status.is_audio_start:
-                    if outputs.audio_ids[-1, 0] == (self.model.audio_offset_vals[1]): # offset + (level_1_len)
+                    if outputs.audio_ids[-1, 0] == (self.model.audio_offset_vals[1]):  # offset + (level_1_len)
                         next_tokens = self.model.audiogen_end_token_id.to(input_ids.device)
                     else:
                         next_tokens = self.model.audio_pad_token_id.to(input_ids.device)
                     audio_ids = torch.cat([audio_ids, outputs.audio_ids], dim=0)
 
                 elif (multimodal_generation_status.audio_parallel_decoding) or \
-                        (not multimodal_generation_status.audio_parallel_decoding and multimodal_generation_status.is_audio_text_end):
+                        (
+                                not multimodal_generation_status.audio_parallel_decoding and multimodal_generation_status.is_audio_text_end):
                     next_tokens = self.model.audiotext_start_token_id.to(input_ids.device)
-
 
             # finished sentences should have their next token be a padding token
             if has_eos_stopping_criteria:
@@ -768,6 +790,7 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
             # update generated ids, model inputs, and length for next step
             input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
 
+            # TODO: streaming mm ids
             if streamer is not None:
                 streamer.put(next_tokens.cpu())
 
