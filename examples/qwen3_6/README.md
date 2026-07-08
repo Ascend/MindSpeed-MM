@@ -11,6 +11,8 @@
 - [环境安装](#环境安装)
   - [环境准备](#1-环境准备)
   - [环境搭建](#2-环境搭建)
+  - [安装配套版本的TriTon-Ascend](#3-安装配套版本的triton-ascend)
+  - [安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc)
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
 - [数据集准备及处理](#数据集准备及处理)
@@ -59,6 +61,38 @@ cd MindSpeed-MM
 ```bash
 bash scripts/install.sh --msid eb10b92
 pip install transformers==5.2.0 triton-ascend==3.2.0 accelerate==1.2.0
+```
+
+### 3. 安装配套版本的Triton-Ascend
+
+安装配套版本的Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
+
+可参考如下安装命令：
+
+```shell
+# 注意：triton-ascend 3.2.0 及以下 Triton-Ascend 和 Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
+pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+```
+
+### 4. 安装fla-npu以适配AscendC
+
+拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
+
+```bash
+git clone https://github.com/flashserve/flash-linear-attention-npu
+cd flash-linear-attention-npu
+# 由于flash-linear-attention-npu为开源仓实现，当前使用充分验证的历史版本，后续充分验证适配后切换v26.6.0分支
+git checkout 60a791f
+# 适配最新相关组件修改
+git cherry-pick 50cba07
+```
+
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
+
+检验fla_npu是否安装成功
+
+```bash
+pip list | grep fla_npu
 ```
 
 ---

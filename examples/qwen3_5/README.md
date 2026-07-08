@@ -89,10 +89,13 @@ pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra
 ```bash
 git clone https://github.com/flashserve/flash-linear-attention-npu
 cd flash-linear-attention-npu
+# 由于flash-linear-attention-npu为开源仓实现，当前使用充分验证的历史版本，后续充分验证适配后切换v26.6.0分支
 git checkout 60a791f
+# 适配最新相关组件修改
+git cherry-pick 50cba07
 ```
 
-安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu)
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
 
 检验fla_npu是否安装成功
 
