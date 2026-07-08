@@ -38,7 +38,9 @@ def get_attn_mask(device, seq_len=2048):
 
 
 def _convert_cu_seq_lens(
-    cu_seq_lens: Optional[Union[torch.Tensor, List[int]]], input_layout: Optional[str] = None
+    cu_seq_lens_q: Optional[Union[torch.Tensor, List[int]]],
+    cu_seq_lens_k: Optional[Union[torch.Tensor, List[int]]],
+    input_layout: Optional[str] = None
 ) -> Tuple[Optional[List[int]], Optional[str]]:
     """
     Converts cu_seq_lens to a list and validates input_layout constraints.
@@ -52,8 +54,10 @@ def _convert_cu_seq_lens(
     """
 
     # 1. Convert Tensor to List if necessary
-    if isinstance(cu_seq_lens, torch.Tensor):
-        cu_seq_lens = cu_seq_lens.tolist()
+    if isinstance(cu_seq_lens_q, torch.Tensor):
+        cu_seq_lens_q = cu_seq_lens_q.tolist()
+    if isinstance(cu_seq_lens_k, torch.Tensor):
+        cu_seq_lens_k = cu_seq_lens_k.tolist()
 
     if input_layout:
         # 2. Normalize layout string
@@ -61,24 +65,38 @@ def _convert_cu_seq_lens(
 
         # Check constraints for packed layouts (BNSD/BSND)
         if input_layout in ["BNSD", "BSND"]:
-            if cu_seq_lens is not None and len(cu_seq_lens) > 2:
+            if (cu_seq_lens_q is not None or cu_seq_lens_k is not None) and (len(cu_seq_lens_q) > 2 or len(cu_seq_lens_k) > 2):
                 raise RuntimeError(
                     f"NPU flash attention layout {input_layout} does not support packing data "
                     f"when cu_seq_lens length > 2"
                 )
 
         # Auto-correct layout if cu_seq_lens is missing
-        elif input_layout == "1TND" and (cu_seq_lens is None or len(cu_seq_lens) == 2):
+        elif input_layout == "1TND" and (cu_seq_lens_q is None or len(cu_seq_lens_q) == 2) and (cu_seq_lens_k is None or len(cu_seq_lens_k) == 2):
             # Fallback to standard layout if packing info is missing
             input_layout = "BSND"
-            cu_seq_lens = None
+            cu_seq_lens_q = None
+            cu_seq_lens_k = None
 
-        elif input_layout == "1NTD" and (cu_seq_lens is None or len(cu_seq_lens) == 2):
-            # Fallback to standard layout if packing info is missing
-            input_layout = "BNSD"
-            cu_seq_lens = None
+        elif input_layout == "1NTD":
+            if (cu_seq_lens_q is None or len(cu_seq_lens_q) == 2) and (cu_seq_lens_k is None or len(cu_seq_lens_k) == 2):
+                # Fallback to standard layout if packing info is missing
+                input_layout = "BNSD"
+                cu_seq_lens_q = None
+                cu_seq_lens_k = None
+            elif len(cu_seq_lens_q) > 2 and len(cu_seq_lens_k) > 2:
+                # Judge whether cu_seq_lens is an arithmetic sequence (i.e., all sequences have equal length).
+                # If true, switch to BNSD computation
+                cu_seq_q = torch.tensor(cu_seq_lens_q)
+                diffs_q = torch.diff(cu_seq_q)
+                cu_seq_k = torch.tensor(cu_seq_lens_k)
+                diffs_k = torch.diff(cu_seq_k)
+                if torch.all(diffs_q == diffs_q[0]).item() and torch.all(diffs_k == diffs_k[0]).item():
+                    input_layout = "BNSD"
+                    cu_seq_lens_q = None
+                    cu_seq_lens_k = None
 
-    return cu_seq_lens, input_layout
+    return cu_seq_lens_q, cu_seq_lens_k, input_layout
 
 
 def transformers_flash_attention_forward(
@@ -197,8 +215,7 @@ def flash_attention_forward(
         # Convert cumulative sequence lengths to list format for NPU API.
         # (For ring cp, cu_seqlens info in seq_split_lens)
         if not dist.is_initialized() or not (get_parallel_state().is_ring_enable() and seq_split_lens is not None):
-            cu_seq_lens_q, input_layout = _convert_cu_seq_lens(cu_seq_lens_q, input_layout=input_layout)
-            cu_seq_lens_k, input_layout = _convert_cu_seq_lens(cu_seq_lens_k, input_layout=input_layout)
+            cu_seq_lens_q, cu_seq_lens_k, input_layout = _convert_cu_seq_lens(cu_seq_lens_q, cu_seq_lens_k, input_layout=input_layout)
 
         # Determine sequence length based on layout.
         if input_layout in ["BSND", "1TND"]:
