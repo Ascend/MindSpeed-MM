@@ -4,13 +4,12 @@
 
 import os
 from dataclasses import dataclass
-from tqdm import tqdm
 from typing import Optional, Union
 
 import torch
 import torch.nn.functional as F
 from torch import nn
-
+from tqdm import tqdm
 from transformers.cache_utils import Cache
 from transformers.generation.configuration_utils import GenerationConfig
 from transformers.generation.logits_process import LogitsProcessorList
@@ -22,13 +21,12 @@ from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs, auto_docstring, can_return_tuple, logging
 
 from .configuration_longcat_next import LongcatNextConfig
+from .cosy24k_vocoder import Cosy24kVocoder
+from .image_refiner import ImageRefinerContainer
 from .modeling_longcat_ngram import LongcatFlashNgramModel, NgramCache
 from .modular_longcat_next import CasualDepthTransformerHead
 from .modular_longcat_next_audio import LongcatNextAudioTokenizer
 from .modular_longcat_next_visual import LongcatNextVisualTokenizer
-
-from .cosy24k_vocoder import Cosy24kVocoder
-from .image_refiner import ImageRefinerContainer
 from .refiner_modules import FlowMatchEulerDiscreteScheduler
 
 logger = logging.get_logger(__name__)
@@ -76,7 +74,6 @@ class LongcatNextForCausalLMGenerationStatus:
         self.audio_parallel_decoding = audio_generation_config.audio_parallel_decoding
 
     def switch_to(self, modal):
-
         if modal not in ["text", "visual", "audio"]:
             raise AssertionError("modal should in 'text', 'visual', 'audio' ")
         self.mode = modal
@@ -152,7 +149,6 @@ class LongcatNextModel(LongcatFlashNgramModel):
         if isinstance(past_key_values, NgramCache) and past_key_values.ngram_context is not None:
             ngram_context = past_key_values.ngram_context
 
-        # assert input_ids.size(0) == 1, "only support bs=1 for now" # but when bs=2, idx=1 is for uncond_image_generation
         special_visual_mask, special_audio_mask, special_audio_text_start_mask, special_audio_text_pad_mask = self.get_placeholder_mask(
             input_ids[:1])  # seq-dim
 
@@ -161,7 +157,7 @@ class LongcatNextModel(LongcatFlashNgramModel):
             special_visual_mask | special_audio_mask | special_audio_text_pad_mask | special_audio_text_start_mask] = 0
             filled_text_pad_mask = torch.ones_like(special_audio_mask)
             audio_text_position_mask = (
-                        special_audio_text_pad_mask | special_audio_text_start_mask | special_audio_mask)
+                    special_audio_text_pad_mask | special_audio_text_start_mask | special_audio_mask)
 
             if audio_text_ids is not None and audio_text_ids.size(1) > 0 and audio_text_position_mask.sum() > 0:
                 filled_text = audio_text_ids[:, -audio_text_position_mask.sum():]
@@ -453,7 +449,7 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
         if "cfg_scale" in generation_config.custom_params and generation_config.custom_params["cfg_scale"] != 1.0:
             cond_logits, uncond_logits = next_token_logits.chunk(2, dim=0)
             next_token_logits = generation_config.custom_params["cfg_scale"] * (
-                        cond_logits - uncond_logits) + uncond_logits
+                    cond_logits - uncond_logits) + uncond_logits
 
         next_token_scores = logits_processor(multimodal_ids, next_token_logits.to(multimodal_ids.device))
         if generation_config.do_sample:
