@@ -139,6 +139,7 @@ class Qwen35Converter(Converter):
         trust_remote_code: bool = True,
         to_bf16: bool = False,
         keep_origin_mtp_weights: bool = False,
+        num_workers: int = 0,
     ):
         """
         Merges torch-dcp shards and converts them back into standard Hugging Face format.
@@ -155,6 +156,7 @@ class Qwen35Converter(Converter):
                 in comma-separated format. These parameters need special reshaping during conversion.
             keep_origin_mtp_weights (bool): If True and DCP does not contain MTP weights,
                 preserve the original MTP weights from origin_hf_dir. Default is False.
+            num_workers (int): Number of parallel workers for conversion. Default is 0 (serial).
         """
         config = AutoConfig.from_pretrained(origin_hf_dir, trust_remote_code=trust_remote_code)
         num_experts = getattr(config.text_config, "num_experts", 0)
@@ -196,7 +198,8 @@ class Qwen35Converter(Converter):
             save_dir=Path(save_hf_dir),
             model_assets_dir=Path(origin_hf_dir),
             select_key_convert_func=lambda key: f"model.{dcp_prefix}" + key,
-            state_dict_convert_func=state_dict_convert_func
+            state_dict_convert_func=state_dict_convert_func,
+            num_workers=num_workers
         )
         mtp_state_dict = None
 

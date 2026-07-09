@@ -158,10 +158,17 @@ mm-convert Qwen35Converter dcp_to_hf \
 --save_hf_dir ckpt/save_hf_path/Qwen3.5-xxB-hf-save \
 --dcp_dir ./save_path/iter_000xx \
 --origin_hf_dir ckpt/hf_path/Qwen3.5-xxB \
---to_bf16 false
+--to_bf16 false \
+--num_workers 0
+
+# 其中：
+# save_hf_dir: 转换后Huggingface格式的权重保存目录
+# dcp_dir: 保存的DCP格式权重目录，`iter_000xx`表示保存的第xx步的权重
+# origin_hf_dir：原始Huggingface格式权重目录
+# to_bf16：是否将权重数据类型从fp32转换成bf16
+# num_workers: 并行工作线程数，0表示串行执行，若存储IO性能允许，可适当调大并发数以提升转换效率，推荐设置为4
 ```
 
-其中，`--save_hf_dir`表示转换后的权重保存路径，`--dcp_dir`表示保存的权重路径，`iter_000xx`表示保存的第xx步的权重，`--origin_hf_dir`表示原始huggingface权重的路径，`--to_bf16`表示权重数据类型是否从fp32转换成bf16。
 注意：如果模型没有开启mtp（即，在`xxx_config.yaml`中model下的`mtp_num_layers`字段配置为0或没有配置），默认转换后的权重中不会包含mtp层的权重，可以通过设置`--keep_origin_mtp_weights true`来保留mtp层的权重。
 
 ---

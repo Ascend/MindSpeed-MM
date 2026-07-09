@@ -1,4 +1,5 @@
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import shutil
 from pathlib import Path
@@ -122,6 +123,48 @@ def update_safetensors_files(
         save_file(existing_state_dict, file_path, metadata={"format": "pt"})
 
 
+def _process_single_dcp_shard(
+        idx,
+        safetensor_file,
+        selected_keys,
+        load_dir,
+        save_dir,
+        metadata,
+        state_dict_convert_func,
+        hf_metadata,
+    ):
+        """
+        Process a single HF safetensors shard: partial-load DCP weights, convert, and save.
+        This function is designed to be called in a worker thread.
+
+        Args:
+            idx: File index, used to restore task ordering in logs/errors.
+            safetensor_file: Target safetensors filename.
+            selected_keys: DCP keys needed by this target safetensors shard.
+            load_dir: Directory path to load the DCP checkpoint.
+            save_dir: Directory path to save the HF shard.
+            metadata: Full DCP metadata. It is read-only in this worker.
+            state_dict_convert_func: Optional function to convert the loaded state dict.
+            hf_metadata: Metadata written into the target safetensors file.
+        """
+        load_dir = Path(load_dir)
+        save_dir = Path(save_dir)
+
+        # Each worker creates its own storage_reader to avoid thread-safety issues.
+        storage_reader = FileSystemReader(str(load_dir))
+
+        partial_metadata = extract_metadata(selected_keys, metadata)
+        partial_state_dict = partial_load_dcp_state_dict(partial_metadata, storage_reader)
+        partial_state_dict = partial_state_dict["model"] if "model" in partial_state_dict else partial_state_dict
+
+        if state_dict_convert_func:
+            partial_state_dict = state_dict_convert_func(partial_state_dict)
+
+        save_file(partial_state_dict, save_dir / safetensor_file, metadata=hf_metadata)
+
+        return idx, safetensor_file
+
+
 @validate_arguments
 def merge_dcp_to_hf(
     load_dir: DirectoryPath,
@@ -155,18 +198,31 @@ def merge_dcp_to_hf_sharded(
     model_assets_dir: DirectoryPath,
     select_key_convert_func: Optional[callable],
     state_dict_convert_func: Optional[callable],
-    trust_remote_code: bool = True
+    trust_remote_code: bool = True,
+    num_workers: int = 0,
 ):
     """
     Load DCP weights in shards and save them as sharded checkpoints in Hugging Face (HF) format.
+
+    Args:
+        load_dir: Path to DCP checkpoint directory.
+        save_dir: Path to save HF format model.
+        model_assets_dir: Path to model assets (config, tokenizer, index, etc.).
+        select_key_convert_func: Optional function to map HF keys to DCP keys for selection.
+        state_dict_convert_func: Optional function to convert loaded DCP state dict back to HF.
+        trust_remote_code: Whether to trust remote code when loading HF assets.
+        num_workers: Number of parallel workers. Default is 0 (serial execution).
     """
+    load_dir = Path(load_dir)
+    save_dir = Path(save_dir)
+    model_assets_dir = Path(model_assets_dir)
 
     config = AutoConfig.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
     processor = AutoProcessor.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
     config.save_pretrained(save_dir)
     processor.save_pretrained(save_dir)
 
-    storage_reader = FileSystemReader(load_dir)
+    storage_reader = FileSystemReader(str(load_dir))
     metadata = load_metadata(storage_reader)
     hf_metadata = {"format": "pt"}
 
@@ -188,15 +244,41 @@ def merge_dcp_to_hf_sharded(
         safetensor_file = get_single_safetensors_filename(Path(model_assets_dir))
         file_to_selected_keys = {safetensor_file: list(metadata.state_dict_metadata.keys())}
 
-    for safetensor_file, selected_keys in tqdm(file_to_selected_keys.items(), desc="Processing files"):
+    # Prepare task arguments
+    tasks = []
+    for i, (safetensor_file, selected_keys) in enumerate(file_to_selected_keys.items()):
+        tasks.append((
+            i,
+            safetensor_file,
+            selected_keys,
+            load_dir,
+            save_dir,
+            metadata,
+            state_dict_convert_func,
+            hf_metadata,
+        ))
 
-        partial_metadata = extract_metadata(selected_keys, metadata)
-        partial_state_dict = partial_load_dcp_state_dict(partial_metadata, storage_reader)
-        partial_state_dict = partial_state_dict["model"] if "model" in partial_state_dict else partial_state_dict
+    if num_workers >= 1 and len(tasks) > 1:
+        # Parallel execution using threads (threads share memory, so closures work)
+        failed_tasks = []
 
-        partial_state_dict = state_dict_convert_func(partial_state_dict) if state_dict_convert_func else partial_state_dict
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            futures = {executor.submit(_process_single_dcp_shard, *task) for task in tasks}
 
-        save_file(partial_state_dict, save_dir / safetensor_file, metadata=hf_metadata)
+            for future in tqdm(as_completed(futures), total=len(tasks), desc="Processing files (parallel)"):
+                try:
+                    future.result()
+                except Exception as e:
+                    failed_tasks.append((future, e))
+                    print(f"Warning: Task failed with error: {e}")
+
+        if failed_tasks:
+            print(f"Error: {len(failed_tasks)} task(s) failed. Check the warnings above for details.")
+            raise RuntimeError(f"{len(failed_tasks)} task(s) failed during parallel processing")
+    else:
+        # Serial execution: reuse _process_single_dcp_shard in main thread
+        for task in tqdm(tasks, desc="Processing files"):
+            _process_single_dcp_shard(*task)
 
     set_directory_permissions(save_dir)
 
@@ -208,6 +290,7 @@ if __name__ == "__main__":
     parser.add_argument("--model-assets-dir", type=str, required=True, help="Path to model assets (config, tokenizer, etc.)")
     parser.add_argument("--prefix", type=str, default="", help="Key prefix for state dict (e.g., 'model.')")
     parser.add_argument("--sharded", action="store_true", help="Enable sharded conversion to reduce memory usage (process one shard at a time)")
+    parser.add_argument("--num-workers", type=int, default=0, help="Number of parallel workers for sharded conversion. Default is 0 (serial execution).")
 
     args = parser.parse_args()
 
@@ -221,7 +304,8 @@ if __name__ == "__main__":
             state_dict_convert_func=lambda sd: {
                 (k[len(args.prefix):] if k.startswith(args.prefix) else k): v
                 for k, v in sd.items()
-            }
+            },
+            num_workers=args.num_workers
         )
     else:
         merge_dcp_to_hf(
