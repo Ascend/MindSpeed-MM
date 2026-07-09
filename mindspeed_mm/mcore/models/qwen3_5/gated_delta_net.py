@@ -462,10 +462,10 @@ class GatedDeltaNet(MegatronModule):
         elif self.config.causal_conv1d_implementation == "triton_with_transpose":
             from mindspeed_mm.fsdp.ops.gdn.triton_core.causal_conv1d import causal_conv1d_triton
             conv1d_weight = conv1d_weight.squeeze(1)
-            qkv, _  = causal_conv1d_triton(
+            qkv, _ = causal_conv1d_triton(
                 x=qkv,
                 weight=conv1d_weight,
-                H=2*self.local_num_k_heads+self.local_num_v_heads,
+                H=2 * self.local_num_k_heads + self.local_num_v_heads,
                 bias=conv1d_bias,
                 activation='silu',
                 cu_seqlens=None

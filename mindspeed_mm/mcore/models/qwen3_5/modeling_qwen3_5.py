@@ -109,7 +109,7 @@ class Qwen3_5Model(MegatronModule):
         self.video_token_id = language_transformer_config.video_token_id
         self.vision_start_token_id = language_transformer_config.vision_start_token_id
         self.spatial_merge_size = vision_transformer_config.spatial_merge_size
-        self.square_merge_size = vision_transformer_config.spatial_merge_size**2
+        self.square_merge_size = vision_transformer_config.spatial_merge_size ** 2
 
         # This attribute is needed to check if an all-reduce is required
         # on the word embeddings inside `finalize_model_grads._allreduce_word_embedding_grads`.
@@ -483,7 +483,7 @@ class Qwen3_5VisionModel(MultiModalModule):
 
         self.patch_embed = Qwen3_5VisionPatchEmbed(transformer_config)
         self.pos_embed = nn.Embedding(transformer_config.num_position_embeddings, transformer_config.hidden_size)
-        self.num_grid_per_side = int(transformer_config.num_position_embeddings**0.5)
+        self.num_grid_per_side = int(transformer_config.num_position_embeddings ** 0.5)
 
         head_dim = transformer_config.hidden_size // transformer_config.num_attention_heads
         self.rotary_pos_emb = Qwen3_5VisionRotaryEmbedding(head_dim // 2)
@@ -555,7 +555,7 @@ class Qwen3_5VisionModel(MultiModalModule):
                 coords = coords.repeat(num_frames, 1)
 
             num_tokens = coords.shape[0]
-            pos_ids[offset : offset + num_tokens] = coords
+            pos_ids[offset: offset + num_tokens] = coords
             offset += num_tokens
 
         embeddings = freq_table[pos_ids]  # lookup rotary embeddings
@@ -666,7 +666,7 @@ class Qwen3_5VisionModel(MultiModalModule):
         hidden_states = self.merger(hidden_states)
 
         # Encodes images into continuous embeddings that can be forwarded to the language model.
-        split_sizes = (grid_thw.prod(-1) // self.spatial_merge_size**2).tolist()
+        split_sizes = (grid_thw.prod(-1) // self.spatial_merge_size ** 2).tolist()
         hidden_states = torch.split(hidden_states, split_sizes)
         hidden_states = torch.cat(hidden_states, dim=0)
         return hidden_states
@@ -1162,7 +1162,7 @@ class Qwen3_5TextModel(GPTModel):
         ]
 
         return chunk_loss(
-            hidden_states.transpose(0,1),
+            hidden_states.transpose(0, 1),
             lm_head.weight,
             lm_head.bias,
             loss_forward=calculate_lm_loss,
