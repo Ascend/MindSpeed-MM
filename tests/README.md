@@ -54,17 +54,11 @@ PR合入前都须通过全量CI门禁用例测试。
 | | Vision RoPE索引计算 (Qwen2.5VL) | [test_qwen2_5vl_get_rope_index.py](ut/models/vision/test_qwen2_5vl_get_rope_index.py) |
 | | Vision RoPE索引计算 (Qwen2.5Omni) | [test_qwen2_5_omni_get_rope_index.py](ut/models/vision/test_qwen2_5_omni_get_rope_index.py) |
 | | Vision RoPE Processor (Qwen2VL) | [test_qwen2vl_rope_processor.py](ut/models/vision/vision_encoders/test_qwen2vl_rope_processor.py) |
-| **Models - Transformers** | Attention Utils (Qwen3VL) | [test_attention_utils.py](ut/models/transformers/qwen3vl/test_attention_utils.py) |
-| | Attention Modules (Qwen3Omni) | [test_attention_modules.py](ut/models/transformers/qwen3omni/test_attention_modules.py) |
 | **Models - Text Encoder** | 文本编码器处理 | [test_text_encoder_processor.py](ut/models/text_encoder/test_text_encoder_processor.py) |
 | | Tokenizer处理 | [test_tokenzier_processor.py](ut/models/text_encoder/test_tokenzier_processor.py) |
 | **Models - Audio Encoder** | 音频编码器处理 | [test_audio_encoder_processor.py](ut/models/audio_encoder/test_audio_encoder_processor.py) |
 | **Models - AE** | AutoEncoder处理 | [test_ae_processor.py](ut/models/ae/test_ae_processor.py) |
-| **Models - Diffusion** | IDDPM Scheduler | [test_iddpm.py](ut/models/diffusion/test_iddpm.py) |
-| | Diffusers Scheduler | [test_diffusers_scheduler.py](ut/models/diffusion/test_diffusers_scheduler.py) |
-| | Wan Flow Match Scheduler | [test_wan_flow_match_scheduler.py](ut/models/diffusion/test_wan_flow_match_scheduler.py) |
-| | CogVideoX扩散模型 | [test_cogvideo_diffusion.py](ut/models/diffusion/test_cogvideo_diffusion.py) |
-| | Hunyuan I2V扩散模型 | [test_hunyuan_i2v_diffusion.py](ut/models/diffusion/test_hunyuan_i2v_diffusion.py) |
+| **Models - Diffusion** | Wan Flow Match Scheduler | [test_wan_flow_match_scheduler.py](ut/models/diffusion/test_wan_flow_match_scheduler.py) |
 | **Models - Common** | 激活函数 | [test_activations.py](ut/models/common/test_activations.py) |
 | | 非对齐分割 | [test_unaligned_split.py](ut/models/common/test_unaligned_split.py) |
 | | 位置编码 | [test_pos_embeddings.py](ut/models/common/embeddings/test_pos_embeddings.py) |
