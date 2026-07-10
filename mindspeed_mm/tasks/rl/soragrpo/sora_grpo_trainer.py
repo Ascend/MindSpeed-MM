@@ -79,6 +79,27 @@ class SoraGRPOTrainer(ABC):
         if rank <= 0 and args.save is not None:
             os.makedirs(args.save, exist_ok=True)
 
+        ###### profile config ######
+        enable_profile = args.mm.tool.profile.enable
+        start_step = args.mm.tool.profile.static_param.start_step
+        end_step = args.mm.tool.profile.static_param.end_step
+        profile_rank_list = args.mm.tool.profile.ranks  # 如果采集所有的卡，则rank_list配置为空列表
+        dir_name = args.mm.tool.profile.static_param.save_path
+        ###### profile config end ######
+        prof = None
+        if enable_profile:
+            import torch_npu
+            experimental_config = torch_npu.profiler._ExperimentalConfig(
+                profiler_level=torch_npu.profiler.ProfilerLevel.Level1, data_simplification=args.mm.tool.profile.static_param.data_simplification)
+            prof = torch_npu.profiler.profile(
+                activities=[torch_npu.profiler.ProfilerActivity.CPU, torch_npu.profiler.ProfilerActivity.NPU],
+                with_stack=args.mm.tool.profile.static_param.with_stack,  # 采集torch op的函数调用栈的开关，会占用较多空间
+                record_shapes=args.mm.tool.profile.static_param.record_shapes,  # 采集torch op的input shape和input type的开关
+                profile_memory=args.mm.tool.profile.static_param.with_memory,  # 采集memory相关数据的开关
+                experimental_config=experimental_config,
+                on_trace_ready=torch_npu.profiler.tensorboard_trace_handler(dir_name, analyse_flag=args.mm.tool.profile.static_param.analyse_flag)
+            )
+
         transformer = None
         load_rank_batchsize = args.load_rank
         for start_rank in range(0, local_world_size, load_rank_batchsize):
@@ -204,7 +225,19 @@ class SoraGRPOTrainer(ABC):
                 if args.save is not None and step % args.save_interval == 0:
                     self.save_checkpoint(transformer, rank, args.save, step, epoch)
                     dist.barrier()
+                select_flag = enable_profile and prof is not None and step >= start_step and step < end_step
+                if profile_rank_list:
+                    select_flag = select_flag and torch.distributed.get_rank() in profile_rank_list
+                if select_flag:
+                    print(f"rank {torch.distributed.get_rank()} profile start")
+                    prof.start()
                 loss, grad_norm = self.train_one_step(loader)
+
+                if select_flag:
+                    prof.stop()
+                if select_flag:
+                    prof.step()
+                    print(f"rank {torch.distributed.get_rank()} profile complete")
 
                 step_time = time.time() - start_time
                 step_times.append(step_time)

@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from argparse import Namespace
+from contextlib import ExitStack
 
 import torch
 import mindspeed.megatron_adaptor
@@ -31,6 +32,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch(
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state') as initialize_sequence_parallel_state,
             patch('mindspeed_mm.configs.config.mm_extra_args_provider'),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             with patch.object(FluxGRPOTrainer, 'get_args', return_value=Namespace(sp_size=1)) as mock_get_args:
@@ -60,7 +62,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch(
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
             patch('mindspeed_mm.configs.config.merge_mm_args'),
-            patch('sys.argv', ['script.py', '--load', 'test.txt'])
+            patch('sys.argv', ['script.py', '--load', 'test.txt']),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             trainer = FluxGRPOTrainer(self.mock_dataset_provider)
@@ -83,7 +86,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('torch.cuda.current_device', return_value=0),
             patch(
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
-            patch('mindspeed_mm.configs.config.merge_mm_args')
+            patch('mindspeed_mm.configs.config.merge_mm_args'),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             with self.assertRaises(SystemExit) as cm:
@@ -105,7 +109,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('torch.cuda.current_device', return_value=0),
             patch(
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
-            patch('mindspeed_mm.configs.config.merge_mm_args')
+            patch('mindspeed_mm.configs.config.merge_mm_args'),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             with patch.object(FluxGRPOTrainer, 'get_args', return_value=Namespace(sp_size=1)) as mock_get_args:
@@ -135,6 +140,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('torch.distributed.is_initialized', return_value=True),
             patch('torch.distributed.get_world_size', return_value=8),
             patch('torch.distributed.all_gather'),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             with patch.object(FluxGRPOTrainer, 'get_args', return_value=Namespace(sp_size=1)) as mock_get_args:
@@ -173,6 +179,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('torch.distributed.is_initialized', return_value=True),
             patch('torch.distributed.get_world_size', return_value=8),
             patch('torch.distributed.all_gather'),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             with patch.object(FluxGRPOTrainer, 'get_args', return_value=Namespace(sp_size=1)) as mock_get_args:
@@ -219,6 +226,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('torch.distributed.is_initialized', return_value=True),
             patch('torch.distributed.get_world_size', return_value=8),
             patch('torch.distributed.all_gather'),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             with patch.object(FluxGRPOTrainer, 'get_args', return_value=Namespace(sp_size=1)) as mock_get_args:
@@ -267,6 +275,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('torch.distributed.all_gather'),
             patch('torch.distributed.fsdp.FullyShardedDataParallel'),
             patch('safetensors.torch.save_file') as mock_save_file,
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             try:
@@ -304,6 +313,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('torch.distributed.get_world_size', return_value=8),
             patch('torch.distributed.all_gather'),
             patch('torch.distributed.fsdp.FullyShardedDataParallel'),
+            patch('torch.cuda.device_count', return_value=8),
             patch('safetensors.torch.save_file') as mock_save_file,
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
@@ -337,6 +347,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('torch.distributed.is_initialized', return_value=True),
             patch('torch.distributed.get_world_size', return_value=8),
             patch('torch.distributed.all_gather'),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             with patch.object(FluxGRPOTrainer, 'get_args', return_value=Namespace(sp_size=1)) as mock_get_args:
@@ -366,6 +377,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('mindspeed_mm.tasks.rl.soragrpo.utils.fsdp_util.apply_fsdp_checkpointing'),
             patch('torch.optim.AdamW'),
             patch('diffusers.get_scheduler'),
+            patch('torch.cuda.device_count', return_value=8),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             test_args = Namespace(
@@ -391,6 +403,23 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 train_sp_batch_size=1,
                 train_iters=5,
                 save_interval=1000,
+                mm=Namespace(
+                    tool=Namespace(
+                        profile=Namespace(
+                            enable=False,
+                            static_param=Namespace(
+                                start_step=10,
+                                end_step=11,
+                                save_path="./profile",
+                                with_stack=False,
+                                record_shapes=True,
+                                with_memory=False,
+                                analyse_flag=True,
+                            ),
+                            ranks=[],
+                        )
+                    )
+                ),
             )
             mock_hyper_model = MagicMock()
             mock_hyper_model.diffuser = MagicMock()
@@ -403,30 +432,41 @@ class TestSoraGRPOTrainer(unittest.TestCase):
 
     def test_train_and_train_one_step(self):
         clear_module("mindspeed_mm")
-        with (
-            patch.dict('os.environ', {
+        with ExitStack() as stack:
+            # ===== env & torch =====
+            stack.enter_context(patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
                 'WORLD_SIZE': '8',
                 'LOCAL_WORLD_SIZE': '8'
-            }, clear=True),
-            patch('torch.cuda.set_device'),
-            patch('torch.cuda.current_device', return_value=0),
-            patch(
-                'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
-            patch('mindspeed_mm.configs.config.merge_mm_args'),
-            patch('torch.distributed.init_process_group'),
-            patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
-            patch('torch.distributed.all_gather'),
-            patch('torch.distributed.barrier'),
-            patch('torch.distributed.fsdp.FullyShardedDataParallel'),
-            patch('torch.distributed.all_reduce'),
-            patch('torch.distributed.get_rank', return_value=0),
-            patch('mindspeed_mm.tasks.rl.soragrpo.utils.fsdp_util.apply_fsdp_checkpointing'),
-            patch('torch.optim.AdamW'),
-            patch('diffusers.get_scheduler'),
-        ):
+            }, clear=True))
+            stack.enter_context(patch('torch.cuda.set_device'))
+            stack.enter_context(patch('torch.cuda.current_device', return_value=0))
+            stack.enter_context(patch('torch.cuda.device_count', return_value=8))
+
+            # ===== mm utils =====
+            stack.enter_context(
+                patch('mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state')
+            )
+            stack.enter_context(patch('mindspeed_mm.configs.config.merge_mm_args'))
+
+            # ===== dist / fsdp =====
+            stack.enter_context(patch('torch.distributed.init_process_group'))
+            stack.enter_context(patch('torch.distributed.is_initialized', return_value=True))
+            stack.enter_context(patch('torch.distributed.get_world_size', return_value=8))
+            stack.enter_context(patch('torch.distributed.all_gather'))
+            stack.enter_context(patch('torch.distributed.barrier'))
+            stack.enter_context(patch('torch.distributed.fsdp.FullyShardedDataParallel'))
+            stack.enter_context(patch('torch.distributed.all_reduce'))
+            stack.enter_context(patch('torch.distributed.get_rank', return_value=0))
+            stack.enter_context(
+                patch('mindspeed_mm.tasks.rl.soragrpo.utils.fsdp_util.apply_fsdp_checkpointing')
+            )
+
+            # ===== optimizer / scheduler =====
+            stack.enter_context(patch('torch.optim.AdamW'))
+            stack.enter_context(patch('diffusers.get_scheduler'))
+
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
             test_args = Namespace(
                 seed=1234,
@@ -453,7 +493,24 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 save_interval=1000,
                 clip_range=1e-4,
                 max_grad_norm=2.0,
-                adv_clip_max=5.0
+                adv_clip_max=5.0,
+                mm=Namespace(
+                    tool=Namespace(
+                        profile=Namespace(
+                            enable=False,
+                            static_param=Namespace(
+                                start_step=10,
+                                end_step=11,
+                                save_path="./profile",
+                                with_stack=False,
+                                record_shapes=True,
+                                with_memory=False,
+                                analyse_flag=True,
+                            ),
+                            ranks=[],
+                        )
+                    )
+                ),
             )
             mock_hyper_model = MagicMock()
             mock_hyper_model.diffuser = MagicMock()
@@ -501,6 +558,32 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 # The number of training step executions is correct
                 self.assertEqual(mock_sample_reference.call_count, 5)
                 # Forward and backward call counts are correct: 12 samples, 9 timesteps, 5 training steps
+                self.assertEqual(mock_grpo_one_step.call_count, 12 * 9 * 5)
+
+            with ExitStack() as stack:
+                stack.enter_context(patch.object(FluxGRPOTrainer, 'get_args', return_value=test_args))
+                stack.enter_context(patch.object(FluxGRPOTrainer, 'model_provider', return_value=mock_hyper_model))
+
+                mock_sample_reference = stack.enter_context(
+                    patch.object(
+                        FluxGRPOTrainer,
+                        'sample_reference',
+                        return_value=(samples_batched_list, train_timesteps, sigma_schedule, perms)
+                    )
+                )
+
+                mock_grpo_one_step = stack.enter_context(
+                    patch.object(
+                        FluxGRPOTrainer,
+                        'grpo_one_step',
+                        return_value=torch.tensor([-0.4985], requires_grad=True)
+                    )
+                )
+
+                trainer = FluxGRPOTrainer(self.mock_dataset_provider)
+                trainer.train()
+
+                self.assertEqual(mock_sample_reference.call_count, 5)
                 self.assertEqual(mock_grpo_one_step.call_count, 12 * 9 * 5)
 
 

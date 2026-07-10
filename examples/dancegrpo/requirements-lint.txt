@@ -29,7 +29,7 @@ h5py
 idna
 imageio
 matplotlib
-numpy==1.26.3
+numpy
 omegaconf
 opencv-python
 opencv-python-headless
@@ -65,7 +65,7 @@ peft>=0.17.0
 einops
 wheel
 loguru
-diffusers>=0.38.0
+diffusers==0.39.0
 
 
 # type checking

@@ -1,9 +1,10 @@
 import torch
 from diffusers import FluxTransformer2DModel, AutoencoderKL
-from diffusers.models.transformers.transformer_flux import FluxTransformerBlock, FluxSingleTransformerBlock
+from diffusers.models.transformers.transformer_flux import FluxTransformerBlock, FluxSingleTransformerBlock, FluxAttention
+
 
 from mindspeed_mm.tasks.rl.soragrpo.sora_grpo_model import SoraGRPOModel
-
+from mindspeed_mm.tasks.rl.soragrpo.ops.npu_ops import NpuFusedRMSNorm
 
 class FluxGRPOModel(SoraGRPOModel):
     def __init__(self, args, device):
@@ -30,3 +31,25 @@ class FluxGRPOModel(SoraGRPOModel):
 
     def get_split_modules(self):
         return FluxTransformerBlock, FluxSingleTransformerBlock
+
+
+_original_flux_attention_init = FluxAttention.__init__
+
+
+def _patched_flux_attention_init(self, *args, **kwargs):
+    # origin __init__
+    _original_flux_attention_init(self, *args, **kwargs)
+
+    # ---- patch ----
+    self.norm_q = NpuFusedRMSNorm(self.head_dim, eps=kwargs.get("eps", 1e-5))
+
+    self.norm_k = NpuFusedRMSNorm(self.head_dim, eps=kwargs.get("eps", 1e-5))
+
+    if hasattr(self, "norm_added_q"):
+        self.norm_added_q = NpuFusedRMSNorm(self.head_dim, eps=kwargs.get("eps", 1e-5))
+
+    if hasattr(self, "norm_added_k"):
+        self.norm_added_k = NpuFusedRMSNorm(self.head_dim, eps=kwargs.get("eps", 1e-5))
+
+
+FluxAttention.__init__ = _patched_flux_attention_init
