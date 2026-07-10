@@ -32,7 +32,7 @@ from mindspeed_mm.fsdp.checkpoint.utils import (
     remove_base_layer_keys,
     restore_base_layer_keys,
 )
-from mindspeed_mm.fsdp.checkpoint.load_utils import rank0_load_and_broadcast_weights
+from mindspeed_mm.fsdp.checkpoint.broadcast_utils import rank0_load_and_broadcast_dcp_weights
 
 
 logger = logging.getLogger(__name__)
@@ -161,6 +161,7 @@ class DistributedCheckpointer(CheckpointerBase):
         storage_writer: Optional[FileSystemWriter] = None,
         enable_lora: bool = False,
         save_ckpt_dtype: Optional[torch.dtype] = None,
+        **kwargs,
     ) -> None:
         """
         save training state to distributed checkpoint
@@ -211,6 +212,7 @@ class DistributedCheckpointer(CheckpointerBase):
         load_rank0_and_broadcast: bool = False,
         load_strict: bool = False,
         enable_lora: bool = False,
+        **kwargs,
     ) -> bool:
         """
         load training state from distributed checkpoint
@@ -247,7 +249,7 @@ class DistributedCheckpointer(CheckpointerBase):
             storage_reader = cls._create_storage_reader(checkpoint_dir)
 
         if load_rank0_and_broadcast:
-            rank0_load_and_broadcast_weights(
+            rank0_load_and_broadcast_dcp_weights(
                 load_state=load_state,
                 storage_reader=storage_reader,
             )

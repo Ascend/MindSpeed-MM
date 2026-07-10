@@ -248,6 +248,17 @@ class TrainingArguments(BaseArguments):
             )
         },
     )
+    save_format: Literal["auto", "hf", "dcp"] = field(
+        default="auto",
+        metadata={
+            "help": (
+                "Format used when saving checkpoints. 'auto' detects HF safetensors "
+                "vs DCP automatically; 'dcp' saves full training state; "
+                "'hf' exports HuggingFace safetensors weights only and does not "
+                "support resume training."
+            )
+        },
+    )
     load_strict: bool = field(
         default=False,
         metadata={"help": "Whether to load checkpoint strictly."},

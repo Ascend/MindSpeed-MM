@@ -26,6 +26,7 @@ from mindspeed_mm.fsdp.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.fsdp.data.dataloader.dataloader import PrefetchGradAccDataLoader
 from mindspeed_mm.fsdp.optimizer.optimizer import build_optimizer
 from mindspeed_mm.fsdp.optimizer.lr_scheduler import build_lr_scheduler
+from mindspeed_mm.fsdp.checkpoint.hf_checkpointer import HuggingFaceCheckpointer
 from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
 from mindspeed_mm.fsdp.utils.register import import_plugin
 from mindspeed_mm.fsdp.params.argument import Arguments
@@ -41,7 +42,8 @@ from mindspeed_mm.fsdp.utils.lora_utils import (
 )
 from mindspeed_mm.fsdp.utils.lora_weight_manager import LoraWeightManager
 from mindspeed_mm.config.config_manager import ConfigManager
-from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _retie_embeddings
+from mindspeed_mm.fsdp.checkpoint.hf_utils import looks_like_hf_weight_dir
+from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +78,7 @@ class Trainer:
         dataloader_result = self.get_dataloader() if dataloader_provider is None else dataloader_provider(args)
         self.train_dataloader = dataloader_result[0] if isinstance(dataloader_result, tuple) else dataloader_result
         self.val_dataloader = dataloader_result[1] if isinstance(dataloader_result, tuple) else None
-        self.checkpointer = self.get_checkpointer()
+        self.load_checkpointer, self.save_checkpointer = self.get_checkpointers()
 
         # Validate and calculate training iterations
         self._validate_and_set_train_iters(args)
@@ -95,7 +97,8 @@ class Trainer:
             self.model,
             self.optimizer,
             self.lr_scheduler,
-            self.checkpointer,
+            load_checkpointer=self.load_checkpointer,
+            save_checkpointer=self.save_checkpointer,
             val_dataloader=self.val_dataloader,
             lora_weight_manager=self.lora_weight_manager,
         )
@@ -213,7 +216,7 @@ class Trainer:
             self.lora_weight_manager.verify_lora_weights()
 
         # Re-tie embed_tokens and lm_head weights when tie_word_embeddings is true
-        _retie_embeddings(model)
+        retie_embeddings(model)
 
         return model
 
@@ -421,9 +424,44 @@ class Trainer:
             )
         return train_dataloader, val_dataloader
 
+    def get_checkpointers(self):
+        """Return checkpointing classes for load and save formats."""
+        checkpointer_by_format = {
+            "hf": HuggingFaceCheckpointer,
+            "dcp": DistributedCheckpointer,
+        }
+
+        auto_format = "hf" if looks_like_hf_weight_dir(self.args.training.load) else "dcp"
+        if self.args.training.load_format == "auto":
+            self.args.training.load_format = auto_format
+        if self.args.training.save_format == "auto":
+            self.args.training.save_format = auto_format
+
+        if not self.args.training.no_save_optim or not self.args.training.no_save_rng:
+            if self.args.training.save_format != "dcp":
+                print_rank(
+                    logger.info,
+                    "HF format does not support saving optimizer or RNG state; switching save_format to 'dcp'.",
+                )
+            self.args.training.save_format = "dcp"
+
+        load_format = self.args.training.load_format
+        save_format = self.args.training.save_format
+        if load_format not in checkpointer_by_format:
+            raise ValueError(f"Unsupported load_format: {load_format}")
+        if save_format not in checkpointer_by_format:
+            raise ValueError(f"Unsupported save_format: {save_format}")
+        if load_format == "hf" and (not self.args.training.no_load_optim or not self.args.training.no_load_rng):
+            raise ValueError(
+                "HF checkpoint loading only restores model weights. Please set both "
+                "no_load_optim=True and no_load_rng=True when load_format is 'hf'."
+            )
+        return checkpointer_by_format[load_format], checkpointer_by_format[save_format]
+
     def get_checkpointer(self):
-        """Return checkpointing class (can be overridden for different checkpoint formats)."""
-        return DistributedCheckpointer
+        """Return the load-format checkpointer for backward-compatible callers."""
+        load_checkpointer, _ = self.get_checkpointers()
+        return load_checkpointer
 
     def train(self):
         """Start the training process."""

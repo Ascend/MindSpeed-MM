@@ -1,19 +1,32 @@
-import os
-import logging
 import gc
 from glob import glob
-from typing import Optional
+import logging
+import os
 from dataclasses import dataclass
+from typing import Dict, Optional, Set
+
+from safetensors import safe_open
+import torch
+import torch.distributed as dist
+from torch.distributed.tensor import DTensor
 from tqdm import tqdm
 
-import torch
-from torch.distributed.tensor import DTensor
-
 from mindspeed.fsdp.utils.log import print_rank
-from mindspeed_mm.fsdp.checkpoint.dcp_utils import load_metadata, extract_metadata, partial_load_dcp_state_dict
-from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed, tensor_to_dtensor
-from mindspeed_mm.fsdp.utils.device import get_device_type, empty_cache
-
+from mindspeed_mm.fsdp.checkpoint.dcp_utils import (
+    extract_metadata,
+    load_metadata,
+    partial_load_dcp_state_dict,
+)
+from mindspeed_mm.fsdp.checkpoint.hf_utils import (
+    convert_weight_key,
+    _lora_base_key_map,
+    _log_unexpected_keys,
+    locate_hf_weight_files,
+    post_process_after_load,
+    write_full_tensor,
+)
+from mindspeed_mm.fsdp.utils.device import empty_cache, get_device_type
+from mindspeed_mm.fsdp.utils.utils import tensor_to_dtensor
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +51,7 @@ def chunk_list(lst, chunk_size):
 
 
 @torch.no_grad()
-def rank0_load_and_broadcast_weights(load_state, storage_reader):
+def rank0_load_and_broadcast_dcp_weights(load_state, storage_reader):
     MODEL = "model"
     OPTIMIZER = "optimizer"
 
@@ -204,3 +217,103 @@ def rank0_load_and_broadcast_weights(load_state, storage_reader):
     if len(params_to_load) > 0:
         print_rank(logger.warning, f"These weights were not loaded from the checkpoint, param keys: {params_to_load}.")
     print_rank(logger.info, f"Finished loading and broadcasting checkpoint tensors from rank 0.")
+
+
+@torch.no_grad()
+def rank0_load_and_broadcast_hf_weights(
+    model: torch.nn.Module,
+    hf_dir: str,
+    enable_lora: bool = False,
+    load_strict: bool = False,
+    weight_transform=None,
+) -> None:
+    """Load HF safetensors weights via rank0 read + ``dist.broadcast``.
+
+    Mirrors the structure of the project's DCP rank0 broadcast loader
+    (``broadcast_utils.py``): rank0 opens each safetensors shard, broadcasts the
+    per-shard ``param_info_list`` in one shot, then per-tensor broadcasts the
+    tensor data. Every rank then runs the same dispatch as ``load_hf_weights``
+    once it holds the full tensor. Total disk I/O is one read of the HF
+    weights (vs ``world_size`` reads for ``load_hf_weights``), at the cost of
+    cross-rank communication.
+
+    Assumes ``model`` has been laid out by ``fully_shard`` and brought out of
+    meta via ``to_empty_if_needed`` in ``get_model``.
+    """
+    rank0 = dist.get_rank() == 0
+    torch_device = torch.device(get_device_type())
+
+    param_names = {name for name, _ in model.named_parameters()}
+    buffer_names = {name for name, _ in model.named_buffers()}
+    lora_base_map = _lora_base_key_map(param_names) if enable_lora else {}
+    unexpected_keys: Set[str] = set()
+
+    if rank0:
+        shard_paths = [s.filepath for s in locate_hf_weight_files(hf_dir)]
+    else:
+        shard_paths = []
+    shard_count_tensor = torch.tensor(
+        [len(shard_paths)] if rank0 else [0],
+        dtype=torch.int64,
+        device=torch_device,
+    )
+    dist.broadcast(shard_count_tensor, src=0)
+    shard_count = int(shard_count_tensor.item())
+
+    shard_iterable = tqdm(
+        range(shard_count),
+        desc="Loading HF checkpoint shards",
+        disable=int(os.getenv("LOCAL_RANK", "-1")) > 0,
+    )
+
+    for shard_id in shard_iterable:
+        # rank0 reads the whole shard into a dict and builds the per-shard param_info_list;
+        # other ranks receive that list via broadcast.
+        if rank0:
+            shard_state: Dict[str, torch.Tensor] = {}
+            with safe_open(shard_paths[shard_id], framework="pt", device="cpu") as f:
+                for key in f.keys():
+                    shard_state[key] = f.get_tensor(key)
+            resolved_state: Dict[str, torch.Tensor] = {}
+            for key, value in shard_state.items():
+                key = convert_weight_key(key, model)
+                if weight_transform is not None:
+                    key, value = weight_transform.hf_to_dcp(key, value)
+                key = lora_base_map.get(key, key)
+                resolved_state[key] = value
+            shard_state = resolved_state
+            param_info_list = [
+                ParamInfo(name=k, shape=v.shape, dtype=v.dtype)
+                for k, v in shard_state.items()
+            ]
+        else:
+            shard_state = {}
+            param_info_list = []
+
+        broadcast_list = [param_info_list]
+        dist.broadcast_object_list(broadcast_list, src=0)
+        param_info_list = broadcast_list[0]
+
+        # Per-tensor broadcast + dispatch.
+        for info in param_info_list:
+            key = info.name
+            if rank0:
+                tensor = shard_state[info.name].to(torch_device, non_blocking=True)
+            else:
+                tensor = torch.empty(info.shape, dtype=info.dtype, device=torch_device)
+            dist.broadcast(tensor, src=0)
+
+            if key in param_names:
+                param_names.discard(key)
+                write_full_tensor(model, key, tensor)
+            elif key in buffer_names:
+                write_full_tensor(model, key, tensor)
+            else:
+                unexpected_keys.add(key)
+            del tensor
+
+        del shard_state
+        empty_cache()
+
+    _log_unexpected_keys(unexpected_keys)
+    post_process_after_load(missing_param_keys=param_names, load_strict=load_strict)

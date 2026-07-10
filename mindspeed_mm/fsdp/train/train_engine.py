@@ -19,7 +19,6 @@ from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
 from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
 from mindspeed_mm.fsdp.data.dataloader.dataloader import Preloader
-from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_checkpoint, looks_like_hf_weight_dir
 from mindspeed_mm.fsdp.utils.constants import MEMORY_REPORT_ITERATION
 from mindspeed_mm.fsdp.train.training_context import TrainingStage, TrainingContext
 
@@ -36,7 +35,9 @@ class TrainEngine:
         model,
         optimizer,
         scheduler,
-        checkpointer,
+        checkpointer=None,
+        load_checkpointer=None,
+        save_checkpointer=None,
         lora_weight_manager=None,
         val_dataloader=None,
         **kwargs,
@@ -49,6 +50,10 @@ class TrainEngine:
         self.optimizer = optimizer
         self.lr_scheduler = scheduler
         self.checkpointer = checkpointer
+        self.load_checkpointer = load_checkpointer or checkpointer
+        self.save_checkpointer = save_checkpointer or checkpointer
+        if self.load_checkpointer is None or self.save_checkpointer is None:
+            raise ValueError("Both load_checkpointer and save_checkpointer must be provided.")
         self.lora_weight_manager = lora_weight_manager
 
         # Training state tracking
@@ -350,24 +355,14 @@ class TrainEngine:
         if not args.training.no_load_optim:
             state["optimizer"] = self.optimizer
 
-        fmt = args.training.load_format
-        if fmt == "auto":
-            fmt = "hf" if looks_like_hf_weight_dir(args.training.load) else "dcp"
-        if fmt == "hf":
-            release = load_hf_checkpoint(
-                self.model, args.training.load,
-                load_rank0_and_broadcast=args.training.load_rank0_and_broadcast,
-                enable_lora=args.training.lora.enable,
-                load_strict=args.training.load_strict,
-            )
-        else:
-            release = self.checkpointer.load(
-                path=args.training.load,
-                state=state,
-                load_rank0_and_broadcast=args.training.load_rank0_and_broadcast,
-                load_strict=args.training.load_strict,
-                enable_lora=args.training.lora.enable,
-            )
+        release = self.load_checkpointer.load(
+            path=args.training.load,
+            state=state,
+            load_rank0_and_broadcast=args.training.load_rank0_and_broadcast,
+            load_strict=args.training.load_strict,
+            enable_lora=args.training.lora.enable,
+            model_id=args.model.model_id,
+        )
 
         if not release:
             iteration = state["extra_state"]["iteration"]
@@ -415,12 +410,14 @@ class TrainEngine:
         if not args.training.no_save_rng:
             state["extra_state"]["torch_rng_state"] = torch.get_rng_state()
         save_ckpt_dtype = get_dtype(args.training.save_ckpt_dtype) if args.training.save_ckpt_dtype else None
-        self.checkpointer.save(
+        self.save_checkpointer.save(
             args.training.save,
             state=state,
             iteration=iteration,
             enable_lora=args.training.lora.enable,
-            save_ckpt_dtype=save_ckpt_dtype
+            save_ckpt_dtype=save_ckpt_dtype,
+            model_assets_dir=args.model.model_name_or_path,
+            model_id=args.model.model_id,
         )
 
         # Synchronize all processes after saving

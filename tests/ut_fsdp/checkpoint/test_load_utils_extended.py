@@ -29,7 +29,7 @@ class TestChunkList:
     )
     def test_chunk_list_balances_remainder_to_earlier_chunks(self, items, chunk_size, expected):
         pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.checkpoint.load_utils import chunk_list
+        from mindspeed_mm.fsdp.checkpoint.broadcast_utils import chunk_list
 
         assert chunk_list(items, chunk_size) == expected
 
@@ -39,7 +39,7 @@ class TestChunkList:
     )
     def test_chunk_list_keeps_original_order(self, chunk_size):
         pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.checkpoint.load_utils import chunk_list
+        from mindspeed_mm.fsdp.checkpoint.broadcast_utils import chunk_list
 
         items = [f"param_{idx}" for idx in range(17)]
         chunks = chunk_list(items, chunk_size)
@@ -63,7 +63,7 @@ class TestChunkList:
     )
     def test_chunk_list_returns_requested_number_of_chunks(self, length, chunk_size):
         pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.checkpoint.load_utils import chunk_list
+        from mindspeed_mm.fsdp.checkpoint.broadcast_utils import chunk_list
 
         chunks = chunk_list(list(range(length)), chunk_size)
 
@@ -87,7 +87,7 @@ class TestChunkList:
     )
     def test_chunk_list_chunk_lengths_differ_by_at_most_one(self, length, chunk_size):
         pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.checkpoint.load_utils import chunk_list
+        from mindspeed_mm.fsdp.checkpoint.broadcast_utils import chunk_list
 
         chunks = chunk_list(list(range(length)), chunk_size)
         lengths = [len(chunk) for chunk in chunks]
@@ -96,7 +96,7 @@ class TestChunkList:
 
     def test_chunk_list_raises_when_chunk_size_is_zero(self):
         pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.checkpoint.load_utils import chunk_list
+        from mindspeed_mm.fsdp.checkpoint.broadcast_utils import chunk_list
 
         with pytest.raises(ZeroDivisionError):
             chunk_list([1, 2, 3], 0)
@@ -105,7 +105,7 @@ class TestChunkList:
 class TestParamInfo:
     def test_param_info_defaults_to_empty_metadata(self):
         pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.checkpoint.load_utils import ParamInfo
+        from mindspeed_mm.fsdp.checkpoint.broadcast_utils import ParamInfo
 
         info = ParamInfo()
 
@@ -116,7 +116,7 @@ class TestParamInfo:
 
     def test_param_info_stores_tensor_metadata(self):
         torch = pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.checkpoint.load_utils import ParamInfo
+        from mindspeed_mm.fsdp.checkpoint.broadcast_utils import ParamInfo
 
         info = ParamInfo(
             name="model.layers.0.weight",
@@ -132,7 +132,7 @@ class TestParamInfo:
 
     def test_param_info_equality_uses_dataclass_value_semantics(self):
         torch = pytest.importorskip("torch")
-        from mindspeed_mm.fsdp.checkpoint.load_utils import ParamInfo
+        from mindspeed_mm.fsdp.checkpoint.broadcast_utils import ParamInfo
 
         left = ParamInfo("weight", torch.Size([4]), torch.bfloat16, "optimizer")
         right = ParamInfo("weight", torch.Size([4]), torch.bfloat16, "optimizer")

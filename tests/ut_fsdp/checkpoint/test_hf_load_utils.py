@@ -1,5 +1,5 @@
 # pylint: skip-file
-"""Unit tests for mindspeed_mm.fsdp.checkpoint.hf_load_utils.
+"""Unit tests for mindspeed_mm.fsdp.checkpoint.hf_utils.
 
 Single-process tests cover every primitive and end-to-end ``load_hf_weights``
 on a plain (non-FSDP) model. The multi-rank test for
@@ -54,7 +54,7 @@ class TestPrimitives:
         ("layers.1.weight", "weight"),        # ModuleList index
     ])
     def test_resolve_leaf_walks_to_owner(self, name, expected_local):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _resolve_leaf
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import _resolve_leaf
 
         model = nn.Module()
         model.level1 = nn.Module()
@@ -67,7 +67,7 @@ class TestPrimitives:
         assert local in leaf._parameters
 
     def test_resolve_leaf_missing_path_raises(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _resolve_leaf
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import _resolve_leaf
 
         with pytest.raises(ValueError, match="Cannot resolve"):
             _resolve_leaf(nn.Linear(4, 4), "no.such.path.weight")
@@ -80,7 +80,7 @@ class TestPrimitives:
         ({r"^foo": "^bar(group)"}, "foo.x", "bar.x"),     # strips ^ and ()
     ])
     def test_convert_weight_key(self, mapping, key, expected):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import convert_weight_key
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import convert_weight_key
 
         model = nn.Module()
         if mapping is not None:
@@ -88,7 +88,7 @@ class TestPrimitives:
         assert convert_weight_key(key, model) == expected
 
     def test_write_full_tensor_parameter_and_buffer(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import write_full_tensor
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import write_full_tensor
 
         class M(nn.Module):
             def __init__(self):
@@ -105,7 +105,7 @@ class TestPrimitives:
         assert torch.allclose(m.buf, new_buf)
 
     def test_write_full_tensor_casts_dtype(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import write_full_tensor
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import write_full_tensor
 
         m = nn.Linear(4, 8)
         src = torch.randn(8, 4, dtype=torch.bfloat16)
@@ -114,7 +114,7 @@ class TestPrimitives:
         assert torch.allclose(m.weight, src.float(), atol=1e-2)
 
     def test_write_full_tensor_unknown_name_raises(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import write_full_tensor
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import write_full_tensor
 
         with pytest.raises(ValueError, match="neither a parameter nor a buffer"):
             write_full_tensor(nn.Linear(4, 4), "nope", torch.randn(4, 4))
@@ -133,7 +133,7 @@ class TestLocateAndDetect:
         ("dcp", False),  # DCP tracker only
     ])
     def test_looks_like_hf_weight_dir(self, setup, expected, tmp_path):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import looks_like_hf_weight_dir
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import looks_like_hf_weight_dir
 
         if setup == "none":
             assert looks_like_hf_weight_dir(None) is False
@@ -151,7 +151,7 @@ class TestLocateAndDetect:
         assert looks_like_hf_weight_dir(str(tmp_path)) is expected
 
     def test_locate_single_file(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import locate_hf_weight_files
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import locate_hf_weight_files
 
         with tempfile.TemporaryDirectory() as td:
             _make_single_safetensors(td, {"w": torch.randn(2, 3)})
@@ -160,7 +160,7 @@ class TestLocateAndDetect:
         assert streams[0].filepath.endswith("model.safetensors")
 
     def test_locate_sharded_sorted(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import locate_hf_weight_files
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import locate_hf_weight_files
 
         with tempfile.TemporaryDirectory() as td:
             _make_sharded_safetensors(td, {
@@ -174,14 +174,14 @@ class TestLocateAndDetect:
         ]
 
     def test_locate_empty_dir_raises(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import locate_hf_weight_files
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import locate_hf_weight_files
 
         with tempfile.TemporaryDirectory() as td, \
              pytest.raises(ValueError, match="No HF safetensors"):
             locate_hf_weight_files(td)
 
     def test_locate_index_references_missing_shard(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import locate_hf_weight_files
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import locate_hf_weight_files
 
         with tempfile.TemporaryDirectory() as td:
             with open(os.path.join(td, "model.safetensors.index.json"), "w") as f:
@@ -190,7 +190,7 @@ class TestLocateAndDetect:
                 locate_hf_weight_files(td)
 
     def test_hf_weight_file_stream_iterates_all(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import HFWeightFileStream
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import HFWeightFileStream
 
         weights = {"a": torch.randn(2, 3), "b": torch.randn(4)}
         with tempfile.TemporaryDirectory() as td:
@@ -207,14 +207,14 @@ class TestLocateAndDetect:
 # ===========================================================================
 class TestLogUnexpectedKeys:
     def test_empty_does_not_log(self, caplog):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _log_unexpected_keys
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import _log_unexpected_keys
 
         with caplog.at_level(logging.INFO):
             _log_unexpected_keys(set())
         assert len(caplog.records) == 0
 
     def test_logs_count_and_samples_without_truncation(self, caplog):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _log_unexpected_keys
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import _log_unexpected_keys
 
         with caplog.at_level(logging.INFO):
             _log_unexpected_keys({"k_a", "k_b", "k_c"})
@@ -224,7 +224,7 @@ class TestLogUnexpectedKeys:
         assert "showing 5 of" not in msg
 
     def test_truncates_above_five(self, caplog):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _log_unexpected_keys
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import _log_unexpected_keys
 
         keys = {f"k_{i:02d}" for i in range(12)}
         with caplog.at_level(logging.INFO):
@@ -235,7 +235,7 @@ class TestLogUnexpectedKeys:
 
 
 # ===========================================================================
-# _retie_embeddings
+# retie_embeddings
 # ===========================================================================
 def _make_tieable_model(tie: bool):
     class TieableModel(nn.Module):
@@ -256,30 +256,30 @@ def _make_tieable_model(tie: bool):
 
 class TestRetieEmbeddings:
     def test_tie_true_restores_object_sharing(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _retie_embeddings
+        from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
 
         m = _make_tieable_model(tie=True)
         assert m.embed.weight is not m.lm_head.weight
-        _retie_embeddings(m)
+        retie_embeddings(m)
         assert m.embed.weight is m.lm_head.weight
         m.embed.weight.data.fill_(0.0)
         assert torch.all(m.lm_head.weight == 0)
 
     def test_tie_false_is_noop(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _retie_embeddings
+        from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
 
         m = _make_tieable_model(tie=False)
-        _retie_embeddings(m)
+        retie_embeddings(m)
         assert m.embed.weight is not m.lm_head.weight
 
     def test_model_without_config_is_skipped(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _retie_embeddings
+        from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
 
-        _retie_embeddings(nn.Linear(4, 4))  # must not raise
+        retie_embeddings(nn.Linear(4, 4))  # must not raise
 
     def test_nested_text_config_and_rule(self):
         """Outer tie=True but inner text_config tie=False -> no tie (AND rule)."""
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _retie_embeddings
+        from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
 
         class Cfg:
             tie_word_embeddings = True
@@ -289,7 +289,7 @@ class TestRetieEmbeddings:
 
         m = _make_tieable_model(tie=True)
         m.config = Cfg()
-        _retie_embeddings(m)
+        retie_embeddings(m)
         assert m.embed.weight is not m.lm_head.weight
 
 
@@ -311,7 +311,7 @@ class TestLoadHfWeightsE2E:
         return {n: torch.randn_like(p) for n, p in model.named_parameters()}
 
     def test_full_load_round_trip(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_weights
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import load_hf_weights
 
         model, target = self._make_model(), None
         target = self._matching_weights(model)
@@ -323,7 +323,7 @@ class TestLoadHfWeightsE2E:
             assert torch.allclose(loaded[n], expected), n
 
     def test_sharded_load_round_trip(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_weights
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import load_hf_weights
 
         model = self._make_model()
         target = self._matching_weights(model)
@@ -339,7 +339,7 @@ class TestLoadHfWeightsE2E:
             assert torch.allclose(loaded[n], expected), n
 
     def test_missing_key_warns(self, caplog):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_weights
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import load_hf_weights
 
         model = self._make_model()
         target = self._matching_weights(model)
@@ -352,7 +352,7 @@ class TestLoadHfWeightsE2E:
                    for r in caplog.records)
 
     def test_load_strict_raises_on_missing(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_weights
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import load_hf_weights
 
         model = self._make_model()
         target = self._matching_weights(model)
@@ -363,7 +363,7 @@ class TestLoadHfWeightsE2E:
                 load_hf_weights(model, td, load_strict=True)
 
     def test_unexpected_key_summary_logged(self, caplog):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_weights
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import load_hf_weights
 
         model = self._make_model()
         target = self._matching_weights(model)
@@ -392,14 +392,14 @@ class _FakeLoraLinear(nn.Module):
 
 class TestLora:
     def test_base_key_map(self):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import _lora_base_key_map
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import _lora_base_key_map
 
         names = {"l0.q.base_layer.weight", "l0.q.lora_A.default.weight", "norm.weight"}
         assert _lora_base_key_map(names) == {"l0.q.weight": "l0.q.base_layer.weight"}
         assert _lora_base_key_map({"a.weight", "b.bias"}) == {}  # non-LoRA -> empty
 
     def test_enable_lora_loads_base_and_keeps_adapter(self, caplog):
-        from mindspeed_mm.fsdp.checkpoint.hf_load_utils import load_hf_weights
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import load_hf_weights
 
         model = nn.Module()
         model.q_proj = _FakeLoraLinear(4, 8)  # LoRA target
@@ -431,7 +431,7 @@ def _rank0_broadcast_worker(rank: int, world_size: int, init_file: str, hf_dir: 
     import torch.distributed as dist
     import torch.nn as nn
 
-    from mindspeed_mm.fsdp.checkpoint.hf_load_utils import (
+    from mindspeed_mm.fsdp.checkpoint.broadcast_utils import (
         rank0_load_and_broadcast_hf_weights,
     )
 

@@ -2,6 +2,8 @@
 import os
 import logging
 
+import torch
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,3 +71,36 @@ def restore_base_layer_keys(modified_state_dict, key_mapping):
         original_key = reverse_mapping.get(key, key)
         if original_key != key:
             modified_state_dict[original_key] = modified_state_dict.pop(key)
+
+
+def retie_embeddings(model: torch.nn.Module) -> None:
+    """Re-tie input/output embeddings when the config requests it.
+
+    - ``to_empty_if_needed`` broke any shared storage; this restores it.
+    - AND across ``model.config`` and ``text_config`` covers nested multimodal cases.
+    - Object-reference assignment so both modules share one nn.Parameter.
+    """
+    config = getattr(model, "config", None)
+    if config is None:
+        return
+    text_config = (
+        config.get_text_config(decoder=True) if hasattr(config, "get_text_config") else config
+    )
+    should_tie = (
+        (hasattr(config, "tie_word_embeddings") or hasattr(text_config, "tie_word_embeddings"))
+        and getattr(config, "tie_word_embeddings", True)
+        and getattr(text_config, "tie_word_embeddings", True)
+    )
+    if not should_tie:
+        return
+
+    try:
+        input_embeddings = model.get_input_embeddings()
+        output_embeddings = model.get_output_embeddings()
+        if input_embeddings is None or output_embeddings is None:
+            return
+        # Object-reference assignment -- after this both modules share the same
+        # nn.Parameter, so gradients accumulate into one storage.
+        output_embeddings._parameters["weight"] = input_embeddings._parameters["weight"]
+    except Exception as e:
+        raise RuntimeError("Failed to tie input/output embeddings after HF load") from e
