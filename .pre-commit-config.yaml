@@ -55,3 +55,18 @@ repos:
           - "--style=file"  # 读取 .clang-format 文件
           - "--verbose"
           - "-i"
+
+  # -------------------------- Gitleaks 本地离线二进制扫描 --------------------------
+  - repo: local
+    hooks:
+      - id: gitleaks-offline-scan
+        name: Gitleaks Secret Scan(Local Binary)
+        entry: ./gitleaks
+        language: system
+        pass_filenames: true
+        args:
+          - protect
+          - --verbose
+          - --redact
+          - --config=pre-commit/.gitleaks.toml
+        stages: [pre-commit]
