@@ -83,7 +83,9 @@ git clone https://github.com/flashserve/flash-linear-attention-npu
 cd flash-linear-attention-npu
 # 由于flash-linear-attention-npu为开源仓实现，当前使用充分验证的历史版本，后续充分验证适配后切换v26.6.0分支
 git checkout 60a791f
-# 适配最新相关组件修改
+# 适配最新相关组件修改，cherry-pick需要提前配置好git的name及email
+# git config user.email "you@example.com"
+# git config user.name "Your Name"
 git cherry-pick 50cba07
 ```
 
