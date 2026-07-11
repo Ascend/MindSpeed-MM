@@ -735,7 +735,6 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
                 # token selection
                 if do_sample:
                     probs = nn.functional.softmax(next_token_scores, dim=-1)
-                    # TODO (joao): this OP throws "skipping cudagraphs due to ['incompatible ops']", find solution
                     next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
                 else:
                     next_tokens = torch.argmax(next_token_scores, dim=-1)
@@ -786,7 +785,6 @@ class LongcatNextForCausalLM(LongcatFlashForCausalLM):
             # update generated ids, model inputs, and length for next step
             input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
 
-            # TODO: streaming mm ids
             if streamer is not None:
                 streamer.put(next_tokens.cpu())
 
