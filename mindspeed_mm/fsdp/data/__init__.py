@@ -58,7 +58,11 @@ def build_mm_dataloader(
     dataloader_mode = dataloader_param.pop("dataloader_mode")
 
     if dataloader_mode == "base":
-        data_loader = prepare_base_dataloader(dataset, **dataloader_param, dataset_param=dataset_param)
+        data_loader = prepare_base_dataloader(
+            dataset, **dataloader_param,
+            dataset_param=dataset_param,
+            model=model
+        )
         return data_loader
     elif dataloader_mode == "sampler":
         data_loader = prepare_sampler_dataloader(

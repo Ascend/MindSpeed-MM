@@ -43,6 +43,7 @@ def prepare_base_dataloader(
     persistent_workers=None,
     collate_param=None,
     dataset_param=None,
+    model=None,
     **kwargs,
 ):
     """
@@ -66,7 +67,7 @@ def prepare_base_dataloader(
     collate_fn = None
     if collate_param:
         data_collator, collate_kwargs = resolve_data_collator(collate_param, dataset_param)
-        collate_fn = data_collator(dataset_param=dataset_param, **collate_kwargs)
+        collate_fn = data_collator(dataset_param=dataset_param, model=model, **collate_kwargs)
     if persistent_workers is None:
         persistent_workers = True if num_workers > 0 else False
 
