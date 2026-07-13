@@ -58,8 +58,6 @@ SIG_SELECT_MIN = nb_types.Tuple([nb_types.int64, nb_types.boolean])(
     nb_types.Array(nb_types.int64, 2, 'C'),
     nb_types.int64
 )
-
-
 @njit(SIG_SELECT_MIN, nopython=True, cache=True)
 def select_min_workload_rank_numba(
     ep_size: int,
@@ -128,7 +126,6 @@ SIG_REARRANGE_RANK = nb_types.Tuple([
     nb_types.ListType(nb_types.UniTuple(nb_types.int64, 4)) # update_experts_lists
 )
 
-
 @njit(SIG_REARRANGE_RANK, nopython=True, cache=True)
 def rearrange_rank_select_expert_ids_np(
     num_local_experts,
@@ -190,8 +187,6 @@ SIG_REARRANGE_TOKENS = nb_types.Tuple([
     nb_types.int64,       # dup_experts_id
     nb_types.ListType(nb_types.UniTuple(nb_types.int64, 4)) # update_experts_lists
 )
-
-
 @njit(SIG_REARRANGE_TOKENS, nopython=True, cache=True)
 def rearrange_select_expert_ids_np(
     num_local_experts,
@@ -266,8 +261,6 @@ SIG_GREEDY_PLAN = nb_types.Tuple([
     nb_types.Array(nb_types.int64, 1, 'C'), # input_splits
     nb_types.ListType(nb_types.UniTuple(nb_types.int64, 4)) # update_experts_lists
 )
-
-
 @njit(SIG_GREEDY_PLAN, nopython=True, cache=True)
 def greedy_plan(
     np_workload_per_rank,
@@ -388,6 +381,8 @@ class GreedyDupExpertsPlanner:
         self.output_splits = None
         self.num_local_tokens_per_expert = None
 
+        self.plan_cache = []
+
         # Cache numpy versions of workload to avoid repeated conversion
         self._np_group_workload = None
         self._np_workload_per_rank = None
@@ -398,8 +393,6 @@ class GreedyDupExpertsPlanner:
             group_workload: [ep_size, num_experts] — Supports Tensor or Numpy, internally unified to Numpy
             selected_experts: [total_tokens] — Must be on device (as it needs modification)
         """
-        if self.dup_experts_map is not None:
-            return
 
         device = selected_experts.device
         dtype = group_workload.dtype if isinstance(group_workload, torch.Tensor) else np.array(group_workload).dtype
@@ -484,6 +477,15 @@ class GreedyDupExpertsPlanner:
         self.output_splits = torch.from_numpy(local_tokens_np.sum(axis=-1)).cpu()
         self.input_splits = torch.from_numpy(self.input_splits).cpu()
 
+        self.plan_cache.append({
+            "dup_experts_map": self.dup_experts_map,
+            "selected_experts_with_dup": self.selected_experts_with_dup,
+            "num_global_tokens_per_local_expert": self.num_global_tokens_per_local_expert,
+            "num_global_sum_tokens_per_local_expert": self.num_global_sum_tokens_per_local_expert,
+            "input_splits": self.input_splits,
+            "output_splits": self.output_splits
+        })
+
         return
 
     def clear_record_planner_result(self):
@@ -496,3 +498,16 @@ class GreedyDupExpertsPlanner:
         self.num_global_sum_tokens_per_local_expert = None
         self.input_splits = None
         self.output_splits = None
+
+        self.plan_cache = []
+
+    def pop_plan_cache(self):
+        self.plan_cache.pop()
+        if len(self.plan_cache) ==0:
+            self.clear_record_planner_result()
+
+    def get_plan_item(self, item_name):
+        if len(self.plan_cache) == 0:
+            return None
+        else:
+            return self.plan_cache[-1].get(item_name, None)

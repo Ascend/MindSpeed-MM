@@ -1114,7 +1114,7 @@ class Qwen3_5MoeExperts(nn.Module):
             )
 
             def hook_fn(*args, **kwargs):
-                self.ep_balance_strategy.planner.clear_record_planner_result()
+                self.ep_balance_strategy.planner.pop_plan_cache()
             self.register_full_backward_hook(hook_fn)
 
     def forward(
