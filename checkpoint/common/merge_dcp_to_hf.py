@@ -124,45 +124,45 @@ def update_safetensors_files(
 
 
 def _process_single_dcp_shard(
-        idx,
-        safetensor_file,
-        selected_keys,
-        load_dir,
-        save_dir,
-        metadata,
-        state_dict_convert_func,
-        hf_metadata,
-    ):
-        """
-        Process a single HF safetensors shard: partial-load DCP weights, convert, and save.
-        This function is designed to be called in a worker thread.
+    idx,
+    safetensor_file,
+    selected_keys,
+    load_dir,
+    save_dir,
+    metadata,
+    state_dict_convert_func,
+    hf_metadata,
+):
+    """
+    Process a single HF safetensors shard: partial-load DCP weights, convert, and save.
+    This function is designed to be called in a worker thread.
 
-        Args:
-            idx: File index, used to restore task ordering in logs/errors.
-            safetensor_file: Target safetensors filename.
-            selected_keys: DCP keys needed by this target safetensors shard.
-            load_dir: Directory path to load the DCP checkpoint.
-            save_dir: Directory path to save the HF shard.
-            metadata: Full DCP metadata. It is read-only in this worker.
-            state_dict_convert_func: Optional function to convert the loaded state dict.
-            hf_metadata: Metadata written into the target safetensors file.
-        """
-        load_dir = Path(load_dir)
-        save_dir = Path(save_dir)
+    Args:
+        idx: File index, used to restore task ordering in logs/errors.
+        safetensor_file: Target safetensors filename.
+        selected_keys: DCP keys needed by this target safetensors shard.
+        load_dir: Directory path to load the DCP checkpoint.
+        save_dir: Directory path to save the HF shard.
+        metadata: Full DCP metadata. It is read-only in this worker.
+        state_dict_convert_func: Optional function to convert the loaded state dict.
+        hf_metadata: Metadata written into the target safetensors file.
+    """
+    load_dir = Path(load_dir)
+    save_dir = Path(save_dir)
 
-        # Each worker creates its own storage_reader to avoid thread-safety issues.
-        storage_reader = FileSystemReader(str(load_dir))
+    # Each worker creates its own storage_reader to avoid thread-safety issues.
+    storage_reader = FileSystemReader(str(load_dir))
 
-        partial_metadata = extract_metadata(selected_keys, metadata)
-        partial_state_dict = partial_load_dcp_state_dict(partial_metadata, storage_reader)
-        partial_state_dict = partial_state_dict["model"] if "model" in partial_state_dict else partial_state_dict
+    partial_metadata = extract_metadata(selected_keys, metadata)
+    partial_state_dict = partial_load_dcp_state_dict(partial_metadata, storage_reader)
+    partial_state_dict = partial_state_dict["model"] if "model" in partial_state_dict else partial_state_dict
 
-        if state_dict_convert_func:
-            partial_state_dict = state_dict_convert_func(partial_state_dict)
+    if state_dict_convert_func:
+        partial_state_dict = state_dict_convert_func(partial_state_dict)
 
-        save_file(partial_state_dict, save_dir / safetensor_file, metadata=hf_metadata)
+    save_file(partial_state_dict, save_dir / safetensor_file, metadata=hf_metadata)
 
-        return idx, safetensor_file
+    return idx, safetensor_file
 
 
 @validate_arguments

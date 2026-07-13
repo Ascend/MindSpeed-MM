@@ -414,6 +414,7 @@ class TrainEngine:
             args.training.save,
             state=state,
             iteration=iteration,
+            save_async=args.training.save_async,
             enable_lora=args.training.lora.enable,
             save_ckpt_dtype=save_ckpt_dtype,
             model_assets_dir=args.model.model_name_or_path,

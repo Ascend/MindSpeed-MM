@@ -198,7 +198,7 @@ class TrainingArguments(BaseArguments):
     )
     save_async: bool = field(
         default=False,
-        metadata={"help": "Whether to save checkpoint asynchronously."},
+        metadata={"help": "Whether to save checkpoint asynchronously. Currently only supports DCP save format."},
     )
     save_ckpt_dtype: Optional[Literal["fp32", "fp16", "bf16"]] = field(
         default=None,
@@ -338,6 +338,9 @@ class TrainingArguments(BaseArguments):
 
         if self.val_micro_batch_size is not None and self.val_micro_batch_size <= 0:
             raise ValueError("val_micro_batch_size must be > 0 when set.")
+
+        if self.save_async and self.save_format != "dcp":
+            logger.warning("Async checkpoint saving only supports DCP save format. Please set `save_format` to 'dcp'.")
 
         if self.lr < self.lr_start:
             raise ValueError(f"Learning rate {self.lr} < starting lr {self.lr_start}. Check scheduler configuration.")

@@ -23,7 +23,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.fsdp.utils.device import empty_cache, synchronize
+from mindspeed_mm.fsdp.utils.device import empty_cache, get_dist_comm_backend, synchronize
 from mindspeed_mm.fsdp.checkpoint.checkpointer import CheckpointerBase
 from mindspeed_mm.fsdp.checkpoint.utils import (
     get_checkpoint_name,
@@ -278,9 +278,9 @@ class DistributedCheckpointer(CheckpointerBase):
     ) -> None:
         """Execute DCP save with optional async support."""
         if save_async:
-            # Lazily create a dedicated Gloo process group for async DCP saves
+            # Lazily create a dedicated process group for async DCP saves
             if cls._async_process_group is None:
-                cls._async_process_group = dist.new_group(backend="gloo")
+                cls._async_process_group = dist.new_group(backend=get_dist_comm_backend(cpu=True))
 
             if cls.dcp_save_future is not None:
                 logger.info("[RANK %s] waiting for previous DCP saving session to end...", dist.get_rank())
