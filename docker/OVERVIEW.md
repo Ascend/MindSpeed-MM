@@ -16,15 +16,65 @@ MindSpeed MM: An Atlas multimodal large model suite for large-scale distributed 
 
 The MindSpeed MM image is based on both Ubuntu 22.04 and openEuler 24.03 operating systems, supporting x86_64 and aarch64 (ARM64) CPU architectures. The image comes with the following pre-installed software:
 
-- **PyTorch** + **torch_npu**: Deep learning framework
+- **PyTorch** + **TorchNPU**: Deep learning framework
 - **decord 0.6.0**: High-performance video decoding library
 - **CANN**: Huawei Atlas AI processor base software stack
 - **verl_qwen3vl conda environment**: Pre-compiled VERL Qwen3VL reinforcement learning training environment (including vllm, vllm-ascend, verl)
 
-Due to differences in dependencies between models, only the above basic packages are pre-installed in the image. After pulling the image and starting a container, users should manually install additional dependencies required by their target model in the base environment according to the model's README file.
+Due to differences in dependencies between models, only the above basic dependencies are pre-installed in the image. After pulling the image and starting a container, users need to manually install the additional dependencies required by the target model in the base environment according to the target model's README file.
 
 Image download: Please visit the [Image Center](https://www.hiascend.com/developer/ascendhub) and search for mindspeed-mm to get the corresponding `docker pull` command.
 Currently, only images for `openEuler 24.03` OS and `aarch64` architecture are provided.
+
+## Image Tag Key Field Description
+
+The image tag naming follows the template:
+
+`{version}-{CANN version}-{TorchNPU version}[-{product info}-{OS}]-{Python version}[-{architecture}-{other fields}]`
+
+The version number and CANN/TorchNPU/Python versions are mandatory fields; those in square brackets are optional. Field order cannot be changed; all separators use `-`.
+
+| Field | Mandatory | Description | Example Values |
+| ------ | ------ | ------ | -------- |
+| version | Yes | MindSpeed MM version identifier (Git tag with `v` prefix; Git branch name without `v`) | v26.0.0, v26.1.0 |
+| CANN version | Yes | `cann` + version number | cann9.0.0 |
+| TorchNPU version | Yes | `torch_npu` + version number | torch_npu2.7.1 |
+| product info | Yes | NPU chip type (lowercase) | a3 |
+| OS | Yes | Operating system | openeuler24.03, ubuntu22.04 |
+| Python version | Yes | `py` + version number | py3.11 |
+| architecture | Yes | CPU architecture | x86_64, aarch64 |
+| other fields | No | Additional identifiers (e.g., CI runtime environment) | ci |
+
+### Example Tags
+
+| Tag | version | CANN | TorchNPU | NPU | OS | Python | Arch |
+| ----- | ----- | ----- | ----- | ----- | --------- | -------- | ------ |
+| `v26.0.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-x86_64` | v26.0.0 | 9.0.0 | 2.7.1 | A3 | openEuler 24.03 | 3.11 | x86_64 |
+| `v26.1.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-aarch64` | v26.1.0 | 9.0.0 | 2.7.1 | A3 | openEuler 24.03 | 3.11 | aarch64 |
+
+### Tag Meaning Explanation
+
+Taking `v26.1.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-aarch64` as an example:
+
+| Field | Value | Meaning |
+| ------ | ------ | ------ |
+| version | `v26.1.0` | MindSpeed MM Git tag (branch: 26.1.0) |
+| CANN version | `cann9.0.0` | Based on CANN 9.0.0 |
+| TorchNPU version | `torch_npu2.7.1` | TorchNPU 2.7.1 |
+| product info | `a3` | For Atlas A3 servers |
+| OS | `openeuler24.03` | Based on openEuler 24.03 |
+| Python version | `py3.11` | Python 3.11 |
+| architecture | `aarch64` | ARM64 architecture |
+
+> The CANN version and TorchNPU version are derived from the base image and the `--torch-npu-version` parameter at build time.
+
+Dockerfile naming follows the template: `Dockerfile[.{chip info}.{OS}.{other fields}]`
+
+- The unified `Dockerfile` supports all NPU types and OS versions through build arguments
+- Fields are separated by `.`
+- Within fields, the separator is `-`
+- Chip info uses lowercase (e.g., a3)
+- OS uses PascalCase (openEuler, ubuntu)
 
 ## Project Directory Structure Specification
 
@@ -34,8 +84,8 @@ The Docker project directory follows a clear hierarchical structure for easy mai
 
 ```text
 docker/
-├── Dockerfile                 # Unified Dockerfile supporting multiple NPU types and OS
-├── build.sh                   # Image build script with flexible parameter configuration
+├── Dockerfile                 # Unified Dockerfile, supporting multiple NPU types and OS versions
+├── build.sh                   # Image build script, supporting various parameter configurations
 ├── OVERVIEW.md                # English documentation
 ├── OVERVIEW.zh.md             # Chinese documentation
 └── scripts/                   # Script directory
@@ -54,23 +104,23 @@ docker/
 
 The `docker/build.sh` script will during the build process:
 
-1. Locate the corresponding script directory based on the version number specified by the `-v` parameter (default: master)
+1. Locate the corresponding script directory based on the version number specified by the `-v` parameter (default: 26.1.0)
 2. Copy all `install_*.sh` scripts from the `docker/scripts/model_install/` directory to the `install_scripts/` temporary directory
 
-**Important Note**: The current version of Dockerfile only executes predefined specific installation scripts (such as `install_verl_qwen3vl.sh`). If you need to add new model environment installation scripts, you must also update the Dockerfile to include the copy and execution logic for the new scripts.
+**Important Note**: The current version of the Dockerfile only executes predefined specific installation scripts (such as `install_verl_qwen3vl.sh`). If you need to add new model environment installation scripts, you must also update the Dockerfile to include the copy and execution logic for the new scripts.
 
 ## 1. Image Usage Guide
 
-**Important Note:** 
+**Important Notes:**
 
-1. Due to differences in dependencies between models, the image only pre-installs basic dependencies including torch, torch_npu, and decord. After pulling the image and starting a container, users need to manually install the dependencies required for their target model in the base environment according to the model's README file.
-2. If the NPU driver is not installed in the default path (/usr/local/Ascend/driver), you must specify the actual path in the Docker run command. For example, if the driver is located at /usr/local/npu/driver, adjust the command accordingly.
+1. Due to differences in dependencies between models, the image only pre-installs basic dependencies including PyTorch, TorchNPU, and decord. After pulling the image and starting a container, users need to manually install the dependencies required for the target model in the base environment according to the target model's README file.
+2. If the NPU driver is not installed in the default path (/usr/local/Ascend/driver), you need to add the path information in the command when running the following docker commands. Taking the path "/usr/local/npu/driver" as an example:
 
     ```bash
     # Basic run
     docker run -it --rm \
         -e LD_LIBRARY_PATH="/usr/local/npu/driver/lib64/driver:/usr/local/npu/driver/lib64/common:$LD_LIBRARY_PATH" \
-        mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
+        mindspeed-mm:v26.0.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-x86_64 bash
     ```
 
 ### Running the Image
@@ -78,11 +128,11 @@ The `docker/build.sh` script will during the build process:
 ```bash
 # Basic run
 docker run -it --rm \
-    mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
+    mindspeed-mm:v26.0.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-x86_64 bash
 
 # Run with NPU device (example: device /dev/davinci1)
-# Change the ascend-toolkit path to the actual installation path.
-# Assuming your NPU device is installed at /dev/davinci1 and NPU driver is installed at /usr/local/Ascend:
+# Modify the ascend-toolkit path according to actual situation
+# Assuming your NPU device is installed at /dev/davinci1 and the NPU driver is installed at /usr/local/Ascend:
 docker run -it --rm \
     --device=/dev/davinci1 \
     --device=/dev/davinci_manager \
@@ -93,9 +143,10 @@ docker run -it --rm \
     -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
     -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
-    mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
+    mindspeed-mm:v26.0.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-x86_64 bash
 
-# Run with data directory mounting (example: device /dev/davinci1)
+# Run with data directory mounted (example: device /dev/davinci1)
+# Modify the ascend-toolkit path according to actual situation
 docker run -it --rm \
     --device=/dev/davinci1 \
     --device=/dev/davinci_manager \
@@ -108,7 +159,7 @@ docker run -it --rm \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
     -v /path/to/data:/data \
     -v /path/to/weights:/weights \
-    mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64 bash
+    mindspeed-mm:v26.0.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-x86_64 bash
 ```
 
 ### Built-in Environments
@@ -117,32 +168,41 @@ The image includes the following pre-configured environments:
 
 | Environment | Description | Working Directory |
 | ------ | ------ | --------- |
-| base | Basic environment containing PyTorch, torch_npu, decord, MindSpeed MM | /workspace/MindSpeed-MM |
+| base | Basic environment, including PyTorch, TorchNPU, decord, MindSpeed MM | /workspace/MindSpeed-MM |
 | verl_qwen3vl | VERL Qwen3VL model environment (vllm, vllm-ascend, verl) | /workspace/verl_qwen3vl |
 
 **Environment Notes:**
 
 - Since the verl environment requires source code compilation, which is time-consuming, it has been pre-installed and configured in the image.
-- Considering differences in dependencies between models, the image only pre-installs basic dependencies including torch, torch_npu, and decord.
-- After pulling the image and starting a container, users need to manually install the dependencies required for their target model in the base environment according to the model's README file.
+- Considering differences in dependencies between models, the image only pre-installs basic dependencies including PyTorch, TorchNPU, and decord.
+- After pulling the image and starting a container, users need to manually install the dependencies required for the target model in the base environment according to the target model's README file.
 
 ## 2. Local Custom Installation Guide
 
 ### Build Script Parameter Description
 
-The build script `build.sh` supports multiple parameter configurations. The following default values are examples; please adjust according to actual needs:
+The build script `build.sh` supports multiple parameter configurations. The following default values are examples only; please adjust according to actual needs. The default value `9.0.0` for `--base-image-version` is an example only. **It is strongly recommended to explicitly specify the base image matching your target environment via `--base-image` or `--base-image-version`.**
 
 | Parameter | Description | Default (Example) |
 | ------ | ------ | ------------ |
-| `-t, --npu-type` | NPU type | None (required) |
-| `-o, --os` | Operating system: openeuler24.03 or ubuntu22.04 | openeuler24.03 |
-| `-v, --version` | MindSpeed MM version identifier, used as Git branch name and script directory selection basis | master |
-| `--torch-version` | PyTorch version | 2.7.1 |
-| `--torch-npu-version` | torch-npu version | 2.7.1 |
-| `--base-image-version` | Base image CANN version | 9.0.0-beta.2 |
-| `--base-image` | Complete base image name | None |
-| `--torch-whl` | torch .whl file path (offline installation) | None |
-| `--torch-npu-whl` | torch-npu .whl file path (offline installation) | None |
+| `-t, --npu-type` | NPU type: A3 or 910B (auto-detected from `--base-image` if not specified) | None (required) |
+| `-o, --os` | Operating system: openeuler24.03 or ubuntu22.04 (auto-detected from `--base-image` if not specified) | openeuler24.03 |
+| `-v, --version` | MindSpeed MM version identifier, also used as Git branch name and script directory selection basis | 26.1.0 |
+| `-m, --miniconda` | Miniconda installer path (auto-downloaded if not specified) | None (auto-download) |
+| `-d, --decord-deps` | decord dependencies directory path (auto-downloaded for ARM if not specified) | None (auto-download) |
+| `-s, --decord-script` | decord install script path | common/install_decord_on_arm.sh |
+| `-i, --image-name` | Image name (auto-generated according to naming rules by default) | Auto-generated |
+| `--tag` | Custom image tag (overrides the default tag; keeps repo name `mindspeed-mm`) | None |
+| `-n, --no-cache` | Build without cache | None |
+| `--torch-version` | PyTorch version (online installation) | 2.7.1 |
+| `--torch-npu-version` | TorchNPU version (online installation) | 2.7.1 |
+| `--torch-whl` | torch.whl file path (offline installation) | None |
+| `--torch-npu-whl` | torch-npu.whl file path (offline installation) | None |
+| `--torchvision-whl` | torchvision.whl file path (optional, offline installation) | None |
+| `--torchaudio-whl` | torchaudio.whl file path (optional, offline installation) | None |
+| `--base-image-version` | Base image CANN version (example value; recommended to specify explicitly) | 9.0.0 |
+| `--base-image` | Complete base image name (higher priority than `--base-image-version`; recommended) | None |
+| `--build-ci` | Build CI image with multi-version conda environments (skip verl + MindSpeed-MM clone) | None |
 | `--cleanup-on-fail` | Clean up dangling images/containers on build failure | None |
 
 ### Basic Build Examples
@@ -171,7 +231,7 @@ bash build.sh -t A3 \
 bash build.sh -t A3 --base-image-version 9.0.0
 
 # Build with specified version
-bash build.sh -t A3 -v master
+bash build.sh -t A3 -v 26.1.0
 ```
 
 ### Automatic Download Function Description
@@ -180,7 +240,7 @@ The build script supports automatic download of the following resources. Please 
 
 1. **Miniconda installer**: Automatically downloaded when the `--miniconda` parameter is not specified
 2. **decord dependency package**: Automatically downloaded for ARM architecture
-3. **Base image**: Automatically pulled when `--base-image` is specified and the image doesn't exist locally
+3. **Base image**: Automatically pulled when `--base-image` is specified and doesn't exist locally
 
 ## 3. Custom Image Building/Usage Guide
 
@@ -188,9 +248,10 @@ The build script supports automatic download of the following resources. Please 
 
 The build script automatically recognizes key information from the base image name:
 
-1. **NPU type recognition**: Recognizes the NPU chip model from the image tag
+1. **NPU type recognition**: Recognizes the NPU type (e.g., `a3`) from the image tag
 2. **Operating system recognition**: Recognizes `openeuler24.03` or `ubuntu22.04` from the image tag
-3. **Automatic image tag generation**: Automatically generates image tags that conform to naming rules based on recognized information
+3. **CANN version recognition**: Extracts the CANN version number (e.g., `9.0.0`) from the image tag
+4. **Automatic image tag generation**: Automatically generates image tags conforming to naming rules based on recognized information
 
 ### Best Practice Example
 
@@ -201,10 +262,10 @@ The following example shows how to build a MindSpeed MM image using a custom bas
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Custom configuration
-BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-beta.2-910b-openeuler24.03-py3.11"
+BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11"
 TORCH_VERSION="2.7.1"
-TORCH_NPU_VERSION="2.7.1.post2"
-MINDSPEED_MM_VERSION="master"
+TORCH_NPU_VERSION="2.7.1.post6"
+MINDSPEED_MM_VERSION="26.0.0"
 
 # Execute build
 bash "${SCRIPT_DIR}/build.sh" \
@@ -217,8 +278,8 @@ bash "${SCRIPT_DIR}/build.sh" \
 
 **Key Feature Description:**
 
-1. **Automatic recognition**: The script automatically recognizes NPU type (910) and operating system (openeuler24.03) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
-2. **Automatic tag generation**: Automatically generates image tags based on recognition results, such as `mindspeed-mm:master-910b-openeuler24.03-py3.11-x86_64`
+1. **Automatic recognition**: The script automatically recognizes the NPU type, operating system (openeuler24.03), and CANN version (9.0.0) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
+2. **Automatic tag generation**: Automatically generates image tags conforming to the naming rules based on recognition results.
 3. **Automatic download**: If the Miniconda installer or decord dependencies are not available locally, the script will automatically download them
 4. **Failure cleanup**: The `--cleanup-on-fail` parameter ensures cleanup of dangling resources if the build fails
 
@@ -228,11 +289,11 @@ If you need to add environment installation support for other models, you can fo
 
 #### 1. View Model Examples
 
-First, check the README files for related models in the `examples/` directory to understand the model's environment dependencies and installation requirements.
+First, check the README files of related models in the `examples/` directory to understand the model's environment dependencies and installation requirements.
 
 #### 2. Create Installation Scripts Following Directory Structure Specification
 
-Create new installation scripts according to the hierarchical structure of the `docker/scripts` directory:
+Create new installation scripts according to the hierarchical structure specification of the `docker/scripts` directory:
 
 1. **Create script**: Create a new installation script in the `docker/scripts/model_install/` directory
 2. **Naming convention**: Script files must be named in the format `install_{environment_name}.sh`
@@ -241,7 +302,7 @@ Create new installation scripts according to the hierarchical structure of the `
 
 - **Script path**: `docker/scripts/model_install/install_qwen3.5.sh`
 
-Create a new installation script by referring to the format of `docker/scripts/master/model_install/install_verl_qwen3vl.sh`:
+Create a new installation script by referring to the format of `docker/scripts/model_install/install_verl_qwen3vl.sh`:
 
 ```bash
 #!/bin/bash
@@ -249,7 +310,7 @@ set -e
 
 source /tmp/common_functions.sh
 
-MINDSPEED_MM_BRANCH="${1:-master}"
+MINDSPEED_MM_BRANCH="${1:-26.1.0}"
 
 ENV_NAME="your_model_name"  # Modify to your model environment name
 WORK_DIR="/workspace/${ENV_NAME}"
@@ -274,7 +335,7 @@ cd ${WORK_DIR}
 # Example: pip_install_retry "package_name==version" 3
 # Example: git clone repository and install
 
-# Reinstall torch and torch_npu if needed
+# Reinstall PyTorch and TorchNPU (if needed)
 reinstall_torch_and_npu
 
 conda clean -ya && rm -rf /root/.cache/pip
@@ -304,9 +365,9 @@ Since the current Dockerfile only executes predefined specific installation scri
        rm -f /tmp/install_your_model.sh
    ```
 
-3. **Automatic copy mechanism of build script**: The `docker/build.sh` script automatically copies all `install_*.sh` scripts from `docker/scripts/model_install/` to the `install_scripts/` temporary directory, so the new script will be automatically copied to the build context.
+3. **Automatic copy mechanism of build script**: The `docker/build.sh` script automatically copies all `install_*.sh` scripts from `docker/scripts/model_install/` to the `install_scripts/` temporary directory, so new scripts will be automatically copied to the build context.
 
-4. **Version correspondence**: By specifying the version number with the `-v` parameter, this version number is used to specify the Git branch to clone for MindSpeed-MM.
+4. **Version correspondence**: By specifying the version number with the `-v` parameter, this version number is used to specify the Git branch for cloning MindSpeed-MM.
 
 #### 4. Build Image for Testing
 
@@ -314,12 +375,12 @@ Build an image containing the new model environment using the following command:
 
 ```bash
 # Use the -v parameter to specify the version number, and the build script will automatically find the corresponding installation script
-bash build.sh -t A3 -v master
+bash build.sh -t A3 -v 26.1.0
 ```
 
 #### 5. Update Documentation
 
-Add information about the new environment in the "Built-in Environments" section:
+Add information about the new environment in the "Built-in Environments" section of the documentation:
 
 | Environment | Description | Working Directory |
 | ------ | ------ | --------- |
@@ -340,7 +401,7 @@ Add information about the new environment in the "Built-in Environments" section
 Create a custom Dockerfile based on this image:
 
 ```dockerfile
-FROM mindspeed-mm:master-a3-openeuler24.03-py3.11-x86_64
+FROM mindspeed-mm:v26.0.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-x86_64
 
 RUN pip install your-package==1.0.0
 
@@ -352,6 +413,7 @@ WORKDIR /workspace/your-project
 Build and run (example: device /dev/davinci1):
 
 ```bash
+# Modify the ascend-toolkit path according to actual situation
 docker build -t my-mindspeed-app:latest .
 docker run -it --rm \
     --device=/dev/davinci1 \
@@ -365,29 +427,6 @@ docker run -it --rm \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
     my-mindspeed-app:latest bash
 ```
-
-### Software Stack
-
-| Component | Version |
-| ------ | ------ |
-| CANN | 9.0.0-beta.2 |
-| Python | 3.11 |
-| Miniconda | 26.1.1-1 |
-| PyTorch | 2.7.1 |
-| torch_npu | 2.7.1 |
-| decord | 0.6.0 |
-| MindSpeed MM | master |
-
-### Compatibility Change Notes
-
-#### Date: 2026-04-20
-
-- Initial release version
-- Based on CANN 9.0.0-beta.2
-- PyTorch 2.7.1 + torch_npu 2.7.1
-- Python 3.11 (Miniconda 26.1.1-1)
-- Includes verl_qwen3vl conda environment
-- Supports openEuler 24.03 and Ubuntu 22.04
 
 ## License
 

@@ -30,7 +30,7 @@ fi
 
 MIRROR_URLS=(
     "https://repo.anaconda.com/miniconda/${MINICONDA_FILE}"
-    "https://repo.huaweicloud.com/anaconda/miniconda/${MINICONDA_FILE}"
+    "https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/${MINICONDA_FILE}"
 )
 
 mkdir -p "${OUTPUT_DIR}"

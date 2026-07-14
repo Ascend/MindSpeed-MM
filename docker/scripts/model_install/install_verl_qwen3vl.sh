@@ -3,7 +3,7 @@ set -e
 
 source /tmp/common_functions.sh
 
-MINDSPEED_MM_BRANCH="${1:-master}"
+MINDSPEED_MM_BRANCH="${1:-26.1.0}"
 
 ENV_NAME="verl_qwen3vl"
 WORK_DIR="/workspace/${ENV_NAME}"
