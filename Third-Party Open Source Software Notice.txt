@@ -547,6 +547,14 @@ For the full text of the license, please go to the above.
 Copyright (c) 2024 Keller Jordan
 
 Software Notice
+Software MiniMax-M3-VL
+License: Apache License 2.0
+For the full text of the license, please go to the above.
+
+Copyright Notice included in the software:
+Copyright 2026 the MiniMax AI Team and HuggingFace Team. All rights reserved.
+
+Software Notice
 Software DanceGRPO
 License: Apache License 2.0
 For the full text of the license, please go to the above.
