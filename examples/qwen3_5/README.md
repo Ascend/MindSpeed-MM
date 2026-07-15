@@ -90,15 +90,23 @@ pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra
 ```bash
 git clone https://github.com/flashserve/flash-linear-attention-npu
 cd flash-linear-attention-npu
-# 由于flash-linear-attention-npu为开源仓实现，当前使用充分验证的历史版本，后续充分验证适配后切换v26.6.0分支
-git checkout 60a791f
-# 适配最新相关组件修改，cherry-pick需要提前配置好git的name及email
-# git config user.email "you@example.com"
-# git config user.name "Your Name"
-git cherry-pick 50cba07
+git checkout c2e3d83f
 ```
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
+
+推荐使用以下安装命令
+
+```shell
+# source 实际的cann路径
+source /usr/local/Ascend/cann/set_env.sh
+
+# 编译算子 run 包，--soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
+bash build.sh --soc=ascend910b --pkg --vendor_name=fla_npu
+bash build_out/fla-npu_*.run
+cd torch_custom/fla_npu/
+bash build.sh
+```
 
 检验fla_npu是否安装成功
 
@@ -253,6 +261,9 @@ mm-convert Qwen35Converter dcp_to_hf \
   - 在`model.skip_gdn_recompute`配置是否跳过linear attention层gdn的重计算，`true`表示跳过，`false`表示不跳过
   - 在`model.skip_flash_attn_recompute`配置是否跳过full attention层的flash attention的重计算，`true`表示跳过，`false`表示不跳过
   - 开启该特性时需要同时使能重计算和async activation offload特性
+- `gdn_implementation`和`causal_conv1d_implementation`
+  - gdn_implementation和causal_conv1d_implementation分别支持`eager`，`triton`和`ascendc`配置，使用`ascendc`性能最佳，需要安装fla_npu库
+  - 当gdn_implementation配置为`ascendc`时，causal_conv1d_implementation只支持和`triton`和`ascendc`，防止算子之间的布局不匹配
 
 【单机运行配置】
 以qwen3_5模型为例：

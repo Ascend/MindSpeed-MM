@@ -80,7 +80,7 @@ IMPL_TRITON = "triton"
 IMPL_TRITON_WITH_TRANSPOSE = "triton_with_transpose"
 IMPL_ASCENDC = "ascendc"
 IMPL_ASCENDC_LEGACY = "ascendc_legacy"
-IMPL_FOR_CAUSAL_CONV = (IMPL_EAGER, IMPL_TRITON, IMPL_TRITON_WITH_TRANSPOSE)
+IMPL_FOR_CAUSAL_CONV = (IMPL_EAGER, IMPL_TRITON, IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC)
 IMPL_FOR_GDN = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC, IMPL_ASCENDC_LEGACY)
 
 
@@ -568,7 +568,8 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         self.causal_conv1d_implementation = config.causal_conv1d_implementation
         self.gdn_implementation = config.gdn_implementation
         self.skip_gdn_recompute = config.skip_gdn_recompute
-        if self.gdn_implementation == IMPL_ASCENDC and IS_NPU_AVAILABLE:
+
+        if self.gdn_implementation == IMPL_ASCENDC and self.causal_conv1d_implementation == IMPL_TRITON and IS_NPU_AVAILABLE:
             self.causal_conv1d_implementation = IMPL_TRITON_WITH_TRANSPOSE
 
         if self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE and IS_NPU_AVAILABLE:
@@ -579,6 +580,10 @@ class Qwen3_5GatedDeltaNet(nn.Module):
             from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
             print_rank(logger.info, "Qwen3_5 causal_conv1d use NPU triton ops")
             self.causal_conv1d_fn = causal_conv1d
+        elif self.causal_conv1d_implementation == IMPL_ASCENDC and IS_NPU_AVAILABLE:
+            from mindspeed_mm.fsdp.ops.gdn.causal_conv1d_ascendc import causal_conv1d_ascendc
+            print_rank(logger.info, "Qwen3_5 causal_conv1d use NPU AscendC ops")
+            self.causal_conv1d_fn = causal_conv1d_ascendc
         else:
             self.causal_conv1d_fn = causal_conv1d_fn
         self.causal_conv1d_update = causal_conv1d_update or torch_causal_conv1d_update
@@ -775,6 +780,15 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                     activation=self.activation,
                     cu_seqlens=cu_seqlens,
                 )
+            elif self.causal_conv1d_implementation == IMPL_ASCENDC:
+                mixed_qkv = self.causal_conv1d_fn(
+                    x=mixed_qkv,
+                    weight=conv_weight.squeeze(1),
+                    H=2*local_num_k_heads + local_num_v_heads,
+                    bias=self.conv1d.bias,
+                    activation=self.activation,
+                    cu_seqlens=cu_seqlens,
+                )[0]
             elif self.causal_conv1d_implementation == IMPL_EAGER and self.causal_conv1d_fn is not None:  # for fla
                 conv_weight = conv_weight.squeeze(1)
                 mixed_qkv = self.causal_conv1d_fn(
@@ -790,7 +804,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                 mixed_qkv = F.silu(F.conv1d(mixed_qkv, weight=conv_weight, bias=self.conv1d.bias, padding=self.conv_kernel_size - 1, groups=local_key_dim * 2 + local_value_dim)[:, :, :mixed_qkv.shape[-1]])
                 mixed_qkv = mixed_qkv.transpose(1, 2)
 
-        if self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
+        if self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
             query, key, value = torch.split(
                 mixed_qkv,
                 [
@@ -825,7 +839,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         else:
             g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
         if self.num_v_heads // self.num_k_heads > 1:
-            if self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
+            if self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
                 query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
                 key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
             else:
@@ -2218,17 +2232,29 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
     def overwrite_transformer_config(transformer_config, model_args, feature_args):
         # gdn implementation
         gdn_implementation = getattr(model_args, "gdn_implementation", IMPL_EAGER).lower().strip()
-        if not any(gdn_implementation == impl for impl in IMPL_FOR_GDN):
+        if gdn_implementation not in IMPL_FOR_GDN:
             raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'.")
         transformer_config.text_config.gdn_implementation = gdn_implementation
         # causal conv1d implementation
         causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()
-        if not any(causal_conv1d_implementation == impl for impl in IMPL_FOR_CAUSAL_CONV):
-            raise ValueError(f"Invalid causal_conv1d='{causal_conv1d_implementation}'. Must be one of: 'eager', 'triton'.")
+        if causal_conv1d_implementation not in IMPL_FOR_CAUSAL_CONV:
+            raise ValueError(f"Invalid causal_conv1d='{causal_conv1d_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'.")
         transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
+
+        if (gdn_implementation == "ascendc") and (causal_conv1d_implementation == "eager"):
+            raise ValueError(
+                f"Inconsistent implementations: gdn='{gdn_implementation}', "
+                f"causal_conv1d='{causal_conv1d_implementation}'. "
+                f"gdn can be 'ascendc' only if causal_conv1d is not 'eager'."
+            )
 
         # skip flash attn recompute
         skip_flash_attn_recompute = getattr(model_args, "skip_flash_attn_recompute", False)
+        if skip_flash_attn_recompute and gdn_implementation == "eager":
+            raise ValueError(
+                "skip_flash_attn_recompute cannot be True when gdn_implementation is 'eager'. "
+                "Please set skip_flash_attn_recompute to False or use a different gdn_implementation."
+            )
         transformer_config.vision_config.skip_flash_attn_recompute = skip_flash_attn_recompute
         transformer_config.text_config.skip_flash_attn_recompute = skip_flash_attn_recompute
 

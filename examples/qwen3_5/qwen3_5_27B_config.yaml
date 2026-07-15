@@ -83,7 +83,7 @@ model:
   #   - model.visual
   # 融合算子配置
   gdn_implementation: ascendc
-  causal_conv1d_implementation: triton
+  causal_conv1d_implementation: ascendc
   # skip_recompute
   skip_gdn_recompute: true
   skip_flash_attn_recompute: true
