@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import threading
+import sys
 from typing import Optional
 
 import torch
@@ -26,7 +27,7 @@ from mindspeed_mm.fsdp.data.data_utils.utils import get_seed_worker
 from mindspeed_mm.fsdp.data.dataloader.sampler import BaseRandomBatchSampler
 from mindspeed_mm.fsdp.data.dataloader.data_collator import resolve_data_collator
 from mindspeed_mm.fsdp.utils.constants import GLOBAL_STEP_TOKEN_NUM, AVG_PER_STEP_TOKEN_NUM
-from mindspeed_mm.fsdp.utils.device import get_device_type
+from mindspeed_mm.fsdp.utils.device import get_device_type, create_stream, get_current_stream, switch_to_specified_stream
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.utils.utils import move_to_device
 
@@ -254,51 +255,113 @@ class PrefetchGradAccDataLoader:
 
 class Preloader:
     """
-    Async data preloader that overlaps CPU data loading with training computation.
+    Async data preloader with decoupled CPU prefetch and H2D transfer.
 
-    Uses a background thread to preload the next CPU batch while the current batch
-    is being processed by forward/backward.
+    The CPU-side data loading (``next`` on the underlying iterator, collation, etc.)
+    runs in a background thread and overlaps with forward/backward without consuming
+    any device memory. The H2D transfer is launched on a dedicated stream only when
+    :meth:`trigger_h2d` is called -- typically right after backward -- so that the
+    next batch's device tensors are allocated after the current batch's activations have
+    been freed, reducing peak device memory during the forward/backward pass.
+
+    Expected usage pattern (one ``next`` / ``trigger_h2d`` pair per micro-batch)::
+
+        batch = preloader.next()       # consume ready batch, start CPU prefetch
+        forward(batch); backward(batch)
+        preloader.trigger_h2d()        # launch H2D for next batch
     """
 
     def __init__(self, data_iterator, param_dtype=None):
         self.data_iterator = data_iterator
         self.param_dtype = param_dtype
+        self.device = get_device_type()
+        self.h2dstream = create_stream(self.device)
+        # next_batch: device batch ready to be returned by next()
+        # _cpu_batch: cpu batch fetched by the background thread, awaiting H2D
         self.next_batch = None
-        self._thread = None
+        self._cpu_batch = None
+        self._cpu_thread = None
+        self._h2d_thread = None
+        self._fetch_error = None
         self._exhausted = False
-        self._load_next()
 
-    def _load_next(self):
-        """Load the next batch from the iterator."""
+        # Eagerly prepare the first batch so the first next() is immediately ready.
+        self._fetch_cpu_sync()
+        self._launch_h2d()
+
+    def _fetch_cpu_sync(self):
+        """Fetch the next CPU batch from the underlying iterator (thread target)."""
         try:
-            self.next_batch = next(self.data_iterator)
-        except (StopIteration, Exception):
-            self.next_batch = None
+            self._cpu_batch = next(self.data_iterator)
+        except StopIteration:
+            self._cpu_batch = None
             self._exhausted = True
+        except Exception:
+            # Store exc_info to re-raise on the main thread after join,
+            # preserving the original traceback from this background thread.
+            self._fetch_error = sys.exc_info()
 
-    def _start_async_preload(self):
-        """Start a background thread to preload the next CPU batch."""
+    def _start_cpu_prefetch(self):
+        """Launch a background daemon thread to fetch the next CPU batch."""
         if self._exhausted:
+            self._cpu_thread = None
             return
-        self._thread = threading.Thread(target=self._load_next, daemon=True)
-        self._thread.start()
+        self._cpu_thread = threading.Thread(target=self._fetch_cpu_sync, daemon=True)
+        self._cpu_thread.start()
+
+    def _launch_h2d(self):
+        """Transfer the prefetched CPU batch to device on the dedicated stream."""
+        # Make sure the CPU prefetch is done before launching H2D.
+        if self._cpu_thread is not None:
+            self._cpu_thread.join()
+            self._cpu_thread = None
+        # If CPU prefetch failed, mark next_batch as unavailable;
+        # the stored error is re-raised on the main thread in next().
+        if self._fetch_error is not None:
+            self.next_batch = None
+            return
+        if self._cpu_batch is None:
+            self.next_batch = None
+            return
+        batch_data = self._cpu_batch
+        self._cpu_batch = None
+        with switch_to_specified_stream(self.h2dstream):
+            self.next_batch = move_to_device(
+                batch_data, float_dtype=self.param_dtype, non_blocking=True
+            )
+
+    def trigger_h2d(self):
+        """Launch H2D for the prefetched batch in a background thread.
+        Call this after backward completes (per micro-batch) so that the next
+        batch's device memory is allocated only after the current activations are freed.
+        """
+        if self._exhausted and self._cpu_thread is None:
+            return
+        self._h2d_thread = threading.Thread(target=self._launch_h2d, daemon=True)
+        self._h2d_thread.start()
 
     def next(self):
-        """Wait for CPU preload, and start next CPU preload."""
-        if self._thread is not None:
-            self._thread.join()
-            self._thread = None
+        """Return the ready device batch, or None if the iterator is exhausted."""
+        if self._h2d_thread is not None:
+            self._h2d_thread.join()
+            self._h2d_thread = None
+        # Re-raise any exception captured in the CPU prefetch thread,
+        # preserving the original traceback from where it originated.
+        if self._fetch_error is not None:
+            _, exc_value, exc_tb = self._fetch_error
+            self._fetch_error = None
+            raise exc_value.with_traceback(exc_tb)
+        get_current_stream().wait_stream(self.h2dstream)
         if self.next_batch is None:
-            return None
-        batch = move_to_device(self.next_batch, float_dtype=self.param_dtype)
-        self._start_async_preload()
+            raise StopIteration("Dataloader has been exhausted, no more data available.")
+        batch = self.next_batch
+        self.next_batch = None
+        # Kick off CPU prefetch for the next batch so it overlaps with the upcoming forward&backward.
+        self._start_cpu_prefetch()
         return batch
 
     def __iter__(self):
         yield self.next()
 
     def __next__(self):
-        batch = self.next()
-        if batch is None:
-            raise StopIteration("Dataloader has been exhausted, no more data available.")
-        return batch
+        return self.next()

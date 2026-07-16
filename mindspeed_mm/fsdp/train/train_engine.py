@@ -167,6 +167,11 @@ class TrainEngine:
             TrainingContext().set_training_stage(TrainingStage.BACKWARD)
             loss.backward()
 
+            # Start H2D for the next batch after backward so the device memory is
+            # allocated only after the current activations are free.
+            if hasattr(train_dataloader_iter, 'trigger_h2d') and callable(getattr(train_dataloader_iter, 'trigger_h2d')):
+                train_dataloader_iter.trigger_h2d()
+
             if getattr(output, 'aux_loss', None) is not None:
                 aux_loss = output.aux_loss / args.training.gradient_accumulation_steps
                 total_aux_loss = aux_loss if total_aux_loss is None else total_aux_loss + aux_loss
