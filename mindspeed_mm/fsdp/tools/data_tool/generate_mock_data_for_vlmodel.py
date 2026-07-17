@@ -37,10 +37,10 @@ if __name__ == '__main__':
     random_image.save(os.path.join(path_root, f"test_pic_h{height}_w{width}.jpg"))
 
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_path)
-    seed_text = "A moment frozen in the flow of time."
+    seed_text = "A moment frozen in the flow of time"
 
     repeat_times = text_length // (len(tokenizer.encode(seed_text)) * 2) + 1
-    text = seed_text * repeat_times
+    text = (seed_text + ' ') * repeat_times
 
     image_prompt = "<image>\n" * num_pics
 
