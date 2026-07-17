@@ -289,7 +289,7 @@ class GatedDeltaNet(MegatronModule):
             self.gated_delta_rule = torch_chunk_gated_delta_rule
         elif self.config.gdn_implementation == "triton":
             self.gated_delta_rule = chunk_gated_delta_rule
-        elif self.config.gdn_implementation == "AscendC":
+        elif self.config.gdn_implementation == "ascendc":
             self.gated_delta_rule = flash_gated_delta_rule
 
         # Output layernorm before projection
@@ -470,6 +470,16 @@ class GatedDeltaNet(MegatronModule):
                 activation='silu',
                 cu_seqlens=None
             )
+        elif self.config.causal_conv1d_implementation == "ascendc":
+            from mindspeed_mm.fsdp.ops.gdn.causal_conv1d_ascendc import causal_conv1d_ascendc
+            qkv, _ = causal_conv1d_ascendc(
+                x=qkv,
+                weight=conv1d_weight.squeeze(1),
+                H=2 * self.local_num_k_heads + self.local_num_v_heads,
+                bias=conv1d_bias,
+                activation='silu',
+                cu_seqlens=None
+            )
 
         query, key, value, gate, beta, alpha = self._prepare_qkv_for_gated_delta_rule(
             qkv, gate, beta, alpha, batch, seq_len
@@ -525,7 +535,7 @@ class GatedDeltaNet(MegatronModule):
         Fuses split, reshape, L2 norm, repeat_interleave, and contiguous operations.
         """
         # Split qkv into query_key and value
-        if self.config.causal_conv1d_implementation == "triton_with_transpose":
+        if self.config.causal_conv1d_implementation in ("triton_with_transpose", "ascendc"):
             query, key, value = torch.split(
                 qkv,
                 [self.local_num_k_heads, self.local_num_k_heads, self.local_num_v_heads],
@@ -545,7 +555,7 @@ class GatedDeltaNet(MegatronModule):
 
         # Expand query and key if needed (grouped query attention)
         if self.num_value_heads // self.num_key_heads > 1:
-            repeat_dim = 1 if self.config.causal_conv1d_implementation == "triton_with_transpose" else 2
+            repeat_dim = 1 if self.config.causal_conv1d_implementation in ("triton_with_transpose", "ascendc") else 2
             repeat_factor = self.num_value_heads // self.num_key_heads
             query = query.repeat_interleave(repeat_factor, dim=repeat_dim)
             key = key.repeat_interleave(repeat_factor, dim=repeat_dim)

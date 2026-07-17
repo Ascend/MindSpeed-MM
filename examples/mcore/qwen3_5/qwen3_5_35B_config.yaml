@@ -5,10 +5,9 @@ gpt_args:
   ## parallel: （TP/PP/CP/)
   context_parallel_size: 1
   context_parallel_algo: ulysses_cp_algo
-  tensor_model_parallel_size: 2
-  sequence_parallel: true
-  expert_model_parallel_size: 4
-  pipeline_model_parallel_size: 1
+  tensor_model_parallel_size: &TP 1
+  expert_model_parallel_size: &EP 8
+  pipeline_model_parallel_size: &PP 1
 
   ## training:
   clip_grad: 1.0
@@ -48,14 +47,13 @@ gpt_args:
   swiglu: true
   use_fused_swiglu: true
   use_flash_attn: true
-  moe_grouped_gemm: true
-  moe_permute_fusion: true
-  moe_token_dispatcher_type: alltoall
+  moe_grouped_gemm: &MOE_GROUPED_GEMM true
+  moe_permute_fusion: &MOE_PERMUTE_FUSION true
+  moe_token_dispatcher_type: &MOE_TOKEN_DISPATCHER_TYPE alltoall
   vocab_size: 152064
   seq_length: 1024
   make_vocab_size_divisible_by: 1
   tokenizer_type: NullTokenizer
-  no_gradient_accumulation_fusion: true
   untie_embeddings_and_output_weights: true
   no_masked_softmax_fusion: true
 
@@ -91,13 +89,12 @@ model:
   text_decoder:
     model_id: qwen3_5_moe
     # parallel
-    expert_model_parallel_size: 4
-    tensor_model_parallel_size: 2
-    pipeline_model_parallel_size: 1
-    sequence_parallel: true
+    expert_model_parallel_size: *EP
+    tensor_model_parallel_size: *TP
+    pipeline_model_parallel_size: *PP
 
-    causal_conv1d_implementation: triton_with_transpose
-    gdn_implementation: AscendC
+    causal_conv1d_implementation: ascendc
+    gdn_implementation: ascendc
 
     image_token_id: 248056
     video_token_id: 248057
@@ -124,10 +121,10 @@ model:
     moe_shared_expert_gate: true
     moe_router_load_balancing_type: none
     moe_aux_loss_coeff: 1e-3
-    moe_grouped_gemm: true
+    moe_grouped_gemm: *MOE_GROUPED_GEMM
     moe_router_pre_softmax: true
-    moe_token_dispatcher_type: alltoall
-    moe_permute_fusion: true
+    moe_token_dispatcher_type: *MOE_TOKEN_DISPATCHER_TYPE
+    moe_permute_fusion: *MOE_PERMUTE_FUSION
     moe_router_force_load_balancing: false
     # Common LLM config
     share_embeddings_and_output_weights: false
@@ -152,10 +149,10 @@ model:
     apply_rotary_pos_emb_in_fp32: false
     max_position_embeddings: 8192
     vocab_size: 248320
-    recompute_num_layers: 0
+    recompute_num_layers: 40
     recompute_granularity: full
     recompute_method: block
-    use_chunk_loss: false
+    use_chunk_loss: true
     chunk_size: 512
   patch:
       clip_grad_async: true

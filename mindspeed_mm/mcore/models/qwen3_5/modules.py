@@ -2,6 +2,7 @@ from contextlib import nullcontext
 from typing import Optional, Union, List
 from dataclasses import dataclass
 import copy
+from functools import partial
 
 from einops import rearrange
 import torch
@@ -24,12 +25,12 @@ from megatron.core.fp8_utils import get_fp8_context
 from megatron.core.transformer.transformer_block import TransformerBlock, TransformerBlockSubmodules
 from megatron.core.utils import WrappedTensor, deprecate_inference_params, make_viewless_tensor, divide, is_te_min_version
 from megatron.core.inference.contexts import BaseInferenceContext
-from megatron.core.tensor_parallel import get_cuda_rng_tracker, get_expert_parallel_rng_tracker_name
 from megatron.core.tensor_parallel.mappings import all_gather_last_dim_from_tensor_parallel_region
 from megatron.core.parallel_state import get_tensor_model_parallel_rank
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.moe.moe_layer import MoELayer, MoESubmodules
+from megatron.core.transformer.moe.moe_utils import switch_load_balancing_loss_func
 from megatron.core.models.common.embeddings.rope_utils import (
     _apply_rotary_pos_emb_bshd,
     get_pos_emb_on_this_cp_rank,
@@ -1573,57 +1574,13 @@ class Qwen3_5TextTransformerBlock(TransformerBlock):
         return hidden_states
 
 
-class RandomSTE(torch.autograd.Function):
-    """
-    Straight-Through Estimator(STE) function that returns random values
-    with different seed for each rank.
-
-    This is used to generate random logits of router for load-balanced benchmark.
-    """
-
-    @staticmethod
-    def forward(ctx, logits: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass returns random logits with rank-specific seed.
-
-        Args:
-            logits (torch.Tensor): The logits.
-
-        Returns:
-            torch.Tensor: The random logits.
-        """
-        with get_cuda_rng_tracker().fork(get_expert_parallel_rng_tracker_name()):
-            random_logits = logits.clone().normal_()
-        return random_logits
-
-    @staticmethod
-    def backward(ctx, grad_output: torch.Tensor) -> torch.Tensor:
-        """
-        Backward pass propagates the gradient for logits.
-
-        Args:
-            grad_output (torch.Tensor): The gradient output.
-
-        Returns:
-            torch.Tensor: The gradient input.
-        """
-        return grad_output
-
-
-def apply_random_logits(logits: torch.Tensor) -> torch.Tensor:
-    """
-    Apply the RandomSTE function to the logits.
-
-    Args:
-        logits (torch.Tensor): The logits.
-
-    Returns:
-        torch.Tensor: The random logits.
-    """
-    return RandomSTE.apply(logits)
 
 
 class TopKRouter(Mcore_TopKRouter):
+    def __init__(self, config: TransformerConfig):
+        super().__init__(config=config)
+        self.expert_ids = torch.arange(self.config.num_moe_experts, device="npu").view(1, 1, self.config.num_moe_experts)
+
     def forward(self, input: torch.Tensor):
         """
         Forward pass of the router.
@@ -1632,13 +1589,21 @@ class TopKRouter(Mcore_TopKRouter):
             input (torch.Tensor): Input tensor.
         """
         logits = nn.functional.linear(input, self.weight)
-
-        if self.config.moe_router_force_load_balancing:
-            # Apply force load balancing with random logits for benchmark
-            logits = apply_random_logits(logits)
-
         router_probs = nn.functional.softmax(logits, dtype=torch.float, dim=-1)
         router_top_value, router_indices = torch.topk(router_probs, self.topk, dim=-1)  # (seq_len, top_k)
+        if self.config.moe_router_load_balancing_type == "aux_loss" and self.config.moe_aux_loss_coeff > 0:
+            topk_map = (router_indices.unsqueeze(-1) == self.expert_ids).any(dim=1)
+
+            tokens_per_expert = topk_map.sum(dim=0)
+            aux_loss_func = partial(
+                switch_load_balancing_loss_func,
+                probs=router_probs,
+                tokens_per_expert=tokens_per_expert,
+                topk=self.topk,
+            )
+            _ = self.apply_load_balancing_loss(
+                activation=router_probs, load_balancing_loss_func=aux_loss_func
+            )
         router_top_value /= router_top_value.sum(dim=-1, keepdim=True)
         router_top_value = router_top_value.to(logits.dtype)
         router_scores = router_top_value
@@ -1702,9 +1667,11 @@ class MM_MoELayer(MoELayer):
 
         hidden_shape = hidden_states.shape
         hidden_states = hidden_states.view(-1, hidden_shape[-1])
-        shared_expert_output = self.shared_experts(hidden_states)
+        if self.use_shared_expert:
+            shared_expert_output = self.shared_experts(hidden_states)
         _, routing_weights, selected_experts = self.router(hidden_states)
         output = custom_forward(hidden_states, routing_weights, selected_experts, self.config.num_moe_experts)
-        output += shared_expert_output
+        if self.use_shared_expert:
+            output += shared_expert_output
 
         return output.reshape(hidden_shape), None
