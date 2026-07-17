@@ -49,6 +49,17 @@ def rename_key(key: str, hf_prefix: str, dcp_prefix: str) -> str:
     return f"{dcp_prefix}{key}"
 
 
+def build_weight_transform(model_id: str):
+    transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id)
+    if transform_cls is None:
+        supported_model_ids = ", ".join(sorted(WEIGHT_TRANSFORM_PIPELINES))
+        raise ValueError(
+            f"No weight transform pipeline registered for model_id={model_id!r}. "
+            f"Supported model ids: {supported_model_ids}"
+        )
+    return transform_cls()
+
+
 class WeightTransformPipeline(ABC):
     """Base pipeline for weight format conversion
     """
