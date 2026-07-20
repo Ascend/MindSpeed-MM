@@ -144,8 +144,8 @@ MindSpore使用[函数式自动微分](https://www.mindspore.cn/tutorials/zh-CN/
 
   | msrun 分布式参数   | 与torchrun分布式参数的关系 | 参数说明 |
   | ------------------ | -------------------------- | ------- |
-  | --local_worker_num | nproc_per_node        | 参与分布式任务的Worker进程总数 |
-  | --worker_num       | nproc_per_node*nnodes | 当前节点上拉起的Worker进程数 |
+  | --local_worker_num | nproc_per_node        | 当前节点上拉起的Worker进程数 |
+  | --worker_num       | nproc_per_node*nnodes | 参与分布式任务的Worker进程总数 |
   | --master_addr      | master_addr           | 指定Scheduler的IP地址或者主机名 | 
   | --master_port      | master_port           | 指定Scheduler绑定端口号 |
   | --node_rank        | node_rank             | 当前节点的索引 |

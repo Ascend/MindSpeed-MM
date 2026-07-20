@@ -30,7 +30,7 @@
 | 配置文件目录                        |    750（rwxr-x---）                |
 | 日志文件（记录完毕或者已经归档）      |    440（r--r-----）                |
 | 日志文件（正在记录）                 |    640（rw-r-----）                |
-| 日志文件记录                        |    750（rwxr-x---）                |
+| 日志文件目录                        |    750（rwxr-x---）                |
 | Debug文件                          |    640（rw-r-----）                |
 | Debug文件目录                      |    750 (rwxr-x---)                 |
 | 临时文件目录                       |     750（rwxr-x---）                |
@@ -82,7 +82,7 @@
 
 ## 公开接口声明
 
-MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。19个入口脚本分别为:
+MindSpeed MM 暂时未发布wheel包，无正式对外公开接口，所有功能均通过shell脚本调用。入口脚本分别为:
 
 - [evaluate_gen](./evaluate_gen.py)
 - [evaluate_vlm](./evaluate_vlm.py)

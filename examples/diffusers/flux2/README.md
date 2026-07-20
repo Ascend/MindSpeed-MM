@@ -134,7 +134,7 @@
 
 2. 【配置 FLUX2 微调脚本】
 
-    联网情况下，微调模型可通过以下步骤下载。无网络时，用户可访问huggingface官网自行下载[FLUX.2-dev模型](https://huggingface.co/black-forest-labs/FLUX.2-dev) `model_name`模型
+    联网情况下，微调模型可通过以下步骤下载。无网络时，用户可访问huggingface官网自行下载[FLUX.2-dev模型](https://huggingface.co/black-forest-labs/FLUX.2-dev)
 
     > [!NOTE]
     >
@@ -238,8 +238,8 @@ FLUX 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
 | 芯片 | 卡数 |     任务     |  FPS  | batch_size | Resolution | AMP_Type | Torch_Version | FSDP2 |
 |:---:|:---:|:----------:|:-----:|:----------:|:---:|:---:|:---:|:---:|
-| Atlas 900 A2 PODc | 8p | Flux-全参微调  |  1.28  | 1 | 1024 | bf16 | 2.7.1 | ✔ |
-| 竞品A | 8p | Flux-全参微调  |  1.24 | 1 | 1024 | bf16 | 2.7.1 | ✔ |
+| Atlas 900 A2 PODc | 8p | Flux-微调  |  1.28  | 1 | 1024 | bf16 | 2.7.1 | ✔ |
+| 竞品A | 8p | Flux-微调  |  1.24 | 1 | 1024 | bf16 | 2.7.1 | ✔ |
 
 <a id="jump5"></a>
 
@@ -371,8 +371,8 @@ FLUX 在 **昇腾芯片** 和 **参考芯片** 上的性能对比：
 
 | 芯片 | 卡数 |     任务     |  FPS  | batch_size | Resolution | AMP_Type | Torch_Version | FSDP2 |
 |:---:|:---:|:----------:|:-----:|:----------:|:---:|:---:|:---:|:---:|
-| Atlas 900 A2 PODc | 8p | Flux-全参微调  |  0.61  | 1 | 1024 | bf16 | 2.7.1 | ✔ |
-| 竞品A | 8p | Flux-全参微调  |  0.6 | 1 | 1024 | bf16 | 2.7.1 | ✔ |
+| Atlas 900 A2 PODc | 8p | Flux-微调  |  0.61  | 1 | 1024 | bf16 | 2.7.1 | ✔ |
+| 竞品A | 8p | Flux-微调  |  0.6 | 1 | 1024 | bf16 | 2.7.1 | ✔ |
 
 ## 推理
 

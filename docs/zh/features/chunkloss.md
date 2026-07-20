@@ -43,7 +43,7 @@ features:
 
 ```json
 "loss_cfg": {
-    "compute_mode": "default",
+    "compute_mode": "chunk",
     "chunk_size": 1024
 }
 ```

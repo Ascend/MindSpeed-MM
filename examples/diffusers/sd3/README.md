@@ -47,7 +47,7 @@
 
     # 安装 torch 和 torch_npu，注意要选择对应python版本、x86或arm的torch、torch_npu及apex包
     pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
-    pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
+    pip install torch_npu-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
 
     # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装
@@ -164,7 +164,7 @@
     ```shell
     input_dir="dog"
 
-    # accelerator 修改 --dataset_name=#dataset_name
+    # accelerator 修改 --dataset_name=$dataset_name
     --instance_data_dir=$input_dir
     ```
 
@@ -323,7 +323,7 @@ vim infer_sd3_img2img.py # 进入运行I2I推理的Python文件
 
   ```python
   model_path = "stabilityai/stable-diffusion-3.5-large"  # 模型权重/微调权重路径
-  lora_weights = "/pytorch_lora_weights.safetensors"  # Lora权重路径
+  lora_weights = "./output/pytorch_lora_weights.safetensors"  # Lora权重路径
   ```
 
 - 启动分布式推理脚本

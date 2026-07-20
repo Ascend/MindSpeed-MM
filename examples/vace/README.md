@@ -1,6 +1,6 @@
 # VACE使用指南
 
-- [VACE 使用指南](#vace使用指南)
+- [VACE使用指南](#vace使用指南)
   - [版本说明](#版本说明)
     - [参考实现](#参考实现)
   - [任务支持列表](#任务支持列表)
@@ -34,7 +34,7 @@
 【数据处理】
 
 ```shell
-uel=https://github.com/ali-vilab/VACE
+url=https://github.com/ali-vilab/VACE
 commit_id=0897c6d
 ```
 

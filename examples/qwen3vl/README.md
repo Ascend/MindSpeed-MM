@@ -204,7 +204,7 @@ gpt_args:
 
 - 是否计算AttnMask
   配置方式为在 `qwen3vl_full_sft_xxB.yaml` 文件中修改`is_causal`字段。
-  是否使用casual_mask，设置为 true 时按照casual mask计算，为 false 时会创建完整的attention mask，长序列时推荐使能以节省显存。
+  是否使用causal_mask，设置为 true 时按照causal mask计算，为 false 时会创建完整的attention mask，长序列时推荐使能以节省显存。
 
 - attn_implementation 和 layout配置
   当前支持vision和text模块选择不同的Attntion实现方式，具体为在`qwen3vl_full_sft_xxB.yaml`文件中修改`attn_implementation`字段，当前支持情况如下表。

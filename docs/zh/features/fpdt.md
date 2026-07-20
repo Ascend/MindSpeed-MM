@@ -35,7 +35,7 @@ FPDT 通过引入更细粒度的sequence划分、计算通信掩盖机制，CPU-
 ```
 
 - 当开启CP > 1时，开启```FPDT```同时开启```FPDT_chunk_number```可使能FPDT
-- 需要确保```FPDT_chunk_number```可以被per_gpu_seq_len数整除
+- 需要确保per_gpu_seq_len可以被```FPDT_chunk_number```整除
 
 ## 使用效果
 

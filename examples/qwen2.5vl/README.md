@@ -884,7 +884,6 @@ bash examples/qwen2.5vl/evaluate_qwen2_5_vl_7b.sh
 
 1. 在 `finetune_xx.sh`里，与模型结构相关的参数并不生效，以`examples/qwen2.5vl/model_xb.json`里同名参数配置为准，非模型结构的训练相关参数在 `finetune_xx.sh`修改。
 2. 在使用单卡进行3B模型训练时，如果出现Out Of Memory，可以使用多卡并开启分布式优化器（`--use-distributed-optimizer`）进行训练。需注意：分布式优化器（ZeRO-1）只沿 **DP 组**分片优化器状态，`DP = WORLD_SIZE /（TP × PP × CP）`，**仅当 DP≥2 时才降低单卡显存**；若并行度（TP×PP×CP）已占满全部卡导致 DP=1，该参数为空操作，优化器建好后仍会 OOM。例如 7B 默认 `PP=2`，仅用 2 卡时 DP=1，需 ≥4 卡才有收益。各规格最小卡数见下表。
-3. `model.json`设置use_remove_padding为true时，在`examples/qwen2vl/dot_product_attention.py`中，attention_mask形状当前固定为[2048, 2048]，如需更改请参考[昇腾官网FlashAttentionScore](https://www.hiascend.com/document/detail/zh/Pytorch/600/ptmoddevg/trainingmigrguide/performance_tuning_0027.html)的替换指南
 
 ### 各规格最小卡数与分布式优化器生效门槛
 

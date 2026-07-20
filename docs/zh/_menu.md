@@ -12,7 +12,7 @@
       - [DiT Ring Attention](./features/dit_ring_attention.md)
       - [DiT USP](./features/dit_usp.md)
     - [异构并行](./features/hetero_parallel.md)
-  - [显示优化]()
+  - [显存优化]()
     - [Async Activation Offload](./features/async_activation_offload.md)
     - [Online Data Rearrange](./features/online_data_rearrange.md)
   - [优化特性]()
