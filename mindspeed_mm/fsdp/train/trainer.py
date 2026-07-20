@@ -316,6 +316,7 @@ class Trainer:
             muon_momentum=args.training.muon_momentum,
             ns_steps=args.training.ns_steps,
             lr_scaling_plan=args.training.lr_scaling_plan,
+            mem_fraction_static=args.training.mem_fraction_static,
         )
         return optimizer
 

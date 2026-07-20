@@ -34,6 +34,7 @@ from torch.optim.optimizer import Optimizer
 
 from ..distributed.parallel_state import get_parallel_state
 from ...optimizer.muon import Muon
+from mindspeed_mm.fsdp.optimizer.swap_optimizer import AdamWSwap
 
 
 logger = logging.getLogger(__name__)
@@ -229,6 +230,7 @@ def build_optimizer(
     muon_momentum: float = 0.95,
     ns_steps: int = 5,
     lr_scaling_plan: Optional[List] = None,
+    mem_fraction_static: float = 0.8,
 ) -> "torch.optim.Optimizer":
     # EP-aware routing: for FSDP2+EP, split params into EP and non-EP groups and build two optimizers.
     ps = get_parallel_state()
@@ -248,6 +250,7 @@ def build_optimizer(
             matched_adamw_rms=matched_adamw_rms,
             muon_momentum=muon_momentum,
             ns_steps=ns_steps,
+            mem_fraction_static=mem_fraction_static,
         )
     # Other cases remain the same
     if lr_scaling_plan:
@@ -289,8 +292,17 @@ def build_optimizer(
         foreach = not fused
         fused = fused
         optim = AdamW(param_groups, lr, betas, eps, weight_decay, fused=fused, foreach=foreach)
+    elif optimizer_type == "adamw_swap":
+        optim = AdamWSwap(
+            param_groups,
+            lr=lr,
+            betas=betas,
+            eps=eps,
+            weight_decay=weight_decay,
+            mem_fraction_static=mem_fraction_static,
+        )
     else:
-        raise ValueError("Only adamw and muon are supported as optimizers.")
+        raise ValueError("Only adamw, adamw_swap and muon are supported as optimizers.")
 
     return optim
 
@@ -373,6 +385,7 @@ def build_ep_fsdp2_optimizer(
     matched_adamw_rms: float = 0.2,
     muon_momentum: float = 0.95,
     ns_steps: int = 5,
+    mem_fraction_static: float = 0.8,
 ):
     """
     Build a MultiOptimizer instance when model is parallelized with EP+FSDP2
@@ -475,8 +488,17 @@ def build_ep_fsdp2_optimizer(
             )
         elif optimizer_type == "adamw":
             return AdamW(groups, lr, betas, eps, weight_decay, fused=fused_, foreach=foreach)
+        elif optimizer_type == "adamw_swap":
+            return AdamWSwap(
+                groups,
+                lr=lr,
+                betas=betas,
+                eps=eps,
+                weight_decay=weight_decay,
+                mem_fraction_static=mem_fraction_static,
+            )
         else:
-            raise ValueError("Only adamw and muon are supported as optimizers.")
+            raise ValueError("Only adamw, adamw_swap and muon are supported as optimizers.")
 
     optimizer_dict: Dict[str, Optimizer] = {}
     if ep_groups:

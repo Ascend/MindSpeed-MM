@@ -123,9 +123,18 @@ class TrainingArguments(BaseArguments):
         default_factory=list,
         metadata={"help": "Parameters without weight decay, for example, bias."},
     )
-    optimizer: Literal["adamw", "muon"] = field(
+    optimizer: Literal["adamw", "adamw_swap", "muon"] = field(
         default="adamw",
-        metadata={"help": "Optimizer. Supported: adamw, muon. Default to adamw."},
+        metadata={"help": "Optimizer. Supported: adamw, adamw_swap, muon. Default to adamw."},
+    )
+    mem_fraction_static: float = field(
+        default=0.8,
+        metadata={
+            "help": (
+                "Fraction of currently available device memory used to swap AdamWSwap states "
+                "from host to device in each batch. Must be in (0, 1]."
+            )
+        },
     )
     matched_adamw_rms: float = field(
         default=0.2,
@@ -342,11 +351,20 @@ class TrainingArguments(BaseArguments):
         if self.save_async and self.save_format != "dcp":
             logger.warning("Async checkpoint saving only supports DCP save format. Please set `save_format` to 'dcp'.")
 
+        if self.optimizer == "adamw_swap":
+            logger.warning(
+                "The `adamw_swap` optimizer may result in training performance degradation. "
+                "Carefully evaluate its performance impact before enabling it."
+            )
+
         if self.lr < self.lr_start:
             raise ValueError(f"Learning rate {self.lr} < starting lr {self.lr_start}. Check scheduler configuration.")
 
         if self.lr < self.lr_min:
             raise ValueError(f"Learning rate {self.lr} < minimum lr {self.lr_min}. Check scheduler configuration.")
+
+        if self.mem_fraction_static <= 0.0 or self.mem_fraction_static > 1.0:
+            raise ValueError(f"mem_fraction_static must be in (0, 1], got {self.mem_fraction_static}.")
 
     def compute_distributed_training(
         self, parallel_args
