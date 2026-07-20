@@ -25,9 +25,13 @@ from mindspeed_mm.fsdp.checkpoint.hf_utils import (
     find_safetensors_index,
     save_state_dict,
 )
-from mindspeed_mm.fsdp.utils.device import empty_cache, synchronize
+from mindspeed_mm.fsdp.utils.constants import FILE_MODE
+from mindspeed_mm.fsdp.utils.device import empty_cache, get_device_type, synchronize
 
 logger = logging.getLogger(__name__)
+
+# Controls whether non-zero ranks sleep or compute while rank 0 saves HuggingFace checkpoint shards.
+HF_SAVE_WAIT_MODE = os.getenv("HF_SAVE_WAIT_MODE", "sleep")
 
 
 class HuggingFaceCheckpointer(CheckpointerBase):
@@ -103,9 +107,13 @@ class HuggingFaceCheckpointer(CheckpointerBase):
                 weight_map[name] = weights_name
             shard_files[weights_name] = list(save_state.keys())
         num_shards = len(shard_files)
+        sync_markers = [Path(checkpoint_dir) / f".hf-save-{i:05d}.done" for i in range(num_shards)]
 
         if is_rank_0:
             os.makedirs(checkpoint_dir, exist_ok=True)
+            if dist.is_initialized():
+                for marker in sync_markers:
+                    marker.unlink(missing_ok=True)
 
         logger.info_rank0("Starting HuggingFace safetensors save from model...")
         if dist.is_initialized():
@@ -113,7 +121,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
 
         total_size = 0
         start_time = time.time()
-        for fname, names in shard_files.items():
+        for shard_index, (fname, names) in enumerate(shard_files.items()):
             full_state_dict = OrderedDict()
             for name in names:
                 tensor = save_state[name]
@@ -126,7 +134,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
                     total_size += tensor.numel() * get_dtype_size(tensor.dtype)
                 del tensor
 
-            # Rank 0 writes the shard, then all ranks sync before processing the next shard
+            # Avoid launching an HCCL collective while rank 0 writes the shard.
             if is_rank_0:
                 save_state_dict(full_state_dict, os.path.join(checkpoint_dir, fname))
                 del full_state_dict
@@ -135,7 +143,20 @@ class HuggingFaceCheckpointer(CheckpointerBase):
             empty_cache()
             if dist.is_initialized():
                 synchronize()
-                dist.barrier()
+                if is_rank_0:
+                    sync_markers[shard_index].touch(mode=FILE_MODE)
+                else:
+                    # Keep non-zero ranks computationally active to prevent termination by idle-worker enforcement.
+                    if HF_SAVE_WAIT_MODE == "compute":
+                        dummy_tensor = torch.ones((1024, 1024), dtype=torch.float16, device=get_device_type())
+                        while not sync_markers[shard_index].is_file():
+                            torch.matmul(dummy_tensor, dummy_tensor)
+                            synchronize()
+                        del dummy_tensor
+                        empty_cache()
+                    else:
+                        while not sync_markers[shard_index].is_file():
+                            time.sleep(1)
 
         elapsed_time = time.time() - start_time
         logger.info_rank0(f"HuggingFace safetensors save from live model took {elapsed_time:.2f}s")
@@ -162,6 +183,9 @@ class HuggingFaceCheckpointer(CheckpointerBase):
 
         if dist.is_initialized():
             dist.barrier()
+            if is_rank_0:
+                for marker in sync_markers:
+                    marker.unlink(missing_ok=True)
 
         return
 
