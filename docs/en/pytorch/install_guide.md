@@ -20,9 +20,9 @@ This document describes how to quickly install MindSpeed MM, a multimodal model 
 >
 > In the table, √ indicates that the product is supported, and x indicates that the product is not supported.
 
-- For the OSs supported by each hardware product in bare-metal deployment scenarios, see the [Compatibility Query Assistant](https://www.hiascend.com/hardware/compatibility).
+<!-- - For the OSs supported by each hardware product in bare-metal deployment scenarios, see the [Compatibility Query Assistant](https://www.hiascend.com/hardware/compatibility).
 
-- For the OSs supported by each hardware product in VM and container deployment scenarios, see [OS Compatibility](https://www.hiascend.com/document/detail/en/canncommercial/900/softwareinst/instg/instg_0101.html?OS=openEuler&InstallType=netyum) in *CANN Software Installation* (commercial edition) or [OS Compatibility](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0101.html?OS=openEuler&InstallType=netyum) in *CANN Software Installation* (community edition).
+- For the OSs supported by each hardware product in VM and container deployment scenarios, see [OS Compatibility](https://www.hiascend.com/document/detail/en/CANNCommunityEdition/900/softwareinst/instg/instg_0101.html?OS=openEuler&InstallType=netyum) in *CANN Software Installation* (community edition).-->
 
 ## Installation Preparations
 
@@ -138,7 +138,7 @@ You can install MindSpeed MM in either of the following ways:
 
 #### One-Click Installation
 
-Currently, the [Qwen3-VL](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/examples/qwen3vl/README.md) and [Qwen3.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qwen3_5) models support one-click installation.
+Currently, the [Qwen3-VL](../../../examples/qwen3vl/) and [Qwen3.5](../../../examples/qwen3_5/) models support one-click installation.
 
 The one-click command installs PyTorch, `torch_npu`, Megatron-LM, MindSpeed, and MindSpeed MM in sequence. Because Megatron-LM does not yet fully support installation through `pip install`, the command copies its source code for use.
 
@@ -201,7 +201,7 @@ This method applies to users who install PyTorch and other third-party libraries
 
 2. Install CANN.
 
-   Install matching versions of the NPU driver and firmware and CANN software (Toolkit, ops, and NNAL), and configure the CANN environment variables. For details, see [CANN Software Installation](https://www.hiascend.com/document/detail/zh/canncommercial/900/softwareinst/instg/instg_0000.html) (commercial edition) or [CANN Software Installation](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0000.html) (community edition).
+   Install matching versions of the NPU driver and firmware and CANN software (Toolkit, ops, and NNAL), and configure the CANN environment variables. For details, see [CANN Software Installation](https://www.hiascend.com/document/detail/en/CANNCommunityEdition/900/softwareinst/instg/instg_0000.html) (community edition).
 
    CANN provides a process-level environment variable configuration script. Before you run service code on an NPU in training or inference scenarios, run this script. Otherwise, the service code cannot run.
 
@@ -214,7 +214,7 @@ This method applies to users who install PyTorch and other third-party libraries
 
 3. Install PyTorch and `torch_npu`.
 
-   See [Installing PyTorch](https://www.hiascend.com/document/detail/zh/Pytorch/2600/configandinstg/instg/docs/en/installation_guide/installation_via_binary_package.md) in *Ascend Extension for PyTorch Installation Guide* to obtain matching PyTorch and `torch_npu` software packages.
+   See [Installing PyTorch](https://www.hiascend.com/document/detail/en/Pytorch/2600/configandinstg/instg/docs/en/installation_guide/installation_via_binary_package.md) in *Ascend Extension for PyTorch Installation Guide* to obtain matching PyTorch and `torch_npu` software packages.
    You can use the following commands as a reference:
 
    ```shell
