@@ -49,7 +49,7 @@ Qwen Image是基于 MMDiT 扩散骨干与 Qwen2.5-VL 文本编码器构建的多
 1. 软件与驱动安装
 
     ```bash
-    # 创建并激活python环境，安装 torch 和 torch_npu，请参考上述安装指南
+    # 创建并激活python环境，安装 torch 和 TorchNPU，请参考上述安装指南
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
     source /usr/local/Ascend/cann/set_env.sh

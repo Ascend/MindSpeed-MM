@@ -43,12 +43,12 @@ CANN安装
     # 根据实际情况修改 ascend-toolkit 路径
     source /usr/local/Ascend/nnal/atb/set_env.sh
 
-PyTorch+torch_npu 安装    
+PyTorch+TorchNPU 安装    
 ::::::::::::::::::::::::::
 
-下载 `torch_npu <https://www.hiascend.com/developer/download/community/result?module=pt>`_ ，参考 `Ascend Extension for PyTorch 配置与安装 <https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0004.html>`_ 或执行以下命令安装：
+下载 `TorchNPU <https://www.hiascend.com/developer/download/community/result?module=pt>`_ ，参考 `TorchNPU 配置与安装 <https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0004.html>`_ 或执行以下命令安装：
 
-安装torch和torch_npu，以下以python 3.10 + torch 2.7.1为例：
+安装torch和TorchNPU，以下以python 3.10 + torch 2.7.1为例：
 
 .. code:: bash
 

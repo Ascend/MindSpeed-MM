@@ -53,7 +53,7 @@ commit_id=7df2afb936cd37b7b3a262edc119b2a57f070e3b
 
 ### 1. 环境依赖
 
-| PyTorch版本 | torch_npu版本 | Python版本 |
+| PyTorch版本 | TorchNPU版本 | Python版本 |
 |-----------|-------------| ---------- |
 | 2.7.1     | 2.7.1       | Python3.11 |
 
@@ -77,7 +77,7 @@ pip config set global.extra-index-url "https://mirrors.huaweicloud.com/ascend/re
 # 安装cmake，如果cmake版本过低，需要升级版本，推荐3.26.4
 conda install -c conda-forge cmake=3.26.4
 
-# 安装torch，torch_npu和pybind11==3.0.1
+# 安装torch，TorchNPU和pybind11==3.0.1
 pip install torch-2.7.1-cp311-cp311-*.whl
 pip install torch_npu-2.7.1*.manylinux_*.whl
 pip install pybind11==3.0.1
@@ -122,7 +122,7 @@ cd ..
 # 安装三方库
 pip install qwen-vl-utils==0.0.11 mathruler viztracer uvloop==0.21.0 setuptools==80.9.0 cloudpickle==3.1.2
 
-# 因安装环境可能导致覆盖，需重新安装torch_npu
+# 因安装环境可能导致覆盖，需重新安装TorchNPU
 pip install torch_npu-2.7.1*.manylinux_*.whl
 ```
 

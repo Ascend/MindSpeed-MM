@@ -43,7 +43,7 @@ url=https://huggingface.co/stepfun-ai/Step3-VL-10B
 【模型开发时推荐使用配套的环境版本】
 
 请参考[安装指南](../../docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
-> Python 版本推荐 3.10，torch 和 torch_npu 版本推荐 2.7.1。
+> Python 版本推荐 3.10，torch 和 TorchNPU 版本推荐 2.7.1。
 
 ### 2. 环境搭建
 

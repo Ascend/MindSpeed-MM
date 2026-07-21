@@ -45,7 +45,7 @@
 1. 软件与驱动安装
 
     ```bash
-    # 安装 torch 和 torch_npu，参考上述安装指南进行安装
+    # 安装 torch 和 TorchNPU，参考上述安装指南进行安装
 
     # 将shell脚本中的环境变量路径修改为真实路径，下面为参考路径
     source /usr/local/Ascend/cann/set_env.sh

@@ -45,12 +45,12 @@ commit_id=c0dbe09
 【模型开发时推荐使用配套的环境版本】
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
-> Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
+> Python版本推荐3.10，torch和TorchNPU版本推荐2.7.1版本
 
-‼️MoE部分的加速特性依赖较新版本的torch_npu和CANN，推荐使用以下版本
+‼️MoE部分的加速特性依赖较新版本的TorchNPU和CANN，推荐使用以下版本
 
 - [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
-- [torch_npu](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/docs/zh/installation_guide/installation_description.md)
+- [TorchNPU](https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/docs/zh/installation_guide/installation_description.md)
 
 <a id="jump1.2"></a>
 

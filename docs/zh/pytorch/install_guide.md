@@ -8,7 +8,7 @@
 
 |产品|是否支持（训练场景）|
 |--|:-:|
-|Ascend 950 系列产品|√|
+|<term>Ascend 950 系列产品</term>|√|
 |<term>Atlas A3 训练系列产品</term>|√|
 |<term>Atlas A3 推理系列产品</term>|x|
 |<term>Atlas A2 训练系列产品</term>|√|
@@ -50,13 +50,13 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 > [!NOTE]
 >
 > - 使用镜像前，请先确认机器型号。最新镜像仅支持aarch64架构，可通过uname -a命令确认当前环境是否符合要求。
-> - 配套镜像已预装配套的CANN 9.0.0软件及Ascend Extension for PyTorch 26.0.0插件，您可根据需要选用。
+> - 配套镜像已预装配套的CANN 9.1.0软件及TorchNPU 26.1.0插件，您可根据需要选用。
 > - 若您当前环境与提供的镜像不兼容，请选择[方式二：源码安装](#方式二源码安装)。
 > - master分支后续会更新新的镜像，如果需要自定义构建镜像，请参见[镜像概述](../../../docker/OVERVIEW.zh.md)。
 
 1. 拉取镜像
 
-   最新镜像均配套[MindSpeed MM的26.0.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0)，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
+   最新镜像均配套[MindSpeed MM的26.1.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0)，该镜像即将上线，当前可使用MindSpeed MM 26.0.0分支对应镜像，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
 
    - <term>Atlas A2 训练系列产品</term>：26.0.0-910b-openeuler24.03-py3.11-aarch64
 
@@ -122,9 +122,13 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
           mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
       ```
 
+    具体参数配置说明可查看MindSpeed MM Docker镜像概述的[构建脚本参数说明](../../../docker/OVERVIEW.zh.md#构建脚本参数说明)
+
 3. 加载容器并确认环境状态
 
    ```bash
+    # 查询本地运行中的容器ID/名称
+    docker ps -a
     # 加载容器
     docker exec -it 容器名 bash
     # 确认NPU是否可以正常使用
@@ -142,7 +146,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
   目前[Qwen3-VL](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/examples/qwen3vl/README.md)、[Qwen3.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qwen3_5)模型已支持一键安装。
 
-  一键式命令会依次安装`PyTorch`、`torch_npu`、`Megatron-LM`、`MindSpeed`、`MindSpeed MM`。由于Megatron-LM对于`pip install`安装方式适配性待提升，采用源码拷贝方式进行使用。
+  一键式命令会依次安装`PyTorch`、`TorchNPU`、`Megatron-LM`、`MindSpeed`、`MindSpeed MM`。由于Megatron-LM对于`pip install`安装方式适配性待提升，采用源码拷贝方式进行使用。
 
   以Qwen3.5模型安装为例：
 
@@ -172,9 +176,9 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
         |-ic, --install-cann |安装CANN|否|默认安装版本CANN 8.5.0|
         |-h, --help|显示安装帮助|否|-|
 
-  3. 如已安装了PyTorch或torch_npu，请按以下步骤操作；未安装可跳过本步骤：
+  3. 如已安装了PyTorch或TorchNPU，请按以下步骤操作；未安装可跳过本步骤：
 
-      控制台打印了如下信息，表示检测到环境中已经安装了2.6.0版本的PyTorch和torch_npu。如果您希望安装新版本的PyTorch和torch_npu，请输入`y`；如果希望保持已安装的PyTorch和torch_npu，请输入`n`。
+      控制台打印了如下信息，表示检测到环境中已经安装了2.6.0版本的PyTorch和TorchNPU。如果您希望安装新版本的PyTorch和TorchNPU，请输入`y`；如果希望保持已安装的PyTorch和TorchNPU，请输入`n`。
 
         ```text
         Version check results:
@@ -203,7 +207,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
   2. 安装CANN
 
-      安装配套版本的NPU驱动固件、CANN软件（Toolkit、ops和NNAL）并配置CANN环境变量，具体请参考《[CANN 软件安装](https://www.hiascend.com/document/detail/zh/canncommercial/900/softwareinst/instg/instg_0000.html)》（商用版）或《[CANN 软件安装](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0000.html)》（社区版）。
+      安装配套版本的NPU驱动固件、CANN软件（Toolkit、ops和NNAL）并配置CANN环境变量，具体请参考《[CANN 软件安装](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0000.html)》。
 
       CANN软件提供进程级环境变量设置脚本，训练或推理场景下使用NPU执行业务代码前需要调用该脚本，否则业务代码将无法执行。
 
@@ -214,13 +218,13 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
        以上命令以root用户安装后的默认路径为例，请用户根据set_env.sh的实际路径进行替换。
 
-  3. 安装PyTorch以及torch_npu
+  3. 安装PyTorch以及TorchNPU
 
-      请参考《Ascend Extension for PyTorch 软件安装指南》中的“[安装PyTorch](https://www.hiascend.com/document/detail/zh/Pytorch/2600/configandinstg/instg/docs/zh/installation_guide/installation_via_binary_package.md)”章节，获取配套版本的PyTorch以及torch_npu软件包。
+      请参考《TorchNPU软件安装》中的“[安装PyTorch](https://www.hiascend.com/document/detail/zh/Pytorch/2600/configandinstg/instg/docs/zh/installation_guide/installation_via_binary_package.md)”章节，获取配套版本的PyTorch以及TorchNPU软件包。
       可参考如下安装命令：
 
         ```shell
-        # 安装torch和torch_npu构建参考 https://gitcode.com/ascend/pytorch/releases
+        # 安装torch和TorchNPU构建参考 https://gitcode.com/ascend/pytorch/releases
         pip3 install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
         pip3 install torch_npu-2.7.1post4-cp310-cp310-manylinux_2_28_aarch64.whl
         ```

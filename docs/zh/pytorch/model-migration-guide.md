@@ -74,7 +74,7 @@ sequenceDiagram
 
 >[!NOTE]
 >
-> Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
+> Python版本推荐3.10，torch和TorchNPU版本推荐2.7.1版本
 
 ### 数据模块迁移
 
