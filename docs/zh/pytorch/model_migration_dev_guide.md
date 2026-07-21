@@ -75,7 +75,7 @@ MindSpeed-MM 训练逻辑整体沿用 Megatron 风格，各类模型统一使用
 
 请参考 [环境搭建](https://mindspeed-mm.readthedocs.io/zh-cn/latest/quick_start/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA.html) 章节，完成 HDK、CANN、PyTorch 和 TorchNPU 基础环境搭建；
 
-> Python 版本推荐 3.10，torch 和 torch_npu 版本推荐 2.7.1 版本
+> Python 版本推荐 3.10，torch 和 TorchNPU 版本推荐 2.7.1 版本
 
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git

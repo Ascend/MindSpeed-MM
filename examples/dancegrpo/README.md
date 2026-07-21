@@ -71,7 +71,7 @@ conda activate test
 
 # 对于x86的设备，若遇到有关torchvision的导包问题，建议优先检查环境中的torchvision版本是否为`+cpu`版本，建议使用以下源配置解决此类问题
 # pip config set global.extra-index-url "https://download.pytorch.org/whl/cpu/ https://mirrors.huaweicloud.com/ascend/repos/pypi"
-# 安装torch和torch_npu
+# 安装torch和TorchNPU
 pip install torch-2.7.1+cpu-cp310-cp310-*.whl
 pip install torch_npu-2.7.1*.whl
 

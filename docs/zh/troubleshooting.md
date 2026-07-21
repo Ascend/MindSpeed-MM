@@ -38,7 +38,7 @@
    ```
 
 2. 对照 [版本配套说明](release_notes_mm.md#相关产品版本配套说明) 确认版本是否配套
-3. 检查 torch_npu 版本是否与 CANN 版本匹配：
+3. 检查 TorchNPU 版本是否与 CANN 版本匹配：
 
    ```bash
    python -c "import torch_npu; print(torch_npu.__version__)"
@@ -246,7 +246,7 @@
 
 **排查步骤**：
 
-1. Docker 镜像仅预装 torch、torch_npu 和 decord 基础依赖
+1. Docker 镜像仅预装 torch、TorchNPU 和 decord 基础依赖
 2. 根据目标模型的 README 在 base 环境中手动安装额外依赖
 3. 参考 [Docker 使用](../../docker/OVERVIEW.zh.md)
 

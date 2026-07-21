@@ -127,7 +127,7 @@
                 <td>分布式后端</td>
                 <td>GPU: <code>hccl</code>, NPU: <code>nccl</code>:, CPU: <code>gloo</code>, HPC: <code>mpi</code></td>
                 <td><code>hccl</code></td>
-                <td><code>hccl</code>会被<code>torch_npu</code> patch成为<code>nccl</code></td>
+                <td><code>hccl</code>会被<code>TorchNPU</code> patch成为<code>nccl</code></td>
             </tr>
             
             <tr>

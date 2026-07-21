@@ -38,7 +38,7 @@
 
 昇腾基础软件安装请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
 
-> Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
+> Python版本推荐3.10，torch和TorchNPU版本推荐2.7.1版本
 
 1. 在工作目录执行下列命令
 

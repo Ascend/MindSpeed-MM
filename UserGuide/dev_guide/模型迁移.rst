@@ -121,7 +121,7 @@ train_valid_test_datasets_provider   构建数据加载器
 
 请参考 `环境搭建 <https://mindspeed-mm.readthedocs.io/zh-cn/latest/quick_start/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA.html>`_ 章节，完成HDK、CANN、PyTorch和TorchNPU基础环境搭建；
 
-> Python版本推荐3.10，torch和torch_npu版本推荐2.7.1版本
+> Python版本推荐3.10，torch和TorchNPU版本推荐2.7.1版本
 
 .. code:: bash
 

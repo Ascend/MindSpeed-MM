@@ -40,7 +40,7 @@
 
 **表 1**  MindSpeed MM配套表
 
-| MindSpeed MM版本 | MindSpeed Core代码分支名称 | Megatron版本 | PyTorch版本  | Ascend Extension for PyTorch版本 | CANN版本 | Triton-Ascend版本 | Python版本     |
+| MindSpeed MM版本 | MindSpeed Core代码分支名称 | Megatron版本 | PyTorch版本  | TorchNPU版本 | CANN版本 | Triton-Ascend版本 | Python版本     |
 | ---------------- | ------------------ | ------------ | -----------  | ------------- |--------------------- |-----------------| ------------------- |
 | 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.1           | Python3.10      |
 | 26.0.0           | 26.0.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.0.0        | 9.0.0  | 3.2.1           | Python3.10      |
@@ -182,9 +182,9 @@
 ## 配套文档
 
 |文档名称|内容简介|更新说明|
-|--|--|--|
 |《[MindSpeed MM安装指导](../zh/pytorch/install_guide.md)》|指导用户如何在NPU上基于PyTorch完成MindSpeed MM的安装，内容涵盖硬件与操作系统兼容性说明、驱动固件及CANN基础软件安装，以及基于PyTorch框架下的完整安装流程，帮助用户快速搭建多模态模型训练环境。|-|
-|《[MindSpeed MM快速入门](../zh/pytorch/quickstart.md)》|以Wan2.1和Qwen2.5-VL为例，指导开发者在PyTorch框架下完成Wan2.1和Qwen2.5-VL模型的微调，帮助用户快速上手多模态模型训练。|-|
+|《[MindSpeed MM快速入门（基于Megatron训练后端）](../zh/pytorch/quickstart.md)》|以Wan2.1和Qwen2.5-VL为例，指导开发者基于Megatron训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
+|《[MindSpeed MM快速入门（基于FSDP2训练后端）](../zh/pytorch/quickstart_fsdp2.md)》|以Qwen3-VL-30B，指导开发者基于FSDP2训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
 
 ## 病毒扫描及漏洞修补列表
 
@@ -192,9 +192,9 @@
 
 |防病毒软件名称|防病毒软件版本|病毒库版本|扫描时间|扫描结果|
 |---|---|---|---|---|
-|QiAnXin|8.0.5.5260|2026-04-01 08:00:00.0|2026-04-02|无病毒，无恶意|
-|Kaspersky|12.0.0.6672|2026-04-02 10:05:00|2026-04-02|无病毒，无恶意|
-|Bitdefender|7.5.1.200224|7.100588|2026-04-02|无病毒，无恶意|
+|QiAnXin|8.0.5.5260|2026-07-05 08:00:00.0|2026-07-06|无病毒，无恶意|
+|Kaspersky|12.0.0.6672|2026-07-06 10:03:00|2026-07-06|无病毒，无恶意|
+|Bitdefender|7.5.1.200224|7.101158|2026-07-06|无病毒，无恶意|
 
 ### 漏洞修补列表
 

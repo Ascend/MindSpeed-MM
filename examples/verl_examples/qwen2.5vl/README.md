@@ -55,7 +55,7 @@ commit_id=97b65c63c729c61ca607315cf7084012aabc6bba
 
 ### 1. 环境依赖
 
-| PyTorch版本 | torch_npu版本 | Python版本 |
+| PyTorch版本 | TorchNPU版本 | Python版本 |
 |-----------|-------------| ---------- |
 | 2.5.1     | 2.5.1       | Python3.11 |
 
@@ -71,7 +71,7 @@ conda activate test
 # for torch-npu dev version or x86 machine [Optional]
 # pip config set global.extra-index-url "https://download.pytorch.org/whl/cpu/ https://mirrors.huaweicloud.com/ascend/repos/pypi"
 # pip install 后缀需加上 --trusted-host download.pytorch.org --trusted-host mirrors.huaweicloud.com
-# 安装torch和torch_npu
+# 安装torch和TorchNPU
 pip install torch-2.5.1-cp311-cp311-*.whl
 pip install torch_npu-2.5.1*.manylinux2014_*.whl
 
@@ -106,7 +106,7 @@ cd ..
 # 安装三方库
 pip install transformers==4.52.4 mathruler==0.1.0 decorator qwen-vl-utils==0.0.11 viztracer cloudpickle==2.1.0 setuptools==80.9.0
 
-# 因安装环境可能导致覆盖，需重新安装torch_npu
+# 因安装环境可能导致覆盖，需重新安装TorchNPU
 pip install torch_npu-2.5.1*.manylinux2014_*.whl
 ```
 

@@ -2,7 +2,7 @@
 
 | 序号 | 问题简述 | 影响 | 当前方案 | 后续计划 | 相关链接 |
 |:------:|:------:|:------:|:------:|:------:|:------:|
-| 1 | CANN 版本不匹配导致训练报错 | 训练无法启动或出现算子报错 | 确保驱动固件、CANN Toolkit/Kernels/NNAL、PyTorch、torch_npu 版本严格配套，参考 [版本配套说明](./release_notes_mm.md#相关产品版本配套说明) | 持续更新版本配套表 | [安装说明](./pytorch/install_guide.md) |
+| 1 | CANN 版本不匹配导致训练报错 | 训练无法启动或出现算子报错 | 确保驱动固件、CANN Toolkit/Kernels/NNAL、PyTorch、TorchNPU版本严格配套，参考 [版本配套说明](./release_notes_mm.md#相关产品版本配套说明) | 持续更新版本配套表 | [安装说明](./pytorch/install_guide.md) |
 | 2 | `ModuleNotFoundError: No module named 'acl'` | 无法导入昇腾相关模块 | 检查是否已执行 `source /usr/local/Ascend/ascend-toolkit/set_env.sh`，建议写入 `~/.bashrc` | - | [安装说明](./pytorch/install_guide.md) |
 | 3 | CANN nnal 包安装顺序错误导致 `libatb.so` 找不到 | 推理或训练时报动态库缺失错误 | nnal 包必须在 `source /usr/local/Ascend/ascend-toolkit/set_env.sh` 之后安装，否则找不到依赖路径 | - | [安装说明](./pytorch/install_guide.md) |
 | 4 | 多机多卡启动时脚本卡死无报错 | 无法启动分布式训练 | 确保已安装 `pdsh`，否则多机多卡启动脚本会卡死。可通过 `apt install pdsh` 或 `yum install pdsh` 安装 | - | - |
@@ -21,4 +21,4 @@
 | 17 | 训练 loss 不收敛 | 模型效果差 | 检查：1. 数据质量和清洗逻辑；2. 学习率和 warmup 策略；3. 是否使用预训练权重初始化；4. 数据路径和图片路径是否正确 | - | - |
 | 18 | 推荐的关键环境变量配置 | 影响训练性能和稳定性 | 建议配置：`export ASCEND_GLOBAL_LOG_LEVEL=1`、`export TASK_QUEUE_ENABLE=2`、`export CPU_AFFINITY_CONF=2`、`export HCCL_CONNECT_TIMEOUT=600`、`export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True` | - | - |
 | 19 | Megatron-LM 版本与 MindSpeed-MM 不匹配 | 安装或运行报错 | MindSpeed-MM 需要配套版本的 Megatron-LM，请参考 [安装说明](./pytorch/install_guide.md) 中指定的 commit 或 tag 进行 checkout | - | [安装说明](./pytorch/install_guide.md) |
-| 20 | Docker 镜像中缺少模型特定依赖 | 模型训练报错 | Docker 镜像仅预装 torch、torch_npu 和 decord 基础依赖，需根据目标模型的 README 在 base 环境中手动安装额外依赖 | - | - |
+| 20 | Docker 镜像中缺少模型特定依赖 | 模型训练报错 | Docker 镜像仅预装 torch、TorchNPU 和 decord 基础依赖，需根据目标模型的 README 在 base 环境中手动安装额外依赖 | - | - |
