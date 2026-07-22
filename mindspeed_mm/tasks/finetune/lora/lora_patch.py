@@ -403,9 +403,25 @@ def apply_patches():
     if hasattr(_lora_model, 'dispatch_megatron'):
         _orig_dispatch_megatron = _lora_model.dispatch_megatron
 
-        def _patched_dispatch_megatron(target, adapter_name, config, **kwargs):
-            kwargs.setdefault("fan_in_fan_out", config.fan_in_fan_out)
-            return _orig_dispatch_megatron(target, adapter_name, config=config, **kwargs)
+        def _patched_dispatch_megatron(
+            target,
+            adapter_name,
+            lora_config=None,
+            config=None,
+            **kwargs,
+        ):
+            lora_config = lora_config if lora_config is not None else config
+            kwargs.setdefault(
+                "fan_in_fan_out",
+                lora_config.fan_in_fan_out,
+            )
+
+            return _orig_dispatch_megatron(
+                target,
+                adapter_name,
+                lora_config,
+                **kwargs,
+            )
 
         _lora_model.dispatch_megatron = _patched_dispatch_megatron
 
