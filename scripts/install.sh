@@ -8,6 +8,7 @@ Usage: $0 [OPTIONS]
 Options:
     -t, --torchversion VERSION   PyTorch version to install (default: 2.7.1)
     -m, --msid COMMIT_ID    MindSpeed commit ID (optional, use latest if not specified)
+    -b, --msbranch BRANCH   MindSpeed branch name (optional, mutually exclusive with --msid)
     -y, --yes               Auto confirm all reinstallations
     -n, --no                Auto skip all reinstallations
     -mt, --megatron         Install Megatron-LM
@@ -17,6 +18,9 @@ Options:
 Examples:
     # Install with latest MindSpeed (no commit ID)
     bash $0 --torchversion 2.7.1 --install-cann
+
+    # Install with specific MindSpeed branch
+    bash $0 --torchversion 2.7.1 --msbranch master --install-cann
 
     # Install with specific commit ID
     bash $0 --torchversion 2.7.1 --msid 93c45456c7044bacddebc5072316c01006c938f9 --install-cann
@@ -38,6 +42,7 @@ EOF
 # Default values
 TORCH_VERSION="2.7.1"
 MINDSPEED_COMMIT_ID=""
+MINDSPEED_BRANCH=""
 AUTO_CONFIRM=""  # Auto confirm mode: "", "yes", "no"
 INSTALL_MEGATRON=false  # Whether to install Megatron-LM
 INSTALL_CANN=false  # Whether to install CANN
@@ -47,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -t|--torchversion) TORCH_VERSION="$2"; shift 2 ;;
         -m|--msid) MINDSPEED_COMMIT_ID="$2"; shift 2 ;;
+        -b|--msbranch) MINDSPEED_BRANCH="$2"; shift 2 ;;
         -y|--yes) AUTO_CONFIRM="yes"; shift ;;
         -n|--no) AUTO_CONFIRM="no"; shift ;;
         -mt|--megatron) INSTALL_MEGATRON=true; shift ;;
@@ -56,11 +62,24 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Validate that --msid and --msbranch are mutually exclusive
+if [ -n "$MINDSPEED_COMMIT_ID" ] && [ -n "$MINDSPEED_BRANCH" ]; then
+    echo "Error: --msid and --msbranch are mutually exclusive. Please specify only one."
+    show_help
+    exit 1
+fi
+
 echo "========================================"
 echo "Installation Configuration"
 echo "========================================"
 echo "PyTorch Version: $TORCH_VERSION"
-echo "MindSpeed Commit ID: ${MINDSPEED_COMMIT_ID:-"latest"}"
+if [ -n "$MINDSPEED_BRANCH" ]; then
+    echo "MindSpeed Branch: $MINDSPEED_BRANCH"
+elif [ -n "$MINDSPEED_COMMIT_ID" ]; then
+    echo "MindSpeed Commit ID: $MINDSPEED_COMMIT_ID"
+else
+    echo "MindSpeed: latest"
+fi
 echo "Auto Confirm Mode: ${AUTO_CONFIRM:-"interactive"}"
 echo "Install Megatron-LM: $INSTALL_MEGATRON"
 echo "Install CANN: $INSTALL_CANN"
@@ -220,8 +239,9 @@ if [ "$INSTALL_CANN" = true ]; then
     # Call install_cann.sh and pass ARCH parameter
     echo "Calling install_cann.sh with architecture: $ARCH"
     # Execute CANN installation script
-    if ! "$CANN_INSTALL_SCRIPT" "$ARCH"; then
-        cann_exit_code=$?
+    "$CANN_INSTALL_SCRIPT" "$ARCH"
+    cann_exit_code=$?
+    if [ $cann_exit_code -ne 0 ]; then
         echo "Error: CANN installation failed with exit code: $cann_exit_code"
         echo "Aborting installation due to CANN installation failure."
         exit 1
@@ -555,19 +575,30 @@ else
 fi
 
 # Install mindspeed with retry mechanism
-if [ -z "$MINDSPEED_COMMIT_ID" ]; then
-    echo "[INFO] Installing MindSpeed with latest version (no commit ID specified)"
-else
+if [ -n "$MINDSPEED_BRANCH" ]; then
+    echo "[INFO] Installing MindSpeed with branch: $MINDSPEED_BRANCH"
+elif [ -n "$MINDSPEED_COMMIT_ID" ]; then
     echo "[INFO] Installing MindSpeed with commit ID: $MINDSPEED_COMMIT_ID"
+else
+    echo "[INFO] Installing MindSpeed with latest version (no commit ID or branch specified)"
 fi
 
 if [ ! -d "MindSpeed" ]; then
-    git clone https://gitcode.com/Ascend/MindSpeed.git
+    # Clone and checkout the specified branch in one step when --msbranch is provided
+    if [ -n "$MINDSPEED_BRANCH" ]; then
+        git clone -b "$MINDSPEED_BRANCH" https://gitcode.com/Ascend/MindSpeed.git
+    else
+        git clone https://gitcode.com/Ascend/MindSpeed.git
+    fi
 fi
 cd MindSpeed
 
-# Only checkout specific commit if COMMIT_ID is provided
-if [ -n "$MINDSPEED_COMMIT_ID" ]; then
+if [ -n "$MINDSPEED_BRANCH" ]; then
+    # For existing clone, fetch and checkout the branch to keep it up to date
+    git fetch origin "$MINDSPEED_BRANCH"
+    git checkout "$MINDSPEED_BRANCH"
+elif [ -n "$MINDSPEED_COMMIT_ID" ]; then
+    # Only checkout specific commit if COMMIT_ID is provided
     git checkout "$MINDSPEED_COMMIT_ID"
 fi
 
@@ -577,10 +608,12 @@ if ! install_with_retry "mindspeed" "pip3 install -e ."; then
     exit 1
 fi
 
-if [ -z "$MINDSPEED_COMMIT_ID" ]; then
-    echo "[INFO] MindSpeed latest version successfully installed!"
-else
+if [ -n "$MINDSPEED_BRANCH" ]; then
+    echo "[INFO] MindSpeed with branch: $MINDSPEED_BRANCH successfully installed!"
+elif [ -n "$MINDSPEED_COMMIT_ID" ]; then
     echo "[INFO] MindSpeed with commit ID: $MINDSPEED_COMMIT_ID successfully installed!"
+else
+    echo "[INFO] MindSpeed latest version successfully installed!"
 fi
 
 cd ..

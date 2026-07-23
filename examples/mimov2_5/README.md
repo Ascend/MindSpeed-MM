@@ -64,7 +64,7 @@ cd MindSpeed-MM
 执行如下指令一键安装：
 
 ```bash
-bash scripts/install.sh --msid eb10b92 && pip install transformers==5.2.0 accelerate==1.2.0
+bash scripts/install.sh --msbranch 26.1.0_core_r0.12.1 && pip install transformers==5.2.0 accelerate==1.2.0
 ```
 
 ---
