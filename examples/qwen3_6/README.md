@@ -59,7 +59,7 @@ cd MindSpeed-MM
 执行如下指令安装：
 
 ```bash
-bash scripts/install.sh --msid eb10b92
+bash scripts/install.sh --msbranch master
 pip install transformers==5.2.0 triton-ascend==3.2.0 accelerate==1.2.0
 ```
 

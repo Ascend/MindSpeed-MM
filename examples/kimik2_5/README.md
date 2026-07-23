@@ -67,7 +67,7 @@ commit_id=7eb5002
 执行如下指令一键安装：
 
 ```bash
-bash scripts/install.sh && pip install tiktoken==0.12.0
+bash scripts/install.sh --msbranch master && pip install tiktoken==0.12.0
 ```
 
 ---

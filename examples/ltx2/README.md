@@ -85,7 +85,7 @@ commit_id=28c3c73fe557666c3de176e1e50a5220152ccfca
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 
 # 2. 安装 mindspeed 及依赖（如已集成可跳过）
-git clone https://gitcode.com/Ascend/MindSpeed.git
+git clone -b master https://gitcode.com/Ascend/MindSpeed.git
 cd MindSpeed
 cp -r mindspeed ../MindSpeed-MM/
 cd ../MindSpeed-MM

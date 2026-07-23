@@ -69,7 +69,7 @@ cd MindSpeed-MM
 执行如下指令一键安装：
 
 ```bash
-bash scripts/install.sh --msid eb10b92 && bash examples/qwen3_5/install_extensions.sh
+bash scripts/install.sh --msbranch master && bash examples/qwen3_5/install_extensions.sh
 ```
 
 ### 3. 安装配套版本的Triton-Ascend
