@@ -234,21 +234,43 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id, None)
         weight_transform = transform_cls() if transform_cls is not None else None
 
-        if load_rank0_and_broadcast:
-            rank0_load_and_broadcast_hf_weights(
-                model=state["model"],
-                hf_dir=path,
-                enable_lora=enable_lora,
-                load_strict=load_strict,
-                weight_transform=weight_transform,
-            )
-        else:
-            load_hf_weights(
-                model=state["model"],
-                hf_dir=path,
-                enable_lora=enable_lora,
-                load_strict=load_strict,
-                weight_transform=weight_transform,
-            )
+        original_num_threads = torch.get_num_threads()
+        local_world_size = max(1, int(os.getenv("LOCAL_WORLD_SIZE", "1")))
+        load_num_threads = max(1, (os.cpu_count() or 1) // local_world_size)
+
+        try:
+            # Increase CPU parallelism temporarily for HF weight loading.
+            torch.set_num_threads(load_num_threads)
+            if original_num_threads != load_num_threads:
+                print_rank(
+                    logger.info,
+                    f"Changed PyTorch CPU thread count from {original_num_threads} to "
+                    f"{load_num_threads} for HF weight loading.",
+                )
+            if load_rank0_and_broadcast:
+                rank0_load_and_broadcast_hf_weights(
+                    model=state["model"],
+                    hf_dir=path,
+                    enable_lora=enable_lora,
+                    load_strict=load_strict,
+                    weight_transform=weight_transform,
+                )
+            else:
+                load_hf_weights(
+                    model=state["model"],
+                    hf_dir=path,
+                    enable_lora=enable_lora,
+                    load_strict=load_strict,
+                    weight_transform=weight_transform,
+                )
+        finally:
+            # Restore the thread count for subsequent training.
+            torch.set_num_threads(original_num_threads)
+            if original_num_threads != load_num_threads:
+                print_rank(
+                    logger.info,
+                    f"Restored PyTorch CPU thread count from {load_num_threads} to "
+                    f"{original_num_threads} after HF weight loading.",
+                )
 
         return True
