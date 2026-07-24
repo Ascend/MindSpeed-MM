@@ -5,7 +5,8 @@ gpt_args:
   ## parallel: （TP/PP/CP/)
   context_parallel_size: 1
   context_parallel_algo: ulysses_cp_algo
-  tensor_model_parallel_size: &TP 1
+  tensor_model_parallel_size: &TP 2
+  sequence_parallel: true
   expert_model_parallel_size: &EP 8
   pipeline_model_parallel_size: &PP 1
 
@@ -92,6 +93,7 @@ model:
     expert_model_parallel_size: *EP
     tensor_model_parallel_size: *TP
     pipeline_model_parallel_size: *PP
+    sequence_parallel: true
 
     causal_conv1d_implementation: ascendc
     gdn_implementation: ascendc
@@ -210,35 +212,7 @@ data:
     dataloader_mode: sampler
     drop_last: true
     sampler_type: BaseRandomBatchSampler
-    num_workers: 0
+    num_workers: 8
     collate_param:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
-
-
-# 工具配置
-tools:
-  profile:
-    enable: false
-    profile_type: static
-    ranks: [0]
-    static_param:
-      level: level1
-      with_stack: false
-      with_memory: false
-      record_shapes: false
-      with_cpu: true
-      save_path: ./profiling
-      start_step: 10
-      end_step: 11
-      data_simplification: false
-      aic_metrics_type: PipeUtilization
-  memory_profile:
-      enable: false
-      start_step: 1
-      end_step: 2
-      save_path: ./memory_snapshot
-      dump_ranks: [0]
-      stacks: all
-      max_entries: null
-      mem_info: false
