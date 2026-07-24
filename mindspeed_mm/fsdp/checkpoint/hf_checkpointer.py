@@ -44,6 +44,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         save_ckpt_dtype: Optional[torch.dtype] = None,
         model_assets_dir: str = None,
         model_id=None,
+        enable_lora: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -55,6 +56,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
             save_ckpt_dtype: optional dtype to cast floating-point model weights before saving
             model_assets_dir: original huggingface checkpoint directory used to copy config, processor and shard mapping
             model_id: model id used to select model-specific weight transform pipeline
+            enable_lora: whether to normalize PEFT base-layer keys before saving
         return:
             None
         """
@@ -69,7 +71,12 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         if safetensor_idx_path is not None:
             with open(safetensor_idx_path, "r", encoding="utf-8") as f:
                 fqn_to_filename_mapping = json.load(f)["weight_map"]
-        save_state = get_model_save_state(state["model"], fqn_to_filename_mapping, save_ckpt_dtype)
+        save_state = get_model_save_state(
+            state["model"],
+            fqn_to_filename_mapping,
+            save_ckpt_dtype,
+            enable_lora=enable_lora,
+        )
 
         # Transform state dict from DCP to HF format
         transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id, None)

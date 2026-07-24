@@ -246,12 +246,15 @@ def parse_fqn_to_filename_mapping_from_json(safetensor_idx_path: str) -> Dict[st
 def get_model_save_state(
     model: torch.nn.Module,
     fqn_to_filename_mapping: Optional[Dict[str, int]],
-    save_ckpt_dtype: Optional[torch.dtype] = None
+    save_ckpt_dtype: Optional[torch.dtype] = None,
+    enable_lora: bool = False,
 ) -> Dict[str, torch.Tensor]:
     """Build a state dict suitable for HuggingFace safetensors saving.
     """
-    from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import ModelState
-    save_state = ModelState(model, save_ckpt_dtype).state_dict()
+    from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import LoraModelState, ModelState
+
+    model_state_cls = LoraModelState if enable_lora else ModelState
+    save_state = model_state_cls(model, save_ckpt_dtype).state_dict()
 
     if fqn_to_filename_mapping is not None:
         filtered_state = {}
