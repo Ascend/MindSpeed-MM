@@ -11,8 +11,8 @@ TMP_FILE=$(mktemp)
 pip freeze | grep -E "transformers|accelerate|datasets" > "$TMP_FILE"
 cat "$TMP_FILE"
 
-cp -r /home/ci_resource/code/transformers-7a833d1/transformers .
-cd transformers
+cp -r /workspace/transformers-7a833d1 .
+cd transformers-7a833d1
 pip install -e .
 pip install accelerate==1.11.0 librosa==0.11.0 datasets==4.0.0
 
@@ -130,9 +130,8 @@ torchrun $DISTRIBUTED_ARGS $BASEPATH/pretrain_transformers.py \
     --distributed-backend nccl \
     2>&1 | tee logs/train_${logfile}.log
 
-pip uninstall -y librosa
 pip install -r "$TMP_FILE"
 cd "$BASEPATH"
 rm -f "$TMP_FILE"
-rm -rf transformers
+rm -rf transformers-7a833d1
 cd "$INITIAL_DIR"

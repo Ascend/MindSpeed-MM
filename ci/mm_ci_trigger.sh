@@ -12,10 +12,40 @@ type="$4"
 echo "init env"
 source /usr/local/Ascend/driver/bin/setenv.bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-source /root/miniconda3/bin/activate "ci_${branch}"
-rm -rf /root/.cache/torch_extensions/py38_cpu
-rm -rf /root/.cache/torch_extensions/py310_cpu
-rm -rf /root/.cache/torch_extensions/py311_cpu
+# 显式加载 conda 初始化钩子（非交互式 shell 不会自动 source ~/.bashrc）
+source /opt/conda/etc/profile.d/conda.sh
+conda activate "ci_${branch}"
+pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+
+# ============================================================
+# 打印当前 conda 环境的 pip 安装列表
+# ============================================================
+echo ""
+echo "############################################################"
+echo "##                  pip list 输出                          ##"
+echo "############################################################"
+echo ""
+pip list
+echo ""
+echo "############################################################"
+echo "##                pip list 输出结束                        ##"
+echo "############################################################"
+echo ""
+
+# ============================================================
+# 打印 NPU 硬件信息
+# ============================================================
+echo ""
+echo "############################################################"
+echo "##                npu-smi info 输出                        ##"
+echo "############################################################"
+echo ""
+npu-smi info
+echo ""
+echo "############################################################"
+echo "##              npu-smi info 输出结束                      ##"
+echo "############################################################"
+echo ""
 
 #导出修改文件列表
 cd "${WORKSPACE}/CODE/"
@@ -62,80 +92,39 @@ cp -r "/workspace/Megatron-LM_${MEGATRON_BRANCH}" "${WORKSPACE}/Megatron-LM"
 echo "[CI] Megatron-LM commit: $(cd "${WORKSPACE}/Megatron-LM" && git rev-parse HEAD)"
 
 # ============================================================
-# Step C: Clone MindSpeed（按日期缓存，已下载则直接复用）
-#   缓存根目录: /home/ci_resource/mindspeed-mm_code/
-#   缓存子目录:
-#     固定 commit 缓存: MindSpeed-commit-date/  （存放 MindSpeed-${MINDSPEED_COMMIT}-${COMMIT_DATE}）
-#     固定分支缓存:    MindSpeed-branch-date/  （存放 MindSpeed-${MINDSPEED_BRANCH}-${DATE_SUFFIX}）
+# Step C: Clone MindSpeed（直接下载到 /workspace，无缓存复用）
+#   下载路径:
+#     按分支下载: /workspace/MindSpeed-${MINDSPEED_BRANCH}
+#     按commit下载: /workspace/MindSpeed-${MINDSPEED_COMMIT}
 # ============================================================
-DATE_SUFFIX=$(date +%Y%m%d)
-MINDSPEED_CACHE_BASE="/home/ci_resource/mindspeed-mm_code"
-# 固定 commit 缓存目录与固定分支缓存目录
-COMMIT_CACHE_DIR="${MINDSPEED_CACHE_BASE}/MindSpeed-commit-date"
-BRANCH_CACHE_DIR="${MINDSPEED_CACHE_BASE}/MindSpeed-branch-date"
-
-# 确保缓存根目录及两个子目录存在（若不存在则创建）
-mkdir -p "${COMMIT_CACHE_DIR}" "${BRANCH_CACHE_DIR}"
-
 # ------------------------------------------------------------
-# C1: 固定分支缓存——当天同分支已下载则复用，否则克隆
-#   缓存路径: ${BRANCH_CACHE_DIR}/MindSpeed-${MINDSPEED_BRANCH}-${DATE_SUFFIX}
+# C1: 按分支下载 MindSpeed
 # ------------------------------------------------------------
-TARGET_PATH_BRANCH="${BRANCH_CACHE_DIR}/MindSpeed-${MINDSPEED_BRANCH}-${DATE_SUFFIX}"
-if [ -d "${TARGET_PATH_BRANCH}" ]; then
-    echo "[CI] Reusing cached MindSpeed (branch): ${TARGET_PATH_BRANCH}"
-else
-    echo "[CI] Cloning MindSpeed by branch (${MINDSPEED_BRANCH}) to ${TARGET_PATH_BRANCH} ..."
-    git clone https://gitcode.com/Ascend/MindSpeed.git -b "${MINDSPEED_BRANCH}" "${TARGET_PATH_BRANCH}"
-fi
+TARGET_PATH_BRANCH="/workspace/MindSpeed-${MINDSPEED_BRANCH}"
+echo "[CI] Cloning MindSpeed by branch (${MINDSPEED_BRANCH}) to ${TARGET_PATH_BRANCH} ..."
+git clone https://gitcode.com/Ascend/MindSpeed.git -b "${MINDSPEED_BRANCH}" "${TARGET_PATH_BRANCH}"
 echo "[CI] MindSpeed-${MINDSPEED_BRANCH} commit: $(cd "${TARGET_PATH_BRANCH}" && git rev-parse HEAD)"
 
 # ------------------------------------------------------------
-# C2: 固定 commit 缓存——查找已有缓存，命中则复用；否则克隆并归档
-#   缓存路径: ${COMMIT_CACHE_DIR}/MindSpeed-${MINDSPEED_COMMIT}-${COMMIT_DATE}
-#   - 若已存在该 commit 的任意缓存目录，直接复用（不再下载）
-#   - 否则下载到临时目录，取该 commit 的合入日期（YYYYMMDD）作为后缀归档
+# C2: 按 commit 下载 MindSpeed
 # ------------------------------------------------------------
-COMMIT_CACHE=$(ls -1dt "${COMMIT_CACHE_DIR}/MindSpeed-${MINDSPEED_COMMIT}-"*/ 2>/dev/null | head -n 1)
-if [ -n "${COMMIT_CACHE}" ]; then
-    TARGET_PATH_COMMIT="${COMMIT_CACHE%/}"
-    echo "[CI] Reusing cached MindSpeed (commit): ${TARGET_PATH_COMMIT}"
-else
-    echo "[CI] Cloning MindSpeed by commit (${MINDSPEED_COMMIT}) ..."
-    TMP_CLONE=$(mktemp -d "${COMMIT_CACHE_DIR}/tmp_clone_XXXXXX")
-    git clone https://gitcode.com/Ascend/MindSpeed.git -b "${MINDSPEED_BRANCH}" "${TMP_CLONE}"
-    cd "${TMP_CLONE}"
-    git checkout "${MINDSPEED_COMMIT}"
-    # 以 commit 合入日期（YYYYMMDD）作为后缀
-    COMMIT_DATE=$(git show -s --format=%ci "${MINDSPEED_COMMIT}" | awk '{print $1}' | tr -d '-')
-    cd "${WORKSPACE}"
-    TARGET_PATH_COMMIT="${COMMIT_CACHE_DIR}/MindSpeed-${MINDSPEED_COMMIT}-${COMMIT_DATE}"
-    if [ -d "${TARGET_PATH_COMMIT}" ]; then
-        # 并发情况下已被下载，删除临时目录并复用
-        rm -rf "${TMP_CLONE}"
-        echo "[CI] Reusing cached MindSpeed (commit): ${TARGET_PATH_COMMIT}"
-    else
-        mv "${TMP_CLONE}" "${TARGET_PATH_COMMIT}"
-        echo "[CI] Archived MindSpeed (commit) to ${TARGET_PATH_COMMIT}"
-    fi
-fi
+TARGET_PATH_COMMIT="/workspace/MindSpeed-${MINDSPEED_COMMIT}"
+echo "[CI] Cloning MindSpeed by commit (${MINDSPEED_COMMIT}) ..."
+git clone https://gitcode.com/Ascend/MindSpeed.git -b "${MINDSPEED_BRANCH}" "${TARGET_PATH_COMMIT}"
+cd "${TARGET_PATH_COMMIT}"
+git checkout "${MINDSPEED_COMMIT}"
+cd "${WORKSPACE}"
 echo "[CI] MindSpeed-${MINDSPEED_COMMIT} commit: $(cd "${TARGET_PATH_COMMIT}" && git rev-parse HEAD)"
 
 # ------------------------------------------------------------
-# C3: 复制 mindspeed 到 CODE/ 目录
-#   优先使用固定 commit 缓存（确定性版本）；若不存在则回退到固定分支缓存
+# C3: 复制 mindspeed 到 CODE/ 目录（从固定 commit 版本复制，不存在则报错）
 # ------------------------------------------------------------
 echo "init mindspeed"
 if [ -d "${TARGET_PATH_COMMIT}/mindspeed" ]; then
-    # 固定 commit 情况：从 commit 缓存复制 mindspeed
-    echo "[CI] Copying mindspeed from commit cache: ${TARGET_PATH_COMMIT}"
+    echo "[CI] Copying mindspeed from commit version: ${TARGET_PATH_COMMIT}"
     cp -r "${TARGET_PATH_COMMIT}/mindspeed" "${WORKSPACE}/CODE/"
-elif [ -d "${TARGET_PATH_BRANCH}/mindspeed" ]; then
-    # 固定分支情况：从分支缓存复制 mindspeed
-    echo "[CI] Copying mindspeed from branch cache: ${TARGET_PATH_BRANCH}"
-    cp -r "${TARGET_PATH_BRANCH}/mindspeed" "${WORKSPACE}/CODE/"
 else
-    echo "[ERROR] mindspeed not found in commit or branch cache!"
+    echo "[ERROR] mindspeed not found in commit version: ${TARGET_PATH_COMMIT}"
     exit 1
 fi
 
@@ -152,28 +141,17 @@ pip install -e .[test]
 echo "start test"
 cd "${WORKSPACE}/CODE/ci"
 export PYTHONPATH="$PYTHONPATH:${WORKSPACE}/CODE"
+echo "TRITON_CACHE_DIR: /home/ci_resource/triton_cache/"
+mkdir -p "/home/ci_resource/triton_cache/"
+export TRITON_CACHE_DIR="/home/ci_resource/triton_cache/"
 python access_control_test.py --type="${type}"
 
 # ============================================================
 # Step D: 清理资源
-#   - MindSpeed 固定 commit 缓存：保留最新 6 份，超出则删除最老的
-#   - MindSpeed 固定分支缓存：保留最新 6 份，超出则删除最老的
-#   - 删除本次运行复制的 Megatron-LM
+#   - 直接删除 /workspace 下的所有代码（Megatron-LM、两个 MindSpeed 代码）
 # ============================================================
-echo "[CI] Cleaning up MindSpeed commit cache (keep latest 6) ..."
-# 按修改时间倒序列出固定 commit 缓存，保留最新 6 份，删除其余
-mapfile -t COMMIT_CACHES < <(ls -1dt "${COMMIT_CACHE_DIR}/MindSpeed-"*/ 2>/dev/null)
-if [ "${#COMMIT_CACHES[@]}" -gt 6 ]; then
-    printf '%s\n' "${COMMIT_CACHES[@]}" | tail -n +7 | xargs -r rm -rf
-fi
-
-echo "[CI] Cleaning up MindSpeed branch cache (keep latest 6) ..."
-# 按修改时间倒序列出固定分支缓存，保留最新 6 份，删除其余
-mapfile -t BRANCH_CACHES < <(ls -1dt "${BRANCH_CACHE_DIR}/MindSpeed-"*/ 2>/dev/null)
-if [ "${#BRANCH_CACHES[@]}" -gt 6 ]; then
-    printf '%s\n' "${BRANCH_CACHES[@]}" | tail -n +7 | xargs -r rm -rf
-fi
-
-echo "[CI] Cleaning up cloned Megatron-LM ..."
+echo "[CI] Cleaning up /workspace ..."
+rm -rf /workspace/Megatron-LM*
+rm -rf /workspace/MindSpeed-*
 rm -rf "${WORKSPACE}/Megatron-LM"
 echo "[CI] Cleanup done."
