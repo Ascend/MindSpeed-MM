@@ -21,22 +21,8 @@
   </thead>
   <tbody>
     <tr>
-      <td rowspan="42"> 多模态生成 </td>
+      <td rowspan="23"> 多模态生成 </td>
       </tr>
-      <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/lumina">Lumina-mGPT 2.0</a></td>
-      <td><a href="https://huggingface.co/Alpha-VLLM/Lumina-mGPT-2.0">7B</a></td>
-      <td> 微调 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
-      <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/opensoraplan1.5">OpenSoraPlan1.5</a></td>
-      <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.5.0">8.5B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
       <tr>
       <td rowspan="2"><a href="../../../examples/wan2.2">Wan2.2-T2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">5B</a></td>
@@ -73,7 +59,7 @@
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers">1.3B</a></td>
-      <td> Lora微调 </td>
+      <td> LoRA微调 </td>
       <td> 1x8</td>
       <td> BF16 </td>
     </tr>
@@ -85,7 +71,7 @@
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-14B-Diffusers">14B</a></td>
-      <td> Lora微调 </td>
+      <td> LoRA微调 </td>
       <td> 1x8</td>
       <td> BF16 </td>
     </tr>
@@ -104,7 +90,7 @@
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-720P-Diffusers">14B</a></td>
-      <td> Lora微调 </td>
+      <td> LoRA微调 </td>
       <td> 1x8</td>
       <td> BF16 </td>
     </tr>
@@ -116,134 +102,18 @@
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/hunyuanvideo">HunyuanVideo-T2V</a></td>
-      <td><a href="https://huggingface.co/tencent/HunyuanVideo">13B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/hunyuanvideo">HunyuanVideo-I2V</a></td>
-      <td><a href="https://huggingface.co/tencent/HunyuanVideo-I2V">13B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
       <td><a href="../../../examples/hunyuanvideo_1.5">HunyuanVideo1.5-T2V</a></td>
       <td><a href="https://huggingface.co/tencent/HunyuanVideo1.5-T2V">8B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
       <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensora1.0">OpenSora 1.0</a></td>
-      <td><a href="https://huggingface.co/hpcai-tech/Open-Sora/tree/main">5.5B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensora1.2">OpenSora 1.2</a></td>
-      <td><a href="https://huggingface.co/hpcai-tech/OpenSora-STDiT-v3">5.2B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/opensora2.0">OpenSora 2.0-T2V</a></td>
-      <td><a href="https://huggingface.co/hpcai-tech/Open-Sora-v2">11B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/opensoraplan1.2">OpenSoraPlan 1.2</a></td>
-      <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.2.0">8.7B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/opensoraplan1.3">OpenSoraPlan 1.3-T2V</a></td>
-      <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.3.0"> 8.6B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/opensoraplan1.3">OpenSoraPlan 1.3-I2V</a></td>
-      <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.3.0"> 8.6B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/vae">WFVAE</a></td>
-      <td><a href="https://huggingface.co/LanguageBind/Open-Sora-Plan-v1.3.0/tree/main/vae"> 0.18B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/cogvideox">CogVideoX-T2V</a></td>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/cogvideox">CogVideoX-I2V</a></td>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX-5b"> 5B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-  <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/cogvideox">CogVideoX 1.5-T2V</a></td>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
-      <td> Lora微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/cogvideox">CogVideoX 1.5-I2V</a></td>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
-      <td> 预训练 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/THUDM/CogVideoX1.5-5B-SAT"> 5B </a></td>
-      <td> Lora微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
+    </tr>    
     <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qihoo_t2x">Qihoo-T2X</a></td>
       <td><a href="https://huggingface.co/qihoo360/Qihoo-T2X">1.1B</a></td>
       <td> 推理 </td>
       <td> 1x1 </td>
       <td> BF16 </td>
-    </tr>
-    <tr>
-      <td rowspan="2"><a href="../../../examples/diffusers/sdxl">SDXL</a></td>
-      <td><a href="https://github.com/huggingface/diffusers/tree/5956b68a6927126daffc2c5a6d1a9a189defe288">3.5B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://github.com/huggingface/diffusers/tree/5956b68a6927126daffc2c5a6d1a9a189defe288">3.5B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> FP16 </td>
     </tr>
     <tr>
       <td rowspan="2"><a href="../../../examples/diffusers/sd3">SD3.5</a></td>
@@ -254,7 +124,7 @@
     </tr>
     <tr>
       <td><a href="https://github.com/huggingface/diffusers/tree/94643fac8a27345f695500085d78cc8fa01f5fa9"> 8.1B </a></td>
-      <td> Lora微调 </td>
+      <td> LoRA微调 </td>
       <td> 1x8 </td>
       <td> FP16 </td>
     </tr>
@@ -289,33 +159,19 @@
     <tr>
       <td><a href="../../../examples/diffusers/qwen_image">Qwen-Image</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">27B</a></td>
-      <td> Lora微调 </td>
+      <td> LoRA微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
     <tr>
       <td><a href="../../../examples/diffsynth/qwen_image_edit">Qwen-Image-Edit</a></td>
       <td><a href="https://github.com/modelscope/Diffsynth-Studio/tree/main/examples/qwen_image">27B</a></td>
-      <td> Lora微调 </td>
+      <td> LoRA微调 </td>
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
     <tr>
-      <td rowspan="28"> 多模态理解 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/glm4.1v">GLM-4.1V</a></td>
-      <td><a href="https://github.com/THUDM/GLM-4.1V-Thinking">9B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/deepseekocr">DeepSeek-OCR</a></td>
-      <td><a href="https://github.com/deepseek-ai/DeepSeek-OCR">3B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
+      <td rowspan="16"> 多模态理解 </td>
     </tr>
     <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/llava1.5">LLaVA 1.5</a></td>
@@ -325,74 +181,10 @@
       <td> BF16 </td>
     </tr>
     <tr>
-      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/internvl2">InternVL 2.0</a></td>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2-2B">2B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2-8B">8B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2-26B">26B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2-Llama3-76B">76B</a></td>
-      <td> 全参微调 </td>
-      <td> 8x16 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/internvl2.5">InternVL 2.5</a></td>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL2_5-78B">78B</a></td>
-      <td> 微调 </td>
-      <td> 8x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/internvl3">InternVL 3.0</a></td>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL3-8B">8B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/OpenGVLab/InternVL3-78B">78B</a></td>
-      <td> 微调 </td>
-      <td> 4x8 (A3) </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
       <td><a href="../../../examples/internvl3.5">InternVL 3.5</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL3_5-30B-A3B-Instruct">30B</a></td>
       <td> 微调 </td>
       <td> 1x8 (A3)  </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qwen2vl">Qwen2-VL</a></td>
-      <td><a href="https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct">2B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct">7B</a></td>
-      <td> 微调 </td>
-      <td> 1x8 </td>
-      <td> BF16 </td>
-    </tr>
-    <tr>
-      <td><a href="https://huggingface.co/Qwen/Qwen2-VL-72B-Instruct">72B</a></td>
-      <td> 微调 </td>
-      <td> 4x8 (A3) </td>
       <td> BF16 </td>
     </tr>
     <tr>
@@ -479,14 +271,14 @@
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
-    <tr>
-      <td> 语音识别 </td>
-      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/whisper">Whisper</a></td>
-      <td><a href="https://github.com/openai/whisper">1.5B</a></td>
-      <td> 预训练 </td>
-      <td> 1x8</td>
-      <td> BF16 </td>
-    </tr>
+         <tr> 
+       <td> 语音识别 </td> 
+       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/whisper">Whisper</a></td> 
+       <td><a href="https://github.com/openai/whisper">1.5B</a></td> 
+       <td> 预训练 </td> 
+       <td> 1x8</td> 
+       <td> BF16 </td> 
+     </tr>
     <tr>
       <td> 语音生成 </td>
       <td><a href="../../../examples/cosyvoice3">CosyVoice3</a></td>
