@@ -154,7 +154,7 @@ model:
     recompute_num_layers: 40
     recompute_granularity: full
     recompute_method: block
-    use_chunk_loss: true
+    use_chunk_loss: false
     chunk_size: 512
   patch:
       clip_grad_async: true
