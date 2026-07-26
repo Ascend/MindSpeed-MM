@@ -1,0 +1,163 @@
+# 并行策略
+parallel:
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - vision_tower
+      - vision_tower.encoder.blocks.{*}
+      - mm_projector
+      - language_model.model
+      - language_model.model.embed_tokens
+      - language_model.model.layers.{*}
+      # Patched sparse MoE stores all routed experts in one 3-D tensor module.
+      - language_model.model.layers.{*}.block_sparse_moe.experts
+      - language_model.lm_head
+    hook_modules:
+      - language_model.model.layers.{*}
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+    param_dtype: bf16
+    reduce_dtype: fp32
+  ulysses_parallel_size: 1
+  # Expert Parallel size for MoE. Set to 1 to disable EP.
+  expert_parallel_size: 4
+  ep_plan:
+    apply_modules:
+      - language_model.model.layers.{*}.block_sparse_moe.experts
+    dispatcher: alltoall
+    use_npu_fused_ops: true
+
+# 数据相关配置
+data:
+  dataset_param:
+    dataset_type: huggingface
+    # 数据集属性
+    attr:
+      images: images
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+
+    # 数据预处理
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH mindspeed_mm/fsdp/models/kimi_k3
+      trust_remote_code: true
+      use_fast_tokenizer: false
+      split_special_tokens: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 0
+      video_fps: 2.0
+      video_maxlen: 64
+
+    basic_parameters:
+      cutoff_len: 1024
+      template: kimi_k3
+      enable_thinking: false
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: /data
+      dataset: &DATASET_PATH /data/mllm_format_llava_instruct_data.json
+      cache_dir: ./cache_dir/
+      overwrite_cache: false
+      preprocess_on_fly: true
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+
+  # 数据加载
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      collator_id: qwen3vl
+      ignore_pad_token_for_loss: true
+    enable_preload: true
+
+# 模型配置
+model:
+  model_id: kimi_k3
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  use_grouped_expert_matmul: true
+  # KDA算子实现：fused（triton-ascend-kernels融合大算子）/ naive（仓内小算子）
+  kda_implementation: fused
+  # 选择性重计算：attention 相关融合算子（ViT/MLA 的 FA、KDA）不参与重算，
+  skip_flash_attn_recompute: true
+  skip_kda_recompute: true
+
+# 优化特性配置
+features:
+  loss_cfg:
+    loss_type: default
+  enable_chunk_loss: true
+  chunkloss_plan:
+    apply_module: language_model.lm_head
+    chunk_size: 1024
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - vision_tower.encoder.blocks.{*}
+      - language_model.model.layers.{*}
+  # activation offload 配置（skip_*_recompute 的层号簿记依赖此开关，勿单独关闭）
+  enable_activation_offload: true
+  activation_offload_plan:
+    apply_modules:
+     - vision_tower.encoder.blocks.{*}
+     - language_model.model.layers.{*}
+  enable_chunk_mbs: false
+
+# 训练配置
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.1
+  weight_decay: 0
+  train_iters: 10000
+  clip_grad: 0.0
+  init_model_with_meta_device: true
+  optimizer: adamw
+  adam_fused: true
+  save_interval: 10000
+  use_deter_comp: false
+  load_rank0_and_broadcast: false
+  plugin:
+    - mindspeed_mm/fsdp/models/kimi_k3
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+
+# 工具配置
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false

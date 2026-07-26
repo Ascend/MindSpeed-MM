@@ -545,6 +545,32 @@ _register_template(
 
 
 _register_template(
+    name="kimi_k3",
+    params=RegisterParams(
+        format_user=StringFormatter(
+            slots=[
+                '<|open|>message role="user"<|sep|>{{content}}<|close|>message<|sep|>'
+                '<|end_of_msg|><|open|>message role="assistant"<|sep|>'
+                '<|open|>response<|sep|>'
+            ]
+        ),
+        format_assistant=StringFormatter(
+            slots=[
+                "{{content}}<|close|>response<|sep|><|close|>message<|sep|><|end_of_msg|>"
+            ]
+        ),
+        format_system=StringFormatter(
+            slots=['<|open|>message role="system"<|sep|>{{content}}<|close|>message<|sep|><|end_of_msg|>']
+        ),
+        default_system="",
+        stop_words=["<|end_of_msg|>"],
+        replace_eos=True,
+    ),
+    mm_plugin=get_mm_plugin("kimi_k3", image_token="<|media_pad|>"),
+)
+
+
+_register_template(
     name="qwen3_asr",
     params=RegisterParams(
         format_user=StringFormatter(slots=["<|im_start|>user\n{{content}}<|im_end|>\n<|im_start|>assistant\n"]),

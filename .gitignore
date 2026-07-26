@@ -158,3 +158,4 @@ mindspeed
 /tests/st/run_logs/
 
 fusion_result.json
+cache_dir/

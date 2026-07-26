@@ -1328,6 +1328,76 @@ class KimiK25Plugin(BasePlugin):
         return messages
 
 
+class KimiK3Plugin(BasePlugin):
+    @override
+    def _get_mm_inputs(
+        self,
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        processor: "MMProcessor",
+    ) -> Dict[str, "torch.Tensor"]:
+        image_processor: BaseImageProcessor = getattr(processor, "image_processor", None)
+        mm_inputs = {}
+        if len(images) != 0:
+            images = self._regularize_images(
+                images,
+                image_max_pixels=getattr(processor, "image_max_pixels", 768 * 768),
+                image_min_pixels=getattr(processor, "image_min_pixels", 32 * 32),
+            )["images"]
+            medias = [{"type": "image", "image": image} for image in images]
+            mm_inputs.update(image_processor(medias, return_tensors="pt"))
+
+        return mm_inputs
+
+    @override
+    def process_messages(self, messages, images, videos, audios, processor):
+        self._validate_input(processor, images, videos, audios)
+        self._validate_messages(messages, images, videos, audios)
+
+        image_processor: BaseImageProcessor = getattr(processor, "image_processor", None)
+        image_merge_length: int = getattr(image_processor, "media_proc_cfg")["merge_kernel_size"] ** 2
+
+        if self.expand_mm_tokens:
+            mm_inputs = self._get_mm_inputs(images, videos, audios, processor)
+            image_grid_thw = mm_inputs.get("grid_thws", [])
+        else:
+            image_grid_thw = [None] * len(images)
+
+        images = self._regularize_images(
+            images,
+            image_max_pixels=getattr(processor, "image_max_pixels", 768 * 768),
+            image_min_pixels=getattr(processor, "image_min_pixels", 32 * 32),
+        )["images"]
+        image_prompts = [
+            image_processor.make_image_prompt(image.width, image.height)
+            for image in images
+        ]
+
+        num_image_tokens = 0
+        messages = deepcopy(messages)
+        for message in messages:
+            content = message["content"]
+            while IMAGE_PLACEHOLDER in content:
+                image_seqlen = (
+                    int(image_grid_thw[num_image_tokens].prod().item() // image_merge_length)
+                    if self.expand_mm_tokens else 1
+                )
+                content = content.replace(
+                    IMAGE_PLACEHOLDER,
+                    image_prompts[num_image_tokens].replace(
+                        self.image_token,
+                        self.image_token * image_seqlen,
+                    ),
+                    1,
+                )
+                num_image_tokens += 1
+
+            message["content"] = content
+
+        return messages
+
+
 class Step3VLPlugin(BasePlugin):
     """Image-only Step3-VL SFT adapter.
 
@@ -1458,6 +1528,7 @@ PLUGINS = {
     "qwen3_omni": Qwen3OmniPlugin,
     "qwen3_asr": Qwen3ASRPlugin,
     "kimi_k25": KimiK25Plugin,
+    "kimi_k3": KimiK3Plugin,
     "step3_vl": Step3VLPlugin,
 }
 
