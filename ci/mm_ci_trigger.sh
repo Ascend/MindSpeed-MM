@@ -56,28 +56,18 @@ cat "${WORKSPACE}/modify.txt"
 cd "${WORKSPACE}"
 
 # ============================================================
-# Step A: 确定分支版本映射（显式指定各分支对应的 Megatron-LM / MindSpeed 版本）
+# Step A: 确定分支版本映射（本脚本仅维护当前分支对应的 Megatron-LM / MindSpeed 版本，因为每个分支都有自己的脚本）
 #   MEGATRON_BRANCH  : Megatron-LM 分支（从镜像预下载目录复制）
 #   MINDSPEED_BRANCH : MindSpeed 分支名（按分支下载）
 #   MINDSPEED_COMMIT : MindSpeed 固定 commit id（按 commit 下载，用于 copy 到 CODE/）
 # ============================================================
-case "${branch}" in
-    26.0.0)
-        MEGATRON_BRANCH="core_v0.12.1"
-        MINDSPEED_BRANCH="v${branch}_core_r0.12.1"
-        MINDSPEED_COMMIT="26ba4eb1"
-        ;;
-    26.1.0)
-        MEGATRON_BRANCH="core_v0.12.1"
-        MINDSPEED_BRANCH="v${branch}_core_r0.12.1"
-        MINDSPEED_COMMIT="26ba4eb1"
-        ;;
-    *)
-        MEGATRON_BRANCH="core_v0.12.1"
-        MINDSPEED_BRANCH="master"
-        MINDSPEED_COMMIT="26ba4eb1"
-        ;;
-esac
+MEGATRON_BRANCH="core_v0.12.1"
+if [ "$branch" = "master" ]; then
+    MINDSPEED_BRANCH="master"
+else
+    MINDSPEED_BRANCH="${branch}_core_r0.12.1"
+fi
+MINDSPEED_COMMIT="26ba4eb1"
 
 echo "[CI] MindSpeed-MM branch : ${branch}"
 echo "[CI] Megatron-LM branch   : ${MEGATRON_BRANCH}"
