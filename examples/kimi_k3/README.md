@@ -26,7 +26,6 @@
 
 ```shell
 url=https://huggingface.co/moonshotai/Kimi-K3/tree/main
-commit_id=（请按实际下载的模型版本填写）
 ```
 
 ### 变更记录
@@ -73,12 +72,6 @@ bash scripts/install.sh --msbranch master && pip install tiktoken==0.12.0
 
 Kimi-K3 的 KDA（Kimi Delta Attention）等线性注意力融合算子基于 Triton 实现，在昇腾环境下需要安装配套版本的 Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
 
-可参考如下安装命令：
-
-```shell
-# 注意：triton-ascend 3.2.0 及以下 Triton-Ascend 和 Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
-pip install triton-ascend==3.2.0 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
-```
 
 KDA 算子实现依赖 `triton-ascend-kernels` 算子库（`modeling_kimi_linear.py` 中的 `chunk_kda` 来自该包），且需要使用本仓提供的 `chunk.py` 替换算子库中的同名文件，安装步骤如下：
 
@@ -97,7 +90,7 @@ cp -f ${MM_PATH}/mindspeed_mm/fsdp/ops/kda/triton_ascend/chunk.py \
   src/triton_ascend_kernels/attention/fla/kda/chunk.py
 
 # 安装
-pip install .
+pip install -e .
 ```
 
 ---
