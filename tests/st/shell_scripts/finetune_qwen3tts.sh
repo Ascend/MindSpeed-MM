@@ -16,31 +16,23 @@ pip install transformers==4.57.3 torchaudio==2.7.1 librosa soundfile sox onnxrun
 cd "$INITIAL_DIR"
 
 fetch_and_copy_mindspeed() {
-    DATE_SUFFIX=$(date +%Y%m%d)
-    TARGET_PATH="/home/ci_resource/code/MindSpeed-date/MindSpeed-${DATE_SUFFIX}"
-
-    if [ -d "$TARGET_PATH" ]; then
-        echo "Path already exists: $TARGET_PATH"
-        cp -r "$TARGET_PATH/mindspeed" "$BASEPATH/"
-        echo "Copied mindspeed from $TARGET_PATH to $BASEPATH"
-    else
-        echo "Path does not exist: $TARGET_PATH"
-        if git clone --depth 1 https://gitcode.com/Ascend/MindSpeed "$TARGET_PATH"; then
-            echo "Clone successful: $TARGET_PATH"
-            cp -r "$TARGET_PATH/mindspeed" "$BASEPATH/"
-            echo "Copied mindspeed from $TARGET_PATH to $BASEPATH"
-        else
-            echo "Clone failed, will use cache file"
-            CACHE_PATH="/home/ci_resource/code/MindSpeed-26.0.0"
-            if [ -d "$CACHE_PATH/mindspeed" ]; then
-                cp -r "$CACHE_PATH/mindspeed" "$BASEPATH/"
-                echo "Copied mindspeed from $CACHE_PATH to $BASEPATH"
-            else
-                echo "Cache path does not contain mindspeed folder: $CACHE_PATH"
-                exit 1
-            fi
-        fi
+    # 从 /workspace 目录下查找按分支下载的 MindSpeed 代码
+    # 排除按 commit 下载的目录（commit hash 格式为 7-40 位十六进制字符，如 26ba4eb1）
+    # 如果是master分支则只有MindSpeed-master一份代码；如果是${MINDSPEED_BRANCH}分支则有MindSpeed-${MINDSPEED_BRANCH}一份代码。
+    # ${MINDSPEED_BRANCH}变量在ci\mm_ci_trigger.sh中定义。
+    TARGET_PATH=$(ls -d /workspace/MindSpeed-* 2>/dev/null | grep -vE "MindSpeed-[0-9a-f]{7,40}$" | head -n 1)
+    if [ -z "$TARGET_PATH" ] || [ ! -d "$TARGET_PATH/mindspeed" ]; then
+        echo "No valid MindSpeed branch directory found in /workspace"
+        return 1
     fi
+    echo "Found MindSpeed branch directory: $TARGET_PATH"
+    # Copy the mindspeed folder from the branch directory to BASEPATH
+    cp -r "$TARGET_PATH/mindspeed" "$BASEPATH/" || {
+        echo "Failed to copy mindspeed from $TARGET_PATH" >&2
+        return 1
+    }
+    echo "Copied mindspeed from $TARGET_PATH to $BASEPATH"
+    return 0
 }
 
 need_restore=false
