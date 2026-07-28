@@ -16,11 +16,15 @@
 - [训练](#训练)
   - [准备工作](#1-准备工作)
   - [配置参数](#2-配置参数)
-  - [启动训练](#3-启动训练)
+  - [受限场景支持](#3-受限场景支持)
+  - [启动训练](#4-启动训练)
 - [环境变量声明](#环境变量声明)
 - [注意事项](#注意事项)
 
 ## 版本说明
+
+> 当前版本仅支持减层受限场景训练，使用前请先阅读[受限场景支持](#3-受限场景支持)章节。
+> 更多能力正在支持，敬请期待！
 
 ### 参考实现
 
@@ -65,13 +69,12 @@ cd MindSpeed-MM
 执行如下指令一键安装：
 
 ```bash
-bash scripts/install.sh --msbranch master && pip install tiktoken==0.12.0
+bash scripts/install.sh --msbranch master && pip install tiktoken==0.12.0  transformers==4.56.2
 ```
 
 ### 3. 安装配套版本的Triton-Ascend
 
 Kimi-K3 的 KDA（Kimi Delta Attention）等线性注意力融合算子基于 Triton 实现，在昇腾环境下需要安装配套版本的 Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
-
 
 KDA 算子实现依赖 `triton-ascend-kernels` 算子库（`modeling_kimi_linear.py` 中的 `chunk_kda` 来自该包），且需要使用本仓提供的 `chunk.py` 替换算子库中的同名文件，安装步骤如下：
 
@@ -156,9 +159,9 @@ NODE_RANK: 当前节点序号
 
 | 配置项 | 配置路径 | 参数说明 | 调整说明 |
 |--------|----------|----------|----------|
-| `ulysses_parallel_size` | `parallel` | ulysses-cp 并行度 | 值为1时不开启，根据实际情况调整 |
+| `ulysses_parallel_size` | `parallel` | ulysses-cp 并行度 | 暂不支持，开发中 |
 | `expert_parallel_size` | `parallel` | EP专家并行度 | 值为1时不开启，仅对MoE模型生效 |
-| `ep_plan` | `parallel` | EP调度策略配置 | 包含`dispatcher`、`use_npu_fused_ops`等子字段，`dispatcher`可选`alltoall`/`allgather` |
+| `ep_plan` | `parallel` | EP调度策略配置 | 包含`dispatcher`、`use_npu_fused_ops`等子字段，`dispatcher`可选`alltoall` |
 | `num_to_forward_prefetch` | `parallel->fsdp_plan` | 前向计算时预取后续层参数 | 减少通信等待开销 |
 | `num_to_backward_prefetch` | `parallel->fsdp_plan` | 反向计算时预取后续层参数 | 减少通信等待开销 |
 | `enable_preload` | `data->dataloader_param` | 数据预加载开关 | 开启后数据加载与计算重叠，减少训练等待时间 |
@@ -192,8 +195,6 @@ NODE_RANK: 当前节点序号
 
 根据实际的需求配置`kimik3_config.yaml`中的`expert_parallel_size`（值为1时不开启EP）。
 
-根据`expert_parallel_size`可以自行选择更合适的`ep_plan.dispatcher`，推荐`expert_parallel_size`小于`topk`时，`dispatcher`选择`allgather`，`expert_parallel_size`大于`topk`时选择`alltoall`。
-
 【性能优化配置】
 
 - 重计算
@@ -226,7 +227,7 @@ NODE_RANK: 当前节点序号
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-NPROC_PER_NODE=8
+NPROC_PER_NODE=16
 MASTER_ADDR=localhost
 MASTER_PORT=6087
 NNODES=1
@@ -246,11 +247,25 @@ NNODES: 一共几个节点
 
 <a id="jump3.3"></a>
 
-### 3. 启动训练
+### 3. 受限场景支持
+
+当前版本已验证的场景如下。更多场景正在支持中，敬请期待！
+
+- **减层训练**：基于减层、减专家模型配置进行训练验证；
+  - 调整层数：修改模型配置路径 `mindspeed_mm/fsdp/models/kimi_k3` 下 `config.json` 中的 `num_hidden_layers` 字段；
+  - 调整专家个数：修改 `config.json` 中的 `num_experts` 字段，注意需与 `kimik3_config.yaml` 中的 `expert_parallel_size` 配套调整（专家个数需能被EP并行度整除）；
+  - 参考配置：当前 A3 单节点可配置 `num_hidden_layers=16`、`num_experts=32`；
+- **序列长度**：mbs=1时支持6k序列长度以下；
+- **权重加载**：当前采用随机初始化权重（加载预训练权重能力后续支持）；
+- **CP 长序列训练**：暂不支持，开发中。
+
+<a id="jump3.4"></a>
+
+### 4. 启动训练
 
 (1) 修改 `kimik3_config.yaml` 中 `data->dataset_param->basic_parameters->dataset` 字段，配置实际的数据集路径；
 
-(2) 启动训练：
+(2) 启动训练（当前仅支持减层减专家场景）：
 
 ```shell
 bash examples/kimi_k3/finetune_kimik3.sh
