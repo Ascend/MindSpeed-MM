@@ -85,6 +85,18 @@ class LoraArguments(BaseArguments):
             "If None, validation is skipped."
         },
     )
+    disable_peft_moe_conversion: bool = field(
+        default=True,
+        metadata={
+            "help": "Whether to disable PEFT's automatic MoE target_modules → target_parameters "
+            "conversion (triggered by config.model_type for MoE models like qwen3_5_moe). "
+            "When True (default), gate_proj/up_proj/down_proj stay as target_modules and LoRA "
+            "is applied to nn.Linear layers (e.g. shared_expert). "
+            "When False, PEFT converts them to target_parameters (gate_up_proj, down_proj), "
+            "which targets nn.Parameter objects in the routed experts. Use False if you want "
+            "LoRA on the experts module instead of shared_expert."
+        },
+    )
 
     def model_post_init(self, __context):
         """Validate LoRA configuration after initialization."""

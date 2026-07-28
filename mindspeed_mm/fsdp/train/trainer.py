@@ -281,6 +281,7 @@ class Trainer:
             init_lora_weights=lora_config.init_lora_weights,
             pretrained_lora_path=lora_config.pretrained_lora_path,
             lora_target_modules_support=lora_config.lora_target_modules_support,
+            disable_peft_moe_conversion=lora_config.disable_peft_moe_conversion,
         )
 
         # Get LoRA parameter statistics

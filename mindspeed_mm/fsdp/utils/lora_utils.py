@@ -181,6 +181,42 @@ def get_lora_trainable_params(model: nn.Module) -> Tuple[int, int, Dict[str, Any
     return trainable_params, total_params, stats_dict
 
 
+_MISSING = object()
+
+
+def _disable_peft_moe_conversion(model: nn.Module):
+    """Temporarily hide ``config.model_type`` to prevent PEFT's v5 MoE config conversion.
+
+    PEFT's ``_convert_peft_config_moe`` remaps ``gate_proj``/``up_proj``/``down_proj``
+    from *target_modules* (matching ``nn.Linear`` in ``shared_expert``) to
+    *target_parameters* (matching ``nn.Parameter`` names like ``gate_up_proj`` in
+    ``Qwen3_5MoeExperts``).  This silently redirects LoRA from the shared expert to
+    the routed experts, which is rarely what the user wants.
+
+    By setting ``model_type`` to ``None`` during ``inject_adapter_in_model`` the
+    conversion is skipped, so the original ``target_modules`` suffixes are preserved
+    and LoRA lands on the intended ``nn.Linear`` layers.
+
+    Returns the original ``model_type`` value (or ``_MISSING`` sentinel) so it can
+    be restored by :func:`_restore_peft_moe_conversion`.
+    """
+    config = getattr(model, "config", None)
+    if config is None or not hasattr(config, "model_type"):
+        return _MISSING
+    saved = config.model_type
+    config.model_type = None
+    return saved
+
+
+def _restore_peft_moe_conversion(model: nn.Module, saved_type):
+    """Restore ``config.model_type`` after :func:`_disable_peft_moe_conversion`."""
+    if saved_type is _MISSING:
+        return
+    config = getattr(model, "config", None)
+    if config is not None:
+        config.model_type = saved_type
+
+
 def add_lora_to_model(
     model: nn.Module,
     lora_rank: int = 8,
@@ -190,6 +226,7 @@ def add_lora_to_model(
     init_lora_weights: bool | str = True,
     pretrained_lora_path: Optional[str] = None,
     lora_target_modules_support: Optional[List[str]] = None,
+    disable_peft_moe_conversion: bool = True,
 ) -> nn.Module:
     """Add LoRA adapters to a PyTorch model.
 
@@ -205,6 +242,10 @@ def add_lora_to_model(
         init_lora_weights: Weight initialization method (True, False, or str).
         pretrained_lora_path: Path to pretrained LoRA weights (optional).
         lora_target_modules_support: List of supported module types for validation.
+        disable_peft_moe_conversion: If True, prevent PEFT from converting
+            gate_proj/up_proj/down_proj target_modules into target_parameters
+            (which would redirect LoRA from nn.Linear layers to MoE expert
+            nn.Parameter objects).
 
     Returns:
         The model with LoRA adapters injected.
@@ -240,7 +281,12 @@ def add_lora_to_model(
                     f"lora_target_modules_support"
                 )
 
+    _saved_model_type = _MISSING
+    if disable_peft_moe_conversion:
+        _saved_model_type = _disable_peft_moe_conversion(model)
     model = inject_adapter_in_model(lora_config, model)
+    if disable_peft_moe_conversion:
+        _restore_peft_moe_conversion(model, _saved_model_type)
 
     for param in model.parameters():
         if param.requires_grad:
