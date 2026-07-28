@@ -25,7 +25,7 @@ in FSDP2 distributed training environments, including:
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
 import torch.distributed as dist
@@ -51,13 +51,20 @@ class LoraWeightManager:
     sharding and checkpoint formats.
     """
 
-    def __init__(self, model: nn.Module):
+    def __init__(self, model: nn.Module, lora_config: Optional[Any] = None):
         """Initialize the LoRA weight manager.
 
         Args:
             model: The PyTorch model with LoRA adapters.
+            lora_config: Optional LoRA configuration object (e.g.
+                ``LoraArguments``) carrying ``rank``/``alpha``/``dropout``/
+                ``target_modules``/``init_lora_weights``. When provided, it is
+                used to write a PEFT-compatible ``adapter_config.json`` next
+                to the saved weights; otherwise ``adapter_config.json``
+                generation is skipped.
         """
         self.model = model
+        self.lora_config = lora_config
         self._is_distributed = dist.is_initialized()
         self._rank = dist.get_rank() if self._is_distributed else 0
         self._world_size = dist.get_world_size() if self._is_distributed else 1
@@ -149,6 +156,10 @@ class LoraWeightManager:
 
         num_saved_params = len(lora_state_dict)
 
+        # Generate a PEFT-compatible adapter_config.json alongside the weights
+        # so the output directory can be loaded directly by PEFT/vLLM/SGLang.
+        self.write_adapter_config(save_path)
+
         print_rank(
             logger.info,
             f"Saved {num_saved_params} LoRA parameters ({num_lora_params:,} elements) "
@@ -156,6 +167,69 @@ class LoraWeightManager:
         )
 
         return num_saved_params, num_lora_params
+
+    def write_adapter_config(self, save_path: str) -> None:
+        """Write a PEFT-compatible ``adapter_config.json`` next to LoRA weights.
+
+        Generates the standard PEFT adapter configuration file (via
+        ``peft.LoraConfig.save_pretrained``) so that the output adapter
+        directory can be loaded directly by ``peft.PeftModel.from_pretrained``,
+        vLLM, SGLang, etc., without users having to hand-craft the file.
+
+        Only the config file is written; LoRA weights are untouched. If no
+        ``lora_config`` was provided, generation is skipped with a warning.
+        Only rank 0 writes the file to avoid concurrent-write corruption in
+        distributed runs.
+
+        Args:
+            save_path: Directory path to write ``adapter_config.json`` into.
+        """
+        lora_config = self._build_peft_lora_config()
+        if lora_config is None:
+            logger.warning(
+                "Skipping adapter_config.json generation: no LoRA config was "
+                "provided to LoraWeightManager."
+            )
+            return
+
+        if self._rank == 0:
+            lora_config.save_pretrained(save_path)
+
+        print_rank(
+            logger.info,
+            f"Wrote adapter_config.json to {os.path.join(save_path, 'adapter_config.json')}"
+        )
+
+    def _build_peft_lora_config(self) -> Optional[Any]:
+        """Build a ``peft.LoraConfig`` from ``self.lora_config``.
+
+        Returns:
+            A ``peft.LoraConfig`` instance, or None if no ``lora_config`` was
+            provided.
+        """
+        if self.lora_config is None:
+            return None
+
+        try:
+            from peft import LoraConfig
+        except ImportError as e:
+            raise RuntimeError(
+                "PEFT library is required to write adapter_config.json. "
+                "Please install it with: pip install peft"
+            ) from e
+
+        return LoraConfig(
+            r=getattr(self.lora_config, "rank", 8),
+            lora_alpha=getattr(self.lora_config, "alpha", 16),
+            lora_dropout=getattr(self.lora_config, "dropout", 0.0),
+            target_modules=getattr(
+                self.lora_config, "target_modules", ["q_proj", "k_proj", "v_proj"]
+            ),
+            init_lora_weights=getattr(self.lora_config, "init_lora_weights", True),
+            bias="none",
+            task_type="CAUSAL_LM",
+            inference_mode=True,
+        )
 
     def save_full_model_with_lora(
         self,

@@ -575,6 +575,51 @@ class TestLoraWeightManagerExtended:
             assert name in loaded_state
             assert torch.allclose(original_state[name], loaded_state[name])
 
+    def test_write_adapter_config_with_explicit_config(self, tmp_path: pathlib.Path) -> None:
+        import json
+        from types import SimpleNamespace
+
+        model = self._create_lora_model()
+        lora_cfg = SimpleNamespace(
+            rank=16,
+            alpha=32,
+            dropout=0.1,
+            target_modules=["q_proj", "v_proj"],
+            init_lora_weights="gaussian",
+        )
+        manager = LoraWeightManager(model, lora_config=lora_cfg)
+
+        save_path = os.path.join(tmp_path, "adapter_cfg_explicit")
+        manager.write_adapter_config(save_path)
+
+        config_path = os.path.join(save_path, "adapter_config.json")
+        assert os.path.exists(config_path)
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+
+        assert cfg["peft_type"] == "LORA"
+        assert cfg["r"] == 16
+        assert cfg["lora_alpha"] == 32
+        assert cfg["lora_dropout"] == 0.1
+        assert set(cfg["target_modules"]) == {"q_proj", "v_proj"}
+        assert cfg["init_lora_weights"] == "gaussian"
+        assert cfg["bias"] == "none"
+        assert cfg["task_type"] == "CAUSAL_LM"
+        assert cfg["inference_mode"] is True
+        assert cfg["fan_in_fan_out"] is False
+
+    def test_write_adapter_config_skips_without_config(self, tmp_path: pathlib.Path) -> None:
+        # LoRA layers are present, but no lora_config is passed -> adapter_config.json
+        # is skipped (config is required, not inferred from the model).
+        model = self._create_lora_model()
+        manager = LoraWeightManager(model)
+
+        save_path = os.path.join(tmp_path, "no_adapter_cfg")
+        manager.write_adapter_config(save_path)
+
+        assert not os.path.exists(os.path.join(save_path, "adapter_config.json"))
+
 
 def run_tests() -> None:
     """Run all tests."""

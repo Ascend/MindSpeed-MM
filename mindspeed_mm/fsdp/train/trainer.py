@@ -212,7 +212,7 @@ class Trainer:
                 to_empty_if_needed(model, device=device)
 
         if args.training.lora.enable:
-            self.lora_weight_manager = LoraWeightManager(model)
+            self.lora_weight_manager = LoraWeightManager(model, lora_config=args.training.lora)
             self.lora_weight_manager.verify_lora_weights()
 
         # Re-tie embed_tokens and lm_head weights when tie_word_embeddings is true
