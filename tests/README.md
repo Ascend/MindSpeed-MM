@@ -31,12 +31,10 @@ PR合入前都须通过全量CI门禁用例测试。
 | Module | Features | Scripts |
 | :------- | :--------- | :-------- |
 | **Pretrain** | Wan2.1 T2V, FSDP2 | [pretrain_wan2.1_t2v.sh](st/shell_scripts/pretrain_wan2.1_t2v.sh) |
-| | Wan2.1 T2V, FSDP2, Megatron-Bridge | [pretrain_wan2.1_t2v_use_bridge.sh](st/shell_scripts/pretrain_wan2.1_t2v_use_bridge.sh) |
 | | Wan2.2 I2V, FSDP2 | [pretrain_wan2.2_i2v.sh](st/shell_scripts/pretrain_wan2.2_i2v.sh) |
 | **Finetune** | Qwen2.5VL 7B, TP=2, PP=2 | [finetune_qwen2_5_vl_7b.sh](st/shell_scripts/finetune_qwen2_5_vl_7b.sh) |
 | | Qwen3Omni, FSDP2 | [finetune_qwen3omni.sh](st/shell_scripts/finetune_qwen3omni.sh) |
 | | Qwen3VL 30B, FSDP2 | [finetune_qwen3vl_30B.sh](st/shell_scripts/finetune_qwen3vl_30B.sh) |
-| | Qwen3VL 30B, FSDP2, Megatron-Bridge | [finetune_qwen3vl_30B_use_bridge.sh](st/shell_scripts/finetune_qwen3vl_30B_use_bridge.sh) |
 | | Kimi-K2.5, FSDP2 | [finetune_kimik2_5.sh](st/shell_scripts/finetune_kimik2_5.sh) |
 | **Inference** | Wan2.2 T2V, CP=2 | [inference_wan2.2_t2v.sh](st/shell_scripts/inference_wan2.2_t2v.sh) |
 
@@ -131,41 +129,3 @@ test_ + 目标文件名或特性、功能名
 | ---------- | ------ |
 | 模型权重 | `/home/ci_resource/models` |
 | 数据集 | `/home/ci_resource/data` |
-
----
-
-## 五、附录
-
-### 5.1 目录结构说明
-
-```text
-tests/
-├── README.md                        # 本文档
-├── conftest.py                      # pytest全局配置
-├── st/                              # 系统测试用例
-│   ├── shell_scripts/               # ST脚本存放目录
-│   │   ├── pretrain_*.sh            # 预训练用例
-│   │   ├── finetune_*.sh            # 微调用例
-│   │   ├── posttrain_*.sh           # 后训练用例
-│   │   └── inference_*.sh           # 推理用例
-│   ├── run_configs/                 # 用例配置文件目录
-│   ├── baseline_results/            # 基线数据目录
-│   ├── st_run.sh                    # ST用例执行入口
-│   └── local_st_run.sh              # 本地ST执行脚本
-└── ut/                              # 单元测试用例
-    ├── loss/                        # Loss相关UT
-    ├── tools/                       # 工具相关UT
-    ├── data/                        # 数据处理UT
-    ├── models/                      # 模型相关UT
-    │   ├── vision/                  # 视觉模型UT
-    │   ├── transformers/            # Transformer UT
-    │   ├── text_encoder/            # 文本编码器UT
-    │   ├── audio_encoder/           # 音频编码器UT
-    │   ├── ae/                      # 自编码器UT
-    │   ├── diffusion/               # 扩散模型UT
-    │   └── common/                  # 通用模块UT
-    ├── tasks/                       # 任务相关UT
-    ├── tools/                       # 工具UT
-    ├── fsdp/                        # FSDP相关UT
-    └── test_*.py                    # 根目录UT
-```
