@@ -59,7 +59,7 @@ def _worker(rank: int, world_size: int, init_file: str):
         # device mesh dynamic helpers should exist and match the real world topology
         assert ps.get_dp_group_size() == world_size
         assert ps.get_dp_rank() == rank
-        assert ps.get_fsdp_group_size() == world_size
+        assert ps.get_hsdp_group_size() == world_size
         assert ps.get_fsdp_rank() == rank
 
         # flattened/disabled dimensions should be singletons in this config
@@ -72,8 +72,8 @@ def _worker(rank: int, world_size: int, init_file: str):
         assert ps.is_ep_enable() is True
         assert ps.get_ep_group_size() == world_size
 
-        # get_fsdp_device_mesh should return a valid submesh
-        fsdp_mesh = ps.get_fsdp_device_mesh()
+        # get_hsdp_device_mesh should return a valid submesh
+        fsdp_mesh = ps.get_hsdp_device_mesh()
         assert hasattr(fsdp_mesh, "mesh")
         # submesh total elements should match world size
         assert int(torch.numel(fsdp_mesh.mesh)) == world_size
@@ -91,8 +91,9 @@ def _worker(rank: int, world_size: int, init_file: str):
         assert ps2 is ps
 
         # sanity: groups exist and are usable
-        assert dist.get_world_size(ps.get_fsdp_group()) == world_size
-        dist.barrier(ps.get_fsdp_group())
+        assert dist.get_world_size(ps.get_hsdp_group()) == world_size
+        assert dist.get_world_size(ps.get_fsdp_group()) == 1
+        dist.barrier(ps.get_hsdp_group())
     finally:
         _destroy_pg()
 

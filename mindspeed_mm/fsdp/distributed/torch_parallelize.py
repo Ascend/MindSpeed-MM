@@ -15,7 +15,7 @@ class ParallelApplier:
         self.parallel_state = get_parallel_state()
 
     def apply_fsdp_modules(self, model, training_config):
-        model = fully_shard_parallel_modules(model, self.parallel_state.get_fsdp_device_mesh(), self.config.fsdp_plan,
+        model = fully_shard_parallel_modules(model, self.parallel_state.get_hsdp_device_mesh(), self.config.fsdp_plan,
                                              training_config)
         return model
 

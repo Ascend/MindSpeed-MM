@@ -59,7 +59,7 @@ def _worker_l2_clip(rank: int, world_size: int, init_file: str):
 
         ps_mod.init_parallel_state(
             data_parallel_size=world_size,
-            fully_shard_parallel_size=1,
+            fully_shard_parallel_size=world_size,
             tensor_parallel_size=1,
             ring_attention_size=1,
             ulysses_parallel_size=1,
@@ -118,7 +118,7 @@ def _worker_inf_norm(rank: int, world_size: int, init_file: str):
 
         ps_mod.init_parallel_state(
             data_parallel_size=world_size,
-            fully_shard_parallel_size=1,
+            fully_shard_parallel_size=world_size,
             tensor_parallel_size=1,
             ring_attention_size=1,
             ulysses_parallel_size=1,
@@ -136,9 +136,9 @@ def _worker_inf_norm(rank: int, world_size: int, init_file: str):
         m = M()
         m = m.to(torch.device("npu", rank))
         if rank == 0:
-            m.p.grad = torch.full((4,), 2.0, device=torch.device("npu", rank))
-        else:
             m.p.grad = torch.full((4,), 5.0, device=torch.device("npu", rank))
+        else:
+            m.p.grad = torch.full((4,), 2.0, device=torch.device("npu", rank))
 
         before = m.p.grad.clone()
         returned = mod.clip_grad_norm(m, max_norm=0.0, norm_type=float("inf"))
@@ -165,7 +165,7 @@ def _worker_ep_path(rank: int, world_size: int, init_file: str):
 
         ps = ps_mod.init_parallel_state(
             data_parallel_size=world_size,
-            fully_shard_parallel_size=1,
+            fully_shard_parallel_size=world_size,
             tensor_parallel_size=1,
             ring_attention_size=1,
             ulysses_parallel_size=1,
