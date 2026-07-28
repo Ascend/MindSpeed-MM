@@ -103,7 +103,7 @@ source /usr/local/Ascend/cann/set_env.sh
 
 # 编译算子 run 包，--soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
 bash build.sh --soc=ascend910b --pkg --vendor_name=fla_npu
-bash build_out/fla-npu_*.run
+bash build_out/fla-npu-*.run
 cd torch_custom/fla_npu/
 bash build.sh
 ```
