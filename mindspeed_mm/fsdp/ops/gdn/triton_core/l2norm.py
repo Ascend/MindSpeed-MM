@@ -107,7 +107,7 @@ def l2norm_bwd_kernel(
     i_t_start = tl.program_id(0)
     num_blocks = bt_size
 
-    total_i_t = T // BT
+    total_i_t = (T + BT - 1) // BT
     base_tasks_per_block = total_i_t // num_blocks
     remainder_tasks = total_i_t % num_blocks
 
