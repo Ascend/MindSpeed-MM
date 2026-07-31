@@ -1130,12 +1130,14 @@ class Qwen3_5MoeExperts(nn.Module):
             def hook_fn(*args, **kwargs):
                 self.ep_balance_strategy.planner.pop_plan_cache()
             self.register_full_backward_hook(hook_fn)
+        self.skip_moe_pad_tokens = config.skip_moe_pad_tokens
 
     def forward(
         self,
         hidden_states: torch.Tensor,
         top_k_index: torch.Tensor,
         top_k_weights: torch.Tensor,
+        **kwargs,
     ) -> torch.Tensor:
         if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE:
             import torch_npu
@@ -1181,6 +1183,7 @@ class Qwen3_5MoeExperts(nn.Module):
         top_k_weights: torch.Tensor,
         ep_group: ProcessGroup,
         ep_plan: EPPlanConfig,
+        **kwargs,
     ) -> torch.Tensor:
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
@@ -1212,6 +1215,8 @@ class Qwen3_5MoeExperts(nn.Module):
                 ep_group=ep_group,
                 fused=ep_plan.use_npu_fused_ops,
                 ep_balance_strategy=self.ep_balance_strategy if self.enable_ep_balance else None,
+                seq_mask=kwargs.get("seq_mask", None),
+                skip_moe_pad_tokens=self.skip_moe_pad_tokens,
             )
         else:
             raise NotImplementedError(f"EP dispatcher {ep_plan.dispatcher} is not implenmented for Qwen3.5 MoE.")
@@ -1254,12 +1259,12 @@ class Qwen3_5MoeSparseMoeBlock(nn.Module):
         self.shared_expert = Qwen3_5MoeMLP(config, intermediate_size=config.shared_expert_intermediate_size)
         self.shared_expert_gate = torch.nn.Linear(config.hidden_size, 1, bias=False)
 
-    def forward(self, hidden_states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, hidden_states: torch.Tensor, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
         batch_size, sequence_length, hidden_dim = hidden_states.shape
         hidden_states_reshaped = hidden_states.view(-1, hidden_dim)
         shared_expert_output = self.shared_expert(hidden_states_reshaped)
         _, routing_weights, selected_experts = self.gate(hidden_states_reshaped)
-        expert_output = self.experts(hidden_states_reshaped, selected_experts, routing_weights)
+        expert_output = self.experts(hidden_states_reshaped, selected_experts, routing_weights, **kwargs)
 
         shared_expert_output = F.sigmoid(self.shared_expert_gate(hidden_states_reshaped)) * shared_expert_output
 
@@ -1354,7 +1359,7 @@ class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
+        hidden_states = self.mlp(hidden_states, **kwargs)
         # For the MoE layers, we need to unpack
         if isinstance(hidden_states, tuple):
             hidden_states, _ = hidden_states
@@ -1953,6 +1958,7 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
             )
         linear_attn_mask = self._update_linear_attn_mask(attention_mask, cache_position)
         # Modification: For Ulysses, cu_seq_len needs to be calculated before position_ids split
+        kwargs["seq_mask"] = attention_mask
         kwargs_fa = kwargs
         ps = get_parallel_state()
         if ps.is_ulysses_enable() and use_packing:
@@ -1967,6 +1973,8 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
             position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
             text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
             inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
+            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
+            kwargs["seq_mask"] = split_forward_gather_backward_with_cp(kwargs["seq_mask"], dim=1)
 
         hidden_states = inputs_embeds
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
@@ -2549,7 +2557,7 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         if gdn_implementation not in IMPL_FOR_GDN:
             raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'.")
         transformer_config.text_config.gdn_implementation = gdn_implementation
-        
+
         # causal conv1d implementation
         causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()
         if causal_conv1d_implementation not in IMPL_FOR_CAUSAL_CONV:
@@ -2597,6 +2605,9 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         # ep balance
         transformer_config.text_config.enable_ep_balance = getattr(feature_args, "enable_ep_balance", False)
         transformer_config.text_config.max_dup_experts_num = getattr(feature_args.ep_balance_plan, "max_dup_experts_num", 2)
+
+        # skip moe pad tokens
+        transformer_config.text_config.skip_moe_pad_tokens = getattr(feature_args, "skip_moe_pad_tokens", False)
 
         return transformer_config
 

@@ -24,7 +24,6 @@ from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingSt
 FORCE_EP_BALANCE = int(os.getenv("MM_FORCE_EP_BALANCE", "0")) == 1
 
 
-
 def force_ep_balance(
     num_experts: int,
     selected_experts: torch.Tensor
@@ -52,7 +51,21 @@ def ep_forward(
     fused: bool = True,
     swiglu_limit: float = 0.0,
     ep_balance_strategy = None,
+    skip_moe_pad_tokens: bool = False,
+    seq_mask: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
+    if skip_moe_pad_tokens:
+        if seq_mask is None:
+            raise ValueError("seq_mask must be provided when skip_moe_pad_tokens is enabled.")
+        seq_mask = seq_mask.view(-1)
+        pad_indices = seq_mask == 0
+        nonpad_indices = ~pad_indices
+        original_hidden_states = hidden_states
+        hidden_states = original_hidden_states[nonpad_indices, :]
+        pad_hidden_states = original_hidden_states[pad_indices, :]
+        routing_weights = routing_weights[nonpad_indices, :]
+        selected_experts = selected_experts[nonpad_indices, :]
+
     if FORCE_EP_BALANCE:
         selected_experts = force_ep_balance(num_experts, selected_experts)
 
@@ -129,6 +142,12 @@ def ep_forward(
         num_global_tokens_per_local_expert,
         ep_group,
     )
+
+    if skip_moe_pad_tokens:
+        result = torch.zeros_like(original_hidden_states)
+        result[nonpad_indices, :] = hidden_states
+        result[pad_indices, :] = pad_hidden_states
+        hidden_states = result
 
     return hidden_states
 
@@ -287,8 +306,22 @@ def ep_mc2_forward(
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
     swiglu_limit: float = 0.0,
-    **kwargs,
+    ep_balance_strategy = None,
+    skip_moe_pad_tokens: bool = False,
+    seq_mask: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
+    if skip_moe_pad_tokens:
+        if seq_mask is None:
+            raise ValueError("seq_mask must be provided when SKIP_MOE_PAD_TOKENS is enabled.")
+        seq_mask = seq_mask.view(-1)
+        pad_indices = seq_mask == 0
+        nonpad_indices = ~pad_indices
+        original_hidden_states = hidden_states
+        hidden_states = original_hidden_states[nonpad_indices, :]
+        pad_hidden_states = original_hidden_states[pad_indices, :]
+        routing_weights = routing_weights[nonpad_indices, :]
+        selected_experts = selected_experts[nonpad_indices, :]
+
     if FORCE_EP_BALANCE:
         selected_experts = force_ep_balance(num_experts, selected_experts)
 
@@ -332,7 +365,14 @@ def ep_mc2_forward(
         hidden_states, unpermute_indices, probs=routing_weights, fused=True
     )
 
+    if skip_moe_pad_tokens:
+        result = torch.zeros_like(original_hidden_states)
+        result[nonpad_indices, :] = hidden_states
+        result[pad_indices, :] = pad_hidden_states
+        hidden_states = result
+
     return hidden_states
+
 
 def ep_allgather_forward(
     num_experts: int,
@@ -345,6 +385,8 @@ def ep_allgather_forward(
     fused: bool = True,
     swiglu_limit: float = 0.0,
     ep_balance_strategy = None,
+    skip_moe_pad_tokens: bool = False,
+    seq_mask: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     enable_ep_balance = ep_balance_strategy is not None
     # Reshape hidden states to (batch_size * sequence_length, hidden_dim)
@@ -358,6 +400,18 @@ def ep_allgather_forward(
     # Handle force load balancing (for testing/debugging purposes)
     # If FORCE_EP_BALANCE is enabled, we override the selected_experts to ensure a uniform distribution
     # across experts, regardless of the actual routing weights.
+    if skip_moe_pad_tokens:
+        if seq_mask is None:
+            raise ValueError("seq_mask must be provided when skip_moe_pad_tokens is enabled.")
+        seq_mask = seq_mask.view(-1)
+        pad_indices = seq_mask == 0
+        nonpad_indices = ~pad_indices
+        original_hidden_states = hidden_states
+        hidden_states = original_hidden_states[nonpad_indices, :]
+        pad_hidden_states = original_hidden_states[pad_indices, :]
+        routing_weights = routing_weights[nonpad_indices, :]
+        selected_experts = selected_experts[nonpad_indices, :]
+
     if FORCE_EP_BALANCE:
         selected_experts = force_ep_balance(num_experts, selected_experts)
 
@@ -471,5 +525,11 @@ def ep_allgather_forward(
     # where the tokens originally came from.
     # This is the inverse communication pattern of the initial AllGather.
     hidden_states = reduce_scatter_tokens_in_ep(unpermuted_local_hidden_states, ep_group=ep_group)
+
+    if skip_moe_pad_tokens:
+        result = torch.zeros_like(original_hidden_states)
+        result[nonpad_indices, :] = hidden_states
+        result[pad_indices, :] = pad_hidden_states
+        hidden_states = result
 
     return hidden_states

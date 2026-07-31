@@ -114,3 +114,8 @@ class FeatureArguments(BaseArguments):
         metadata={"help": "Whether apply ep balance strategy"}
     )
     ep_balance_plan: EPBalancePlanConfig = field(default_factory=EPBalancePlanConfig)
+
+    skip_moe_pad_tokens: bool = field(
+        default=False,
+        metadata={"help": "Whether skip moe pad tokens"}
+    )
