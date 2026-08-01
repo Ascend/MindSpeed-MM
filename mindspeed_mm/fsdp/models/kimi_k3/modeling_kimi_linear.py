@@ -21,25 +21,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# MIT License:
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
 import math
 from collections.abc import Callable
 from typing import Any
@@ -71,26 +52,22 @@ except ImportError:
     def check_model_inputs(func):
         return func
 
-# try:
-#     from fla.modules import FusedRMSNormGated, ShortConvolution
-#     from fla.ops.kda import chunk_kda, fused_recurrent_kda
-#     # from fla.ops.kda.gate import fused_kda_gate  # deprecated, gate is now computed inside chunk_kda/fused_recurrent_kda
-#     from fla.ops.utils.index import prepare_cu_seqlens_from_mask, prepare_lens_from_mask
-#     from fla.utils import tensor_cache
-# except ImportError:
-#     raise ImportError("Plese run `pip install -U fla-core`")
-
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
-from mindspeed_mm.fsdp.ops.gdn.triton.utils import tensor_cache
 
-from triton_ascend_kernels.attention.fla.kda.chunk import chunk_kda
-
-from mindspeed_mm.fsdp.ops.kda.short_conv import ShortConvolution
+if IS_NPU_AVAILABLE:
+    import torch_npu
+    from mindspeed_mm.fsdp.ops.gdn.triton.utils import tensor_cache
+    from triton_ascend_kernels.attention.fla.kda.chunk import chunk_kda
+    from mindspeed_mm.fsdp.ops.kda.short_conv import ShortConvolution
+else:
+    from fla.modules import ShortConvolution
+    from fla.ops.kda import chunk_kda, fused_recurrent_kda
+    from fla.utils import tensor_cache
 
 from .configuration_kimi_k3 import KimiLinearConfig
 
-assert version.parse(transformers.__version__) >= version.parse("4.56.0"), \
-    "Please upgrade transformers to >= 4.56.0"
+if version.parse(transformers.__version__) < version.parse("4.56.0"):
+    raise RuntimeError("Please upgrade transformers to >= 4.56.0")
 
 logger = logging.get_logger(__name__)
 
@@ -106,7 +83,6 @@ class KimiK_3_MoeRMSNormGated(nn.Module):
     def forward(self, hidden_states, gate=None):
         input_dtype = hidden_states.dtype
         if IS_NPU_AVAILABLE:
-            import torch_npu
             hidden_states = torch_npu.npu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
             hidden_states = hidden_states * F.sigmoid(gate)
         else:
@@ -311,10 +287,16 @@ class KimiRMSNorm(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, hidden_states):
-        dtype = hidden_states.dtype
-        x = hidden_states.float()
-        x = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.variance_epsilon)
-        return self.weight * x.to(dtype)
+        if IS_NPU_AVAILABLE:
+            if hidden_states.dtype != self.weight.dtype:
+                hidden_states = hidden_states.to(self.weight.dtype)
+            return torch_npu.npu_rms_norm(hidden_states, self.weight,
+                                           epsilon=self.variance_epsilon)[0]
+        else:
+            dtype = hidden_states.dtype
+            x = hidden_states.float()
+            x = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.variance_epsilon)
+            return self.weight * x.to(dtype)
 
 
 ALL_LAYERNORM_LAYERS.append(KimiRMSNorm)
@@ -691,8 +673,11 @@ class KimiDeltaAttention(nn.Module):
         if mode == 'chunk':
             kda_implementation = getattr(self.config, "kda_implementation", "fused")
             if kda_implementation == "fused":
-                # 融合大算子（triton_ascend_kernels）
-                beta = torch.sigmoid(beta)
+                if IS_NPU_AVAILABLE:
+                    use_beta_sigmoid_in_kernel = False
+                    beta = torch.sigmoid(beta)
+                else:
+                    use_beta_sigmoid_in_kernel = True
                 o, recurrent_state = chunk_kda(
                     q=q,
                     k=k,
@@ -705,7 +690,7 @@ class KimiDeltaAttention(nn.Module):
                     output_final_state=True,
                     use_qk_l2norm_in_kernel=True,
                     use_gate_in_kernel=True,
-                    use_beta_sigmoid_in_kernel=False,
+                    use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
                     safe_gate=self.gate_lower_bound is not None,
                     lower_bound=self.gate_lower_bound,
                     transpose_state_layout=True,
@@ -739,24 +724,9 @@ class KimiDeltaAttention(nn.Module):
                     f"Unsupported kda_implementation: {kda_implementation}. "
                     "Expected 'fused' or 'naive'."
                 )
-
         else:
-            o, recurrent_state = fused_recurrent_kda(
-                q=q,
-                k=k,
-                v=v,
-                g=g,
-                beta=beta,
-                A_log=self.A_log,
-                dt_bias=self.dt_bias,
-                initial_state=recurrent_state,
-                output_final_state=True,
-                use_qk_l2norm_in_kernel=True,
-                use_gate_in_kernel=True,
-                use_beta_sigmoid_in_kernel=True,
-                lower_bound=self.gate_lower_bound,
-                transpose_state_layout=True,
-                cu_seqlens=cu_seqlens,
+            raise ValueError(
+                f"Unsupported kda mode: {mode}. "
             )
         if cache_params is not None:
             cache_params.recurrent_states[self.layer_idx] = recurrent_state

@@ -1,6 +1,6 @@
 
 import os
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import torch
 import torch.distributed as dist
@@ -40,6 +40,26 @@ def force_ep_balance(
     return selected_experts
 
 
+def apply_activation(
+    intermediate_hidden_states: torch.Tensor,
+    dim: int = -1,
+    fused: bool = True,
+    swiglu_limit: float = 0.0,
+    activation: Optional[Callable] = None,
+) -> torch.Tensor:
+    """Apply the activation to the first grouped-matmul output.
+
+    When ``activation`` is provided it is called directly with the full
+    ``gate_up`` tensor and is expected to return the activated tensor
+    (e.g. Kimi's ``SituAndMul``). Otherwise the default SwiGLU logic is used.
+    """
+    if activation is not None:
+        return activation(intermediate_hidden_states)
+    if swiglu_limit > 0:
+        return clamp_swiglu(intermediate_hidden_states, dim=dim, fused=fused, limit=swiglu_limit)
+    return swiglu(intermediate_hidden_states, dim=dim, fused=fused)
+
+
 def ep_forward(
     num_experts: int,
     routing_weights: torch.Tensor,
@@ -53,6 +73,7 @@ def ep_forward(
     ep_balance_strategy = None,
     skip_moe_pad_tokens: bool = False,
     seq_mask: Optional[torch.Tensor] = None,
+    activation: Optional[Callable] = None,
 ) -> torch.Tensor:
     if skip_moe_pad_tokens:
         if seq_mask is None:
@@ -106,10 +127,9 @@ def ep_forward(
     # If no tokens are assigned to the expert in the current EP shard, no computation is performed
     if hidden_states.shape[0] > 0:
         intermediate_hidden_states = grouped_matmul(hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert, fused=fused)
-        if swiglu_limit > 0:
-            intermediate_activations = clamp_swiglu(intermediate_hidden_states, dim=-1, fused=fused, limit=swiglu_limit)
-        else:
-            intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+        intermediate_activations = apply_activation(
+            intermediate_hidden_states, dim=-1, fused=fused, swiglu_limit=swiglu_limit, activation=activation
+        )
 
         if enable_ep_balance:
             ep_balance_strategy.executor.wait_async_works_finished(name="fc2")
@@ -309,6 +329,7 @@ def ep_mc2_forward(
     ep_balance_strategy = None,
     skip_moe_pad_tokens: bool = False,
     seq_mask: Optional[torch.Tensor] = None,
+    activation: Optional[Callable] = None,
 ) -> torch.Tensor:
     if skip_moe_pad_tokens:
         if seq_mask is None:
@@ -353,10 +374,9 @@ def ep_mc2_forward(
     intermediate_hidden_states = all2all_grouped_matmul(
         inputs=hidden_states, weights=fc1_weight, group=ep_group, send_counts=send_counts, recv_counts=recv_counts
     )
-    if swiglu_limit > 0:
-        intermediate_activations = clamp_swiglu(intermediate_hidden_states, dim=-1, fused=fused, limit=swiglu_limit)
-    else:
-        intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+    intermediate_activations = apply_activation(
+        intermediate_hidden_states, dim=-1, fused=fused, swiglu_limit=swiglu_limit, activation=activation
+    )
 
     hidden_states = grouped_matmul_all2all(
         inputs=intermediate_activations, weights=fc2_weight, group=ep_group, send_counts=recv_counts, recv_counts=send_counts
@@ -387,6 +407,7 @@ def ep_allgather_forward(
     ep_balance_strategy = None,
     skip_moe_pad_tokens: bool = False,
     seq_mask: Optional[torch.Tensor] = None,
+    activation: Optional[Callable] = None,
 ) -> torch.Tensor:
     enable_ep_balance = ep_balance_strategy is not None
     # Reshape hidden states to (batch_size * sequence_length, hidden_dim)
@@ -497,11 +518,10 @@ def ep_allgather_forward(
     # First Linear Layer (fc1) with Grouped Matmul
     intermediate_hidden_states = grouped_matmul(permuted_local_hidden_states, fc1_weight, tokens_per_expert)
 
-    # Activation Function (SwiGLU)
-    if swiglu_limit > 0:
-        intermediate_activations = clamp_swiglu(intermediate_hidden_states, dim=-1, fused=fused, limit=swiglu_limit)
-    else:
-        intermediate_activations = swiglu(intermediate_hidden_states, dim=-1, fused=fused)
+    # Activation Function (SwiGLU by default, or the caller-provided activation)
+    intermediate_activations = apply_activation(
+        intermediate_hidden_states, dim=-1, fused=fused, swiglu_limit=swiglu_limit, activation=activation
+    )
 
     if enable_ep_balance:
         ep_balance_strategy.executor.wait_async_works_finished(name="fc2")

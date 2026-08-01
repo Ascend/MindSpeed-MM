@@ -59,6 +59,10 @@ class KimiK3ForConditionalGeneration(WeightInitMixin, _KimiK3ForConditionalGener
         use_grouped_expert_matmul = getattr(model_args, "use_grouped_expert_matmul", False)
         transformer_config.text_config.use_grouped_expert_matmul = use_grouped_expert_matmul
 
+        # ep balance
+        transformer_config.text_config.enable_ep_balance = getattr(feature_args, "enable_ep_balance", False)
+        transformer_config.text_config.max_dup_experts_num = getattr(feature_args.ep_balance_plan, "max_dup_experts_num", 2)
+
         # Selective-recompute switches: keep the expensive attention kernels (FA / KDA)
         # out of gradient-checkpoint replay and offload their small intermediates to host.
         # Requires features.recompute and features.enable_activation_offload to be on,

@@ -17,19 +17,17 @@ untouched.
 from __future__ import annotations
 
 from typing import Any
-import os
 
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributed.tensor import DTensor
 
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
-from mindspeed_mm.fsdp.ops.swiglu import swiglu
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
-from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import force_ep_balance
 
 from .configuration_kimi_k3 import KimiLinearConfig
 from .modeling_kimi_linear import (
@@ -40,9 +38,6 @@ from .modeling_kimi_linear import (
     SituAndMul,
     _get_situ_activation_params,
 )
-
-
-FORCE_EP_BALANCE = int(os.getenv("MM_FORCE_EP_BALANCE", "0")) == 1
 
 
 def _is_situ(config: KimiLinearConfig) -> bool:
@@ -93,6 +88,25 @@ class PatchKimiMoeExperts(nn.Module):
         self.use_grouped_expert_matmul = getattr(config, "use_grouped_expert_matmul", False)
         self.fused = self.use_grouped_expert_matmul and IS_NPU_AVAILABLE
 
+        ps = get_parallel_state()
+        if ps.is_ep_enable() and not _is_situ(config):
+            raise ValueError(
+                f"Kimi-K3 MoE with expert parallelism only supports the 'situ' activation, "
+                f"got hidden_act={config.hidden_act!r}."
+            )
+        self.enable_ep_balance = getattr(config, "enable_ep_balance", False) and ps.is_ep_enable()
+        if self.enable_ep_balance:
+            from mindspeed_mm.fsdp.distributed.expert_parallel.ep_balance.ep_balance_strategy import EPBalanceStrategy
+            self.ep_balance_strategy = EPBalanceStrategy(
+                ep_group=ps.get_ep_group(),
+                num_experts=self.num_experts,
+                max_dup_experts_num=getattr(config, "max_dup_experts_num", 2),
+            )
+
+            def hook_fn(*args, **kwargs):
+                self.ep_balance_strategy.planner.pop_plan_cache()
+            self.register_full_backward_hook(hook_fn)
+
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -103,16 +117,6 @@ class PatchKimiMoeExperts(nn.Module):
         std = getattr(self.config, "initializer_range", 0.02)
         init.normal_(self.gate_up_proj, mean=0.0, std=std)
         init.normal_(self.down_proj, mean=0.0, std=std)
-
-    def _apply_activation(self, gate_up: torch.Tensor, fused: bool = False) -> torch.Tensor:
-        """Apply the configured activation to the first linear output."""
-        if _is_situ(self.config):
-            return self.act_fn(gate_up)
-        # Only use the fused npu_swiglu kernel when the configured activation is SiLU.
-        if fused and IS_NPU_AVAILABLE and self.config.hidden_act == "silu":
-            return swiglu(gate_up, dim=-1, fused=True)
-        gate, up = gate_up.chunk(2, dim=-1)
-        return self.act_fn(gate) * up
 
     def forward(
         self,
@@ -150,7 +154,11 @@ class PatchKimiMoeExperts(nn.Module):
         intermediate = grouped_matmul(
             permuted_hidden_states, self.gate_up_proj, tokens_per_expert, fused=True
         )
-        intermediate_activations = self._apply_activation(intermediate, fused=True)
+        if _is_situ(self.config):
+            intermediate_activations = self.act_fn(intermediate)
+        else:
+            gate, up = intermediate.chunk(2, dim=-1)
+            intermediate_activations = self.act_fn(gate) * up
         output = grouped_matmul(
             intermediate_activations, self.down_proj, tokens_per_expert, fused=True
         )
@@ -182,7 +190,11 @@ class PatchKimiMoeExperts(nn.Module):
             top_k_pos, token_idx = torch.where(expert_mask[expert_idx])
             current_state = hidden_states[token_idx]
             gate_up = F.linear(current_state, gate_up_proj[expert_idx])
-            current_hidden_states = self._apply_activation(gate_up, fused=False)
+            if _is_situ(self.config):
+                current_hidden_states = self.act_fn(gate_up)
+            else:
+                gate, up = gate_up.chunk(2, dim=-1)
+                current_hidden_states = self.act_fn(gate) * up
             current_hidden_states = F.linear(current_hidden_states, down_proj[expert_idx])
             current_hidden_states = current_hidden_states * top_k_weights[
                 token_idx, top_k_pos, None
@@ -203,33 +215,13 @@ class PatchKimiMoeExperts(nn.Module):
         ep_group: Any,
         ep_plan: Any,
     ) -> torch.Tensor:
-
-        """EP routed-expert forward (alltoall dispatcher only).
+        """EP routed-expert forward.
 
         This method is discovered by ``expert_parallelize_modules`` and bound to
-        ``forward`` when expert parallelism is enabled.  It reuses the all-to-all
-        dispatch/combine helpers from the generic EP dispatcher and applies the
-        configured activation (including ``situ``) in the middle.
-
-        Note:
-            Only the ``alltoall`` dispatcher is supported for Kimi-K3 MoE.
-            ``mc2`` and ``allgather`` are not implemented yet.
+        ``forward`` when expert parallelism is enabled.  It reuses the generic
+        EP dispatchers (``alltoall`` / ``mc2`` / ``allgather``) and passes the
+        configured activation (including ``situ``) down to the dispatcher.
         """
-        if ep_plan.dispatcher != "alltoall":
-            raise NotImplementedError(
-                f"Kimi-K3 MoE EP currently only supports dispatcher='alltoall', "
-                f"got {ep_plan.dispatcher!r}."
-            )
-
-        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import (
-            alltoall_combine,
-            alltoall_dispatch,
-            dispatch_preprocess,
-        )
-
-        num_experts = self.num_experts
-        hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
-
         gate_up_proj = (
             self.gate_up_proj.to_local()
             if isinstance(self.gate_up_proj, DTensor)
@@ -241,66 +233,47 @@ class PatchKimiMoeExperts(nn.Module):
             else self.down_proj
         )
 
-        routing_weights = top_k_weights
-        if routing_weights.size() != top_k_index.size():
-            routing_weights = routing_weights.gather(1, top_k_index)
-
-        input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert = dispatch_preprocess(
-            top_k_index, num_experts, ep_group
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import (
+            ep_allgather_forward,
+            ep_forward,
+            ep_mc2_forward,
         )
 
-        if FORCE_EP_BALANCE:
-            top_k_index = force_ep_balance(num_experts, top_k_index)
+        ep_dispatcher_dict = {
+            "alltoall": ep_forward,
+            "mc2": ep_mc2_forward,
+            "allgather": ep_allgather_forward,
+        }
 
-        hidden_states, unpermute_indices, post_dispatch_unpermute_indices = alltoall_dispatch(
-            hidden_states,
+        if self.enable_ep_balance:
+            self.ep_balance_strategy.executor.register_backward_dup_experts_grad_acc_hook(gate_up_proj, name="fc1")
+            self.ep_balance_strategy.executor.register_backward_dup_experts_grad_acc_hook(down_proj, name="fc2")
+
+            if ep_plan.dispatcher in ["mc2", "allgather"]:
+                raise NotImplementedError("EP load balancing strategy currently only supports alltoall dispatch.")
+
+        if ep_plan.dispatcher not in ep_dispatcher_dict:
+            raise NotImplementedError(
+                f"EP dispatcher {ep_plan.dispatcher} is not implemented for Kimi-K3 MoE."
+            )
+
+        dispatcher_func = ep_dispatcher_dict[ep_plan.dispatcher]
+        hidden_states = dispatcher_func(
+            self.num_experts,
+            top_k_weights,
             top_k_index,
-            input_splits,
-            output_splits,
-            num_experts,
-            num_global_tokens_per_local_expert,
-            ep_group,
-            fused=ep_plan.use_npu_fused_ops,
-        )
-
-        if hidden_states.shape[0] > 0:
-            intermediate = grouped_matmul(
-                hidden_states,
-                gate_up_proj,
-                num_global_sum_tokens_per_local_expert,
-                fused=ep_plan.use_npu_fused_ops,
-            )
-            intermediate_activations = self._apply_activation(
-                intermediate, fused=ep_plan.use_npu_fused_ops
-            )
-            hidden_states = grouped_matmul(
-                intermediate_activations,
-                down_proj,
-                num_global_sum_tokens_per_local_expert,
-                fused=ep_plan.use_npu_fused_ops,
-            )
-        else:
-            # Maintain gradients for expert weights when no tokens hit local experts.
-            intermediate = hidden_states @ gate_up_proj.sum(0)
-            intermediate_activations = self._apply_activation(intermediate, fused=False)
-            hidden_states = intermediate_activations @ down_proj.sum(0) * 0.0
-
-        hidden_states = alltoall_combine(
             hidden_states,
-            routing_weights,
-            post_dispatch_unpermute_indices,
-            unpermute_indices,
-            input_splits,
-            output_splits,
-            num_experts,
-            num_global_tokens_per_local_expert,
-            ep_group,
+            fc1_weight=gate_up_proj,
+            fc2_weight=down_proj,
+            ep_group=ep_group,
             fused=ep_plan.use_npu_fused_ops,
+            ep_balance_strategy=self.ep_balance_strategy if self.enable_ep_balance else None,
+            activation=self.act_fn,
         )
 
         return hidden_states
 
-    
+
 class PatchKimiSparseMoeBlock(nn.Module):
     """Patched Kimi sparse MoE block with 3-D expert tensors, GMM and EP support.
 

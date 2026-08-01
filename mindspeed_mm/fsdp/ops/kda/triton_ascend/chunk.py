@@ -1,24 +1,19 @@
-# Copyright (c) 2023-2026, Songlin Yang, Yu Zhang, Zhiyuan Li
+# Copyright © 2026 Huawei Technologies Co., Ltd.
+# Based on flash-linear-attention: https://github.com/fla-org/flash-linear-attention
 #
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
-# For a list of all contributors, visit:
-#   https://github.com/fla-org/flash-linear-attention/graphs/contributors
+# This file contains code copied and/or modified from the flash-linear-attention project.
+# The original source code was licensed under the MIT license and included
+# the following copyright notice:
+# Copyright (c) 2023-2026, Songlin Yang, Yu Zhang, Zhiyuan Li
 
-# Related files are modified and supported by the Moonshot AI Team
-
-import warnings
 
 import torch
 
-from fla.modules.l2norm import l2norm_bwd, l2norm_fwd
-from fla.ops.backends import dispatch
-from fla.ops.common.gate import fused_beta_sigmoid, fused_beta_sigmoid_bwd
-from fla.ops.cp import FLACPContext
-from fla.ops.kda.chunk_bwd import chunk_kda_bwd
-from fla.ops.kda.chunk_fwd import chunk_kda_fwd
-from fla.ops.utils.index import prepare_chunk_indices
-from fla.utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
+from .l2norm_kda import l2norm_bwd, l2norm_fwd
+from .chunk_bwd import chunk_kda_bwd
+from .chunk_fwd import chunk_kda_fwd
+from .utils import prepare_chunk_indices
+from .fla_utils import autocast_custom_bwd, autocast_custom_fwd, input_guard
 
 
 class ChunkKDAFunction(torch.autograd.Function):
@@ -39,61 +34,117 @@ class ChunkKDAFunction(torch.autograd.Function):
         output_final_state: bool = False,
         use_qk_l2norm_in_kernel: bool = False,
         use_gate_in_kernel: bool = False,
-        use_beta_sigmoid_in_kernel: bool = False,
-        allow_neg_eigval: bool = False,
-        state_v_first: bool = False,
         cu_seqlens: torch.LongTensor | None = None,
         cu_seqlens_cpu: torch.LongTensor | None = None,
         safe_gate: bool = False,
         lower_bound: float | None = None,
-        chunk_size: int = 64,
         disable_recompute: bool = False,
         return_intermediate_states: bool = False,
-        cp_context: FLACPContext | None = None,
+        transpose_state_layout: bool = False,
+        skip_recompute: bool = False,
     ):
+        chunk_size = 64
+
+        if skip_recompute:
+            if disable_recompute:
+                raise ValueError("`skip_recompute` is not compatible with `disable_recompute=True`.")
+            if return_intermediate_states:
+                raise ValueError("`skip_recompute` is not compatible with `return_intermediate_states=True`.")
+            # Lazy imports to avoid a hard dependency on mindspeed_mm (and circular imports).
+            from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
+            from mindspeed_mm.fsdp.features.memory.async_offload import OffloadManager, SwapTensor
+            from mindspeed_mm.fsdp.utils.device import get_current_stream
+            training_stage = TrainingContext().get_training_stage()
+            layer_idx = TrainingContext().get_layer_index()
+            depth = TrainingContext().get_model_depth()
+
         # Apply l2norm
         q_rstd, k_rstd = None, None
         if use_qk_l2norm_in_kernel:
             q, q_rstd = l2norm_fwd(q)
             k, k_rstd = l2norm_fwd(k)
 
-        beta_raw = beta
-        if use_beta_sigmoid_in_kernel:
-            beta = fused_beta_sigmoid(beta_raw, scale=2.0 if allow_neg_eigval else 1.0)
-
-        chunk_indices = None
-        if cu_seqlens is not None:
-            chunk_indices = prepare_chunk_indices(
-                cu_seqlens,
-                chunk_size,
-                cu_seqlens_cpu=cu_seqlens_cpu,
-            )
+        chunk_indices = prepare_chunk_indices(
+            cu_seqlens, chunk_size, cu_seqlens_cpu=cu_seqlens_cpu) if cu_seqlens is not None else None
 
         g_input = g
 
-        (o, final_state, g_cumsum, Aqk, Akk, w, u, qg, kg, v_new, h, initial_state) = chunk_kda_fwd(
-            q=q,
-            k=k,
-            v=v,
-            g=g_input,
-            beta=beta,
-            scale=scale,
-            initial_state=initial_state,
-            output_final_state=output_final_state,
-            cu_seqlens=cu_seqlens,
-            cu_seqlens_cpu=cu_seqlens_cpu,
-            chunk_indices=chunk_indices,
-            safe_gate=safe_gate,
-            lower_bound=lower_bound,
-            use_gate_in_kernel=use_gate_in_kernel,
-            A_log=A_log,
-            dt_bias=dt_bias,
-            chunk_size=chunk_size,
-            disable_recompute=disable_recompute,
-            return_intermediate_states=return_intermediate_states,
-            cp_context=cp_context,
-            state_v_first=state_v_first,
-        )
+        if skip_recompute and training_stage == TrainingStage.BACKWARD:
+            # --- Recompute replay: restore the forward intermediates offloaded to host
+            # instead of recomputing chunk_kda_fwd. Values are bit-identical to the
+            # first forward, so gradients are identical to full recomputation. ---
+            # Put order during forward: [o, Aqk, Akk, (final_state), (g_cumsum)].
+            swap_tensor_nums = 3 + int(output_final_state) + int(not use_gate_in_kernel)
+            if layer_idx == depth - 1:
+                # Last layer's tensors were kept on device (LIFO stack).
+                restored = [OffloadManager().pop_npu_tensor().tensor for _ in range(swap_tensor_nums)]
+                restored.reverse()
+            else:
+                h2d_stream = OffloadManager().swap_stream
+                restored = []
+                for swap_key in reversed(OffloadManager().get_layer_items_keys(layer_idx)[-swap_tensor_nums:]):
+                    swap_tensor = OffloadManager().get(swap_key)
+                    swap_tensor.launch_h2d(h2d_stream)
+                    get_current_stream().wait_event(swap_tensor.h2d_event)
+                    restored.append(swap_tensor.tensor)
+                    OffloadManager().clear(swap_key)
+                restored.reverse()
+            o, Aqk, Akk = restored[0], restored[1], restored[2]
+            idx = 3
+            final_state = None
+            if output_final_state:
+                final_state = restored[idx]
+                idx += 1
+            g_cumsum = None
+            if not use_gate_in_kernel:
+                g_cumsum = restored[idx]
+            # Same as the default (disable_recompute=False) path: these are rebuilt
+            # inside chunk_kda_bwd from the inputs and Aqk/Akk.
+            w, u, qg, kg, v_new, h = None, None, None, None, None, None
+        else:
+            (o, final_state, g_cumsum, Aqk, Akk, w, u, qg, kg, v_new, h, initial_state) = chunk_kda_fwd(
+                q=q,
+                k=k,
+                v=v,
+                g=g_input,
+                beta=beta,
+                scale=scale,
+                initial_state=initial_state,
+                output_final_state=output_final_state,
+                cu_seqlens=cu_seqlens,
+                cu_seqlens_cpu=cu_seqlens_cpu,
+                chunk_indices=chunk_indices,
+                safe_gate=safe_gate,
+                lower_bound=lower_bound,
+                use_gate_in_kernel=use_gate_in_kernel,
+                A_log=A_log,
+                dt_bias=dt_bias,
+                disable_recompute=disable_recompute,
+                return_intermediate_states=return_intermediate_states,
+                transpose_state_layout=transpose_state_layout,
+            )
+
+        if skip_recompute and training_stage == TrainingStage.FORWARD:
+            # --- Forward pass: offload the intermediates needed by backward (and the
+            # output o consumed by downstream ops during the replay) to host. ---
+            swap_tensors = [o, Aqk, Akk]
+            if output_final_state:
+                swap_tensors.append(final_state)
+            if not use_gate_in_kernel:
+                swap_tensors.append(g_cumsum)
+            d2h_stream = OffloadManager().swap_stream
+            for swap_tensor in swap_tensors:
+                key, after_block = OffloadManager().get_cnt(layer_idx)
+                if after_block:
+                    # Free device memory of the previous layer's tensors.
+                    OffloadManager().del_npu_tensor("{}_".format(layer_idx - 1))
+                if layer_idx == depth - 1:
+                    # Keep the last layer's tensors on device; they are consumed first.
+                    OffloadManager().put_npu_tensor(SwapTensor(swap_tensor, key))
+                else:
+                    swap_tensor = SwapTensor(swap_tensor, key)
+                    swap_tensor.launch_d2h(d2h_stream)
+                    OffloadManager().put(key, swap_tensor)
 
         if return_intermediate_states:
             assert torch.is_inference_mode_enabled(), "return_intermediate_states is only allowed in inference mode"
@@ -101,7 +152,7 @@ class ChunkKDAFunction(torch.autograd.Function):
             return o.type_as(q), final_state, h
 
         ctx.save_for_backward(
-            q, q_rstd, k, k_rstd, v, g_cumsum, g_input, beta_raw, beta, A_log, dt_bias, Aqk, Akk,
+            q, q_rstd, k, k_rstd, v, g_cumsum, g_input, beta, A_log, dt_bias, Aqk, Akk,
             w, u, qg, kg, v_new, h,
             initial_state, cu_seqlens, chunk_indices
         )
@@ -111,11 +162,8 @@ class ChunkKDAFunction(torch.autograd.Function):
         ctx.lower_bound = lower_bound
         ctx.use_qk_l2norm_in_kernel = use_qk_l2norm_in_kernel
         ctx.use_gate_in_kernel = use_gate_in_kernel
-        ctx.use_beta_sigmoid_in_kernel = use_beta_sigmoid_in_kernel
-        ctx.allow_neg_eigval = allow_neg_eigval
         ctx.disable_recompute = disable_recompute
-        ctx.cp_context = cp_context
-        ctx.state_v_first = state_v_first
+        ctx.transpose_state_layout = transpose_state_layout
         return o.type_as(q), final_state
 
     @staticmethod
@@ -126,7 +174,7 @@ class ChunkKDAFunction(torch.autograd.Function):
         do: torch.Tensor,
         dht: torch.Tensor,
     ):
-        (q, q_rstd, k, k_rstd, v, g_cumsum, g_input, beta_raw, beta, A_log, dt_bias, Aqk, Akk,
+        (q, q_rstd, k, k_rstd, v, g_cumsum, g_input, beta, A_log, dt_bias, Aqk, Akk,
          w, u, qg, kg, v_new, h,
          initial_state, cu_seqlens, chunk_indices) = (
             ctx.saved_tensors
@@ -136,6 +184,7 @@ class ChunkKDAFunction(torch.autograd.Function):
             q=q,
             k=k,
             v=v,
+            g=g_cumsum,
             beta=beta,
             Aqk=Aqk,
             Akk=Akk,
@@ -143,37 +192,25 @@ class ChunkKDAFunction(torch.autograd.Function):
             initial_state=initial_state,
             do=do,
             dht=dht,
-            g=g_cumsum,
-            g_org=g_input if ctx.use_gate_in_kernel else None,
-            state_v_first=ctx.state_v_first,
             cu_seqlens=cu_seqlens,
             chunk_indices=chunk_indices,
             chunk_size=ctx.chunk_size,
             safe_gate=ctx.safe_gate,
-            lower_bound=ctx.lower_bound,
+            g_org=g_input if ctx.use_gate_in_kernel else None, lower_bound=ctx.lower_bound,
             use_gate_in_kernel=ctx.use_gate_in_kernel,
-            A_log=A_log,
-            dt_bias=dt_bias,
+            A_log=A_log, dt_bias=dt_bias,
             disable_recompute=ctx.disable_recompute,
-            cp_context=ctx.cp_context,
-            w=w,
-            u=u,
-            qg=qg,
-            kg=kg,
-            v_new=v_new,
-            h=h,
+            w=w, u=u, qg=qg, kg=kg, v_new=v_new, h=h,
+            transpose_state_layout=ctx.transpose_state_layout,
         )
         if ctx.use_qk_l2norm_in_kernel:
             dq = l2norm_bwd(q, q_rstd, dq)
             dk = l2norm_bwd(k, k_rstd, dk)
-        if ctx.use_beta_sigmoid_in_kernel:
-            db = fused_beta_sigmoid_bwd(beta_raw, db, scale=2.0 if ctx.allow_neg_eigval else 1.0)
 
-        return (dq.to(q), dk.to(k), dv.to(v), dg.to(g_input), db.to(beta_raw), dA, dbias, None, dh0,
-                None, None, None, None, None, None, None, None, None, None, None, None, None, None)
+        return (dq.to(q), dk.to(k), dv.to(v), dg.to(g_input), db.to(beta), dA, dbias, None, dh0,
+                None, None, None, None, None, None, None, None, None, None, None)
 
 
-@dispatch('kda')
 @torch.compiler.disable
 def chunk_kda(
     q: torch.Tensor,
@@ -186,119 +223,100 @@ def chunk_kda(
     output_final_state: bool = False,
     use_qk_l2norm_in_kernel: bool = False,
     use_gate_in_kernel: bool = False,
-    use_beta_sigmoid_in_kernel: bool = False,
-    allow_neg_eigval: bool = False,
+    cu_seqlens: torch.LongTensor | None = None,
+    cu_seqlens_cpu: torch.LongTensor | None = None,
     safe_gate: bool = False,
     lower_bound: float | None = None,
     disable_recompute: bool = False,
     return_intermediate_states: bool = False,
-    state_v_first: bool = False,
-    cu_seqlens: torch.LongTensor | None = None,
-    cu_seqlens_cpu: torch.LongTensor | None = None,
-    cp_context: FLACPContext = None,
+    transpose_state_layout: bool = False,
+    skip_recompute: bool = False,
     **kwargs,
 ):
     r"""
     Args:
         q (torch.Tensor):
-            queries of shape ``[B, T, H, K]``.
+            queries of shape `[B, T, H, K]`.
         k (torch.Tensor):
-            keys of shape ``[B, T, H, K]``.
+            keys of shape `[B, T, H, K]`.
         v (torch.Tensor):
-            values of shape ``[B, T, HV, V]``.
-            GVA (Grouped Value Attention) is applied if ``HV > H``, where ``HV`` must be divisible by ``H``.
+            values of shape `[B, T, H, V]`.
         g (torch.Tensor):
-            (forget) gating tensor (in log space!) of shape ``[B, T, HV, K]``.
-            When ``use_gate_in_kernel=False`` (default), ``g`` should be the pre-computed decay value.
-            When ``use_gate_in_kernel=True``, ``g`` is the raw input before gate activation;
-            the kernel fuses ``-exp(A_log) * softplus(g + dt_bias)`` + chunk cumsum internally.
+            (forget) gating tensor (in log space!) of shape `[B, T, H, K]`.
         beta (torch.Tensor):
-            betas of shape ``[B, T, HV]``.
+            betas of shape `[B, T, H]`.
         scale (Optional[float]):
             Scale factor for the KDA attention scores.
-            If not provided, it will default to ``1 / sqrt(K)``. Default: ``None``.
+            If not provided, it will default to `1 / sqrt(K)`. Default: `None`.
         initial_state (Optional[torch.Tensor]):
-            Initial state of shape ``[N, HV, K, V]`` for ``N`` input sequences.
-            For equal-length input sequences, ``N`` equals the batch size ``B``.
-            Default: ``None``.
+            Initial state of shape `[N, H, K, V]` for `N` input sequences.
+            For equal-length input sequences, `N` equals the batch size `B`.
+            Default: `None`.
         output_final_state (Optional[bool]):
-            Whether to output the final state of shape ``[N, HV, K, V]``. Default: ``False``.
+            Whether to output the final state of shape `[N, H, K, V]`. Default: `False`.
         use_qk_l2norm_in_kernel (bool):
-            Whether to apply L2norm to the q,k tensor internally. Default: ``False``.
+            Whether to apply L2norm to the q,k tensor internally. Default: `False`.
         use_gate_in_kernel (bool):
             Whether to compute the log-space KDA decay internally.
-            - If ``True``:
-              The passed ``g`` acts as the raw input for ``-exp(A_log) * softplus(g + dt_bias.view(HV, K))``.
+            - If `True`:
+              The passed `g` acts as the raw input for `-exp(A_log).view(H, -1) * softplus(g + dt_bias.view(H, K))`.
               Note that as part of the input arguments,
-              ``A_log`` (shape ``[HV]``) and the optional ``dt_bias`` (shape ``[HV * K]``) should be provided.
-            - If ``False``, ``g`` is expected to be the pre-computed decay value.
-            Default: ``False``.
-        use_beta_sigmoid_in_kernel (bool):
-            Whether to apply ``torch.sigmoid(beta)`` before launching the chunk kernel.
-            - If ``True``, the passed ``beta`` acts as the raw beta logits.
-            - If ``False``, ``beta`` is expected to already be in post-sigmoid space.
-            Default: ``False``.
-        allow_neg_eigval (bool):
-            Whether to allow negative eigenvalues by scaling ``beta`` to ``[0, 2)``.
-            Only takes effect together with ``use_beta_sigmoid_in_kernel=True``, in which case
-            the kernel computes ``2 * sigmoid(beta)`` instead of ``sigmoid(beta)``.
-            Default: ``False``.
-        safe_gate (bool):
-            Whether to clamp the gate to ``[lower_bound, 0)`` and enable M=16 TensorCore
-            acceleration for higher throughput. Requires ``lower_bound`` to be set.
-            Default: ``False``.
-        lower_bound (Optional[float]):
-            Lower bound for the forget gate (in log space). When set together with
-            ``safe_gate=True``, changes the gate activation from
-            ``-exp(A_log) * softplus(g + dt_bias)`` to
-            ``lower_bound * sigmoid(exp(A_log) * (g + dt_bias))``,
-            which naturally clamps the output to ``[lower_bound, 0)``.
-            Recommended value: ``-5`` (i.e., per-step decay ``exp(-5) ≈ 0.0067``).
-            Default: ``None``.
-        disable_recompute (bool):
-            Whether to disable gradient recomputation in the kernel. When ``True``, the kernel
-            will save all intermediate activations for backward pass, which is beneficial
-            for training small models at the cost of increased memory usage. Default: ``False``.
-        return_intermediate_states (bool):
-            If True, returns intermediate state ``h`` for inference scenarios (e.g., vLLM).
-            Must be used within ``torch.inference_mode()`` and will return a 3-tuple instead of 2-tuple.
-            This is not intended for training as it bypasses autograd. Default: ``False``.
-        state_v_first (Optional[bool]):
-            Store the recurrent state in V-first ``[V, K]`` layout instead of the default ``[K, V]``. Default: ``False``.
+              `A_log` (shape `[H]`) and the optional `dt_bias` (shape `[H * K]`) should be provided.
+            - If `False`, `g` is expected to be the pre-computed decay value.
+            Default: `False`.
         cu_seqlens (torch.LongTensor):
-            Cumulative sequence lengths of shape ``[N+1]`` used for variable-length training,
+            Cumulative sequence lengths of shape `[N+1]` used for variable-length training,
             consistent with the FlashAttention API.
         cu_seqlens_cpu (torch.LongTensor):
-            Cumulative sequence lengths of shape ``[N+1]`` used for variable-length training,
+            Cumulative sequence lengths of shape `[N+1]` used for variable-length training,
             consistent with the FlashAttention API.
-        cp_context (Optional[FLACPContext]):
-            Context parallel context for distributed training across multiple devices.
-            When provided, ``initial_state`` and ``output_final_state`` are not supported,
-            and ``cu_seqlens`` will be overridden by the context. Default: ``None``.
+        safe_gate (bool):
+            Whether the kernel can assume the input gate values `g` are in a safe range.
+            When `True`, the kernel can use M=16 TensorCore acceleration.
+            The safe range is approximately [-5, 0). Default: `False`.
+        lower_bound (Optional[float]):
+            Lower bound for the forget gate activation function when `use_gate_in_kernel=True`.
+            This parameter modifies the internal forget gate activation and is recommended
+            to be set to `-5` when `safe_gate` is enabled. Default: `None`.
+        disable_recompute (bool):
+            Whether to disable gradient recomputation in the kernel. When `True`, the kernel
+            will save all intermediate activations for backward pass, which is beneficial
+            for training small models at the cost of increased memory usage. Default: `False`.
+        return_intermediate_states (bool):
+            If True, returns intermediate state `h` for inference scenarios (e.g., vLLM).
+            Must be used within `torch.inference_mode()` and will return a 3-tuple instead of 2-tuple.
+            This is not intended for training as it bypasses autograd. Default: `False`.
+        skip_recompute (bool):
+            Whether to skip recomputing this kernel during gradient checkpointing replay.
+            When `True`, the forward pass offloads the intermediates needed by backward
+            (`o`, `Aqk`, `Akk`, and optionally `final_state`/`g_cumsum`) to host memory;
+            during the backward-stage replay they are restored instead of recomputed,
+            yielding bit-identical gradients while saving the forward kernel replay.
+            Requires MindSpeed-MM's activation offload machinery (`OffloadManager`)
+            and gradient checkpointing to be active. Default: `False`.
 
     Returns:
         - Normal mode (return_intermediate_states=False): A tuple (o, final_state)
             o (torch.Tensor):
-                Outputs of shape ``[B, T, HV, V]``.
+                Outputs of shape `[B, T, H, V]`.
             final_state (torch.Tensor):
-                Final state of shape ``[N, HV, K, V]`` if ``output_final_state=True`` else ``None``.
+                Final state of shape `[N, H, K, V]` if `output_final_state=True` else `None`.
         - Inference mode (return_intermediate_states=True): A tuple (o, final_state, h)
             o (torch.Tensor):
-                Outputs of shape ``[B, T, HV, V]``.
+                Outputs of shape `[B, T, H, V]`.
             final_state (torch.Tensor):
-                Final state of shape ``[N, HV, K, V]`` if ``output_final_state=True`` else ``None``.
+                Final state of shape `[N, H, K, V]` if `output_final_state=True` else `None`.
             h (torch.Tensor):
-                Intermediate states of shape ``[B, NT, HV, K, V]`` and dtype ``bfloat16``.
-                - For equal-length sequences: ``NT = ceil(T / chunk_size)``
-                - For variable-length sequences (cu_seqlens): B is always 1 (flattened),
-                  NT is the total number of chunks across all sequences.
+                Intermediate states of shape `[B, NT, H, K, V]` and dtype `bfloat16` for caching or further processing.
+                - For equal-length sequences: `NT = #chunks_per_sequence` (typically `ceil(T / chunk_size)`)
+                - For variable-length sequences (cu_seqlens): B is always 1 (flattened), NT is the total number of chunks across all sequences, determined by `prepare_chunk_indices(cu_seqlens, chunk_size)`
 
     Examples::
         >>> import torch
         >>> import torch.nn.functional as F
         >>> from einops import rearrange
         >>> from fla.ops.kda import chunk_kda
-        # inputs with equal lengths (no GVA, HV == H)
+        # inputs with equal lengths
         >>> B, T, H, K, V = 4, 2048, 4, 512, 512
         >>> q = torch.randn(B, T, H, K, dtype=torch.bfloat16, device='cuda')
         >>> k = torch.randn(B, T, H, K, dtype=torch.bfloat16, device='cuda')
@@ -308,23 +326,6 @@ def chunk_kda(
         >>> h0 = torch.randn(B, H, K, V, dtype=torch.bfloat16, device='cuda')
         >>> A_log = torch.randn(H, dtype=torch.float32, device='cuda')
         >>> dt_bias = torch.randn(H * K, dtype=torch.float32, device='cuda')
-        >>> o, ht = chunk_kda(
-            q, k, v, g, beta,
-            A_log=A_log,
-            dt_bias=dt_bias,
-            use_qk_l2norm_in_kernel=True,
-            use_gate_in_kernel=True,
-            initial_state=h0,
-            output_final_state=True
-        )
-        # GVA mode (HV > H)
-        >>> HV = 8  # 2x more value heads than qk heads
-        >>> v = torch.randn(B, T, HV, V, dtype=torch.bfloat16, device='cuda')
-        >>> g = torch.rand(B, T, HV, K, dtype=torch.bfloat16, device='cuda')
-        >>> beta = torch.rand(B, T, HV, dtype=torch.bfloat16, device='cuda')
-        >>> h0 = torch.randn(B, HV, K, V, dtype=torch.bfloat16, device='cuda')
-        >>> A_log = torch.randn(HV, dtype=torch.float32, device='cuda')
-        >>> dt_bias = torch.randn(HV * K, dtype=torch.float32, device='cuda')
         >>> o, ht = chunk_kda(
             q, k, v, g, beta,
             A_log=A_log,
@@ -349,24 +350,6 @@ def chunk_kda(
             cu_seqlens=cu_seqlens
         )
     """
-    if 'transpose_state_layout' in kwargs:
-        if state_v_first:
-            raise ValueError("Cannot pass both `state_v_first` and the deprecated `transpose_state_layout`.")
-        warnings.warn(
-            "`transpose_state_layout` is deprecated and renamed to `state_v_first`.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        state_v_first = kwargs.pop('transpose_state_layout')
-
-    if cp_context is not None:
-        assert initial_state is None, "Initial state is not supported for CP"
-        assert output_final_state is False, "Output final state is not supported for CP"
-        assert cp_context.cu_seqlens is not None, "cu_seqlens is required for CP"
-        # Override cu_seqlens and cu_seqlens_cpu with the ones from the context
-        cu_seqlens = cp_context.cu_seqlens
-        if cp_context.cu_seqlens_cpu is not None:
-            cu_seqlens_cpu = cp_context.cu_seqlens_cpu
 
     if cu_seqlens is not None:
         if q.shape[0] != 1:
@@ -387,32 +370,19 @@ def chunk_kda(
         assert "A_log" in kwargs, "A_log must be provided when use_gate_in_kernel=True."
         A_log, dt_bias = kwargs["A_log"], kwargs.get("dt_bias")
 
-    chunk_size = kwargs.pop("chunk_size", 64)
-    if chunk_size not in (32, 64):
-        raise ValueError(f"`chunk_size` must be either 32 or 64 for KDA, got {chunk_size}.")
-
     if safe_gate and use_gate_in_kernel:
         if lower_bound is None:
             raise ValueError("`lower_bound` must be specified when `safe_gate=True` and `use_gate_in_kernel=True`.")
         if not (-5 <= lower_bound < 0):
             raise ValueError(f"`lower_bound` must be in the safe range [-5, 0), got {lower_bound}.")
 
-    if allow_neg_eigval and not use_beta_sigmoid_in_kernel:
-        raise ValueError("`allow_neg_eigval=True` requires `use_beta_sigmoid_in_kernel=True`.")
-
-    # Validate head dimensions for GVA
-    B, T, H, K, HV = *q.shape, v.shape[2]
-    assert q.shape == k.shape, f"q and k must have the same shape, got q={q.shape} vs k={k.shape}"
-    assert K <= 256, f"Currently we only support key headdim <=256 for KDA, got {K}."
-    assert HV % H == 0, (
-        f"For GVA, num_v_heads (HV={HV}) must be evenly divisible by num_qk_heads (H={H}), "
-        f"but got HV % H = {HV % H}"
-    )
-    assert g.shape == (B, T, HV, K), f"g must have shape [B, T, HV, K]={[B, T, HV, K]}, got {list(g.shape)}"
-    assert beta.shape == (B, T, HV), f"beta must have shape [B, T, HV]={[B, T, HV]}, got {list(beta.shape)}"
+    assert q.shape == k.shape == g.shape, "q, k, g must have the same shape."
+    assert k.shape[-1] <= 256, "Currently we only support key headdim <=256 for KDA :-("
+    assert beta.shape == q.shape[:3], "beta must be of shape (batch size, seq len, num of head)."
+    assert v.shape == (*q.shape[:3], v.shape[-1]), "v must be of shape (batch size, seq len, num of head, head dim)."
 
     if scale is None:
-        scale = K ** -0.5
+        scale = k.shape[-1] ** -0.5
     return ChunkKDAFunction.apply(
         q,
         k,
@@ -426,15 +396,12 @@ def chunk_kda(
         output_final_state,
         use_qk_l2norm_in_kernel,
         use_gate_in_kernel,
-        use_beta_sigmoid_in_kernel,
-        allow_neg_eigval,
-        state_v_first,
         cu_seqlens,
         cu_seqlens_cpu,
         safe_gate,
         lower_bound,
-        chunk_size,
         disable_recompute,
         return_intermediate_states,
-        cp_context,
+        transpose_state_layout,
+        skip_recompute,
     )

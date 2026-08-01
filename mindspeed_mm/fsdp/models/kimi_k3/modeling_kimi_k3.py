@@ -19,25 +19,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# MIT License:
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
 import math
 from collections.abc import Sequence
 from copy import deepcopy
@@ -89,7 +70,7 @@ def set_global_param(param_name: str = None, param: Optional[torch.Tensor] = Non
         _COS = param
     else:
         raise ValueError(f"Invalid param type: '{param_name}'.")
-    
+
 
 def get_global_param(param_name: str = None) -> Optional[torch.Tensor]:
     if param_name == "sin":
@@ -386,7 +367,8 @@ class MoonVision3dPatchEmbed(nn.Module):
                  pos_emb_width: int = 14,
                  pos_emb_time: int = 4,
                  pos_emb_type: str = 'divided_fixed',
-                 patch_embed_proj_bias: bool = True):
+                 patch_embed_proj_bias: bool = True,
+                 pos_emb_interpolation_mode: str = 'bicubic'):
         super().__init__()
         assert isinstance(
             patch_size,
@@ -408,7 +390,8 @@ class MoonVision3dPatchEmbed(nn.Module):
                 height=pos_emb_height,
                 width=pos_emb_width,
                 num_frames=pos_emb_time,
-                dim=out_dim)
+                dim=out_dim,
+                interpolation_mode=pos_emb_interpolation_mode)
         else:
             raise NotImplementedError(
                 f'Not support pos_emb_type: {pos_emb_type}')
@@ -708,12 +691,12 @@ class MoonViT3dEncoder(nn.Module):
 
         if IS_NPU_AVAILABLE:
             cu_seqlens = tuple(cu_seqlens[1:].cpu().numpy().tolist())
-            
+
         cos = rope_freqs_cis.unsqueeze(-2).real.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
         sin = rope_freqs_cis.unsqueeze(-2).imag.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
         set_global_param("cos", cos)
         set_global_param("sin", sin)
-            
+
         for block in self.blocks:
             hidden_states = block(hidden_states,
                                   cu_seqlens,
@@ -776,6 +759,8 @@ class MoonViT3dPretrainedModel(PreTrainedModel):
             pos_emb_type=config.pos_emb_type,
             patch_embed_proj_bias=getattr(config, 'patch_embed_proj_bias',
                                           True),
+            pos_emb_interpolation_mode=getattr(
+                config, 'pos_emb_interpolation_mode', 'bicubic'),
         )
 
         self.encoder = MoonViT3dEncoder(
@@ -981,6 +966,8 @@ class VisionTowerConfig(PretrainedConfig):
                                              True)
         self.mlp_type = getattr(config, 'mlp_type', 'mlp2')
         self.linear_bias = getattr(config, 'linear_bias', True)
+        self.pos_emb_interpolation_mode = getattr(
+            config, 'pos_emb_interpolation_mode', 'bilinear')
 
 
 class ProjectorConfig:
@@ -1099,7 +1086,7 @@ class KimiK3ForConditionalGeneration(KimiK3PreTrainedModel):
             inputs_embeds[image_mask] = image_features
             inputs_embeds *= ~pad_mask.unsqueeze(-1)
             position_ids = (attention_mask.cumsum(-1) - 1).masked_fill_(attention_mask == 0, 1)
-            
+
             return inputs_embeds, attention_mask, labels, position_ids
 
         _, embed_dim = image_features[0].shape
@@ -1372,7 +1359,7 @@ class KimiK3ForConditionalGeneration(KimiK3PreTrainedModel):
         else:
             logits = self.language_model.lm_head(hidden_states)
             logits = logits.float()
-            
+
             loss = None
             if labels is not None:
                 # Shift so that tokens < n predict n

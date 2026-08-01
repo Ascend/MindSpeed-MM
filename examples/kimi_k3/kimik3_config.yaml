@@ -113,6 +113,10 @@ features:
      - vision_tower.encoder.blocks.{*}
      - language_model.model.layers.{*}
   enable_chunk_mbs: false
+  # ep balance
+  enable_ep_balance: false
+  ep_balance_plan:
+    max_dup_experts_num: 2
 
 # 训练配置
 training:
