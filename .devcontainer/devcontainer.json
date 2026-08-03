@@ -1,0 +1,85 @@
+{
+  "name": "MindSpeed-MM Dev",
+  "image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64",
+  // // ----- build 模式（从 Dockerfile 构建时取消注释，注释上方 image 行） -----
+  // "build": {
+  //   "dockerfile": "../docker/Dockerfile",
+  //   "context": "../docker",
+  //   // 构建时使用 host 网络，使构建容器可通过 127.0.0.1:6268 访问宿主机代理
+  //   "options": ["--network=host"],
+  //   "args": {
+  //     // PyTorch / torch_npu 版本（在线安装）
+  //     "TORCH_VERSION": "2.7.1",
+  //     "TORCH_NPU_VERSION": "2.7.1.post8",
+  //     // MindSpeed-MM 分支（dev 镜像会克隆该分支；工作区挂载会覆盖克隆内容）
+  //     "MINDSPEED_MM_BRANCH": "26.1.0",
+  //     // 构建开发镜像（非 CI 多版本镜像）
+  //     "BUILD_CI": "false",
+  //     // CANN 基础镜像版本
+  //     "BASE_IMAGE": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11",
+  //     // 以下参数对应 prepare-context.sh 暂存到上下文中的文件/目录名
+  //     "MINICONDA_SH": "miniconda.sh",
+  //     "DECORD_SCRIPT": "install_decord_on_arm.sh",
+  //     "DECORD_DEPS_DIR": "decord_deps",
+  //     "TORCH_WHL_DIR": "torch_wheels"
+  //   }
+  // },
+  // // build 模式专用：构建前在宿主机执行，下载 Miniconda、暂存辅助脚本
+  // "initializeCommand": "bash .devcontainer/prepare-context.sh",
+  // 将本地源码挂载到镜像默认工作目录，覆盖构建时克隆的仓库，实现实时编辑
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/MindSpeed-MM,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace/MindSpeed-MM",
+  "remoteUser": "root",
+  // 昇腾 NPU 设备访问。请按宿主机实际卡号调整 /dev/davinci0 索引。
+  // 若宿主机无 NPU，注释掉 runArgs 与 mounts 即可作为纯代码编辑环境使用。
+  "runArgs": [
+    "--network=host",
+    "--device=/dev/davinci0",
+    "--device=/dev/davinci1",
+    "--device=/dev/davinci_manager",
+    "--device=/dev/devmm_svm",
+    "--device=/dev/hisi_hdc",
+    "--ipc=host"
+  ],
+  "mounts": [
+    "source=/usr/local/dcmi,target=/usr/local/dcmi,type=bind",
+    "source=/usr/local/bin/npu-smi,target=/usr/local/bin/npu-smi,type=bind",
+    "source=/usr/local/Ascend/driver/lib64,target=/usr/local/Ascend/driver/lib64,type=bind",
+    "source=/usr/local/Ascend/driver/version.info,target=/usr/local/Ascend/driver/version.info,type=bind",
+    "source=/etc/ascend_install.info,target=/etc/ascend_install.info,type=bind"
+  ],
+  // 容器创建后：以可编辑模式安装项目（依赖已在镜像中预装），并配置 pre-commit
+  "postCreateCommand": "pip install -e . --no-deps && pip install pre-commit && pre-commit install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Python 核心
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        // Ruff（linting + formatting）
+        "charliermarsh.ruff",
+        // 通用
+        "eamodio.gitlens",
+        "yzhang.markdown-all-in-one",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/conda/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.autoImportCompletions": true,
+        "editor.formatOnSave": true,
+        "editor.rulers": [120],
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "yaml.schemas": {},
+        "search.exclude": {
+          "**/kernel_meta_*": true,
+          "**/.cache": true
+        }
+      }
+    }
+  }
+}

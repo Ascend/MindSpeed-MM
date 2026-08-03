@@ -17,20 +17,15 @@
 #                    then produce the final image.
 # ============================================
 
-# --- Base image arguments ---
-# OS: Operating system type, e.g. openeuler24.03 or ubuntu22.04
-ARG OS=openeuler24.03
-# BASE_IMAGE_VERSION: CANN base image version tag
-ARG BASE_IMAGE_VERSION=9.0.0-beta.2
-# NPU_TYPE: Ascend NPU model (910b / a3 / etc.)
-ARG NPU_TYPE=910b
-# BASE_IMAGE: Full base image URL; the default splicing rule is used when empty
+# BASE_IMAGE: Full base image URL; when empty, falls back to the hardcoded default below.
+# NOTE: Do not use nested ${VAR} inside ${BASE_IMAGE:-default} — Docker's :- parser
+#       stops at the first '}' and produces a malformed image name.
 ARG BASE_IMAGE=""
 
 # Stage 1 (base): Build the base runtime environment.
 # Pulls the CANN base image from the Huawei Cloud Ascend registry by default;
 # comes with CANN and Python 3.11 pre-installed.
-FROM ${BASE_IMAGE:-swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:${BASE_IMAGE_VERSION}-${NPU_TYPE}-${OS}-py3.11} AS base
+FROM ${BASE_IMAGE:-swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11} AS base
 
 # Switch to root (the CANN base image defaults to a non-root user)
 USER root
@@ -40,11 +35,9 @@ USER root
 ARG MINICONDA_SH
 # TORCH_VERSION / TORCH_NPU_VERSION: PyTorch and torch_npu versions
 ARG TORCH_VERSION=2.7.1
-ARG TORCH_NPU_VERSION=2.7.1
+ARG TORCH_NPU_VERSION=2.7.1.post8
 # TORCH_WHL_DIR: Directory containing local PyTorch .whl files (optional, for offline install)
 ARG TORCH_WHL_DIR=torch_wheels
-# OS_FAMILY: Operating system family (openeuler / ubuntu), used to select the package manager
-ARG OS_FAMILY
 
 # Detect CPU architecture and print info (x86_64 / aarch64)
 RUN ARCH=$(uname -m) && \
@@ -60,18 +53,6 @@ RUN ARCH=$(uname -m) && \
     fi && \
     echo "=========================================="
 
-# Configure DNS resolution (ensures the container can access the public internet).
-# Uses: domestic DNS (114) -> Google DNS (8.8.8.8) -> Alibaba DNS (223.5.5.5)
-RUN if [ -f /etc/resolv.conf ]; then \
-        echo "Existing resolv.conf:" && cat /etc/resolv.conf; \
-    else \
-        echo "No resolv.conf found, creating one..."; \
-    fi && \
-    echo "nameserver 114.114.114.114" > /etc/resolv.conf && \
-    echo "nameserver 8.8.8.8" >> /etc/resolv.conf && \
-    echo "nameserver 223.5.5.5" >> /etc/resolv.conf && \
-    echo "Updated resolv.conf:" && cat /etc/resolv.conf
-
 # Configure system package repositories (via external script for yum/apt sources)
 COPY configure_repo.sh /tmp/configure_repo.sh
 RUN chmod +x /tmp/configure_repo.sh && \
@@ -82,8 +63,16 @@ RUN chmod +x /tmp/configure_repo.sh && \
 # - Build toolchain: gcc/g++, make, cmake (for compiling C++ extensions like decord)
 # - Network tools:   git, wget, curl
 # - Media processing: ffmpeg and related dev libraries (for video decoding)
-RUN echo "Installing system dependencies..." && \
-    if [ "$OS_FAMILY" = "openeuler" ]; then \
+# OS family is detected from /etc/os-release (ID field), so no build arg is needed.
+RUN . /etc/os-release && \
+    DETECTED_OS_FAMILY="" && \
+    ID_LOWER=$(echo "$ID" | tr '[:upper:]' '[:lower:]') && \
+    case "$ID_LOWER" in \
+        *openeuler*) DETECTED_OS_FAMILY="openeuler" ;; \
+        *ubuntu*)    DETECTED_OS_FAMILY="ubuntu" ;; \
+    esac && \
+    echo "Installing system dependencies (ID=$ID, OS_FAMILY=$DETECTED_OS_FAMILY)..." && \
+    if [ "$DETECTED_OS_FAMILY" = "openeuler" ]; then \
         yum install -y \
             git \
             iproute \
@@ -96,7 +85,7 @@ RUN echo "Installing system dependencies..." && \
             cmake \
             ffmpeg-devel \
         && yum clean all; \
-    elif [ "$OS_FAMILY" = "ubuntu" ]; then \
+    elif [ "$DETECTED_OS_FAMILY" = "ubuntu" ]; then \
         apt-get install -y \
             git \
             iproute2 \
@@ -114,8 +103,7 @@ RUN echo "Installing system dependencies..." && \
             libswscale-dev \
         && apt-get clean; \
     else \
-        echo "ERROR: Unsupported OS: $OS_FAMILY"; \
-        exit 1; \
+        echo "ERROR: Unsupported OS ID: $ID" && exit 1; \
     fi
 
 # Install Miniconda (for creating and managing Python virtual environments).

@@ -66,7 +66,7 @@ MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，
 | Python版本 | `py3.11` | Python 3.11 |
 | 架构类型 | `aarch64` | ARM64 架构 |
 
-> CANN 版本与 TorchNPU 版本来源于构建时的基础镜像和 `--torch-npu-version` 参数。
+> CANN 版本、NPU 类型、操作系统和 Python 版本均来源于构建时基础镜像的 tag，TorchNPU 版本来源于 `--torch-npu-version` 参数。
 
 Dockerfile 命名遵循模板：`Dockerfile[.{芯片信息}.{操作系统}.{其他字段}]`
 
@@ -181,12 +181,11 @@ docker run -it --rm \
 
 ### 构建脚本参数说明
 
-构建脚本 `build.sh` 支持多种参数配置，以下默认值仅为示例，请根据实际需求调整。其中 `--base-image-version` 的默认值 `9.0.0` 仅为示例，**强烈建议通过 `--base-image` 或 `--base-image-version` 显式指定与目标环境匹配的基础镜像**。
+构建脚本 `build.sh` 支持多种参数配置。其中 CANN 版本、NPU 类型、操作系统和 Python 版本**只能**通过解析 `--base-image` 的 tag 获取，不支持手动指定。
 
-| 参数 | 说明 | 默认值（示例） |
+| 参数 | 说明 | 默认值 |
 | ------ | ------ | ------------ |
-| `-t, --npu-type` | NPU 类型：A3 或 910B（未指定时可从 `--base-image` 自动识别） | 无（必需） |
-| `-o, --os` | 操作系统：openeuler24.03 或 ubuntu22.04（未指定时可从 `--base-image` 自动识别） | openeuler24.03 |
+| `--base-image` | **必选。** 完整基础镜像名称，CANN 版本、NPU 类型、操作系统和 Python 版本均从镜像 tag 自动识别 | 无（必需） |
 | `-v, --version` | MindSpeed MM 版本标识，同时作为 Git 分支名称和脚本目录选择依据 | 26.1.0 |
 | `-m, --miniconda` | Miniconda 安装器路径（未指定时自动下载） | 无（自动下载） |
 | `-d, --decord-deps` | decord 依赖目录路径（ARM 架构下未指定时自动下载） | 无（自动下载） |
@@ -200,8 +199,6 @@ docker run -it --rm \
 | `--torch-npu-whl` | torch-npu.whl 文件路径（离线安装） | 无 |
 | `--torchvision-whl` | torchvision.whl 文件路径（可选，离线安装） | 无 |
 | `--torchaudio-whl` | torchaudio.whl 文件路径（可选，离线安装） | 无 |
-| `--base-image-version` | 基础镜像 CANN 版本（示例值，建议显式指定） | 9.0.0 |
-| `--base-image` | 完整基础镜像名称（优先级高于 `--base-image-version`，推荐使用） | 无 |
 | `--build-ci` | 构建 CI 镜像，包含多版本 conda 环境（跳过 verl + MindSpeed-MM 克隆） | 无 |
 | `--cleanup-on-fail` | 构建失败时清理悬空镜像/容器 | 无 |
 
@@ -210,28 +207,22 @@ docker run -it --rm \
 ```bash
 cd docker
 
-# 构建 A3 + openEuler 镜像（默认）
-bash build.sh -t A3
-
-# 构建 A2 + openEuler 镜像
-bash build.sh -t 910B
+# 构建 A3 + openEuler 镜像
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11
 
 # 构建 A3 + Ubuntu 镜像
-bash build.sh -t A3 -o ubuntu22.04
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-ubuntu22.04-py3.11
 
 # 指定 PyTorch 版本构建
-bash build.sh -t A3 --torch-version 2.7.1 --torch-npu-version 2.7.1
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1.post4
 
 # 使用离线 .whl 文件构建
-bash build.sh -t A3 \
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 \
     --torch-whl /path/to/torch-2.7.1+cpu-cp311-cp311-linux_x86_64.whl \
     --torch-npu-whl /path/to/torch_npu-2.7.1-cp311-cp311-linux_x86_64.whl
 
-# 指定基础镜像版本构建
-bash build.sh -t A3 --base-image-version 9.0.0
-
 # 指定版本构建
-bash build.sh -t A3 -v 26.1.0
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -v 26.1.0
 ```
 
 ### 自动下载功能说明
@@ -246,12 +237,13 @@ bash build.sh -t A3 -v 26.1.0
 
 ### 自动识别基础镜像
 
-构建脚本会自动识别基础镜像名称中的关键信息：
+构建脚本会自动从基础镜像 tag 中识别关键信息（`--base-image` 参数为必选）：
 
-1. **NPU 类型识别**：从镜像 tag 中识别NPU类型(如`a3`)
-2. **操作系统识别**：从镜像 tag 中识别 `openeuler24.03` 或 `ubuntu22.04`
-3. **CANN 版本识别**：从镜像 tag 中提取 CANN 版本号（如 `9.0.0`）
-4. **自动生成镜像 tag**：基于识别到的信息自动生成符合命名规则的镜像 tag
+1. **CANN 版本识别**：从镜像 tag 中提取 CANN 版本号（如 `9.0.0`）
+2. **NPU 类型识别**：从镜像 tag 中识别 NPU 类型（如 `a3`）
+3. **操作系统识别**：从镜像 tag 中识别 `openeuler24.03` 或 `ubuntu22.04`
+4. **Python 版本识别**：从镜像 tag 中的 `py<x.y>` 字段提取 Python 版本（如 `3.11`）
+5. **自动生成镜像 tag**：基于识别到的信息自动生成符合命名规则的镜像 tag
 
 ### 最佳实践示例
 
@@ -262,7 +254,7 @@ bash build.sh -t A3 -v 26.1.0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 自定义配置
-BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11"
+BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11"
 TORCH_VERSION="2.7.1"
 TORCH_NPU_VERSION="2.7.1.post6"
 MINDSPEED_MM_VERSION="26.0.0"
@@ -278,7 +270,7 @@ bash "${SCRIPT_DIR}/build.sh" \
 
 **关键特性说明：**
 
-1. **自动识别**：脚本会自动从 `BASE_IMAGE` 中识别 NPU 类型、操作系统（openeuler24.03）和 CANN 版本（9.0.0）。如果`BASE_IMAGE`在系统中不存在，会自动拉取。
+1. **自动识别**：脚本会自动从 `BASE_IMAGE` 中识别 CANN 版本（9.0.0）、NPU 类型（a3）、操作系统（openeuler24.03）和 Python 版本（3.11）。如果`BASE_IMAGE`在系统中不存在，会自动拉取。
 2. **自动生成 tag**：基于识别结果自动生成符合命名规则的镜像 tag。
 3. **自动下载**：如果本地没有 Miniconda 安装器或 decord 依赖，脚本会自动下载
 4. **失败清理**：`--cleanup-on-fail` 参数确保构建失败时清理悬空资源
@@ -375,7 +367,7 @@ echo "=========================================="
 
 ```bash
 # 使用 -v 参数指定版本号，构建脚本会自动找到对应的安装脚本
-bash build.sh -t A3 -v 26.1.0
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -v 26.1.0
 ```
 
 #### 5. 更新文档

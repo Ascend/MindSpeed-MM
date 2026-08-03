@@ -26,7 +26,9 @@ cleanup_dangling() {
 # Dockerfile naming: Dockerfile (unified, supports all NPU types and OS)
 # Image tag naming: {version}-cann{cann_version}-torch_npu{torch_npu_version}-{chip}-{os}-py{python_version}-{architecture}
 # Usage:
-#   bash build.sh -t A3 [-m /path/to/miniconda.sh] [-o ubuntu22.04]
+#   bash build.sh --base-image <base-image> [-m /path/to/miniconda.sh]
+# CANN version, NPU type, OS and Python version are auto-detected from the
+# base image tag and cannot be specified manually.
 # ============================================
 
 set -e
@@ -42,7 +44,8 @@ Usage: $0 [OPTIONS]
 Build MindSpeed MM Docker Image
 
 Required:
-    -t, --npu-type TYPE      NPU type: A3 or 910B (auto-detected from --base-image if not specified)
+    --base-image IMAGE       Full base image name (e.g. swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11)
+                             CANN version, NPU type, OS and Python version are auto-detected from the image tag.
 
 Optional:
     -m, --miniconda PATH     Miniconda installer path (auto-download if not specified)
@@ -51,7 +54,6 @@ Optional:
     -i, --image-name NAME    Image name (default: mindspeed-mm:v{version}-cann{cann_ver}-torch_npu{torch_npu_ver}-{chip}-{os}-py{py_ver}-{arch})
     --tag TAG                Custom image tag (overrides the default tag; keeps repo name 'mindspeed-mm')
     -n, --no-cache           Build without cache
-    -o, --os OS              OS: openeuler24.03 or ubuntu22.04 (auto-detected from --base-image if not specified)
     -v, --version VERSION    MindSpeed MM version (default: 26.1.0, determines model install scripts)
     --torch-version VER      PyTorch version (default: 2.7.1, for online install)
     --torch-npu-version VER  torch-npu version (default: 2.7.1, for online install)
@@ -59,14 +61,11 @@ Optional:
     --torch-npu-whl PATH     torch-npu .whl file path (offline install)
     --torchvision-whl PATH   torchvision .whl file path (optional, offline install)
     --torchaudio-whl PATH    torchaudio .whl file path (optional, offline install)
-    --base-image-version VER Base image CANN version (default: 9.0.0, example only; recommended to specify via --base-image or --base-image-version)
-    --base-image IMAGE       Full base image name (higher priority than --base-image-version; recommended)
     --build-ci               Build CI image with multi-version conda environments (skip verl + MindSpeed-MM clone)
     --cleanup-on-fail        Clean up dangling images/containers if build fails
     -h, --help               Show help
 
 Dockerfile naming convention: Dockerfile (unified, supports all NPU types and OS)
-    NPU type and OS are passed as build arguments
 
 Image tag naming convention: {version}-cann{cann_version}-torch_npu{torch_npu_version}-{chip}-{os}-py{python_version}-{architecture}[-ci]
     e.g. v26.0.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-x86_64
@@ -74,51 +73,39 @@ Image tag naming convention: {version}-cann{cann_version}-torch_npu{torch_npu_ve
          v26.1.0-cann9.0.0-torch_npu2.7.1-910b-openeuler24.03-py3.11-aarch64-ci   (CI build via --build-ci)
 
 Examples:
-    bash $0 -t A3
-    bash $0 -t A3 -o ubuntu22.04
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-beta.2-910b-openeuler24.03-py3.11
-    bash $0 -t 910B --torch-version 2.7.1 --torch-npu-version 2.7.1
-    bash $0 -t A3 --base-image-version 9.0.0
-    bash $0 -t A3 -i myproject/mindspeed-mm:v1.0
-    bash $0 -t A3 --torch-whl /path/to/torch.whl --torch-npu-whl /path/to/torch_npu.whl
-    bash $0 -t 910B --build-ci                           # Build CI image (tag auto-appends '-ci')
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -i myproject/mindspeed-mm:v1.0
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --torch-whl /path/to/torch.whl --torch-npu-whl /path/to/torch_npu.whl
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11 --build-ci   # Build CI image (tag auto-appends '-ci')
 EOF
 }
 
-NPU_TYPE=""
 MINICONDA_PATH=""
 DECORD_DEPS_PATH=""
 DECORD_SCRIPT_PATH=""
 IMAGE_NAME=""
 IMAGE_TAG=""
 NO_CACHE=""
-OS="openeuler24.03"
 TORCH_VERSION="2.7.1"
 TORCH_NPU_VERSION="2.7.1"
 TORCH_WHL_PATH=""
 TORCH_NPU_WHL_PATH=""
 TORCHVISION_WHL_PATH=""
 TORCHAUDIO_WHL_PATH=""
-# Default value is an example only. It is recommended to explicitly specify the
-# base image via --base-image or --base-image-version to match your target environment.
-BASE_IMAGE_VERSION="9.0.0"
+BASE_IMAGE=""
 MINDSPEED_MM_VERSION="26.1.0"
-PYTHON_VERSION="3.11"
-NPU_TYPE_EXPLICIT=false
-OS_EXPLICIT=false
 CLEANUP_ON_FAIL=false
 BUILD_CI=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -t|--npu-type)      NPU_TYPE="$2"; NPU_TYPE_EXPLICIT=true; shift 2 ;;
         -m|--miniconda)     MINICONDA_PATH="$2"; shift 2 ;;
         -d|--decord-deps)   DECORD_DEPS_PATH="$2"; shift 2 ;;
         -s|--decord-script) DECORD_SCRIPT_PATH="$2"; shift 2 ;;
         -i|--image-name)    IMAGE_NAME="$2"; shift 2 ;;
         --tag)              IMAGE_TAG="$2"; shift 2 ;;
         -n|--no-cache)      NO_CACHE="--no-cache"; shift ;;
-        -o|--os)            OS="$2"; OS_EXPLICIT=true; shift 2 ;;
         -v|--version)       MINDSPEED_MM_VERSION="$2"; shift 2 ;;
         --torch-version)    TORCH_VERSION="$2"; shift 2 ;;
         --torch-npu-version) TORCH_NPU_VERSION="$2"; shift 2 ;;
@@ -126,7 +113,6 @@ while [[ $# -gt 0 ]]; do
         --torch-npu-whl)    TORCH_NPU_WHL_PATH="$2"; shift 2 ;;
         --torchvision-whl)  TORCHVISION_WHL_PATH="$2"; shift 2 ;;
         --torchaudio-whl)   TORCHAUDIO_WHL_PATH="$2"; shift 2 ;;
-        --base-image-version) BASE_IMAGE_VERSION="$2"; shift 2 ;;
         --base-image)       BASE_IMAGE="$2"; shift 2 ;;
         --build-ci)         BUILD_CI=true; shift ;;
         --cleanup-on-fail)  CLEANUP_ON_FAIL=true; shift ;;
@@ -172,6 +158,12 @@ parse_base_image_tag() {
         detected_cann="${tag_lower%%-*}"
     fi
 
+    # Python version: match 'py<x.y>' field in the tag (e.g. py3.11 -> 3.11)
+    local detected_python=""
+    if [[ "$tag_lower" =~ py([0-9]+\.[0-9]+) ]]; then
+        detected_python="${BASH_REMATCH[1]}"
+    fi
+
     if [ -n "$detected_npu" ]; then
         DETECTED_NPU_TYPE="$detected_npu"
         echo ">>> Auto-detected NPU type from base image: $detected_npu"
@@ -187,33 +179,56 @@ parse_base_image_tag() {
         echo ">>> Auto-detected OS from base image: $detected_os"
     fi
 
+    if [ -n "$detected_python" ]; then
+        DETECTED_PYTHON_VERSION="$detected_python"
+        echo ">>> Auto-detected Python version from base image: $detected_python"
+    fi
+
     return 0
 }
 
 DETECTED_NPU_TYPE=""
 DETECTED_OS=""
 DETECTED_CANN_VERSION=""
+DETECTED_PYTHON_VERSION=""
 
-if [ -n "$BASE_IMAGE" ]; then
-    echo ">>> Auto-detecting NPU type, OS, and CANN version from base image..."
-    parse_base_image_tag "$BASE_IMAGE"
-
-    if [ "$NPU_TYPE_EXPLICIT" = false ] && [ -n "$DETECTED_NPU_TYPE" ]; then
-        NPU_TYPE="$DETECTED_NPU_TYPE"
-        echo ">>> Using auto-detected NPU type: $NPU_TYPE"
-    fi
-
-    if [ "$OS_EXPLICIT" = false ] && [ -n "$DETECTED_OS" ]; then
-        OS="$DETECTED_OS"
-        echo ">>> Using auto-detected OS: $OS"
-    fi
-fi
-
-if [ -z "$NPU_TYPE" ]; then
-    echo "Error: NPU type is required (-t or --npu-type) or provide --base-image for auto-detection"
+if [ -z "$BASE_IMAGE" ]; then
+    echo "Error: --base-image is required. CANN version, NPU type, OS and Python version are auto-detected from the base image tag."
     show_help
     exit 1
 fi
+
+echo ">>> Auto-detecting NPU type, OS, CANN version and Python version from base image..."
+parse_base_image_tag "$BASE_IMAGE"
+
+if [ -z "$DETECTED_NPU_TYPE" ]; then
+    echo "Error: Failed to detect NPU type from base image tag (expected '910b' or 'a3')."
+    exit 1
+fi
+NPU_TYPE="$DETECTED_NPU_TYPE"
+
+if [ -z "$DETECTED_OS" ]; then
+    echo "Error: Failed to detect OS from base image tag (expected 'openeuler24.03' or 'ubuntu22.04')."
+    exit 1
+fi
+OS="$DETECTED_OS"
+
+if [ -z "$DETECTED_CANN_VERSION" ]; then
+    echo "Error: Failed to detect CANN version from base image tag."
+    exit 1
+fi
+CANN_VERSION="$DETECTED_CANN_VERSION"
+
+if [ -z "$DETECTED_PYTHON_VERSION" ]; then
+    echo "Error: Failed to detect Python version from base image tag (expected 'py<x.y>' field, e.g. py3.11)."
+    exit 1
+fi
+PYTHON_VERSION="$DETECTED_PYTHON_VERSION"
+
+echo ">>> Using detected NPU type:    $NPU_TYPE"
+echo ">>> Using detected OS:          $OS"
+echo ">>> Using detected CANN version: $CANN_VERSION"
+echo ">>> Using detected Python:      $PYTHON_VERSION"
 
 NPU_TYPE=$(echo "$NPU_TYPE" | tr '[:lower:]' '[:upper:]')
 NPU_TYPE_LOWER=$(echo "$NPU_TYPE" | tr '[:upper:]' '[:lower:]')
@@ -319,15 +334,6 @@ if [[ "$MINICONDA_NAME" == *"aarch64"* ]]; then
     ARCH_NAME="aarch64"
 fi
 
-# Determine CANN version for the image tag:
-#   - From the base image tag (auto-detected) when --base-image is provided
-#   - From --base-image-version otherwise
-if [ -n "$BASE_IMAGE" ] && [ -n "$DETECTED_CANN_VERSION" ]; then
-    CANN_VERSION="$DETECTED_CANN_VERSION"
-else
-    CANN_VERSION="$BASE_IMAGE_VERSION"
-fi
-
 if [ -n "$IMAGE_NAME" ] && [ -n "$IMAGE_TAG" ]; then
     echo "Warning: both --image-name and --tag provided; --image-name takes precedence (--tag ignored)"
 fi
@@ -404,14 +410,15 @@ fi
 echo "=========================================="
 echo "Build Configuration"
 echo "=========================================="
+echo "Base Image:         ${BASE_IMAGE}"
 echo "NPU Type:           ${NPU_TYPE}"
 echo "OS:                 ${OS}"
+echo "CANN Version:       ${CANN_VERSION}"
+echo "Python Version:     ${PYTHON_VERSION}"
 echo "CPU Architecture:   ${ARCH_NAME}"
 echo "Dockerfile:         ${DOCKERFILE}"
 echo "Image Name:         ${IMAGE_NAME}"
 echo "Image Tag:          ${IMAGE_TAG:-(auto)}"
-echo "Base Image Version: ${BASE_IMAGE_VERSION}"
-echo "CANN Version:       ${CANN_VERSION}"
 echo "PyTorch Version:    ${TORCH_VERSION}"
 echo "torch-npu Version:  ${TORCH_NPU_VERSION}"
 echo "MindSpeed MM Ver:   ${MINDSPEED_MM_VERSION}"
@@ -434,21 +441,19 @@ echo "Build CI:           ${BUILD_CI}"
 echo "No Cache:           ${NO_CACHE:-No}"
 echo "=========================================="
 
-if [ -n "$BASE_IMAGE" ]; then
-    echo ""
-    echo ">>> Checking if base image exists..."
-    if ! docker image inspect "$BASE_IMAGE" > /dev/null 2>&1; then
-        echo ">>> Base image not found, pulling: ${BASE_IMAGE}"
-        docker pull "$BASE_IMAGE"
-        if [ $? -ne 0 ]; then
-            echo "Error: Failed to pull base image"
-            exit 1
-        fi
-    else
-        echo ">>> Base image already exists: ${BASE_IMAGE}"
+echo ""
+echo ">>> Checking if base image exists..."
+if ! docker image inspect "$BASE_IMAGE" > /dev/null 2>&1; then
+    echo ">>> Base image not found, pulling: ${BASE_IMAGE}"
+    docker pull "$BASE_IMAGE"
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to pull base image"
+        exit 1
     fi
-    echo ""
+else
+    echo ">>> Base image already exists: ${BASE_IMAGE}"
 fi
+echo ""
 
 cd "$SCRIPT_DIR"
 
@@ -506,9 +511,7 @@ fi
 
 BUILD_ARGS="--build-arg MINICONDA_SH=${MINICONDA_NAME}"
 BUILD_ARGS="$BUILD_ARGS --build-arg DECORD_SCRIPT=${DECORD_SCRIPT_NAME}"
-BUILD_ARGS="$BUILD_ARGS --build-arg OS=${OS}"
 BUILD_ARGS="$BUILD_ARGS --build-arg OS_FAMILY=${OS_FAMILY}"
-BUILD_ARGS="$BUILD_ARGS --build-arg NPU_TYPE=${NPU_TYPE_LOWER}"
 BUILD_ARGS="$BUILD_ARGS --build-arg TORCH_VERSION=${TORCH_VERSION}"
 BUILD_ARGS="$BUILD_ARGS --build-arg TORCH_NPU_VERSION=${TORCH_NPU_VERSION}"
 BUILD_ARGS="$BUILD_ARGS --build-arg TORCH_WHL_DIR=torch_wheels"
@@ -519,11 +522,8 @@ if [ "$BUILD_CI" = true ]; then
     BUILD_ARGS="$BUILD_ARGS --build-arg FINAL_WORKDIR=/workspace"
 fi
 
-if [ -n "$BASE_IMAGE" ]; then
-    BUILD_ARGS="$BUILD_ARGS --build-arg BASE_IMAGE=${BASE_IMAGE}"
-else
-    BUILD_ARGS="$BUILD_ARGS --build-arg BASE_IMAGE_VERSION=${BASE_IMAGE_VERSION}"
-fi
+# Always pass the full BASE_IMAGE to the Dockerfile (required, auto-detected values come from its tag).
+BUILD_ARGS="$BUILD_ARGS --build-arg BASE_IMAGE=${BASE_IMAGE}"
 
 BUILD_ARGS="$BUILD_ARGS --build-arg DECORD_DEPS_DIR=${DECORD_DEPS_NAME}"
 

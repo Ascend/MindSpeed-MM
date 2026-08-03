@@ -66,7 +66,7 @@ Taking `v26.1.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-aarch64` as an
 | Python version | `py3.11` | Python 3.11 |
 | architecture | `aarch64` | ARM64 architecture |
 
-> The CANN version and TorchNPU version are derived from the base image and the `--torch-npu-version` parameter at build time.
+> The CANN version, NPU type, OS, and Python version are all derived from the base image tag. The TorchNPU version comes from the `--torch-npu-version` parameter at build time.
 
 Dockerfile naming follows the template: `Dockerfile[.{chip info}.{OS}.{other fields}]`
 
@@ -181,12 +181,11 @@ The image includes the following pre-configured environments:
 
 ### Build Script Parameter Description
 
-The build script `build.sh` supports multiple parameter configurations. The following default values are examples only; please adjust according to actual needs. The default value `9.0.0` for `--base-image-version` is an example only. **It is strongly recommended to explicitly specify the base image matching your target environment via `--base-image` or `--base-image-version`.**
+The build script `build.sh` supports multiple parameter configurations. The CANN version, NPU type, OS, and Python version are **only** obtained by parsing the `--base-image` tag — they cannot be specified manually.
 
-| Parameter | Description | Default (Example) |
+| Parameter | Description | Default |
 | ------ | ------ | ------------ |
-| `-t, --npu-type` | NPU type: A3 or 910B (auto-detected from `--base-image` if not specified) | None (required) |
-| `-o, --os` | Operating system: openeuler24.03 or ubuntu22.04 (auto-detected from `--base-image` if not specified) | openeuler24.03 |
+| `--base-image` | **Required.** Full base image name. CANN version, NPU type, OS, and Python version are auto-detected from the image tag | None (required) |
 | `-v, --version` | MindSpeed MM version identifier, also used as Git branch name and script directory selection basis | 26.1.0 |
 | `-m, --miniconda` | Miniconda installer path (auto-downloaded if not specified) | None (auto-download) |
 | `-d, --decord-deps` | decord dependencies directory path (auto-downloaded for ARM if not specified) | None (auto-download) |
@@ -200,8 +199,6 @@ The build script `build.sh` supports multiple parameter configurations. The foll
 | `--torch-npu-whl` | torch-npu.whl file path (offline installation) | None |
 | `--torchvision-whl` | torchvision.whl file path (optional, offline installation) | None |
 | `--torchaudio-whl` | torchaudio.whl file path (optional, offline installation) | None |
-| `--base-image-version` | Base image CANN version (example value; recommended to specify explicitly) | 9.0.0 |
-| `--base-image` | Complete base image name (higher priority than `--base-image-version`; recommended) | None |
 | `--build-ci` | Build CI image with multi-version conda environments (skip verl + MindSpeed-MM clone) | None |
 | `--cleanup-on-fail` | Clean up dangling images/containers on build failure | None |
 
@@ -210,28 +207,22 @@ The build script `build.sh` supports multiple parameter configurations. The foll
 ```bash
 cd docker
 
-# Build A3 + openEuler image (default)
-bash build.sh -t A3
-
-# Build A2 + openEuler image
-bash build.sh -t 910B
+# Build A3 + openEuler image
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11
 
 # Build A3 + Ubuntu image
-bash build.sh -t A3 -o ubuntu22.04
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-ubuntu22.04-py3.11
 
 # Build with specified PyTorch version
-bash build.sh -t A3 --torch-version 2.7.1 --torch-npu-version 2.7.1
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1.post4
 
 # Build with offline .whl files
-bash build.sh -t A3 \
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 \
     --torch-whl /path/to/torch-2.7.1+cpu-cp311-cp311-linux_x86_64.whl \
     --torch-npu-whl /path/to/torch_npu-2.7.1-cp311-cp311-linux_x86_64.whl
 
-# Build with specified base image version
-bash build.sh -t A3 --base-image-version 9.0.0
-
 # Build with specified version
-bash build.sh -t A3 -v 26.1.0
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -v 26.1.0
 ```
 
 ### Automatic Download Function Description
@@ -246,12 +237,13 @@ The build script supports automatic download of the following resources. Please 
 
 ### Automatic Base Image Recognition
 
-The build script automatically recognizes key information from the base image name:
+The build script automatically recognizes key information from the base image tag (the `--base-image` parameter is required):
 
-1. **NPU type recognition**: Recognizes the NPU type (e.g., `a3`) from the image tag
-2. **Operating system recognition**: Recognizes `openeuler24.03` or `ubuntu22.04` from the image tag
-3. **CANN version recognition**: Extracts the CANN version number (e.g., `9.0.0`) from the image tag
-4. **Automatic image tag generation**: Automatically generates image tags conforming to naming rules based on recognized information
+1. **CANN version recognition**: Extracts the CANN version number (e.g., `9.0.0`) from the image tag
+2. **NPU type recognition**: Recognizes the NPU type (e.g., `a3`) from the image tag
+3. **Operating system recognition**: Recognizes `openeuler24.03` or `ubuntu22.04` from the image tag
+4. **Python version recognition**: Extracts the Python version (e.g., `3.11`) from the `py<x.y>` field in the image tag
+5. **Automatic image tag generation**: Automatically generates image tags conforming to naming rules based on recognized information
 
 ### Best Practice Example
 
@@ -262,7 +254,7 @@ The following example shows how to build a MindSpeed MM image using a custom bas
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Custom configuration
-BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11"
+BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11"
 TORCH_VERSION="2.7.1"
 TORCH_NPU_VERSION="2.7.1.post6"
 MINDSPEED_MM_VERSION="26.0.0"
@@ -278,7 +270,7 @@ bash "${SCRIPT_DIR}/build.sh" \
 
 **Key Feature Description:**
 
-1. **Automatic recognition**: The script automatically recognizes the NPU type, operating system (openeuler24.03), and CANN version (9.0.0) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
+1. **Automatic recognition**: The script automatically recognizes the CANN version (9.0.0), NPU type (a3), operating system (openeuler24.03), and Python version (3.11) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
 2. **Automatic tag generation**: Automatically generates image tags conforming to the naming rules based on recognition results.
 3. **Automatic download**: If the Miniconda installer or decord dependencies are not available locally, the script will automatically download them
 4. **Failure cleanup**: The `--cleanup-on-fail` parameter ensures cleanup of dangling resources if the build fails
@@ -375,7 +367,7 @@ Build an image containing the new model environment using the following command:
 
 ```bash
 # Use the -v parameter to specify the version number, and the build script will automatically find the corresponding installation script
-bash build.sh -t A3 -v 26.1.0
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -v 26.1.0
 ```
 
 #### 5. Update Documentation

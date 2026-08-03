@@ -19,6 +19,7 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
       - id: check-json
+        exclude: \.devcontainer/devcontainer\.json$
 
   # -------------------------- Python 核心检查 --------------------------
   # codespell
