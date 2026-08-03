@@ -15,6 +15,8 @@
   - [安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc)
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
+  - [权重加载](#2-权重加载)
+  - [权重保存](#3-权重保存)
 - [数据集准备及处理](#数据集准备及处理)
 - [微调](#微调)
   - [准备工作](#1-准备工作)
@@ -134,7 +136,13 @@ pip list | grep fla_npu
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
 
-如果使用fsdp2的meta init初始化模型或MoE模型需要支持mtp，都需要先根据模型配置完成以下权重转换：
+<a id="jump2.2"></a>
+
+### 2. 权重加载
+
+当前支持huggingface权重或dcp权重加载，在`xxx_config.yaml`中`training->load_format`字段中配置加载权重的类型，支持`hf`, `dcp`和`auto`，设置为`auto`时会根据权重文件格式自行判断权重类型。
+
+如果需要加载dcp权重，请先根据模型配置完成以下hf权重到dcp权重的转换：
 
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
@@ -156,7 +164,19 @@ mm-convert Qwen35Converter hf_to_dcp \
 并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 注意：如果MoE模型不支持mtp，可在执行`mm-convert`权重转换前将`ckpt/hf_path/xxxxxxx/config.json`中的`mtp_num_hidden_layers`设置为0，以跳过mtp专家权重合并，缩短转换时间，如397B模型可以缩短约5分钟。
 
-MindSpeed MM保存权重的格式也为dcp格式，可使用如下命令将dcp权重转换回HF权重：
+<a id="jump2.3"></a>
+
+### 3. 权重保存
+
+MindSpeed MM保存权重类型支持huggingface格式和dcp格式，在`xxx_config.yaml`中`training->save_format`字段中配置保存权重的类型，支持`hf`, `dcp`和`auto`:
+
+（1）`save_format`配置为`auto`时,保存权重类型与加载权重类型保持一致;
+
+（2）`save_format`配置为`hf`时,会将保存权重文件转换为safetensors格式;
+
+**注意：hf保存格式仅支持保存权重，不支持保存优化器状态和随机数状态，若需要进行断点续训，请保存为dcp格式**
+
+（3）`save_format`配置为`dcp`时,可使用如下命令将dcp权重转换回hf权重：
 
 ```bash
 # 待转换的dcp权重目录结构样例为：
