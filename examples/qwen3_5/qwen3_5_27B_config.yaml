@@ -97,7 +97,6 @@ features:
       apply_modules:
         - model.visual.blocks.{*}
         - model.language_model.layers.{*}
-        - mtp.layers.{*}
   # chunkloss配置
   enable_chunk_loss: true
   chunkloss_plan:
@@ -109,7 +108,6 @@ features:
     apply_modules:
      - model.visual.blocks.{*}
      - model.language_model.layers.{*}
-     - mtp.layers.{*}
   # chunkmbs配置
   enable_chunk_mbs: false
   chunkmbs_plan:
