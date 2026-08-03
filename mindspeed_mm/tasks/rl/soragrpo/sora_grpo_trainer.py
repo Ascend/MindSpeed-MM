@@ -32,6 +32,7 @@ from mindspeed_mm.tasks.rl.soragrpo.utils.communications_flux import sp_parallel
 from mindspeed_mm.tasks.rl.soragrpo.utils.fsdp_util import get_dit_fsdp_kwargs, apply_fsdp_checkpointing
 from mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states import initialize_sequence_parallel_state, \
     get_sequence_parallel_state, destroy_sequence_parallel_group
+from mindspeed_mm.tasks.rl.soragrpo.utils.device import check_npu_version, NPUVersion
 
 
 class SoraGRPOTrainer(ABC):
@@ -69,7 +70,9 @@ class SoraGRPOTrainer(ABC):
         if world_size <= 8:
             os.environ['HCCL_DETERMINISTIC'] = 'true'
         elif world_size >= 16:
-            os.environ['HCCL_OP_EXPANSION_MODE'] = 'AIV'
+            # 950服务器不需要设置 HCCL_OP_EXPANSION_MODE=AIV
+            if not check_npu_version(min_version=NPUVersion.A5):
+                os.environ['HCCL_OP_EXPANSION_MODE'] = 'AIV'
 
         # We use different seeds for the noise generation in each process to ensure that the noise is different in a batch.
         if args.seed is not None:
@@ -240,6 +243,9 @@ class SoraGRPOTrainer(ABC):
                     print(f"rank {torch.distributed.get_rank()} profile complete")
 
                 step_time = time.time() - start_time
+                if torch.distributed.get_rank() == 0:
+                    print('===========================')
+                    print('step_time:', step_time)
                 step_times.append(step_time)
 
                 progress_bar.set_postfix(
@@ -265,14 +271,25 @@ class SoraGRPOTrainer(ABC):
         lr_scheduler = self.lr_scheduler
 
         total_loss = 0.0
+        total_loss_addnum = 0
         optimizer.zero_grad()
 
+        # Measure sample_reference (rollout) time
+        rollout_start_time = time.time()
         samples_batched_list, train_timesteps, sigma_schedule, perms = self.sample_reference(dataloader)
+        rollout_time = time.time() - rollout_start_time
+
+        # Initialize sft time tracking
+        total_sft_time = 0.0
+        num_sft_calls = 0
 
         for i, sample in list(enumerate(samples_batched_list)):
             for j in range(train_timesteps):
                 clip_range = args.clip_range
                 adv_clip_max = args.adv_clip_max
+
+                # Measure sft time including grpo_one_step, loss calculation and backward
+                sft_start_time = time.time()
                 new_log_probs = self.grpo_one_step(
                     sample,
                     perms[i][j],
@@ -296,9 +313,13 @@ class SoraGRPOTrainer(ABC):
                         args.gradient_accumulation_steps * train_timesteps)
 
                 loss.backward()
+                sft_time = time.time() - sft_start_time
+                total_sft_time += sft_time
+                num_sft_calls += 1
                 avg_loss = loss.detach().clone()
                 dist.all_reduce(avg_loss, op=dist.ReduceOp.AVG)
                 total_loss += avg_loss.item()
+                total_loss_addnum += 1
 
             if dist.get_rank() % self.world_size == 0:
                 print("hps reward", sample["rewards"].item())
@@ -312,6 +333,18 @@ class SoraGRPOTrainer(ABC):
                 lr_scheduler.step()
                 optimizer.zero_grad()
             dist.barrier()
+
+        # Calculate average sft time
+        avg_sft_time = total_sft_time / num_sft_calls if num_sft_calls > 0 else 0
+        if dist.get_rank() == 0:
+            print("train step total_loss(sum)=", total_loss)
+            print("----------------loss mean---------------")
+            print("train step total_loss=", total_loss / total_loss_addnum)
+            print("----------------time statistics---------------")
+            print(f"rollout time: {rollout_time:.4f} seconds")
+            print(f"average sft time: {avg_sft_time:.4f} seconds")
+            print(f"total sft time: {total_sft_time:.4f} seconds")
+            print(f"number of sft calls: {num_sft_calls}")
         return total_loss, grad_norm.item()
 
     @abstractmethod
@@ -612,6 +645,12 @@ class SoraGRPOTrainer(ABC):
             type=int,
             default=8,
             help="load rank batch size",
+        )
+        parser.add_argument(
+            "--save_images",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="whether to save sampled images during training; disable for pure perf testing",
         )
         parser = mm_extra_args_provider(parser)
         return parser.parse_args()

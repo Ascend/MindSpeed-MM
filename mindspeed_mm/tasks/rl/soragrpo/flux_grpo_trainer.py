@@ -10,6 +10,7 @@
 # This modified file is released under the same license.
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 import torch
 import torch.distributed as dist
@@ -19,8 +20,19 @@ from tqdm.auto import tqdm
 from mindspeed_mm.tasks.rl.soragrpo.sora_grpo_trainer import SoraGRPOTrainer
 from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_model import FluxGRPOModel
 
-
 class FluxGRPOTrainer(SoraGRPOTrainer):
+    def __init__(self, train_valid_test_dataset_provider):
+        super().__init__(train_valid_test_dataset_provider)
+        self.step_counter = 0
+        self._image_save_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="image_saver")
+
+    def train(self):
+        try:
+            super().train()
+        finally:
+            self._image_save_executor.shutdown(wait=True)
+            print("Image save executor has been shut down")
+
     def model_provider(self, args):
         return FluxGRPOModel(args, device=self.device)
 
@@ -157,6 +169,7 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
         # dict of lists -> list of dicts for easier iteration
         samples_batched_list = [dict(zip(samples_batched, x)) for x in zip(*samples_batched.values())]
         train_timesteps = int(len(samples["timesteps"][0]) * args.timestep_fraction)
+        self.step_counter += 1
         return samples_batched_list, train_timesteps, sigma_schedule, perms
 
     def sample_reference_model(self, args, caption, encoder_hidden_states, pooled_prompt_embeds, text_ids):
@@ -236,8 +249,10 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
                     image_processor = VaeImageProcessor(16)
                     batch_decoded_images = image_processor.postprocess(image)
 
-            for idx, image in zip(batch_idx, batch_decoded_images):
-                image.save(f"./images/flux_{rank}_{idx}.png")
+            if args.save_images:
+                for idx, image in zip(batch_idx, batch_decoded_images):
+                    os.makedirs(f"./images/flux_grpo/step{self.step_counter}", exist_ok=True)
+                    self._image_save_executor.submit(self._image_save_async, image, f"./images/flux_grpo/step{self.step_counter}/rank{rank}_idx{idx}.png")
 
             batch_caption = [caption[i] for i in batch_idx]
             if args.use_hpsv2:
@@ -344,3 +359,10 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
         )
 
         return latent_image_ids.to(device=device, dtype=dtype)
+
+    @staticmethod
+    def _save_image_async(image, filepath):
+        try:
+            image.save(filepath)
+        except Exception as e:
+            print(f"Error saving image {filepath}: {e}")

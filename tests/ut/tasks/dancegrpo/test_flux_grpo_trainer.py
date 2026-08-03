@@ -114,6 +114,7 @@ class TestFluxGRPOTrainer(unittest.TestCase):
                 trainer.args.shift = 3.0
                 trainer.args.use_hpsv2 = True
                 trainer.args.num_generations = 12
+                trainer.args.save_images = False
 
                 trainer.hyper_model = MagicMock()
                 trainer.hyper_model.diffuser = MagicMock()
