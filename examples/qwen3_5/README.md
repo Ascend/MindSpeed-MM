@@ -97,6 +97,17 @@ git checkout c2e3d83f
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
 
+> **说明：** 请确保操作系统已安装 `gawk`，否则后续安装会失败。可参考以下命令安装：
+
+```shell
+# Ubuntu / Debian
+apt-get update
+apt-get install gawk
+# openEuler / CentOS / RHEL
+yum update
+yum install gawk
+```
+
 推荐使用以下安装命令
 
 ```shell

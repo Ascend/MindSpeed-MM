@@ -84,6 +84,7 @@ RUN . /etc/os-release && \
             make \
             cmake \
             ffmpeg-devel \
+            gawk \
         && yum clean all; \
     elif [ "$DETECTED_OS_FAMILY" = "ubuntu" ]; then \
         apt-get install -y \
@@ -101,6 +102,7 @@ RUN . /etc/os-release && \
             libavformat-dev \
             libavutil-dev \
             libswscale-dev \
+            gawk \
         && apt-get clean; \
     else \
         echo "ERROR: Unsupported OS ID: $ID" && exit 1; \
