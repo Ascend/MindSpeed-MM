@@ -4,32 +4,33 @@
 
 ### 产品版本信息
 
-<table><tbody><tr><th class="firstcol" valign="top" width="26.25%"><p>产品名称</p>
-</th>
-<td class="cellrowborder" valign="top" width="73.75%"><p><span>MindSpeed MM</span></p>
-</td>
-</tr>
-<tr><th class="firstcol" valign="top" width="26.25%"><p>产品版本</p>
-</th>
-<td class="cellrowborder" valign="top" width="73.75%" ><p>26.1.0</p>
-</td>
-</tr>
-<tr><th class="firstcol" valign="top" width="26.25%"><p>版本类型</p>
-</th>
-<td class="cellrowborder" valign="top" width="73.75%" ><p>正式版本</p>
-</td>
-</tr>
-<tr><th class="firstcol" valign="top" width="26.25%" id="mcps1.1.3.4.1"><p>发布时间</p>
-</th>
-<td class="cellrowborder" valign="top" width="73.75%" headers="mcps1.1.3.4.1 "><p>2026年7月</p>
-</td>
-</tr>
-<tr><th class="firstcol" valign="top" width="26.25%"><p>维护周期</p>
-</th>
-<td class="cellrowborder" valign="top" width="73.75%"><p>6个月</p>
-</td>
-</tr>
-</tbody>
+<table>
+  <tbody>
+    <tr>
+      <th class="firstcol" valign="top" width="26.25%"><p>产品名称</p></th>
+      <td class="cellrowborder" valign="top" width="73.75%"><p>MindSpeed</p></td>
+    </tr>
+    <tr>
+      <th class="firstcol" valign="top" width="26.25%"><p>产品版本</p></th>
+      <td class="cellrowborder" valign="top" width="73.75%"><p>26.1.0</p></td>
+    </tr>
+    <tr>
+      <th class="firstcol" valign="top" width="26.25%"><p>版本类型</p></th>
+      <td class="cellrowborder" valign="top" width="73.75%"><p>正式版本</p></td>
+    </tr>
+    <tr>
+      <th class="firstcol" valign="top" width="26.25%"><p>组件名称</p></th>
+      <td class="cellrowborder" valign="top" width="73.75%"><p>MindSpeed MM</p></td>
+    </tr>
+    <tr>
+      <th class="firstcol" valign="top" width="26.25%"><p>发布时间</p></th>
+      <td class="cellrowborder" valign="top" width="73.75%"><p>2026年7月</p></td>
+    </tr>
+    <tr>
+      <th class="firstcol" valign="top" width="26.25%"><p>维护周期</p></th>
+      <td class="cellrowborder" valign="top" width="73.75%"><p>6个月</p></td>
+    </tr>
+  </tbody>
 </table>
 
 > [!NOTE]
@@ -56,7 +57,7 @@
 >
 > 本节表格中“/”表示不可配套，“Y”表示可配套。
 
-**表 2**  MindSpeed MM与Ascend Extention for PyTorch版本兼容
+**表 2**  MindSpeed MM与TorchNPU版本兼容
 
 <table style="table-layout: fixed; width: 531px"><colgroup>
 <col style="width: 156px">
@@ -68,7 +69,7 @@
 <thead>
   <tr>
     <th rowspan="2">MindSpeed MM</th>
-    <th colspan="4">Ascend Extention for PyTorch版本</th>
+    <th colspan="4">TorchNPU版本</th>
   </tr>
   <tr>
     <th>7.2.0</th>
@@ -110,10 +111,10 @@
     <th colspan="4">CANN版本</th>
   </tr>
   <tr>
-    <th>8.3.RC1</th>
-    <th>8.5.0</th>
-    <th>9.0.0</th>
-    <th>9.1.0</th>
+    <th>8.3.RCX</th>
+    <th>8.5.X</th>
+    <th>9.0.X</th>
+    <th>9.1.X</th>
   </tr></thead>
 <tbody>
   <tr>
@@ -184,7 +185,7 @@
 |文档名称|内容简介|更新说明|
 |《[MindSpeed MM安装指导](../zh/pytorch/install_guide.md)》|指导用户如何在NPU上基于PyTorch完成MindSpeed MM的安装，内容涵盖硬件与操作系统兼容性说明、驱动固件及CANN基础软件安装，以及基于PyTorch框架下的完整安装流程，帮助用户快速搭建多模态模型训练环境。|-|
 |《[MindSpeed MM快速入门（基于Megatron训练后端）](../zh/pytorch/quickstart.md)》|以Wan2.1和Qwen2.5-VL为例，指导开发者基于Megatron训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
-|《[MindSpeed MM快速入门（基于FSDP2训练后端）](../zh/pytorch/quickstart_fsdp2.md)》|以Qwen3-VL-30B，指导开发者基于FSDP2训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
+|《[MindSpeed MM快速入门（基于FSDP2训练后端）](../zh/pytorch/quickstart_fsdp2.md)》|以Qwen3-VL-30B为例，指导开发者基于FSDP2训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
 
 ## 病毒扫描及漏洞修补列表
 

@@ -17,7 +17,7 @@ FSDP2（Fully Sharded Data Parallel 2）沿数据并行维对参数、梯度、�
 >
 > MindSpeed MM支持<term>Ascend 950 系列产品</term>、<term>Atlas A3 训练系列产品</term>和<term>Atlas A2 训练系列产品</term>，且要求单NPU的片上内存为64GB及以上。
 >
-> 当前示例脚本中`NPUS_PER_NODE=16`表示需要16个NPU，如果实际情况低于此配置，可能遇到OOM问题。
+> 当前示例脚本中`NPUS_PER_NODE=16`表示需要16个NPU，如果实际情况低于此配置，可能遇到OOM（Out of Memory，内存不足）问题。
 >
 > 若使用其他模型，建议参考具体脚本的实际参数。
 
@@ -29,8 +29,9 @@ FSDP2（Fully Sharded Data Parallel 2）沿数据并行维对参数、梯度、�
 
 ## 环境准备
 
-1. 基于PyTorch框架和Python3.10完成模型训练环境的安装，具体请参见[MindSpeed MM安装指导](install_guide.md)。
-2. 在`MindSpeed-MM`下创建以下目录用于存储日志、数据及权重文件。
+请单击[MindSpeed快速安装](https://www.hiascend.com/developer/software/mindspeed)根据引导进行环境搭建，详细安装说明请参考[MindSpeed MM安装指导](install_guide.md)。
+
+在`MindSpeed-MM`下创建以下目录用于存储日志、数据及权重文件。
 
     ```bash
     mkdir logs

@@ -17,7 +17,7 @@ MindSpeed MM架构关系如图所示
 
 图1 MindSpeed MM架构图
 
-![alt text](../../sources/images/architecture_mindspeed_mm.png)
+![MindSpeed MM架构图](../../sources/images/architecture_mindspeed_mm.png)
 
 ## 功能特性
 

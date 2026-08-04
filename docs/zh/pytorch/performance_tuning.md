@@ -35,7 +35,7 @@ MindSpeed-MM提供了Profiling采集工具，支持静态采集和动态采集�
 
 ### 性能分析工具
 
-采集到性能数据后，可通过[MindStudio Insight](https://www.hiascend.com/document/detail/zh/mindstudio/2600/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/overview.md)对性能数据进行可视化分析，定位性能瓶颈。
+采集到性能数据后，可通过[MindStudio Insight](https://www.hiascend.com/document/detail/zh/mindstudio/2610/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/overview.md)对性能数据进行可视化分析，定位性能瓶颈。
 
 MindStudio Insight是昇腾提供的性能分析工具，支持对Profiling采集的数据进行多维度分析，包括：
 
@@ -46,7 +46,7 @@ MindStudio Insight是昇腾提供的性能分析工具，支持对Profiling采�
 
 #### 多卡Timeline对齐
 
-多卡采集时各卡timeline各自记录，多机场景下因各机器时钟不一致，可能导致各卡timeline相对位置不对齐，影响跨卡分析（如快慢卡、通信等待）的判断；这属于采集数据在分析时的展示问题，不影响实际训练。MindStudio Insight对单卡、集群、多模型场景已实现timeline相对位置自动对齐；若多机场景仍不准，可使用其单卡或泳道维度的时间校准功能（在时间线界面设置偏移量，将对应卡/泳道左右平移），手动对齐各卡时间基准，详见[MindStudio Insight系统调优指南](https://www.hiascend.com/document/detail/zh/mindstudio/2600/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/system_tuning.md)中“时间线（Timeline） - 支持单卡和泳道时间对齐”小节。
+多卡采集时各卡timeline各自记录，多机场景下因各机器时钟不一致，可能导致各卡timeline相对位置不对齐，影响跨卡分析（如快慢卡、通信等待）的判断；这属于采集数据在分析时的展示问题，不影响实际训练。MindStudio Insight对单卡、集群、多模型场景已实现timeline相对位置自动对齐；若多机场景仍不准，可使用其单卡或泳道维度的时间校准功能（在时间线界面设置偏移量，将对应卡/泳道左右平移），手动对齐各卡时间基准，详见[MindStudio Insight系统调优指南](https://www.hiascend.com/document/detail/zh/mindstudio/2610/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/system_tuning.md)中“时间线（Timeline） - 支持单卡和泳道时间对齐”小节。
 
 ### 性能拆解分析方法
 
@@ -112,7 +112,7 @@ TorchNPU提供了`CPU_AFFINITY_CONF`环境变量，用于控制CPU端任务绑�
 
 #### 调度下发优化
 
-当Host侧算子下发成为瓶颈（profiling中大段Free且CPU侧无任务执行）时，可尝试以下torch_npu插件环境变量：
+当Host侧算子下发成为瓶颈（profiling中大段Free且CPU侧无任务执行）时，可尝试以下TorchNPU插件环境变量：
 
 | 环境变量 | 作用 | 推荐值 |
 |----------|------|--------|

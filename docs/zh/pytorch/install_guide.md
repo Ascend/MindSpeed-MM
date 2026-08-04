@@ -23,25 +23,17 @@
 
 - 各硬件产品对应物理机部署场景支持的操作系统请参考[兼容性查询助手](https://www.hiascend.com/hardware/compatibility)。
 
-- 各硬件产品对应虚拟机及容器部署场景支持的操作系统请参考《CANN 软件安装》“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0101.html?OS=openEuler&InstallType=netyum)”章节。
+- 各硬件产品对应虚拟机及容器部署场景支持的操作系统请参考《CANN 软件安装》“[操作系统兼容性说明](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910/softwareinst/instg/instg_0101.html?OS=openEuler&InstallType=netyum)”章节。
 
 ## 安装前准备
 
 请参见《版本说明》中的“[相关产品版本配套说明](../release_notes_mm.md#相关产品版本配套说明)”章节，下载安装对应的软件版本。
 
+请单击[固件与驱动](https://hiascend.com/hardware/firmware-drivers)，并根据引导完成固件与驱动的安装。
+
 > [!NOTICE]
 >
 > 安装运行程序建议使用非root用户，且建议对安装程序的目录文件做好权限管控：文件夹权限设置为750，文件权限设置为640。可以通过设置umask控制安装后文件的权限，如设置umask为0027。更多安全相关内容请参见《[安全声明](../../../SECURITYNOTE.md)》中各组件关于“文件权限控制”的说明。
-
-下载[固件与驱动](https://hiascend.com/hardware/firmware-drivers/community)，请根据系统和硬件产品型号选择对应版本的社区版本或商用版本的固件与驱动。
-参考如下命令安装：
-
-```shell
-chmod +x Ascend-hdk-<chip_type>-npu-driver_<version>_linux-<arch>.run
-chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
-./Ascend-hdk-<chip_type>-npu-driver_<version>_linux-<arch>.run --full --force
-./Ascend-hdk-<chip_type>-npu-firmware_<version>.run --full
-```
 
 ## 安装MindSpeed MM
 
@@ -144,7 +136,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
 #### 一键安装
 
-  目前[Qwen3-VL](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/examples/qwen3vl/README.md)、[Qwen3.5](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qwen3_5)模型已支持一键安装。
+  目前[Qwen3-VL](../../../examples/qwen3vl/README.md)、[Qwen3.5](../../../examples/qwen3_5/README.md)模型已支持一键安装。
 
   一键式命令会依次安装`PyTorch`、`TorchNPU`、`Megatron-LM`、`MindSpeed`、`MindSpeed MM`。由于Megatron-LM对于`pip install`安装方式适配性待提升，采用源码拷贝方式进行使用。
 
@@ -155,7 +147,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
       ```bash
         git clone https://gitcode.com/Ascend/MindSpeed-MM.git
         cd MindSpeed-MM
-        git checkout 26.0.0
+        git checkout 26.1.0
       ```
 
   2. 执行如下指令一键安装：
@@ -207,7 +199,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
   2. 安装CANN
 
-      安装配套版本的NPU驱动固件、CANN软件（Toolkit、ops和NNAL）并配置CANN环境变量，具体请参考《[CANN 软件安装](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900/softwareinst/instg/instg_0000.html)》。
+      安装配套版本的NPU驱动固件、CANN软件（Toolkit、ops和NNAL）并配置CANN环境变量，具体请参考《[CANN 软件安装](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910/softwareinst/instg/instg_0000.html)》。
 
       CANN软件提供进程级环境变量设置脚本，训练或推理场景下使用NPU执行业务代码前需要调用该脚本，否则业务代码将无法执行。
 
@@ -220,13 +212,13 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
   3. 安装PyTorch以及TorchNPU
 
-      请参考《TorchNPU软件安装》中的“[安装PyTorch](https://www.hiascend.com/document/detail/zh/Pytorch/2600/configandinstg/instg/docs/zh/installation_guide/installation_via_binary_package.md)”章节，获取配套版本的PyTorch以及TorchNPU软件包。
+      请参考《TorchNPU软件安装》中的“[安装TorchNPU](https://www.hiascend.com/document/detail/zh/Pytorch/latest/installguide/swinstall/docs/zh/installation_guide/installation_via_binary_package.md)”章节，获取配套版本的PyTorch以及TorchNPU软件包。
       可参考如下安装命令：
 
         ```shell
         # 安装torch和TorchNPU构建参考 https://gitcode.com/ascend/pytorch/releases
         pip3 install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
-        pip3 install torch_npu-2.7.1post4-cp310-cp310-manylinux_2_28_aarch64.whl
+        pip3 install torch_npu-2.7.1post8-cp310-cp310-manylinux_2_28_aarch64.whl
         ```
 
   4. 获取MindSpeed MM和Megatron-LM源码。
@@ -241,14 +233,14 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
       cd MindSpeed-MM
       ```
 
-  5. 获取MindSpeed加速库源码并安装。
+  5. 获取MindSpeed Core源码并安装。
 
       ```shell
       # 获取源码
       git clone https://gitcode.com/Ascend/MindSpeed.git
       # 根据需要切换到特定的分支或commitid
       cd MindSpeed
-      git checkout 26.0.0_core_r0.12.1
+      git checkout 26.1.0_core_r0.12.1
       # 安装加速库
       pip install -r requirements.txt
       pip install -e .
