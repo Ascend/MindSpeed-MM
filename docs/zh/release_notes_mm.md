@@ -184,7 +184,7 @@
 
 |文档名称|内容简介|更新说明|
 |--|--|--|
-|《[MindSpeed MM安装指导](../zh/pytorch/install_guide.md)》|指导用户如何在NPU上基于PyTorch完成MindSpeed MM的安装，内容涵盖硬件与操作系统兼容性说明、驱动固件及CANN基础软件安装，以及基于PyTorch框架下的完整安装流程，帮助用户快速搭建多模态模型训练环境。|-|
+|《[MindSpeed MM软件安装](../zh/pytorch/install_guide.md)》|指导用户在NPU上基于PyTorch完成MindSpeed MM的安装，内容涵盖硬件与操作系统兼容性说明、驱动固件及CANN基础软件安装，以及基于PyTorch框架下的完整安装流程，帮助用户快速搭建多模态模型训练环境。|-|
 |《[MindSpeed MM快速入门（基于Megatron训练后端）](../zh/pytorch/quickstart.md)》|以Wan2.1和Qwen2.5-VL为例，指导开发者基于Megatron训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
 |《[MindSpeed MM快速入门（基于FSDP2训练后端）](../zh/pytorch/quickstart_fsdp2.md)》|以Qwen3-VL-30B为例，指导开发者基于FSDP2训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
 

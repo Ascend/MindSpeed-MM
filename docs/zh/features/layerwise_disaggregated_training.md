@@ -106,7 +106,7 @@
 
 本文档以Qwen2.5VL-32B-Instruct模型为例（VIT隐藏层数32层，LLM隐藏层数64层）介绍边云特性使能方法，具体步骤如下：
 
-1. 参考[MindSpeed MM安装指导](../pytorch/install_guide.md)，完成环境安装。
+1. 参考[MindSpeed MM软件安装](../pytorch/install_guide.md)，完成环境安装。
 
 2. 从Hugging Face库下载对应的模型权重[Qwen2.5-VL-32B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct)，放至./ckpt/hf_path路径下。
 

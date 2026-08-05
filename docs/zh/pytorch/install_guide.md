@@ -1,4 +1,4 @@
-# MindSpeed MM安装指导
+# MindSpeed MM软件安装
 
   本文主要向用户介绍如何快速基于PyTorch框架完成MindSpeed MM（多模态模型套件）的安装。
 
