@@ -4,8 +4,54 @@ import pytest
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from unittest.mock import patch
 
 from mindspeed_mm.fsdp.distributed.expert_parallel.ep_balance.greedy_dup_experts_executor import DupExpertExecutor
+
+
+class _CompletedWork:
+    def wait(self):
+        return True
+
+
+def test_multiple_duplicate_gradients_are_accumulated():
+    """同一原专家存在多个远端副本时，所有副本梯度都必须累加。"""
+    executor = DupExpertExecutor.__new__(DupExpertExecutor)
+    executor.num_local_experts = 2
+    executor.wait_works = {}
+    executor.dup_experts_grad = {}
+
+    # Parameter direction: rank0/expert0 -> rank1 and rank2. During backward,
+    # rank0 receives gradients for the same local expert from both ranks.
+    plans = [
+        {"src_local_id": 0, "src_rank": 0, "dst_rank": 1, "dup_id": 0},
+        {"src_local_id": 0, "src_rank": 0, "dst_rank": 2, "dup_id": 0},
+    ]
+    duplicate_grads = torch.empty((1, 2, 3), dtype=torch.float32)
+
+    def fake_irecv(tensor, src, tag):
+        tensor.fill_(float(src))
+        return _CompletedWork()
+
+    with patch(
+        "mindspeed_mm.fsdp.distributed.expert_parallel.ep_balance.greedy_dup_experts_executor.dist.get_rank",
+        return_value=0,
+    ), patch(
+        "mindspeed_mm.fsdp.distributed.expert_parallel.ep_balance.greedy_dup_experts_executor.dist.irecv",
+        side_effect=fake_irecv,
+    ):
+        received, works = executor.send_recv_duplicate_experts_grad_async(plans, duplicate_grads)
+
+    assert len(received[0]) == 2
+    executor.dup_experts_grad["fc1"] = received
+    executor.wait_works["fc1"] = works
+
+    local_grad = torch.ones((2, 2, 3), dtype=torch.float32)
+    result = executor.add_dup_experts_grad(local_grad, "fc1")
+
+    # Original gradient 1 + rank1 duplicate gradient 1 + rank2 duplicate gradient 2.
+    assert torch.equal(result[0], torch.full_like(result[0], 4.0))
+    assert torch.equal(result[1], torch.ones_like(result[1]))
 
 
 # =============================================================================
@@ -87,6 +133,7 @@ def _test_param_p2p_comm():
         for i in range(executor.num_local_experts)
     ])
 
+    # dup_experts_map[dst_rank][dup_id] = global_src_expert_id
     # Rank0 wants expert3 (from rank1), Rank1 wants expert0 (from rank0)
     dup_map = [
         [3],   # rank0: dup0 ← expert3
