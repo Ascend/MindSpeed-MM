@@ -29,7 +29,7 @@ FSDP2（Fully Sharded Data Parallel 2）沿数据并行维对参数、梯度、�
 
 ## 环境准备
 
-请单击[MindSpeed快速安装](https://www.hiascend.com/developer/software/mindspeed)根据引导进行环境搭建，详细安装说明请参考[MindSpeed MM安装指导](install_guide.md)。
+请单击[MindSpeed快速安装](https://www.hiascend.com/developer/software/mindspeed/download)根据引导进行环境搭建，详细安装说明请参考[MindSpeed MM软件安装](install_guide.md)。
 
 在`MindSpeed-MM`下创建以下目录用于存储日志、数据及权重文件。
 
