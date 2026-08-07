@@ -15,39 +15,24 @@
 
 from __future__ import annotations
 
+import logging
 import math
-import os
 from dataclasses import dataclass
-from functools import partial
-from typing import List, Optional, Tuple, Union
+from typing import Tuple
 
+from einops import rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributed.tensor import DTensor
 
+
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
 from mindspeed_mm.fsdp.utils.device import get_device_type
-from mindspeed_mm.utils.utils import get_dtype
 
 
-# Inline utilities to avoid pulling in heavy external modules at import time
-class _LlamaRMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.variance_epsilon = eps
-
-    def forward(self, hidden_states):
-        try:
-            return torch_npu.npu_rms_norm(hidden_states, self.weight, epsilon=self.variance_epsilon)[0]
-        except TypeError:
-            input_dtype = hidden_states.dtype
-            hidden_states = hidden_states.to(torch.float32)
-            variance = hidden_states.pow(2).mean(-1, keepdim=True)
-            hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-            return self.weight * hidden_states.to(input_dtype)
+logger = logging.getLogger(__name__)
 
 
 class _FP32LayerNorm(nn.Module):
@@ -69,6 +54,7 @@ class _FP32LayerNorm(nn.Module):
         ).to(origin_dtype)
 
 
+# Delay imports of heavy modules to reduce import-time overhead
 _WanVideoVAE = None
 _WanFlowMatchScheduler = None
 
@@ -76,81 +62,15 @@ _WanFlowMatchScheduler = None
 def get_wan_video_vae():
     global _WanVideoVAE
     if _WanVideoVAE is None:
-        from mindspeed_mm.models.ae.wan_video_vae import WanVideoVAE as _WanVideoVAE
+        from mindspeed_mm.fsdp.models.wan2_2.vae import WanVideoVAE as _WanVideoVAE
     return _WanVideoVAE
 
 
 def get_wan_flow_match_scheduler():
     global _WanFlowMatchScheduler
     if _WanFlowMatchScheduler is None:
-        from mindspeed_mm.models.diffusion.wan_flow_match_scheduler import WanFlowMatchScheduler as _WanFlowMatchScheduler
+        from mindspeed_mm.fsdp.models.wan2_2.diffusion import WanFlowMatchScheduler as _WanFlowMatchScheduler
     return _WanFlowMatchScheduler
-
-
-class _SimpleTextEncoder(nn.Module):
-    """Loads directly from transformers."""
-    TRANSFORMERS_MAPPING = {
-        "T5": "T5EncoderModel",
-        "MT5": "MT5EncoderModel",
-        "UMT5": "UMT5EncoderModel",
-    }
-
-    def __init__(
-        self,
-        model,
-        use_attention_mask=True,
-        output_key="last_hidden_state",
-        hidden_state_skip_layer=None,
-        ucg_rate=None,
-    ):
-        super().__init__()
-        self.model = model
-        self.use_attention_mask = use_attention_mask
-        self.output_key = output_key
-        self.hidden_state_skip_layer = hidden_state_skip_layer
-        self.ucg_rate = ucg_rate
-
-    def encode(self, input_ids, attention_mask, **kwargs):
-        device = get_device_type()
-        *BN, L = input_ids.shape
-        input_ids = input_ids.to(device).view(-1, L)
-        attention_mask = attention_mask.to(device).view(-1, L)
-        model_attention_mask = attention_mask if self.use_attention_mask else None
-
-        output = self.model(
-            input_ids=input_ids,
-            attention_mask=model_attention_mask,
-            output_hidden_states=self.hidden_state_skip_layer is not None,
-        )
-
-        emb = output[self.output_key]
-        if self.hidden_state_skip_layer:
-            emb = emb[-(self.hidden_state_skip_layer + 1)]
-
-        if self.ucg_rate is not None and self.ucg_rate > 0.0:
-            def expand_dims_like(x, y):
-                while x.dim() != y.dim():
-                    x = x.unsqueeze(-1)
-                return x
-            emb = (
-                expand_dims_like(
-                    torch.bernoulli(
-                        (1.0 - self.ucg_rate) * torch.ones(emb.shape[0], device=emb.device, dtype=emb.dtype)
-                    ),
-                    emb,
-                )
-                * emb
-            )
-
-        if self.output_key in ["last_hidden_state", "hidden_states"]:
-            emb = emb.view(*BN, emb.shape[-2], -1)
-        elif self.output_key in ["pooler_output", "text_embeds"]:
-            emb = emb.view(*BN, -1)
-        else:
-            raise NotImplementedError(f"Text encoder output_key: {self.output_key} is not implemented!")
-
-        attention_mask = attention_mask.view(*BN, -1)
-        return emb, attention_mask
 
 
 @dataclass
@@ -158,46 +78,9 @@ class Wan2_2ModelOutput:
     loss: torch.Tensor
 
 
-def build_text_encoder(config: dict):
-    """Build a _SimpleTextEncoder directly from transformers."""
-    import transformers
-
-    config = dict(config)  # shallow copy
-    backend = config.pop("hub_backend", "hf")
-    model_id = config.pop("model_id", "UMT5")
-    use_attention_mask = config.pop("use_attention_mask", True)
-    ucg_rate = config.pop("ucg_rate", None)
-    output_key = config.pop("output_key", "last_hidden_state")
-    hidden_state_skip_layer = config.pop("hidden_state_skip_layer", None)
-    using_kwargs = config.pop("using_kwargs", None)
-
-    pretrained_path = config.pop("from_pretrained")
-    torch_dtype = get_dtype(config.pop("dtype", "bf16"))
-
-    # Drop keys that transformers does not recognize
-    config.pop("load_in_8bit", None)
-
-    if model_id in _SimpleTextEncoder.TRANSFORMERS_MAPPING:
-        automodel_name = _SimpleTextEncoder.TRANSFORMERS_MAPPING[model_id]
-        automodel = getattr(transformers, automodel_name)
-    else:
-        raise ValueError(f"Model ID {model_id} is not supported for text encoder in pure FSDP2 mode")
-
-    text_encoder = automodel.from_pretrained(
-        pretrained_path,
-        torch_dtype=torch_dtype,
-        local_files_only=True,
-        trust_remote_code=False,
-    )
-
-    return _SimpleTextEncoder(
-        model=text_encoder,
-        use_attention_mask=use_attention_mask,
-        output_key=output_key,
-        hidden_state_skip_layer=hidden_state_skip_layer,
-        ucg_rate=ucg_rate,
-    )
-
+# ---------------------------------------------------------------------------
+# Native Wan2.2 model implementation (adapted from wan/modules/model.py)
+# ---------------------------------------------------------------------------
 
 def sinusoidal_embedding_1d(dim, position):
     assert dim % 2 == 0
@@ -206,51 +89,62 @@ def sinusoidal_embedding_1d(dim, position):
     sinusoid = torch.outer(
         position, torch.pow(10000, -torch.arange(half).to(position).div(half)))
     x = torch.cat([torch.cos(sinusoid), torch.sin(sinusoid)], dim=1)
-    return x
+    return x.to(position.dtype)
 
 
 @torch.amp.autocast('cuda', enabled=False)
 def rope_params(max_seq_len, dim, theta=10000):
     assert dim % 2 == 0
-    # Keep float64 to match the original repo's precision
     freqs = torch.outer(
         torch.arange(max_seq_len, dtype=torch.float64),
         1.0 / torch.pow(theta,
                         torch.arange(0, dim, 2, dtype=torch.float64).div(dim)))
-    freqs = torch.polar(torch.ones_like(freqs), freqs)
+    freqs = torch.polar(torch.ones_like(freqs), freqs).to(torch.complex64)
     return freqs
+
+
+def precompute_rope_freqs_i(grid_sizes, freqs):
+    """Precompute per-sample 3D RoPE frequencies for the whole batch.
+    """
+    b = grid_sizes.size(0)
+    c = freqs.size(1)
+    max_seq_len = int((grid_sizes[:, 0] * grid_sizes[:, 1] * grid_sizes[:, 2]).max().item())
+    freqs_parts = freqs.split([c - 2 * (c // 3), c // 3, c // 3], dim=1)
+    out = torch.zeros(b, max_seq_len, 1, c, dtype=freqs.dtype, device=freqs.device)
+
+    for i, (f, h, w) in enumerate(grid_sizes.tolist()):
+        seq_len = f * h * w
+        if freqs.device.type == 'npu':
+            # NPU: avoid aclnnCat on complex dtypes by operating on real/imag.
+            parts = [
+                torch.view_as_real(
+                    freqs_parts[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1)).float(),
+                torch.view_as_real(
+                    freqs_parts[1][:h].view(1, h, 1, -1).expand(f, h, w, -1)).float(),
+                torch.view_as_real(
+                    freqs_parts[2][:w].view(1, 1, w, -1).expand(f, h, w, -1)).float(),
+            ]
+            freqs_i = torch.view_as_complex(
+                torch.cat(parts, dim=-2)).reshape(seq_len, 1, -1)
+        else:
+            freqs_i = torch.cat([
+                freqs_parts[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
+                freqs_parts[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
+                freqs_parts[2][:w].view(1, 1, w, -1).expand(f, h, w, -1),
+            ], dim=-1).reshape(seq_len, 1, -1)
+        out[i, :seq_len] = freqs_i
+    return out
 
 
 @torch.amp.autocast('cuda', enabled=False)
 def rope_apply(x, grid_sizes, freqs):
     n, c = x.size(2), x.size(3) // 2
-    freqs = freqs.split([c - 2 * (c // 3), c // 3, c // 3], dim=1)
-    output = []
-    for i, (f, h, w) in enumerate(grid_sizes.tolist()):
-        seq_len = f * h * w
-        x_i = torch.view_as_complex(x[i, :seq_len].to(torch.float64).reshape(
-            seq_len, n, -1, 2))
-        if x.device.type == 'npu':
-            freqs_parts = [
-                torch.view_as_real(
-                    freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1)).float(),
-                torch.view_as_real(
-                    freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1)).float(),
-                torch.view_as_real(
-                    freqs[2][:w].view(1, 1, w, -1).expand(f, h, w, -1)).float(),
-            ]
-            freqs_i = torch.view_as_complex(
-                torch.cat(freqs_parts, dim=-2)).reshape(seq_len, 1, -1)
-        else:
-            freqs_i = torch.cat([
-                freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
-                freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
-                freqs[2][:w].view(1, 1, w, -1).expand(f, h, w, -1),
-            ], dim=-1).reshape(seq_len, 1, -1)
-        x_i = torch.view_as_real(x_i * freqs_i).flatten(2)
-        x_i = torch.cat([x_i, x[i, seq_len:]])
-        output.append(x_i)
-    return torch.stack(output).to(x.dtype)
+    # ``freqs`` has already been expanded by ``precompute_rope_freqs_i`` to
+    # (batch, seq, 1, c) once per forward pass in ``WanModel.forward``.
+    b, s = x.size(0), x.size(1)
+    x_i = torch.view_as_complex(x.to(torch.float64).reshape(b, s, n, c, 2))
+    x_i = torch.view_as_real(x_i * freqs[:, :s]).flatten(3)
+    return x_i.to(x.dtype)
 
 
 class WanRMSNorm(nn.Module):
@@ -261,10 +155,10 @@ class WanRMSNorm(nn.Module):
         self.weight = nn.Parameter(torch.ones(dim))
 
     def forward(self, x):
-        return self._norm(x) * self.weight
-
-    def _norm(self, x):
-        return x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + self.eps)
+        dtype = x.dtype
+        x_f = x.float()
+        x_f = x_f * torch.rsqrt(x_f.pow(2).mean(dim=-1, keepdim=True) + self.eps)
+        return x_f.to(dtype) * self.weight
 
 
 class WanLayerNorm(nn.LayerNorm):
@@ -272,7 +166,11 @@ class WanLayerNorm(nn.LayerNorm):
         super().__init__(dim, elementwise_affine=elementwise_affine, eps=eps)
 
     def forward(self, x):
-        return super().forward(x)
+        weight = self.weight
+        bias = self.bias
+        return F.layer_norm(
+            x, self.normalized_shape, weight, bias, self.eps
+        )
 
 
 def flash_attention(
@@ -308,16 +206,46 @@ def flash_attention(
         return x if x.dtype in half_dtypes else x.to(dtype)
 
     # NPU path
-    if q.device.type == 'npu' and attn_implementation == "flash_attention_2":
+    if get_device_type() == 'npu' and attn_implementation == "flash_attention_2":
         import torch_npu
+        n = q.size(2)
+        d = q.size(-1)
+        if softmax_scale is None:
+            softmax_scale = 1.0 / math.sqrt(d)
+        if q.dtype == torch.float32:
+            q_npu = q.permute(0, 2, 1, 3).contiguous()
+            k_npu = k.permute(0, 2, 1, 3).contiguous()
+            v_npu = v.permute(0, 2, 1, 3).contiguous()
+            if q_scale is not None:
+                q_npu = q_npu * q_scale
+
+            sq_full = q.size(1)
+            sk_full = k.size(1)
+            actual_seq_qlen = []
+            actual_seq_kvlen = []
+            if q_lens is not None and not torch.all(q_lens == sq_full):
+                actual_seq_qlen = q_lens.cumsum(0).tolist()
+            if k_lens is not None and not torch.all(k_lens == sk_full):
+                actual_seq_kvlen = k_lens.cumsum(0).tolist()
+
+            out = torch_npu.npu_fusion_attention(
+                q_npu, k_npu, v_npu, n, "BNSD",
+                pse=None,
+                padding_mask=None,
+                atten_mask=None,
+                actual_seq_qlen=actual_seq_qlen,
+                actual_seq_kvlen=actual_seq_kvlen,
+                keep_prob=1.0 - dropout_p,
+                scale=softmax_scale,
+            )[0]
+            out = out.permute(0, 2, 1, 3).contiguous()
+            return out
+
         q_npu = half(q).transpose(1, 2).contiguous()
         k_npu = half(k).transpose(1, 2).contiguous()
         v_npu = half(v).transpose(1, 2).contiguous()
-        n = q.size(2)
         if q_scale is not None:
             q_npu = q_npu * q_scale
-        if softmax_scale is None:
-            softmax_scale = 1.0 / math.sqrt(q.size(-1))
         out = torch_npu.npu_fusion_attention(
             q_npu, k_npu, v_npu, n, "BNSD",
             pse=None,
@@ -338,7 +266,7 @@ def flash_attention(
             if q_lens is not None and not torch.all(q_lens == q_lens[0]):
                 import warnings
                 warnings.warn("Variable-length attention with sdpa fallback may be incorrect. "
-                            "Consider ensuring equal sequence lengths per batch.")
+                              "Consider ensuring equal sequence lengths per batch.")
         q = half(q).transpose(1, 2)
         k = half(k).transpose(1, 2)
         v = half(v).transpose(1, 2)
@@ -411,14 +339,12 @@ def flash_attention(
 
 class WanSelfAttention(nn.Module):
     def __init__(self,
-                dim,
-                num_heads,
-                window_size=(-1, -1),
-                qk_norm=True,
-                eps=1e-6,
-                layer_idx=0,
-                num_layers=1,
-                attn_implementation="eager"):
+                 dim,
+                 num_heads,
+                 window_size=(-1, -1),
+                 qk_norm=True,
+                 eps=1e-6,
+                 attn_implementation="eager"):
         assert dim % num_heads == 0
         super().__init__()
         self.dim = dim
@@ -484,7 +410,6 @@ class WanSelfAttention(nn.Module):
 
         # Ring CP path: direct ring attention (q/k/v already split in seq dim)
         if ps.is_ring_enable():
-            from einops import rearrange
             from mindspeed_mm.fsdp.distributed.context_parallel.ring_context_parallel.ring_context_parallel import (
                 ringattn_context_parallel, AttentionWithCp
             )
@@ -518,24 +443,21 @@ class WanSelfAttention(nn.Module):
                 k_lens=seq_lens,
                 window_size=self.window_size,
                 attn_implementation=self.attn_implementation,
-                layer_idx=getattr(self, 'layer_idx', None),
             )
             x = flash_attention(**_attn_kwargs)
 
+        if ps.is_ring_enable():
+            from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+                load_balanced_gather_forward_split_backward,
+            )
+            x = load_balanced_gather_forward_split_backward(x, ps.get_ring_group(), dim=1)
+
         if ps.is_ulysses_enable():
             x = all_to_all(x, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2)
-            # Gather attention output back to full seq so residual/addnorm operate on full x.
-            # Pass gather_sizes to support unaligned sequence lengths across Ulysses ranks.
             from mindspeed_mm.fsdp.distributed.context_parallel.communication import gather_forward_split_backward
             from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
             _ulysses_gather_sizes = cal_split_sizes(s, ps.get_ulysses_group_size())
             x = gather_forward_split_backward(x, ps.get_ulysses_group(), dim=1, gather_sizes=_ulysses_gather_sizes)
-
-        if ps.is_ring_enable():
-            # Gather ring attention output back to full seq.
-            # Requires seq_len % ring_size == 0 for aligned gather.
-            from mindspeed_mm.fsdp.distributed.context_parallel.communication import gather_forward_split_backward
-            x = gather_forward_split_backward(x, ps.get_ring_group(), dim=1)
 
         x = x.flatten(2)
         x = self.o(x)
@@ -550,9 +472,8 @@ class WanCrossAttention(WanSelfAttention):
         k = self.norm_k(self.k(context)).view(b, -1, n, d)
         v = self.v(context).view(b, -1, n, d)
 
-        x = flash_attention(q, k, v, k_lens=context_lens,
-                            attn_implementation=self.attn_implementation,
-                            layer_idx=getattr(self, 'layer_idx', None))
+        x = flash_attention(q, k, v, k_lens=None,
+                            attn_implementation=self.attn_implementation)
 
         x = x.flatten(2)
         x = self.o(x)
@@ -605,7 +526,7 @@ class WanMoEExperts(nn.Module):
             gate, up = gate_up.chunk(2, dim=-1)
             gated_output = up * self.act_fn(gate)
             out = gated_output @ self.down_proj[expert_id]
-            weighted_output = out[0] * routing_weights[token_idx, expert_id, None]
+            weighted_output = out * routing_weights[token_idx, expert_id, None]
             next_states.index_add_(0, token_idx, weighted_output.to(hidden_states.dtype))
         next_states = next_states.view(batch_size, -1, self.dim)
         return next_states
@@ -655,26 +576,25 @@ class WanSparseMoEBlock(nn.Module):
         self.experts = WanMoEExperts(dim, ffn_dim, num_experts)
 
     def forward(self, hidden_states):
-        router_weights, router_logits, router_indices = self.gate(hidden_states)
-        self.last_router_logits = router_logits
+        router_weights, _, router_indices = self.gate(hidden_states)
         routed_out = self.experts(hidden_states, router_weights, router_indices)
         return routed_out
 
 
 class WanAttentionBlock(nn.Module):
     def __init__(self,
-                dim,
-                ffn_dim,
-                num_heads,
-                window_size=(-1, -1),
-                qk_norm=True,
-                cross_attn_norm=False,
-                eps=1e-6,
-                num_experts=1,
-                top_k=1,
-                layer_idx=0,
-                num_layers=1,
-                attn_implementation="eager"):
+                 dim,
+                 ffn_dim,
+                 num_heads,
+                 window_size=(-1, -1),
+                 qk_norm=True,
+                 cross_attn_norm=False,
+                 eps=1e-6,
+                 num_experts=1,
+                 top_k=1,
+                 attn_implementation="eager",
+                 fp32_modulation=False,
+                 fp32_calculate=False):
         super().__init__()
         self.dim = dim
         self.ffn_dim = ffn_dim
@@ -683,12 +603,12 @@ class WanAttentionBlock(nn.Module):
         self.qk_norm = qk_norm
         self.cross_attn_norm = cross_attn_norm
         self.eps = eps
+        self.fp32_modulation = fp32_modulation
+        self.fp32_calculate = fp32_calculate
 
         self.norm1 = WanLayerNorm(dim, eps)
         self.self_attn = WanSelfAttention(
             dim, num_heads, window_size, qk_norm, eps,
-            layer_idx=layer_idx,
-            num_layers=num_layers,
             attn_implementation=attn_implementation,
         )
         self.norm3 = WanLayerNorm(dim, eps, elementwise_affine=True) if cross_attn_norm else nn.Identity()
@@ -706,11 +626,54 @@ class WanAttentionBlock(nn.Module):
         self.modulation = nn.Parameter(torch.randn(1, 6, dim) / dim**0.5)
 
     def forward(self, x, e, seq_lens, grid_sizes, freqs, context, context_lens):
+        if self.fp32_calculate:
+            dtype = x.dtype
+            e_fp32 = (self.modulation.to(torch.float32).unsqueeze(0) + e.to(torch.float32)).chunk(6, dim=2)
+            e_fp32 = [i.squeeze(2) for i in e_fp32]
+
+            y = self.self_attn(
+                (self.norm1(x.float()) * (1 + e_fp32[1]) + e_fp32[0]).to(dtype),
+                seq_lens, grid_sizes, freqs)
+            x = (x.float() + y.float() * e_fp32[2]).to(dtype)
+
+            y = self.cross_attn(self.norm3(x.float()).to(dtype), context, context_lens)
+            x = (x.float() + y.float()).to(dtype)
+
+            y = self.ffn(
+                (self.norm2(x.float()) * (1 + e_fp32[4]) + e_fp32[3]).to(dtype))
+            x = (x.float() + y.float() * e_fp32[5]).to(dtype)
+            return x
+
+        if self.fp32_modulation:
+            # Match the reference implementation: keep modulation in fp32 and
+            # promote self-attention / FFN inputs to fp32 for numerical parity.
+            device_type = x.device.type
+            with torch.amp.autocast(device_type=device_type, dtype=torch.float32):
+                e = (self.modulation.unsqueeze(0) + e).chunk(6, dim=2)
+            assert e[0].dtype == torch.float32
+
+            y = self.self_attn(
+                self.norm1(x).float() * (1 + e[1].squeeze(2)) + e[0].squeeze(2),
+                seq_lens, grid_sizes, freqs)
+            with torch.amp.autocast(device_type=device_type, dtype=torch.float32):
+                x = x + y * e[2].squeeze(2)
+
+            def cross_attn_ffn(x, context, context_lens, e):
+                x = x + self.cross_attn(self.norm3(x), context, context_lens)
+                y = self.ffn(
+                    self.norm2(x).float() * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
+                with torch.amp.autocast(device_type=device_type, dtype=torch.float32):
+                    x = x + y * e[5].squeeze(2)
+                return x
+
+            x = cross_attn_ffn(x, context, context_lens, e)
+            return x
+
         e = (self.modulation.unsqueeze(0) + e).chunk(6, dim=2)
         e = [i.squeeze(2).to(x.dtype) for i in e]
 
         y = self.self_attn(
-            self.norm1(x.to(torch.float32)).to(x.dtype) * (1 + e[1]) + e[0],
+            self.norm1(x) * (1 + e[1]) + e[0],
             seq_lens, grid_sizes, freqs)
         x = x + y * e[2]
 
@@ -718,18 +681,20 @@ class WanAttentionBlock(nn.Module):
         x = x + y
 
         y = self.ffn(
-            self.norm2(x.to(torch.float32)).to(x.dtype) * (1 + e[4]) + e[3])
+            self.norm2(x) * (1 + e[4]) + e[3])
         x = x + y * e[5]
         return x
 
 
 class Head(nn.Module):
-    def __init__(self, dim, out_dim, patch_size, eps=1e-6):
+    def __init__(self, dim, out_dim, patch_size, eps=1e-6, fp32_modulation=False, fp32_calculate=False):
         super().__init__()
         self.dim = dim
         self.out_dim = out_dim
         self.patch_size = patch_size
         self.eps = eps
+        self.fp32_modulation = fp32_modulation
+        self.fp32_calculate = fp32_calculate
 
         out_dim = math.prod(patch_size) * out_dim
         self.norm = WanLayerNorm(dim, eps)
@@ -738,7 +703,23 @@ class Head(nn.Module):
         self.modulation = nn.Parameter(torch.randn(1, 2, dim) / dim**0.5)
 
     def forward(self, x, e):
-        # Align with wan_dit default (fp32_calculate=False).
+        if self.fp32_calculate:
+            dtype = x.dtype
+            e_fp32 = (self.modulation.to(torch.float32).unsqueeze(0) + e.to(torch.float32).unsqueeze(2)).chunk(2, dim=2)
+            e_fp32 = [i.squeeze(2) for i in e_fp32]
+            x = self.head(
+                (self.norm(x.float()) * (1 + e_fp32[1]) + e_fp32[0]).to(dtype))
+            return x
+
+        if self.fp32_modulation:
+            with torch.amp.autocast(device_type=x.device.type, dtype=torch.float32):
+                e = (self.modulation.unsqueeze(0) + e.unsqueeze(2)).chunk(2, dim=2)
+                e = [i.squeeze(2) for i in e]
+                x = self.head(
+                    self.norm(x.float()) * (1 + e[1]) + e[0])
+            return x.type(x.dtype)
+
+        # Compute in the input dtype (bf16) to keep NPU memory usage low.
         e = (self.modulation.unsqueeze(0) + e.unsqueeze(2)).chunk(2, dim=2)
         e = [i.squeeze(2).to(x.dtype) for i in e]
 
@@ -753,27 +734,28 @@ class WanModel(nn.Module):
     """
 
     def __init__(self,
-                model_type='t2v',
-                patch_size=(1, 2, 2),
-                text_len=512,
-                in_dim=16,
-                dim=2048,
-                ffn_dim=8192,
-                freq_dim=256,
-                text_dim=4096,
-                out_dim=16,
-                num_heads=16,
-                num_layers=32,
-                window_size=(-1, -1),
-                qk_norm=True,
-                cross_attn_norm=True,
-                eps=1e-6,
-                num_experts=1,
-                top_k=1,
-                **kwargs):
+                 model_type='t2v',
+                 patch_size=(1, 2, 2),
+                 text_len=512,
+                 in_dim=16,
+                 dim=2048,
+                 ffn_dim=8192,
+                 freq_dim=256,
+                 text_dim=4096,
+                 out_dim=16,
+                 num_heads=16,
+                 num_layers=32,
+                 window_size=(-1, -1),
+                 qk_norm=True,
+                 cross_attn_norm=True,
+                 eps=1e-6,
+                 num_experts=1,
+                 top_k=1,
+                 fp32_calculate=False,
+                 **kwargs):
         super().__init__()
 
-        assert model_type in ['t2v', 'i2v', 'ti2v', 's2v']
+        assert model_type in ['t2v', 'i2v']
         self.model_type = model_type
 
         self.patch_size = patch_size
@@ -792,6 +774,7 @@ class WanModel(nn.Module):
         self.eps = eps
         self.num_experts = num_experts
         self.top_k = top_k
+        self.mask_text_padding = kwargs.get("mask_text_padding", False)
 
         self.patch_embedding = nn.Conv3d(
             in_dim, dim, kernel_size=patch_size, stride=patch_size)
@@ -802,19 +785,23 @@ class WanModel(nn.Module):
         self.time_embedding = nn.Sequential(
             nn.Linear(freq_dim, dim), nn.SiLU(), nn.Linear(dim, dim))
         self.time_projection = nn.Sequential(nn.SiLU(), nn.Linear(dim, dim * 6))
+        if fp32_calculate:
+            self.time_embedding = self.time_embedding.to(torch.float32)
 
+        fp32_modulation = kwargs.get('fp32_modulation', False)
+        self.fp32_calculate = fp32_calculate
         self.blocks = nn.ModuleList([
             WanAttentionBlock(
                 dim, ffn_dim, num_heads, window_size, qk_norm,
                 cross_attn_norm, eps, num_experts, top_k,
-                layer_idx=i,
-                num_layers=num_layers,
                 attn_implementation=kwargs.get('attn_implementation', 'eager'),
+                fp32_modulation=fp32_modulation,
+                fp32_calculate=fp32_calculate,
             )
             for i in range(num_layers)
         ])
 
-        self.head = Head(dim, out_dim, patch_size, eps)
+        self.head = Head(dim, out_dim, patch_size, eps, fp32_modulation=fp32_modulation, fp32_calculate=fp32_calculate)
 
         assert (dim % num_heads) == 0 and (dim // num_heads) % 2 == 0
         self._freqs = None
@@ -848,16 +835,30 @@ class WanModel(nn.Module):
         assert seq_lens.max() <= seq_len
         x = torch.cat([
             torch.cat([u, u.new_zeros(1, seq_len - u.size(1), u.size(2))],
-                    dim=1) for u in x
+                      dim=1) for u in x
         ])
 
+        # Precompute 3D RoPE frequencies once per forward pass instead of
+        # rebuilding them inside every attention layer.
+        freqs_i = precompute_rope_freqs_i(grid_sizes, freqs)
+
+        # Compute time embedding once per sample and broadcast to the sequence dimension.
         if t.dim() == 1:
-            t = t.expand(t.size(0), seq_len)
-        bt = t.size(0)
-        t = t.flatten()
-        e = self.time_embedding(
-            sinusoidal_embedding_1d(self.freq_dim, t).unflatten(0, (bt, seq_len)))
-        e0 = self.time_projection(e).unflatten(2, (6, self.dim))
+            t_sample = t
+        else:
+            t_sample = t[:, 0]
+        seq_len = x.size(1)
+        if self.fp32_calculate:
+            with torch.amp.autocast(device_type=t_sample.device.type, dtype=torch.float32):
+                sin = sinusoidal_embedding_1d(self.freq_dim, t_sample).float()
+                e_sample = self.time_embedding(sin)
+                e0_sample = self.time_projection(e_sample).unflatten(1, (6, self.dim))
+        else:
+            sin = sinusoidal_embedding_1d(self.freq_dim, t_sample).to(x.dtype)
+            e_sample = self.time_embedding(sin)
+            e0_sample = self.time_projection(e_sample).unflatten(1, (6, self.dim))
+        e = e_sample.unsqueeze(1).expand(-1, seq_len, -1)
+        e0 = e0_sample.unsqueeze(1).expand(-1, seq_len, -1, -1)
 
         if context_lens is None:
             context_lens = torch.tensor([u.size(0) for u in context], dtype=torch.long, device=context[0].device)
@@ -868,13 +869,17 @@ class WanModel(nn.Module):
                 [u, u.new_zeros(self.text_len - u.size(0), u.size(1))])
             for u in context
         ])
+
+        if self.mask_text_padding and context_lens is not None:
+            for i, seq_len in enumerate(context_lens.tolist()):
+                context_stacked[i, seq_len:] = 0
         context = self.text_embedding(context_stacked)
 
         kwargs = dict(
             e=e0,
             seq_lens=seq_lens,
             grid_sizes=grid_sizes,
-            freqs=freqs,
+            freqs=freqs_i,
             context=context,
             context_lens=context_lens)
 
@@ -903,7 +908,7 @@ class WanModel(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
-            elif isinstance(m, (WanRMSNorm, _LlamaRMSNorm)):
+            elif isinstance(m, WanRMSNorm):
                 nn.init.ones_(m.weight)
             elif isinstance(m, (_FP32LayerNorm, WanLayerNorm)):
                 if m.weight is not None:
@@ -917,8 +922,7 @@ class WanModel(nn.Module):
                 nn.init.normal_(m.down_proj, std=m.ffn_dim ** -0.5)
             elif hasattr(m, 'modulation') and isinstance(m.modulation, nn.Parameter):
                 # WanAttentionBlock and Head use modulation for time conditioning.
-                # Under init_empty_weights the original torch.randn values are lost,
-                # so we re-initialize with the same std used in __init__.
+                # Under init_empty_weights the original torch.randn values are lost. Re-initialize with the same std used in __init__.
                 nn.init.normal_(m.modulation, std=m.modulation.shape[-1] ** -0.5)
 
         nn.init.xavier_uniform_(self.patch_embedding.weight.flatten(1))
@@ -968,7 +972,8 @@ class MLPProj(nn.Module):
 
 
 class WanDiTFSDP2(WanModel):
-    """WanModel wrapper adapting the native implementation to FSDP2 batch-tensor interface."""
+    """WanModel wrapper adapting the native implementation to FSDP2 batch-tensor interface..
+    """
 
     def __init__(
         self,
@@ -985,13 +990,10 @@ class WanDiTFSDP2(WanModel):
         num_heads: int = 16,
         num_layers: int = 32,
         qk_norm: bool = True,
-        qk_norm_type: str = "rmsnorm",
         cross_attn_norm: bool = True,
         eps: float = 1e-6,
-        max_seq_len: int = 1024,
         clip_token_len: int = 257,
         fp32_calculate: bool = False,
-        seperated_timestep: bool = False,
         **kwargs,
     ):
         # Map model_type aliases used in MindSpeed-MM config
@@ -1004,6 +1006,10 @@ class WanDiTFSDP2(WanModel):
         num_experts = kwargs.pop('num_experts', 1)
         top_k = kwargs.pop('top_k', 1)
         attn_implementation = kwargs.pop('attn_implementation', 'eager')
+        fp32_modulation = kwargs.pop('fp32_modulation', False)
+        # Default to False to match the reference implementation, which does not zero out
+        # text padding positions before text_embedding.
+        mask_text_padding = kwargs.pop('mask_text_padding', False)
         super().__init__(
             model_type=native_model_type,
             patch_size=patch_size,
@@ -1023,12 +1029,13 @@ class WanDiTFSDP2(WanModel):
             num_experts=num_experts,
             top_k=top_k,
             attn_implementation=attn_implementation,
+            fp32_modulation=fp32_modulation,
+            mask_text_padding=mask_text_padding,
+            fp32_calculate=fp32_calculate,
         )
         self.img_dim = img_dim
-        self.max_seq_len = max_seq_len
         self.clip_token_len = clip_token_len
         self.fp32_calculate = fp32_calculate
-        self.seperated_timestep = seperated_timestep
 
         if native_model_type in ["i2v", "flf2v"]:
             self.img_emb = MLPProj(img_dim, hidden_size, native_model_type == 'flf2v', clip_token_len, fp32_calculate)
@@ -1059,11 +1066,11 @@ class WanDiTFSDP2(WanModel):
         i2v_vae_feature: torch.Tensor = None,
         **kwargs,
     ):
+        # Align inputs with model dtype (FSDP2 mp_policy may cast params to bf16,
+        # but predictor itself is not an FSDP leaf module, so inputs are not auto-cast)
         target_dtype = self.dtype
         if x.dtype != target_dtype:
             x = x.to(target_dtype)
-        if isinstance(timestep, torch.Tensor) and timestep.dtype != target_dtype:
-            timestep = timestep.to(target_dtype)
         if isinstance(prompt, torch.Tensor) and prompt.dtype != target_dtype:
             prompt = prompt.to(target_dtype)
         if isinstance(prompt_mask, torch.Tensor) and prompt_mask.dtype != target_dtype:
@@ -1077,10 +1084,6 @@ class WanDiTFSDP2(WanModel):
         if self.model_type in ["i2v", "flf2v"]:
             if i2v_clip_feature is not None:
                 i2v_clip_feature = i2v_clip_feature.to(x)
-            if i2v_vae_feature is not None:
-                i2v_vae_feature = i2v_vae_feature.to(x)
-            x = torch.cat([x, i2v_vae_feature], dim=1)
-        elif self.model_type in ["wan2_2-i2v"]:
             if i2v_vae_feature is not None:
                 i2v_vae_feature = i2v_vae_feature.to(x)
             x = torch.cat([x, i2v_vae_feature], dim=1)
@@ -1104,6 +1107,9 @@ class WanDiTFSDP2(WanModel):
         else:
             t = torch.tensor([timestep], device=x_list[0].device, dtype=x_list[0].dtype)
 
+        # seq_len: max sequence length after patchify
+        # For a tensor [C, F, H, W], after Conv3d patch embedding with stride=patch_size,
+        # shape becomes [dim, F//p_t, H//p_h, W//p_w]. Sequence length = (F//p_t) * (H//p_h) * (W//p_w)
         sample = x_list[0]
         seq_len = (sample.shape[1] // self.patch_size[0]) * (
             sample.shape[2] // self.patch_size[1]) * (sample.shape[3] // self.patch_size[2])
@@ -1116,6 +1122,7 @@ class WanDiTFSDP2(WanModel):
         # y for i2v (already concatenated into x above, so y=None)
         y = None
 
+        # Handle i2v clip feature for native model compatibility.
         if self.model_type in ["i2v", "flf2v"] and i2v_clip_feature is not None:
             clip_embedding = self.img_emb(
                 i2v_clip_feature.float() if self.fp32_calculate else i2v_clip_feature.to(x_list[0].dtype)
@@ -1125,11 +1132,16 @@ class WanDiTFSDP2(WanModel):
                 for i in range(len(context_list))
             ]
 
-        # Derive actual text lengths from prompt_mask so cross-attention can mask
-        # padding positions.  If prompt_mask is unavailable we fall back to full
-        # length for every sample.
         if isinstance(prompt_mask, torch.Tensor) and prompt_mask.numel() > 0:
-            _context_lens = prompt_mask.sum(dim=-1).long().tolist()
+            # prompt_mask may be [B, L] or [B, 1, L]; reduce to per-sample lengths.
+            # Keep the result as a 1-D tensor/list so batch-size=1 still yields
+            # a list with one element (WanModel.forward iterates over it).
+            _context_lens_tensor = prompt_mask.sum(dim=-1).long()
+            while _context_lens_tensor.dim() > 1:
+                _context_lens_tensor = _context_lens_tensor.squeeze(-1)
+            _context_lens = _context_lens_tensor.tolist()
+            if not isinstance(_context_lens, list):
+                _context_lens = [_context_lens]
         else:
             _context_lens = None
 
