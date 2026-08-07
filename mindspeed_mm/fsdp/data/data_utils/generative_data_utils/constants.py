@@ -1,0 +1,12 @@
+# some constants used for dataset
+PROMPT_MASK = "prompt_mask"
+PROMPT_IDS = "prompt_ids"
+TEXT = "text"
+VIDEO = "video"
+VIDEO_REJECTED = "video_rejected"
+VIDEO_MASK = "video_mask"
+FILE_INFO = "file"
+FILE_REJECTED_INFO = "file_rejected"
+CAPTIONS = "captions"
+SCORE = "score"
+SCORE_REJECTED = "score_rejected"
