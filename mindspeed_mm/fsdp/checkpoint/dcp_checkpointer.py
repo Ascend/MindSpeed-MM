@@ -18,7 +18,6 @@ from torch.distributed.checkpoint.state_dict import (
     set_model_state_dict,
     set_optimizer_state_dict,
 )
-from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 from torch.distributed.checkpoint.stateful import Stateful
 
 from mindspeed.fsdp.utils.log import print_rank
@@ -33,6 +32,7 @@ from mindspeed_mm.fsdp.checkpoint.utils import (
     restore_base_layer_keys,
 )
 from mindspeed_mm.fsdp.checkpoint.broadcast_utils import rank0_load_and_broadcast_dcp_weights
+from mindspeed_mm.fsdp.checkpoint.dcp_utils import ProgressLoadPlanner
 
 
 logger = logging.getLogger(__name__)
@@ -258,7 +258,7 @@ class DistributedCheckpointer(CheckpointerBase):
                 state_dict=load_state,
                 storage_reader=storage_reader,
                 process_group=process_group,
-                planner=DefaultLoadPlanner(allow_partial_load=not load_strict),
+                planner=ProgressLoadPlanner(allow_partial_load=not load_strict),
             )
         # Note: further per-param DTensor alignment and device fixes happen inside OptimizerState.load_state_dict
 

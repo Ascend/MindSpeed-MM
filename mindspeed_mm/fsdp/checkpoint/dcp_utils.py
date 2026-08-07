@@ -6,14 +6,16 @@ import os
 from functools import reduce
 
 import torch
+import torch.distributed as dist
 from torch import Tensor
 from torch.distributed.checkpoint.metadata import Metadata, STATE_DICT_TYPE
 from torch.distributed.checkpoint.storage import StorageWriter, StorageReader
 from torch.distributed.checkpoint.planner import SavePlanner, LoadPlanner, ReadItem, LoadItemType, LoadPlan
-from torch.distributed.checkpoint.default_planner import DefaultSavePlanner, _EmptyStateDictLoadPlanner
+from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner, DefaultSavePlanner, _EmptyStateDictLoadPlanner
 from torch.distributed.checkpoint.logger import _dcp_method_logger
 from torch.distributed.checkpoint.filesystem import _StoragePrefix, _StorageInfo
 from torch.distributed.checkpoint import FileSystemReader
+from tqdm import tqdm
 
 
 def partial_save_dcp_state_dict(
@@ -325,3 +327,36 @@ def extract_metadata(
     )
 
     return partial_metadata
+
+
+class ProgressLoadPlanner(DefaultLoadPlanner):
+    """DCP load planner with local parameter progress."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._progress = None
+        self._completed = 0
+
+    def finish_plan(self, plan):
+        plan = super().finish_plan(plan)
+        if not dist.is_initialized() or dist.get_rank() == 0:
+            self._progress = tqdm(total=len(plan.items), desc="Loading dcp checkpoint (rank 0)", unit=" params")
+            if not plan.items:
+                self._progress.close()
+        return plan
+
+    def _advance_progress(self) -> None:
+        if self._progress is None:
+            return
+        self._completed += 1
+        self._progress.update(1)
+        if self._completed >= self._progress.total:
+            self._progress.close()
+
+    def load_bytes(self, read_item, value) -> None:
+        super().load_bytes(read_item, value)
+        self._advance_progress()
+
+    def commit_tensor(self, read_item, tensor: torch.Tensor) -> None:
+        super().commit_tensor(read_item, tensor)
+        self._advance_progress()
