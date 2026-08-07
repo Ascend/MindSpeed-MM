@@ -377,6 +377,7 @@ def torch_causal_conv1d_update(
     bias=None,
     activation=None,
 ):
+    hidden_states = hidden_states.transpose(1, 2).contiguous()
     _, hidden_size, seq_len = hidden_states.shape
     state_len = conv_state.shape[-1]
 
@@ -385,7 +386,7 @@ def torch_causal_conv1d_update(
     out = F.conv1d(hidden_states_new, weight.unsqueeze(1), bias, padding=0, groups=hidden_size)
     out = F.silu(out[:, :, -seq_len:])
     out = out.to(hidden_states.dtype)
-    return out
+    return out.transpose(1, 2).contiguous()
 
 
 def l2norm(x: torch.FloatTensor, dim: int = -1, eps: float = 1e-6):
