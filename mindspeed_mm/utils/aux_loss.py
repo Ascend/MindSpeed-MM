@@ -96,6 +96,12 @@ def load_balancing_loss_func_optimized(
 
     if context_parallel_group is not None and torch.distributed.get_world_size(group=context_parallel_group) > 1:
         torch.distributed.all_reduce(
+            router_selected,
+            op=torch.distributed.ReduceOp.SUM,
+            group=context_parallel_group
+        )
+
+        torch.distributed.all_reduce(
             router_total,
             op=torch.distributed.ReduceOp.SUM,
             group=context_parallel_group
