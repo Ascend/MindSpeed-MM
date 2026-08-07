@@ -170,6 +170,13 @@ def _fsdp2_reduce_group(
     For finite p, returns the globally-reduced sum of p-th powers (not the final norm).
     For inf, returns the globally-reduced max.
     """
+    if len(params) == 0:
+        device = torch.device(get_device_type())
+        val = torch.tensor(0.0, device=device, dtype=torch.float32)
+        for _, group in reduce_groups:
+            if group is not None:
+                dist.all_reduce(val, op=dist.ReduceOp.SUM, group=group)
+        return val
     if math.isinf(norm_type):
         val = _local_max(params)
         for _, group in reduce_groups:

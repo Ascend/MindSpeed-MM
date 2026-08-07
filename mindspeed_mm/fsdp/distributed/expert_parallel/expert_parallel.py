@@ -63,7 +63,7 @@ def prepare_distribute_output_fn(module, outputs, device_mesh):
 
 def distribute_expert_weight(module_name, module, ep_mesh):
     for name, param in module.named_parameters(recurse=False):
-        dist_param = torch.nn.Parameter(distribute_tensor(param, ep_mesh, [Shard(0)]))
+        dist_param = torch.nn.Parameter(distribute_tensor(param, ep_mesh, [Shard(0)]), requires_grad=param.requires_grad)
         module.register_parameter(name, dist_param)
 
     for name, children_module in module.named_children():
