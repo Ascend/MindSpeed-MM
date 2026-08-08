@@ -328,10 +328,12 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
         if skip_recompute and training_stage == TrainingStage.BACKWARD:
             if layer_idx == depth - 1:
                 if output_final_state:
-                    final_state = OffloadManager().pop_npu_tensor()
-                A = OffloadManager().pop_npu_tensor()
-                o = OffloadManager().pop_npu_tensor()
-                g = OffloadManager().pop_npu_tensor()
+                    final_state = OffloadManager().pop_npu_tensor().tensor
+                else:
+                    final_state = None
+                A = OffloadManager().pop_npu_tensor().tensor
+                o = OffloadManager().pop_npu_tensor().tensor
+                g = OffloadManager().pop_npu_tensor().tensor
 
             else:
                 layer_items_keys = OffloadManager().get_layer_items_keys(layer_idx)
