@@ -1,5 +1,6 @@
 # pylint: skip-file
 import logging
+import gc
 from datetime import datetime
 
 import torch
@@ -246,6 +247,9 @@ class TrainEngine:
             train_dataloader_iter = Preloader(train_dataloader_iter, param_dtype=param_dtype)
 
         self.model.train()
+        if args.training.manual_gc_interval > 0:
+            gc.disable()
+            gc.collect()
 
         # --- Train Loop ---
         curr_step_lr = self.lr_scheduler.get_last_lr()[0]
@@ -310,6 +314,9 @@ class TrainEngine:
                 and self.iteration % args.training.val_interval == 0
             ):
                 self._run_validation(self.iteration)
+
+            if self.args.training.manual_gc_interval > 0 and self.iteration % self.args.training.manual_gc_interval == 0:
+                gc.collect()
 
         # Stop profiling if enabled
         self.profiler.stop()

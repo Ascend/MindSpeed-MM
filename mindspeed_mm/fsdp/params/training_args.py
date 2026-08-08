@@ -314,6 +314,10 @@ class TrainingArguments(BaseArguments):
         default=None,
         metadata={"help": "Micro batch size for validation. If None, use micro_batch_size."},
     )
+    manual_gc_interval: int = field(
+        default=0,
+        metadata={"help": "Training step interval to trigger manual garbage collection. When the value is set to 0, garbage collection is not triggered between training steps. When the value is greater than 0, default python garbage collection is  disabled and triggered every `manual_gc_interval` steps."},
+    )
     use_deter_comp: bool = field(
         default=False,
         metadata={"help": "Whether to use deterministic computation for reproducibility."},
@@ -365,6 +369,9 @@ class TrainingArguments(BaseArguments):
 
         if self.mem_fraction_static <= 0.0 or self.mem_fraction_static > 1.0:
             raise ValueError(f"mem_fraction_static must be in (0, 1], got {self.mem_fraction_static}.")
+
+        if self.manual_gc_interval < 0:
+            raise ValueError(f"`manual_gc_interval` must be a non-negative integer, got {self.manual_gc_interval}.")
 
     def compute_distributed_training(
         self, parallel_args

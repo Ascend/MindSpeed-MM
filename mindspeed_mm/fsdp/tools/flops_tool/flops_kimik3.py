@@ -3,7 +3,6 @@ import random
 import argparse
 
 from PIL import Image
-from torch.nn import functional as F
 from transformers import AutoConfig
 
 
@@ -67,7 +66,7 @@ def regularize_images(images, **kwargs):
 
     Args:
         images (list): 原始图像列表, 支持PIL对象/图片路径两种输入
-        **kwargs: 透传给 _preprocess_image 的关键字参数, 如mage_max_pixels、image_min_pixels
+        **kwargs: 透传给 _preprocess_image 的关键字参数, 如 image_max_pixels、image_min_pixels
 
     Returns:
         list[Image.Image]: 经过统一规整、尺寸限制、格式转换后的PIL图像列表
@@ -174,11 +173,11 @@ def compute_llm_mlp_flops(text_cfg, tokens_sum):
 
     # dense flops
     per_dense_flops = 2 * tokens_sum * hidden_size * intermediate_size * 3
-    dense_flops = per_dense_flops *  first_k_dense_replace * 3
+    dense_flops = per_dense_flops * first_k_dense_replace * 3
 
     # moe flops
     down_proj_flops = 2 * tokens_sum * hidden_size * routed_expert_hidden_size
-    gate_flops = 2 * tokens_sum * routed_expert_hidden_size * num_experts
+    gate_flops = 2 * tokens_sum * hidden_size * num_experts
 
     shared_flops = 2 * tokens_sum * hidden_size * moe_intermediate_size * 3 * num_shared_experts
     up_proj_flops = 2 * tokens_sum * hidden_size * routed_expert_hidden_size
@@ -321,6 +320,7 @@ def main(args):
     hf_cfg = AutoConfig.from_pretrained(args.hf_ckpt_path, trust_remote_code=True)
 
     # 图像编码器 FLOPs
+    image_encoder_flops = 0
     if args.image_num > 0:
         vit_flops_per_image = estimate_vit_flops(hf_cfg, pixel_values.shape[0], freeze=args.freeze_vit)
         image_encoder_flops = vit_flops_per_image * args.gbs * args.image_num
