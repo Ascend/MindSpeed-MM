@@ -4,6 +4,7 @@ from typing import Set, List, Any, Dict, Optional, Union
 from collections import OrderedDict
 
 import torch
+from torch.distributed._tensor import DTensor
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard, CPUOffloadPolicy
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -78,7 +79,9 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
                    "DDP mode is enabled (fully_shard_parallel_size=1) instead of FSDP wrapping")
         return model
 
-    if hasattr(model, 'fully_shard') and callable(getattr(model, 'fully_shard')):
+    is_container = hasattr(model, 'get_sub_models') and callable(getattr(model, 'get_sub_models'))
+
+    if not is_container and hasattr(model, 'fully_shard') and callable(getattr(model, 'fully_shard')):
         execute_result = model.fully_shard(fsdp_plan=fsdp_plan)
         if execute_result:
             return model
@@ -103,6 +106,23 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
             fully_shard(module, **config)
         else:
             fully_shard(module, hook_module=hook_module, **config)
+
+    if is_container:
+        for name, sub_model in model.get_sub_models().items():
+            has_unwrapped_params = False
+            for param in sub_model.parameters(recurse=True):
+                if param not in ignored_params and not isinstance(param, DTensor):
+                    has_unwrapped_params = True
+                    break
+            if has_unwrapped_params:
+                print_rank(logger.info, f"[FSDP2]: Wrapping sub-model <{name}> to manage unwrapped params")
+                fully_shard(sub_model, **config)
+
+        if hasattr(model, 'fully_shard') and callable(getattr(model, 'fully_shard')):
+            execute_result = model.fully_shard(fsdp_plan=fsdp_plan)
+            if execute_result:
+                return model
+
     # Apply FSDP to the entire model
     fully_shard(model, **config)
 
@@ -123,7 +143,7 @@ def get_mixprecision_policy(fsdp_plan: FSDPPlanConfig):
     )
 
 
-def _post_order_traverse(model: torch.nn.Module, parent_path: str = ""):
+def _post_order_traverse(model: torch.nn.Module, parent_path: str = "", visited: Optional[set] = None):
     """
     Perform post-order traversal of model submodules.
 
@@ -133,13 +153,20 @@ def _post_order_traverse(model: torch.nn.Module, parent_path: str = ""):
     Args:
         model: The model to traverse.
         parent_path: The path to the current module in the hierarchy.
+        visited: Module instances already yielded. This avoids duplicate FSDP
+            wrapping when a wrapper exposes the same module through aliases.
 
     Yields:
         Tuple of (module_path, module) for each module in the model.
     """
+    if visited is None:
+        visited = set()
     for name, child in model.named_children():
+        if child in visited:
+            continue
+        visited.add(child)
         child_path = f"{parent_path}.{name}" if parent_path else name
-        yield from _post_order_traverse(child, child_path)
+        yield from _post_order_traverse(child, child_path, visited)
     yield parent_path, model
 
 
@@ -268,6 +295,54 @@ def _is_submodule(child: torch.nn.Module, parent: torch.nn.Module) -> bool:
     return any(m is child for m in parent.modules())
 
 
+def _get_container_owner_map(model: torch.nn.Module) -> Dict[torch.nn.Module, str]:
+    """Build a module -> owning sub-model name map for ModelContainer models.
+
+    Returns an empty dict for non-container models. Used to filter out
+    cross-container layers from FSDP prefetch candidates.
+    """
+    if not hasattr(model, 'get_sub_models') or not callable(getattr(model, 'get_sub_models')):
+        return {}
+
+    owner_map = {}
+    for sub_model_name, sub_model in model.get_sub_models().items():
+        if sub_model is None:
+            continue
+        for module in sub_model.modules():
+            owner_map.setdefault(module, sub_model_name)
+    return owner_map
+
+
+def _get_layer_owner(layer_modules: List[torch.nn.Module], owner_map: Dict[torch.nn.Module, str]) -> Optional[str]:
+    """
+    Return the single owning sub-model name shared by all layer modules, or None when mixed/unknown.
+    """
+    if not owner_map:
+        return None
+    owners = {owner_map.get(module) for module in layer_modules}
+    owners.discard(None)
+    if len(owners) == 1:
+        return next(iter(owners))
+    return None
+
+
+def _filter_prefetch_layers_by_owner(
+    current_layer_modules: List[torch.nn.Module],
+    layers_to_prefetch: List[List[torch.nn.Module]],
+    owner_map: Dict[torch.nn.Module, str],
+) -> List[List[torch.nn.Module]]:
+    current_owner = _get_layer_owner(current_layer_modules, owner_map)
+    if current_owner is None:
+        return layers_to_prefetch
+
+    filtered_layers = []
+    for layer_modules in layers_to_prefetch:
+        target_owner = _get_layer_owner(layer_modules, owner_map)
+        if target_owner is None or target_owner == current_owner:
+            filtered_layers.append(layer_modules)
+    return filtered_layers
+
+
 def _order_sub_modules_by_hierarchy(sub_modules: List[Union[torch.nn.Module, List[torch.nn.Module]]], parent_first: bool = False) -> List[Union[torch.nn.Module, List[torch.nn.Module]]]:
     """
     Reorder a list of sub-modules based on their hierarchical relationship.
@@ -390,6 +465,7 @@ def set_modules_to_prefetch(
     wrapped_modules: List[Dict[torch.nn.Module]] = [OrderedDict() for _ in range(len(fsdp_plan.apply_modules))] # [hook_module/default_hook_module: List(torch.nn.Module)]
     # Get E-FSDP modules if EP plan is provided
     efsdp_modules = get_efsdp_modules(model, ep_plan) if ep_plan else []
+    container_owner_map = _get_container_owner_map(model)
 
     order_num = 0
     # --- Phase 1: Traverse the model to group modules by their hook/order ---
@@ -475,9 +551,10 @@ def set_modules_to_prefetch(
             # Determine the range of modules to prefetch
             j_end = min(len(wrapped_modules_in_order), i + 1 + fsdp_plan.num_to_forward_prefetch)
             layers_to_prefetch = wrapped_modules_in_order[i + 1: j_end]
+            layers_to_prefetch = _filter_prefetch_layers_by_owner(layer_modules, layers_to_prefetch, container_owner_map)
             if layers_to_prefetch:
                 # Flatten the list of modules from the prefetch layers
-                modules_to_prefetch = [module_to_prefetch for layer_modules in layers_to_prefetch for module_to_prefetch in layer_modules]
+                modules_to_prefetch = [module_to_prefetch for prefetch_layer_modules in layers_to_prefetch for module_to_prefetch in prefetch_layer_modules]
 
                 # Sort to find the first FSDP module that will be executed in this group
                 layer_modules = _order_sub_modules_by_hierarchy(layer_modules)
@@ -499,9 +576,10 @@ def set_modules_to_prefetch(
             # Determine the range for backward prefetch
             j_end = min(len(rev_wrapped_modules_in_order), i + 1 + fsdp_plan.num_to_backward_prefetch)
             layers_to_prefetch = rev_wrapped_modules_in_order[i + 1: j_end]
+            layers_to_prefetch = _filter_prefetch_layers_by_owner(layer_modules, layers_to_prefetch, container_owner_map)
             if layers_to_prefetch:
                 # Flatten the list
-                modules_to_prefetch = [module_to_prefetch for layer_modules in layers_to_prefetch for module_to_prefetch in layer_modules]
+                modules_to_prefetch = [module_to_prefetch for prefetch_layer_modules in layers_to_prefetch for module_to_prefetch in prefetch_layer_modules]
                 # Sort to find the last FSDP module that was executed in this group
                 layer_modules = _order_sub_modules_by_hierarchy(layer_modules)
                 # Set the prefetch modules on the last module in the current group

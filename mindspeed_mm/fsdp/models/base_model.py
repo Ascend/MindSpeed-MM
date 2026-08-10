@@ -1,9 +1,14 @@
+import logging
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import torch
 import torch.nn as nn
 
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
+
+
+logger = logging.getLogger(__name__)
 
 
 class BaseModel(ABC):
@@ -32,16 +37,79 @@ class BaseModel(ABC):
     @classmethod
     @abstractmethod
     def _from_config(cls, config: ModelArguments) -> "BaseModel":
-        """
-        Create model instance from configuration without loading pretrained weights.
-        Typically used for initialization with meta device or when starting from scratch.
+        """Create a model instance from configuration without loading pretrained weights (meta-device or from-scratch init)."""
+        pass
 
-        Args:
-            config: ModelArguments
 
-        Returns:
-            Model instance initialized from configuration
-        """
+class GenerativeBaseModel(BaseModel):
+    """Base class for generative-model (diffusion family) components.
+
+    Adds the unified weight-setup flow on top of :class:`BaseModel`:
+    ``setup_weights`` loads pretrained weights (HF/Diffusers/DCP) or falls
+    back to random init, so each sub-model (ae / text_encoder / predictor)
+    is built and loaded through the same interface.
+    """
+
+    # Registry key of ``WEIGHT_TRANSFORM_PIPELINES`` selecting the
+    # key-conversion pipeline for diffusers checkpoint sources (e.g.
+    # ``"wan2_2"``).  ``None`` loads weights without key conversion.
+    weight_transform_model_type: Optional[str] = None
+
+    def get_weight_load_module(self):
+        """Module that receives checkpoint weights; defaults to ``self``, wrappers override to point at the inner module."""
+        return self
+
+    def resolve_weight_source(self, config):
+        """Resolve ``(ckpt_path, declared_format, conversion_dir)``; overridable for construction-time fallbacks."""
+        from mindspeed_mm.fsdp.checkpoint.convert import resolve_checkpoint_source
+
+        return resolve_checkpoint_source(config)
+
+    def setup_weights(self, config):
+        """Default generative-model weight setup: pretrained load or random init; a failed load raises."""
+        from mindspeed_mm.fsdp.checkpoint.convert import (
+            load_checkpoint_with_conversion,
+            resolve_load_format,
+        )
+        from mindspeed_mm.fsdp.utils.utils import setup_module_weights
+
+        module = self.get_weight_load_module()
+        ckpt_path, declared_format, conversion_dir = self.resolve_weight_source(config)
+
+        def load_fn():
+            load_format = resolve_load_format(ckpt_path, declared_format)
+            logger.info(
+                "Loading %s weights: path=%s load_format=%s",
+                type(self).__name__,
+                ckpt_path,
+                load_format,
+            )
+            # Raises on failure: silently falling back to random
+            # initialization would train from garbage weights.
+            load_checkpoint_with_conversion(
+                module,
+                ckpt_path,
+                load_format,
+                conversion_output_dir=conversion_dir,
+                model_type=self.weight_transform_model_type,
+            )
+            return True
+
+        def init_fn():
+            if hasattr(self, "init_weights"):
+                self.init_weights()
+
+        loaded = setup_module_weights(
+            module=module,
+            ckpt_path=ckpt_path,
+            load_fn=load_fn,
+            init_fn=init_fn,
+        )
+        self._weights_loaded = loaded
+        self.post_load(loaded)
+
+    def post_load(self, loaded: bool):
+        """Hook invoked after :meth:`setup_weights`; default no-op (``loaded`` marks pretrained vs random-init fallback)."""
         pass
 
 

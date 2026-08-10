@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Callable, Optional
 import time
 
 import torch
@@ -16,39 +16,89 @@ from .constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
 from .device import get_device_type, get_torch_device
 
 
-def to_empty_if_needed(model, device: torch.device | str | int | None, recurse: bool = True):
-    """Move the parameters and buffers to the specified device without copying storage if they are not already on that device.
+def to_empty_if_needed(
+    model,
+    device: torch.device | str | int | None,
+    recurse: bool = True,
+    only_meta: bool = False,
+    buffer_device: torch.device | str | int | None = None,
+):
+    """Move parameters/buffers toward ``device`` without copying storage when already there.
 
     Args:
-        module: The module whose parameters and buffers to (maybe) move.
-        device: The desired device of the parameters and buffers in the module. If `None`, the default device is used.
-        recurse: Whether parameters and buffers of submodules should be recursively moved to the specified device.
+        device: Target device for parameters.
+        recurse: Whether to descend into submodules.
+        only_meta: True handles only meta tensors (build-time weight-loading
+            flow); False handles every wrong-device parameter (pre-training
+            FSDP2 materialization flow).
+        buffer_device: Buffer placement policy. ``None`` (default) is the
+            legacy policy: CPU buffers move to ``get_device_type()`` regardless
+            of ``device`` (FSDP2 CPU-offload keeps buffers such as RoPE
+            ``inv_freq`` on the compute device); other buffers stay. A concrete
+            device materializes/moves meta or wrong-device buffers to it.
 
-    Behavior Scenarios:
+    Behavior Scenarios (ACC = accelerator returned by ``get_device_type()``):
         Scenario 1: Meta initialization + CPU offload (e.g., FSDP2 with offload_to_cpu=True)
+            defaults: only_meta=False, buffer_device=None
         -------------------------------------------------------------------------
           - Parameters:               Meta => CPU
-          - Buffers:                  CUDA => CUDA
-          - Tensors(eg. inv_freq):    CPU => CUDA
+          - Buffers:                  ACC => ACC (meta buffers stay meta)
+          - Tensors(eg. inv_freq):    CPU => ACC
 
         Scenario 2: Meta initialization only (no CPU offload)
+            defaults: only_meta=False, buffer_device=None
         -------------------------------------------------------------------------
-          - Parameters:               Meta => CUDA
-          - Buffers:                  CUDA => CUDA
-          - Tensors(eg. inv_freq):    CPU => CUDA
+          - Parameters:               Meta => ACC
+          - Buffers:                  ACC => ACC (meta buffers stay meta)
+          - Tensors(eg. inv_freq):    CPU => ACC
+
+        Scenario 3: Build-time weight loading (e.g., ``setup_module_weights``)
+            only_meta=True, buffer_device=device
+        -------------------------------------------------------------------------
+          - Meta Parameters:          Meta => device (default CPU)
+          - Meta Buffers:             Meta => device
+          - Non-meta tensors:         untouched (same object, no copy)
     """
     device = torch.empty((), device=device).device
 
     def _replace_tensor(t):
         # Case 1: This is a trainable parameter (subclass of torch.Tensor with requires_grad)
-        if isinstance(t, torch.nn.Parameter):# meta or cpu
+        if isinstance(t, torch.nn.Parameter):
+            if only_meta and not t.is_meta:
+                return t
             return torch.empty_like(t, device=device) if t.device != device else t
-        else:
-            # Case 2: This is a buffer or regular tensor (non-parameter)
-            # we do not offload buffer to cpu when enable FSDP2 offload_to_cpu function.
+        # Case 2: This is a buffer or regular tensor (non-parameter)
+        if buffer_device is None:
+            # Legacy policy: we do not offload buffer to cpu when enable FSDP2 offload_to_cpu function.
             return t.to(device=get_device_type()) if t.device == torch.device('cpu') else t
+        if only_meta and not t.is_meta:
+            return t
+        buffer_target = torch.empty((), device=buffer_device).device
+        return torch.empty_like(t, device=buffer_target) if t.device != buffer_target else t
 
     return model._apply(_replace_tensor, recurse=recurse)
+
+
+def setup_module_weights(
+    module,
+    ckpt_path: Optional[str],
+    load_fn: Callable[[], bool],
+    init_fn: Optional[Callable] = None,
+    device: str = "cpu",
+):
+    """Materialize a module and load pretrained weights via ``load_fn``, falling back to ``init_fn`` random init; returns True when pretrained weights were loaded."""
+    # Build-time weight-loading flow: materialize only meta tensors (params AND buffers)
+    # onto ``device`` (default CPU), required before ``load_state_dict`` inside ``init_empty_weights``.
+    to_empty_if_needed(module, device, only_meta=True, buffer_device=device)
+
+    loaded = False
+    if ckpt_path is not None:
+        loaded = load_fn()
+
+    if not loaded and init_fn is not None:
+        init_fn()
+
+    return loaded
 
 
 def tensor_to_dtensor(t: torch.Tensor, device_mesh, placements):

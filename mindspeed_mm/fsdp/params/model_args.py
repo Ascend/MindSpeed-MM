@@ -1,6 +1,6 @@
 # pylint: skip-file
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from mindspeed_mm.config.arguments.base_args import BaseArguments
 
@@ -36,6 +36,14 @@ class ModelArguments(BaseArguments):
         default_factory=list,
         metadata={"help": "List of module names to freeze during training."},
     )
+    dtype: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Parameter dtype cast applied after model build (e.g. 'bf16'). "
+                    "Unset keeps the legacy default of casting to fp32. "
+                    "In ModelContainer mode it can be set per sub-model independently."
+        },
+    )
     mtp_num_layers: int = field(
         default=0,
         metadata={"help": "Number of mtp layers."},
@@ -43,4 +51,12 @@ class ModelArguments(BaseArguments):
     mtp_loss_scaling_factor: float = field(
         default=0.1,
         metadata={"help": "Mtp loss scaling factor."},
+    )
+    models: Optional[Dict[str, Any]] = field(
+        default=None,
+        metadata={
+            "help": "Optional per-sub-model configurations for ModelContainer mode. "
+                    "When set, each sub-model is built independently and assembled "
+                    "into a registered container model."
+        },
     )

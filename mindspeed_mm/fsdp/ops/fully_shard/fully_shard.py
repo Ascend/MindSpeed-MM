@@ -418,6 +418,12 @@ def _pre_forward(
         args, kwargs = self._fsdp_param_group.pre_forward(module, args, kwargs)
     for fsdp_state in self._states_to_forward_prefetch:
         if (target_param_group := fsdp_state._fsdp_param_group) is not None:
+            if not hasattr(target_param_group.comm_ctx, "all_gather_copy_in_stream"):
+                logger.debug(
+                    "Skipping FSDP forward prefetch for an uninitialized target "
+                    "communication context"
+                )
+                continue
             prefetch_all_gather_copy_in_stream = target_param_group.comm_ctx.all_gather_copy_in_stream
 
             # Notice:
@@ -427,7 +433,7 @@ def _pre_forward(
             # before triggering a new prefetch. This prevents an extra block from being
             # prefetched and avoids bandwidth contention (e.g., between FSDP unshard
             # and token dispatch in EP scenarios).
-            for comm_ctx in self.global_comm_ctx:
+            for comm_ctx in getattr(self, "global_comm_ctx", []):
                 if comm_ctx.all_gather_state and comm_ctx.all_gather_state.event:
                     prefetch_all_gather_copy_in_stream.wait_event(comm_ctx.all_gather_state.event)
 

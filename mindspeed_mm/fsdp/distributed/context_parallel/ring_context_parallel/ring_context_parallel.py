@@ -15,6 +15,16 @@ from .context_parallel_kv_cache import ContextParallelKVCache
 from .utils import RingP2P, tnd_out_update, causal_out_update, general_out_update, forward_update, get_selection_indices_for_tnd_softmax_update
 
 
+def _batch_index(seq1d, seq_len):
+    """Local equivalent of ``mindspeed.utils.batch_index``, vendored because ``mindspeed.utils`` hard-depends on megatron (unavailable under NON_MEGATRON)."""
+    from bisect import bisect_right
+
+    end_points = list(range(seq_len, seq1d[-1] + 1, seq_len))
+    indexes = [0] + [bisect_right(seq1d, point) for point in end_points]
+    seq_batch = [seq1d[indexes[idx]:indexes[idx + 1]] for idx in range(len(indexes) - 1)]
+    return [[elem - idx * seq_len for elem in seq] for idx, seq in enumerate(seq_batch)]
+
+
 def causal_forward_fetch(q_block_id, kv_block_id, q, cur_k, cur_v, attn_mask=None):
     cur_attn_mask = None
     if q_block_id == kv_block_id:
@@ -1186,12 +1196,11 @@ class AttentionWithCp(torch.autograd.Function):
     @classmethod
     def compute_mask(cls, actual_seq_qlen, actual_seq_kvlen, q_block_id, kv_block_id, attn_mask):
         from bisect import bisect_right
-        from mindspeed.utils import batch_index
 
         if actual_seq_qlen:
             seq_len = actual_seq_qlen[-1] // AttentionWithCp.batch_size
-            actual_seq_qlen = batch_index(actual_seq_qlen, seq_len)
-            actual_seq_kvlen = batch_index(actual_seq_kvlen, seq_len)
+            actual_seq_qlen = _batch_index(actual_seq_qlen, seq_len)
+            actual_seq_kvlen = _batch_index(actual_seq_kvlen, seq_len)
             block_size = cls.block_size
             actual_seq_qlen = [[0] + lst for lst in actual_seq_qlen]
             sub_seq_qlen = [torch.tensor(x[1:]) - torch.tensor(x[:-1]) for x in actual_seq_qlen]
@@ -1249,11 +1258,7 @@ class TNDGeneralAttentionStrategy(AttentionStrategy):
         return attn_outs, cp_config.cur_sub_out_seq_len
 
     def update_out(self, cp_config):
-        """General attention strategy implementation using TND layout.
-
-        This strategy utilizes NPU fused attention operations for optimized performance
-        with TND (Time, Number of heads, Dimension) tensor layout.
-        """
+        """TND-layout attention strategy using NPU fused attention ops."""
         q_block_id, kv_block_id, cur_attn_outs, global_attn_outs, cur_sub_out_seq_len = \
             cp_config.q_block_id, cp_config.kv_block_id, cp_config.attn_outs, cp_config.global_attn_outs, cp_config.cur_sub_out_seq_len
 
@@ -1314,10 +1319,7 @@ class AttentionWithCpTNDGeneral(torch.autograd.Function):
     @staticmethod
     def forward(ctx, q, k, v, n, cp_para, softmax_scale=None, attn_mask=None, dropout_p=0.,
                 packed_seq_params=None, split_seq_lens_per_cp_rank=None):
-        '''split_seq_lens_perrank表示各个序列划分到所有rank上的长度，例如：
-           cp_rank1: s1_1, s2_1, s3_1
-           cp_rank2: s1_2, s2_2, s3_2
-        '''
+        """split_seq_lens_perrank表示各序列划分到每个rank上的长度（如cp_rank1: s1_1, s2_1；cp_rank2: s1_2, s2_2）。"""
 
         enable_mla = k.shape[-1] != v.shape[-1]
         ctx.enable_mla = enable_mla

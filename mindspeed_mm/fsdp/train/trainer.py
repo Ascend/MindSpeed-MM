@@ -20,6 +20,7 @@ from mindspeed_mm.fsdp.utils.device import (
 )
 from mindspeed_mm.fsdp.distributed.parallel_state import init_parallel_state, get_parallel_state
 from mindspeed_mm.fsdp.models.modelhub import ModelHub
+from mindspeed_mm.fsdp.models.model_container import ModelContainer
 from mindspeed_mm.fsdp.distributed.torch_parallelize import ParallelApplier
 from mindspeed_mm.fsdp.features.apply_features import FeaturesApplier
 from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed, init_model_weights
@@ -171,7 +172,11 @@ class Trainer:
     def get_foundation_model(self):
         """Load the foundation model from the model hub."""
         args: Arguments = self.args
-        model = ModelHub.build(args.model, args.features, args.training)
+        if getattr(args.model, "models", None):
+            from mindspeed_mm.fsdp.models.model_container_hub import ModelContainerHub
+            model = ModelContainerHub.build(args.model, args.features, args.training)
+        else:
+            model = ModelHub.build(args.model, args.features, args.training)
         return model
 
     def get_model(self, model_provider: Optional[Callable] = None):
@@ -185,10 +190,15 @@ class Trainer:
         """
         args = self.args
         model = self.get_foundation_model() if model_provider is None else model_provider()
+        is_container = isinstance(model, ModelContainer)
 
         # Apply LoRA adapters before FSDP2 sharding (if enabled)
         if args.training.lora.enable:
-            model = self.enable_lora(model)
+            if is_container:
+                for name, sub_model in model.get_sub_models().items():
+                    setattr(model, name, self.enable_lora(sub_model))
+            else:
+                model = self.enable_lora(model)
 
         # Apply parallelization strategy and model features
         self.model_features_applier.pre_fully_shard_apply(model)
@@ -206,11 +216,22 @@ class Trainer:
                 raise ValueError(
                     "Must set `training.load` when `training.load_rank0_and_broadcast` is True, otherwise the model will be initialized with meta device but no weights will be loaded."
                 )
-            elif args.training.load is None and not args.training.load_rank0_and_broadcast or args.training.lora.enable:
+
+            if is_container:
+                for _name, sub_model in model.get_sub_models().items():
+                    if getattr(sub_model, "_ms_mm_meta_init", False):
+                        to_empty_if_needed(sub_model, device=device)
+                if args.training.load is None and not args.training.load_rank0_and_broadcast or args.training.lora.enable:
+                    for _name, sub_model in model.get_sub_models().items():
+                        if getattr(sub_model, "_ms_mm_meta_init", False) and not getattr(
+                            sub_model, "_weights_loaded", False
+                        ):
+                            init_model_weights(sub_model)
+            else:
                 to_empty_if_needed(model, device=device)
-                init_model_weights(model)
-            else:  # load is not None
-                to_empty_if_needed(model, device=device)
+                if args.training.load is None and not args.training.load_rank0_and_broadcast or args.training.lora.enable:
+                    if not getattr(model, "_weights_loaded", False):
+                        init_model_weights(model)
 
         if args.training.lora.enable:
             self.lora_weight_manager = LoraWeightManager(model, lora_config=args.training.lora)
@@ -338,10 +359,7 @@ class Trainer:
         return lr_scheduler
 
     def get_dataloader(self):
-        """Build training dataloader with proper parallel partitioning.
-        Returns:
-            tuple: (train_dataloader, val_dataloader) where val_dataloader may be None
-        """
+        """Build train/val dataloaders with parallel partitioning (val may be None)."""
         args = self.args
         print_rank(logger.info, "Prepare data")
         data_config = args.data

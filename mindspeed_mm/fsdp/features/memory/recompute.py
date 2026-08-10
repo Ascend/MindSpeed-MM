@@ -1,5 +1,6 @@
 # Copyright (c) 2025, Huawei Technologies Co., Ltd. All rights reserved.
 import logging
+import inspect
 import functools
 
 from torch.utils.checkpoint import checkpoint
@@ -32,8 +33,13 @@ def get_recompute_modules(modules, plan):
 
 
 def recompute_wrapper(function, use_reentrant):
+    # Only inject the transformers-style cache kwarg when the wrapped forward
+    # actually accepts it. Native Wan blocks do not take this argument.
+    has_past_key_values = 'past_key_values' in inspect.signature(function).parameters
+
     def wrapper(*args, **kwargs):
-        kwargs['past_key_values'] = None  # transformers kv cache must be set None, or model use_cache=False
+        if has_past_key_values:
+            kwargs['past_key_values'] = None  # transformers kv cache must be set None, or model use_cache=False
         if not use_reentrant:
             return checkpoint(function, *args, use_reentrant=use_reentrant, **kwargs)
         else:

@@ -189,6 +189,12 @@ def build_text_encoder(config: dict):
         from_pretrained=pretrained_path,
         load_format=cfg.pop("load_format", None) or cfg.pop("checkpoint_format", None),
     )
+    # By default the frozen text encoder is placed on the compute device along
+    # with the other sub-models.  Set ``skip_to_device: true`` in the
+    # text_encoder YAML section to keep it on CPU and move inputs/outputs
+    # per-step instead (saves NPU memory at the cost of slower host-device
+    # copies).
+    skip_to_device = cfg.pop("skip_to_device", False)
     if isinstance(skip_to_device, str):
         skip_to_device = skip_to_device.strip().lower() in ("true", "1", "yes", "on")
     wrapper._ms_mm_skip_to_device = bool(skip_to_device)

@@ -1,9 +1,8 @@
-import os
 import importlib
 import logging
+from typing import Optional
 
 import torch
-import torch.distributed as dist
 from transformers import AutoConfig, PretrainedConfig, PreTrainedModel
 from accelerate import init_empty_weights
 
@@ -14,10 +13,21 @@ from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.feature_args import FeatureArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.utils.register import model_register
+from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.models.base_model import BaseModel
 
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_configured_dtype(model, model_args: ModelArguments):
+    """Cast a freshly built model to fp32 unless the config pins a ``dtype`` (e.g. ``dtype: bf16``)."""
+    dtype = getattr(model_args, "dtype", None)
+    if dtype in (None, ""):
+        return model.float()
+    if not isinstance(dtype, torch.dtype):
+        dtype = get_dtype(str(dtype).strip().lower())
+    return model.to(dtype=dtype)
 
 
 class ModelHub:
@@ -25,7 +35,8 @@ class ModelHub:
     Responsible for building HuggingFace native models.
     """
     @staticmethod
-    def _build_custom_model(model_args: ModelArguments, training_args: TrainingArguments) -> BaseModel:
+    def _build_custom_model(model_args: ModelArguments, training_args: TrainingArguments,
+        meta_init: bool = False) -> BaseModel:
         # First try to get model class from custom MODEL_MAPPINGS using model_id
         model_id = getattr(model_args, "model_id", None)
         if model_id:
@@ -37,21 +48,22 @@ class ModelHub:
             raise ValueError(f"model_id '{model_id}' is not registered in MODEL_MAPPINGS. ")
 
         # Initialize model with meta device for memory efficiency if specified
-        if training_args.init_model_with_meta_device:
+        if meta_init:
             with init_empty_weights():
-                model = model_cls._from_config(model_args).float()
+                model = _apply_configured_dtype(model_cls._from_config(model_args), model_args)
             for m in model.modules():
                 if getattr(m, "_is_hf_initialized", False):
                     m._is_hf_initialized = False
         else:
             # Load model from pretrained weights
-            model = model_cls.from_pretrained(model_args).float()
+            model = _apply_configured_dtype(model_cls.from_pretrained(model_args), model_args)
 
         return model
 
     @staticmethod
     def _build_transformers_model(transformer_config: PretrainedConfig, model_args: ModelArguments,
-        feature_args: FeatureArguments, training_args: TrainingArguments) -> PreTrainedModel:
+        feature_args: FeatureArguments, training_args: TrainingArguments,
+        meta_init: bool = False) -> PreTrainedModel:
         # Get model architecture from config
         architectures = getattr(transformer_config, "architectures", [])
         model_cls = None
@@ -74,9 +86,12 @@ class ModelHub:
 
 
         # Initialize model with meta device for memory efficiency if specified
-        if training_args.init_model_with_meta_device:
+        if meta_init:
             with init_empty_weights():
-                model = model_cls._from_config(transformer_config).float()
+                # NOTE: the dtype is taken from ``model_args`` (the YAML model
+                # section), not from the HF config, so only an explicitly
+                # configured ``dtype`` overrides the default fp32 cast.
+                model = _apply_configured_dtype(model_cls._from_config(transformer_config), model_args)
             for m in model.modules():
                 if getattr(m, "_is_hf_initialized", False):
                     m._is_hf_initialized = False
@@ -94,7 +109,8 @@ class ModelHub:
         return model
 
     @staticmethod
-    def build(model_args: ModelArguments, feature_args: FeatureArguments, training_args: TrainingArguments):
+    def build(model_args: ModelArguments, feature_args: FeatureArguments, training_args: TrainingArguments,
+        meta_init: Optional[bool] = None):
         """
         Build a model instance from HuggingFace based on model arguments and training configuration.
 
@@ -105,23 +121,32 @@ class ModelHub:
         Returns:
             Configured model instance ready for training.
         """
-        try:
-            # Load HuggingFace Config
-            print_rank(logger.info, f"> Loading AutoConfig from {model_args.model_name_or_path}...")
-            transformer_config = AutoConfig.from_pretrained(
-                model_args.model_name_or_path,
-                trust_remote_code=model_args.trust_remote_code,
-                _attn_implementation=model_args.attn_implementation
-            )
-        except Exception as e:
-            # If config loading fails, treat as custom model
-            first_line = next(iter(str(e).splitlines()), "")
-            _MAX_ERROR_MSG_LEN = 200
-            msg = first_line[:_MAX_ERROR_MSG_LEN] + "..." if len(first_line) > _MAX_ERROR_MSG_LEN else first_line
-            logger.warning(
-                f"AutoConfig.from_pretrained failed for '{model_args.model_name_or_path}' "
-                f"({type(e).__name__}: {msg}); falling back to custom model builder. "
-                f"If you intended to load a HuggingFace model, check the error above."
+        meta_init = training_args.init_model_with_meta_device
+        model_name_or_path = getattr(model_args, "model_name_or_path", None)
+        if model_name_or_path and str(model_name_or_path).lower() not in ("none", "null", ""):
+            try:
+                # Load HuggingFace Config
+                print_rank(logger.info, f"> Loading AutoConfig from {model_name_or_path}...")
+                transformer_config = AutoConfig.from_pretrained(
+                    model_name_or_path,
+                    trust_remote_code=model_args.trust_remote_code,
+                    _attn_implementation=model_args.attn_implementation
+                )
+            except Exception as e:
+                # If config loading fails, treat as custom model
+                first_line = next(iter(str(e).splitlines()), "")
+                _MAX_ERROR_MSG_LEN = 200
+                msg = first_line[:_MAX_ERROR_MSG_LEN] + "..." if len(first_line) > _MAX_ERROR_MSG_LEN else first_line
+                logger.warning(
+                    f"AutoConfig.from_pretrained failed for '{model_name_or_path}' "
+                    f"({type(e).__name__}: {msg}); falling back to custom model builder. "
+                    f"If you intended to load a HuggingFace model, check the error above."
+                )
+                transformer_config = None
+        else:
+            print_rank(
+                logger.info,
+                "> model_name_or_path is empty/None; skipping AutoConfig and using custom model builder.",
             )
             transformer_config = None
 
@@ -129,10 +154,10 @@ class ModelHub:
         if transformer_config:
             print_rank(logger.info, f"Building transformers model from configuration...")
             model: PreTrainedModel = ModelHub._build_transformers_model(transformer_config, model_args, feature_args,
-                                                                        training_args)
+                                                                        training_args, meta_init=meta_init)
         else:
             print_rank(logger.info, f"Building custom model...")
-            model: BaseModel = ModelHub._build_custom_model(model_args, training_args)
+            model: BaseModel = ModelHub._build_custom_model(model_args, training_args, meta_init=meta_init)
 
         # Apply parameter freezing if specified
         freezed_named_modules = []
