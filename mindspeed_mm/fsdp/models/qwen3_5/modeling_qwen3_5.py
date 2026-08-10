@@ -995,10 +995,11 @@ def eager_attention_forward(
 class Qwen3_5Attention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: Qwen3_5Config, layer_idx: int):
+    def __init__(self, config: Qwen3_5Config, layer_idx: int, is_mtp: bool = False):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
+        self.skip_flash_attn_recompute = config.skip_flash_attn_recompute and not is_mtp
         self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
         self.scaling = self.head_dim**-0.5
@@ -1067,7 +1068,7 @@ class Qwen3_5Attention(nn.Module):
             is_causal=True,
             total_seq_len=total_seq_len,
             seq_split_lens=None,
-            skip_flash_attn_recompute=self.config.skip_flash_attn_recompute,
+            skip_flash_attn_recompute=self.skip_flash_attn_recompute,
             **kwargs,
         )
 
@@ -1124,7 +1125,7 @@ class Qwen3_5DecoderLayer(GradientCheckpointingLayer):
         if self.layer_type == "linear_attention":
             self.linear_attn = Qwen3_5GatedDeltaNet(config, layer_idx)
         elif self.layer_type == "full_attention":
-            self.self_attn = Qwen3_5Attention(config, layer_idx)
+            self.self_attn = Qwen3_5Attention(config, layer_idx, is_mtp=is_mtp)
         self.mlp = Qwen3_5MLP(config, config.intermediate_size)
         self.input_layernorm = Qwen3_5RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = Qwen3_5RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
