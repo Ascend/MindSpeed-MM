@@ -1,8 +1,9 @@
 # Copyright 2025 Optuna, HuggingFace Inc. and the LlamaFactory team
 
 import logging
-import os
 from functools import lru_cache
+
+from mindspeed_mm.fsdp import envs
 
 
 def get_logger(name):
@@ -20,18 +21,18 @@ def get_logger(name):
 
 
 def info_rank0(self: "logging.Logger", *args, **kwargs) -> None:
-    if int(os.getenv("LOCAL_RANK", "0")) == 0:
+    if envs.LOCAL_RANK == 0:
         self.info(*args, **kwargs)
 
 
 def warning_rank0(self: "logging.Logger", *args, **kwargs) -> None:
-    if int(os.getenv("LOCAL_RANK", "0")) == 0:
+    if envs.LOCAL_RANK == 0:
         self.warning(*args, **kwargs)
 
 
 @lru_cache(None)
 def warning_rank0_once(self: "logging.Logger", *args, **kwargs) -> None:
-    if int(os.getenv("LOCAL_RANK", "0")) == 0:
+    if envs.LOCAL_RANK == 0:
         self.warning(*args, **kwargs)
 
 

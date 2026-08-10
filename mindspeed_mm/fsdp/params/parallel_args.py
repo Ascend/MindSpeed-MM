@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from typing import List, Literal, Optional, Union
 import logging
-import os
 import torch
 
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from mindspeed_mm.config.arguments.base_args import BaseArguments
 
@@ -96,9 +96,9 @@ class ParallelArguments(BaseArguments):
     recompute_plan: RecomputePlanConfig = field(default_factory=RecomputePlanConfig)
 
     def model_post_init(self, __context):
-        self.local_rank = int(os.getenv("LOCAL_RANK"))
-        self.global_rank = int(os.getenv("RANK"))
-        self.world_size = int(os.getenv("WORLD_SIZE"))
+        self.local_rank = envs.get("LOCAL_RANK", required=True)
+        self.global_rank = envs.get("RANK", required=True)
+        self.world_size = envs.get("WORLD_SIZE", required=True)
 
         if self.fully_shard_parallel_size == "auto":
             # If -1, use all remaining processes after tensor parallelism for FSDP

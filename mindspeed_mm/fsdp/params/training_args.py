@@ -2,8 +2,8 @@
 from dataclasses import field, dataclass
 from typing import List, Literal, Optional, Any
 import logging
-import os
 
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.params.lora_args import LoraArguments
 from mindspeed_mm.config.arguments.base_args import BaseArguments
 
@@ -72,9 +72,9 @@ class Profiler(BaseArguments):
 
     def model_post_init(self, __context):
         self._train_steps = -1
-        self.local_rank = int(os.getenv("LOCAL_RANK"))
-        self.global_rank = int(os.getenv("RANK"))
-        self.world_size = int(os.getenv("WORLD_SIZE"))
+        self.local_rank = envs.get("LOCAL_RANK", required=True)
+        self.global_rank = envs.get("RANK", required=True)
+        self.world_size = envs.get("WORLD_SIZE", required=True)
 
         # determine whether to profile this rank
         if self.enable:
@@ -342,9 +342,9 @@ class TrainingArguments(BaseArguments):
 
     def model_post_init(self, __context):
         self._train_steps = -1
-        self.local_rank = int(os.getenv("LOCAL_RANK"))
-        self.global_rank = int(os.getenv("RANK"))
-        self.world_size = int(os.getenv("WORLD_SIZE"))
+        self.local_rank = envs.get("LOCAL_RANK", required=True)
+        self.global_rank = envs.get("RANK", required=True)
+        self.world_size = envs.get("WORLD_SIZE", required=True)
 
         if self.val_interval < 0:
             raise ValueError("val_interval must be >= 0.")

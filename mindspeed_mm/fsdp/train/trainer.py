@@ -7,6 +7,7 @@ from functools import partial
 
 import torch
 
+from mindspeed_mm.fsdp import envs
 from mindspeed.fsdp.utils.log import print_rank, set_log_level
 from mindspeed.fsdp.utils.random import set_seed
 
@@ -149,7 +150,7 @@ class Trainer:
         set_accelerator_compatible(get_torch_device())
         set_log_level()
         # Set device index for current process
-        local_rank = int(os.environ['LOCAL_RANK'])
+        local_rank = envs.get("LOCAL_RANK", required=True)
         torch.accelerator.set_device_index(local_rank)
         # Set random seeds for reproducibility
         set_seed(args.training.seed, set_deterministic=args.training.use_deter_comp)

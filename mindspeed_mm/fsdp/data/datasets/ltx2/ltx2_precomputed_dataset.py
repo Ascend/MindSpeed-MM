@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import logging
-import os
 import random
 import sys
 from dataclasses import dataclass, field, fields
@@ -18,6 +17,7 @@ if "ltx_core" not in sys.modules:
 from ltx_core.components.patchifiers import AudioPatchifier, VideoLatentPatchifier, get_pixel_coords
 from ltx_core.types import AudioLatentShape, SpatioTemporalScaleFactors, VideoLatentShape
 
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.utils.register import data_register
 
 logger = logging.getLogger(__name__)
@@ -103,13 +103,10 @@ class LTX2PrecomputedDataset(Dataset):
     def _get_world_size() -> int:
         if torch.distributed.is_available() and torch.distributed.is_initialized():
             return int(torch.distributed.get_world_size())
-        env_world_size = os.getenv("WORLD_SIZE")
-        if env_world_size is not None:
-            try:
-                return int(env_world_size)
-            except ValueError:
-                return 1
-        return 1
+        try:
+            return envs.WORLD_SIZE
+        except ValueError:
+            return 1
 
     @classmethod
     def _trim_pairs_for_data_parallel(cls, pairs: list[tuple[Path, Path, Path | None]]) -> list[tuple[Path, Path, Path | None]]:

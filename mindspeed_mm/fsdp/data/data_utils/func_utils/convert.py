@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, Tuple, Literal, List, Di
 
 import torch
 from transformers import PreTrainedTokenizer, ProcessorMixin, AutoProcessor, AutoConfig, AutoTokenizer, PretrainedConfig
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.config.arguments.base_args import BaseArguments
 
 from .log import get_logger
@@ -544,7 +545,8 @@ def align_dataset(
     if not data_args.streaming:
         kwargs = dict(
             num_proc=data_args.preprocessing_num_workers,
-            load_from_cache_file=(not data_args.overwrite_cache) or (int(os.getenv("LOCAL_RANK", -1)) != 0),
+            load_from_cache_file=(not data_args.overwrite_cache)
+            or (envs.get("LOCAL_RANK", -1) != 0),
             desc="Converting format of dataset",
         )
 

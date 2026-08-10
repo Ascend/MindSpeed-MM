@@ -14,6 +14,7 @@ from transformers import AutoConfig, AutoProcessor
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 
 from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.checkpoint.broadcast_utils import rank0_load_and_broadcast_hf_weights
 from mindspeed_mm.fsdp.checkpoint.checkpointer import CheckpointerBase
 from mindspeed_mm.fsdp.checkpoint.convert import WEIGHT_TRANSFORM_PIPELINES
@@ -31,7 +32,7 @@ from mindspeed_mm.fsdp.utils.device import empty_cache, get_device_type, synchro
 logger = logging.getLogger(__name__)
 
 # Controls whether non-zero ranks sleep or compute while rank 0 saves HuggingFace checkpoint shards.
-HF_SAVE_WAIT_MODE = os.getenv("HF_SAVE_WAIT_MODE", "sleep")
+HF_SAVE_WAIT_MODE = envs.HF_SAVE_WAIT_MODE
 
 
 class HuggingFaceCheckpointer(CheckpointerBase):
@@ -242,7 +243,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         weight_transform = transform_cls() if transform_cls is not None else None
 
         original_num_threads = torch.get_num_threads()
-        local_world_size = max(1, int(os.getenv("LOCAL_WORLD_SIZE", "1")))
+        local_world_size = max(1, envs.LOCAL_WORLD_SIZE)
         load_num_threads = max(1, (os.cpu_count() or 1) // local_world_size)
 
         try:

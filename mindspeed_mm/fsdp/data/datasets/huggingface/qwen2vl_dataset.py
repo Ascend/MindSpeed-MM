@@ -8,6 +8,7 @@ from datasets import load_dataset
 from torch.utils.data import IterableDataset
 from transformers.training_args import TrainingArguments
 
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.distributed.parallel_state import is_parallel_state_initialized, get_parallel_state
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import (
     DataArguments,
@@ -71,7 +72,7 @@ class AsyncPreprocessIterableDataset(IterableDataset):
                     normalized_buffer_size,
                     normalized_num_workers,
                 )
-            
+
         return normalized_buffer_size, normalized_num_workers
 
     def _preprocess_item(self, item):
@@ -227,7 +228,7 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
                     "Warning: Both val_dataset and val_rate have been provided. The val_dataset will take priority, and the val_rate will be ignored.",
                     UserWarning)
 
-        local_process_index = int(os.getenv("LOCAL_RANK", -1))
+        local_process_index = envs.get("LOCAL_RANK", -1)
         if data_args.streaming:
             kwargs = {}
         else:

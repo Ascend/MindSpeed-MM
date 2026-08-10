@@ -13,9 +13,10 @@
 # limitations under the License.
 import glob
 import json
-import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
+
+from mindspeed_mm.fsdp import envs
 
 
 def load_jsonl(path: str | Path) -> List[Dict[str, Any]]:
@@ -79,8 +80,8 @@ def resolve_shard_spec(
     default_num_shards: Optional[int] = None,
     default_shard_rank: Optional[int] = None,
 ) -> tuple[int, int]:
-    world_size = int(num_shards or default_num_shards or os.environ.get("WORLD_SIZE", 1))
-    rank = int(shard_rank if shard_rank is not None else default_shard_rank or os.environ.get("RANK", 0))
+    world_size = int(num_shards or default_num_shards or envs.WORLD_SIZE)
+    rank = int(shard_rank if shard_rank is not None else default_shard_rank or envs.RANK)
     if world_size < 1:
         raise ValueError(f"`num_shards` must be >= 1, got {world_size}.")
     if rank < 0 or rank >= world_size:

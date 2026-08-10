@@ -12,6 +12,7 @@ from torch.distributed.tensor import DTensor
 from tqdm import tqdm
 
 from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.checkpoint.dcp_utils import (
     extract_metadata,
     load_metadata,
@@ -132,7 +133,7 @@ def rank0_load_and_broadcast_dcp_weights(load_state, storage_reader):
     shard_iterable = tqdm(
         range(shard_count),
         desc="Loading checkpoint shards",
-        disable=int(os.getenv("LOCAL_RANK", "-1")) > 0,
+        disable=envs.get("LOCAL_RANK", -1) > 0,
     )
 
     for shard_id in shard_iterable:
@@ -263,7 +264,7 @@ def rank0_load_and_broadcast_hf_weights(
     shard_iterable = tqdm(
         range(shard_count),
         desc="Loading HF checkpoint shards",
-        disable=int(os.getenv("LOCAL_RANK", "-1")) > 0,
+        disable=envs.get("LOCAL_RANK", -1) > 0,
     )
 
     for shard_id in shard_iterable:

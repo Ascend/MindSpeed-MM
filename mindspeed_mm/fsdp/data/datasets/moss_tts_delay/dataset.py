@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -19,6 +18,8 @@ from typing import Any, Dict, Iterable, List, Optional
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
+
+from mindspeed_mm.fsdp import envs
 from transformers import AutoConfig, AutoProcessor, AutoTokenizer
 
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DataArguments
@@ -159,8 +160,8 @@ class MossTTSSFTDataset(Dataset):
     def __init__(self, basic_param, preprocess_param, **kwargs):
         data_args = DataArguments(**basic_param)
         process_args = ProcessorArguments(**preprocess_param)
-        rank = int(os.environ.get("RANK", 0))
-        world_size = int(os.environ.get("WORLD_SIZE", 1))
+        rank = envs.RANK
+        world_size = envs.WORLD_SIZE
 
         train_paths, records, local_train_paths, using_pre_sharded_files = load_jsonl_for_rank(
             data_args.dataset_dir,

@@ -1,10 +1,10 @@
 
-import os
 from typing import Callable, List, Optional
 
 import torch
 import torch.distributed as dist
 
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
@@ -21,7 +21,7 @@ from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingSt
 # Enable forced expert balance for debugging purposes only.
 # Set environment variable export MM_FORCE_EP_BALANCE=1 to activate.
 # MUST BE DISABLED during formal training.
-FORCE_EP_BALANCE = int(os.getenv("MM_FORCE_EP_BALANCE", "0")) == 1
+FORCE_EP_BALANCE = envs.MM_FORCE_EP_BALANCE
 
 
 def force_ep_balance(
