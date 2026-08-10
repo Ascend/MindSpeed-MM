@@ -1975,7 +1975,6 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
             position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
             text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
             inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
-            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
             kwargs["seq_mask"] = split_forward_gather_backward_with_cp(kwargs["seq_mask"], dim=1)
 
         hidden_states = inputs_embeds
