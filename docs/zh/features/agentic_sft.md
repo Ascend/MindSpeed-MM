@@ -108,7 +108,7 @@ data:
     attr:
       formatting: multimodal_tool  # 使用 multimodal_tool 格式转换器
 
-    preprocess_parameters:
+    basic_parameters:
       template: qwen3_vl_nothink  # 推荐使用 qwen3_vl_nothink 或 qwen3_omni_nothink 模板
       # 如需使用其他模板，可参照 qwen3_vl_nothink 的模板注册代码进行传参 tool_prompt = StringFormatter(slots=[tools_slot])
 ```
