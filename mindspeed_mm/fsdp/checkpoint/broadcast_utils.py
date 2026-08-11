@@ -279,7 +279,10 @@ def rank0_load_and_broadcast_hf_weights(
             for key, value in shard_state.items():
                 key = convert_weight_key(key, model)
                 if weight_transform is not None:
-                    key, value = weight_transform.hf_to_dcp(key, value)
+                    converted = weight_transform.hf_to_dcp(key, value)
+                    if converted is None:
+                        continue
+                    key, value = converted
                 key = lora_base_map.get(key, key)
                 resolved_state[key] = value
             shard_state = resolved_state

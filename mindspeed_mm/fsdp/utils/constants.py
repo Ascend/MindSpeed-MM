@@ -11,3 +11,9 @@ LATEST_TXT = "latest_checkpointed_iteration.txt"
 DCP_CHECKPOINT_VERSION = 3.0
 DIR_MODE = 0o750
 FILE_MODE = 0o640
+
+# Projection suffixes used by MTP expert weight conversion.
+HF_GATE_PROJ_SUFFIX = ".gate_proj.weight"
+HF_UP_PROJ_SUFFIX = ".up_proj.weight"
+DCP_DOWN_PROJ_SUFFIX = ".down_proj"
+DCP_GATE_UP_PROJ_SUFFIX = ".gate_up_proj"

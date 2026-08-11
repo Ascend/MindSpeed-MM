@@ -46,6 +46,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         model_assets_dir: str = None,
         model_id=None,
         enable_lora: bool = False,
+        mtp_num_layers: Optional[int] = None,
         **kwargs,
     ) -> None:
         """
@@ -58,6 +59,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
             model_assets_dir: original huggingface checkpoint directory used to copy config, processor and shard mapping
             model_id: model id used to select model-specific weight transform pipeline
             enable_lora: whether to normalize PEFT base-layer keys before saving
+            mtp_num_layers: number of MTP layers enabled by the training model
         return:
             None
         """
@@ -72,24 +74,28 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         if safetensor_idx_path is not None:
             with open(safetensor_idx_path, "r", encoding="utf-8") as f:
                 fqn_to_filename_mapping = json.load(f)["weight_map"]
+        transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id, None)
+        weight_transform = transform_cls(hf_dir=model_assets_dir, mtp_num_layers=mtp_num_layers) if transform_cls else None
         save_state = get_model_save_state(
             state["model"],
-            fqn_to_filename_mapping,
-            save_ckpt_dtype,
+            save_ckpt_dtype=save_ckpt_dtype,
             enable_lora=enable_lora,
         )
-
-        # Transform state dict from DCP to HF format
-        transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id, None)
-        weight_transform = transform_cls() if transform_cls is not None else None
         if weight_transform is not None:
             new_state = {}
             for key, tensor in save_state.items():
-                key, tensor = weight_transform.dcp_to_hf(key, tensor)
-                new_state[key] = tensor
+                new_state.update(weight_transform.dcp_to_hf(key, tensor))
             save_state = new_state
 
         if fqn_to_filename_mapping is not None:
+            filtered_state = {}
+            for key, tensor in save_state.items():
+                if key in fqn_to_filename_mapping:
+                    filtered_state[key] = tensor
+                else:
+                    logger.info_rank0(f"Skipping weight not in HF weight_map: {key}")
+            save_state = filtered_state
+
             original_mapping_size = len(fqn_to_filename_mapping)
             fqn_to_filename_mapping = {k: v for k, v in fqn_to_filename_mapping.items() if k in save_state}
             if len(fqn_to_filename_mapping) < original_mapping_size:
@@ -206,6 +212,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         load_strict: bool = False,
         enable_lora: bool = False,
         model_id=None,
+        mtp_num_layers: Optional[int] = None,
         **kwargs,
     ) -> bool:
         """
@@ -217,6 +224,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
             load_strict: strictly enforce that the checkpoint keys match the model's state_dict
             enable_lora: whether to enable LoRA checkpoint loading logic
             model_id: model id used to select model-specific weight transform pipeline
+            mtp_num_layers: number of MTP layers
         return:
             release (bool): whether the loaded checkpoint is a "release" checkpoint
         """
@@ -240,7 +248,7 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         )
 
         transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id, None)
-        weight_transform = transform_cls() if transform_cls is not None else None
+        weight_transform = transform_cls(hf_dir=path, mtp_num_layers=mtp_num_layers) if transform_cls else None
 
         original_num_threads = torch.get_num_threads()
         local_world_size = max(1, envs.LOCAL_WORLD_SIZE)

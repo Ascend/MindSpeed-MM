@@ -204,7 +204,10 @@ def load_hf_weights(
         for raw_key, full_tensor in shard_stream:
             key = convert_weight_key(raw_key, model)
             if weight_transform is not None:
-                key, full_tensor = weight_transform.hf_to_dcp(key, full_tensor)
+                converted = weight_transform.hf_to_dcp(key, full_tensor)
+                if converted is None:
+                    continue
+                key, full_tensor = converted
             key = lora_base_map.get(key, key)  # bare -> base_layer for LoRA targets
             if key in param_names:
                 param_names.discard(key)
@@ -245,7 +248,6 @@ def parse_fqn_to_filename_mapping_from_json(safetensor_idx_path: str) -> Dict[st
 @torch.no_grad()
 def get_model_save_state(
     model: torch.nn.Module,
-    fqn_to_filename_mapping: Optional[Dict[str, int]],
     save_ckpt_dtype: Optional[torch.dtype] = None,
     enable_lora: bool = False,
 ) -> Dict[str, torch.Tensor]:
@@ -254,18 +256,7 @@ def get_model_save_state(
     from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import LoraModelState, ModelState
 
     model_state_cls = LoraModelState if enable_lora else ModelState
-    save_state = model_state_cls(model, save_ckpt_dtype).state_dict()
-
-    if fqn_to_filename_mapping is not None:
-        filtered_state = {}
-        for k, v in save_state.items():
-            if k in fqn_to_filename_mapping:
-                filtered_state[k] = v
-            else:
-                logger.info_rank0(f"Skipping weight not in HF weight_map: {k}")
-        save_state = filtered_state
-
-    return save_state
+    return model_state_cls(model, save_ckpt_dtype).state_dict()
 
 
 @lru_cache

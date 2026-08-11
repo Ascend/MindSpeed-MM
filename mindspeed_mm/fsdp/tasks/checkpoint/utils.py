@@ -11,6 +11,7 @@ import torch
 from torch.distributed.checkpoint import FileSystemReader, FileSystemWriter
 from tqdm import tqdm
 from transformers import AutoConfig, AutoProcessor
+from transformers.utils import SAFE_WEIGHTS_INDEX_NAME
 
 from mindspeed_mm.fsdp.checkpoint.dcp_utils import (
     extract_metadata,
@@ -65,7 +66,10 @@ def _process_single_file(idx, safe_path, save_path, weight_transform, add_checkp
     state_dict = load_file(str(safe_path), device="cpu")
     converted_state_dict = {}
     for key, tensor in state_dict.items():
-        key, tensor = weight_transform.hf_to_dcp(key, tensor)
+        converted = weight_transform.hf_to_dcp(key, tensor)
+        if converted is None:
+            continue
+        key, tensor = converted
         converted_state_dict[key] = tensor
 
     save_dict = {"model": converted_state_dict}
@@ -158,6 +162,65 @@ def get_single_safetensors_filename(directory: Path) -> str:
     return "model.safetensors"
 
 
+def has_mtp_expert_weights(load_dir: str | Path) -> bool:
+    """Check whether a DCP checkpoint contains merged MTP expert weights."""
+    metadata = load_metadata(FileSystemReader(str(load_dir)))
+    return any(
+        "mtp.layers." in key and ".mlp.experts." in key
+        for key in metadata.state_dict_metadata
+    )
+
+
+def load_origin_mtp_weights(origin_hf_dir: str | Path):
+    """Load MTP weights from the original HF checkpoint."""
+    origin_dir = Path(origin_hf_dir)
+    index_path = origin_dir / SAFE_WEIGHTS_INDEX_NAME
+    if index_path.exists():
+        with open(index_path, "r", encoding="utf-8") as f:
+            weight_map = json.load(f)["weight_map"]
+        mtp_keys = [key for key in weight_map if key.startswith("mtp.")]
+        mtp_files = set(weight_map[key] for key in mtp_keys)
+    else:
+        mtp_files = {get_single_safetensors_filename(origin_dir)}
+        mtp_keys = None
+
+    mtp_state_dict = {}
+    for sf_file in mtp_files:
+        file_path = origin_dir / sf_file
+        if not file_path.exists():
+            continue
+        file_state_dict = load_file(file_path)
+        keys = mtp_keys if mtp_keys is not None else file_state_dict.keys()
+        for key in keys:
+            if key.startswith("mtp.") and key in file_state_dict:
+                mtp_state_dict[key] = file_state_dict[key]
+    return mtp_state_dict
+
+
+def update_safetensors_files(
+    save_dir: str | Path,
+    state_dict,
+):
+    """Merge additional tensors into the HF shards selected by their index."""
+    save_dir = Path(save_dir)
+    index_path = save_dir / SAFE_WEIGHTS_INDEX_NAME
+    if index_path.exists():
+        with open(index_path, "r", encoding="utf-8") as f:
+            weight_map = json.load(f)["weight_map"]
+        file_to_new_weights = {}
+        for key, tensor in state_dict.items():
+            if key in weight_map:
+                file_to_new_weights.setdefault(weight_map[key], {})[key] = tensor
+    else:
+        file_to_new_weights = {get_single_safetensors_filename(save_dir): state_dict}
+
+    for target_file, new_weights in file_to_new_weights.items():
+        file_path = save_dir / target_file
+        existing_state_dict = load_file(file_path) if file_path.exists() else {}
+        existing_state_dict.update(new_weights)
+        save_file(existing_state_dict, file_path, metadata={"format": "pt"})
+
+
 def _process_single_dcp_shard(
     idx,
     safetensor_file,
@@ -196,10 +259,11 @@ def _process_single_dcp_shard(
 
     converted_state_dict = {}
     for key, tensor in partial_state_dict.items():
-        key, tensor = weight_transform.dcp_to_hf(key, tensor)
-        if to_bf16:
-            tensor = tensor.to(dtype=torch.bfloat16)
-        converted_state_dict[key] = tensor
+        converted = weight_transform.dcp_to_hf(key, tensor)
+        for converted_key, converted_tensor in converted.items():
+            if to_bf16:
+                converted_tensor = converted_tensor.to(dtype=torch.bfloat16)
+            converted_state_dict[converted_key] = converted_tensor
 
     save_file(converted_state_dict, save_dir / safetensor_file, metadata=hf_metadata)
 
@@ -248,14 +312,17 @@ def merge_dcp_to_hf_sharded(
         with open(index_file, "r", encoding="utf-8") as f:
             weight_map = json.load(f)["weight_map"]
 
-        file_to_selected_keys = {
-            safetensor_file: [
-                select_key_convert_func(k) if select_key_convert_func else k
-                for k, v in weight_map.items()
-                if v == safetensor_file
-            ]
-            for safetensor_file in set(weight_map.values())
+        hf_to_dcp_key_mapping = {
+            hf_key: dcp_key
+            for hf_keys, dcp_key in weight_transform.hf_to_dcp_mapping.items()
+            for hf_key in hf_keys
         }
+        file_to_selected_keys = {}
+        for hf_key, safetensor_file in weight_map.items():
+            dcp_key = hf_to_dcp_key_mapping.get(hf_key, hf_key)
+            if select_key_convert_func:
+                dcp_key = select_key_convert_func(dcp_key)
+            file_to_selected_keys.setdefault(safetensor_file, set()).add(dcp_key)
     else:
         safetensor_file = get_single_safetensors_filename(Path(model_assets_dir))
         file_to_selected_keys = {safetensor_file: list(metadata.state_dict_metadata.keys())}

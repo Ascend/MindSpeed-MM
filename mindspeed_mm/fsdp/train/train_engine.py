@@ -374,6 +374,7 @@ class TrainEngine:
             load_strict=args.training.load_strict,
             enable_lora=args.training.lora.enable,
             model_id=args.model.model_id,
+            mtp_num_layers=args.model.mtp_num_layers,
         )
 
         if not release:
@@ -431,6 +432,7 @@ class TrainEngine:
             save_ckpt_dtype=save_ckpt_dtype,
             model_assets_dir=args.model.model_name_or_path,
             model_id=args.model.model_id,
+            mtp_num_layers=args.model.mtp_num_layers,
         )
 
         # Synchronize all processes after saving
