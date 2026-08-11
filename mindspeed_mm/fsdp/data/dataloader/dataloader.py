@@ -27,7 +27,7 @@ from mindspeed_mm.fsdp.data.data_utils.utils import get_seed_worker
 from mindspeed_mm.fsdp.data.dataloader.sampler import BaseRandomBatchSampler
 from mindspeed_mm.fsdp.data.dataloader.data_collator import resolve_data_collator
 from mindspeed_mm.fsdp.utils.constants import GLOBAL_STEP_TOKEN_NUM, AVG_PER_STEP_TOKEN_NUM
-from mindspeed_mm.fsdp.utils.device import get_device_type, create_stream, get_current_stream, switch_to_specified_stream
+from mindspeed_mm.fsdp.utils.device import get_device_type, get_torch_device, create_stream, get_current_stream, switch_to_specified_stream
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.utils.utils import move_to_device
 
@@ -274,8 +274,18 @@ class Preloader:
     def __init__(self, data_iterator, param_dtype=None):
         self.data_iterator = data_iterator
         self.param_dtype = param_dtype
-        self.device = get_device_type()
+        self.device_type = get_device_type()
+
+        # New h2d threads default to device 0 due to thread‑local device context.
+        # Capture rank device_index on main thread for background threads to bind explicitly.
+        if self.device_type == "cpu":
+            self.device = self.device_type
+            self.device_index = None
+        else:
+            self.device_index = torch.accelerator.current_device()
+            self.device = torch.device(self.device_type, self.device_index)
         self.h2dstream = create_stream(self.device)
+
         # next_batch: device batch ready to be returned by next()
         # _cpu_batch: cpu batch fetched by the background thread, awaiting H2D
         self.next_batch = None
@@ -283,6 +293,7 @@ class Preloader:
         self._cpu_thread = None
         self._h2d_thread = None
         self._fetch_error = None
+        self._h2d_error = None
         self._exhausted = False
 
         # Eagerly prepare the first batch so the first next() is immediately ready.
@@ -323,12 +334,21 @@ class Preloader:
         if self._cpu_batch is None:
             self.next_batch = None
             return
+        # New threads default to rank0, bind it to this rank's device before any device work
+        # to avoid multi‑threads targeting rank0.
+        if self.device_index is not None:
+            get_torch_device().set_device(self.device_index)
         batch_data = self._cpu_batch
         self._cpu_batch = None
-        with switch_to_specified_stream(self.h2dstream):
-            self.next_batch = move_to_device(
-                batch_data, float_dtype=self.param_dtype, non_blocking=True
-            )
+        try:
+            with switch_to_specified_stream(self.h2dstream):
+                self.next_batch = move_to_device(
+                    batch_data, float_dtype=self.param_dtype, non_blocking=True)
+        except Exception:
+            # Store exc_info to re-raise on the main thread in next(), otherwise an
+            # error here (e.g. device OOM) would masquerade as an exhausted iterator.
+            self._h2d_error = sys.exc_info()
+            self.next_batch = None
 
     def trigger_h2d(self):
         """Launch H2D for the prefetched batch in a background thread.
@@ -345,11 +365,15 @@ class Preloader:
         if self._h2d_thread is not None:
             self._h2d_thread.join()
             self._h2d_thread = None
-        # Re-raise any exception captured in the CPU prefetch thread,
-        # preserving the original traceback from where it originated.
+        # Re-raise any exception captured in the CPU prefetch thread or the H2D
+        # thread, preserving the original traceback from where it originated.
         if self._fetch_error is not None:
             _, exc_value, exc_tb = self._fetch_error
             self._fetch_error = None
+            raise exc_value.with_traceback(exc_tb)
+        if self._h2d_error is not None:
+            _, exc_value, exc_tb = self._h2d_error
+            self._h2d_error = None
             raise exc_value.with_traceback(exc_tb)
         get_current_stream().wait_stream(self.h2dstream)
         if self.next_batch is None:

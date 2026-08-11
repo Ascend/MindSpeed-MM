@@ -141,14 +141,15 @@ def init_model_weights(model):
 
 def move_to_device(batch: Dict[str, Any], float_dtype: str = None, non_blocking=False):
     new_batch = dict()
+    device = torch.device(get_device_type(), torch.accelerator.current_device())
     for k, v in batch.items():
         if k in [AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM]:
-            new_batch[k] = v.to(device=get_device_type(), non_blocking=non_blocking)
+            new_batch[k] = v.to(device=device, non_blocking=non_blocking)
         elif isinstance(v, torch.Tensor):
             dtype = float_dtype if torch.is_floating_point(v) else None
-            new_batch[k] = v.to(device=get_device_type(), dtype=dtype, non_blocking=non_blocking)
+            new_batch[k] = v.to(device=device, dtype=dtype, non_blocking=non_blocking)
         elif isinstance(v, list) and all(isinstance(t, torch.Tensor) for t in v):
-            new_batch[k] = [t.to(device=get_device_type(),
+            new_batch[k] = [t.to(device=device,
                             dtype=float_dtype if torch.is_floating_point(t) else None, non_blocking=non_blocking)
                         for t in v]
         elif isinstance(v, (bool, int, float, str)) or v is None:
