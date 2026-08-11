@@ -435,3 +435,7 @@ MindSpeed MM is released under the Apache License 2.0. See the [LICENSE](https:/
 Like all Docker images, these images may also contain other software under other licenses (such as Bash from the base distribution, and any direct or indirect dependencies of the included main software).
 
 For any use of pre-built images, it is the responsibility of the image user to ensure that any use of this image complies with the relevant licenses of all software contained therein.
+
+## Disclaimer
+
+The released Ascend software images are community versions and are not intended for commercial accountability. They are provided solely as references for production practices.
