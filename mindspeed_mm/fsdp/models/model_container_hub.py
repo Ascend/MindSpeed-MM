@@ -1,4 +1,3 @@
-import os
 import logging
 
 import torch
@@ -6,6 +5,7 @@ import torch
 from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed.fsdp.utils.log import print_rank
 
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.feature_args import FeatureArguments
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
@@ -77,7 +77,7 @@ class ModelContainerHub:
 
         built_models = {}
         orig_meta_init = training_args.init_model_with_meta_device
-        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+        local_rank = envs.get("LOCAL_RANK", 0)
         target_device = torch.device(f"{get_device_type()}:{local_rank}")
 
         for name, sub_cfg in models_config.items():
