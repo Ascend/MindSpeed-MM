@@ -150,6 +150,16 @@ class Trainer:
         # Set accelerator compatibility and logging level
         set_accelerator_compatible(get_torch_device())
         set_log_level()
+        # Enable before model execution so backward failures include the
+        # corresponding forward traceback.
+        detect_anomaly = envs.MM_DETECT_ANOMALY
+        torch.autograd.set_detect_anomaly(detect_anomaly)
+        if detect_anomaly:
+            print_rank(
+                logger.warning,
+                "PyTorch autograd anomaly detection is enabled. "
+                "Training performance will be significantly reduced.",
+            )
         # Set device index for current process
         local_rank = envs.get("LOCAL_RANK", required=True)
         torch.accelerator.set_device_index(local_rank)

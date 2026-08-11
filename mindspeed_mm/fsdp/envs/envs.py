@@ -84,6 +84,14 @@ _register(
     converter=bool,
     description="Force expert-parallel load balancing for debugging.",
 )
+_register(
+    name="MM_DETECT_ANOMALY",
+    default=False,
+    converter=bool,
+    description=(
+        "Enable PyTorch autograd anomaly detection for FSDP2 training debugging."
+    ),
+)
 
 _manager.validate_registry()
 environment_variables = _manager.variables

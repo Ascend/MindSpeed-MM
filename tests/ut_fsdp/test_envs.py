@@ -90,6 +90,20 @@ def test_invalid_bool_reports_variable_name(monkeypatch):
         _ = envs.MM_FORCE_EP_BALANCE
 
 
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [("true", True), ("1", True), ("false", False), ("0", False)],
+)
+def test_detect_anomaly_conversion(monkeypatch, raw_value, expected):
+    monkeypatch.setenv("MM_DETECT_ANOMALY", raw_value)
+    assert envs.MM_DETECT_ANOMALY is expected
+
+
+def test_detect_anomaly_defaults_to_false(monkeypatch):
+    monkeypatch.delenv("MM_DETECT_ANOMALY", raising=False)
+    assert envs.MM_DETECT_ANOMALY is False
+
+
 def test_integer_conversion_preserves_launcher_values(monkeypatch):
     monkeypatch.setenv("LOCAL_RANK", "7")
     assert envs.LOCAL_RANK == 7

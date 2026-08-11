@@ -274,6 +274,21 @@ export ASCEND_LAUNCH_BLOCKING=1
 
 > **警告**：同步模式会严重影响性能，仅在 debug 时使用，生产环境必须关闭。
 
+### 开启自动求导异常检测
+
+当反向传播报错、梯度出现 `NaN`，但无法确定对应的前向算子时，可通过环境变量
+开启 FSDP2 的 PyTorch autograd 异常检测：
+
+```bash
+export MM_DETECT_ANOMALY=true
+```
+
+该环境变量由 FSDP2 环境变量管理器转换为布尔值，并在模型执行前调用
+`torch.autograd.set_detect_anomaly(True)`。反向传播发生异常时，日志会包含对应
+前向计算的调用栈。未设置时默认为 `false`。
+
+> **警告**：自动求导异常检测会显著降低训练性能，仅用于问题定位，正式训练时必须关闭。
+
 ### 开启 NPU 特征值检测
 
 ```bash
