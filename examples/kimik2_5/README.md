@@ -1,4 +1,4 @@
-# Kimi-K2.5 / K2.6 使用指南
+# Kimi-K2.5 / K2.6 / K2.7-Code 使用指南
 
 <p align="left">
 </p>
@@ -37,11 +37,20 @@ url=https://huggingface.co/moonshotai/Kimi-K2.6/tree/main
 commit_id=7eb5002
 ```
 
+**Kimi-K2.7-Code**
+
+```shell
+url=https://huggingface.co/moonshotai/Kimi-K2.7-Code/tree/main
+commit_id=74797c9
+```
+
 ### 变更记录
 
 2026.02.13: 首次支持Kimi-K2.5模型
 
 2026.06.05: 首次支持Kimi-K2.6模型
+
+2026.08.11: 首次支持Kimi-K2.7-Code模型
 
 ---
 <a id="jump1"></a>
@@ -93,8 +102,9 @@ bash scripts/install.sh --msbranch master && pip install tiktoken==0.12.0
 
 - Kimi-K2.5: [Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5/tree/main)
 - Kimi-K2.6: [Kimi-K2.6](https://huggingface.co/moonshotai/Kimi-K2.6/tree/main)
+- Kimi-K2.7-Code: [Kimi-K2.7-Code](https://huggingface.co/moonshotai/Kimi-K2.7-Code/tree/main)
 
-> **说明**：Kimi-K2.6 与 Kimi-K2.5 共用相同的模型代码目录 `mindspeed_mm/fsdp/models/kimik2_5`，仅权重文件不同。
+> **说明**：Kimi-K2.5、Kimi-K2.6 与 Kimi-K2.7-Code 共用相同的模型代码目录 `mindspeed_mm/fsdp/models/kimik2_5`，仅权重文件不同。
 
 以 Kimi-K2.5 为例：
 
@@ -121,7 +131,7 @@ cp -f \
 cd ${MM_PATH}
 ```
 
-Kimi-K2.5/K2.6 模型需要配置多机训练，如需拉起多机训练，请修改启动脚本下的 `MASTER_ADDR`、`NNODES` 以及 `NODE_RANK` 变量：
+Kimi-K2.5/K2.6/K2.7-Code 模型需要配置多机训练，如需拉起多机训练，请修改启动脚本下的 `MASTER_ADDR`、`NNODES` 以及 `NODE_RANK` 变量：
 
 ``` shell
 MASTER_ADDR: 主节点IP地址
