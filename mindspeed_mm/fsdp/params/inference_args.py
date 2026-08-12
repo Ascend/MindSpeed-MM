@@ -96,7 +96,8 @@ class InferenceRuntimeArguments(BaseArguments):
         default_factory=GenerationArguments,
         metadata={"help": "Text generation settings passed to the model's generate method."},
     )
-    data_path: str = field(
+    data_path: Optional[str] = field(
+        default=None,
         metadata={"help": "Path to a JSON list of inference samples with text and optional image fields."},
     )
 

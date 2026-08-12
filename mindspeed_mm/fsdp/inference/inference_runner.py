@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from typing import Callable, Optional, Sequence
 
 os.environ["USE_TF"] = "FALSE"
 
@@ -37,8 +38,13 @@ logger = logging.getLogger(__name__)
 class InferenceRunner:
     """Builds FSDP2 inference components and manages their lifecycle."""
 
-    def __init__(self, args: InferenceArguments):
+    def __init__(
+        self,
+        args: InferenceArguments,
+        data_provider: Optional[Callable] = None,
+    ):
         self.args = args
+        self.data_provider = data_provider
         self.initialize()
         self.model = self.get_model()
         self.adapter = self.get_adapter()
@@ -111,6 +117,8 @@ class InferenceRunner:
         )
 
     def get_sample(self, item: dict, index: int) -> list[dict]:
+        if "messages" in item:
+            return item["messages"]
         if not isinstance(item.get("text"), str):
             raise ValueError(f"Inference sample {index} must contain a text string")
         image = item.get("image", [])
@@ -134,7 +142,10 @@ class InferenceRunner:
         messages.append({"type": "text", "value": item["text"]})
         return messages
 
-    def get_samples(self) -> list[dict]:
+    def get_data(self) -> Sequence[dict]:
+        if self.data_provider is not None:
+            return self.data_provider(self.args)
+
         args = self.args.inference
         if not os.path.isfile(args.data_path):
             raise FileNotFoundError(f"Inference data file does not exist: {args.data_path}")
@@ -148,41 +159,14 @@ class InferenceRunner:
                 raise ValueError(f"Inference sample {index} must be a JSON object")
         return data
 
-    def generate(self):
-        inference_data = self.get_samples()
-        total_duration = 0.0
-        inference_speeds = []
-
-        for index, item in enumerate(inference_data):
-            messages = self.get_sample(item, index)
-            print_rank(print, f"\n===== Processing sample {index + 1}/{len(inference_data)} =====")
-            print_rank(print, f"Image path: {item.get('image', '')}")
-            if "videos" in item:
-                print_rank(print, f"Video path: {item['videos']}")
-            print_rank(print, f"Prompt: {item['text']}")
-
-            result = self.engine.run(messages)
-            inference_speed = (
-                result["output_token_count"] / result["inference_duration"]
-                if result["inference_duration"] > 0
-                else 0.0
-            )
-            print_rank(print, f"Input token count: {result['input_token_count']}")
-            print_rank(print, f"Output token count: {result['output_token_count']}")
-            print_rank(print, f"Inference duration: {result['inference_duration']:.4f} seconds")
-            print_rank(print, f"Inference speed: {inference_speed:.2f} tokens/second")
-            print_rank(print, f"Inference result:\n{result['output_text']}")
-            total_duration += result["inference_duration"]
-            inference_speeds.append(inference_speed)
-
-        print_rank(print, "\n===== Batch Inference Summary =====")
-        print_rank(print, f"Total processed samples: {len(inference_data)}")
-        print_rank(print, f"Total inference duration: {total_duration:.4f} seconds")
-        if inference_speeds:
-            print_rank(print, f"Average inference speed: {sum(inference_speeds) / len(inference_speeds):.2f} tokens/second")
+    def infer(self) -> list[tuple[dict, dict]]:
+        return self.engine.infer(
+            inference_data=self.get_data(),
+            sample_builder=self.get_sample,
+        )
 
 
 if __name__ == "__main__":
     arguments = ConfigManager(config_class=InferenceArguments).load_and_parse()
     inference_runner = InferenceRunner(args=arguments)
-    inference_runner.generate()
+    inference_runner.infer()
