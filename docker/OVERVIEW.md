@@ -87,7 +87,7 @@ Below are all image tags of the current latest version v26.1.0 (`cann9.1.0` + `t
 | `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile) | 950 + openEuler 24.03, x86_64/aarch64 combined |
 | `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile) | 950 + Ubuntu 22.04, x86_64/aarch64 combined |
 
-> The latest tags in the table above are multi-architecture images (x86 and aarch64 combined). Once actually built, this Dockerfile generates tags with the architecture suffix, such as `-aarch64` / `-x86_64` (e.g. `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`). For all tags of historical versions, please refer to [Supported Tags](./supported_tags.md).
+> The latest tags in the table above are multi-architecture images (x86 and aarch64 combined). Once actually built, this Dockerfile generates tags with the architecture suffix, such as `-aarch64` / `-x86_64` (e.g. `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`). For all tags of historical versions, please refer to [Supported Tags](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/supported_tags.md).
 
 ## Project Directory Structure Specification
 
