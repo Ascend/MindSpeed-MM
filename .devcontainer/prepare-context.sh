@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DOCKER_DIR="${PROJECT_ROOT}/docker"
 COMMON_DIR="${DOCKER_DIR}/common"
-MODEL_INSTALL_DIR="${DOCKER_DIR}/scripts/model_install"
 
 # 可通过环境变量覆盖默认值
 OS="${OS:-openeuler24.03}"
@@ -48,26 +47,17 @@ else
     echo ">>> Miniconda 已存在: miniconda.sh"
 fi
 
-# 2. 暂存 common_functions.sh
-cp "${COMMON_DIR}/common_functions.sh" "common_functions.sh"
-
-# 3. 暂存软件源配置脚本为 configure_repo.sh（Dockerfile 固定 COPY 该名称）
+# 2. 暂存软件源配置脚本为 configure_repo.sh（Dockerfile 固定 COPY 该名称）
 cp "${COMMON_DIR}/${REPO_SCRIPT}" "configure_repo.sh"
 
-# 4. 暂存模型环境安装脚本到 install_scripts/
-mkdir -p "install_scripts"
-for script in "${MODEL_INSTALL_DIR}"/install_*.sh; do
-    [ -f "$script" ] && cp "$script" "install_scripts/"
-done
-
-# 5. 暂存 decord 安装脚本（ARM 构建需要；x86 构建会被跳过，但文件必须存在）
+# 3. 暂存 decord 安装脚本（ARM 构建需要；x86 构建会被跳过，但文件必须存在）
 cp "${COMMON_DIR}/install_decord_on_arm.sh" "install_decord_on_arm.sh"
 
-# 6. 创建 torch_wheels 占位目录（空目录 = 在线安装 PyTorch）
+# 4. 创建 torch_wheels 占位目录（空目录 = 在线安装 PyTorch）
 mkdir -p "torch_wheels"
 touch "torch_wheels/.placeholder"
 
-# 7. 创建 decord_deps 目录
+# 5. 创建 decord_deps 目录
 #    - x86_64: decord 已在阶段一通过 pip 安装，仅创建占位目录满足 COPY 路径
 #    - aarch64: 下载 decord 源码编译依赖
 if [ "$ARCH" = "aarch64" ]; then

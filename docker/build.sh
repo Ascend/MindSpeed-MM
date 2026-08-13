@@ -23,19 +23,21 @@ cleanup_dangling() {
 
     echo ">>> Cleanup complete"
 }
-# Dockerfile naming: Dockerfile (unified, supports all NPU types and OS)
-# Image tag naming: {version}-cann{cann_version}-torch_npu{torch_npu_version}-{chip}-{os}-py{python_version}-{architecture}
-# Usage:
-#   bash build.sh --base-image <base-image> [-m /path/to/miniconda.sh]
-# CANN version, NPU type, OS and Python version are auto-detected from the
-# base image tag and cannot be specified manually.
+
+# Dockerfile naming: Dockerfile (dev image), Dockerfile.ci (CI image)
+# Dev image tag:  {version}-cann{cann}-torch_npu{torch_npu}-{chip}-{os}-py{python}-{arch}
+# CI image tag:   {dev_tag}-ci  (built on top of the dev image)
+#
+# CANN version, NPU type (910b/a3/950), OS and architecture are auto-detected
+# from the base image tag. The Python version defaults to the Python detected
+# from the base image tag, but can be overridden with --python-version, which
+# controls the Miniconda variant and hence the conda base environment.
 # ============================================
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMMON_DIR="${SCRIPT_DIR}/common"
-SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 
 show_help() {
     cat << EOF
@@ -44,80 +46,53 @@ Usage: $0 [OPTIONS]
 Build MindSpeed MM Docker Image
 
 Required:
-    --base-image IMAGE       Full base image name (e.g. swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11)
-                             CANN version, NPU type, OS and Python version are auto-detected from the image tag.
+    --base-image IMAGE       Full base image name (e.g. swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.11)
+                             CANN version, NPU type (910b/a3/950), OS and architecture are auto-detected from the image tag.
 
 Optional:
-    -m, --miniconda PATH     Miniconda installer path (auto-download if not specified)
-    -d, --decord-deps PATH   decord dependencies directory path (auto-download for ARM)
-    -s, --decord-script PATH decord install script path (default: common/install_decord_on_arm.sh)
-    -i, --image-name NAME    Image name (default: mindspeed-mm:v{version}-cann{cann_ver}-torch_npu{torch_npu_ver}-{chip}-{os}-py{py_ver}-{arch})
-    --tag TAG                Custom image tag (overrides the default tag; keeps repo name 'mindspeed-mm')
+    --python-version VER     Python version for the conda base environment (e.g. 3.11, 3.10, 3.12).
+                             Selects the matching Miniconda installer. Defaults to the Python version
+                             detected from the base image tag.
+    --tag TAG                Custom image tag (default: auto-generated from build info; CI appends '-ci')
+    -v, --version VERSION    MindSpeed MM version (default: 26.1.0; branch used to clone the repo)
+    --torch-version VER      PyTorch version (default: 2.7.1, online install)
+    --torch-npu-version VER  torch-npu version (default: 2.7.1.post8, online install)
     -n, --no-cache           Build without cache
-    -v, --version VERSION    MindSpeed MM version (default: 26.1.0, determines model install scripts)
-    --torch-version VER      PyTorch version (default: 2.7.1, for online install)
-    --torch-npu-version VER  torch-npu version (default: 2.7.1, for online install)
-    --torch-whl PATH         torch .whl file path (offline install)
-    --torch-npu-whl PATH     torch-npu .whl file path (offline install)
-    --torchvision-whl PATH   torchvision .whl file path (optional, offline install)
-    --torchaudio-whl PATH    torchaudio .whl file path (optional, offline install)
-    --build-ci               Build CI image with multi-version conda environments (skip verl + MindSpeed-MM clone)
+    --build-ci               Build CI image on top of the dev image (multi-version conda environments)
     --cleanup-on-fail        Clean up dangling images/containers if build fails
     -h, --help               Show help
 
-Dockerfile naming convention: Dockerfile (unified, supports all NPU types and OS)
-
-Image tag naming convention: {version}-cann{cann_version}-torch_npu{torch_npu_version}-{chip}-{os}-py{python_version}-{architecture}[-ci]
-    e.g. v26.0.0-cann9.0.0-torch_npu2.7.1-a3-openeuler24.03-py3.11-x86_64
-         v26.1.0-cann9.0.0-torch_npu2.7.1-910b-openeuler24.03-py3.11-aarch64
-         v26.1.0-cann9.0.0-torch_npu2.7.1-910b-openeuler24.03-py3.11-aarch64-ci   (CI build via --build-ci)
-
 Examples:
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -i myproject/mindspeed-mm:v1.0
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --torch-whl /path/to/torch.whl --torch-npu-whl /path/to/torch_npu.whl
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-openeuler24.03-py3.11 --build-ci   # Build CI image (tag auto-appends '-ci')
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-a3-openeuler24.03-py3.11
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1.post8
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-950-openeuler24.03-py3.12 --python-version 3.12
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.11 --build-ci
 EOF
 }
 
-MINICONDA_PATH=""
-DECORD_DEPS_PATH=""
-DECORD_SCRIPT_PATH=""
-IMAGE_NAME=""
 IMAGE_TAG=""
 NO_CACHE=""
 TORCH_VERSION="2.7.1"
-TORCH_NPU_VERSION="2.7.1"
-TORCH_WHL_PATH=""
-TORCH_NPU_WHL_PATH=""
-TORCHVISION_WHL_PATH=""
-TORCHAUDIO_WHL_PATH=""
+TORCH_NPU_VERSION="2.7.1.post8"
 BASE_IMAGE=""
 MINDSPEED_MM_VERSION="26.1.0"
 CLEANUP_ON_FAIL=false
 BUILD_CI=false
+PYTHON_VERSION=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -m|--miniconda)     MINICONDA_PATH="$2"; shift 2 ;;
-        -d|--decord-deps)   DECORD_DEPS_PATH="$2"; shift 2 ;;
-        -s|--decord-script) DECORD_SCRIPT_PATH="$2"; shift 2 ;;
-        -i|--image-name)    IMAGE_NAME="$2"; shift 2 ;;
-        --tag)              IMAGE_TAG="$2"; shift 2 ;;
-        -n|--no-cache)      NO_CACHE="--no-cache"; shift ;;
-        -v|--version)       MINDSPEED_MM_VERSION="$2"; shift 2 ;;
-        --torch-version)    TORCH_VERSION="$2"; shift 2 ;;
+        --tag)               IMAGE_TAG="$2"; shift 2 ;;
+        -n|--no-cache)       NO_CACHE="--no-cache"; shift ;;
+        -v|--version)        MINDSPEED_MM_VERSION="$2"; shift 2 ;;
+        --torch-version)     TORCH_VERSION="$2"; shift 2 ;;
         --torch-npu-version) TORCH_NPU_VERSION="$2"; shift 2 ;;
-        --torch-whl)        TORCH_WHL_PATH="$2"; shift 2 ;;
-        --torch-npu-whl)    TORCH_NPU_WHL_PATH="$2"; shift 2 ;;
-        --torchvision-whl)  TORCHVISION_WHL_PATH="$2"; shift 2 ;;
-        --torchaudio-whl)   TORCHAUDIO_WHL_PATH="$2"; shift 2 ;;
-        --base-image)       BASE_IMAGE="$2"; shift 2 ;;
-        --build-ci)         BUILD_CI=true; shift ;;
-        --cleanup-on-fail)  CLEANUP_ON_FAIL=true; shift ;;
-        -h|--help)          show_help; exit 0 ;;
-        *)                  echo "Unknown argument: $1"; show_help; exit 1 ;;
+        --base-image)        BASE_IMAGE="$2"; shift 2 ;;
+        --python-version)    PYTHON_VERSION="$2"; shift 2 ;;
+        --build-ci)          BUILD_CI=true; shift ;;
+        --cleanup-on-fail)   CLEANUP_ON_FAIL=true; shift ;;
+        -h|--help)           show_help; exit 0 ;;
+        *)                   echo "Unknown argument: $1"; show_help; exit 1 ;;
     esac
 done
 
@@ -139,6 +114,8 @@ parse_base_image_tag() {
     local detected_npu=""
     if [[ "$tag_lower" == *"910b"* ]]; then
         detected_npu="910B"
+    elif [[ "$tag_lower" == *"950"* ]]; then
+        detected_npu="950"
     elif [[ "$tag_lower" == *"-a3-"* ]] || [[ "$tag_lower" == *"-a3-py"* ]]; then
         detected_npu="A3"
     fi
@@ -151,7 +128,7 @@ parse_base_image_tag() {
     fi
 
     local detected_cann=""
-    if [[ -n "$detected_npu" ]]; then
+    if [ -n "$detected_npu" ]; then
         local npu_lower=$(echo "$detected_npu" | tr '[:upper:]' '[:lower:]')
         detected_cann="${tag_lower%%-${npu_lower}-*}"
     else
@@ -193,7 +170,7 @@ DETECTED_CANN_VERSION=""
 DETECTED_PYTHON_VERSION=""
 
 if [ -z "$BASE_IMAGE" ]; then
-    echo "Error: --base-image is required. CANN version, NPU type, OS and Python version are auto-detected from the base image tag."
+    echo "Error: --base-image is required."
     show_help
     exit 1
 fi
@@ -202,7 +179,7 @@ echo ">>> Auto-detecting NPU type, OS, CANN version and Python version from base
 parse_base_image_tag "$BASE_IMAGE"
 
 if [ -z "$DETECTED_NPU_TYPE" ]; then
-    echo "Error: Failed to detect NPU type from base image tag (expected '910b' or 'a3')."
+    echo "Error: Failed to detect NPU type from base image tag (expected '910b', '950' or 'a3')."
     exit 1
 fi
 NPU_TYPE="$DETECTED_NPU_TYPE"
@@ -219,23 +196,22 @@ if [ -z "$DETECTED_CANN_VERSION" ]; then
 fi
 CANN_VERSION="$DETECTED_CANN_VERSION"
 
-if [ -z "$DETECTED_PYTHON_VERSION" ]; then
-    echo "Error: Failed to detect Python version from base image tag (expected 'py<x.y>' field, e.g. py3.11)."
-    exit 1
+# Resolve Python version: user-specified takes precedence, else auto-detected.
+if [ -z "$PYTHON_VERSION" ]; then
+    if [ -z "$DETECTED_PYTHON_VERSION" ]; then
+        echo "Error: Failed to detect Python version from base image tag (expected 'py<x.y>', e.g. py3.11)."
+        echo "       Use --python-version to specify it explicitly."
+        exit 1
+    fi
+    PYTHON_VERSION="$DETECTED_PYTHON_VERSION"
 fi
-PYTHON_VERSION="$DETECTED_PYTHON_VERSION"
-
-echo ">>> Using detected NPU type:    $NPU_TYPE"
-echo ">>> Using detected OS:          $OS"
-echo ">>> Using detected CANN version: $CANN_VERSION"
-echo ">>> Using detected Python:      $PYTHON_VERSION"
 
 NPU_TYPE=$(echo "$NPU_TYPE" | tr '[:lower:]' '[:upper:]')
 NPU_TYPE_LOWER=$(echo "$NPU_TYPE" | tr '[:upper:]' '[:lower:]')
 OS=$(echo "$OS" | tr '[:upper:]' '[:lower:]')
 
-if [ "$NPU_TYPE" != "A3" ] && [ "$NPU_TYPE" != "910B" ]; then
-    echo "Error: NPU type must be A3 or 910B"
+if [ "$NPU_TYPE" != "A3" ] && [ "$NPU_TYPE" != "910B" ] && [ "$NPU_TYPE" != "950" ]; then
+    echo "Error: NPU type must be A3, 910B or 950"
     exit 1
 fi
 
@@ -250,161 +226,85 @@ case "$OS" in
     ubuntu*)    OS_FAMILY="ubuntu" ;;
 esac
 
-OS_NAME=""
-case "$OS_FAMILY" in
-    openeuler) OS_NAME="openEuler" ;;
-    ubuntu)    OS_NAME="ubuntu" ;;
-esac
-
 REPO_SCRIPT=""
 case "$OS_FAMILY" in
     openeuler) REPO_SCRIPT="configure_yum_repo.sh" ;;
     ubuntu)    REPO_SCRIPT="configure_apt_repo.sh" ;;
 esac
 
-
-if [ -n "$TORCH_WHL_PATH" ] && [ ! -f "$TORCH_WHL_PATH" ]; then
-    echo "Error: torch .whl file not found: $TORCH_WHL_PATH"
-    exit 1
+# CPU architecture: used for Miniconda/decord selection and the image tag.
+DOWNLOAD_ARCH=$(uname -m)
+if [ "$DOWNLOAD_ARCH" = "aarch64" ]; then
+    IS_ARM=true
+    ARCH_NAME="aarch64"
+else
+    IS_ARM=false
+    ARCH_NAME="x86_64"
 fi
-if [ -n "$TORCH_NPU_WHL_PATH" ] && [ ! -f "$TORCH_NPU_WHL_PATH" ]; then
-    echo "Error: torch-npu .whl file not found: $TORCH_NPU_WHL_PATH"
-    exit 1
-fi
-if [ -n "$TORCHVISION_WHL_PATH" ] && [ ! -f "$TORCHVISION_WHL_PATH" ]; then
-    echo "Error: torchvision .whl file not found: $TORCHVISION_WHL_PATH"
-    exit 1
-fi
-if [ -n "$TORCHAUDIO_WHL_PATH" ] && [ ! -f "$TORCHAUDIO_WHL_PATH" ]; then
-    echo "Error: torchaudio .whl file not found: $TORCHAUDIO_WHL_PATH"
-    exit 1
-fi
+# aarch64 builds decord from source in the decord-builder stage.
+DECORD_BUILD=$([ "$IS_ARM" = true ] && echo "true" || echo "false")
 
 DOCKERFILE="${SCRIPT_DIR}/Dockerfile"
+CI_DOCKERFILE="${SCRIPT_DIR}/Dockerfile.ci"
 
 if [ ! -f "$DOCKERFILE" ]; then
     echo "Error: Dockerfile not found: $DOCKERFILE"
     exit 1
 fi
-
-MODEL_INSTALL_DIR="${SCRIPTS_DIR}/model_install"
-
-if [ ! -d "$MODEL_INSTALL_DIR" ]; then
-    echo "Error: Model install scripts directory not found: $MODEL_INSTALL_DIR"
+if [ "$BUILD_CI" = true ] && [ ! -f "$CI_DOCKERFILE" ]; then
+    echo "Error: Dockerfile.ci not found: $CI_DOCKERFILE"
     exit 1
 fi
 
-if [ -z "$MINICONDA_PATH" ]; then
-    echo ">>> Miniconda path not specified, will auto-download..."
-    DOWNLOAD_ARCH=$(uname -m)
-    if [ "$DOWNLOAD_ARCH" = "x86_64" ]; then
-        DOWNLOAD_ARCH="x86_64"
-    elif [ "$DOWNLOAD_ARCH" = "aarch64" ]; then
-        DOWNLOAD_ARCH="aarch64"
-    else
-        echo "Error: Unsupported architecture: $DOWNLOAD_ARCH"
-        exit 1
-    fi
-    DOWNLOAD_SCRIPT="${COMMON_DIR}/download_miniconda.sh"
-
-    if [ -f "$DOWNLOAD_SCRIPT" ]; then
-        DOWNLOAD_DIR="${SCRIPT_DIR}/downloads"
-        echo ">>> Auto-downloading Miniconda (${DOWNLOAD_ARCH})..."
-        bash "$DOWNLOAD_SCRIPT" "$DOWNLOAD_DIR" "$DOWNLOAD_ARCH"
-
-        MINICONDA_FILE="Miniconda3-py311_26.1.1-1-Linux-${DOWNLOAD_ARCH}.sh"
-        MINICONDA_PATH="${DOWNLOAD_DIR}/${MINICONDA_FILE}"
-
-        if [ ! -f "$MINICONDA_PATH" ]; then
-            echo "Error: Miniconda installer not found after auto-download"
-            exit 1
-        fi
-        echo ">>> Miniconda download complete: $MINICONDA_PATH"
-    else
-        echo "Error: Download script not found: $DOWNLOAD_SCRIPT"
-        exit 1
-    fi
+# Auto-download Miniconda (variant selected by the requested Python version).
+echo ">>> Auto-downloading Miniconda (${DOWNLOAD_ARCH}, Python ${PYTHON_VERSION})..."
+DOWNLOAD_SCRIPT="${COMMON_DIR}/download_miniconda.sh"
+DOWNLOAD_DIR="${SCRIPT_DIR}/downloads"
+mkdir -p "$DOWNLOAD_DIR"
+MINICONDA_FILE=$(bash "$DOWNLOAD_SCRIPT" "$DOWNLOAD_DIR" "$DOWNLOAD_ARCH" "$PYTHON_VERSION" | tail -n 1)
+MINICONDA_PATH="${DOWNLOAD_DIR}/${MINICONDA_FILE}"
+if [ ! -f "$MINICONDA_PATH" ]; then
+    echo "Error: Miniconda installer not found after auto-download: $MINICONDA_PATH"
+    exit 1
 fi
+echo ">>> Miniconda download complete: $MINICONDA_PATH"
 
 MINICONDA_NAME=$(basename "$MINICONDA_PATH")
-IS_ARM=false
-ARCH_NAME="x86_64"
-if [[ "$MINICONDA_NAME" == *"aarch64"* ]]; then
-    IS_ARM=true
-    ARCH_NAME="aarch64"
-fi
 
-if [ -n "$IMAGE_NAME" ] && [ -n "$IMAGE_TAG" ]; then
-    echo "Warning: both --image-name and --tag provided; --image-name takes precedence (--tag ignored)"
-fi
-
-if [ -z "$IMAGE_NAME" ]; then
-    DEFAULT_TAG="v${MINDSPEED_MM_VERSION}-cann${CANN_VERSION}-torch_npu${TORCH_NPU_VERSION}-${NPU_TYPE_LOWER}-${OS}-py${PYTHON_VERSION}-${ARCH_NAME}"
-    if [ "$BUILD_CI" = true ]; then
-        DEFAULT_TAG="${DEFAULT_TAG}-ci"
-    fi
-    if [ -n "$IMAGE_TAG" ]; then
-        IMAGE_NAME="mindspeed-mm:${IMAGE_TAG}"
-    else
-        IMAGE_NAME="mindspeed-mm:${DEFAULT_TAG}"
-    fi
-fi
-
-if [ ! -f "$MINICONDA_PATH" ]; then
-    echo "Warning: Miniconda installer not found: $MINICONDA_PATH"
-    DOWNLOAD_ARCH=$(uname -m)
-    if [ "$IS_ARM" = true ]; then
-        DOWNLOAD_ARCH="aarch64"
-    fi
-    DOWNLOAD_SCRIPT="${COMMON_DIR}/download_miniconda.sh"
-
-    if [ -f "$DOWNLOAD_SCRIPT" ]; then
-        echo ">>> Auto-downloading Miniconda (${DOWNLOAD_ARCH})..."
-        DOWNLOAD_DIR=$(dirname "$MINICONDA_PATH")
-        bash "$DOWNLOAD_SCRIPT" "$DOWNLOAD_DIR" "$DOWNLOAD_ARCH"
-        MINICONDA_NAME=$(basename "$MINICONDA_PATH")
-        if [ ! -f "$MINICONDA_PATH" ]; then
-            echo "Error: Miniconda installer not found after auto-download"
-            exit 1
-        fi
-        echo ">>> Miniconda download complete: $MINICONDA_PATH"
-    else
-        echo "Error: Download script not found: $DOWNLOAD_SCRIPT"
-        exit 1
-    fi
-fi
-
+# ARM: auto-download decord source dependencies.
 if [ "$IS_ARM" = true ]; then
-    if [ -z "$DECORD_DEPS_PATH" ]; then
-        echo "Warning: decord dependencies directory required for ARM architecture"
-        DOWNLOAD_SCRIPT="${COMMON_DIR}/download_decord_deps.sh"
-
-        if [ -f "$DOWNLOAD_SCRIPT" ]; then
-            echo ">>> Auto-downloading decord dependencies..."
-            DECORD_DEPS_PATH="${SCRIPT_DIR}/decord_deps"
-            bash "$DOWNLOAD_SCRIPT" "$DECORD_DEPS_PATH"
-            if [ ! -d "$DECORD_DEPS_PATH" ]; then
-                echo "Error: decord dependencies directory not found after auto-download"
-                exit 1
-            fi
-            echo ">>> decord dependencies download complete: $DECORD_DEPS_PATH"
-        else
-            echo "Error: Download script not found: $DOWNLOAD_SCRIPT"
-            exit 1
-        fi
-    fi
+    echo ">>> Auto-downloading decord dependencies..."
+    DECORD_DEPS_PATH="${SCRIPT_DIR}/decord_deps"
+    bash "${COMMON_DIR}/download_decord_deps.sh" "$DECORD_DEPS_PATH"
     if [ ! -d "$DECORD_DEPS_PATH" ]; then
-        echo "Error: decord dependencies directory not found: $DECORD_DEPS_PATH"
+        echo "Error: decord dependencies directory not found after auto-download"
         exit 1
     fi
+else
+    # x86_64: decord is installed via pip in the base stage; still need a valid
+    # build-context path for the Dockerfile COPY.
+    mkdir -p decord_deps
+    touch decord_deps/.placeholder
 fi
 
-if [ -z "$DECORD_SCRIPT_PATH" ]; then
-    DECORD_SCRIPT_PATH="${COMMON_DIR}/install_decord_on_arm.sh"
-fi
+DECORD_SCRIPT_PATH="${COMMON_DIR}/install_decord_on_arm.sh"
 if [ ! -f "$DECORD_SCRIPT_PATH" ]; then
     echo "Error: decord install script not found: $DECORD_SCRIPT_PATH"
     exit 1
+fi
+
+# Image naming.
+DEFAULT_TAG="v${MINDSPEED_MM_VERSION}-cann${CANN_VERSION}-torch_npu${TORCH_NPU_VERSION}-${NPU_TYPE_LOWER}-${OS}-py${PYTHON_VERSION}-${ARCH_NAME}"
+if [ -n "$IMAGE_TAG" ]; then
+    DEV_TAG="$IMAGE_TAG"
+else
+    DEV_TAG="$DEFAULT_TAG"
+fi
+DEV_IMAGE_NAME="mindspeed-mm:${DEV_TAG}"
+if [ "$BUILD_CI" = true ]; then
+    IMAGE_NAME="mindspeed-mm:${DEV_TAG}-ci"
+else
+    IMAGE_NAME="$DEV_IMAGE_NAME"
 fi
 
 echo "=========================================="
@@ -416,27 +316,9 @@ echo "OS:                 ${OS}"
 echo "CANN Version:       ${CANN_VERSION}"
 echo "Python Version:     ${PYTHON_VERSION}"
 echo "CPU Architecture:   ${ARCH_NAME}"
-echo "Dockerfile:         ${DOCKERFILE}"
-echo "Image Name:         ${IMAGE_NAME}"
-echo "Image Tag:          ${IMAGE_TAG:-(auto)}"
 echo "PyTorch Version:    ${TORCH_VERSION}"
 echo "torch-npu Version:  ${TORCH_NPU_VERSION}"
 echo "MindSpeed MM Ver:   ${MINDSPEED_MM_VERSION}"
-echo "Model Scripts Dir:  ${MODEL_INSTALL_DIR}"
-if [ -n "$TORCH_WHL_PATH" ] && [ -n "$TORCH_NPU_WHL_PATH" ]; then
-    echo "Install Mode:       Offline (.whl)"
-elif [ -n "$TORCH_WHL_PATH" ]; then
-    echo "Install Mode:       Mixed (torch offline, torch-npu online)"
-elif [ -n "$TORCH_NPU_WHL_PATH" ]; then
-    echo "Install Mode:       Mixed (torch online, torch-npu offline)"
-else
-    echo "Install Mode:       Online (pip)"
-fi
-echo "Miniconda:          ${MINICONDA_PATH}"
-echo "Decord Script:      ${DECORD_SCRIPT_PATH}"
-if [ -n "$DECORD_DEPS_PATH" ]; then
-    echo "Decord Deps:        ${DECORD_DEPS_PATH}"
-fi
 echo "Build CI:           ${BUILD_CI}"
 echo "No Cache:           ${NO_CACHE:-No}"
 echo "=========================================="
@@ -462,106 +344,55 @@ cp "$MINICONDA_PATH" .
 DECORD_SCRIPT_NAME=$(basename "$DECORD_SCRIPT_PATH")
 cp "$DECORD_SCRIPT_PATH" .
 
-cp "${COMMON_DIR}/common_functions.sh" .
-
 cp "${COMMON_DIR}/${REPO_SCRIPT}" configure_repo.sh
-
-mkdir -p install_scripts
-for script in "${MODEL_INSTALL_DIR}"/install_*.sh; do
-    cp "$script" install_scripts/
-done
-
-DECORD_DEPS_NAME=""
-DECORD_DEPS_COPIED=false
-DECORD_DEPS_PLACEHOLDER=false
-if [ -n "$DECORD_DEPS_PATH" ]; then
-    DECORD_DEPS_NAME=$(basename "$DECORD_DEPS_PATH")
-    DECORD_DEPS_REAL=$(realpath "$DECORD_DEPS_PATH")
-    CURRENT_DIR_REAL=$(realpath .)
-    if [ "$DECORD_DEPS_REAL" != "${CURRENT_DIR_REAL}/${DECORD_DEPS_NAME}" ]; then
-        cp -r "$DECORD_DEPS_PATH" .
-        DECORD_DEPS_COPIED=true
-    fi
-fi
-
-# For x86_64 builds where decord deps are not needed (installed via pip in Stage 1),
-# create an empty placeholder directory so the Dockerfile's COPY always has a
-# valid source path. Mirrors the torch_wheels placeholder pattern.
-if [ -z "$DECORD_DEPS_NAME" ]; then
-    mkdir -p decord_deps
-    touch decord_deps/.placeholder
-    DECORD_DEPS_NAME=decord_deps
-    DECORD_DEPS_PLACEHOLDER=true
-fi
-
-mkdir -p torch_wheels
-touch torch_wheels/.placeholder
-if [ -n "$TORCH_WHL_PATH" ]; then
-    cp "$TORCH_WHL_PATH" torch_wheels/
-fi
-if [ -n "$TORCH_NPU_WHL_PATH" ]; then
-    cp "$TORCH_NPU_WHL_PATH" torch_wheels/
-fi
-if [ -n "$TORCHVISION_WHL_PATH" ]; then
-    cp "$TORCHVISION_WHL_PATH" torch_wheels/
-fi
-if [ -n "$TORCHAUDIO_WHL_PATH" ]; then
-    cp "$TORCHAUDIO_WHL_PATH" torch_wheels/
-fi
 
 BUILD_ARGS="--build-arg MINICONDA_SH=${MINICONDA_NAME}"
 BUILD_ARGS="$BUILD_ARGS --build-arg DECORD_SCRIPT=${DECORD_SCRIPT_NAME}"
-BUILD_ARGS="$BUILD_ARGS --build-arg OS_FAMILY=${OS_FAMILY}"
 BUILD_ARGS="$BUILD_ARGS --build-arg TORCH_VERSION=${TORCH_VERSION}"
 BUILD_ARGS="$BUILD_ARGS --build-arg TORCH_NPU_VERSION=${TORCH_NPU_VERSION}"
-BUILD_ARGS="$BUILD_ARGS --build-arg TORCH_WHL_DIR=torch_wheels"
 BUILD_ARGS="$BUILD_ARGS --build-arg MINDSPEED_MM_BRANCH=${MINDSPEED_MM_VERSION}"
-BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_CI=${BUILD_CI}"
-
-if [ "$BUILD_CI" = true ]; then
-    BUILD_ARGS="$BUILD_ARGS --build-arg FINAL_WORKDIR=/workspace"
-fi
-
-# Always pass the full BASE_IMAGE to the Dockerfile (required, auto-detected values come from its tag).
 BUILD_ARGS="$BUILD_ARGS --build-arg BASE_IMAGE=${BASE_IMAGE}"
-
-BUILD_ARGS="$BUILD_ARGS --build-arg DECORD_DEPS_DIR=${DECORD_DEPS_NAME}"
+BUILD_ARGS="$BUILD_ARGS --build-arg PYTHON_VERSION=${PYTHON_VERSION}"
+BUILD_ARGS="$BUILD_ARGS --build-arg DECORD_DEPS_DIR=decord_deps"
+BUILD_ARGS="$BUILD_ARGS --build-arg DECORD_BUILD=${DECORD_BUILD}"
 
 echo ""
-echo "Starting image build..."
+echo ">>> Building dev image: ${DEV_IMAGE_NAME}"
 echo ""
 
-# Temporarily disable set -e to handle build failure gracefully
 set +e
-
 docker build \
-    -t "$IMAGE_NAME" \
+    -t "$DEV_IMAGE_NAME" \
     -f "$DOCKERFILE" \
     $BUILD_ARGS \
     $NO_CACHE \
     --network=host \
     .
-
 BUILD_RESULT=$?
-
-# Restore set -e
 set -e
 
-# Clean up temporary files regardless of build result
-rm -f "${MINICONDA_NAME}"
-rm -f "${DECORD_SCRIPT_NAME}"
-rm -f "common_functions.sh"
-rm -f "configure_repo.sh"
-rm -rf "install_scripts"
-rm -rf "torch_wheels"
-if [ -n "$DECORD_DEPS_NAME" ] && [ "$DECORD_DEPS_COPIED" = true ]; then
-    rm -rf "${DECORD_DEPS_NAME}"
-fi
-if [ "$DECORD_DEPS_PLACEHOLDER" = true ]; then
-    rm -rf decord_deps
+if [ $BUILD_RESULT -eq 0 ] && [ "$BUILD_CI" = true ]; then
+    echo ""
+    echo ">>> Building CI image on top of dev image: ${IMAGE_NAME}"
+    echo ""
+    set +e
+    docker build \
+        -t "$IMAGE_NAME" \
+        -f "$CI_DOCKERFILE" \
+        --build-arg DEV_IMAGE="$DEV_IMAGE_NAME" \
+        $NO_CACHE \
+        --network=host \
+        .
+    BUILD_RESULT=$?
+    set -e
 fi
 
-# Check build result and handle accordingly
+# Clean up temporary build-context files regardless of build result.
+rm -f "${MINICONDA_NAME}"
+rm -f "${DECORD_SCRIPT_NAME}"
+rm -f "configure_repo.sh"
+rm -rf "decord_deps"
+
 if [ $BUILD_RESULT -eq 0 ]; then
     echo ""
     echo "=========================================="

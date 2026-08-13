@@ -163,10 +163,8 @@ cache_dir/
 # devcontainer: Build context artifacts staged to docker/ via .devcontainer/prepare-context.sh
 /docker/miniconda.sh
 /docker/Miniconda3-*.sh
-/docker/common_functions.sh
 /docker/configure_repo.sh
 /docker/install_decord_on_arm.sh
-/docker/install_scripts/
 /docker/torch_wheels/
 /docker/decord_deps/
 /docker/downloads/

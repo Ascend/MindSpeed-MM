@@ -1,297 +1,192 @@
 # ============================================
-# MindSpeed-MM Docker Image Build File
+# MindSpeed MM Docker Image Build File (dev image)
 #
-# Supported NPU types (configurable): 910b, a3, etc.
-# Supported CPU architectures:        x86_64 and aarch64 (ARM)
-# Supported operating systems:        openEuler and Ubuntu
-#
-# Build targets:
-#   - Default dev image (BUILD_CI=false): Installs PyTorch/NPU, verl_qwen3vl,
-#     and clones the MindSpeed-MM code.
-#   - CI image (BUILD_CI=true): Extends the dev image by creating multiple conda
-#     environments, one per MindSpeed-MM release branch.
+# Supported NPU types:        910b, a3, 950
+# Supported CPU architectures: x86_64 and aarch64 (ARM)
+# Supported operating systems: openEuler and Ubuntu
 #
 # Multi-stage build:
-#   Stage 1 (base): Install system deps, Miniconda, PyTorch, torch_npu, etc.
-#   Stage 2 (final): Install decord, CI multi-version envs or verl_qwen3vl,
-#                    then produce the final image.
+#   Stage 1 (base):            system runtime deps, Miniconda, PyTorch, torch_npu,
+#                              decord (x86_64 via pip)
+#   Stage 2 (decord-builder):  build decord + ffmpeg from source (aarch64 only)
+#   Stage 3 (final):           assemble runtime artifacts, clone MindSpeed-MM
+#
+# The CI image is built separately on top of this dev image (see Dockerfile.ci).
 # ============================================
 
-# BASE_IMAGE: Full base image URL; when empty, falls back to the hardcoded default below.
-# NOTE: Do not use nested ${VAR} inside ${BASE_IMAGE:-default} — Docker's :- parser
-#       stops at the first '}' and produces a malformed image name.
 ARG BASE_IMAGE=""
+FROM ${BASE_IMAGE:-swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-a3-openeuler24.03-py3.11} AS base
 
-# Stage 1 (base): Build the base runtime environment.
-# Pulls the CANN base image from the Huawei Cloud Ascend registry by default;
-# comes with CANN and Python 3.11 pre-installed.
-FROM ${BASE_IMAGE:-swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11} AS base
-
-# Switch to root (the CANN base image defaults to a non-root user)
+# The CANN base image defaults to a non-root user
 USER root
 
-# --- Build arguments (used in the base stage only) ---
-# MINICONDA_SH: Path to the Miniconda installer script (passed via --build-arg)
+# --- Build arguments (base stage) ---
 ARG MINICONDA_SH
-# TORCH_VERSION / TORCH_NPU_VERSION: PyTorch and torch_npu versions
 ARG TORCH_VERSION=2.7.1
 ARG TORCH_NPU_VERSION=2.7.1.post8
-# TORCH_WHL_DIR: Directory containing local PyTorch .whl files (optional, for offline install)
-ARG TORCH_WHL_DIR=torch_wheels
+ARG PYTHON_VERSION=3.11
 
-# Detect CPU architecture and print info (x86_64 / aarch64)
+# Print CPU architecture (x86_64 / aarch64) for early feedback.
 RUN ARCH=$(uname -m) && \
     echo "==========================================" && \
     echo "Detected CPU architecture: ${ARCH}" && \
-    if [ "$ARCH" = "x86_64" ]; then \
-        echo "Architecture type: x86"; \
-    elif [ "$ARCH" = "aarch64" ]; then \
-        echo "Architecture type: ARM"; \
-    else \
-        echo "ERROR: Unsupported architecture: $ARCH"; \
-        exit 1; \
-    fi && \
+    case "$ARCH" in \
+        x86_64|aarch64) echo "Architecture supported" ;; \
+        *) echo "ERROR: Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac && \
     echo "=========================================="
 
-# Configure system package repositories (via external script for yum/apt sources)
+# Configure system package repositories (external script handles yum/apt sources).
+# Kept early in the build: this layer only changes when the script changes, so
+# the layers below it are reused from cache across builds.
 COPY configure_repo.sh /tmp/configure_repo.sh
 RUN chmod +x /tmp/configure_repo.sh && \
     bash /tmp/configure_repo.sh && \
     rm /tmp/configure_repo.sh
 
-# Install system-level dependencies.
-# - Build toolchain: gcc/g++, make, cmake (for compiling C++ extensions like decord)
-# - Network tools:   git, wget, curl
-# - Media processing: ffmpeg and related dev libraries (for video decoding)
-# OS family is detected from /etc/os-release (ID field), so no build arg is needed.
+# Install runtime system dependencies only.
+# Build-only toolchain (gcc/g++/make/cmake/autoconf/...) is intentionally NOT
+# installed here: it is needed only by the decord-builder stage for aarch64.
+# This keeps this stage and the final image smaller. The OS family is detected
+# from /etc/os-release, so no build arg is required.
 RUN . /etc/os-release && \
-    DETECTED_OS_FAMILY="" && \
     ID_LOWER=$(echo "$ID" | tr '[:upper:]' '[:lower:]') && \
     case "$ID_LOWER" in \
-        *openeuler*) DETECTED_OS_FAMILY="openeuler" ;; \
-        *ubuntu*)    DETECTED_OS_FAMILY="ubuntu" ;; \
-    esac && \
-    echo "Installing system dependencies (ID=$ID, OS_FAMILY=$DETECTED_OS_FAMILY)..." && \
-    if [ "$DETECTED_OS_FAMILY" = "openeuler" ]; then \
-        yum install -y \
-            git \
-            iproute \
-            wget \
-            curl \
-            vim \
-            gcc \
-            gcc-c++ \
-            make \
-            cmake \
-            ffmpeg-devel \
-            gawk \
-        && yum clean all; \
-    elif [ "$DETECTED_OS_FAMILY" = "ubuntu" ]; then \
-        apt-get install -y \
-            git \
-            iproute2 \
-            wget \
-            curl \
-            vim \
-            gcc \
-            g++ \
-            make \
-            cmake \
-            ffmpeg \
-            libavcodec-dev \
-            libavformat-dev \
-            libavutil-dev \
-            libswscale-dev \
-            gawk \
-        && apt-get clean; \
-    else \
-        echo "ERROR: Unsupported OS ID: $ID" && exit 1; \
-    fi
+        *openeuler*) \
+            yum install -y git iproute wget curl vim gawk ffmpeg && \
+            yum clean all ;; \
+        *ubuntu*) \
+            apt-get install -y git iproute2 wget curl vim gawk ffmpeg \
+                libavcodec-dev libavformat-dev libavutil-dev libswscale-dev && \
+            apt-get clean ;; \
+        *) echo "ERROR: Unsupported OS ID: $ID" && exit 1 ;; \
+    esac
 
-# Install Miniconda (for creating and managing Python virtual environments).
-# -b: silent install (no user prompts)
-# -p /opt/conda: target installation path
+# Install Miniconda. The installer variant (py3xx) is selected by
+# --python-version, which sets the Python version of the conda base environment.
+# -b: silent install (no user prompts); -p /opt/conda: target install path.
 COPY ${MINICONDA_SH} /tmp/miniconda.sh
-RUN echo "Installing Miniconda..." && \
-    bash /tmp/miniconda.sh -b -p /opt/conda && \
+RUN bash /tmp/miniconda.sh -b -p /opt/conda && \
     rm /tmp/miniconda.sh && \
-    /opt/conda/bin/conda clean -ya
+    export PATH=/opt/conda/bin:$PATH && \
+    # conda 25.x requires accepting the Anaconda channel ToS before installing.
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+    # Pin the conda base environment to the requested Python version
+    conda install -y -n base python=${PYTHON_VERSION} && \
+    conda clean -ya
 
-# Add conda to PATH and disable auto-update (avoids errors in non-interactive sessions)
 ENV PATH=/opt/conda/bin:$PATH
 ENV CONDA_AUTO_UPDATE_CONDA=false
 
-# Configure pip to use Huawei Cloud PyPI mirror (faster downloads in China) and init conda
+# Configure pip to use the Huawei Cloud PyPI mirror and init conda for bash
+# (auto-activates the base env on container start).
 RUN pip config set global.index-url https://repo.huaweicloud.com/repository/pypi/simple && \
     pip config set global.trusted-host "repo.huaweicloud.com" && \
-    # Initialize conda for bash shell (auto-activates the base env on container start)
     /opt/conda/bin/conda init bash
 
-# Copy local PyTorch wheel files (preferred when provided for offline installation)
-COPY ${TORCH_WHL_DIR} /tmp/torch_wheels/
+# Install PyTorch and torch_npu (online). Retries tolerate network instability.
+# - x86_64:  official PyTorch CPU index (more stable).
+# - aarch64: default PyPI index.
+RUN ARCH=$(uname -m) && \
+    MAX_RETRIES=3 && \
+    for retry in $(seq 1 $MAX_RETRIES); do \
+        pip cache purge 2>/dev/null || true; \
+        rm -rf /root/.cache/pip; \
+        if [ "$ARCH" = "x86_64" ]; then \
+            if pip install --no-cache-dir torch==${TORCH_VERSION} torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu; then break; fi; \
+        elif [ "$ARCH" = "aarch64" ]; then \
+            if pip install --no-cache-dir torch==${TORCH_VERSION} torchvision torchaudio; then break; fi; \
+        fi; \
+    done && \
+    for retry in $(seq 1 $MAX_RETRIES); do \
+        pip cache purge 2>/dev/null || true; \
+        rm -rf /root/.cache/pip; \
+        if pip install --no-cache-dir torch-npu==${TORCH_NPU_VERSION} pyyaml; then break; fi; \
+    done
 
-# Install PyTorch and torch_npu.
-# Prefers local .whl files (offline mode); falls back to online PyPI installation.
-# Online install retries up to 3 times to tolerate network instability.
-# - x86_64: Installs from the official PyTorch CPU index (better stability).
-# - aarch64: Installs from the default PyPI index.
-RUN if ls /tmp/torch_wheels/*.whl 1>/dev/null 2>&1; then \
-        echo "Installing PyTorch and torch_npu from local .whl files..." && \
-        ls /tmp/torch_wheels/*.whl && \
-        pip install --no-cache-dir /tmp/torch_wheels/*.whl; \
-    else \
-        echo "Installing PyTorch and torch_npu from PyPI..." && \
-        ARCH=$(uname -m) && \
-        MAX_RETRIES=3 && \
-        for retry in $(seq 1 $MAX_RETRIES); do \
-            echo ">>> Attempt $retry of $MAX_RETRIES"; \
-            pip cache purge 2>/dev/null || true; \
-            rm -rf /root/.cache/pip; \
-            if [ "$ARCH" = "x86_64" ]; then \
-                echo "Installing PyTorch for x86_64..." && \
-                pip install --no-cache-dir torch==${TORCH_VERSION} torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && break; \
-            elif [ "$ARCH" = "aarch64" ]; then \
-                echo "Installing PyTorch for aarch64..." && \
-                pip install --no-cache-dir torch==${TORCH_VERSION} torchvision torchaudio && break; \
-            fi; \
-        done && \
-        # Install torch_npu
-        for retry in $(seq 1 $MAX_RETRIES); do \
-            echo ">>> Installing torch-npu, attempt $retry of $MAX_RETRIES"; \
-            pip cache purge 2>/dev/null || true; \
-            rm -rf /root/.cache/pip; \
-            pip install --no-cache-dir torch-npu==${TORCH_NPU_VERSION} && break; \
-        done; \
-    fi && \
-    rm -rf /tmp/torch_wheels
-
-# Install decord (video decoding library) via pip on x86_64.
-# On aarch64, decord must be built from source — handled in Stage 2 (final).
+# Install decord via pip on x86_64 (on aarch64 it is built from source in the
+# decord-builder stage).
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then \
-        echo "Installing decord for x86_64..." && \
-        MAX_RETRIES=3 && \
-        for retry in $(seq 1 $MAX_RETRIES); do \
-            echo ">>> Attempt $retry of $MAX_RETRIES"; \
+        for retry in $(seq 1 3); do \
             pip cache purge 2>/dev/null || true; \
             rm -rf /root/.cache/pip; \
-            pip install --no-cache-dir decord==0.6.0 && break; \
+            if pip install --no-cache-dir decord==0.6.0; then break; fi; \
         done; \
     fi
 
-# Clean conda cache to reduce image size
-RUN conda clean -ya
+# ========================================
+# Stage 2 (decord-builder): aarch64 only.
+# Builds ffmpeg + decord from source and collects the runtime artifacts into
+# /decord_artifacts, so the final image does not retain build tools or sources.
+# ========================================
+FROM base AS decord-builder
+
+ARG DECORD_SCRIPT
+ARG DECORD_DEPS_DIR=decord_deps
+ARG DECORD_BUILD=false
+
+COPY ${DECORD_SCRIPT} /tmp/install_decord.sh
+COPY ${DECORD_DEPS_DIR} /tmp/decord_deps/
+
+RUN chmod +x /tmp/install_decord.sh && \
+    ARCH=$(uname -m) && \
+    mkdir -p /decord_artifacts/lib /decord_artifacts/site && \
+    if [ "$ARCH" = "aarch64" ] && [ "$DECORD_BUILD" = "true" ]; then \
+        echo "Building decord for aarch64..." && \
+        bash /tmp/install_decord.sh /tmp/decord_deps && \
+        echo "Collecting decord runtime artifacts..." && \
+        cp -L /usr/local/lib/*.so* /decord_artifacts/lib/ && \
+        SITE=$(python -c 'import site; print(site.getsitepackages()[0])') && \
+        cp -r "${SITE}"/decord* /decord_artifacts/site/; \
+    else \
+        echo "Skipping decord source build (x86_64 or DECORD_BUILD=false)"; \
+    fi && \
+    rm -rf /tmp/decord_deps /tmp/install_decord.sh ~/ffmpeg_build ~/bin ~/ffmpeg_sources
 
 # ========================================
-# Stage 2 (final): Produce the final image
+# Stage 3 (final): assemble the dev image
 # ========================================
 FROM base AS final
 
-# MINDSPEED_MM_BRANCH: MindSpeed-MM branch to clone (used in non-CI mode)
 ARG MINDSPEED_MM_BRANCH=26.1.0
-# BUILD_CI: Whether to build a CI multi-version image (true = CI / false = dev)
-ARG BUILD_CI=false
-# FINAL_WORKDIR: working directory of the final image
-#   (/workspace for CI, /workspace/MindSpeed-MM for dev; overridden by build.sh for CI)
+ARG DECORD_BUILD=false
+# FINAL_WORKDIR: working directory of the dev image.
 ARG FINAL_WORKDIR=/workspace/MindSpeed-MM
 ENV FINAL_WORKDIR=${FINAL_WORKDIR}
 
 WORKDIR /workspace
 
-# Parameters for building decord from source (aarch64 only)
-ARG DECORD_SCRIPT
-ARG DECORD_DEPS_DIR=decord_deps
-
-# Copy the decord build script and pre-downloaded dependencies
-COPY ${DECORD_SCRIPT} /tmp/install_decord.sh
-RUN chmod +x /tmp/install_decord.sh
-
-COPY ${DECORD_DEPS_DIR} /tmp/decord_deps/
-
-# On aarch64: build and install decord from source using pre-downloaded deps.
-# On x86_64: decord was already installed via pip in Stage 1 — skip.
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "aarch64" ]; then \
-        echo "Installing decord for ARM architecture using pre-downloaded dependencies..." && \
-        bash /tmp/install_decord.sh /tmp/decord_deps; \
-    else \
-        echo "Skipping decord build for x86_64 (already installed via pip)"; \
+# Copy decord runtime artifacts built in the decord-builder stage (aarch64).
+COPY --from=decord-builder /decord_artifacts/ /decord_artifacts/
+RUN if [ "$DECORD_BUILD" = "true" ]; then \
+        echo "Installing decord artifacts..." && \
+        cp -L /decord_artifacts/lib/*.so* /usr/local/lib/ && \
+        SITE=$(python -c 'import site; print(site.getsitepackages()[0])') && \
+        cp -r /decord_artifacts/site/* "${SITE}"/ && \
+        echo '/usr/local/lib' > /etc/ld.so.conf.d/mindspeed-libs.conf && \
+        ldconfig && \
+        python -c "import decord; print(f'decord version: {decord.__version__}')"; \
     fi && \
-    rm -rf /tmp/decord_deps && \
-    rm -f /tmp/install_decord.sh
+    rm -rf /decord_artifacts
 
-# ========================================
-# CI environment build (conditional, only active when BUILD_CI=true)
-# ========================================
-# Install tomli to parse pyproject.toml from each branch
-RUN pip install tomli
+# Clone the MindSpeed-MM repository (dev image).
+RUN echo ">>> Cloning MindSpeed MM..." && \
+    git clone --branch ${MINDSPEED_MM_BRANCH} https://gitcode.com/Ascend/MindSpeed-MM.git
 
-# Copy CI build scripts and config files into the image.
-# Note: the docker build context is the docker/ directory, so relative paths start from docker/.
-COPY scripts/ci/ /tmp/ci_scripts/
-
-# When BUILD_CI=true: run build_ci_envs.py to create multi-version conda environments.
-# When BUILD_CI=false (default): skip this step.
-RUN if [ "$BUILD_CI" = "true" ]; then \
-      echo ">>> Building CI multi-version environments..." && \
-      python /tmp/ci_scripts/build_ci_envs.py && \
-      rm -rf /tmp/ci_scripts; \
-    fi
-
-# ========================================
-# Pre-download CI test dependencies (transformers, Megatron-LM)
-# Cloned during image build to avoid network instability at test time.
-# ========================================
-RUN if [ "$BUILD_CI" = "true" ]; then \
-      echo ">>> Pre-downloading transformers (commit 7a833d1)..." && \
-      git clone https://github.com/huggingface/transformers.git /workspace/transformers && \
-      cd /workspace/transformers && \
-      git checkout 7a833d1 && \
-      cd /workspace && \
-      mv transformers transformers-7a833d1 && \
-      echo ">>> Pre-downloading Megatron-LM (branch core_v0.12.1)..." && \
-      git clone https://github.com/NVIDIA/Megatron-LM.git /workspace/Megatron-LM && \
-      cd /workspace/Megatron-LM && \
-      git checkout core_v0.12.1 && \
-      cd /workspace && \
-      mv Megatron-LM Megatron-LM_core_v0.12.1; \
-    fi
-
-# ========================================
-# Non-CI scenario (BUILD_CI=false, the default dev image)
-# ========================================
-# NOTE: COPY is a Docker build-time instruction and cannot be placed inside a
-#       RUN if block, so we copy unconditionally and conditionally execute.
-COPY common_functions.sh /tmp/common_functions.sh
-COPY install_scripts/install_verl_qwen3vl.sh /tmp/install_verl_qwen3vl.sh
-
-# Install verl_qwen3vl (the verl RL training framework for Qwen3VL models)
-RUN if [ "$BUILD_CI" != "true" ]; then \
-      chmod +x /tmp/install_verl_qwen3vl.sh && \
-      bash /tmp/install_verl_qwen3vl.sh "$MINDSPEED_MM_BRANCH"; \
-    fi && \
-    rm -f /tmp/common_functions.sh /tmp/install_verl_qwen3vl.sh
-
-# Clone the MindSpeed-MM repository (non-CI mode)
-RUN if [ "$BUILD_CI" != "true" ]; then \
-      echo ">>> Cloning MindSpeed MM..." && \
-      git clone --branch ${MINDSPEED_MM_BRANCH} https://gitcode.com/Ascend/MindSpeed-MM.git; \
-    fi
-
-# Final cleanup: remove conda cache, pip cache, and temp files to shrink the image
+# Final cleanup: remove conda/pip caches and temp files to shrink the image.
 RUN conda clean -ya && \
     rm -rf /root/.cache/pip && \
     rm -rf /tmp/*
 
-# Set the default working directory (CI: /workspace, dev: /workspace/MindSpeed-MM)
 WORKDIR ${FINAL_WORKDIR}
 
-# Configure bash startup: cd into the working directory and activate the conda base env
+# Configure bash startup: cd into the working directory and activate conda base.
 RUN echo "cd ${FINAL_WORKDIR}" >> /root/.bashrc && \
     echo '. /opt/conda/etc/profile.d/conda.sh' >> /root/.bashrc && \
     echo 'conda activate base' >> /root/.bashrc
 
-# Ensure conda is in PATH (overwrites any previously reset env var)
 ENV PATH=/opt/conda/bin:$PATH
 # CANN Ascend Toolkit installation path (adjust for your actual CANN version)
 ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/ascend-toolkit
