@@ -249,8 +249,12 @@ class PrefetchGradAccDataLoader:
     def state_dict(self):
         return self.base_dataloader.state_dict()
 
-    def load_state_dict(self, **kwargs):
-        self.base_dataloader.load_state_dict(**kwargs)
+    def load_state_dict(self, state_dict=None):
+        # Accept a positional state_dict (the train_engine caller passes it
+        # positionally). Forward to the wrapped StatefulDataLoader which also
+        # takes a single positional state_dict argument.
+        if state_dict is not None:
+            self.base_dataloader.load_state_dict(state_dict)
 
 
 class Preloader:
