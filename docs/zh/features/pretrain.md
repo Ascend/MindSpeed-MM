@@ -1,5 +1,9 @@
 # 纯文本预训练
 
+## 适用后端
+
+纯文本预训练适用于纯 FSDP2 后端和含 Megatron 后端。两种后端选择预训练数据处理流程的配置项不同，请按照下文对应后端的示例进行配置。
+
 ## 使用场景
 
 预训练（Pretraining）是语言模型发展的核心步骤，目标是让模型通过大规模无标签语料学习语言规律与世界知识。预训练过程更关注语言建模本身，而非具体任务执行。以GPT类模型为例，它是一种典型的自回归语言模型，其核心思想是基于历史上下文预测下一个标记。预训练的过程就是通过反复优化这种预测能力，模型逐渐学会如何理解语境、保持句子连贯性，并掌握更高层次的语言结构，为多种下游任务提供通用的语言表示能力。  
@@ -13,8 +17,9 @@
 
 ## 使用方法
 
-1.纯fsdp2后端
-在xx_config.yaml文件中,配置预训练相关的参数
+### 纯 FSDP2 后端
+
+在 `xx_config.yaml` 文件中配置预训练相关参数：
 
 ```yaml
 ### 数据相关配置
@@ -23,18 +28,23 @@ data:
     ...
     attr:
       formatting: alpaca
-      pretrain: true
       prompt: text
     basic_parameters:
+      stage: pretrain
       template: default
   dataloader_param:
     collate_param:
-      model_name: llm_pretrain
+      collator_id: llm_pretrain
   ...
 ```
 
-2.含megatron后端
-在data.json文件中，配置预训练相关的参数
+> [!NOTE]
+>
+> FSDP2 后端通过 `basic_parameters.stage: pretrain` 选择预训练数据处理流程。切换到预训练时，请将 `attr` 下原有的配置（如 SFT 场景的列映射配置）注释或移除，按上述示例仅保留 `formatting` 和 `prompt` 配置，避免残留配置导致数据对齐失败。
+
+### 含 Megatron 后端
+
+在 `data.json` 文件中配置预训练相关参数：
 
 ```json
 {
@@ -68,19 +78,20 @@ data:
 
 ### 参数说明
 
-1.`attr`和`collate_param`下的参数需要全部替换成上述示例的内容，其他参数的值做对应修改
-2.`basic_parameters/packing`支持配置，对于纯文本大规模预训练，框架将`packing`默认设为true，以充分利用显存、提升训练效率。如果样本不拼接，则按如下方式进行配置：
+FSDP2 后端需要按照上述示例配置 `basic_parameters.stage`、`attr` 和 `collate_param`；含 Megatron 后端需要按照上述示例配置 `attr` 和 `collate_param`。其他参数请根据实际训练任务修改。
 
-- **`basic_parameters/packing`**
-  - 描述：多个短文本样本拼接成一个符合模型最大长度（cutoff_len）的长序列
+- **`basic_parameters.packing`**
+  - 描述：将多个短文本样本拼接成符合模型最大长度 `cutoff_len` 的长序列。对于纯文本大规模预训练，该参数默认为 `true`，以充分利用显存并提升训练效率。
   - 取值：
-    - `true`：默认值，可以不配置该参数
-    - `false`：手动指定
+    - `true`：开启样本拼接，默认值，可以不配置该参数。
+    - `false`：关闭样本拼接。
+
+- **`cutoff_len`**
+  - 描述：训练序列的最大长度。
+  - 配置位置：
+    - 纯 FSDP2 后端：对应 `xx_config.yaml` 中的 `cutoff_len`。
+    - 含 Megatron 后端：对应 `finetune_xx.sh` 中的 `SEQ_LEN`。
 
 ## 注意事项
 
-1.packing开启（默认）的场景下，需要保证`max_samples`个短文本拼接成长序列的总长度不小于cutoff_len，否则会报错
-
-- **`cutoff_len`**
-  - 纯fsdp2后端：对应xx_config.yaml中的`cutoff_len`
-  - 含megatron后端：对应finetune_xx.sh中的`SEQ_LEN`
+packing 开启（默认）的场景下，数据预处理会在每个批次内拼接文本，并按 `cutoff_len` 切分为定长序列。需要保证每个预处理批次中有效文本的 token 总数不小于 `cutoff_len`，否则该批次无法生成训练样本。可通过增大 `preprocessing_batch_size`、增加样本长度或减小 `cutoff_len` 解决。
