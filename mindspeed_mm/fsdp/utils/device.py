@@ -13,9 +13,15 @@ IS_NPU_AVAILABLE = False
 try:
     import torch_npu
 
-    IS_NPU_AVAILABLE = True
+    # torch_npu imports fine even with no visible device (e.g. CPU-only UT
+    # runs), so additionally require an actually usable NPU device: downstream
+    # checks rely on this to safely call torch.npu.* APIs.
+    IS_NPU_AVAILABLE = hasattr(torch, 'npu') and torch.npu.is_available()
 except Exception as e:
     IS_NPU_AVAILABLE = False
+
+# True when at least one accelerator device (CUDA or NPU) is actually usable.
+IS_DEVICE_AVAILABLE = IS_CUDA_AVAILABLE or IS_NPU_AVAILABLE
 
 if IS_NPU_AVAILABLE:
     torch.npu.config.allow_internal_format = False
