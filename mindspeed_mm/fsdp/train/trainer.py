@@ -46,6 +46,7 @@ from mindspeed_mm.fsdp.utils.lora_weight_manager import LoraWeightManager
 from mindspeed_mm.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.checkpoint.hf_utils import looks_like_hf_weight_dir
 from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
+from mindspeed_mm.fsdp.utils.dtype import get_dtype
 
 
 logger = logging.getLogger(__name__)
@@ -329,6 +330,18 @@ class Trainer:
             trainable_params=trainable_params,
             total_params=total_params,
         )
+
+        # Store the frozen base weights in param_dtype (e.g. bf16) to halve the
+        # memory of the base model. The LoRA adapters keep their fp32 native
+        # master weights and are wrapped in their own bf16 FSDP groups (see
+        # fully_shard_lora_modules), so the whole forward/backward pass runs in
+        # bf16 while the fp32 master weights of the trainable adapters are
+        # preserved for the optimizer.
+        base_dtype = get_dtype(self.args.parallel.fsdp_plan.param_dtype) if self.args.parallel.fsdp_plan.param_dtype else None
+        if base_dtype is not None:
+            for name, param in model.named_parameters():
+                if "lora" not in name:
+                    param.data = param.data.to(dtype=base_dtype)
 
         print_rank(logger.info, "LoRA fine-tuning enabled successfully")
 

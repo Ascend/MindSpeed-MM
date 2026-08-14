@@ -99,7 +99,18 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
         cpu_offload = CPUOffloadPolicy(pin_memory=True)
     config = {'mesh': fsdp_mesh, 'ignored_params': ignored_params, "reshard_after_forward": fsdp_plan.reshard_after_forward, "offload_policy": cpu_offload}
     config["mp_policy"] = get_mixprecision_policy(fsdp_plan)
-    # Apply FSDP to specific child modules first
+
+    # Apply FSDP to lora models first is config.lora.enable is True
+    if getattr(getattr(training_config, 'lora', None), 'enable', False):
+        for name, module in model.named_modules():
+            if ('lora_A' in name or 'lora_B' in name) and isinstance(module, torch.nn.ModuleDict):
+                for submodule in module.values():
+                    hook_module = find_hook_module(submodule, hook_modules)
+                    if hook_module is None:
+                        fully_shard(submodule, **config)
+                    else:
+                        fully_shard(submodule, hook_module=hook_module, **config)
+    # Apply FSDP to specific child modules before to the entire model
     for module in fsdp_modules:
         hook_module = find_hook_module(module, hook_modules)
         if hook_module is None:
