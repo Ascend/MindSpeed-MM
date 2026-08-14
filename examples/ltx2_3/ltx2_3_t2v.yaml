@@ -1,0 +1,106 @@
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - transformer.patchify_proj
+      - transformer.transformer_blocks.{*}
+      - transformer.proj_out
+    param_dtype: bf16
+    reduce_dtype: fp32
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+
+data:
+  dataset_param:
+    dataset_type: ltx2_3_precomputed
+    preprocess_parameters: {}
+    ltx2_3_dataset_custom:
+      with_audio: false
+      first_frame_conditioning_p: 0.0
+      timestep_sampling_mode: shifted_logit_normal
+      timestep_sampling_params: {}
+    basic_parameters:
+      dataset_dir: /path/to/your/.precomputed
+      dataset: ltx2_3_precomputed
+      max_samples: null
+  dataloader_param:
+    pin_memory: false
+    shuffle: true
+    seed: 42
+    enable_preload: true
+    num_workers: 8
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    collate_param:
+      model_name: ltx2_3
+      ignore_pad_token_for_loss: false
+
+model:
+  model_id: ltx2_3
+  model_name_or_path: /path/to/LTX-2.3
+  checkpoint_path: &LTX2_3_CHECKPOINT /path/to/LTX-2.3/ltx-2.3-22b-dev.safetensors
+  load_embeddings_processor: true
+
+features:
+  loss_cfg:
+    loss_type: raw
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - transformer.transformer_blocks.{*}
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1.0e-6
+  lr_decay_style: constant
+  lr_min: 1.0e-6
+  weight_decay: 0.01
+  train_iters: 1500
+  clip_grad: 1.0
+  init_model_with_meta_device: true
+  optimizer: adamw
+  adam_fused: true
+  load: /path/to/LTX-2.3/ltx-2.3-22b-dev.safetensors
+  load_format: hf
+  load_rank0_and_broadcast: false
+  no_load_optim: true
+  no_load_rng: true
+  save: ""
+  save_interval: 1000
+  log_interval: 1
+  use_deter_comp: false
+  plugin:
+    - mindspeed_mm/fsdp/models/ltx2_3/ltx2_3_fsdp2
+    - mindspeed_mm/fsdp/data/datasets/ltx2_3
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+    enable: false
+    start_step: 1
+    end_step: 2
+    save_path: ./memory_snapshot
+    dump_ranks: [0]
+    stacks: all
+    max_entries: null
+    mem_info: false

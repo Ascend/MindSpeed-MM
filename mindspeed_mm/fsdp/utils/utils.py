@@ -152,6 +152,8 @@ def move_to_device(batch: Dict[str, Any], float_dtype: str = None, non_blocking=
             new_batch[k] = [t.to(device=device,
                             dtype=float_dtype if torch.is_floating_point(t) else None, non_blocking=non_blocking)
                         for t in v]
+        elif isinstance(v, dict):
+            new_batch[k] = move_to_device(v, float_dtype=float_dtype, non_blocking=non_blocking)
         elif isinstance(v, (bool, int, float, str)) or v is None:
             new_batch[k] = v
     return new_batch

@@ -23,7 +23,6 @@ from mindspeed_mm.fsdp.models.ltx2_3.ltx2_3_fsdp2.modified import (
 )
 from ltx_core.loader.single_gpu_model_builder import SingleGPUModelBuilder
 from ltx_core.loader.helpers import read_model_config
-from ltx_core.loader.module_ops import ModuleOps
 from ltx_core.loader.sft_loader import SafetensorsModelStateDictLoader
 from ltx_core.model.transformer.model import LTXModel
 from ltx_core.model.transformer.model_configurator import (
@@ -140,32 +139,7 @@ class LTX23ForTraining(torch.nn.Module, BaseModel):
     @classmethod
     def _build_transformer_from_config(cls, model_args: ModelArguments) -> LTXModel:
         transformer_cfg = cls._normalized_transformer_config(model_args)
-        transformer = LTXModelConfigurator.from_config({"transformer": transformer_cfg})
-        return cls._limit_transformer_layers(transformer, model_args)
-
-    @staticmethod
-    def _limit_transformer_layers(
-        transformer: LTXModel,
-        model_args: ModelArguments,
-    ) -> LTXModel:
-        num_layers = getattr(model_args, "transformer_num_layers", None)
-        if num_layers is None:
-            return transformer
-        if isinstance(num_layers, bool) or not isinstance(num_layers, int) or num_layers < 1:
-            raise ValueError(
-                f"`transformer_num_layers` must be a positive integer, got {num_layers!r}."
-            )
-
-        total_layers = len(transformer.transformer_blocks)
-        if num_layers > total_layers:
-            raise ValueError(
-                f"transformer_num_layers={num_layers} exceeds checkpoint model depth "
-                f"({total_layers})."
-            )
-        transformer.transformer_blocks = torch.nn.ModuleList(
-            list(transformer.transformer_blocks[:num_layers])
-        )
-        return transformer
+        return LTXModelConfigurator.from_config({"transformer": transformer_cfg})
 
     @classmethod
     def _from_config(cls, config: ModelArguments) -> "LTX23ForTraining":
@@ -185,16 +159,6 @@ class LTX23ForTraining(torch.nn.Module, BaseModel):
             model_class_configurator=LTXModelConfigurator,
             model_sd_ops=LTXV_MODEL_COMFY_RENAMING_MAP,
         )
-        if getattr(config, "transformer_num_layers", None) is not None:
-            builder = builder.with_module_ops(
-                (
-                    ModuleOps(
-                        name="limit_transformer_layers",
-                        matcher=lambda model: hasattr(model, "transformer_blocks"),
-                        mutator=lambda model: cls._limit_transformer_layers(model, config),
-                    ),
-                )
-            )
         transformer = builder.build(device=torch.device("cpu"), dtype=torch.float32)
 
         embeddings_processor = cls._build_embeddings_processor(config, ckpt_path)

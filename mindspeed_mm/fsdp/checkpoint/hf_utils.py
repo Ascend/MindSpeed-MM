@@ -51,7 +51,11 @@ def locate_hf_weight_files(weights_path: str) -> List[HFWeightFileStream]:
     Supports both standard HF layouts:
       - single ``model.safetensors``
       - sharded ``model-*-of-*.safetensors`` described by ``model.safetensors.index.json``
+      - direct path to a .safetensors file
     """
+    if os.path.isfile(weights_path) and weights_path.endswith(".safetensors"):
+        return [HFWeightFileStream(weights_path)]
+
     single = os.path.join(weights_path, SAFE_WEIGHTS_NAME)
     if os.path.isfile(single):
         return [HFWeightFileStream(single)]
