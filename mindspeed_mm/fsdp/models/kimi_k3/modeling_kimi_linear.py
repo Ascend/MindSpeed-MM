@@ -23,9 +23,10 @@
 # limitations under the License.
 import math
 from collections.abc import Callable
-from typing import Any
+from typing import Any, List, Optional, Union
 
 import torch
+import torch.distributed as dist
 import torch.nn.functional as F
 import transformers
 from einops import rearrange
@@ -53,6 +54,12 @@ except ImportError:
         return func
 
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+    all_to_all,
+    split_forward_gather_backward_with_cp,
+)
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 
 if IS_NPU_AVAILABLE:
     import torch_npu
@@ -70,6 +77,35 @@ if version.parse(transformers.__version__) < version.parse("4.56.0"):
     raise RuntimeError("Please upgrade transformers to >= 4.56.0")
 
 logger = logging.get_logger(__name__)
+
+_TOTAL_SEQ_LEN = None
+_VISUAL_SEQ_LEN = None
+_VISUAL_PER_SEQ_LEN = None
+
+
+def set_seq_len(seq_type: str = None, seq_len: Optional[Union[int, List[int]]] = None) -> None:
+    if seq_type == "total":
+        global _TOTAL_SEQ_LEN
+        _TOTAL_SEQ_LEN = seq_len
+    elif seq_type == "visual":
+        global _VISUAL_SEQ_LEN
+        _VISUAL_SEQ_LEN = seq_len
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        _VISUAL_PER_SEQ_LEN = seq_len
+    else:
+        raise ValueError(f"Invalid sequence type: '{seq_type}'. Expected 'total', 'visual' or 'per_visual'.")
+
+
+def get_seq_len(seq_type: str = None) -> int:
+    if seq_type == "total":
+        return _TOTAL_SEQ_LEN
+    elif seq_type == "visual":
+        return _VISUAL_SEQ_LEN
+    elif seq_type == "per_visual":
+        return _VISUAL_PER_SEQ_LEN
+    else:
+        raise ValueError(f"Invalid sequence type: '{seq_type}'. Expected 'total', 'visual' or 'per_visual'.")
 
 
 class KimiK_3_MoeRMSNormGated(nn.Module):
@@ -510,6 +546,17 @@ class KimiMLAAttention(nn.Module):
             value_states = F.pad(
                 value_states, [0, self.q_head_dim - self.v_head_dim])
 
+        # Modification start, Context Parallel
+        # Pass total_seq_len so the patched flash attention performs the Ulysses
+        # all-to-all (scatter heads, gather sequence) internally. The value pad
+        # above happens before that all-to-all, same as the non-CP path.
+        total_seq_len = get_seq_len("total")
+        ps = get_parallel_state() if dist.is_initialized() else None
+        if ps is not None and ps.get_ulysses_group_size() > self.num_key_value_heads:
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
+        # Modification end, Context Parallel
+
         attention_interface: Callable = eager_attention_forward
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
@@ -523,6 +570,7 @@ class KimiMLAAttention(nn.Module):
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
             skip_flash_attn_recompute=getattr(self.config, "skip_flash_attn_recompute", False),
+            total_seq_len=total_seq_len,
             **kwargs,
         )
 
@@ -565,20 +613,27 @@ class KimiDeltaAttention(nn.Module):
             self.hidden_size, projection_k_size, bias=False)
         self.v_proj = nn.Linear(self.hidden_size, projection_size, bias=False)
 
+        self.causal_conv1d_implementation = getattr(config, "causal_conv1d_implementation", "triton")
         self.q_conv1d = ShortConvolution(
             hidden_size=projection_k_size,
             kernel_size=self.conv_size,
             activation='silu',
+            implementation=self.causal_conv1d_implementation,
+            head_num=self.num_k_heads,
         )
         self.k_conv1d = ShortConvolution(
             hidden_size=projection_k_size,
             kernel_size=self.conv_size,
             activation='silu',
+            implementation=self.causal_conv1d_implementation,
+            head_num=self.num_k_heads,
         )
         self.v_conv1d = ShortConvolution(
             hidden_size=projection_size,
             kernel_size=self.conv_size,
             activation='silu',
+            implementation=self.causal_conv1d_implementation,
+            head_num=self.num_heads,
         )
 
         self.A_log = torch.nn.Parameter(torch.log(torch.empty(
@@ -604,6 +659,19 @@ class KimiDeltaAttention(nn.Module):
             self.head_dim, eps=config.rms_norm_eps, activation='sigmoid')
         self.o_proj = nn.Linear(projection_size, self.hidden_size, bias=False)
 
+    @staticmethod
+    def _get_local_conv1d_weight(weight: torch.Tensor, ulysses_rank: int, local_dim: int) -> torch.Tensor:
+        # Modification: shard depthwise conv1d weights to match head-sharded channels
+        # under Ulysses SP. Each ShortConvolution here is per-projection (q/k/v), so a
+        # single contiguous channel slice is enough.
+        if weight.shape[0] < (ulysses_rank + 1) * local_dim:
+            raise ValueError(
+                f"conv1d weight dim ({weight.shape[0]}) is smaller than the requested "
+                f"local slice end ({(ulysses_rank + 1) * local_dim})"
+            )
+        offset = ulysses_rank * local_dim
+        return weight[offset: offset + local_dim]
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -626,12 +694,25 @@ class KimiDeltaAttention(nn.Module):
         if self.training:
             assert mode == 'chunk', "Only chunk mode is supported in training."
 
+        # Modification start: Ulysses context parallel (LASP) for linear attention.
+        ps = get_parallel_state() if dist.is_initialized() else None
+        is_ulysses_enabled = ps is not None and ps.is_ulysses_enable()
+        # Modification end
+
         cu_seqlens = kwargs.get('cu_seqlens')
         indices = None
         if attention_mask is not None:
-            indices, cu_seqlens, _ = get_unpad_data(attention_mask[:, -q_len:])
-            hidden_states = index_first_axis(
-                rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+            if is_ulysses_enabled:
+                # Under Ulysses SP the sequence is sharded across CP ranks while the
+                # mask spans the full sequence. Compute the unpad indices/cu_seqlens
+                # from the full mask here, but defer the unpadding until after the
+                # all-to-all has gathered the full sequence, so both match the
+                # non-CP semantics exactly.
+                indices, cu_seqlens, _ = get_unpad_data(attention_mask)
+            else:
+                indices, cu_seqlens, _ = get_unpad_data(attention_mask[:, -q_len:])
+                hidden_states = index_first_axis(
+                    rearrange(hidden_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
 
         conv_state_q, conv_state_k, conv_state_v = None, None, None
         recurrent_state = None
@@ -641,34 +722,107 @@ class KimiDeltaAttention(nn.Module):
                     self.layer_idx]
             recurrent_state = cache_params.recurrent_states[self.layer_idx]
 
+        # Modification start: Ulysses context parallel (LASP) for linear attention.
+        # The all-to-all after the projections gathers the full sequence and scatters
+        # heads, so the causal convolutions and the chunk kernel run on the full
+        # sequence with local heads only.
+        if is_ulysses_enabled:
+            ulysses_group = ps.get_ulysses_group()
+            ulysses_size = ps.get_ulysses_group_size()
+            ulysses_rank = ps.get_ulysses_rank()
+            if self.num_heads % ulysses_size != 0:
+                raise ValueError(
+                    f"SP size ({ulysses_size}) must divide num_heads ({self.num_heads}) "
+                    "for KimiDeltaAttention LASP"
+                )
+            local_num_heads = self.num_heads // ulysses_size
+            local_key_dim = self.head_k_dim * local_num_heads
+            local_value_dim = self.head_dim * local_num_heads
+            total_seq_len = get_seq_len("total")
+            q_conv_kwargs = {
+                "weight": self._get_local_conv1d_weight(self.q_conv1d.weight, ulysses_rank, local_key_dim)}
+            k_conv_kwargs = {
+                "weight": self._get_local_conv1d_weight(self.k_conv1d.weight, ulysses_rank, local_key_dim)}
+            v_conv_kwargs = {
+                "weight": self._get_local_conv1d_weight(self.v_conv1d.weight, ulysses_rank, local_value_dim)}
+        else:
+            # Keep the default module weights (also keeps the non-NPU fla
+            # ShortConvolution path, which has no `weight` kwarg, intact).
+            q_conv_kwargs, k_conv_kwargs, v_conv_kwargs = {}, {}, {}
+        # Modification end
+
         q_proj_states = self.q_proj(hidden_states)
         k_proj_states = self.k_proj(hidden_states)
         v_proj_states = self.v_proj(hidden_states)
+        # Modification start: LASP all-to-all (scatter heads, gather sequence).
+        if is_ulysses_enabled:
+            q_proj_states = all_to_all(
+                q_proj_states, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            k_proj_states = all_to_all(
+                k_proj_states, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            v_proj_states = all_to_all(
+                v_proj_states, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            if indices is not None:
+                # Unpad the gathered full sequences (deferred from the entry, see
+                # the note above); matches the non-CP unpad semantics exactly.
+                q_proj_states = index_first_axis(
+                    rearrange(q_proj_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+                k_proj_states = index_first_axis(
+                    rearrange(k_proj_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+                v_proj_states = index_first_axis(
+                    rearrange(v_proj_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+        # Modification end
         q, conv_state_q = self.q_conv1d(
             x=q_proj_states,
             cache=conv_state_q,
             output_final_state=use_cache,
             cu_seqlens=cu_seqlens,
+            **q_conv_kwargs,
         )
         k, conv_state_k = self.k_conv1d(
             x=k_proj_states,
             cache=conv_state_k,
             output_final_state=use_cache,
             cu_seqlens=cu_seqlens,
+            **k_conv_kwargs,
         )
         v, conv_state_v = self.v_conv1d(
             x=v_proj_states,
             cache=conv_state_v,
             output_final_state=use_cache,
             cu_seqlens=cu_seqlens,
+            **v_conv_kwargs,
         )
         g = self.f_b_proj(self.f_a_proj(hidden_states))
+        beta = self.b_proj(hidden_states)
+        # Modification start: LASP all-to-all for the decay gate and beta.
+        if is_ulysses_enabled:
+            g = all_to_all(g, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            beta = all_to_all(beta, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            if indices is not None:
+                g = index_first_axis(
+                    rearrange(g, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+                beta = index_first_axis(
+                    rearrange(beta, "b s ... -> (b s) ..."), indices).unsqueeze(0)
+        # Modification end
         g = rearrange(g, '... (h d) -> ... h d', d=self.head_dim)
-        beta = self.b_proj(hidden_states).float()
+        beta = beta.float()
 
         q, k = map(lambda x: rearrange(
             x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
         v = rearrange(v, '... (h d) -> ... h d', d=self.head_dim)
+
+        # Modification start: slice per-head decay params to the local V-heads under LASP.
+        if is_ulysses_enabled:
+            v_head_offset = ulysses_rank * local_num_heads
+            v_head_slice = slice(v_head_offset, v_head_offset + local_num_heads)
+            A_log = self.A_log[v_head_slice]
+            dt_bias_offset = ulysses_rank * local_value_dim
+            dt_bias = self.dt_bias[dt_bias_offset: dt_bias_offset + local_value_dim]
+        else:
+            A_log = self.A_log
+            dt_bias = self.dt_bias
+        # Modification end
 
         if mode == 'chunk':
             kda_implementation = getattr(self.config, "kda_implementation", "fused")
@@ -684,8 +838,8 @@ class KimiDeltaAttention(nn.Module):
                     v=v,
                     g=g,
                     beta=beta,
-                    A_log=self.A_log,
-                    dt_bias=self.dt_bias,
+                    A_log=A_log,
+                    dt_bias=dt_bias,
                     initial_state=recurrent_state,
                     output_final_state=True,
                     use_qk_l2norm_in_kernel=True,
@@ -706,8 +860,8 @@ class KimiDeltaAttention(nn.Module):
                     v=v,
                     g=g,
                     beta=beta,
-                    A_log=self.A_log,
-                    dt_bias=self.dt_bias,
+                    A_log=A_log,
+                    dt_bias=dt_bias,
                     initial_state=recurrent_state,
                     output_final_state=True,
                     use_qk_l2norm_in_kernel=True,
@@ -733,6 +887,17 @@ class KimiDeltaAttention(nn.Module):
             cache_params.conv_states[self.layer_idx] = (
                 conv_state_q, conv_state_k, conv_state_v)
 
+        # Modification start: LASP all-to-all back (scatter sequence, gather heads),
+        # so the gated norm and o_proj run on the sequence-sharded layout again.
+        if is_ulysses_enabled:
+            if indices is not None:
+                # Restore the padded full-sequence layout before scattering the
+                # sequence back, so pad positions are zero exactly as in the
+                # non-CP path.
+                o = pad_input(o.squeeze(0), indices, batch_size, total_seq_len)
+            o = all_to_all(o, ulysses_group, scatter_dim=1, gather_dim=2)
+        # Modification end
+
         if self.use_full_rank_gate:
             g = self.g_proj(hidden_states)
         else:
@@ -742,7 +907,7 @@ class KimiDeltaAttention(nn.Module):
 
         o = rearrange(o, 'b t h d -> b t (h d)')
         o = self.o_proj(o)
-        if attention_mask is not None:
+        if attention_mask is not None and not is_ulysses_enabled:
             o = pad_input(o.squeeze(0), indices, batch_size, q_len)
 
         return o
@@ -1265,6 +1430,18 @@ class KimiLinearModel(KimiPreTrainedModel):
         )
         linear_attn_mask = self._update_linear_attn_mask(
             attention_mask, cache_position)
+
+        # Modification start: Ulysses context parallel patch.
+        # cu_seqlen params must be generated from the full-sequence position_ids
+        # before the sequence is split across CP ranks.
+        total_seq_len = inputs_embeds.shape[1]
+        set_seq_len("total", total_seq_len)
+        ps = get_parallel_state() if dist.is_initialized() else None
+        if ps is not None and ps.is_ulysses_enable():
+            kwargs.update(generate_ulysses_cu_seqlen_params(position_ids))
+            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=1)
+            inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
+        # Modification end
 
         hidden_states = inputs_embeds
         if past_key_values is not None:

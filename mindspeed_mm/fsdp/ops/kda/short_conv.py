@@ -28,9 +28,13 @@ class ShortConvolution(nn.Conv1d):
         kernel_size (int): Size of the convolution kernel
         bias (bool, optional): Whether to include learnable bias. Defaults to False.
         activation (Optional[str], optional): Activation function ('silu' or 'swish'). Defaults to 'silu'.
-        backend (Optional[str], optional): Backend implementation ('triton' or 'cuda'). Defaults to 'triton'.
+        backend (Optional[str], optional): Backend implementation ('triton' or 'cuda') for the decode `step` path. Defaults to 'triton'.
         device (Optional[torch.device], optional): Device to place the layer on. Defaults to None.
         dtype (Optional[torch.dtype], optional): Data type for layer parameters. Defaults to None.
+        implementation (str, optional): Implementation of the non-decode forward path,
+            'triton' (default) or 'ascendc' (AscendC fused op from fla_npu, NPU only).
+        head_num (Optional[int], optional): Number of attention heads packed into the channel dim,
+            required by the AscendC causal_conv1d op. Defaults to None (treated as 1).
         **kwargs: Additional keyword arguments (deprecated 'use_fast_conv1d' supported for compatibility)
 
     Attributes:
@@ -53,6 +57,8 @@ class ShortConvolution(nn.Conv1d):
         backend: str | None = 'triton',
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
+        implementation: str = 'triton',
+        head_num: int | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -67,6 +73,15 @@ class ShortConvolution(nn.Conv1d):
         )
 
         self.hidden_size = hidden_size
+        # Number of attention heads packed into the channel dim, required by the
+        # AscendC causal_conv1d op. Defaults to 1 (whole channel dim as one head).
+        self.head_num = head_num if head_num is not None else 1
+        if implementation not in ('triton', 'ascendc'):
+            raise ValueError(
+                f"Unsupported causal conv1d implementation: {implementation}. "
+                "Expected 'triton' or 'ascendc'."
+            )
+        self.implementation = implementation
         self.activation = None
 
         if activation is not None:
@@ -110,6 +125,7 @@ class ShortConvolution(nn.Conv1d):
         output_final_state: bool = False,
         cu_seqlens: torch.LongTensor | None = None,
         chunk_indices: torch.LongTensor | None = None,
+        weight: torch.Tensor | None = None,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         """
@@ -130,15 +146,13 @@ class ShortConvolution(nn.Conv1d):
                 Shape: [B+1]
             chunk_indices (Optional[torch.LongTensor]):
                 Chunk indices for variable-length sequences. Default: `None`.
+            weight (`Optional[torch.Tensor]`):
+                Optional weight override of shape `[D_local, 1, W]` (e.g. a head-sharded
+                slice under Ulysses context parallel). Default: `None` (use `self.weight`).
 
         Returns:
             Tensor of shape `[B, T, D]`.
         """
-        # Import here to avoid circular dependency
-        # from fla.modules.conv.causal_conv1d import causal_conv1d
-        from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
-
-
         B, T, *_ = x.shape
         N = B if cu_seqlens is None else len(cu_seqlens) - 1
         if mask is not None:
@@ -157,23 +171,44 @@ class ShortConvolution(nn.Conv1d):
             )
             return y, cache
 
-        # cuda backend do not support:
-        # 1. both `cu_seqlens` and `cache` being provided
-        # 2. both `cu_seqlens` and `output_final_state` being provided
-        # and other small issues
-        # to simplify the implementation, we just switch to triton backend
-        if self.backend == 'cuda' and cache is not None:
-            warnings.warn(
-                "The CUDA backend does not support both `cu_seqlens` and `cache` being provided, "
-                "or both `cu_seqlens` and `output_final_state` being provided. "
-                "Switching to the Triton backend instead. ",
-                stacklevel=2,
+        if weight is None:
+            weight = self.weight
+
+        if self.implementation == 'ascendc':
+            # Import here to avoid circular dependency and to keep torch_npu/fla_npu
+            # optional for the triton path.
+            from mindspeed_mm.fsdp.ops.gdn.causal_conv1d_ascendc import causal_conv1d_ascendc
+
+            # The AscendC op needs the number of heads packed in the channel dim.
+            # Derive it from the (possibly head-sharded, e.g. under Ulysses CP) weight
+            # so a weight override scales H proportionally.
+            channels_per_head = self.hidden_size // self.head_num
+            if weight.shape[0] % channels_per_head != 0:
+                raise ValueError(
+                    f"weight channels ({weight.shape[0]}) must be a multiple of "
+                    f"channels_per_head ({channels_per_head})"
+                )
+            H = weight.shape[0] // channels_per_head
+            y, final_state = causal_conv1d_ascendc(
+                x=x,
+                weight=rearrange(weight, "d 1 w -> d w"),  # AscendC op expects [D, W] weight
+                H=H,
+                bias=self.bias,
+                residual=residual,
+                initial_state=cache,
+                activation=self.activation,
+                cu_seqlens=cu_seqlens,
+                output_final_state=output_final_state,
             )
-            self.backend = 'triton'
+            # The AscendC op returns the head layout [B, H, T, d]; convert back to [B, T, D]
+            y = y.transpose(1, 2).reshape(B, T, -1)
+            return y, final_state
+
+        from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
 
         return causal_conv1d(
             x=x,
-            weight=rearrange(self.weight, "d 1 w -> w d"),  # NOTE： 修改了权重格式
+            weight=rearrange(weight, "d 1 w -> w d"),
             bias=self.bias,
             residual=residual,
             initial_state=cache,

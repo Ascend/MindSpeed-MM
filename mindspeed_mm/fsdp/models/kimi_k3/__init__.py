@@ -84,6 +84,16 @@ class KimiK3ForConditionalGeneration(WeightInitMixin, _KimiK3ForConditionalGener
             )
         transformer_config.text_config.kda_implementation = kda_implementation
 
+        # Causal conv1d kernel selection for KDA short convolutions: 'triton' (default)
+        # or 'ascendc' (AscendC fused op from fla_npu, same as qwen3_5, NPU only).
+        causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", "triton")
+        if causal_conv1d_implementation not in ("triton", "ascendc"):
+            raise ValueError(
+                f"Unsupported causal_conv1d_implementation: {causal_conv1d_implementation}. "
+                "Expected 'triton' or 'ascendc'."
+            )
+        transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
+
         return transformer_config
 
     def tie_weights(self, *args, **kwargs):

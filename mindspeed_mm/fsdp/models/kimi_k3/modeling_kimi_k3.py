@@ -26,6 +26,7 @@ from typing import Optional
 
 import numpy as np
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import activations
@@ -44,7 +45,7 @@ from transformers.models.llava.modeling_llava import \
 from transformers.utils import is_flash_attn_2_available
 
 from .configuration_kimi_k3 import KimiK3Config
-from .modeling_kimi_linear import KimiLinearForCausalLM
+from .modeling_kimi_linear import KimiLinearForCausalLM, set_seq_len, get_seq_len
 
 # Flash attention imports
 if is_flash_attn_2_available():
@@ -53,6 +54,13 @@ else:
     flash_attn_varlen_func = None
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+    all_to_all,
+    gather_forward_split_backward,
+    packed_data_split_forward_gather_backward_with_cp,
+)
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
 
 if IS_NPU_AVAILABLE:
     import torch_npu
@@ -106,6 +114,38 @@ def multihead_attention(
         output: shape (batch_size, seqlen, dim) or (tot_seqlens, dim) if packing,
             where dim = num_heads * head_dim
     """
+
+    # Modification start, ulysses cp
+    ps = get_parallel_state() if dist.is_initialized() else None
+    is_ulysses_enabled = ps is not None and ps.is_ulysses_enable()
+    total_seq_len = get_seq_len("visual")
+    head_num = q.shape[1]
+    kv_head_num = k.shape[1]
+
+    # ulysses validation
+    if is_ulysses_enabled:
+        ulysses_size = ps.get_ulysses_group_size()
+        if head_num % ulysses_size != 0:
+            raise ValueError(f"num_query_heads ({head_num}) must be divisible by ulysses_size ({ulysses_size})")
+        if ulysses_size > kv_head_num:
+            if ulysses_size % kv_head_num != 0:
+                raise ValueError(
+                    f"ulysses_size ({ulysses_size}) must be divisible by num_key_value_heads ({kv_head_num})"
+                )
+            n_repeat = ulysses_size // kv_head_num
+            # Shape before: (total_seq_len, kv_head_num, head_dim)
+            # This repeats the K/V heads (dim 1) to match the ulysses_size (SP world size)
+            # Shape after: (total_seq_len, kv_head_num * n_repeat, head_dim) where (kv_head_num * n_repeat) == ulysses_size
+            k = torch.repeat_interleave(k, dim=1, repeats=n_repeat)
+            v = torch.repeat_interleave(v, dim=1, repeats=n_repeat)
+
+    if is_ulysses_enabled:
+        q = all_to_all(q, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
+        k = all_to_all(k, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
+        v = all_to_all(v, ps.get_ulysses_group(), scatter_dim=1, gather_dim=0, gather_size=total_seq_len)
+
+    # Modification end, ulysses cp
+
     if IS_NPU_AVAILABLE:
         # Modification start
         if skip_recompute:
@@ -160,6 +200,9 @@ def multihead_attention(
         )
     if isinstance(attn_out, tuple):
         attn_out = attn_out[0]
+
+    if is_ulysses_enabled:
+        attn_out = all_to_all(attn_out, ps.get_ulysses_group(), scatter_dim=0, gather_dim=1)
 
     attn_out = attn_out.flatten(start_dim=-2)
 
@@ -692,6 +735,22 @@ class MoonViT3dEncoder(nn.Module):
         if IS_NPU_AVAILABLE:
             cu_seqlens = tuple(cu_seqlens[1:].cpu().numpy().tolist())
 
+        # Modification start: ulysses cp
+        seq_len, _ = hidden_states.size()
+        sequence_lengths = torch.repeat_interleave(grid_thws[:, 1] * grid_thws[:, 2], grid_thws[:, 0]).cpu()
+        set_seq_len("visual", seq_len)
+
+        ps = get_parallel_state() if dist.is_initialized() else None
+        # Split sequences across context parallel groups for distributed processing
+        if ps is not None and ps.is_ulysses_enable():
+            hidden_states = packed_data_split_forward_gather_backward_with_cp(
+                hidden_states, dim=0, seq_lens=sequence_lengths
+            )
+            rope_freqs_cis = packed_data_split_forward_gather_backward_with_cp(
+                rope_freqs_cis, dim=0, seq_lens=sequence_lengths
+            )
+        # Modification end: ulysses cp
+
         cos = rope_freqs_cis.unsqueeze(-2).real.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
         sin = rope_freqs_cis.unsqueeze(-2).imag.to(torch.float32).repeat_interleave(2, dim=-1).contiguous()
         set_global_param("cos", cos)
@@ -702,6 +761,19 @@ class MoonViT3dEncoder(nn.Module):
                                   cu_seqlens,
                                   max_seqlen,
                                   rope_freqs_cis=rope_freqs_cis)
+
+        # Modification start: ulysses cp
+        ps = get_parallel_state() if dist.is_initialized() else None
+        if ps is not None and ps.is_ulysses_enable():
+            gather_sizes = cal_split_sizes(get_seq_len("visual"), ps.get_ulysses_group_size())
+            hidden_states = gather_forward_split_backward(
+                hidden_states,
+                ps.get_ulysses_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes,
+            )
+        # Modification end: ulysses cp
 
         hidden_states = self.final_layernorm(hidden_states)
         return hidden_states
@@ -1267,6 +1339,13 @@ class KimiK3ForConditionalGeneration(KimiK3PreTrainedModel):
 
         # Chunk loss needs the full hidden-state sequence; force it on if enabled.
         enable_chunk_loss = getattr(self, "enable_chunk_loss", False)
+        # The plain CE loss path below shifts labels within the local sequence
+        # shard, which is incorrect under ulysses cp, so chunk loss is required.
+        ps = get_parallel_state() if dist.is_initialized() else None
+        if ps is not None and ps.is_ulysses_enable() and not enable_chunk_loss:
+            raise ValueError(
+                "ulysses cp requires chunk loss; enable chunk loss or set ulysses_parallel_size to 1."
+            )
         if enable_chunk_loss:
             output_hidden_states = True
 
@@ -1376,6 +1455,13 @@ class KimiK3ForConditionalGeneration(KimiK3PreTrainedModel):
                     shift_logits.view(-1, shift_logits.size(-1)),
                     shift_labels.view(-1).to(shift_logits.device),
                 )
+
+        # Modification start: ulysses cp, gather the loss computed on the
+        # sequence shards back across the CP group before reducing.
+        if ps is not None and ps.is_cp_enable():
+            loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0)
+            loss = loss.sum()
+        # Modification end: ulysses cp
 
         if not return_dict:
             output = (logits, ) + outputs[1:]

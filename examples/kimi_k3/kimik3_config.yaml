@@ -89,6 +89,8 @@ model:
   use_grouped_expert_matmul: true
   # KDA算子实现：fused（triton-ascend-kernels融合大算子）/ naive（仓内小算子）
   kda_implementation: fused
+  # KDA短卷积算子实现：triton / ascendc
+  causal_conv1d_implementation: triton
   # 选择性重计算：attention 相关融合算子（ViT/MLA 的 FA、KDA）不参与重算，
   skip_flash_attn_recompute: true
   skip_kda_recompute: true

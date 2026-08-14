@@ -14,6 +14,7 @@
     - [1. 环境准备](#1-环境准备)
     - [2. 环境搭建](#2-环境搭建)
     - [3. 安装配套版本的Triton-Ascend](#3-安装配套版本的triton-ascend)
+    - [4. 安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc)
   - [数据集准备及处理](#数据集准备及处理)
   - [训练](#训练)
     - [1. 准备工作](#1-准备工作)
@@ -99,6 +100,39 @@ cp -f ${MM_PATH}/mindspeed_mm/fsdp/ops/kda/triton_ascend/chunk.py \
 pip install -e .
 ```
 
+### 4. 安装fla-npu以适配AscendC
+
+Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。
+
+拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
+
+```bash
+git clone https://github.com/flashserve/flash-linear-attention-npu
+cd flash-linear-attention-npu
+git checkout c2e3d83f
+```
+
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
+
+推荐使用以下安装命令
+
+```shell
+# source 实际的cann路径
+source /usr/local/Ascend/cann/set_env.sh
+
+# 编译算子 run 包，--soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
+bash build.sh --soc=ascend910b --pkg --vendor_name=fla_npu
+bash build_out/fla-npu-*.run
+cd torch_custom/fla_npu/
+bash build.sh
+```
+
+检验fla_npu是否安装成功
+
+```bash
+pip list | grep fla_npu
+```
+
 ---
 
 <a id="jump2"></a>
@@ -162,7 +196,7 @@ NODE_RANK: 当前节点序号
 
 | 配置项 | 配置路径 | 参数说明 | 调整说明 |
 |--------|----------|----------|----------|
-| `ulysses_parallel_size` | `parallel` | ulysses-cp 并行度 | 暂不支持，开发中 |
+| `ulysses_parallel_size` | `parallel` | ulysses-cp 并行度 | 值为1时不开启，根据实际情况调整；|
 | `expert_parallel_size` | `parallel` | EP专家并行度 | 值为1时不开启，仅对MoE模型生效 |
 | `ep_plan` | `parallel` | EP调度策略配置 | 包含`dispatcher`、`use_npu_fused_ops`等子字段，`dispatcher`可选`alltoall` |
 | `num_to_forward_prefetch` | `parallel->fsdp_plan` | 前向计算时预取后续层参数 | 减少通信等待开销 |
@@ -170,6 +204,7 @@ NODE_RANK: 当前节点序号
 | `enable_preload` | `data->dataloader_param` | 数据预加载开关 | 开启后数据加载与计算重叠，减少训练等待时间 |
 | `use_grouped_expert_matmul` | `model` | MoE专家分组矩阵乘融合算子开关 | 开启后使用NPU融合算子加速MoE专家计算 |
 | `kda_implementation` | `model` | KDA算子实现选择 | `fused`: triton-ascend-kernels融合大算子（默认）<br>`naive`: 仓内小算子实现，可用于功能对齐验证 |
+| `causal_conv1d_implementation` | `model` | KDA短卷积算子实现选择 | `triton`: triton实现（默认）<br>`ascendc`: fla_npu AscendC融合算子（仅NPU），需安装fla-npu，参考[安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc) |
 | `skip_flash_attn_recompute` | `model` | 跳过full attention层flash attention重计算 | 选择性重计算，需同时使能重计算和`enable_activation_offload` |
 | `skip_kda_recompute` | `model` | 跳过linear attention层KDA重计算 | 选择性重计算，需同时使能重计算和`enable_activation_offload` |
 | `recompute` | `features` | 重计算开关 | 开启后可以节省显存占用 |
@@ -260,7 +295,7 @@ NNODES: 一共几个节点
   - 参考配置：当前 A3 单节点可配置 `num_hidden_layers=16`、`num_experts=32`；
 - **序列长度**：mbs=1时支持6k序列长度以下；
 - **权重加载**：当前采用随机初始化权重（加载预训练权重能力后续支持）；
-- **CP 长序列训练**：暂不支持，开发中。
+- **CP 长序列训练**：支持 ulysses-cp 长序列训练，配置 `kimik3_config.yaml` 中 `parallel->ulysses_parallel_size` 调整并行度（值为1时不开启）。
 
 <a id="jump3.4"></a>
 
