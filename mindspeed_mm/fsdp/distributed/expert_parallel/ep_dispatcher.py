@@ -9,7 +9,7 @@ from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
 from mindspeed_mm.fsdp.ops.moe_ops.gemm_mc2 import grouped_matmul_all2all, all2all_grouped_matmul
-from mindspeed_mm.fsdp.ops.swiglu import swiglu, clamp_swiglu
+from mindspeed_mm.fsdp.ops.swiglu import swiglu, clamp_swiglu, clipped_swiglu
 from mindspeed_mm.fsdp.distributed.expert_parallel.comm import (
     all_to_all,
     allgather_tokens_in_ep,
@@ -17,12 +17,34 @@ from mindspeed_mm.fsdp.distributed.expert_parallel.comm import (
 )
 from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
 
-
 # Enable forced expert balance for debugging purposes only.
 # Set environment variable export MM_FORCE_EP_BALANCE=1 to activate.
 # MUST BE DISABLED during formal training.
 FORCE_EP_BALANCE = envs.MM_FORCE_EP_BALANCE
 
+
+def apply_activation(
+    intermediate_hidden_states: torch.Tensor,
+    dim: int = -1,
+    fused: bool = True,
+    swiglu_limit: float = 0.0,
+    swiglu_alpha: Optional[float] = None,
+    activation: Optional[Callable] = None,
+) -> torch.Tensor:
+    """Apply the activation to the first grouped-matmul output.
+
+    When ``activation`` is provided it is called directly with the full
+    ``gate_up`` tensor and is expected to return the activated tensor
+    (e.g. Kimi's ``SituAndMul``). Otherwise the default SwiGLU logic is used.
+    """
+    if activation is not None:
+        return activation(intermediate_hidden_states)
+    if swiglu_alpha is not None:
+        limit = 7.0 if swiglu_limit is None else swiglu_limit
+        return clipped_swiglu(intermediate_hidden_states, dim=dim, fused=fused, swiglu_alpha=swiglu_alpha, swiglu_limit=limit)
+    if swiglu_limit is not None and swiglu_limit > 0:
+        return clamp_swiglu(intermediate_hidden_states, dim=dim, fused=fused, limit=swiglu_limit)
+    return swiglu(intermediate_hidden_states, dim=dim, fused=fused)
 
 def force_ep_balance(
     num_experts: int,
@@ -40,26 +62,6 @@ def force_ep_balance(
     return selected_experts
 
 
-def apply_activation(
-    intermediate_hidden_states: torch.Tensor,
-    dim: int = -1,
-    fused: bool = True,
-    swiglu_limit: float = 0.0,
-    activation: Optional[Callable] = None,
-) -> torch.Tensor:
-    """Apply the activation to the first grouped-matmul output.
-
-    When ``activation`` is provided it is called directly with the full
-    ``gate_up`` tensor and is expected to return the activated tensor
-    (e.g. Kimi's ``SituAndMul``). Otherwise the default SwiGLU logic is used.
-    """
-    if activation is not None:
-        return activation(intermediate_hidden_states)
-    if swiglu_limit > 0:
-        return clamp_swiglu(intermediate_hidden_states, dim=dim, fused=fused, limit=swiglu_limit)
-    return swiglu(intermediate_hidden_states, dim=dim, fused=fused)
-
-
 def ep_forward(
     num_experts: int,
     routing_weights: torch.Tensor,
@@ -69,7 +71,8 @@ def ep_forward(
     fc2_weight: torch.Tensor,
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
-    swiglu_limit: float = 0.0,
+    swiglu_limit: Optional[float] = None,
+    swiglu_alpha: Optional[float] = None,
     ep_balance_strategy = None,
     skip_moe_pad_tokens: bool = False,
     seq_mask: Optional[torch.Tensor] = None,
@@ -126,9 +129,19 @@ def ep_forward(
 
     # If no tokens are assigned to the expert in the current EP shard, no computation is performed
     if hidden_states.shape[0] > 0:
-        intermediate_hidden_states = grouped_matmul(hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert, fused=fused)
+        intermediate_hidden_states = grouped_matmul(
+            hidden_states,
+            fc1_weight,
+            num_global_sum_tokens_per_local_expert,
+            fused=fused,
+        )
         intermediate_activations = apply_activation(
-            intermediate_hidden_states, dim=-1, fused=fused, swiglu_limit=swiglu_limit, activation=activation
+            intermediate_hidden_states,
+            dim=-1,
+            fused=fused,
+            swiglu_limit=swiglu_limit,
+            swiglu_alpha=swiglu_alpha,
+            activation=activation,
         )
 
         if enable_ep_balance:
@@ -326,6 +339,7 @@ def ep_mc2_forward(
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
     swiglu_limit: float = 0.0,
+    swiglu_alpha: Optional[float] = None,
     ep_balance_strategy = None,
     skip_moe_pad_tokens: bool = False,
     seq_mask: Optional[torch.Tensor] = None,
@@ -375,7 +389,12 @@ def ep_mc2_forward(
         inputs=hidden_states, weights=fc1_weight, group=ep_group, send_counts=send_counts, recv_counts=recv_counts
     )
     intermediate_activations = apply_activation(
-        intermediate_hidden_states, dim=-1, fused=fused, swiglu_limit=swiglu_limit, activation=activation
+        intermediate_hidden_states,
+        dim=-1,
+        fused=fused,
+        swiglu_limit=swiglu_limit,
+        swiglu_alpha=swiglu_alpha,
+        activation=activation,
     )
 
     hidden_states = grouped_matmul_all2all(
@@ -403,7 +422,8 @@ def ep_allgather_forward(
     fc2_weight: torch.Tensor,
     ep_group: Optional[dist.ProcessGroup] = None,
     fused: bool = True,
-    swiglu_limit: float = 0.0,
+    swiglu_limit: Optional[float] = None,
+    swiglu_alpha: Optional[float] = None,
     ep_balance_strategy = None,
     skip_moe_pad_tokens: bool = False,
     seq_mask: Optional[torch.Tensor] = None,
@@ -518,9 +538,14 @@ def ep_allgather_forward(
     # First Linear Layer (fc1) with Grouped Matmul
     intermediate_hidden_states = grouped_matmul(permuted_local_hidden_states, fc1_weight, tokens_per_expert)
 
-    # Activation Function (SwiGLU by default, or the caller-provided activation)
+    # Activation Function (SwiGLU)
     intermediate_activations = apply_activation(
-        intermediate_hidden_states, dim=-1, fused=fused, swiglu_limit=swiglu_limit, activation=activation
+        intermediate_hidden_states,
+        dim=-1,
+        fused=fused,
+        swiglu_limit=swiglu_limit,
+        swiglu_alpha=swiglu_alpha,
+        activation=activation,
     )
 
     if enable_ep_balance:

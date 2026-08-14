@@ -545,6 +545,26 @@ _register_template(
 
 
 _register_template(
+    name="minimax_m3_vl",
+    params=RegisterParams(
+        format_prefix=EmptyFormatter(slots=["]~!b["]),
+        format_user=StringFormatter(slots=["]~b]user\n{{content}}[e~[\n]~b]ai\n"]),
+        format_assistant=StringFormatter(slots=["</mm:think>{{content}}[e~[\n"]),
+        format_system=StringFormatter(slots=["]~b]system\n{{content}}[e~[\n]~b]developer\nYou are a helpful assistant.[e~[\n"]),
+        stop_words=["[e~["],
+        replace_eos=True,
+        thought_words=("<mm:think>", "</mm:think>"),
+        enable_thinking=False,
+    ),
+    mm_plugin=get_mm_plugin(
+        name="minimax_m3_vl",
+        image_token="]<]image[>[",
+        video_token="]<]video[>[",
+    ),
+)
+
+
+_register_template(
     name="kimi_k3",
     params=RegisterParams(
         format_user=StringFormatter(

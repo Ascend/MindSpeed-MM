@@ -29,3 +29,22 @@ def clamp_swiglu(inputs, dim=-1, fused=True, limit=0.0):
         y1 = y1.clamp(min=None, max=limit)
         y2 = y2.clamp(min=-limit, max=limit)
     return swiglu(torch.cat([y1, y2], dim=-1), dim=dim, fused=fused)
+
+
+def eager_clipped_swiglu(inputs, dim=-1, swiglu_alpha=1.702, swiglu_limit=7.0):
+    """MiniMax clipped SwiGLU eager"""
+    if dim < 0:
+        dim = inputs.dim() + dim
+    if inputs.numel() == 0 or inputs.shape[dim] % 2 != 0:
+        raise ValueError("clipped_swiglu input dim must be even and non-empty")
+    if swiglu_limit < 0:
+        raise ValueError(f"swiglu_limit must be >= 0, got {swiglu_limit}")
+
+    gate, up = torch.chunk(inputs, 2, dim=dim)
+    gate = gate.clamp(max=swiglu_limit)
+    up = up.clamp(min=-swiglu_limit, max=swiglu_limit)
+    return (up + 1.0) * gate * torch.sigmoid(gate * swiglu_alpha)
+
+
+def clipped_swiglu(inputs, dim=-1, fused=True, swiglu_alpha=1.702, swiglu_limit=7.0):
+    return eager_clipped_swiglu(inputs, dim=dim, swiglu_alpha=swiglu_alpha, swiglu_limit=swiglu_limit)

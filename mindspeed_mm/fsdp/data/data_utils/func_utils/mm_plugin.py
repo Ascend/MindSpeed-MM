@@ -1519,6 +1519,92 @@ class Step3VLPlugin(BasePlugin):
         return mm_inputs
 
 
+@dataclass
+class MiniMaxM3VLPlugin(BasePlugin):
+    vision_bos_token: str = "]<]start of image[>["
+    vision_eos_token: str = "]<]end of image[>["
+
+    def _process_images(self, image_processor: Any, images: List["ImageInput"]) -> Dict[str, "torch.Tensor"]:
+        return image_processor(
+            images=images,
+            return_tensors="pt",
+            resample=getattr(image_processor, "resample", None),
+        )
+
+    @override
+    def _get_mm_inputs(
+        self,
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        processor: "MMProcessor",
+    ) -> Dict[str, "torch.Tensor"]:
+        image_processor: BaseImageProcessor = getattr(processor, "image_processor", None)
+        video_processor = get_video_processor(processor)
+        mm_inputs = {}
+        if len(images) != 0:
+            images = self._regularize_images(
+                images,
+                image_max_pixels=getattr(processor, "image_max_pixels", 768 * 768),
+                image_min_pixels=getattr(processor, "image_min_pixels", 32 * 32),
+                resample=False,
+            )["images"]
+            mm_inputs.update(self._process_images(image_processor, images))
+
+        if len(videos) != 0:
+            videos = self._regularize_videos(
+                videos,
+                image_max_pixels=getattr(processor, "video_max_pixels", 256 * 256),
+                image_min_pixels=getattr(processor, "video_min_pixels", 16 * 16),
+                video_fps=getattr(processor, "video_fps", 2.0),
+                video_maxlen=getattr(processor, "video_maxlen", 128),
+            )["videos"]
+            mm_inputs.update(video_processor(videos=videos, return_tensors="pt"))
+        return mm_inputs
+
+    @override
+    def process_messages(
+        self,
+        messages: List[Dict[str, str]],
+        images: List["ImageInput"],
+        videos: List["VideoInput"],
+        audios: List["AudioInput"],
+        processor: Optional["MMProcessor"],
+    ) -> List[Dict[str, str]]:
+        self._validate_input(processor, images, videos, audios)
+        self._validate_messages(messages, images, videos, audios)
+        messages = deepcopy(messages)
+        mm_inputs = self._get_mm_inputs(images, videos, audios, processor) if self.expand_mm_tokens else {}
+        image_grid_thw = mm_inputs.get("image_grid_thw", [None] * len(images))
+        video_grid_thw = mm_inputs.get("video_grid_thw", [None] * len(videos))
+        image_merge_length = getattr(processor.image_processor, "merge_size", 2) ** 2
+        video_processor = get_video_processor(processor)
+        video_merge_length = getattr(video_processor, "merge_size", 2) ** 2
+
+        image_idx, video_idx = 0, 0
+        for message in messages:
+            content = message["content"]
+            while IMAGE_PLACEHOLDER in content:
+                image_seqlen = int(image_grid_thw[image_idx].prod() // image_merge_length) if self.expand_mm_tokens else 1
+                content = content.replace(
+                    IMAGE_PLACEHOLDER,
+                    f"{self.vision_bos_token}{self.image_token * image_seqlen}{self.vision_eos_token}",
+                    1,
+                )
+                image_idx += 1
+
+            while VIDEO_PLACEHOLDER in content:
+                video_seqlen = int(video_grid_thw[video_idx].prod() // video_merge_length) if self.expand_mm_tokens else 1
+                content = content.replace(
+                    VIDEO_PLACEHOLDER,
+                    f"{self.vision_bos_token}{self.video_token * video_seqlen}{self.vision_eos_token}",
+                    1,
+                )
+                video_idx += 1
+            message["content"] = content
+        return messages
+
+
 PLUGINS = {
     "base": BasePlugin,
     "qwen2_vl": Qwen2VLPlugin,
@@ -1530,6 +1616,7 @@ PLUGINS = {
     "kimi_k25": KimiK25Plugin,
     "kimi_k3": KimiK3Plugin,
     "step3_vl": Step3VLPlugin,
+    "minimax_m3_vl": MiniMaxM3VLPlugin,
 }
 
 

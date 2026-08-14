@@ -20,11 +20,14 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import os
 from typing import Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributed.distributed_c10d import ProcessGroup
+from torch.distributed.tensor import DTensor
 
 from transformers import initialization as init
 from transformers.activations import ACT2FN
@@ -48,8 +51,18 @@ from transformers.utils.generic import can_return_tuple, maybe_autocast, merge_w
 from transformers.utils.import_utils import is_torchdynamo_compiling
 from transformers.utils.output_capturing import OutputRecorder, capture_outputs
 
+from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 from mindspeed_mm.fsdp.utils.register import model_register
-from .configuration_minimax_m3_vl import MiniMaxM3VLConfig, MiniMaxM3VLTextConfig, MiniMaxM3VLVisionConfig
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+from transformers import (
+    MiniMaxM3VLConfig,
+    MiniMaxM3VLTextConfig,
+    MiniMaxM3VLVisionConfig,
+)
+if IS_NPU_AVAILABLE:
+    import torch_npu
+
+_MINIMAX_M3_FLASH_ATTENTION = "flash_attention_2"
 
 
 def auto_docstring(*args, **kwargs):
@@ -158,6 +171,8 @@ class MiniMaxM3VLRMSNorm(nn.Module):
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
     def forward(self, x):
+        if IS_NPU_AVAILABLE:
+            return torch_npu.npu_rms_norm(x, 1.0 + self.weight, self.eps)[0]
         output = self._norm(x.float())
         # Llama does x.to(float16) * w whilst MiniMaxM3VL is (x * w).to(float16)
         # See https://github.com/huggingface/transformers/pull/29402
@@ -174,13 +189,12 @@ class MiniMaxM3VLDenseMLP(nn.Module):
         inter = intermediate_size if intermediate_size is not None else config.dense_intermediate_size
         self.swiglu_alpha = config.swiglu_alpha
         self.swiglu_limit = config.swiglu_limit
-        self.gate_proj = nn.Linear(config.hidden_size, inter, bias=False)
-        self.up_proj = nn.Linear(config.hidden_size, inter, bias=False)
+        self.gate_up_proj = nn.Linear(config.hidden_size, 2 * inter, bias=False)
         self.down_proj = nn.Linear(inter, config.hidden_size, bias=False)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        gate = self.gate_proj(hidden_states)
-        up = self.up_proj(hidden_states)
+        gate_up = self.gate_up_proj(hidden_states)
+        gate, up = gate_up.chunk(2, dim=-1)
         gate = gate.clamp(max=self.swiglu_limit)
         up = up.clamp(min=-self.swiglu_limit, max=self.swiglu_limit)
         glu = gate * torch.sigmoid(gate * self.swiglu_alpha)
@@ -201,10 +215,29 @@ class MiniMaxM3VLExperts(nn.Module):
         self.limit = config.swiglu_limit
         self.swiglu_alpha = config.swiglu_alpha
         self.swiglu_limit = config.swiglu_limit
+        # 缓存 NPU grouped-MoE 所需的转置权重，避免每次 forward 都做全量 transpose+contiguous。
+        # 仅当原始参数 _version 变化（优化器 step / FSDP unshard 等原地修改）时重建。
+        self._gate_up_proj_t: torch.Tensor | None = None
+        self._down_proj_t: torch.Tensor | None = None
+        self._gate_up_proj_version: int = -1
+        self._down_proj_version: int = -1
+
+    def _get_grouped_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
+        # Cache transposed moe tensor to adapt npu grouped-moe kernel.
+        if self._gate_up_proj_t is None or self._gate_up_proj_version != self.gate_up_proj._version:
+            self._gate_up_proj_t = self.gate_up_proj.transpose(1, 2).contiguous()
+            self._gate_up_proj_version = self.gate_up_proj._version
+        if self._down_proj_t is None or self._down_proj_version != self.down_proj._version:
+            self._down_proj_t = self.down_proj.transpose(1, 2).contiguous()
+            self._down_proj_version = self.down_proj._version
+        return self._gate_up_proj_t, self._down_proj_t
 
     def forward(
         self, hidden_states: torch.Tensor, top_k_index: torch.Tensor, top_k_weights: torch.Tensor
     ) -> torch.Tensor:
+        if IS_NPU_AVAILABLE:
+            return self._forward_npu_grouped_moe(hidden_states, top_k_index, top_k_weights)
+
         final = torch.zeros_like(hidden_states)
         with torch.no_grad():
             mask = F.one_hot(top_k_index, num_classes=self.num_experts).permute(2, 1, 0)
@@ -218,6 +251,67 @@ class MiniMaxM3VLExperts(nn.Module):
             current = F.linear(current, self.down_proj[expert_idx]) * top_k_weights[token_idx, top_k_pos, None]
             final.index_add_(0, token_idx, current.to(final.dtype))
         return final
+
+    def _forward_npu_grouped_moe(
+        self, hidden_states: torch.Tensor, top_k_index: torch.Tensor, top_k_weights: torch.Tensor
+    ) -> torch.Tensor:
+        from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
+        from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
+        from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
+
+        permuted_hidden_states, row_ids_map = permute(hidden_states, top_k_index.to(torch.int32), fused=True)
+        tokens_per_expert = torch.histc(top_k_index, bins=self.num_experts, min=0, max=self.num_experts)
+
+        gate_up_proj, down_proj = self._get_grouped_weights()
+
+        intermediate_hidden_states = grouped_matmul(
+            permuted_hidden_states, gate_up_proj, tokens_per_expert, fused=True
+        )
+        intermediate_activations = self._apply_gate(intermediate_hidden_states)
+        output = grouped_matmul(intermediate_activations, down_proj, tokens_per_expert, fused=True)
+        return unpermute(output, row_ids_map, probs=top_k_weights, fused=True)
+
+    def _get_ep_grouped_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
+        gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
+        down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
+        return gate_up_proj.transpose(1, 2).contiguous(), down_proj.transpose(1, 2).contiguous()
+
+    def ep_forward(
+        self,
+        hidden_states: torch.Tensor,
+        top_k_index: torch.Tensor,
+        top_k_weights: torch.Tensor,
+        ep_group: ProcessGroup,
+        ep_plan: EPPlanConfig,
+    ) -> torch.Tensor:
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import (
+            ep_allgather_forward,
+            ep_forward,
+            ep_mc2_forward,
+        )
+
+        input_dtype = hidden_states.dtype
+        gate_up_proj, down_proj = self._get_ep_grouped_weights()
+        ep_dispatcher_dict = {
+            "alltoall": ep_forward,
+            "mc2": ep_mc2_forward,
+            "allgather": ep_allgather_forward,
+        }
+        if ep_plan.dispatcher not in ep_dispatcher_dict:
+            raise NotImplementedError(f"EP dispatcher {ep_plan.dispatcher} is not implemented for MiniMax M3 VL MoE.")
+
+        hidden_states = ep_dispatcher_dict[ep_plan.dispatcher](
+            self.num_experts,
+            top_k_weights,
+            top_k_index,
+            hidden_states,
+            fc1_weight=gate_up_proj,
+            fc2_weight=down_proj,
+            ep_group=ep_group,
+            fused=ep_plan.use_npu_fused_ops,
+            activation_fn=self._apply_gate,
+        )
+        return hidden_states.to(input_dtype)
 
     def _apply_gate(self, gate_up: torch.Tensor) -> torch.Tensor:
         # same as GPT OSS, but the weights are not interleaved
@@ -376,6 +470,35 @@ def eager_attention_forward(
     return attn_output, attn_weights
 
 
+def full_attention_fa_forward(
+    module: nn.Module,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attention_mask: torch.Tensor | None,
+    scaling: float,
+    dropout: float = 0.0,
+    **kwargs: Unpack[TransformersKwargs],
+):
+    flash_attention = ALL_ATTENTION_FUNCTIONS.get_interface(_MINIMAX_M3_FLASH_ATTENTION, None)
+    if flash_attention is None:
+        raise RuntimeError("flash_attention_2 is not registered in ALL_ATTENTION_FUNCTIONS.")
+    if not IS_NPU_AVAILABLE or query.device.type != "npu":
+        raise RuntimeError(f"MiniMax M3 VL flash_attention_2 requires NPU tensors, got {query.device.type}.")
+
+    return flash_attention(
+        module,
+        query,
+        key,
+        value,
+        attention_mask,
+        dropout=dropout,
+        scaling=scaling,
+        input_layout="BNSD",
+        **kwargs,
+    )
+
+
 def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     """Applies Rotary Position Embedding to the query and key tensors.
 
@@ -402,9 +525,12 @@ def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     q_rot, q_pass = q[..., :rotary_dim], q[..., rotary_dim:]
     k_rot, k_pass = k[..., :rotary_dim], k[..., rotary_dim:]
 
-    # Apply rotary embeddings on the first half or full tensor
-    q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
-    k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
+    if IS_NPU_AVAILABLE:
+        q_embed = torch_npu.npu_rotary_mul(q_rot, cos, sin)
+        k_embed = torch_npu.npu_rotary_mul(k_rot, cos, sin)
+    else:
+        q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
+        k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
 
     # Concatenate back to full shape
     q_embed = torch.cat([q_embed, q_pass], dim=-1)
@@ -464,9 +590,13 @@ class MiniMaxM3VLAttention(nn.Module):
         if past_key_values is not None:
             key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx)
 
-        attention_interface: Callable = ALL_ATTENTION_FUNCTIONS.get_interface(
-            self.config._attn_implementation, eager_attention_forward
-        )
+        attn_implementation = getattr(self.config, "_attn_implementation", None)
+        if attn_implementation == _MINIMAX_M3_FLASH_ATTENTION:
+            attention_interface: Callable = full_attention_fa_forward
+        else:
+            attention_interface = ALL_ATTENTION_FUNCTIONS.get_interface(
+                attn_implementation, eager_attention_forward
+            )
         block_indices = None
         if self.indexer is not None:
             position_ids = kwargs.get("position_ids")
@@ -478,7 +608,7 @@ class MiniMaxM3VLAttention(nn.Module):
                 query_states.shape[0], -1
             )
             block_indices = self.indexer(hidden_states, position_embeddings, past_key_values, position_ids)
-            if self.config._attn_implementation in ("eager", "sdpa"):
+            if attn_implementation in ("eager", "sdpa", _MINIMAX_M3_FLASH_ATTENTION):
                 attention_mask = self.indexer.build_block_mask(
                     block_indices,
                     attention_mask,
@@ -496,7 +626,6 @@ class MiniMaxM3VLAttention(nn.Module):
             attention_mask,
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
-            block_indices=block_indices,
             **kwargs,
         )
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
@@ -691,7 +820,7 @@ class MiniMaxM3VLPreTrainedModel(PreTrainedModel):
     supports_gradient_checkpointing = True
     _no_split_modules = ["MiniMaxM3VLDecoderLayer", "MiniMaxM3VLVisionEncoderLayer"]
     _skip_keys_device_placement = ["past_key_values"]
-    _supports_flash_attn = False
+    _supports_flash_attn = True
     _supports_sdpa = True
     _supports_flex_attn = False
     _can_compile_fullgraph = True
@@ -703,7 +832,7 @@ class MiniMaxM3VLPreTrainedModel(PreTrainedModel):
     }
     input_modalities = ("image", "video", "text")
     _keys_to_ignore_on_load_unexpected = [r"(^|\.)mtp\..*"]
-    _compatible_flash_implementations = ["MiniMaxAI/msa"]
+    _compatible_flash_implementations = [_MINIMAX_M3_FLASH_ATTENTION]
 
     @torch.no_grad()
     def _init_weights(self, module):
@@ -1123,9 +1252,13 @@ class MiniMaxM3VLVisionAttention(nn.Module):
         queries, keys = apply_rotary_pos_emb_vision(queries, keys, cos, sin)
         queries, keys = queries.transpose(1, 2), keys.transpose(1, 2)
 
-        attention_interface: Callable = ALL_ATTENTION_FUNCTIONS.get_interface(
-            self.config._attn_implementation, eager_attention_forward
-        )
+        attn_implementation = getattr(self.config, "_attn_implementation", None)
+        if attn_implementation == _MINIMAX_M3_FLASH_ATTENTION:
+            attention_interface: Callable = full_attention_fa_forward
+        else:
+            attention_interface = ALL_ATTENTION_FUNCTIONS.get_interface(
+                attn_implementation, eager_attention_forward
+            )
         attn_output, attn_weights = attention_interface(
             self,
             queries,
@@ -1483,62 +1616,27 @@ class MiniMaxM3VLModel(MiniMaxM3VLPreTrainedModel):
         return vision_outputs
 
 
-@auto_docstring(custom_intro="MiniMax M3 VL full model with LM head (text + vision).")
-def _get_debug_int(model_args, name: str, default=None):
-    value = getattr(model_args, name, default)
-    return default if value is None else int(value)
-
-
-def _trim_config_sequence(config, name: str, length: int) -> None:
-    value = getattr(config, name, None)
-    if isinstance(value, list) and len(value) > length:
-        setattr(config, name, value[:length])
-
-
 def _fix_minimax_m3_vl_config(config: MiniMaxM3VLConfig, model_args=None, feature_args=None):
     text_config = config.text_config
     vision_config = config.vision_config
 
-    text_layers = _get_debug_int(model_args, "debug_text_layers", getattr(text_config, "num_hidden_layers", 60))
-    vision_layers = _get_debug_int(model_args, "debug_vision_layers", getattr(vision_config, "num_hidden_layers", 32))
-    text_config.num_hidden_layers = text_layers
-    vision_config.num_hidden_layers = vision_layers
+    attn_implementation = getattr(model_args, "attn_implementation", None) or getattr(
+        config, "_attn_implementation", None
+    )
+    if attn_implementation is not None:
+        if attn_implementation not in ("eager", "sdpa", _MINIMAX_M3_FLASH_ATTENTION):
+            raise ValueError(
+                f"MiniMax M3 VL only supports eager, sdpa, or {_MINIMAX_M3_FLASH_ATTENTION}; "
+                f"got {attn_implementation}."
+            )
+        config._attn_implementation = attn_implementation
+        text_config._attn_implementation = attn_implementation
+        vision_config._attn_implementation = attn_implementation
 
-    _trim_config_sequence(text_config, "layer_types", text_layers)
-    _trim_config_sequence(text_config, "mlp_layer_types", text_layers)
-
-    # Released checkpoint configs use legacy names. The local v5.12 config converts them when
-    # constructed, but keep this defensive for configs loaded through older dynamic code.
-    sparse_cfg = getattr(text_config, "sparse_attention_config", None) or {}
-    if not getattr(text_config, "layer_types", None):
-        sparse_freq = sparse_cfg.get("sparse_attention_freq")
-        if sparse_freq is not None:
-            text_config.layer_types = ["minimax_m3_sparse" if freq else "full_attention" for freq in sparse_freq]
-        else:
-            text_config.layer_types = ["full_attention"] * text_layers
-    if not getattr(text_config, "mlp_layer_types", None):
-        moe_freq = getattr(text_config, "moe_layer_freq", None)
-        if moe_freq is not None:
-            text_config.mlp_layer_types = ["sparse" if freq else "dense" for freq in moe_freq]
-        else:
-            text_config.mlp_layer_types = ["sparse"] * text_layers
-    _trim_config_sequence(text_config, "layer_types", text_layers)
-    _trim_config_sequence(text_config, "mlp_layer_types", text_layers)
-
-    text_config.hidden_act = "silu"
     text_config.use_cache = False
     config.use_cache = False
-    config.image_token_index = getattr(config, "image_token_index", 200025)
-    config.video_token_index = getattr(config, "video_token_index", 200026)
     config.image_token_id = config.image_token_index
     config.video_token_id = config.video_token_index
-
-    num_local_experts = _get_debug_int(model_args, "debug_num_local_experts", None)
-    if num_local_experts is not None:
-        text_config.num_local_experts = num_local_experts
-    num_experts_per_tok = _get_debug_int(model_args, "debug_num_experts_per_tok", None)
-    if num_experts_per_tok is not None:
-        text_config.num_experts_per_tok = num_experts_per_tok
 
     router_aux_loss_coef = 0.0
     if feature_args is not None and getattr(feature_args, "loss_cfg", None) is not None:
@@ -1548,34 +1646,33 @@ def _fix_minimax_m3_vl_config(config: MiniMaxM3VLConfig, model_args=None, featur
 
 
 @model_register.register("minimax_m3_vl")
-class MiniMaxM3SparseForConditionalGeneration(MiniMaxM3VLPreTrainedModel, GenerationMixin):
-    _tied_weights_keys = {"lm_head.weight": "model.language_model.embed_tokens.weight"}
-    _checkpoint_conversion_mapping = {
-        r"^language_model\.model\.(.*)\.self_attn\.index_q_proj\.": r"model.language_model.\1.self_attn.indexer.q_proj.",
-        r"^language_model\.model\.(.*)\.self_attn\.index_k_proj\.": r"model.language_model.\1.self_attn.indexer.k_proj.",
-        r"^language_model\.model\.(.*)\.self_attn\.index_q_norm\.": r"model.language_model.\1.self_attn.indexer.q_norm.",
-        r"^language_model\.model\.(.*)\.self_attn\.index_k_norm\.": r"model.language_model.\1.self_attn.indexer.k_norm.",
-        r"^language_model\.model\.(.*)\.block_sparse_moe\.gate\.": r"model.language_model.\1.mlp.gate.",
-        r"^language_model\.model\.(.*)\.block_sparse_moe\.e_score_correction_bias": r"model.language_model.\1.mlp.gate.e_score_correction_bias",
-        r"^language_model\.model\.(.*)\.block_sparse_moe\.shared_experts\.": r"model.language_model.\1.mlp.shared_experts.",
-        r"^language_model\.lm_head\.": "lm_head.",
-        r"^language_model\.model\.": "model.language_model.",
-        r"^vision_tower\.vision_model\.embeddings\.patch_embedding\.": "model.vision_tower.embeddings.proj.",
-        r"^vision_tower\.vision_model\.encoder\.layers\.": "model.vision_tower.layers.",
-        r"^vision_tower\.vision_model\.": "model.vision_tower.",
-        r"^multi_modal_projector\.": "model.multi_modal_projector.",
-        r"^patch_merge_mlp\.": "model.multi_modal_projector.merge_",
+class MiniMaxM3SparseForConditionalGeneration(
+    MiniMaxM3VLPreTrainedModel,
+    GenerationMixin,
+):
+    _tied_weights_keys = {
+        "lm_head.weight": "model.language_model.embed_tokens.weight"
     }
     config: MiniMaxM3VLConfig
 
     def __init__(self, config: MiniMaxM3VLConfig):
         super().__init__(config)
         self.model = MiniMaxM3VLModel(config)
-        self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(
+            config.text_config.hidden_size,
+            config.text_config.vocab_size,
+            bias=False,
+        )
         self.post_init()
 
-    @staticmethod
-    def overwrite_transformer_config(transformer_config, model_args, feature_args):
+
+    @classmethod
+    def overwrite_transformer_config(
+        cls,
+        transformer_config,
+        model_args,
+        feature_args,
+    ):
         config = MiniMaxM3VLConfig.from_pretrained(
             model_args.model_name_or_path,
             trust_remote_code=False,
@@ -1645,11 +1742,15 @@ class MiniMaxM3SparseForConditionalGeneration(MiniMaxM3VLPreTrainedModel, Genera
         )
         hidden_states = outputs.last_hidden_state
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        logits = self.lm_head(hidden_states[:, slice_indices, :])
+        if getattr(self, "enable_chunk_loss", False) or getattr(self, "enable_dynamic_chunk_loss", False):
+            logits = None
+            loss = self.lm_head(hidden_states[:, slice_indices, :], self.loss_function)
+        else:
+            logits = self.lm_head(hidden_states[:, slice_indices, :])
 
-        loss = None
-        if labels is not None:
-            loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
+            loss = None
+            if labels is not None:
+                loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
 
         return MiniMaxM3VLCausalLMOutputWithPast(
             loss=loss,
