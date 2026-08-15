@@ -41,6 +41,7 @@ class TrainEngine:
         save_checkpointer=None,
         lora_weight_manager=None,
         val_dataloader=None,
+        on_step_end=None,
         **kwargs,
     ):
         self.args = args
@@ -56,6 +57,9 @@ class TrainEngine:
         if self.load_checkpointer is None or self.save_checkpointer is None:
             raise ValueError("Both load_checkpointer and save_checkpointer must be provided.")
         self.lora_weight_manager = lora_weight_manager
+        # Optional per-step boundary hook registered by the feature layer
+        # (e.g. the swap cache iteration boundary); None when nothing registers.
+        self.on_step_end = on_step_end
 
         # Training state tracking
         self.iteration, self.consumed_train_samples = 0, 0
@@ -272,6 +276,10 @@ class TrainEngine:
             self.optimizer.step()
             self.lr_scheduler.step()
             self.optimizer.zero_grad()
+
+            # Per-step boundary hook: fired exactly once per training step
+            if self.on_step_end is not None:
+                self.on_step_end()
 
             # Update training state
             self.consumed_train_samples += args.training.global_batch_size

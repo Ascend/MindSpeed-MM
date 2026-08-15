@@ -1,4 +1,6 @@
 # pylint: skip-file
+import logging
+
 import torch
 from packaging import version
 import transformers
@@ -12,11 +14,30 @@ from ..features.memory.async_offload import async_offload_modules, get_offload_m
 from ..features.memory.chunkloss.chunkloss_lm_head import apply_chunkloss_module, get_chunkloss_module
 from ..features.communication.chunk_mbs import get_chunkmbs_modules, apply_chunkmbs_module
 from ..features.memory.recompute import recompute_modules
+from ..features.memory.swap_manager import SwapManager
+
+
+logger = logging.getLogger(__name__)
 
 
 class FeaturesApplier:
     def __init__(self, feature_config: FeatureArguments):
         self.config = feature_config
+        # Created lazily when the first swap tenant is wired; the trainer
+        # passes it to the TrainEngine for the per-step iteration boundary.
+        self.swap_manager = None
+
+    def _ensure_swap_manager(self) -> SwapManager:
+        if self.swap_manager is None:
+            self.swap_manager = SwapManager(getattr(self.config, "swap_plan", None))
+        return self.swap_manager
+
+    def on_step_end(self):
+        # Per-step boundary hook passed to the TrainEngine as a plain callable
+        # (fired exactly once per training step, after optimizer.zero_grad()).
+        # Features needing the same point compose here, not in the engine.
+        if self.swap_manager is not None:
+            self.swap_manager.step_end()
 
     def get_needed_modules(self, modules, plan):
         matched_submodules = []
@@ -31,7 +52,11 @@ class FeaturesApplier:
         if not getattr(self.config, "recompute", False) or not getattr(self.config, "recompute_plan", None):
             return
 
-        model = recompute_modules(model, self.config.recompute_plan)
+        op_replay_scopes = getattr(self.config.recompute_plan, "op_replay_scopes", None)
+        op_cache = None
+        if op_replay_scopes:
+            op_cache = self._ensure_swap_manager().get_cache("op_replay")
+        model = recompute_modules(model, self.config.recompute_plan, op_cache=op_cache)
 
     def apply_activation_offload_modules(self, model):
         if (
@@ -41,7 +66,8 @@ class FeaturesApplier:
         ):
             return
 
-        activation_offload_modules = get_offload_modules(model, getattr(self.config.activation_offload_plan, "apply_modules"))
+        plan = self.config.activation_offload_plan
+        activation_offload_modules = get_offload_modules(model, plan.apply_modules)
         async_offload_modules(activation_offload_modules)
 
     def apply_chunkloss(self, model):
@@ -90,8 +116,11 @@ class FeaturesApplier:
         hook_optimizer_step(model, optimizer)
 
     def pre_fully_shard_apply(self, model):
-        # The order of these three operations is critical and must not be changed.
-        # 1. Recompute: Wraps the forward pass to save memory by recomputing strategy.
+        # The order of these operations is critical and must not be changed.
+        # 1. Recompute: wraps forwards with checkpoint to save memory by recomputing.
+        #    Op replay (recompute_plan.op_replay_scopes) is a policy of the checkpoint
+        #    boundary and is wired inside recompute_modules (zones patched before
+        #    the wrap, replay activated via the checkpoint's context_fn).
         # 2. Activation Offload: Wraps the logic to move activations to CPU to free up device memory.
         # 3. Chunk MBS: Splits the input batch into micro-batches. This must be the outermost wrapper
         #    to ensure that the micro-batch slicing logic executes *before* the data enters the
