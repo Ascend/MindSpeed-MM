@@ -132,6 +132,14 @@ class ActivationOffloadPlanConfig(BaseArguments):
         default=None,
         metadata={"help": "module that applied activation offload"}
     )
+    impl: Literal["legacy", "stash"] = field(
+        default="legacy",
+        metadata={"help": "Activation offload implementation. 'legacy': per-layer hidden_states "
+                          "swap with resize_(0), self-managed stream and prefetch heuristics. "
+                          "'stash': saved_tensors_hooks tenant (act stash) on the shared swap "
+                          "cache; all physical behavior (capacity, async, prefetch, eviction) is "
+                          "governed by swap_plan."}
+    )
 
 
 class ChunkMbsPlanConfig(BaseArguments):
