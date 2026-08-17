@@ -158,22 +158,26 @@ class SituAndMul(nn.Module):
     """
     SituAndMul activation: beta * tanh(gate / beta) * sigmoid(gate) * up
     When linear_beta is set, up is also transformed by linear_beta * tanh(up / linear_beta).
+
+    Internally uses fused CANN op on NPU, falls back to eager otherwise.
     """
 
-    def __init__(self, beta: float = 1.0, linear_beta: float | None = None):
+    def __init__(self, beta: float = 1.0, linear_beta: float | None = None, use_fused: bool = False):
         super().__init__()
         self.beta = beta
         self.linear_beta = linear_beta
+        self.use_fused = use_fused
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        d = x.shape[-1] // 2
-        gate = x[..., :d].to(torch.float32)
-        up = x[..., d:].to(torch.float32)
-        situ_a = self.beta * torch.tanh(gate / self.beta) * torch.sigmoid(gate)
-        if self.linear_beta is not None:
-            up = self.linear_beta * torch.tanh(up / self.linear_beta)
-        return (situ_a * up).to(x.dtype)
-
+    def forward(self, x: torch.Tensor, ) -> torch.Tensor:
+        from mindspeed_mm.fsdp.ops.glu.situ import fused_situ_glu
+        return fused_situ_glu(
+            x,
+            dim=-1,
+            beta=self.beta,
+            linear_beta=self.linear_beta,
+            activate_left=True,
+            use_fused=self.use_fused,
+        )
 
 ACT2FN["situ"] = SituAndMul
 
@@ -354,6 +358,7 @@ class KimiBlockSparseMLP(nn.Module):
             self.act_fn = SituAndMul(
                 beta=beta,
                 linear_beta=linear_beta,
+                use_fused=config.use_fused_situ_glu,
             )
         else:
             self.act_fn = ACT2FN[config.hidden_act]
@@ -386,6 +391,7 @@ class KimiMLP(nn.Module):
             self.act_fn = SituAndMul(
                 beta=beta,
                 linear_beta=linear_beta,
+                use_fused=config.use_fused_situ_glu,
             )
         else:
             self.act_fn = ACT2FN[config.hidden_act]
@@ -825,8 +831,8 @@ class KimiDeltaAttention(nn.Module):
         # Modification end
 
         if mode == 'chunk':
-            kda_implementation = getattr(self.config, "kda_implementation", "fused")
-            if kda_implementation == "fused":
+            kda_implementation = getattr(self.config, "kda_implementation", "triton")
+            if kda_implementation == "triton":
                 if IS_NPU_AVAILABLE:
                     use_beta_sigmoid_in_kernel = False
                     beta = torch.sigmoid(beta)
@@ -851,7 +857,7 @@ class KimiDeltaAttention(nn.Module):
                     cu_seqlens=cu_seqlens,
                     skip_recompute=getattr(self.config, "skip_kda_recompute", False),
                 )
-            elif kda_implementation == "naive":
+            elif kda_implementation == "eager":
                 # 小算子版本
                 from mindspeed_mm.fsdp.ops.kda.chunk_kda_naive import chunk_kda_naive
                 o, recurrent_state = chunk_kda_naive(
@@ -1508,6 +1514,12 @@ class KimiLinearForCausalLM(KimiPreTrainedModel, GenerationMixin):
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(
             config.hidden_size, config.vocab_size, bias=False)
+
+        self.kda_implementation = config.kda_implementation
+        if self.kda_implementation == "ascendc":
+            from mindspeed_mm.fsdp.ops.ascendc.chunk_kda_ascendc import apply_ascendc_chunk_kda_patch
+            apply_ascendc_chunk_kda_patch()
+            print(f"Info: apply chunk kda function patch")
 
         # Initialize weights and apply final processing
         self.post_init()

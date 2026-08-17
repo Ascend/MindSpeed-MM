@@ -81,7 +81,7 @@ class PatchKimiMoeExperts(nn.Module):
 
         if _is_situ(config):
             beta, linear_beta = _get_situ_activation_params(config)
-            self.act_fn = SituAndMul(beta=beta, linear_beta=linear_beta)
+            self.act_fn = SituAndMul(beta=beta, linear_beta=linear_beta, use_fused=config.use_fused_situ_glu)
         else:
             self.act_fn = ACT2FN[config.hidden_act]
 

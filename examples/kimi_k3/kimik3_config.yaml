@@ -4,7 +4,7 @@ parallel:
   fsdp_plan:
     apply_modules:
       - vision_tower
-      - vision_tower.encoder.blocks.{*}
+      # - vision_tower.encoder.blocks.{*} # Shard only if OOM occurs; otherwise, keep unsharded for best performance.
       - mm_projector
       - language_model.model
       - language_model.model.embed_tokens
@@ -87,10 +87,12 @@ model:
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   use_grouped_expert_matmul: true
-  # KDA算子实现：fused（triton-ascend-kernels融合大算子）/ naive（仓内小算子）
-  kda_implementation: fused
+  # KDA算子实现：ascendc (fla-npu融合算子) / triton (triton-ascend-kernels融合算子)/ eager (torch算子实现)
+  kda_implementation: eager
   # KDA短卷积算子实现：triton / ascendc
   causal_conv1d_implementation: triton
+  # situ_glu融合算子
+  use_fused_situ_glu: false
   # 选择性重计算：attention 相关融合算子（ViT/MLA 的 FA、KDA）不参与重算，
   skip_flash_attn_recompute: true
   skip_kda_recompute: true
@@ -112,8 +114,8 @@ features:
   enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
-     - vision_tower.encoder.blocks.{*}
-     - language_model.model.layers.{*}
+      - vision_tower.encoder.blocks.{*}
+      - language_model.model.layers.{*}
   enable_chunk_mbs: false
   # ep balance
   enable_ep_balance: false

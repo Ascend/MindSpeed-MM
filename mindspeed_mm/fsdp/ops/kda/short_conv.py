@@ -204,7 +204,7 @@ class ShortConvolution(nn.Conv1d):
             y = y.transpose(1, 2).reshape(B, T, -1)
             return y, final_state
 
-        from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
+        from mindspeed_ops.api.triton.convolution import causal_conv1d
 
         return causal_conv1d(
             x=x,
