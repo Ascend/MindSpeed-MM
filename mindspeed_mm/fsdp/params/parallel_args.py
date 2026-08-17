@@ -87,6 +87,10 @@ class ParallelArguments(BaseArguments):
         default=None,
         metadata={"help": "FSDP size inside Expert Parallel groups."}
     )
+    expert_data_parallel_size: int = field(
+        default=1,
+        metadata={"help": "Expert Data Parallel size for MoE models."}
+    )
     ep_plan: EPPlanConfig = field(default_factory=EPPlanConfig)
 
     recompute: bool = field(
@@ -107,7 +111,7 @@ class ParallelArguments(BaseArguments):
             self.fully_shard_parallel_size = int(self.fully_shard_parallel_size)
 
         if self.expert_fully_shard_parallel_size is None:
-            self.expert_fully_shard_parallel_size = self.world_size // self.expert_parallel_size
+            self.expert_fully_shard_parallel_size = self.world_size // (self.expert_parallel_size * self.expert_data_parallel_size)
 
         if (
             self.world_size
@@ -150,3 +154,19 @@ class ParallelArguments(BaseArguments):
             raise ValueError("Tensor parallel size not supported yet.")
         if self.ring_attention_size != 1 and not IS_NPU_AVAILABLE:
             raise ValueError("Ring Attention only support on NPU.")
+
+        # edp=1 → FSDP；edp>1 → HSDP
+        if self.world_size % (self.expert_fully_shard_parallel_size * self.expert_parallel_size * self.expert_data_parallel_size) != 0:
+            raise ValueError(
+                f"world_size({self.world_size}) must be divisible by "
+                f"expert_fully_shard_parallel_size({self.expert_fully_shard_parallel_size}) * "
+                f"expert_parallel_size({self.expert_parallel_size}). "
+                f"expert_data_parallel_size({self.expert_data_parallel_size}). "
+                f"This is required for constructing the EP mesh ('edp', 'efsdp', 'ep')."
+            )
+        if self.expert_data_parallel_size > 1 and self.expert_fully_shard_parallel_size > 1:
+            if self.expert_parallel_size == 1:
+                raise ValueError(
+                    f"HSDP mode requires expert_parallel_size > 1, "
+                    f"got {self.expert_parallel_size}"
+                )

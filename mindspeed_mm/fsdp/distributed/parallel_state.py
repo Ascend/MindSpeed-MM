@@ -94,6 +94,7 @@ class ParallelState(metaclass=Singleton):
             mesh = self.get_device_mesh(name)
             info += f'[{name}] = {enable} | Group size: {size} | device mesh:{mesh} \n'
         info += f'[fsdp] = {True} | Group size: {self.get_hsdp_group_size()} | device mesh:{self.get_hsdp_device_mesh()} \n'
+        info += f'[hsdp] =  {self.device_mesh.get_group("dp_replicate").size() > 1} | Group size: {self.get_hsdp_group_size()} | device mesh:{self.get_hsdp_device_mesh()} \n'
         return info
 
     # ----------------------------- FSDP ----------------------------- #
@@ -105,6 +106,14 @@ class ParallelState(metaclass=Singleton):
 
     def get_hsdp_group_size(self) -> Optional["ProcessGroup"]:
         return self.device_mesh.get_group("dp_cp").size()
+
+    def get_efsdp_device_mesh(self) -> "DeviceMesh":
+      if self.expert_data_parallel_size > 1:
+          # HSDP, return 2D mesh
+          return self.ep_fsdp_device_mesh["edp", "efsdp"]
+      else:
+          # FSDP
+          return self.ep_fsdp_device_mesh["efsdp"]
 
     def get_hsdp_device_mesh(self) -> "DeviceMesh":
         if self.device_mesh.get_group("dp_replicate").size() > 1:
