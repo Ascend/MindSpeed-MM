@@ -14,7 +14,7 @@ from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time, configure_hs
     report_memory
 from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
-from mindspeed_mm.fsdp.tools.profiler import Profiler
+from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
@@ -88,9 +88,6 @@ class TrainEngine:
                 logger.info,
                 f"Reloaded {len(lora_state_dict)} LoRA parameters from {args.training.lora.pretrained_lora_path}",
             )
-
-        self.profiler = Profiler(args.tools.profile)
-        self.profiler.start()
 
     def average_losses_across_data_parallel_group(self, losses):
         """Reduce a tensor of losses across all GPUs."""
@@ -289,7 +286,7 @@ class TrainEngine:
             elapsed_time_per_iteration = get_time(barrier=True) - start_time
 
             # Stop profiling if enabled
-            self.profiler.step()
+            profiler.step()
 
             # Logging
             if self.iteration % args.training.log_interval == 0:
@@ -327,7 +324,7 @@ class TrainEngine:
                 gc.collect()
 
         # Stop profiling if enabled
-        self.profiler.stop()
+        profiler.stop()
         memory_profiler.stop()
         # Final save after training completes
         if args.training.save:

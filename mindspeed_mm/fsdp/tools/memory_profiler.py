@@ -6,6 +6,7 @@ import logging
 
 import torch
 from mindspeed_mm.fsdp.params.tools_args import MemoryProfiler
+from mindspeed_mm.fsdp.utils.decorators import Singleton
 from mindspeed_mm.fsdp.utils.device import (IS_NPU_AVAILABLE, get_torch_device,
                                             get_max_memory_reserved, get_max_memory_allocated, reset_peak_memory_stats)
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
@@ -38,7 +39,7 @@ def _stop():
     get_torch_device().memory._record_memory_history(enabled=None)
 
 
-class MemoryProfiler:
+class MemoryProfiler(metaclass=Singleton):
     def __init__(self):
         self.enable = False
         self.start_step = None

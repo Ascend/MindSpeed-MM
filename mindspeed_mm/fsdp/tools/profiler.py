@@ -18,6 +18,7 @@ import argparse
 
 import torch
 from mindspeed_mm.fsdp.params.tools_args import Profiler
+from mindspeed_mm.fsdp.utils.decorators import Singleton
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
 
@@ -29,7 +30,7 @@ if IS_NPU_AVAILABLE:
 logger = logging.getLogger(__name__)
 
 
-class Profiler:
+class Profiler(metaclass=Singleton):
     """
     Instantiate a Profiler from config.
 
@@ -42,7 +43,28 @@ class Profiler:
         prof.stop()
     """
 
-    def __init__(self, config: Profiler):
+    def __init__(self, config: Profiler = None):
+        self.enable = False
+        self.profile_type = None
+        self.ranks = None
+
+        self.sp_level = None
+        self.sp_with_stack = None
+        self.sp_with_memory = None
+        self.sp_record_shapes = None
+        self.sp_with_cpu = None
+        self.sp_save_path = None
+        self.sp_start_step = None
+        self.sp_end_step = None
+        self.sp_data_simplification = None
+        self.sp_analyse_flag = None
+
+        self.aic_metrics_type = None
+
+        if config is not None:
+            self.reset(config)
+
+    def reset(self, config: Profiler):
         self.enable = config.enable
         self.profile_type = config.profile_type
         self.ranks = config.ranks
@@ -117,6 +139,7 @@ class Profiler:
                     wait=0, warmup=0, active=active, repeat=1, skip_first=skip_first),
                 on_trace_ready=torch.profiler.tensorboard_trace_handler(self.sp_save_path),
                 experimental_config=None)
+        self.start()
 
     def _enable_profile(self):
         '''
@@ -148,6 +171,7 @@ class Profiler:
             else:
                 pass
 
+profiler = Profiler()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="profile offline analysing tool")

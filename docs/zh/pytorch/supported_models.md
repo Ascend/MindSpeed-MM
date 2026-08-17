@@ -107,7 +107,7 @@
       <td> 预训练 </td>
       <td> 1x8</td>
       <td> BF16 </td>
-    </tr>    
+    </tr>
     <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/qihoo_t2x">Qihoo-T2X</a></td>
       <td><a href="https://huggingface.co/qihoo360/Qihoo-T2X">1.1B</a></td>
@@ -271,13 +271,13 @@
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
-         <tr> 
-       <td> 语音识别 </td> 
-       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/whisper">Whisper</a></td> 
-       <td><a href="https://github.com/openai/whisper">1.5B</a></td> 
-       <td> 预训练 </td> 
-       <td> 1x8</td> 
-       <td> BF16 </td> 
+         <tr>
+       <td> 语音识别 </td>
+       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/whisper">Whisper</a></td>
+       <td><a href="https://github.com/openai/whisper">1.5B</a></td>
+       <td> 预训练 </td>
+       <td> 1x8</td>
+       <td> BF16 </td>
      </tr>
     <tr>
       <td> 语音生成 </td>

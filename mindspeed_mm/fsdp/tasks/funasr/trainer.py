@@ -8,7 +8,7 @@ from mindspeed_mm.fsdp.distributed.torch_parallelize import ParallelApplier
 from mindspeed_mm.fsdp.models.funasr.modeling_funasr import get_funasr_model
 from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
-from mindspeed_mm.fsdp.tools.profiler import Profiler
+from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.train.trainer import Trainer
 from mindspeed_mm.fsdp.tasks.funasr.train_engine import FunasrTrainEngine
 from mindspeed_mm.config.config_manager import ConfigManager
@@ -64,10 +64,7 @@ class FunasrTrainer(Trainer):
         self.iteration = 0
         self.consumed_train_samples = 0
         memory_profiler.reset(self.args.tools.memory_profile)
-
-        self.profiler = Profiler(self.args.tools.profile)
-        self.profiler.start()
-
+        profiler.reset(self.args.tools.profiler)
 
     def get_scheduler(self):
         """Build learning rate scheduler."""

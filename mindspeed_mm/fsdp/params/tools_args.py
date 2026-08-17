@@ -36,7 +36,7 @@ class StaticParam(BaseArguments):
     )
     start_step: int = field(
         default=10,
-        metadata={"help": "Start step for profiling."},
+        metadata={"help": "Start step for profiling. `start_step = 0` means to start profiling from the beginning of training."},
     )
     end_step: int = field(
         default=11,

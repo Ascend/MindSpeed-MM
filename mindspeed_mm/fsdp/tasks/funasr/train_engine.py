@@ -12,6 +12,7 @@ from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import pregather_fsdp_params
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
+from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.utils.utils import get_time, move_to_device
 from mindspeed_mm.fsdp.train.train_engine import TrainEngine
@@ -130,7 +131,7 @@ class FunasrTrainEngine(TrainEngine):
                     self.lr_scheduler.step()
                     self.optimizer.zero_grad(set_to_none=True)
 
-                    self.profiler.step()
+                    profiler.step()
                     self.consumed_train_samples += self.args.training.global_batch_size
                     self.iteration += 1
 
@@ -162,7 +163,7 @@ class FunasrTrainEngine(TrainEngine):
                 break
 
         # Final cleanup
-        self.profiler.stop()
+        profiler.stop()
         memory_profiler.stop()
         if self.args.training.save:
             self.save(self.iteration, self.consumed_train_samples)

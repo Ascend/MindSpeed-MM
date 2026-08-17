@@ -33,6 +33,7 @@ from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointe
 from mindspeed_mm.fsdp.utils.register import import_plugin
 from mindspeed_mm.fsdp.params.argument import Arguments
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
+from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.train.train_engine import TrainEngine
 from mindspeed_mm.fsdp.utils.lora_utils import (
     add_lora_to_model,
@@ -74,6 +75,9 @@ class Trainer:
 
         # Reset memory profiler
         memory_profiler.reset(args.tools.memory_profile)
+        # Reset profiler for performance analysis
+        profiler.reset(args.tools.profile)
+
         self.lora_weight_manager = None
         # Build core training components
         self.model = self.get_model(model_provider)
