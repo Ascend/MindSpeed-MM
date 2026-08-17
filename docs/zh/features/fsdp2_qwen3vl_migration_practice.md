@@ -151,6 +151,9 @@ data:
       dataset: /home/usr/data/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/          # 预处理缓存；多机不要共享同一挂载目录
   dataloader_param:
+    pin_memory: true
+    shuffle: true
+    drop_last: true
     sampler_type: BaseRandomBatchSampler
     collate_param:
       collator_id: qwen3vl              # 对应内置 collator 名

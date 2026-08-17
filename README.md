@@ -282,7 +282,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 
 ## 配套版本与支持模型
 
-MindSpeed MM 预置了覆盖多模态生成、多模态理解等任务的丰富模型；各模型的参数规模、训练任务、推荐集群、实测性能与认证状态，详见 **[MindSpeed MM 支持模型列表](docs/zh/pytorch/supported_models.md)**。
+MindSpeed MM 预置了覆盖多模态生成、多模态理解等任务的丰富模型；各模型的参数规模、训练任务、推荐集群与认证状态，详见 **[MindSpeed MM 支持模型列表](docs/zh/pytorch/supported_models.md)**。
 
 大语言模型（稠密模型、稀疏模型和状态空间模型）由 MindSpeed-LLM 专项维护，如需进行大语言模型训练，请访问 [MindSpeed-LLM](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/zh/pytorch/models/supported_models.md) 获取详细使用说明。
 

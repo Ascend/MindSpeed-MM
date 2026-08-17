@@ -29,7 +29,7 @@
 
 请参见《版本说明》中的“[相关产品版本配套说明](../release_notes_mm.md#相关产品版本配套说明)”章节，下载安装对应的软件版本。
 
-> [!NOTICE]
+> [!NOTE]
 >
 > 安装运行程序建议使用非root用户，且建议对安装程序的目录文件做好权限管控：文件夹权限设置为750，文件权限设置为640。可以通过设置umask控制安装后文件的权限，如设置umask为0027。更多安全相关内容请参见《[安全声明](../../../SECURITYNOTE.md)》中各组件关于“文件权限控制”的说明。
 
@@ -261,9 +261,9 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
       pip install -e .
       ```
 
-  7. 安装Triton-Ascend
+  7. 安装Triton-Ascend（按需）
 
-      安装配套版本的Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
+      根据需要安装配套版本的Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
 
       可参考如下安装命令：
 

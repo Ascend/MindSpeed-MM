@@ -1,12 +1,8 @@
 # 快速入门：Qwen3-VL模型微调
 
-MindSpeed MM支持多模态理解模型，下面分别以Qwen3-VL模型为例，介绍MindSpeed MM的使用方法，引导开发者快速上手预置模型在昇腾NPU上的高效运行。
+MindSpeed MM支持多模态理解模型，下面以Qwen3-VL模型为例，介绍MindSpeed MM的使用方法，引导开发者快速上手预置模型在昇腾NPU上的高效运行。
 
-## 多模态理解模型
-
-本章节以Qwen3-VL-30B为例，指导用户在单机场景下如何完成多模态理解模型的微调。
-
-FSDP2（Fully Sharded Data Parallel 2）沿数据并行维对参数、梯度、优化器状态做全分片，显著降低单卡显存占用，且与模型结构解耦、适配新模型成本低。在 MindSpeed-MM中，FSDP2训练具有以下特点：
+Qwen3-VL模型采用Pytorch原生FSDP2（Fully Sharded Data Parallel 2）框架, FSDP2沿数据并行维对参数、梯度、优化器状态做全分片，显著降低单卡显存占用，且与模型结构解耦、适配新模型成本低。在 MindSpeed-MM中，FSDP2训练具有以下特点：
 
 - **训练器**：`mindspeed_mm/fsdp/train/trainer.py`，启动脚本一行`torchrun`即可启动；
 - **配置集中**：一份 YAML 即可，分`parallel`/`data`/`model`/`features`/`training`/`tools`六段；
@@ -71,9 +67,6 @@ FSDP2（Fully Sharded Data Parallel 2）沿数据并行维对参数、梯度、�
     |dcp_dir|转换后保存目录|是|/|
     |hf_dir|Hugging Face权重目录|是|/|
 
-    > [!NOTE]
-    > 由于Qwen3_VL和Qwen2_VL在权重转换逻辑上保持一致，更多工具详情可参见[权重转换命令行工具](../features/mm_convert.md)。
-
     使用 meta init 初始化时需要 DCP 权重（**Qwen3-VL-30B / 235B 必须使用 meta init，仓库默认开启**）
    转换后 `--dcp_dir` 下会生成 `release/` 文件夹和 `latest_checkpointed_iteration.txt`。随后在配置文件中开启 `init_model_with_meta_device` 并把 **`load` 指向该 dcp 目录**（写到 `release` 的上一级，即 `ckpt/Qwen3-VL-30B-A3B-Instruct-dcp`）。
 
@@ -124,7 +117,6 @@ FSDP2（Fully Sharded Data Parallel 2）沿数据并行维对参数、梯度、�
 | `training` | `load` | 转换出的 **DCP 权重**路径 `./ckpt/Qwen3-VL-30B-A3B-Instruct-dcp`（默认注释，meta init 时取消注释并填写） |
 | `training` | `init_model_with_meta_device` | `true`（默认已开；30B/235B 必须） |
 | `training` | `save` / `save_interval` | 权重保存路径与间隔 |
-| `model` | `freeze` | 需冻结的模块（可选） |
 | `features` | `loss_type` | loss 计算方式（`default` 等，见下） |
 
 数据段示例（`model_name_or_path` 用转换前的原始 HF 路径，多机时 `cache_dir` 不要用同一挂载目录）：
@@ -166,6 +158,7 @@ parallel:
 1. 按机器规模配置启动脚本 `examples/qwen3vl/finetune_qwen3vl_30B_v1.sh`：
 
    ```bash
+   # 根据实际情况修改 ascend-toolkit 路径
    source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
    NPUS_PER_NODE=16        # 单机卡数(MindSpeed MM支持Ascend 950 系列产品、Atlas A3 训练系列产品和Atlas A2 训练系列产品，且要求单NPU的片上内存为64GB及以上。当前示例脚本中NPUS_PER_NODE=16 表示需要16个NPU，如果实际情况低于此配置，可能遇到OOM问题)
