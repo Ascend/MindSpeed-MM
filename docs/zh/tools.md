@@ -1,6 +1,8 @@
 # MindSpeed MM 工具库使用指南
 
-## Profiling采集工具
+## MCORE-FSDP2 后端工具
+
+### Profiling采集工具
 
 套件集成了昇腾[profiling采集工具](../../mindspeed_mm/tools/profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件即可生效。
 
@@ -25,7 +27,7 @@ prof.stop()
 --ranks                   # 指profiling采集的rank，default为-1，指采集全部rank
 ```
 
-### 静态采集
+#### 静态采集
 
 `Static Profile`静态采集功能为执行模型训练过程中，针对指定的steps区间进行采集，操作步骤如下：
 
@@ -61,7 +63,7 @@ prof.stop()
         python mindspeed_mm/tools/profiler.py
         ```
 
-### 动态采集
+#### 动态采集
 
 `Dynamic Profile`动态采集功能可在执行模型训练过程中随时开启采集进程，操作步骤如下：
 
@@ -86,7 +88,7 @@ prof.stop()
 
 动态采集的具体参数、入参表、及具体操作步骤等请参考《CANN性能调优工具用户指南》的“[Ascend PyTorch Profiler接口采集](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)”章节。
 
-### 离线解析命令参数说明
+#### 离线解析命令参数说明
 
 ```shell
 --mm-tool <path>               # MM工具配置文件路径，默认为./mindspeed_mm/tools/tools.json
@@ -119,7 +121,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 
 对超长序列、超大模型、强化学习等profiling文件较大的场景，使用离线解析可以节约训练时资源占用。
 
-## Sora类模型特征提取
+### Sora类模型特征提取
 
 [feature_extraction](../../mindspeed_mm/tools/feature_extraction)目录下工具可用于提取视频和文本特征并保存，目前支持单batch静态数据集特征提取。
 
@@ -140,7 +142,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 
 3. 配置完成后，调用[feature_extraction.sh](../../examples/wan2.1/feature_extract/feature_extraction.sh)即可提取数据特征。
 
-## 内存快照提取
+### 内存快照提取
 
 套件集成了昇腾[内存快照采集工具](../../mindspeed_mm/tools/mem_profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../mindspeed_mm/tools/tools.json)文件即可生效。
 
@@ -198,7 +200,7 @@ _stop()
 
 dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件，可以在[交互式查看器](https://pytorch.org/memory_viz)可视化查看内存快照。
 
-## Tensorboard使用
+### Tensorboard使用
 
 1. 若使用Tensorboard，需进行安装：
 
@@ -229,3 +231,126 @@ dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件
     ```shell
     tensorboard --logdir ./tensorboard_dir/
     ```
+
+## FSDP2 后端工具
+
+### Profiling静态采集
+
+FSDP2 后端通过配置模型训练 YAML 文件中的 tools 相关参数实现profiling采集。
+
+1. 在模型训练 YAML 文件中配置 `tools.profile`，例如：
+
+    ```yaml
+    tools:
+      profile:
+        enable: true
+        profile_type: static
+        ranks: [0]
+        static_param:
+          level: level1
+          with_stack: false
+          with_memory: false
+          record_shapes: false
+          with_cpu: true
+          save_path: ./profiling
+          start_step: 10
+          end_step: 11
+          data_simplification: false
+          aic_metrics_type: PipeUtilization
+          analyse_flag: true
+    ```
+
+    主要参数说明如下：
+
+    ```bash
+    --enable                  # 是否开启profiling采集
+    --profile_type            # FSDP2后端当前仅支持static
+    --ranks                   # 采集的rank列表，[-1]表示采集全部rank
+    --level                   # profiling采集级别：level0、level1、level2
+    --with_stack              # 是否采集算子调用栈
+    --with_memory             # 是否采集算子内存占用情况
+    --record_shapes           # 是否采集算子的InputShapes和InputTypes
+    --with_cpu                # 是否采集CPU信息
+    --save_path               # profiling文件保存路径
+    --start_step              # 开始采集的训练步数
+    --end_step                # 结束采集的训练步数，不包含该步
+    --data_simplification     # 是否采用简化数据
+    --aic_metrics_type        # 支持PipeUtilization和ArithmeticUtilization
+    --analyse_flag            # 是否启用在线解析
+    ```
+
+2. 按模型文档启动训练。训练入口会自动读取 `tools.profile`，并在训练循环中启动、推进和停止 Profiling，无需修改模型代码。
+
+3. 当 `start_step` 设置为 `0` 时，Profiler 会在模型、优化器和 DataLoader 等组件初始化前启动，因此采集结果会包含训练前的初始化过程，并持续采集后续训练迭代，直至达到 `end_step`。
+
+4. Profiling 文件保存在 `save_path` 指定的目录中。`analyse_flag` 为 `true` 时会在训练过程中自动解析；为 `false` 时可使用下文的 FSDP2 离线解析命令进行解析。
+
+### Profiling离线解析
+
+FSDP2 后端使用 mindspeed_mm/fsdp/tools/profiler.py 进行离线解析，通过 --profiler-path 指定待解析的 Profiling 数据目录。
+
+```shell
+--profiler-path <path>         # Profiler数据目录路径（必选）
+--max-process-number <number>  # 分析的最大进程数（可选，默认：CPU核心数/2）
+--export-type <type>           # 导出类型，支持text、db，可多次指定，默认：text
+```
+
+|参数类型|参数名|参数说明|默认值|
+|-|-|-|-|
+|path|--profiler-path|Profiler数据目录路径|无，必须指定|
+|number|--max-process-number|分析的最大进程数|CPU核心数/2|
+|type|--export-type|分析结果的导出类型，支持text、db，可多次指定|text|
+
+**示例：**
+
+```shell
+# 解析指定目录下的Profiling数据
+python mindspeed_mm/fsdp/tools/profiler.py --profiler-path ./profiling
+
+# 限制离线解析使用的最大进程数
+python mindspeed_mm/fsdp/tools/profiler.py \
+    --profiler-path ./profiling \
+    --max-process-number 8
+
+# 同时导出text和db格式
+python mindspeed_mm/fsdp/tools/profiler.py \
+    --profiler-path ./profiling \
+    --export-type text \
+    --export-type db
+```
+
+### 内存快照采集
+
+FSDP2 后端使用独立的[内存快照采集工具](../../mindspeed_mm/fsdp/tools/memory_profiler.py)，通过模型训练 YAML 文件中的 tools.memory_profile 配置。
+
+1. 在模型训练 YAML 文件中配置 `tools.memory_profile`，例如：
+
+    ```yaml
+    tools:
+      memory_profile:
+        enable: true
+        start_step: 1
+        end_step: 2
+        save_path: ./memory_snapshot
+        dump_ranks: [0]
+        stacks: all
+        max_entries: null
+        mem_info: false
+    ```
+
+    参数说明如下：
+
+    ```bash
+    --enable                  # 是否开启内存快照采集
+    --start_step              # 开始记录内存历史的步数
+    --end_step                # 导出内存快照并停止记录的步数
+    --save_path               # 内存快照保存路径
+    --dump_ranks              # 导出内存快照的rank列表，从0开始
+    --stacks                  # 堆栈信息范围，可选python或all
+    --max_entries             # 最大记录数，null表示不限制
+    --mem_info                # 是否在每个step打印显存使用信息
+    ```
+
+2. 按模型文档启动训练。训练入口会自动读取 `tools.memory_profile`，并在训练循环中开始记录、导出快照和停止记录，无需修改模型代码。
+
+3. 达到 `end_step` 后，`save_path` 目录下会生成以 `snapshot_` 开头、以 rank 区分的 `pickle` 文件，可通过[交互式查看器](https://pytorch.org/memory_viz)进行可视化分析。如果训练在达到 `end_step` 前结束，已开始记录的内存历史也会在训练退出时导出。
