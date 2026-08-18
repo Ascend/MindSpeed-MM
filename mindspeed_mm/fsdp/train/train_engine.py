@@ -183,15 +183,15 @@ class TrainEngine:
 
         # Average loss across data parallel group
         total_loss = self.average_losses_across_data_parallel_group([total_loss])
-        loss_dict["loss"] = total_loss.item()
+        loss_dict["loss"] = total_loss
 
         if all_mtp_loss:
             for i in range(len(all_mtp_loss)):
                 all_mtp_loss[i] = self.average_losses_across_data_parallel_group([all_mtp_loss[i]])
-                loss_dict[f"mtp_{i+1} loss"] = all_mtp_loss[i].item()
+                loss_dict[f"mtp_{i+1} loss"] = all_mtp_loss[i]
 
         if total_aux_loss:
-            loss_dict["aux loss"] = total_aux_loss.item()
+            loss_dict["aux loss"] = total_aux_loss
 
         return loss_dict
 
@@ -356,7 +356,7 @@ class TrainEngine:
         log_string += ' learning rate: {:.6E} |'.format(curr_step_lr)
         log_string += ' global batch size: {:5d} |'.format(args.training.global_batch_size)
         for name, value in loss_dict.items():
-            log_string += f" {name}: {value:.6E} |"
+            log_string += f" {name}: {value.item():.6E} |"
 
         if grad_norm is not None:
             log_string += ' grad norm: {:.3f} |'.format(grad_norm)

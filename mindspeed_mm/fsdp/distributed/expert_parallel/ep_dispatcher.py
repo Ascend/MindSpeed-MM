@@ -21,6 +21,10 @@ from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingSt
 # Set environment variable export MM_FORCE_EP_BALANCE=1 to activate.
 # MUST BE DISABLED during formal training.
 FORCE_EP_BALANCE = envs.MM_FORCE_EP_BALANCE
+# `torch.bincount` is used for counting expert assignments in EP. This is slower than `torch.histc` but more stable.
+# `torch.histc` is not a deterministic operation and `torch.bincount` is deterministic.
+# Set environment variable export MM_EP_BINCOUNT_DISPATCH=1 to activate.
+EP_BINCOUNT_DISPATCH = envs.MM_EP_BINCOUNT_DISPATCH
 
 
 def apply_activation(
@@ -60,6 +64,17 @@ def force_ep_balance(
     selected_experts = _indices.view(seq_len, activation_num)
 
     return selected_experts
+
+
+def get_num_global_tokens_per_local_expert(
+    selected_experts: torch.Tensor,
+    num_global_experts: int,
+) -> torch.Tensor:
+    if EP_BINCOUNT_DISPATCH:
+        num_local_tokens_per_expert = torch.bincount(selected_experts.view(-1), minlength=num_global_experts)
+    else:
+        num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_global_experts, min=0, max=num_global_experts)
+    return num_local_tokens_per_expert
 
 
 def ep_forward(
@@ -202,7 +217,7 @@ def dispatch_preprocess(
     )
     num_local_experts = num_global_experts // ep_size
 
-    num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_global_experts, min=0, max=num_global_experts)
+    num_local_tokens_per_expert = get_num_global_tokens_per_local_expert(selected_experts, num_global_experts)
 
     if ep_group is None or ep_size <= 1:
         num_global_tokens_per_expert = num_local_tokens_per_expert.view(1, -1)
@@ -247,7 +262,7 @@ def dispatch_preprocess_with_ep_balance(
         # 如果开启负载均衡策略的话，这部分的规划结果可以直接读取
         num_global_tokens_per_expert = ep_balance_planner.get_plan_item("num_global_tokens_per_local_expert")
     else:
-        num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_global_experts, min=0, max=num_global_experts)
+        num_local_tokens_per_expert = get_num_global_tokens_per_local_expert(selected_experts, num_global_experts)
 
         if ep_group is None or ep_size <= 1:
             num_global_tokens_per_expert = num_local_tokens_per_expert.view(1, -1)
@@ -368,7 +383,7 @@ def ep_mc2_forward(
     ep_rank = dist.get_rank(ep_group)
     num_local_experts = num_experts // ep_size
 
-    num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_experts, min=0, max=num_experts)
+    num_local_tokens_per_expert = get_num_global_tokens_per_local_expert(selected_experts, num_experts)
 
     num_global_tokens_per_expert = torch.zeros(
         ep_size,
@@ -471,7 +486,7 @@ def ep_allgather_forward(
         # to account for the duplicated experts. This ensures that tokens are routed to the correct expert indices.
         # If the planner has a mapping of duplicate experts (recompute stage), we use it directly
         with torch.no_grad():
-            num_local_tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_experts, min=0, max=num_experts)
+            num_local_tokens_per_expert = get_num_global_tokens_per_local_expert(selected_experts, num_experts)
             if ep_group is None or dist.get_world_size(ep_group) <= 1:
                 num_global_tokens_per_expert = num_local_tokens_per_expert.view(1, -1)
             else:
@@ -515,7 +530,7 @@ def ep_allgather_forward(
 
     # Count the number of tokens assigned to each local expert
     # This is used for the grouped matrix multiplication
-    tokens_per_expert = torch.histc(selected_experts.view(-1), bins=num_experts, min=0, max=num_experts)[
+    tokens_per_expert = get_num_global_tokens_per_local_expert(selected_experts, num_experts)[
         :num_experts_local
     ] if not enable_ep_balance else ep_balance_strategy.planner.get_plan_item("num_global_sum_tokens_per_local_expert")
 

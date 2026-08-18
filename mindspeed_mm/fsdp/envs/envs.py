@@ -85,6 +85,14 @@ _register(
     description="Force expert-parallel load balancing for debugging.",
 )
 _register(
+    name="MM_EP_BINCOUNT_DISPATCH",
+    default=False,
+    converter=bool,
+    description=(
+        "Use `torch.bincount` for count expert assignment when using expert-parallel training."
+    ),
+)
+_register(
     name="MM_DETECT_ANOMALY",
     default=False,
     converter=bool,
