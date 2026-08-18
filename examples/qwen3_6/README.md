@@ -76,15 +76,14 @@ pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra
 
 ### 4. 安装fla-npu以适配AscendC
 
-拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
+拉取flash-linear-attention-npu代码仓，并进入代码仓根目录
 
 ```bash
-git clone https://github.com/flashserve/flash-linear-attention-npu
+git clone https://github.com/flashserve/flash-linear-attention-npu -b v26.6.0
 cd flash-linear-attention-npu
-git checkout c2e3d83f
 ```
 
-安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/v26.6.0/README.md)
 
 > **说明：** 请确保操作系统已安装 `gawk`，否则后续安装会失败。可参考以下命令安装：
 
@@ -103,17 +102,25 @@ yum install gawk
 # source 实际的cann路径
 source /usr/local/Ascend/cann/set_env.sh
 
-# 编译算子 run 包，--soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
-bash build.sh --soc=ascend910b --pkg --vendor_name=fla_npu
-bash build_out/fla-npu_*.run
-cd torch_custom/fla_npu/
-bash build.sh
+python -m pip install -r requirements.txt
+python scripts/check_npu_env.py --build-only
+
+# --soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
+FLA_NPU_SOC=ascend910_93 python -m pip wheel --no-build-isolation --no-deps . -w dist
+python -m pip install --force-reinstall --no-deps dist/flash_linear_attention_npu-*.whl
 ```
 
 检验fla_npu是否安装成功
 
 ```bash
-pip list | grep fla_npu
+# 显示True
+python -c "import fla_npu; import torch; print(hasattr(torch.ops.npu, 'npu_chunk_fwd_o'))"
+
+# 显示Packaged wheel API check passed.
+python scripts/check_packaged_wheel_api.py
+
+# 显示flash-linear-attention-npu 26.6.0
+pip list | grep fla
 ```
 
 ---
