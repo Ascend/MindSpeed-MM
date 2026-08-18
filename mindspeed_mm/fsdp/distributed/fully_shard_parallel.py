@@ -86,12 +86,24 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
         if execute_result:
             return model
 
+    # Determine whether to use hook_module based on torch version.
+    # The hook_module mechanism (block-level FSDP hooks) is required on all
+    # supported versions (2.7.1/2.9.0/2.10.0) so that nested FSDP units inside a
+    # checkpoint-wrapped block (e.g. linear_attn, experts) are unsharded during
+    # activation recomputation. Without it, torch 2.10.0 native fully_shard never
+    # unshards those nested units on recompute, causing mixed Tensor/DTensor errors.
+    use_hook_module = (
+        "2.7.1" in torch.__version__
+        or "2.9.0" in torch.__version__
+        or "2.10.0" in torch.__version__
+    )
+
     # Get modules and parameters that should be ignored for FSDP
     ignored_modules, ignored_params = get_ignored_modules(model, fsdp_plan)
     # Get modules that should have FSDP applied
     fsdp_modules = get_fsdp_modules(model, fsdp_plan, ignored_modules)
-    # Get modules that FSDP hook add
-    hook_modules = get_fsdp_hook_modules(model, fsdp_plan)
+    # Get modules that FSDP hook add (only needed for 2.7.1/2.9.0 patched fully_shard)
+    hook_modules = get_fsdp_hook_modules(model, fsdp_plan) if use_hook_module else []
 
     # Configure mixed precision if enabled
     cpu_offload = None
@@ -112,7 +124,7 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
                         fully_shard(submodule, hook_module=hook_module, **config)
     # Apply FSDP to specific child modules before to the entire model
     for module in fsdp_modules:
-        hook_module = find_hook_module(module, hook_modules)
+        hook_module = find_hook_module(module, hook_modules) if use_hook_module else None
         if hook_module is None:
             fully_shard(module, **config)
         else:

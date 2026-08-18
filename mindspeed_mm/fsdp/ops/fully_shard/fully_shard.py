@@ -834,6 +834,19 @@ def apply_fully_shard_patch() -> None:
     """
     Applies all custom patches to the FSDPState and FSDPParamGroup classes.
     Call this function once at the beginning of your training script.
+
+    The custom `hook_module` patch is REQUIRED across all supported torch
+    versions (2.7.1 / 2.9.0 / 2.10.0): by attaching every nested FSDP unit's
+    hooks (e.g. `linear_attn`, `mlp.experts`) to the parent checkpoint-wrapped
+    block, the block-level pre-backward hook unshards ALL nested parameters
+    during activation recomputation. Without this, nested FSDP units are never
+    unsharded on recompute (they only get unsharded on their own outputs, which
+    the recomputed graph does not carry), producing the
+    "got mixed torch.Tensor and DTensor" matmul error on PyTorch 2.10.0.
+
+    PyTorch 2.9.0 / 2.10.0 share the same upstream FSDP internals (including
+    `foreach_reduce` / `FSDPParamGroup.post_backward` signatures), so the 2.9.0
+    patched methods are reused for 2.10.0.
     """
     # Patch FSDPState methods
     FSDPState.init = hook_module_init
@@ -846,7 +859,7 @@ def apply_fully_shard_patch() -> None:
     if "2.7.1" in torch.__version__:
         FSDPParamGroup.wait_for_unshard = param_group_wait_for_unshard_pt27
         FSDPParamGroup.post_backward = param_group_post_backward_pt27
-    elif "2.9.0" in torch.__version__:
+    elif "2.9.0" in torch.__version__ or "2.10.0" in torch.__version__:
         FSDPParamGroup.wait_for_unshard = param_group_wait_for_unshard_pt29
         FSDPParamGroup.post_backward = param_group_post_backward_pt29
     else:

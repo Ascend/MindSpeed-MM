@@ -21,7 +21,15 @@ logger = logging.getLogger(__name__)
 
 def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, ep_plan: EPPlanConfig, fsdp_plan: FSDPPlanConfig) -> torch.nn.Module:
     efsdp_modules = get_efsdp_modules(model, ep_plan)
-    efsdp_hook_modules = get_fsdp_hook_modules(model, fsdp_plan)
+    # The hook_module mechanism is required on all supported versions
+    # (2.7.1/2.9.0/2.10.0) so nested FSDP units inside a checkpoint-wrapped block
+    # are unsharded during recompute; see fully_shard_parallel.py for details.
+    use_hook_module = (
+        "2.7.1" in torch.__version__
+        or "2.9.0" in torch.__version__
+        or "2.10.0" in torch.__version__
+    )
+    efsdp_hook_modules = get_fsdp_hook_modules(model, fsdp_plan) if use_hook_module else []
 
     # Configure mixed precision if enabled
     cpu_offload = None
@@ -35,13 +43,17 @@ def expert_fully_shard_modules(model: torch.nn.Module, efsdp_mesh, ep_plan: EPPl
 
     apply_hccl_premul_sum_patch()
     for experts in efsdp_modules:
-        hook_module = find_hook_module(experts, efsdp_hook_modules)
+        if use_hook_module:
+            hook_module = find_hook_module(experts, efsdp_hook_modules)
+            fsdp_kwargs = {**config, 'hook_module': hook_module}
+        else:
+            fsdp_kwargs = config
         if isinstance(experts, torch.nn.ModuleList):
             for expert in experts:
-                fully_shard(expert, hook_module=hook_module, **config)
+                fully_shard(expert, **fsdp_kwargs)
                 set_gradient_divide_factor(expert, ep_plan._gradient_divide_factor)
         else:
-            fully_shard(experts, hook_module=hook_module, **config)
+            fully_shard(experts, **fsdp_kwargs)
             set_gradient_divide_factor(experts, ep_plan._gradient_divide_factor)
 
     return model
