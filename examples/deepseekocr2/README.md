@@ -41,8 +41,6 @@ commit_id=c548f2e60d409fc1d92208472c0f2389998af632
 
 请参考[安装指南](../../docs/zh/pytorch/install_guide.md)
 
-> 注意：Python版本推荐3.10，torch和TorchNPU版本推荐2.7.1版本
-
 <a id="jump1.1"></a>
 
 ### 1. 仓库拉取
