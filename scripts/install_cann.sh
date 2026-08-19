@@ -41,12 +41,11 @@ install_cann_a2_x86_apt() {
     sudo apt-get update
     sudo apt-get install -y gcc python3 python3-pip linux-headers-$(uname -r)
 
-    #Ascend-cann为驱动、Toolkit合一包
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann_8.5.0_linux-x86_64.run
-    bash ./Ascend-cann_8.5.0_linux-x86_64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-toolkit_9.1.0_linux-x86_64.run
+    bash ./Ascend-cann-toolkit_9.1.0_linux-x86_64.run --install
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann-910b-ops_8.5.0_linux-x86_64.run
-    bash ./Ascend-cann-910b-ops_8.5.0_linux-x86_64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-910b-ops_9.1.0_linux-x86_64.run
+    bash ./Ascend-cann-910b-ops_9.1.0_linux-x86_64.run --install
 }
 
 install_cann_a2_x86_yum() {
@@ -56,11 +55,11 @@ install_cann_a2_x86_yum() {
     sudo yum makecache
     sudo yum install -y gcc python3 python3-pip kernel-headers-$(uname -r) kernel-devel-$(uname -r)
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann_8.5.0_linux-x86_64.run
-    bash ./Ascend-cann_8.5.0_linux-x86_64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-toolkit_9.1.0_linux-x86_64.run
+    bash ./Ascend-cann-toolkit_9.1.0_linux-x86_64.run --install
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann-910b-ops_8.5.0_linux-x86_64.run
-    bash ./Ascend-cann-910b-ops_8.5.0_linux-x86_64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-910b-ops_9.1.0_linux-x86_64.run
+    bash ./Ascend-cann-910b-ops_9.1.0_linux-x86_64.run --install
 }
 
 install_cann_a2_arm_apt() {
@@ -68,12 +67,11 @@ install_cann_a2_arm_apt() {
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo apt-get update
     sudo apt-get install -y gcc python3 python3-pip linux-headers-$(uname -r)
-    #Ascend-cann为驱动、Toolkit合一包
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann_8.5.0_linux-aarch64.run
-    bash ./Ascend-cann_8.5.0_linux-aarch64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-toolkit_9.1.0_linux-aarch64.run
+    bash ./Ascend-cann-toolkit_9.1.0_linux-aarch64.run --install
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann-910b-ops_8.5.0_linux-aarch64.run
-    bash ./Ascend-cann-910b-ops_8.5.0_linux-aarch64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-910b-ops_9.1.0_linux-aarch64.run
+    bash ./Ascend-cann-910b-ops_9.1.0_linux-aarch64.run --install
 }
 
 install_cann_a2_arm_yum() {
@@ -81,12 +79,11 @@ install_cann_a2_arm_yum() {
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo yum makecache
     sudo yum install -y gcc python3 python3-pip kernel-headers-$(uname -r) kernel-devel-$(uname -r)
-    #Ascend-cann为驱动、Toolkit合一包
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann_8.5.0_linux-aarch64.run
-    bash ./Ascend-cann_8.5.0_linux-aarch64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-toolkit_9.1.0_linux-aarch64.run
+    bash ./Ascend-cann-toolkit_9.1.0_linux-aarch64.run --install
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann-910b-ops_8.5.0_linux-aarch64.run
-    bash ./Ascend-cann-910b-ops_8.5.0_linux-aarch64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-910b-ops_9.1.0_linux-aarch64.run
+    bash ./Ascend-cann-910b-ops_9.1.0_linux-aarch64.run --install
 }
 
 # a3 NPU安装函数
@@ -95,12 +92,11 @@ install_cann_a3_x86_apt() {
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo apt-get update
     sudo apt-get install -y gcc python3 python3-pip linux-headers-$(uname -r)
-    #Ascend-cann为驱动、Toolkit合一包
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann_8.5.0_linux-x86_64.run
-    bash ./Ascend-cann_8.5.0_linux-x86_64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-toolkit_9.1.0_linux-x86_64.run
+    bash ./Ascend-cann-toolkit_9.1.0_linux-x86_64.run --install
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann-A3-ops_8.5.0_linux-x86_64.run
-    bash ./Ascend-cann-A3-ops_8.5.0_linux-x86_64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-A3-ops_9.1.0_linux-x86_64.run
+    bash ./Ascend-cann-A3-ops_9.1.0_linux-x86_64.run --install
 }
 
 install_cann_a3_x86_yum() {
@@ -108,12 +104,11 @@ install_cann_a3_x86_yum() {
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo yum makecache
     sudo yum install -y gcc python3 python3-pip kernel-headers-$(uname -r) kernel-devel-$(uname -r)
-    #Ascend-cann为驱动、Toolkit合一包
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann_8.5.0_linux-x86_64.run
-    bash ./Ascend-cann_8.5.0_linux-x86_64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-toolkit_9.1.0_linux-x86_64.run
+    bash ./Ascend-cann-toolkit_9.1.0_linux-x86_64.run --install
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann-A3-ops_8.5.0_linux-x86_64.run
-    bash ./Ascend-cann-A3-ops_8.5.0_linux-x86_64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-A3-ops_9.1.0_linux-x86_64.run
+    bash ./Ascend-cann-A3-ops_9.1.0_linux-x86_64.run --install
 }
 
 install_cann_a3_arm_apt() {
@@ -121,12 +116,11 @@ install_cann_a3_arm_apt() {
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo apt-get update
     sudo apt-get install -y gcc python3 python3-pip linux-headers-$(uname -r)
-    #Ascend-cann为驱动、Toolkit合一包
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann_8.5.0_linux-aarch64.run
-    bash ./Ascend-cann_8.5.0_linux-aarch64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-toolkit_9.1.0_linux-aarch64.run
+    bash ./Ascend-cann-toolkit_9.1.0_linux-aarch64.run --install
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann-A3-ops_8.5.0_linux-aarch64.run
-    bash ./Ascend-cann-A3-ops_8.5.0_linux-aarch64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-A3-ops_9.1.0_linux-aarch64.run
+    bash ./Ascend-cann-A3-ops_9.1.0_linux-aarch64.run --install
 }
 
 install_cann_a3_arm_yum() {
@@ -134,12 +128,11 @@ install_cann_a3_arm_yum() {
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
     sudo yum makecache
     sudo yum install -y gcc python3 python3-pip kernel-headers-$(uname -r) kernel-devel-$(uname -r)
-    #Ascend-cann为驱动、Toolkit合一包
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann_8.5.0_linux-aarch64.run
-    bash ./Ascend-cann_8.5.0_linux-aarch64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-toolkit_9.1.0_linux-aarch64.run
+    bash ./Ascend-cann-toolkit_9.1.0_linux-aarch64.run --install
 
-    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.T63/Ascend-cann-A3-ops_8.5.0_linux-aarch64.run
-    bash ./Ascend-cann-A3-ops_8.5.0_linux-aarch64.run --install
+    wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.1.0/Ascend-cann-A3-ops_9.1.0_linux-aarch64.run
+    bash ./Ascend-cann-A3-ops_9.1.0_linux-aarch64.run --install
 }
 
 # 操作系统到包管理器的映射

@@ -173,7 +173,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
         |-y, --yes|确认所有软件重新安装|否|-|
         |-n, --no|自动跳过第三方依赖库安装|否|-|
         |-mt, --megatron|安装Megatron-LM|否|默认安装版本Megatron-LM 0.12.0|
-        |-ic, --install-cann |安装CANN|否|默认安装版本CANN 8.5.0|
+        |-ic, --install-cann |安装CANN|否|默认安装版本CANN 9.1.0|
         |-h, --help|显示安装帮助|否|-|
 
   3. 如已安装了PyTorch或TorchNPU，请按以下步骤操作；未安装可跳过本步骤：

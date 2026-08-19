@@ -46,10 +46,6 @@ commit_id=13b5e3f
 
 请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
 
-‼️ 部分特性依赖较新版本的CANN，请使用 8.5.0 以上版本:
-
-- [CANN](https://www.hiascend.com/document/detail/zh/canncommercial/850/softwareinst/instg/instg_0008.html?Mode=PmIns&InstallType=local&OS=openEuler)
-
 <a id="jump1.2"></a>
 
 ### 2. 环境搭建

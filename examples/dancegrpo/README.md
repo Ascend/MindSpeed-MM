@@ -41,8 +41,6 @@ commit_id=2149f36f22db601f9dbf70472fea11576f62a0f6
 
 请参考[安装指南](../../docs/zh/pytorch/install_guide.md)
 
-> DanceGRPO场景下，Python版本推荐3.10
-
 <a id="jump1.1"></a>
 
 ### 1. 仓库拉取
