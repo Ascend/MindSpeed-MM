@@ -143,7 +143,6 @@ echo ">>> Verifying installation..."
 python -c "import decord; print(f'decord version: {decord.__version__}')"
 
 echo ">>> Cleaning up..."
-rm -rf /tmp/decord
 rm -rf ~/ffmpeg_sources
 rm -f "/tmp/cmake-${CMAKE_VERSION}-linux-aarch64.sh"
 

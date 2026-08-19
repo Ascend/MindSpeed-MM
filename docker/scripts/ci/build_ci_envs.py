@@ -175,7 +175,9 @@ def main():
         # 2c. Explicitly install the pinned torch / torch_npu versions first so
         #     that later dependency installs never downgrade them.
         if torch_ver:
-            run_args(["conda", "run", "-n", env_name, "pip", "install", f"torch=={torch_ver}"])
+            run_args(["conda", "run", "-n", env_name, "pip", "install",
+                      "--index-url", "https://download.pytorch.org/whl/cpu",
+                      f"torch=={torch_ver}"])
         if torch_npu_ver:
             run_args(["conda", "run", "-n", env_name, "pip", "install", f"torch-npu=={torch_npu_ver}"])
 

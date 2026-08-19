@@ -282,9 +282,11 @@ if [ "$IS_ARM" = true ]; then
     fi
 else
     # x86_64: decord is installed via pip in the base stage; still need a valid
-    # build-context path for the Dockerfile COPY.
-    mkdir -p decord_deps
-    touch decord_deps/.placeholder
+    # build-context path for the Dockerfile COPY. Created under SCRIPT_DIR with
+    # an absolute path so it lands in the build context regardless of the
+    # caller's CWD (cd "$SCRIPT_DIR" runs later, at line ~340).
+    mkdir -p "${SCRIPT_DIR}/decord_deps"
+    touch "${SCRIPT_DIR}/decord_deps/.placeholder"
 fi
 
 DECORD_SCRIPT_PATH="${COMMON_DIR}/install_decord_on_arm.sh"
