@@ -22,7 +22,7 @@ The MindSpeed MM image is based on both Ubuntu 22.04 and openEuler 24.03 operati
 
 Due to differences in dependencies between models, only the above basic dependencies are pre-installed in the image. After pulling the image and starting a container, users need to manually install the additional dependencies required by the target model in the base environment according to the target model's README file.
 
-Image download: Please visit the [Image Center](https://www.hiascend.com/developer/ascendhub) and search for mindspeed-mm to get the corresponding `docker pull` command.
+Image download: Please visit [Quay.io](https://quay.io/repository/ascend/mindspeed-mm?tab=tags) to get the corresponding `docker pull` command.
 The current image supports two operating systems, `openEuler 24.03` and `ubuntu22.04`, and provides both `x86_64` and `aarch64` (ARM64) CPU architectures (x86 and aarch64 combined).
 
 ## Image Tag Key Field Description
@@ -76,16 +76,16 @@ Dockerfile naming:
 
 ### Latest Version v26.1.0
 
-Below are all image tags of the current latest version v26.1.0 (`cann9.1.0` + `torch_npu2.7.1.post8`). The latest tags are images combining x86 and aarch64, built using the [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile). You can obtain the corresponding `docker pull` command from the ascendhub ([mindspeed-mm Image Center](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)).
+Below are all image tags of the current latest version v26.1.0 (`cann9.1.0` + `torch_npu2.7.1.post8`). The latest tags are images combining x86 and aarch64, built using the [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile). You can obtain the corresponding `docker pull` command from [Quay.io](https://quay.io/repository/ascend/mindspeed-mm?tab=tags).
 
 | Tag | Dockerfile | Description |
 | --- | --- | --- |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile) | 910B + openEuler 24.03, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile) | 910B + Ubuntu 22.04, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile) | A3 + openEuler 24.03, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile) | A3 + Ubuntu 22.04, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile) | 950 + openEuler 24.03, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/Dockerfile) | 950 + Ubuntu 22.04, x86_64/aarch64 combined |
+| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 910B + openEuler 24.03, x86_64/aarch64 combined |
+| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 910B + Ubuntu 22.04, x86_64/aarch64 combined |
+| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | A3 + openEuler 24.03, x86_64/aarch64 combined |
+| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | A3 + Ubuntu 22.04, x86_64/aarch64 combined |
+| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 950 + openEuler 24.03, x86_64/aarch64 combined |
+| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 950 + Ubuntu 22.04, x86_64/aarch64 combined |
 
 > The latest tags in the table above are multi-architecture images (x86 and aarch64 combined). Once actually built, this Dockerfile generates tags with the architecture suffix, such as `-aarch64` / `-x86_64` (e.g. `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`). For all tags of historical versions, please refer to [Supported Tags](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/supported_tags.md).
 
