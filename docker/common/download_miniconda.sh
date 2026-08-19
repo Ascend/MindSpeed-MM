@@ -3,6 +3,7 @@ set -e
 
 OUTPUT_DIR="${1:-.}"
 REQUESTED_ARCH="${2:-}"
+PYTHON_VERSION="${3:-3.11}"
 
 if [ -n "$REQUESTED_ARCH" ]; then
     ARCH="$REQUESTED_ARCH"
@@ -10,8 +11,12 @@ else
     ARCH=$(uname -m)
 fi
 
+# Map "3.11" -> "311" to select the matching Miniconda variant, which in turn
+# determines the Python version of the conda base environment.
+PY_STR="${PYTHON_VERSION//./}"
+
 echo "=========================================="
-echo "Downloading Miniconda for Python 3.11"
+echo "Downloading Miniconda for Python ${PYTHON_VERSION}"
 echo "Architecture: ${ARCH}"
 echo "Output directory: ${OUTPUT_DIR}"
 echo "=========================================="
@@ -19,9 +24,9 @@ echo "=========================================="
 MINICONDA_VERSION="26.1.1-1"
 
 if [ "$ARCH" = "x86_64" ]; then
-    MINICONDA_FILE="Miniconda3-py311_${MINICONDA_VERSION}-Linux-x86_64.sh"
+    MINICONDA_FILE="Miniconda3-py${PY_STR}_${MINICONDA_VERSION}-Linux-x86_64.sh"
 elif [ "$ARCH" = "aarch64" ]; then
-    MINICONDA_FILE="Miniconda3-py311_${MINICONDA_VERSION}-Linux-aarch64.sh"
+    MINICONDA_FILE="Miniconda3-py${PY_STR}_${MINICONDA_VERSION}-Linux-aarch64.sh"
 else
     echo "ERROR: Unsupported architecture: $ARCH"
     echo "Supported architectures: x86_64, aarch64"
@@ -30,7 +35,7 @@ fi
 
 MIRROR_URLS=(
     "https://repo.anaconda.com/miniconda/${MINICONDA_FILE}"
-    "https://repo.huaweicloud.com/anaconda/miniconda/${MINICONDA_FILE}"
+    "https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/${MINICONDA_FILE}"
 )
 
 mkdir -p "${OUTPUT_DIR}"
@@ -89,4 +94,6 @@ echo ""
 echo "Next steps:"
 echo "  1. Verify the file: bash ${MINICONDA_FILE} --help"
 echo "  2. Use it to build Docker image:"
-echo "     bash build.sh -t A3 -m ${OUTPUT_DIR}/${MINICONDA_FILE}"
+echo "     bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11"
+# Last line: the resulting installer file name (consumed by build.sh).
+echo "${MINICONDA_FILE}"

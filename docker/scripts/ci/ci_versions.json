@@ -1,0 +1,23 @@
+{
+  "ci_26.0.0": {
+    "torch": "2.7.1",
+    "torch_npu": "2.7.1.post4",
+    "python": "3.11",
+    "librosa": "0.11.0",
+    "soundfile": "0.13.1"
+  },
+  "ci_26.1.0": {
+    "torch": "2.7.1",
+    "torch_npu": "2.7.1.post6",
+    "python": "3.11",
+    "librosa": "0.11.0",
+    "soundfile": "0.13.1"
+  },
+  "ci_master": {
+    "torch": "2.10.0",
+    "torch_npu": "2.10.0.post4",
+    "python": "3.12",
+    "librosa": "0.11.0",
+    "soundfile": "0.13.1"
+  }
+}
