@@ -115,10 +115,13 @@ class TrainEngine:
         args = self.args
         if args.features.loss_cfg.loss_type == "raw":
             return
-        chunk_size = args.features.chunkloss_plan.chunk_size if args.features.enable_chunk_loss else None
+        plan = args.features.chunkloss_plan
+        chunk_size = plan.chunk_size
+        vocab_tile_size = plan.vocab_tile_size
+
         if args.features.enable_dynamic_chunk_loss:
-            batch_data['total_chunk_size'] = args.features.chunkloss_plan.total_chunk_size
-        loss_func = build_loss_func(args.features.loss_cfg.loss_type, chunk_size=chunk_size, **batch_data)
+            batch_data['total_chunk_size'] = plan.total_chunk_size
+        loss_func = build_loss_func(args.features.loss_cfg.loss_type, chunk_size=chunk_size, vocab_tile_size=vocab_tile_size, **batch_data)
 
         if hasattr(self.model, "loss_function"):
             self.model.loss_function = loss_func

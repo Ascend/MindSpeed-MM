@@ -78,14 +78,15 @@ class FeaturesApplier:
         async_offload_modules(activation_offload_modules)
 
     def apply_chunkloss(self, model):
+        plan = self.config.chunkloss_plan
         if self.config.enable_chunk_loss:
             setattr(model, "enable_chunk_loss", True)
-            setattr(model, "chunk_size", self.config.chunkloss_plan.chunk_size)
+            setattr(model, "chunk_size", plan.chunk_size)
         elif self.config.enable_dynamic_chunk_loss:
             setattr(model, "enable_dynamic_chunk_loss", True)
         else:
             return
-        chunkloss_module = get_chunkloss_module(model, self.config.chunkloss_plan)
+        chunkloss_module = get_chunkloss_module(model, plan)
         apply_chunkloss_module(chunkloss_module)
 
     def apply_aux_loss_capture(self, model):

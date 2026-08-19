@@ -102,14 +102,34 @@ class ChunkLossPlanConfig(BaseArguments):
         default="lm_head",
         metadata={"help": "module that applied chunk loss"}
     )
-    chunk_size: int = field(
-        default=1024,
-        metadata={"help": "Size of each chunk loss"},
+    chunk_size: Optional[int] = field(
+        default=None,
+        metadata={"help": "Chunk size. Legacy (impl_type='legacy'): token-chunk size along seq, "
+                          "None falls back to 1024. CCE (impl_type='cce'): reused as the outer "
+                          "seq_chunk_size, None passes through to the kernel as single segment "
+                          "(no seq chunking)."},
     )
     total_chunk_size: int = field(
         default=4096,
         metadata={"help": "Size of total chunk loss"},
     )
+    impl_type: Literal["legacy", "cce"] = field(
+        default="legacy",
+        metadata={"help": "Chunk loss implementation: 'legacy' or 'cce'"},
+    )
+    vocab_tile_size: Optional[int] = field(
+        default=4096,
+        metadata={"help": "Vocab tile size for CCE loss"},
+    )
+
+    @model_validator(mode="after")
+    def _resolve_plan(self):
+        if self.impl_type == "legacy" and self.chunk_size is None:
+            self.chunk_size = 1024
+        if self.impl_type != "cce" and self.vocab_tile_size is not None:
+            # vocab tile only applies to cce
+            self.vocab_tile_size = None
+        return self
 
 
 class LossArguments(BaseArguments):
@@ -215,3 +235,19 @@ class FeatureArguments(BaseArguments):
         default=False,
         metadata={"help": "Whether skip moe pad tokens"}
     )
+
+    @model_validator(mode="after")
+    def _normalize_loss_plan(self):
+        plan = self.chunkloss_plan
+        if plan.impl_type == "cce" and not self.enable_chunk_loss:
+            raise ValueError(
+                "chunkloss_plan.impl_type='cce' requires features.enable_chunk_loss=True, "
+                "otherwise CCE loss would be silently disabled."
+            )
+        if not self.enable_chunk_loss:
+            # chunk loss disabled: pass None through so loss build takes the plain path
+            if plan.chunk_size is not None:
+                plan.chunk_size = None
+            if plan.vocab_tile_size is not None:
+                plan.vocab_tile_size = None
+        return self

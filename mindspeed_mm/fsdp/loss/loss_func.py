@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.features.memory.chunkloss.chunkloss import chunk_loss, calculate_lm_loss, fixed_cross_entropy
+from mindspeed_mm.fsdp.features.memory.chunkloss.chunkloss_cce_fused import chunk_loss_cce_fused
 from mindspeed_mm.fsdp.utils.constants import AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import split_forward_gather_backward_with_cp
@@ -145,7 +146,8 @@ def get_loss_func_params(
 def build_loss_func(
     loss_type,
     ignore_index=-100,
-    chunk_size=1024,
+    chunk_size=None,
+    vocab_tile_size=None,
     **kwargs
 ):
     outer_labels = kwargs.get("labels", None)
@@ -153,8 +155,52 @@ def build_loss_func(
     _kwargs[AVG_PER_STEP_TOKEN_NUM] = kwargs.get(AVG_PER_STEP_TOKEN_NUM, None)
     _kwargs['total_chunk_size'] = kwargs.get('total_chunk_size', None)
     _kwargs['cu_seqlens'] = kwargs.get('cu_seqlens', None)
-    if chunk_size or kwargs.get('total_chunk_size', None):
+    if vocab_tile_size is not None:
+        # CCE path: vocab-tile streaming + 2D tile fused kernel + dual-stream pipelining
+        # Supported reductions: 'default' and 'per_token_loss' (both scalar-sum + alpha
+        # normalization). 'per_sample_loss' needs per-sample reduction and is not yet
+        # supported (CCE's autograd Function currently returns a single scalar sum).
+        if loss_type not in ("default", "per_token_loss"):
+            raise NotImplementedError(
+                f"CCE loss currently only supports loss_type='default'/'per_token_loss', got '{loss_type}'"
+            )
+        if kwargs.get('total_chunk_size', None):
+            raise ValueError(
+                "chunkloss_plan.impl_type='cce' is mutually exclusive with enable_dynamic_chunk_loss: "
+                "please enable only one chunk loss implementation."
+            )
+
+        # CCE does token chunking via vocab tiles internally, so it must never re-enter
+        # get_loss_func_params' token-chunk branch. Other loss paths (e.g. dynamic chunk
+        # loss) may have injected total_chunk_size / cu_seqlens into _kwargs; strip them
+        # so they cannot override the chunk_size=None passed below.
+        _cce_kwargs = {k: v for k, v in _kwargs.items() if k not in ("total_chunk_size", "cu_seqlens")}
+
+        def loss_func(hidden_states, head_weight, head_bias, labels=None):
+            if head_bias is not None:
+                raise NotImplementedError(f"head_bias is not supported in CCE loss")
+            labels = labels if labels is not None else outer_labels
+            if labels is None:
+                raise ValueError("labels must be provided either in build_loss_func or in loss_func call.")
+            # Reuse get_loss_func_params to get shift_labels/alpha/ignore_index
+            # Pass chunk_size=None to avoid token chunking (CCE uses vocab tile internally)
+            loss_func_kwargs = get_loss_func_params(
+                labels, loss_type, ignore_index, chunk_size=None, **_cce_kwargs,
+            )
+            shift_labels = loss_func_kwargs[0]["shift_labels"]
+            alpha = loss_func_kwargs[0]["alpha"]  # scalar (loss_mask.sum() or avg tokens)
+            loss = chunk_loss_cce_fused(
+                hidden_states, head_weight, shift_labels,
+                vt=vocab_tile_size, ignore_index=ignore_index,
+                seq_chunk_size=chunk_size,
+            )
+            # Alpha normalization (CCE forward outputs unnormalized sum loss)
+            # Autograd automatically handles gradient scaling for / alpha during backward
+            return loss / alpha
+
+    elif chunk_size or kwargs.get('total_chunk_size', None):
         # Return a closure that computes the chunked language modeling loss using the prepared config.
+
         def loss_func(hidden_states, head_weight, head_bias, labels=None):
             labels = labels if labels is not None else outer_labels
             if labels is None:
