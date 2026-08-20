@@ -61,7 +61,7 @@ Agentic SFT数据采用JSON格式，每条数据包含以下关键字段：
     {
         "messages": [
             {"role": "system", "content": "你是一名专业、高效的AI智能客服。当前对话的时间为: 2024年06月15日 14时30分00秒 (今天是星期六)。"},
-            {"role": "user", "content": "您好，在不在"},
+            {"role": "user", "content": "您好，在不在<audio>"},
             {"role": "assistant", "content": "您好，请问是杜女士吗？"},
             {"role": "user", "content": "您好，是的，我是杜女士。"},
             {"role": "assistant", "content": "杜女士，感谢您的确认。我是疾控中心的工作人员。我们注意到您还没有接种新型流感疫苗。为了您的健康和公共卫生安全，我们建议您尽快接种。"},
