@@ -6,7 +6,7 @@ show_help() {
 Usage: $0 [OPTIONS]
 
 Options:
-    -t, --torchversion VERSION   PyTorch version to install (default: 2.7.1)
+    -t, --torchversion VERSION   PyTorch version to install (default: 2.10.0)
     -m, --msid COMMIT_ID    MindSpeed commit ID (optional, use latest if not specified)
     -b, --msbranch BRANCH   MindSpeed branch name (optional, mutually exclusive with --msid)
     -y, --yes               Auto confirm all reinstallations
@@ -17,30 +17,30 @@ Options:
 
 Examples:
     # Install with latest MindSpeed (no commit ID)
-    bash $0 --torchversion 2.7.1 --install-cann
+    bash $0 --torchversion 2.10.0 --install-cann
 
     # Install with specific MindSpeed branch
-    bash $0 --torchversion 2.7.1 --msbranch master --install-cann
+    bash $0 --torchversion 2.10.0 --msbranch master --install-cann
 
     # Install with specific commit ID
-    bash $0 --torchversion 2.7.1 --msid 93c45456c7044bacddebc5072316c01006c938f9 --install-cann
+    bash $0 --torchversion 2.10.0 --msid 93c45456c7044bacddebc5072316c01006c938f9 --install-cann
 
     # Install without CANN
-    bash $0 --torchversion 2.7.1 --msid 93c45456c7044bacddebc5072316c01006c938f9
+    bash $0 --torchversion 2.10.0 --msid 93c45456c7044bacddebc5072316c01006c938f9
 
     # Auto confirm all reinstallations
-    bash $0 --torchversion 2.6.0 --msid 93c45456c7044bacddebc5072316c01006c938f9 --yes
+    bash $0 --torchversion 2.7.1 --msid 93c45456c7044bacddebc5072316c01006c938f9 --yes
 
     # Auto skip all reinstallations
     bash $0 --msid abcdef1234567890 --no
 
     # Interactive mode (default)
-    bash $0 --torchversion 2.7.1 --msid abcdef1234567890
+    bash $0 --torchversion 2.10.0 --msid abcdef1234567890
 EOF
 }
 
 # Default values
-TORCH_VERSION="2.7.1"
+TORCH_VERSION="2.10.0"
 MINDSPEED_COMMIT_ID=""
 MINDSPEED_BRANCH=""
 AUTO_CONFIRM=""  # Auto confirm mode: "", "yes", "no"

@@ -21,7 +21,7 @@ Last updated: 12/08/2025. Author: cxiaolong
 3. 创建并激活 Python 虚拟环境；
 
    ```bash
-   conda create -n [env_name] python=3.10
+   conda create -n [env_name] python=3.12
    conda activate [env_name]
    # 安装CANN latest下的te包，这会自动安装sympy,decorator等必装包
    pip install [CANN_HOME_PATH]/ascend-toolkit/latest/lib64/te-*-py3-none-any.whl

@@ -11,7 +11,7 @@ Qwen3-VL模型采用Pytorch原生FSDP2（Fully Sharded Data Parallel 2）框架,
 
 ## 环境准备
 
-1. 基于PyTorch框架和Python3.10完成模型训练环境的安装，具体请参见[MindSpeed MM安装指导](install_guide.md)。
+1. 基于PyTorch框架和Python3.12完成模型训练环境的安装，具体请参见[MindSpeed MM安装指导](install_guide.md)。
 2. 在`MindSpeed-MM`下创建以下目录用于存储日志、数据及权重文件。
 
     ```bash

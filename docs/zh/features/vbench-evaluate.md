@@ -35,8 +35,8 @@ vbench完成安装后，需要从源码复制文件到安装目录，其中"..."
 git clone https://github.com/Vchitect/VBench.git
 
 cd VBench
-cp -r vbench2_beta_i2v/third_party .../envs/test/lib/python3.10/site-packages/vbench2_beta_i2v/third_party
-cp -r vbench2_beta_long/configs  .../envs/test/lib/python3.10/site-packages/vbench2_beta_long/configs
+cp -r vbench2_beta_i2v/third_party .../envs/test/lib/python3.12/site-packages/vbench2_beta_i2v/third_party
+cp -r vbench2_beta_long/configs  .../envs/test/lib/python3.12/site-packages/vbench2_beta_long/configs
 
 ```
 

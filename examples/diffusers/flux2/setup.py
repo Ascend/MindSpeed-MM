@@ -70,8 +70,8 @@ setup(
     packages=find_packages(where="src"),
     install_requires=[
         "accelerate==1.10.0",
-        "torch==2.7.1",
-        "torchvision",
+        "torch==2.10.0",
+        "torchvision==0.25.0",
         "transformers==4.55.0",
         "ftfy",
         "tensorboard",

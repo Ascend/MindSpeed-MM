@@ -168,7 +168,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
         |参数名称|说明|是否必选|取值范围|
         |--|--|--|:-:|
-        |-t, --torchversion|表示当前使用的torch版本|否|2.6.0或2.7.1|
+        |-t, --torchversion|表示当前使用的torch版本|否|2.7.1或2.10.0|
         |-m, --msid|表示当前基于源码安装的MindSpeed加速库的commit id|是|MindSpeed最新商用分支commit id|
         |-y, --yes|确认所有软件重新安装|否|-|
         |-n, --no|自动跳过第三方依赖库安装|否|-|
@@ -182,8 +182,8 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
         ```text
         Version check results:
-        Currently installed torch version: 2.6.0, target version: 2.7.1
-        Currently installed torch_npu version: 2.6.0, target version: 2.7.1
+        Currently installed torch version: 2.6.0, target version: 2.10.0
+        Currently installed torch_npu version: 2.6.0, target version: 2.10.0
         Version mismatch detected. Continue installation? (y/n)
         ```
 
@@ -200,8 +200,8 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
   1. 激活环境：
 
       ```bash
-      # 激活上面构建的Python3.10版本的环境
-      conda create -n test python=3.10
+      # 激活上面构建的Python3.12版本的环境
+      conda create -n test python=3.12
       conda activate test
       ```
 
@@ -225,8 +225,8 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
         ```shell
         # 安装torch和TorchNPU构建参考 https://gitcode.com/ascend/pytorch/releases
-        pip3 install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
-        pip3 install torch_npu-2.7.1post4-cp310-cp310-manylinux_2_28_aarch64.whl
+        pip3 install torch-2.10.0-cp312-cp312-manylinux_2_28_aarch64.whl
+        pip3 install torch_npu-2.10.0.post4-cp312-cp312-manylinux_2_28_aarch64.whl
         ```
 
   4. 获取MindSpeed MM和Megatron-LM源码。

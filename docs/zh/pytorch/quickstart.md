@@ -8,7 +8,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别�
 
 ### 环境准备
 
-1. 基于PyTorch框架和Python3.10完成模型训练环境的安装，具体请参见[MindSpeed MM安装指导](install_guide.md)。
+1. 基于PyTorch框架和Python3.12完成模型训练环境的安装，具体请参见[MindSpeed MM安装指导](install_guide.md)。
 2. 在`MindSpeed-MM`下创建以下目录用于存储日志、数据及权重文件。
 
     ```bash
@@ -261,7 +261,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 
 ### 环境准备
 
-1. 基于PyTorch框架和Python3.10完成模型训练环境的安装，具体请参见[MindSpeed MM安装指导](install_guide.md)。
+1. 基于PyTorch框架和Python3.12完成模型训练环境的安装，具体请参见[MindSpeed MM安装指导](install_guide.md)。
 
 2. 安装其它依赖：
 

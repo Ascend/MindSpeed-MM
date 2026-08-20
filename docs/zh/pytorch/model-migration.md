@@ -176,14 +176,14 @@ export CPU_AFFINITY_CONF=<mode>,npu<value1>:<value2>-<value3>
     MindSpeed MM套件基于MindSpeed Core构建，采用类Megatron框架，安装方式如下：
 
     ```bash
-    # python3.10
-    conda create -n test python=3.10
+    # python3.12
+    conda create -n test python=3.12
     conda activate test
 
     # 安装 torch 和 TorchNPU，注意要选择对应python版本、x86或arm的torch、TorchNPU及apex包
     # 下载路径参考 https://www.hiascend.com/document/detail/zh/Pytorch/730/configandinstg/instg/insg_0001.html
-    pip install torch-2.7.1-cp310-cp310-manylinux_2_28_aarch64.whl
-    pip install torch_npu-2.7.1*-cp310-cp310-manylinux_2_28_aarch64.whl
+    pip install torch-2.10.0-cp312-cp312-manylinux_2_28_aarch64.whl
+    pip install torch_npu-2.10.0.post*-cp312-cp312-manylinux_2_28_aarch64.whl
 
     # apex for Ascend 参考 https://gitcode.com/Ascend/apex
     # 建议从原仓编译安装

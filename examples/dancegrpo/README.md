@@ -62,16 +62,10 @@ cd ..
 
 ### 2. 环境搭建
 
-```bash
-# python3.10
-conda create -n test python=3.10
-conda activate test
+请参考[安装指南](../../docs/zh/pytorch/install_guide.md)创建Python环境并安装 torch 和 TorchNPU。
 
-# 对于x86的设备，若遇到有关torchvision的导包问题，建议优先检查环境中的torchvision版本是否为`+cpu`版本，建议使用以下源配置解决此类问题
-# pip config set global.extra-index-url "https://download.pytorch.org/whl/cpu/ https://mirrors.huaweicloud.com/ascend/repos/pypi"
-# 安装torch和TorchNPU
-pip install torch-2.7.1+cpu-cp310-cp310-*.whl
-pip install torch_npu-2.7.1*.whl
+```bash
+conda activate test
 
 # 安装加速库
 git clone https://gitcode.com/Ascend/MindSpeed.git
@@ -223,4 +217,4 @@ bash examples/dancegrpo/posttrain_flux_dancegrpo_A5.sh
 
 ## FAQ
 
-1. 对于CPU型号为x86的设备，建议使用torchvision版本为`0.22.1+cpu`，若遇到有关torchvision的导包问题，建议优先检查环境中的torchvision版本是否为`+cpu`版本。
+1. 对于CPU型号为x86的设备，建议使用torchvision版本为`0.25.0+cpu`，若遇到有关torchvision的导包问题，建议优先检查环境中的torchvision版本是否为`+cpu`版本。

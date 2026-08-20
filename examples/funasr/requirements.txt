@@ -1,4 +1,4 @@
-torchaudio==2.7.1
+torchaudio==2.10.0
 transformers==4.57.0
 zhconv==1.4.3
 whisper_normalizer==0.1.12
