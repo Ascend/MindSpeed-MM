@@ -122,15 +122,6 @@ class ChunkLossPlanConfig(BaseArguments):
         metadata={"help": "Vocab tile size for CCE loss"},
     )
 
-    @model_validator(mode="after")
-    def _resolve_plan(self):
-        if self.impl_type == "legacy" and self.chunk_size is None:
-            self.chunk_size = 1024
-        if self.impl_type != "cce" and self.vocab_tile_size is not None:
-            # vocab tile only applies to cce
-            self.vocab_tile_size = None
-        return self
-
 
 class LossArguments(BaseArguments):
     loss_type: Optional[str] = field(
@@ -236,18 +227,36 @@ class FeatureArguments(BaseArguments):
         metadata={"help": "Whether skip moe pad tokens"}
     )
 
+    # Field normalization for the chunk loss plan. This is the single authority that
+    # owns enable/disable and impl-specific normalization for chunkloss_plan:
+    #
+    #   * disabled        -> chunk_size / vocab_tile_size = None  (plain loss path)
+    #   * enabled legacy  -> chunk_size None falls back to 1024; vocab tile stripped
+    #   * enabled cce     -> vocab tile kept; chunk_size None stays None (opaque, kernel)
     @model_validator(mode="after")
     def _normalize_loss_plan(self):
         plan = self.chunkloss_plan
-        if plan.impl_type == "cce" and not self.enable_chunk_loss:
+        impl = plan.impl_type
+
+        if impl == "cce" and not self.enable_chunk_loss:
             raise ValueError(
                 "chunkloss_plan.impl_type='cce' requires features.enable_chunk_loss=True, "
                 "otherwise CCE loss would be silently disabled."
             )
+
         if not self.enable_chunk_loss:
             # chunk loss disabled: pass None through so loss build takes the plain path
             if plan.chunk_size is not None:
                 plan.chunk_size = None
             if plan.vocab_tile_size is not None:
                 plan.vocab_tile_size = None
+            return self
+
+        # enabled: impl-specific normalization
+        if impl == "legacy":
+            if plan.chunk_size is None:
+                plan.chunk_size = 1024
+        if impl != "cce" and plan.vocab_tile_size is not None:
+            # vocab tile only applies to cce
+            plan.vocab_tile_size = None
         return self
