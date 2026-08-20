@@ -1,0 +1,183 @@
+# 并行策略
+parallel:
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules: # 如果要开prefetch的话，请不要随意修改apply_modules的顺序
+      - model.visual
+      - model.visual.blocks.{*}
+      - model.language_model.embed_tokens
+      - model.language_model
+      - model.language_model.layers.{*}
+      - lm_head
+      - mtp
+    param_dtype: bf16
+    reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+  ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
+
+### 数据相关配置
+data:
+  dataset_param: &TRAIN_DATASET_PARAM
+    dataset_type: huggingface
+    #数据集属性
+    attr:
+      images: images
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+
+    # 数据预处理
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH ./ckpt/hf_path/Qwen38-xxB # 替换为原始hf权重
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 0
+      video_fps: 2.0
+      video_maxlen: 64
+
+    basic_parameters: &TRAIN_BASIC_PARAMETERS
+      cutoff_len: 16384
+      template: qwen3_vl_nothink
+      enable_thinking: false
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: ./data/COCO2017
+      dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
+      cache_dir: ./cache_dir/
+      overwrite_cache: false
+      preprocess_on_fly: true
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+
+  val_dataset_param:
+    <<: *TRAIN_DATASET_PARAM
+    basic_parameters:
+      <<: *TRAIN_BASIC_PARAMETERS
+      dataset: ./data/mllm_format_llava_instruct_data_val.json
+      cache_dir: ./cache_dir/val
+
+  # 数据加载
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      model_name: qwen3vl
+      ignore_pad_token_for_loss: true
+    enable_preload: true
+
+# 模型配置
+model:
+  model_id: qwen3_5
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  attn_implementation: flash_attention_2
+  # 冻结部分模块
+  # freeze:
+  #   - model.visual
+  # 融合算子配置
+  gdn_implementation: ascendc
+  causal_conv1d_implementation: ascendc
+  # skip_recompute
+  skip_gdn_recompute: true
+  skip_flash_attn_recompute: true
+
+# 优化特性配置
+features:
+  # loss 配置
+  loss_cfg:
+    loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
+    router_aux_loss_coef: 0.0
+  # 重计算配置
+  recompute: true
+  recompute_plan:
+      apply_modules:
+        - model.visual.blocks.{*}
+        - model.language_model.layers.{*}
+  # chunkloss配置
+  enable_chunk_loss: true
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 512
+  # activation offload 配置
+  enable_activation_offload: true
+  activation_offload_plan:
+    apply_modules:
+     - model.visual.blocks.{*}
+     - model.language_model.layers.{*}
+  # chunkmbs配置
+  enable_chunk_mbs: false
+  chunkmbs_plan:
+    apply_modules:
+     - model.language_model.layers.{*}
+    chunk_mbs: 1 # 这个表示的是chunk之后的micro batchsize
+    batch_dim: 0
+    chunk_arg_indexs: [0]
+    chunk_kwarg_names: ["position_embeddings", "position_ids", "rope_deltas", "attention_mask"]
+
+# 训练配置
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.1
+  weight_decay: 0
+  train_iters: 100
+  val_interval: 0
+  val_micro_batch_size: 1
+  clip_grad: 0.0
+  init_model_with_meta_device: true
+  optimizer: adamw
+  adam_fused: true
+  save_interval: 10000
+  no_load_optim: true  # Do not load optimizer state; remove if loading is needed.
+  no_load_rng: true  # Do not load RNG state; remove if loading is needed.
+  no_save_optim: true  # Do not save optimizer state; remove if saving is needed.
+  no_save_rng: true  # Do not save RNG state; remove if saving is needed.
+  # load: ./ckpt/hf_path/Qwen38-xxB  # 根据load_format替换为hf权重或转换后的dcp权重路径
+  # load_format: auto  # 设置为auto时根据加载文件格式自动判断是hf权重还是dcp权重
+  # save: ./save_path
+  # save_format: dcp
+  use_deter_comp: false
+  plugin:
+    - mindspeed_mm/fsdp/models/qwen3_5
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+
+# 工具配置
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: true
+      with_memory: true
+      record_shapes: true
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 29
+      end_step: 32
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false

@@ -2425,6 +2425,7 @@ def load_balancing_loss_func(
 
 
 @auto_docstring
+@model_register.register("qwen3_8_moe")
 class Qwen3_5MoeForCausalLM(Qwen3_5MoePreTrainedModel, GenerationMixin):
     _tied_weights_keys = {"lm_head.weight": "model.embed_tokens.weight"}
     _tp_plan = {"lm_head": "colwise_gather_output"}
@@ -2440,9 +2441,73 @@ class Qwen3_5MoeForCausalLM(Qwen3_5MoePreTrainedModel, GenerationMixin):
         self.router_aux_loss_coef = config.router_aux_loss_coef
         self.num_experts = config.num_experts
         self.num_experts_per_tok = config.num_experts_per_tok
+        self.enable_mtp = bool(config.mtp_num_layers)
+        self.mtp = MultiTokenPredictionBlock(
+            config, Qwen3_5MoeDecoderLayer, Qwen3_5MoeRMSNorm
+        ) if self.enable_mtp else None
 
         # Initialize weights and apply final processing
         self.post_init()
+
+    @staticmethod
+    def overwrite_transformer_config(transformer_config, model_args, feature_args):
+        # gdn_implementation
+        gdn_implementation = getattr(model_args, "gdn_implementation", IMPL_EAGER).lower().strip()
+        if gdn_implementation not in IMPL_FOR_GDN:
+            raise ValueError(f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'.")
+        transformer_config.gdn_implementation = gdn_implementation
+
+        # causal conv1d implementation
+        causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()
+        if causal_conv1d_implementation not in IMPL_FOR_CAUSAL_CONV:
+            raise ValueError(f"Invalid causal_conv1d='{causal_conv1d_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'.")
+        transformer_config.causal_conv1d_implementation = causal_conv1d_implementation
+
+        if (gdn_implementation == "ascendc") and (causal_conv1d_implementation == "eager"):
+            raise ValueError(
+                f"Inconsistent implementations: gdn='{gdn_implementation}', "
+                f"causal_conv1d='{causal_conv1d_implementation}'. "
+                f"gdn can be 'ascendc' only if causal_conv1d is not 'eager'."
+            )
+
+        # skip flash attn recompute
+        skip_flash_attn_recompute = getattr(model_args, "skip_flash_attn_recompute", False)
+        if skip_flash_attn_recompute and gdn_implementation == "eager":
+            raise ValueError(
+                "skip_flash_attn_recompute cannot be True when gdn_implementation is 'eager'. "
+                "Please set skip_flash_attn_recompute to False or use a different gdn_implementation."
+            )
+        transformer_config.skip_flash_attn_recompute = skip_flash_attn_recompute
+
+        # skip gdn recompute
+        skip_gdn_recompute = getattr(model_args, "skip_gdn_recompute", False)
+        transformer_config.skip_gdn_recompute = skip_gdn_recompute
+
+        # moe compute
+        use_grouped_expert_matmul = getattr(model_args, "use_grouped_expert_matmul", False)
+        transformer_config.use_grouped_expert_matmul = use_grouped_expert_matmul
+
+        # aux loss
+        transformer_config.router_aux_loss_coef = feature_args.loss_cfg.router_aux_loss_coef
+        transformer_config.router_aux_loss_offload = feature_args.loss_cfg.router_aux_loss_offload
+        # mtp
+        mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
+        if mtp_num_layers not in (0, 1):
+            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be one of: 0, 1.")
+        transformer_config.mtp_num_layers = mtp_num_layers
+
+        # chunkloss
+        transformer_config.enable_chunk_loss = getattr(feature_args, "enable_chunk_loss", False)
+        transformer_config.enable_dynamic_chunk_loss = getattr(feature_args, "enable_dynamic_chunk_loss", False)
+
+        # ep balance
+        transformer_config.enable_ep_balance = getattr(feature_args, "enable_ep_balance", False)
+        transformer_config.max_dup_experts_num = getattr(feature_args.ep_balance_plan, "max_dup_experts_num", 2)
+
+        # skip moe pad tokens
+        transformer_config.skip_moe_pad_tokens = getattr(feature_args, "skip_moe_pad_tokens", False)
+
+        return transformer_config
 
     @can_return_tuple
     @auto_docstring
@@ -2503,11 +2568,21 @@ class Qwen3_5MoeForCausalLM(Qwen3_5MoePreTrainedModel, GenerationMixin):
         hidden_states = outputs.last_hidden_state
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        logits = self.lm_head(hidden_states[:, slice_indices, :])
+        if getattr(self, "enable_chunk_loss", False) or getattr(self, "enable_dynamic_chunk_loss", False):
+            logits = None
+            loss = self.lm_head(hidden_states[:, slice_indices, :], self.loss_function)
+        else:
+            logits = self.lm_head(hidden_states[:, slice_indices, :])
 
-        loss = None
-        if labels is not None:
-            loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
+            loss = None
+            if labels is not None:
+                loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
+
+        # Modification: all gather loss in all cp ranks for scaling up the grad.
+        ps = get_parallel_state()
+        if loss is not None and ps.is_cp_enable():
+            loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0)
+            loss = loss.sum()
 
         aux_loss = None
         if output_router_logits:
