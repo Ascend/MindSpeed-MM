@@ -4,11 +4,19 @@
 
 ### 使用方法（InternVL已支持）
 
-以internvl为例，在examples/internvl2.5/data_4B.json中，修改basic_parameters。
+以internvl为例，数据配置文件为`examples/internvl3.5/data.json`，默认使用单个数据集，`basic_parameters`格式如下：
 
-假设要训练dataset1和dataset2两个数据集，修改如下
+```json
+    "basic_parameters": {
+        "data_path": "/path/dataset_json_path",
+        "data_folder": "/path/dataset_root_path",
+        "repeat_time": 1
+    }
+```
 
-```shell
+假设要训练dataset1和dataset2两个数据集，将`basic_parameters`修改为列表格式如下：
+
+```json
     "basic_parameters": [{
         "data_path": "/path/dataset1_json_path",
         "data_folder": "/path/dataset1_root_path",
@@ -20,6 +28,12 @@
         "repeat_time": 1
     }]
 ```
+
+其中`repeat_time`用于控制对应数据集的重复比例：大于1时样本重复相应倍数，小于1时仅取前侧相应比例的样本。
+
+> [!NOTE]
+>
+> 该多数据集方式适用于`dataset_type: multimodal`的配置（如InternVL）；使用`dataset_type: huggingface`的模型（如Qwen系列）多数据集请按逗号分隔方式配置，参考[针对VL模型的数据构造](./building_data_for_VLModel.md)。
 
 ## 理解模型数据模块添加流程
 
