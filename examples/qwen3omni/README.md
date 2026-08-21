@@ -466,7 +466,7 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
         },
         {
             "role": "user",
-            "content": "您好，在不在"
+            "content": "您好，在不在<audio>"
         },
         {
             "role": "assistant",
