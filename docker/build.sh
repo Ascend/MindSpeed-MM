@@ -357,37 +357,31 @@ BUILD_ARGS="$BUILD_ARGS --build-arg BASE_IMAGE=${BASE_IMAGE}"
 BUILD_ARGS="$BUILD_ARGS --build-arg PYTHON_VERSION=${PYTHON_VERSION}"
 BUILD_ARGS="$BUILD_ARGS --build-arg DECORD_DEPS_DIR=decord_deps"
 BUILD_ARGS="$BUILD_ARGS --build-arg DECORD_BUILD=${DECORD_BUILD}"
+BUILD_ARGS="$BUILD_ARGS --build-arg CANN_VERSION=${CANN_VERSION}"
+
+if [ "$BUILD_CI" = true ]; then
+    TARGET_DOCKERFILE="$CI_DOCKERFILE"
+    TARGET_IMAGE="$IMAGE_NAME"
+    BUILD_KIND="standalone CI"
+else
+    TARGET_DOCKERFILE="$DOCKERFILE"
+    TARGET_IMAGE="$DEV_IMAGE_NAME"
+    BUILD_KIND="dev"
+fi
 
 echo ""
-echo ">>> Building dev image: ${DEV_IMAGE_NAME}"
+echo ">>> Building ${BUILD_KIND} image: ${TARGET_IMAGE}"
 echo ""
-
 set +e
 docker build \
-    -t "$DEV_IMAGE_NAME" \
-    -f "$DOCKERFILE" \
+    -t "$TARGET_IMAGE" \
+    -f "$TARGET_DOCKERFILE" \
     $BUILD_ARGS \
     $NO_CACHE \
     --network=host \
     .
 BUILD_RESULT=$?
 set -e
-
-if [ $BUILD_RESULT -eq 0 ] && [ "$BUILD_CI" = true ]; then
-    echo ""
-    echo ">>> Building CI image on top of dev image: ${IMAGE_NAME}"
-    echo ""
-    set +e
-    docker build \
-        -t "$IMAGE_NAME" \
-        -f "$CI_DOCKERFILE" \
-        --build-arg DEV_IMAGE="$DEV_IMAGE_NAME" \
-        $NO_CACHE \
-        --network=host \
-        .
-    BUILD_RESULT=$?
-    set -e
-fi
 
 # Clean up temporary build-context files regardless of build result.
 rm -f "${MINICONDA_NAME}"

@@ -1,72 +1,123 @@
 # ============================================
-# MindSpeed MM CI Docker Image Build File
+# Standalone MindSpeed-MM CI image
 #
-# Built ON TOP of the dev image (built from Dockerfile).
-# Adds multiple conda environments (one per MindSpeed-MM release branch) and
-# pre-downloads CI test dependencies (transformers, Megatron-LM) to avoid
-# network instability at test time.
+# Current supported platform:
+#   - NPU: 910b
+#   - CPU: aarch64
+#   - OS:  openEuler
 #
-# Kept as a separate Dockerfile so the dev image stays clean and small, and CI
-# builds can extend any published dev image.
+# This image is built directly from the CANN base image. Build tools, downloaded
+# CANN installers, FLA sources, and compiler caches stay in ci-builder; the
+# final stage contains only CI runtime content.
 # ============================================
 
-ARG DEV_IMAGE
-FROM ${DEV_IMAGE}
+ARG BASE_IMAGE=swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12
+FROM ${BASE_IMAGE} AS ci-builder
 
-# tomli is needed to parse pyproject.toml of each branch on Python < 3.11.
-RUN pip install tomli
+USER root
 
-# Copy CI build scripts and version config (context is the docker/ directory).
+ARG MINICONDA_SH
+ARG DECORD_SCRIPT
+ARG DECORD_DEPS_DIR=decord_deps
+ARG DECORD_BUILD=true
+ARG CANN_VERSION=9.1.0
+
+RUN ARCH="$(uname -m)" && \
+    . /etc/os-release && \
+    ID_LOWER="$(echo "${ID}" | tr '[:upper:]' '[:lower:]')" && \
+    test "${ARCH}" = "aarch64" && \
+    echo "${ID_LOWER}" | grep -q "openeuler"
+
+COPY configure_repo.sh /tmp/configure_repo.sh
+RUN chmod +x /tmp/configure_repo.sh && \
+    bash /tmp/configure_repo.sh && \
+    rm -f /tmp/configure_repo.sh && \
+    yum install -y git wget curl gawk && \
+    yum clean all && \
+    rm -rf /var/cache/yum
+
+COPY ${MINICONDA_SH} /tmp/miniconda.sh
+RUN bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm -f /tmp/miniconda.sh && \
+    /opt/conda/bin/conda tos accept --override-channels \
+        --channel https://repo.anaconda.com/pkgs/main && \
+    /opt/conda/bin/conda tos accept --override-channels \
+        --channel https://repo.anaconda.com/pkgs/r && \
+    /opt/conda/bin/pip config set global.index-url \
+        https://repo.huaweicloud.com/repository/pypi/simple && \
+    /opt/conda/bin/pip config set global.trusted-host repo.huaweicloud.com
+
+ENV PATH=/opt/conda/bin:$PATH
+ENV CONDA_AUTO_UPDATE_CONDA=false
+ENV CANN_VERSION=${CANN_VERSION}
+
+# Build Decord once, retain its source for per-Python bindings, and collect only
+# runtime shared objects for the final stage.
+COPY ${DECORD_SCRIPT} /tmp/install_decord.sh
+COPY ${DECORD_DEPS_DIR} /tmp/decord_deps/
+RUN test "${DECORD_BUILD}" = "true" && \
+    chmod +x /tmp/install_decord.sh && \
+    bash /tmp/install_decord.sh /tmp/decord_deps && \
+    mkdir -p /opt/decord_src /decord_artifacts/lib && \
+    cp -a /tmp/decord/. /opt/decord_src/ && \
+    cp -aL /usr/local/lib/*.so* /decord_artifacts/lib/ && \
+    rm -rf /tmp/decord_deps /tmp/install_decord.sh \
+        /root/ffmpeg_sources /root/ffmpeg_build /root/bin
+
+# Build every configured Conda environment. Environments with a structured
+# "fla" entry also receive a private CANN installation and an FLA wheel.
+RUN yum install -y patch && \
+    yum clean all && \
+    rm -rf /var/cache/yum
+
 COPY scripts/ci/ /tmp/ci_scripts/
+RUN python /tmp/ci_scripts/build_ci_envs.py && \
+    rm -rf /tmp/ci_scripts /root/.cache/pip /opt/conda/pkgs/*
 
-# To keep the CI build fully independent of the dev image (which does not retain
-# the decord source tree), we rebuild decord from source here using the SAME
-# script and dependencies as the dev build (install_decord_on_arm.sh). This
-# produces a built decord tree at /tmp/decord from which build_ci_envs.py
-# compiles the per-python pybind11 bindings for every fresh conda environment.
-# Works for any python version (3.12, 3.13, ...): adding one only requires a new
-# entry in ci_versions.json. On x86_64 decord comes from pip instead.
-COPY common/install_decord_on_arm.sh /tmp/install_decord.sh
-COPY decord_deps/ /tmp/decord_deps/
+# Pre-fetch only the revisions used by CI while retaining shallow .git metadata.
+RUN mkdir -p /workspace/transformers-7a833d1 && \
+    git -C /workspace/transformers-7a833d1 init && \
+    git -C /workspace/transformers-7a833d1 remote add origin \
+        https://github.com/huggingface/transformers.git && \
+    git -C /workspace/transformers-7a833d1 fetch --depth 1 origin \
+        7a833d1ccd41673030c85107f65f454c0c3222f5 && \
+    git -C /workspace/transformers-7a833d1 checkout --detach FETCH_HEAD && \
+    git clone --depth 1 --branch core_v0.12.1 \
+        https://github.com/NVIDIA/Megatron-LM.git \
+        /workspace/Megatron-LM_core_v0.12.1
 
-# Create the multi-version conda environments (one per release branch).
-# The decord source build (install_decord_on_arm.sh) installs its own build
-# tools (gcc/g++/make/cmake/...), which are only needed at build time.
-RUN if [ -d /tmp/decord_deps/decord ]; then \
-        echo ">>> Building decord from source (aarch64)..." && \
-        bash /tmp/install_decord.sh /tmp/decord_deps && \
-        echo ">>> Keeping built decord source tree for per-python bindings..." && \
-        mkdir -p /opt/decord_src && \
-        cp -r /tmp/decord/. /opt/decord_src/ ; \
-    else \
-        echo ">>> No decord source found (x86_64 or non-ARM); decord will come from pip"; \
-    fi && \
-    rm -rf /tmp/decord_deps /tmp/install_decord.sh ~/ffmpeg_sources ~/ffmpeg_build ~/bin && \
-    python /tmp/ci_scripts/build_ci_envs.py && \
-    rm -rf /tmp/ci_scripts /tmp/decord
 
-# Pre-download CI test dependencies (cloned during image build to avoid
-# network instability at test time).
-RUN echo ">>> Pre-downloading transformers (commit 7a833d1)..." && \
-    git clone https://github.com/huggingface/transformers.git /workspace/transformers && \
-    cd /workspace/transformers && \
-    git checkout 7a833d1 && \
-    cd /workspace && \
-    mv transformers transformers-7a833d1 && \
-    echo ">>> Pre-downloading Megatron-LM (branch core_v0.12.1)..." && \
-    git clone https://github.com/NVIDIA/Megatron-LM.git /workspace/Megatron-LM && \
-    cd /workspace/Megatron-LM && \
-    git checkout core_v0.12.1 && \
-    cd /workspace && \
-    mv Megatron-LM Megatron-LM_core_v0.12.1
+# ============================================
+# Final CI runtime image
+# ============================================
+FROM ${BASE_IMAGE} AS final
 
-# /workspace must NOT contain MindSpeed-MM source (the CI test code is mounted
-# into ${WORKSPACE}/CODE by the CI platform, not pre-baked into the image).
-RUN rm -rf /workspace/MindSpeed-MM
+USER root
+
+COPY configure_repo.sh /tmp/configure_repo.sh
+RUN chmod +x /tmp/configure_repo.sh && \
+    bash /tmp/configure_repo.sh && \
+    rm -f /tmp/configure_repo.sh && \
+    yum install -y git iproute wget curl gawk ffmpeg && \
+    yum clean all && \
+    rm -rf /var/cache/yum
+
+COPY --from=ci-builder /opt/conda/ /opt/conda/
+COPY --from=ci-builder /workspace/cann/ /workspace/cann/
+COPY --from=ci-builder /workspace/transformers-7a833d1/ \
+    /workspace/transformers-7a833d1/
+COPY --from=ci-builder /workspace/Megatron-LM_core_v0.12.1/ \
+    /workspace/Megatron-LM_core_v0.12.1/
+COPY --from=ci-builder /decord_artifacts/lib/ /usr/local/lib/
+
+RUN echo '/usr/local/lib' > /etc/ld.so.conf.d/mindspeed-ci-libs.conf && \
+    ldconfig && \
+    test -f /workspace/cann/ci_master/cann/set_env.sh && \
+    /opt/conda/bin/conda clean -afy && \
+    rm -rf /root/.cache/pip /opt/conda/pkgs/* /tmp/*
+
+ENV PATH=/opt/conda/bin:$PATH
+ENV CONDA_AUTO_UPDATE_CONDA=false
+ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/ascend-toolkit
 
 WORKDIR /workspace
-ENV FINAL_WORKDIR=/workspace
-
-# Ensure conda is in PATH and CANN toolkit is discoverable.
-ENV PATH=/opt/conda/bin:$PATH
-ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/ascend-toolkit
