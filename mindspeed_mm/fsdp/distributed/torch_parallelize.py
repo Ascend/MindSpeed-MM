@@ -31,7 +31,7 @@ class ParallelApplier:
             self.config.ep_plan._gradient_divide_factor = torch.distributed.get_world_size()
         if self.config.expert_parallel_size > 1 and self.config.ep_plan.apply_modules:
             model = expert_parallelize_modules(model, self.parallel_state.get_ep_device_mesh(), self.config.ep_plan)
-            model = expert_fully_shard_modules(model, self.parallel_state.get_efsdp_device_mesh(), self.config.ep_plan, self.config.fsdp_plan)
+            model = expert_fully_shard_modules(model, self.parallel_state.get_ehsdp_device_mesh(), self.config.ep_plan, self.config.fsdp_plan)
             # Remove modules already handled by efsdp from the standard FSDP plan to prevent duplicate fully_shard errors
             self.config.fsdp_plan.apply_modules = [x for x in self.config.fsdp_plan.apply_modules if x not in self.config.ep_plan.apply_efsdp_modules]
         return model

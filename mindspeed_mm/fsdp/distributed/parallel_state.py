@@ -81,6 +81,7 @@ class ParallelState(metaclass=Singleton):
         mesh_shape = (self.expert_data_parallel_size,) + mesh_shape
 
         self.ep_fsdp_device_mesh = init_device_mesh(device_type=get_device_type(), mesh_shape=mesh_shape, mesh_dim_names=mesh_dim_names)
+        self.ep_fsdp_device_mesh[("edp", "efsdp")]._flatten(mesh_dim_name="ehsdp")
         self.register_funcs(self.ep_fsdp_device_mesh, mesh_dim_names)
 
         if torch.distributed.get_rank() == 0:
@@ -107,7 +108,7 @@ class ParallelState(metaclass=Singleton):
     def get_hsdp_group_size(self) -> Optional["ProcessGroup"]:
         return self.device_mesh.get_group("dp_cp").size()
 
-    def get_efsdp_device_mesh(self) -> "DeviceMesh":
+    def get_ehsdp_device_mesh(self) -> "DeviceMesh":
       if self.expert_data_parallel_size > 1:
           # HSDP, return 2D mesh
           return self.ep_fsdp_device_mesh["edp", "efsdp"]
