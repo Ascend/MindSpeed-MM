@@ -12,7 +12,7 @@ from torch.distributed.checkpoint.metadata import STATE_DICT_TYPE
 from torch.distributed.checkpoint.state_dict_loader import _load_state_dict
 from torch.distributed.checkpoint.default_planner import _EmptyStateDictLoadPlanner
 
-from transformers import AutoConfig, AutoProcessor
+from transformers import AutoConfig, AutoProcessor, GenerationConfig
 from safetensors.torch import load_file, save_file
 
 from checkpoint.common.permissions import set_directory_permissions
@@ -183,6 +183,10 @@ def merge_dcp_to_hf(
     save_path = Path(save_dir)
     config.save_pretrained(save_path)
     processor.save_pretrained(save_path)
+    try:
+        GenerationConfig.from_pretrained(str(model_assets_dir)).save_pretrained(save_path)
+    except (OSError, ValueError):
+        pass
 
     save_hf_weights(
         save_path=save_path,
@@ -221,6 +225,10 @@ def merge_dcp_to_hf_sharded(
     processor = AutoProcessor.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
     config.save_pretrained(save_dir)
     processor.save_pretrained(save_dir)
+    try:
+        GenerationConfig.from_pretrained(model_assets_dir).save_pretrained(save_dir)
+    except (OSError, ValueError):
+        pass
 
     storage_reader = FileSystemReader(str(load_dir))
     metadata = load_metadata(storage_reader)

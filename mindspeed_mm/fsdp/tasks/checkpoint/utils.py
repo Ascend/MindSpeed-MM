@@ -10,7 +10,7 @@ from safetensors.torch import load_file, save_file
 import torch
 from torch.distributed.checkpoint import FileSystemReader, FileSystemWriter
 from tqdm import tqdm
-from transformers import AutoConfig, AutoProcessor
+from transformers import AutoConfig, AutoProcessor, GenerationConfig
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME
 
 from mindspeed_mm.fsdp.checkpoint.dcp_utils import (
@@ -301,6 +301,10 @@ def merge_dcp_to_hf_sharded(
     processor = AutoProcessor.from_pretrained(model_assets_dir, trust_remote_code=trust_remote_code)
     config.save_pretrained(save_dir)
     processor.save_pretrained(save_dir)
+    try:
+        GenerationConfig.from_pretrained(model_assets_dir).save_pretrained(save_dir)
+    except (OSError, ValueError):
+        pass
 
     storage_reader = FileSystemReader(str(load_dir))
     metadata = load_metadata(storage_reader)
