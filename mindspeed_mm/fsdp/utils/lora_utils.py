@@ -31,18 +31,9 @@ from typing import List, Optional, Set, Tuple, Dict, Any
 import torch
 import torch.nn as nn
 
+from mindspeed.fsdp.utils.str_match import module_name_match
+
 logger = logging.getLogger(__name__)
-
-
-def freeze_parameters(model: nn.Module) -> None:
-    """Freeze all parameters in the model.
-
-    Args:
-        model: The PyTorch model to freeze.
-    """
-    model.requires_grad_(False)
-    model.eval()
-    model.train()
 
 
 def match_target_modules(model: nn.Module, patterns: List[str]) -> List[str]:
@@ -69,6 +60,70 @@ def match_target_modules(model: nn.Module, patterns: List[str]) -> List[str]:
                 matched_modules.append(name)
                 break
 
+    return matched_modules
+
+
+def _is_under_freeze(name: str, freeze_patterns: List[str]) -> bool:
+    """Check if a leaf module name falls under any freeze pattern.
+
+    ``model.freeze`` patterns match *container* modules (e.g. ``model.visual``)
+    and freeze their parameters recursively. To decide whether a *leaf* Linear
+    (e.g. ``model.visual.blocks.0.attn.qkv``) is excluded from LoRA injection we
+    check every ancestor prefix (including the leaf itself) against each freeze
+    pattern using the same ``module_name_match`` matcher that freeze uses, so
+    "what freeze freezes, all-linear excludes".
+
+    Args:
+        name: Full module name of the leaf.
+        freeze_patterns: ``model.freeze`` patterns (may contain ``{*}`` wildcards).
+
+    Returns:
+        True if any ancestor of ``name`` matches any freeze pattern.
+    """
+    if not freeze_patterns:
+        return False
+    parts = name.split(".")
+    ancestors = [".".join(parts[:i]) for i in range(1, len(parts) + 1)]
+    return any(
+        module_name_match(freeze_pattern, ancestor)
+        for freeze_pattern in freeze_patterns
+        for ancestor in ancestors
+    )
+
+
+def find_all_linear_target_modules(
+    model: nn.Module,
+    freeze_patterns: Optional[List[str]] = None,
+) -> List[str]:
+    """Resolve the ``all-linear`` keyword to concrete target module names.
+
+    Scans ``model.named_modules()`` and collects every ``nn.Linear`` leaf module
+    whose full name does not contain an output-head/already-LoRA substring and is
+    not covered by any ``model.freeze`` pattern. Returns full module names so the
+    result can be fed directly to ``peft.LoraConfig(target_modules=...)``.
+
+    Args:
+        model: The PyTorch model to scan.
+        freeze_patterns: Optional ``model.freeze`` patterns used to exclude
+            whole components (e.g. ViT / aligner) from LoRA injection.
+
+    Returns:
+        List of full matched module names.
+    """
+    # Skip specified layers during automatic target module selection for LoRA
+    # injection to exclude output heads and prevent recursive LoRA nesting.
+    ignore_layers = ["lm_head", "score", "v_head", "classifier",
+                     "lora_a", "lora_b", "base_layer",]
+    matched_modules: List[str] = []
+    for name, module in model.named_modules():
+        if not isinstance(module, nn.Linear):
+            continue
+        name_lower = name.lower()
+        if any(sub in name_lower for sub in ignore_layers):
+            continue
+        if _is_under_freeze(name, freeze_patterns or []):
+            continue
+        matched_modules.append(name)
     return matched_modules
 
 
@@ -181,9 +236,6 @@ def get_lora_trainable_params(model: nn.Module) -> Tuple[int, int, Dict[str, Any
     return trainable_params, total_params, stats_dict
 
 
-_MISSING = object()
-
-
 def _disable_peft_moe_conversion(model: nn.Module):
     """Temporarily hide ``config.model_type`` to prevent PEFT's v5 MoE config conversion.
 
@@ -197,12 +249,11 @@ def _disable_peft_moe_conversion(model: nn.Module):
     conversion is skipped, so the original ``target_modules`` suffixes are preserved
     and LoRA lands on the intended ``nn.Linear`` layers.
 
-    Returns the original ``model_type`` value (or ``_MISSING`` sentinel) so it can
-    be restored by :func:`_restore_peft_moe_conversion`.
+    Returns the original ``model_type`` value so it can be restored by :func:`_restore_peft_moe_conversion`.
     """
     config = getattr(model, "config", None)
     if config is None or not hasattr(config, "model_type"):
-        return _MISSING
+        return None
     saved = config.model_type
     config.model_type = None
     return saved
@@ -210,7 +261,7 @@ def _disable_peft_moe_conversion(model: nn.Module):
 
 def _restore_peft_moe_conversion(model: nn.Module, saved_type):
     """Restore ``config.model_type`` after :func:`_disable_peft_moe_conversion`."""
-    if saved_type is _MISSING:
+    if saved_type is None:
         return
     config = getattr(model, "config", None)
     if config is not None:
@@ -225,7 +276,6 @@ def add_lora_to_model(
     lora_dropout: float = 0.05,
     init_lora_weights: bool | str = True,
     pretrained_lora_path: Optional[str] = None,
-    lora_target_modules_support: Optional[List[str]] = None,
     disable_peft_moe_conversion: bool = True,
 ) -> nn.Module:
     """Add LoRA adapters to a PyTorch model.
@@ -241,7 +291,6 @@ def add_lora_to_model(
         lora_dropout: Dropout rate for LoRA layers.
         init_lora_weights: Weight initialization method (True, False, or str).
         pretrained_lora_path: Path to pretrained LoRA weights (optional).
-        lora_target_modules_support: List of supported module types for validation.
         disable_peft_moe_conversion: If True, prevent PEFT from converting
             gate_proj/up_proj/down_proj target_modules into target_parameters
             (which would redirect LoRA from nn.Linear layers to MoE expert
@@ -273,27 +322,19 @@ def add_lora_to_model(
         bias="none",
     )
 
-    if lora_target_modules_support is not None:
-        for lora_target_module in lora_config.target_modules:
-            if lora_target_module not in lora_target_modules_support:
-                raise ValueError(
-                    f"lora_target_module {lora_target_module} not in "
-                    f"lora_target_modules_support"
-                )
-
-    _saved_model_type = _MISSING
+    _saved_model_type = None
     if disable_peft_moe_conversion:
         _saved_model_type = _disable_peft_moe_conversion(model)
+
+    # Inject LoRA adapters into the model
     model = inject_adapter_in_model(lora_config, model)
+
     if disable_peft_moe_conversion:
         _restore_peft_moe_conversion(model, _saved_model_type)
 
-    for param in model.parameters():
-        if param.requires_grad:
-            param.data = param.to(torch.float32)
-
+    # Cast every trainable or LoRA-named parameter to float32.
     for name, param in model.named_parameters():
-        if "lora" in name:
+        if param.requires_grad or "lora" in name:
             param.data = param.data.to(dtype=torch.float32)
 
     if pretrained_lora_path is not None:

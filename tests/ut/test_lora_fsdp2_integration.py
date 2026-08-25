@@ -33,7 +33,6 @@ import torch.nn as nn
 from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
 from mindspeed_mm.fsdp.utils.lora_utils import (
     add_lora_to_model,
-    freeze_parameters,
     load_state_dict,
     match_target_modules,
     validate_lora_config,
@@ -338,7 +337,7 @@ class TestAddLoraToModel:
 
     def test_lora_injection(self) -> None:
         model = SimpleModel()
-        freeze_parameters(model)
+        model.requires_grad_(False)
         model = add_lora_to_model(
             model, lora_rank=4, lora_alpha=8,
             lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
@@ -356,7 +355,7 @@ class TestAddLoraToModel:
 
     def test_base_params_frozen_after_injection(self) -> None:
         model = SimpleModel()
-        freeze_parameters(model)
+        model.requires_grad_(False)
         model = add_lora_to_model(
             model, lora_rank=4, lora_alpha=8,
             lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
@@ -371,7 +370,7 @@ class TestAddLoraToModel:
     def test_lora_params_dtype_float32(self) -> None:
         model = SimpleModel()
         model = model.to(torch.float16)
-        freeze_parameters(model)
+        model.requires_grad_(False)
         model = add_lora_to_model(
             model, lora_rank=4, lora_alpha=8,
             lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
@@ -381,31 +380,9 @@ class TestAddLoraToModel:
             if "lora" in name:
                 assert param.dtype == torch.float32
 
-    def test_lora_target_modules_support_valid(self) -> None:
-        model = SimpleModel()
-        freeze_parameters(model)
-        model = add_lora_to_model(
-            model, lora_rank=4, lora_alpha=8,
-            lora_target_modules=["linear1", "linear2"],
-            lora_target_modules_support=["linear1", "linear2", "linear3"],
-        )
-
-        lora_params = [n for n, _ in model.named_parameters() if "lora" in n]
-        assert len(lora_params) > 0
-
-    def test_lora_target_modules_support_invalid(self) -> None:
-        model = SimpleModel()
-        freeze_parameters(model)
-        with pytest.raises(ValueError, match="not in lora_target_modules_support"):
-            add_lora_to_model(
-                model, lora_rank=4, lora_alpha=8,
-                lora_target_modules=["linear1", "linear2"],
-                lora_target_modules_support=["linear1"],
-            )
-
     def test_lora_alpha_stored_on_model(self) -> None:
         model = SimpleModel()
-        freeze_parameters(model)
+        model.requires_grad_(False)
         model = add_lora_to_model(
             model, lora_rank=4, lora_alpha=32,
             lora_target_modules=["linear1"],
@@ -417,7 +394,7 @@ class TestAddLoraToModel:
         from safetensors.torch import save_file
 
         model = SimpleModel()
-        freeze_parameters(model)
+        model.requires_grad_(False)
         model = add_lora_to_model(
             model, lora_rank=4, lora_alpha=8,
             lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
@@ -432,7 +409,7 @@ class TestAddLoraToModel:
         save_file(lora_state, pretrained_path)
 
         model2 = SimpleModel()
-        freeze_parameters(model2)
+        model2.requires_grad_(False)
         model2 = add_lora_to_model(
             model2, lora_rank=4, lora_alpha=8,
             lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
@@ -449,7 +426,7 @@ class TestLoraWeightManagerExtended:
 
     def _create_lora_model(self) -> nn.Module:
         model = SimpleModel()
-        freeze_parameters(model)
+        model.requires_grad_(False)
         model = add_lora_to_model(
             model, lora_rank=4, lora_alpha=8,
             lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,

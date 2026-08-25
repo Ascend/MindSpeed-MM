@@ -20,7 +20,7 @@ parameters used in FSDP2 distributed training.
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Union
 
 from mindspeed_mm.config.arguments.base_args import BaseArguments
 
@@ -39,7 +39,6 @@ class LoraArguments(BaseArguments):
         dropout: Dropout rate for LoRA layers.
         init_lora_weights: Weight initialization method.
         pretrained_lora_path: Path to pretrained LoRA weights (optional).
-        lora_target_modules_support: List of supported module types.
     """
     enable: bool = field(
         default=False,
@@ -53,11 +52,14 @@ class LoraArguments(BaseArguments):
         default=16,
         metadata={"help": "Scaling factor for LoRA weights."},
     )
-    target_modules: List[str] = field(
+    target_modules: Union[str, List[str]] = field(
         default_factory=lambda: ["q_proj", "k_proj", "v_proj"],
         metadata={
-            "help": "List of target module names/patterns for LoRA. "
-            "Supports wildcard patterns (e.g., 'language_model.layers.{*}.q_proj')."
+            "help": "Target module names/patterns for LoRA. Supports wildcard patterns "
+            "(e.g., 'language_model.layers.{*}.q_proj'), the special keyword "
+            "'all-linear' (auto-expand all nn.Linear leaves), or plain strings. "
+            "When 'all-linear' is used, model.freeze patterns exclude components "
+            "(e.g. ViT / aligner) from LoRA injection."
         },
     )
     dropout: float = field(
@@ -78,13 +80,6 @@ class LoraArguments(BaseArguments):
         default=None,
         metadata={"help": "Path to pretrained LoRA weights to load."},
     )
-    lora_target_modules_support: Optional[List[str]] = field(
-        default=None,
-        metadata={
-            "help": "List of supported module types for validation. "
-            "If None, validation is skipped."
-        },
-    )
     disable_peft_moe_conversion: bool = field(
         default=True,
         metadata={
@@ -100,6 +95,11 @@ class LoraArguments(BaseArguments):
 
     def model_post_init(self, __context):
         """Validate LoRA configuration after initialization."""
+        # Normalize target_modules: wrap bare strings (e.g. 'all-linear' or 'q_proj')
+        # into single-element lists for consistent iteration in downstream logic.
+        if isinstance(self.target_modules, str):
+            self.target_modules = [self.target_modules]
+
         if self.enable:
             if self.rank <= 0:
                 raise ValueError(f"LoRA rank must be positive, got {self.rank}")

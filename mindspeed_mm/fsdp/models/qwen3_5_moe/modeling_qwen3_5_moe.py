@@ -1134,6 +1134,14 @@ class Qwen3_5MoeExperts(nn.Module):
             self.register_full_backward_hook(hook_fn)
         self.skip_moe_pad_tokens = config.skip_moe_pad_tokens
 
+    def extra_repr(self) -> str:
+        return (
+            f"(gate_up_proj): Parameter(num_experts={self.num_experts}, "
+            f"hidden_dim={self.hidden_dim}, intermediate_dim={2 * self.intermediate_dim})\n"
+            f"(down_proj): Parameter(num_experts={self.num_experts}, "
+            f"intermediate_dim={self.intermediate_dim}, hidden_dim={self.hidden_dim})"
+        )
+
     def forward(
         self,
         hidden_states: torch.Tensor,

@@ -37,8 +37,8 @@ from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.train.train_engine import TrainEngine
 from mindspeed_mm.fsdp.utils.lora_utils import (
     add_lora_to_model,
-    freeze_parameters,
     match_target_modules,
+    find_all_linear_target_modules,
     validate_lora_config,
     get_lora_trainable_params,
     print_lora_config,
@@ -291,8 +291,17 @@ class Trainer:
         except ValueError as e:
             raise ValueError(f"Invalid LoRA configuration: {e}") from e
 
-        # Match target modules using wildcard patterns
-        matched_modules = match_target_modules(model, lora_config.target_modules)
+        # Match target modules: support the `all-linear` keyword (auto-expand all
+        # nn.Linear leaves) and the explicit wildcard patterns.
+        target_modules_cfg = lora_config.target_modules
+        if isinstance(target_modules_cfg, str):
+            target_modules_cfg = [target_modules_cfg]
+        if "all-linear" in target_modules_cfg:
+            matched_modules = find_all_linear_target_modules(
+                model, freeze_patterns=self.args.model.freeze
+            )
+        else:
+            matched_modules = match_target_modules(model, lora_config.target_modules)
 
         if not matched_modules:
             raise ValueError(
@@ -307,7 +316,7 @@ class Trainer:
             print_rank(logger.info, f"  ... and {len(matched_modules) - 5} more")
 
         # Freeze base model parameters
-        freeze_parameters(model)
+        model.requires_grad_(False)
 
         # Inject LoRA adapters
         model = add_lora_to_model(
@@ -318,7 +327,6 @@ class Trainer:
             lora_dropout=lora_config.dropout,
             init_lora_weights=lora_config.init_lora_weights,
             pretrained_lora_path=lora_config.pretrained_lora_path,
-            lora_target_modules_support=lora_config.lora_target_modules_support,
             disable_peft_moe_conversion=lora_config.disable_peft_moe_conversion,
         )
 
