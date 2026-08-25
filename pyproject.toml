@@ -1,7 +1,7 @@
 [project]
 name = "mindspeed-mm"
 version = "0.1"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.12,<3.13"
 description = "MindSpeed MM is designed to provide end-to-end large multi-modal model solutions for Huawei's Ascend chips, including models, algorithms, and downstream tasks."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -16,8 +16,7 @@ dependencies = [
     "bs4",
     "beartype",
     "pandas",
-    "torch==2.7.1; python_version < '3.12'",
-    "torch==2.10.0; python_version >= '3.12'",
+    "torch==2.10.0",
     "torchvision",
     "torchdata",
     "diffusers>=0.38.0",

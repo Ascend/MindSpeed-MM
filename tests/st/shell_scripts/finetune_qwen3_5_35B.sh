@@ -82,11 +82,12 @@ fi
 # 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export NON_MEGATRON=true
-export HCCL_CONNECT_TIMEOUT=1200
-export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 export MULTI_STREAM_MEMORY_REUSE=2
-export TASK_QUEUE_ENABLE=1
+export TASK_QUEUE_ENABLE=2
+export ASCEND_LAUNCH_BLOCKING=0
+export ACLNN_CACHE_LIMIT=100000
 export CPU_AFFINITY_CONF=1
+export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 
 NPUS_PER_NODE=8
 MASTER_ADDR=localhost

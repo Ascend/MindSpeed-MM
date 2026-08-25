@@ -11,11 +11,33 @@ type="$4"
 # 进入工作目录
 echo "init env"
 source /usr/local/Ascend/driver/bin/setenv.bash
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
+# The master CI environment owns a private CANN installation because building FLA produces CANN-side artifacts.
+CANN_SET_ENV="/usr/local/Ascend/ascend-toolkit/set_env.sh"
+CANN_SET_ENV_BACKUP="/usr/local/Ascend/ascend-toolkit/set_env.sh.base"
+PRIVATE_CANN_SET_ENV="/workspace/cann/ci_${branch}/cann/set_env.sh"
+if [ ! -f "$PRIVATE_CANN_SET_ENV" ]; then
+    echo "[ERROR] Private CANN environment script not found: $PRIVATE_CANN_SET_ENV"
+    exit 1
+fi
+if [ ! -e "$CANN_SET_ENV_BACKUP" ] && [ ! -L "$CANN_SET_ENV_BACKUP" ]; then
+    mv "$CANN_SET_ENV" "$CANN_SET_ENV_BACKUP"
+fi
+ln -sfn "$PRIVATE_CANN_SET_ENV" "$CANN_SET_ENV"
+echo "[CI] CANN set_env: $(readlink -f "$CANN_SET_ENV")"
+source "$CANN_SET_ENV"
+
 # 显式加载 conda 初始化钩子（非交互式 shell 不会自动 source ~/.bashrc）
 source /opt/conda/etc/profile.d/conda.sh
 conda activate "ci_${branch}"
-pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+
+# ============================================================
+# 配置 pip 使用华为云镜像源，加速依赖安装（写入全局 pip.conf）
+# ============================================================
+cat > /etc/pip.conf <<'EOF'
+[global]
+index-url = https://mirrors.huaweicloud.com/repository/pypi/simple
+trusted-host = mirrors.huaweicloud.com
+EOF
 
 # ============================================================
 # 打印当前 conda 环境的 pip 安装列表
