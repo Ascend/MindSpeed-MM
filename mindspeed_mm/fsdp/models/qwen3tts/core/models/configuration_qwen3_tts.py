@@ -478,6 +478,10 @@ class Qwen3TTSConfig(PretrainedConfig):
             tts_eos_token_id=151673,
             **kwargs,
     ):
+        # transformers 4.57.3 defaults tie_word_embeddings to True when the field
+        # is not explicitly provided, which later causes _retie_embeddings to fail.
+        # Force-set it to False before forwarding to the parent config.
+        kwargs["tie_word_embeddings"] = False
         super().__init__(**kwargs)
 
         if talker_config is None:

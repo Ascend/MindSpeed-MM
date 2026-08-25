@@ -221,8 +221,6 @@ def post_process_after_load(
             sorted(missing),
         )
 
-    _retie_embeddings(model)
-
 
 @torch.no_grad()
 def load_hf_weights(
