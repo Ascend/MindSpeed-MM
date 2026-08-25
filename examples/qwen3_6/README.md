@@ -15,6 +15,8 @@
   - [安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc)
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
+  - [权重加载](#2-权重加载)
+  - [权重保存](#3-权重保存)
 - [数据集准备及处理](#数据集准备及处理)
   - [Agentical Trace（OpenAI 格式）数据集](#agentical-traceopenai-格式数据集)
 - [微调](#微调)
@@ -138,12 +140,22 @@ pip list | grep fla
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
 
-如果使用fsdp2的meta init初始化模型，需要先完成以下权重转换：
+### 2. 权重加载
+
+当前支持huggingface权重或dcp权重加载，在`xxx_config.yaml`中`training->load_format`字段中配置加载权重的类型，支持`hf`, `dcp`和`auto`，设置为`auto`时会根据权重文件格式自行判断权重类型。
+
+如果需要加载dcp权重，请先根据模型配置完成以下hf权重到dcp权重的转换：
 
 ```bash
 mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
---dcp_dir ckpt/dcp_path/xxxxxxx
+--dcp_dir ckpt/dcp_path/xxxxxxx \
+--num_workers 0
+
+# 其中：
+# hf_dir: huggingface权重目录
+# dcp_dir: 转换后DCP格式的权重保存目录
+# num_workers: 并行工作线程数，0表示串行执行，若存储IO性能允许，可适当调大并发数以提升转换效率，推荐设置为4
 
 # 转换后的目录结构为：
 # ———— xxxxxxx
@@ -152,8 +164,19 @@ mm-convert Qwen35Converter hf_to_dcp \
 ```
 
 并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
+注意：如果MoE模型不支持mtp，可在执行`mm-convert`权重转换前将`ckpt/hf_path/xxxxxxx/config.json`中的`mtp_num_hidden_layers`设置为0，以跳过mtp专家权重合并，缩短转换时间。
 
-MindSpeed MM保存权重的格式也为dcp格式。可使用如下命令将dcp权重转换回HF权重
+### 3. 权重保存
+
+MindSpeed MM保存权重类型支持huggingface格式和dcp格式，在`xxx_config.yaml`中`training->save_format`字段中配置保存权重的类型，支持`hf`, `dcp`和`auto`:
+
+（1）`save_format`配置为`auto`时,保存权重类型与加载权重类型保持一致;
+
+（2）`save_format`配置为`hf`时,会将保存权重文件转换为safetensors格式;
+
+**注意：hf保存格式仅支持保存权重，不支持保存优化器状态和随机数状态，若需要进行断点续训，请保存为dcp格式**
+
+（3）`save_format`配置为`dcp`时,可使用如下命令将dcp权重转换回hf权重：
 
 ```bash
 # 待转换的dcp权重目录结构样例为：
@@ -162,13 +185,21 @@ MindSpeed MM保存权重的格式也为dcp格式。可使用如下命令将dcp�
 #   |—— latest_checkpointed_iteration.txt
 
 mm-convert Qwen35Converter dcp_to_hf \
---save_hf_dir ckpt/save_hf_path/Qwen3.5-xxB-hf-save \
+--save_hf_dir ckpt/save_hf_path/Qwen3.6-xxB-hf-save \
 --dcp_dir ./save_path/iter_000xx \
---origin_hf_dir ckpt/hf_path/Qwen3.5-xxB \
---to_bf16 false
+--origin_hf_dir ckpt/hf_path/Qwen3.6-xxB \
+--to_bf16 false \
+--num_workers 0
+
+# 其中：
+# save_hf_dir: 转换后Huggingface格式的权重保存目录
+# dcp_dir: 保存的DCP格式权重目录，`iter_000xx`表示保存的第xx步的权重
+# origin_hf_dir：原始Huggingface格式权重目录
+# to_bf16：是否将权重数据类型从fp32转换成bf16
+# num_workers: 并行工作线程数，0表示串行执行，若存储IO性能允许，可适当调大并发数以提升转换效率，推荐设置为4
 ```
 
-其中，`--save_hf_dir`表示转换后的权重保存路径，`--dcp_dir`表示保存的权重路径，`--origin_hf_dir`表示原始huggingface权重的路径，`--to_bf16`表示权重数据类型是否从fp32转换成bf16。
+注意：如果模型没有开启mtp（即，在`xxx_config.yaml`中model下的`mtp_num_layers`字段配置为0或没有配置），默认转换后的权重中不会包含mtp层的权重，可以通过设置`--keep_origin_mtp_weights true`来保留mtp层的权重。
 
 ---
 

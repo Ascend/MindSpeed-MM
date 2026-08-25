@@ -162,8 +162,10 @@ training:
   no_load_rng: true  # Do not load RNG state; remove if loading is needed.
   no_save_optim: true  # Do not save optimizer state; remove if saving is needed.
   no_save_rng: true  # Do not save RNG state; remove if saving is needed.
-  load: ./ckpt/hf_path/Qwen36-xxB-dcp # 替换为转换后的dcp权重
+  load: ./ckpt/hf_path/Qwen36-xxB  # 根据load_format替换为hf权重或转换后的dcp权重路径
+  load_format: auto  # 设置为auto时根据加载文件格式自动判断是hf权重还是dcp权重
   save: ./save_path
+  save_format: dcp
   use_deter_comp: false
   plugin:
     - mindspeed_mm/fsdp/models/qwen3_5_moe
