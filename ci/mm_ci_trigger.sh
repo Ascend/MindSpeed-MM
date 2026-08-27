@@ -15,6 +15,16 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 # 显式加载 conda 初始化钩子（非交互式 shell 不会自动 source ~/.bashrc）
 source /opt/conda/etc/profile.d/conda.sh
 conda activate "ci_${branch}"
+
+# ============================================================
+# 配置 pip 使用华为云镜像源，加速依赖安装（写入全局 pip.conf）
+# ============================================================
+cat > /etc/pip.conf <<'EOF'
+[global]
+index-url = https://mirrors.huaweicloud.com/repository/pypi/simple
+trusted-host = mirrors.huaweicloud.com
+EOF
+
 pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
 
 # ============================================================

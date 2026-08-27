@@ -21,8 +21,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -37,7 +37,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 trainer = FluxGRPOTrainer(train_valid_test_dataset_provider=self.mock_dataset_provider)
                 self.assertEqual(trainer.local_rank, 0)
                 self.assertEqual(trainer.rank, 0)
-                self.assertEqual(trainer.world_size, 8)
+                self.assertEqual(trainer.world_size, 4)
                 self.assertEqual(trainer.train_valid_test_dataset_provider, self.mock_dataset_provider)
                 self.assertEqual(trainer.optimizer, None)
                 self.assertEqual(trainer.device, 0)
@@ -51,8 +51,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -75,8 +75,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -97,8 +97,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -123,8 +123,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -133,7 +133,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
             patch('mindspeed_mm.configs.config.merge_mm_args'),
             patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
+            patch('torch.distributed.get_world_size', return_value=4),
             patch('torch.distributed.all_gather'),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
@@ -141,7 +141,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 trainer = FluxGRPOTrainer(self.mock_dataset_provider)
                 input = torch.zeros(3, 4)
                 output = trainer.gather_tensor(input)
-                self.assertEqual(output.size(), (24, 4))
+                self.assertEqual(output.size(), (12, 4))
 
     def test_assert_eq(self):
         from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
@@ -161,8 +161,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -171,7 +171,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
             patch('mindspeed_mm.configs.config.merge_mm_args'),
             patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
+            patch('torch.distributed.get_world_size', return_value=4),
             patch('torch.distributed.all_gather'),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
@@ -207,8 +207,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -217,7 +217,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
             patch('mindspeed_mm.configs.config.merge_mm_args'),
             patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
+            patch('torch.distributed.get_world_size', return_value=4),
             patch('torch.distributed.all_gather'),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
@@ -253,8 +253,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -263,7 +263,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
             patch('mindspeed_mm.configs.config.merge_mm_args'),
             patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
+            patch('torch.distributed.get_world_size', return_value=4),
             patch('torch.distributed.all_gather'),
             patch('torch.distributed.fsdp.FullyShardedDataParallel'),
             patch('safetensors.torch.save_file') as mock_save_file,
@@ -291,8 +291,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -301,7 +301,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
             patch('mindspeed_mm.configs.config.merge_mm_args'),
             patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
+            patch('torch.distributed.get_world_size', return_value=4),
             patch('torch.distributed.all_gather'),
             patch('torch.distributed.fsdp.FullyShardedDataParallel'),
             patch('safetensors.torch.save_file') as mock_save_file,
@@ -325,8 +325,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -335,7 +335,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
             patch('mindspeed_mm.configs.config.merge_mm_args'),
             patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
+            patch('torch.distributed.get_world_size', return_value=4),
             patch('torch.distributed.all_gather'),
         ):
             from mindspeed_mm.tasks.rl.soragrpo.flux_grpo_trainer import FluxGRPOTrainer
@@ -349,8 +349,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -359,7 +359,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
                 'mindspeed_mm.tasks.rl.soragrpo.utils.parallel_states.initialize_sequence_parallel_state'),
             patch('mindspeed_mm.configs.config.merge_mm_args'),
             patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
+            patch('torch.distributed.get_world_size', return_value=4),
             patch('torch.distributed.all_gather'),
             patch('torch.distributed.barrier'),
             patch('torch.distributed.fsdp.FullyShardedDataParallel'),
@@ -407,8 +407,8 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.cuda.set_device'),
             patch('torch.cuda.current_device', return_value=0),
@@ -417,7 +417,7 @@ class TestSoraGRPOTrainer(unittest.TestCase):
             patch('mindspeed_mm.configs.config.merge_mm_args'),
             patch('torch.distributed.init_process_group'),
             patch('torch.distributed.is_initialized', return_value=True),
-            patch('torch.distributed.get_world_size', return_value=8),
+            patch('torch.distributed.get_world_size', return_value=4),
             patch('torch.distributed.all_gather'),
             patch('torch.distributed.barrier'),
             patch('torch.distributed.fsdp.FullyShardedDataParallel'),

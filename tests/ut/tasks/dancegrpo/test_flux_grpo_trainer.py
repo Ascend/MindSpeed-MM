@@ -19,8 +19,8 @@ class TestFluxGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
@@ -77,8 +77,8 @@ class TestFluxGRPOTrainer(unittest.TestCase):
             patch.dict('os.environ', {
                 'LOCAL_RANK': '0',
                 'RANK': '0',
-                'WORLD_SIZE': '8',
-                'LOCAL_WORLD_SIZE': '8'
+                'WORLD_SIZE': '4',
+                'LOCAL_WORLD_SIZE': '4'
             }, clear=True),
             patch('torch.distributed.init_process_group'),
             patch('torch.cuda.set_device'),
