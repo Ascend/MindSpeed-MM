@@ -193,18 +193,18 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
     process_args = ProcessorArguments(**preprocess_param)
     dataset_attr = DatasetAttr(**dataset_param["attr"])
 
-    tokenizer_module = load_tokenizer(process_args)
-    tokenizer, processor = tokenizer_module['tokenizer'], tokenizer_module['processor']
-
-    # chat_template的优先级高于template。如果chat_template和template同时为None，使用模型自带的chat_template
-    if data_args.chat_template is not None:
-        tokenizer = update_tokenizer_with_chat_template(tokenizer, data_args.chat_template)
-        template = get_template_and_fix_tokenizer(tokenizer, None)
-    else:
-        template = get_template_and_fix_tokenizer(tokenizer, data_args.template)
-
-    # 确保主进程进行数据处理，其他进程复用缓存避免重复计算，该策略和llamafactory对数据处理策略一致
     with TrainingArguments(output_dir='./').main_process_first(desc="pre-process dataset"):
+        tokenizer_module = load_tokenizer(process_args)
+        tokenizer, processor = tokenizer_module['tokenizer'], tokenizer_module['processor']
+
+        # chat_template的优先级高于template。如果chat_template和template同时为None，使用模型自带的chat_template
+        if data_args.chat_template is not None:
+            tokenizer = update_tokenizer_with_chat_template(tokenizer, data_args.chat_template)
+            template = get_template_and_fix_tokenizer(tokenizer, None)
+        else:
+            template = get_template_and_fix_tokenizer(tokenizer, data_args.template)
+
+        # 确保主进程进行数据处理，其他进程复用缓存避免重复计算，该策略和llamafactory对数据处理策略一致
         # -----------------load dataset from file-------------------------------------------------------------------------
         train_dataset = load_dataset(path="json", data_files=data_args.dataset, split="train",
                                      cache_dir=data_args.cache_dir,
