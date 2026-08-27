@@ -19,11 +19,11 @@ parallel:
     num_to_forward_prefetch: 1
     num_to_backward_prefetch: 1
   ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
-  expert_parallel_size: 8
+  expert_parallel_size: 4
   ep_plan:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
-    dispatcher: alltoall
+    dispatcher: allgather
 
 ### 数据相关配置
 data:
@@ -51,7 +51,7 @@ data:
       video_maxlen: 64
 
     basic_parameters:
-      cutoff_len: 1024
+      cutoff_len: 16384
       template: qwen3_vl_nothink
       enable_thinking: false
       train_on_prompt: false
@@ -123,7 +123,7 @@ features:
   chunkmbs_plan:
     apply_modules:
      - model.language_model.layers.{*}
-    chunk_mbs: 2 # 这个表示的是chunk之后的micro batchsize
+    chunk_mbs: 1 # 这个表示的是chunk之后的micro batchsize
     batch_dim: 0
     chunk_arg_indexs: [0]
     chunk_kwarg_names: ["position_embeddings", "position_ids", "rope_deltas", "attention_mask"]
@@ -134,7 +134,7 @@ features:
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  micro_batch_size: 4
   gradient_accumulation_steps: 1
   seed: 42
   lr: 1.0e-5
