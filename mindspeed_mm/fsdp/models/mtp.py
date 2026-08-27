@@ -37,6 +37,25 @@ def shift_tensor(tensor, shifts=-1, dims=-1, fill_value=0):
     return shifted
 
 
+class _MTPPerTokenLoss(torch.autograd.Function):
+    """Return the MTP mean loss while applying Megatron's per-token gradient scale."""
+
+    @staticmethod
+    def forward(ctx, loss_sum, original_num_tokens, mtp_num_tokens, global_avg_num_tokens):
+        ctx.save_for_backward(original_num_tokens, mtp_num_tokens, global_avg_num_tokens)
+        return loss_sum / mtp_num_tokens.to(loss_sum.dtype)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        original_num_tokens, mtp_num_tokens, global_avg_num_tokens = ctx.saved_tensors
+        grad_scale = (
+            original_num_tokens.to(grad_output.dtype)
+            / mtp_num_tokens.to(grad_output.dtype)
+            / global_avg_num_tokens.to(grad_output.dtype)
+        )
+        return grad_output * grad_scale, None, None, None
+
+
 class MultiTokenPredictionBlock(nn.Module):
     def __init__(
         self,
@@ -104,6 +123,15 @@ class MultiTokenPredictionBlock(nn.Module):
             return None
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
         all_mtp_loss = None
+        calculate_per_token_loss = hasattr(loss_function, "avg_per_step_token_num")
+        if calculate_per_token_loss:
+            avg_per_step_token_num = getattr(loss_function, "avg_per_step_token_num", None)
+            if avg_per_step_token_num is None:
+                raise KeyError("per_token_loss must use PrefetchGradAccDataLoader")
+            original_num_tokens = (labels > -1).sum()
+            global_avg_num_tokens = avg_per_step_token_num.detach().clone()
+            torch.distributed.all_reduce(global_avg_num_tokens, op=torch.distributed.ReduceOp.AVG)
+
         for decoder_layer in self.layers:
             input_ids = shift_tensor(input_ids, shifts=-1, dims=-1)
             labels = shift_tensor(labels, shifts=-1, dims=-1, fill_value=-100)
@@ -149,16 +177,26 @@ class MultiTokenPredictionBlock(nn.Module):
 
             if getattr(self.config, "enable_chunk_loss", False) or getattr(self.config, "enable_dynamic_chunk_loss", False):
                 mtp_loss = output_layer(hidden_states[:, slice_indices, :], loss_function, labels)
-                if all_mtp_loss is None:
-                    all_mtp_loss = []
-                    all_mtp_loss.append(mtp_loss)
             else:
                 mtp_logits = output_layer(hidden_states[:, slice_indices, :])
                 if labels is not None:
                     mtp_loss = loss_function(mtp_logits, labels, vocab_size=self.config.vocab_size)
-                    if all_mtp_loss is None:
-                        all_mtp_loss = []
-                    all_mtp_loss.append(mtp_loss)
+
+            if all_mtp_loss is None:
+                all_mtp_loss = []
+            if calculate_per_token_loss:
+                # The MTP loss function returns the local loss sum. Match
+                # Megatron's N/M correction, then use the main loss denominator D.
+                mtp_labels = shift_tensor(labels, shifts=-1, dims=-1, fill_value=-100)
+                mtp_num_tokens = (mtp_labels > -1).sum().clamp(min=1)
+                mtp_loss = _MTPPerTokenLoss.apply(
+                    mtp_loss,
+                    original_num_tokens,
+                    mtp_num_tokens,
+                    global_avg_num_tokens.clamp(min=1),
+                )
+            all_mtp_loss.append(mtp_loss)
+
             if ps.is_ulysses_enable():
                 gather_sizes = cal_split_sizes(seq_len, ps.get_ulysses_group_size())
                 position_ids = gather_forward_split_backward(position_ids, ps.get_ulysses_group(), dim=2, grad_scale="up", gather_sizes=gather_sizes)

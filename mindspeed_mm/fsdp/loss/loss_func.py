@@ -54,6 +54,7 @@ def get_loss_func_params(
     loss_type,
     ignore_index=-100,
     chunk_size=1024,
+    is_mtp=False,
     **kwargs
 ):
     bs = labels.shape[0]
@@ -91,11 +92,16 @@ def get_loss_func_params(
         reduction = "none"  # Keep per-token losses for sample-wise aggregation.
     elif loss_type == "per_token_loss":
         # Use raw sum loss without normalization here;
-        avg_per_step_token_num = kwargs.get(AVG_PER_STEP_TOKEN_NUM, None)
-        if avg_per_step_token_num is None:
-            raise KeyError(f"per_token_loss must use PrefetchGradAccDataLoader")
-        torch.distributed.all_reduce(avg_per_step_token_num, op=torch.distributed.ReduceOp.AVG)
-        alpha = avg_per_step_token_num
+        if is_mtp:
+            # MTP applies its shifted-token normalization together with the
+            # original-token correction in MultiTokenPredictionBlock.
+            alpha = torch.ones((), device=loss_mask.device)
+        else:
+            avg_per_step_token_num = kwargs.get(AVG_PER_STEP_TOKEN_NUM, None)
+            if avg_per_step_token_num is None:
+                raise KeyError(f"per_token_loss must use PrefetchGradAccDataLoader")
+            torch.distributed.all_reduce(avg_per_step_token_num, op=torch.distributed.ReduceOp.AVG)
+            alpha = avg_per_step_token_num
         reduction = "sum"
     elif loss_type == "default":
         # Default: normalize loss by total number of valid tokens in the batch.
@@ -148,6 +154,7 @@ def build_loss_func(
     ignore_index=-100,
     chunk_size=None,
     vocab_tile_size=None,
+    is_mtp=False,
     **kwargs
 ):
     outer_labels = kwargs.get("labels", None)
@@ -185,7 +192,7 @@ def build_loss_func(
             # Reuse get_loss_func_params to get shift_labels/alpha/ignore_index
             # Pass chunk_size=None to avoid token chunking (CCE uses vocab tile internally)
             loss_func_kwargs = get_loss_func_params(
-                labels, loss_type, ignore_index, chunk_size=None, **_cce_kwargs,
+                labels, loss_type, ignore_index, chunk_size=None, is_mtp=is_mtp, **_cce_kwargs,
             )
             shift_labels = loss_func_kwargs[0]["shift_labels"]
             alpha = loss_func_kwargs[0]["alpha"]  # scalar (loss_mask.sum() or avg tokens)
@@ -210,6 +217,7 @@ def build_loss_func(
                 loss_type,
                 ignore_index,
                 chunk_size,
+                is_mtp=is_mtp,
                 **_kwargs,
             )
 
@@ -232,6 +240,7 @@ def build_loss_func(
                 loss_type,
                 ignore_index,
                 chunk_size,
+                is_mtp=is_mtp,
                 **_kwargs,
             )
             shift_labels = loss_func_kwargs[0]["shift_labels"]
@@ -247,4 +256,6 @@ def build_loss_func(
                 reduction=reduction
             )
 
+    if is_mtp and loss_type == "per_token_loss":
+        loss_func.avg_per_step_token_num = _kwargs[AVG_PER_STEP_TOKEN_NUM]
     return loss_func

@@ -2326,7 +2326,7 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
             embed_tokens=self.model.language_model.embed_tokens,
             rotary_emb=self.model.language_model.rotary_emb,
             output_layer=self.lm_head,
-            loss_function=self.loss_function,
+            loss_function=getattr(self, "mtp_loss_function", None) or self.loss_function,
             seq_len=get_seq_len("total"),
             **kwargs,
         )

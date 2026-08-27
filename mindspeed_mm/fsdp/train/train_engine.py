@@ -128,6 +128,16 @@ class TrainEngine:
         else:
             setattr(self.model, "loss_function", loss_func)
 
+        if getattr(args.model, "mtp_num_layers", 0) > 0:
+            mtp_loss_func = build_loss_func(
+                args.features.loss_cfg.loss_type,
+                chunk_size=chunk_size,
+                vocab_tile_size=vocab_tile_size,
+                is_mtp=True,
+                **batch_data,
+            )
+            setattr(self.model, "mtp_loss_function", mtp_loss_func)
+
         output_router_logits = args.features.loss_cfg.router_aux_loss_coef > 0.0
         if output_router_logits:
             batch_data.update(output_router_logits=True)
