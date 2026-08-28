@@ -41,18 +41,26 @@
 
 > [!NOTE]
 >
-> - 使用镜像前，请先确认机器型号。最新镜像仅支持aarch64架构，可通过uname -a命令确认当前环境是否符合要求。
+> - 使用镜像前，请先确认机器型号。最新镜像支持aarch64及X86_64架构，可通过uname -a命令确认当前环境是否符合要求。
 > - 配套镜像已预装配套的CANN 9.1.0软件及TorchNPU 26.1.0插件，您可根据需要选用。
 > - 若您当前环境与提供的镜像不兼容，请选择[方式二：源码安装](#方式二源码安装)。
-> - 26.1.0分支后续会更新新的镜像，如果需要自定义构建镜像，请参见[镜像概述](../../../docker/OVERVIEW.zh.md)。
+> - 如果需要自定义构建镜像，请参见[镜像概述](../../../docker/OVERVIEW.zh.md)。
 
 1. 拉取镜像
 
-   最新镜像均配套[MindSpeed MM的26.1.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0)，该镜像即将上线，当前可使用MindSpeed MM 26.0.0分支对应镜像，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
+   最新镜像均配套[MindSpeed MM的26.1.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0)，请按需[获取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
 
-   - <term>Atlas A2 训练系列产品</term>：26.0.0-910b-openeuler24.03-py3.11-aarch64
+   - <term>Atlas A5 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11
 
-   - <term>Atlas A3 训练系列产品</term>：26.0.0-a3-openeuler24.03-py3.11-aarch64
+   - <term>Atlas A5 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
+
+   - <term>Atlas A3 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
+
+   - <term>Atlas A3 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
+   
+   - <term>Atlas A2 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11
+
+   - <term>Atlas A2 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu22.04-py3.11
 
    ```bash
       # 确认是否成功拉取镜像
@@ -74,7 +82,7 @@
 
       ```bash
       docker run -it --rm \
-          mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
       ```
 
     - 示例二：使用 NPU 设备运行（示例：设备 /dev/davinci1）
@@ -92,7 +100,7 @@
           -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
           -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
           -v /etc/ascend_install.info:/etc/ascend_install.info \
-          mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
       ```
 
     - 示例三：挂载数据目录运行（示例：设备 /dev/davinci1）
@@ -111,7 +119,7 @@
           -v /etc/ascend_install.info:/etc/ascend_install.info \
           -v /path/to/data:/data \
           -v /path/to/weights:/weights \
-          mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
       ```
 
     具体参数配置说明可查看MindSpeed MM Docker镜像概述的[构建脚本参数说明](../../../docker/OVERVIEW.zh.md#构建脚本参数说明)
@@ -255,7 +263,7 @@
 
   7. 安装Triton-Ascend
 
-      安装配套版本的Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
+      安装配套版本的Triton-Ascend，请参考《[Triton-Ascend安装指南](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)》，获取配套版本的Triton-Ascend安装指令。
 
       可参考如下安装命令：
 
