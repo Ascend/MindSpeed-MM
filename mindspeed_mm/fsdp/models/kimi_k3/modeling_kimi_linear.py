@@ -60,6 +60,7 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
 )
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.ops.attn_res.attn_res import apply_attn_res
 
 if IS_NPU_AVAILABLE:
     import torch_npu
@@ -162,13 +163,13 @@ class SituAndMul(nn.Module):
     Internally uses fused CANN op on NPU, falls back to eager otherwise.
     """
 
-    def __init__(self, beta: float = 1.0, linear_beta: float | None = None, use_fused: bool = False):
+    def __init__(self, beta: float = 1.0, linear_beta: float | None = None, situ_glu_implementation: str = "eager"):
         super().__init__()
         self.beta = beta
         self.linear_beta = linear_beta
-        self.use_fused = use_fused
+        self.situ_glu_implementation = situ_glu_implementation
 
-    def forward(self, x: torch.Tensor, ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         from mindspeed_mm.fsdp.ops.glu.situ import fused_situ_glu
         return fused_situ_glu(
             x,
@@ -176,7 +177,7 @@ class SituAndMul(nn.Module):
             beta=self.beta,
             linear_beta=self.linear_beta,
             activate_left=True,
-            use_fused=self.use_fused,
+            situ_glu_implementation=self.situ_glu_implementation
         )
 
 ACT2FN["situ"] = SituAndMul
@@ -358,7 +359,7 @@ class KimiBlockSparseMLP(nn.Module):
             self.act_fn = SituAndMul(
                 beta=beta,
                 linear_beta=linear_beta,
-                use_fused=config.use_fused_situ_glu,
+                situ_glu_implementation=getattr(config, "situ_glu_implementation", "eager"),
             )
         else:
             self.act_fn = ACT2FN[config.hidden_act]
@@ -391,7 +392,7 @@ class KimiMLP(nn.Module):
             self.act_fn = SituAndMul(
                 beta=beta,
                 linear_beta=linear_beta,
-                use_fused=config.use_fused_situ_glu,
+                situ_glu_implementation=getattr(config, "situ_glu_implementation", "eager"),
             )
         else:
             self.act_fn = ACT2FN[config.hidden_act]
@@ -832,7 +833,7 @@ class KimiDeltaAttention(nn.Module):
 
         if mode == 'chunk':
             kda_implementation = getattr(self.config, "kda_implementation", "triton")
-            if kda_implementation == "triton":
+            if kda_implementation in ("triton", "ascendc"):
                 if IS_NPU_AVAILABLE:
                     use_beta_sigmoid_in_kernel = False
                     beta = torch.sigmoid(beta)
@@ -882,7 +883,7 @@ class KimiDeltaAttention(nn.Module):
             else:
                 raise ValueError(
                     f"Unsupported kda_implementation: {kda_implementation}. "
-                    "Expected 'fused' or 'naive'."
+                    "Expected 'triton', 'ascendc', or 'eager'."
                 )
         else:
             raise ValueError(
@@ -1183,6 +1184,10 @@ class KimiDecoderLayer(nn.Module):
         **kwargs: Unpack[FlashAttentionKwargs],
     ):
         if self.use_attn_residuals:
+            # block_residual 在模型主循环中被 reshape 为 4-D（配合 chunk_mbs 按
+            # batch 维切分），此处恢复为算子需要的 (num_tokens, num_blocks, hidden)
+            batch_size, seq_len, _ = hidden_states.shape
+            block_residual = block_residual.view(batch_size * seq_len, -1, self.hidden_size)
             return self._forward_attn_residual(
                 hidden_states, attention_mask, position_ids,
                 past_key_values, output_attentions, use_cache,
@@ -1240,11 +1245,12 @@ class KimiDecoderLayer(nn.Module):
         prefix_sum = hidden_states
 
         if block_residual is not None and block_residual.shape[1] > 0:
-            hidden_states = _apply_attn_res(
+            hidden_states = apply_attn_res(
                 prefix_sum.view(-1, hidden_size),
                 block_residual,
                 self.self_attention_res_proj,
                 self.self_attention_res_norm,
+                getattr(self.config, "attn_res_implementation", "eager"),
             ).view(batch_size, seq_len, hidden_size)
 
         if self.layer_idx % self.attn_res_block_size == 0:
@@ -1280,11 +1286,12 @@ class KimiDecoderLayer(nn.Module):
         else:
             prefix_sum = hidden_states
 
-        hidden_states = _apply_attn_res(
+        hidden_states = apply_attn_res(
             prefix_sum.view(-1, hidden_size),
             block_residual,
             self.mlp_res_proj,
             self.mlp_res_norm,
+            getattr(self.config, "attn_res_implementation", "eager"),
         ).view(batch_size, seq_len, hidden_size)
 
         hidden_states = self.post_attention_layernorm(hidden_states)
@@ -1328,21 +1335,6 @@ class KimiPreTrainedModel(PreTrainedModel):
                 module.weight.data[module.padding_idx].zero_()
 
 
-def _apply_attn_res(prefix_sum, block_residual, proj, norm):
-    """
-    prefix_sum:     (num_tokens, hidden_size)
-    block_residual: (num_tokens, num_blocks, hidden_size)
-    """
-    v = torch.cat((block_residual, prefix_sum.unsqueeze(1)), dim=1)
-    v_float = v.float()
-    variance = v_float.pow(2).mean(-1, keepdim=True)
-    k = v_float * torch.rsqrt(variance + norm.variance_epsilon)
-    score_weight = norm.weight.float() * proj.weight.squeeze(0).float()
-    scores = (k * score_weight).sum(-1)
-    probs = scores.softmax(-1).unsqueeze(1)
-    hidden_states = torch.matmul(probs, v_float).squeeze(1)
-    return hidden_states.to(v.dtype)
-
 class KimiLinearModel(KimiPreTrainedModel):
     def __init__(self, config: KimiLinearConfig):
         super().__init__(config)
@@ -1374,6 +1366,7 @@ class KimiLinearModel(KimiPreTrainedModel):
 
         self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"
         self.gradient_checkpointing = False
+        self.attn_res_implementation = getattr(config, "attn_res_implementation", "eager")
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -1463,6 +1456,10 @@ class KimiLinearModel(KimiPreTrainedModel):
             layer_mask = linear_attn_mask if decoder_layer.is_linear_attn else causal_mask
 
             if self.use_attn_residuals:
+                # reshape 为 (batch, seq, num_blocks, hidden)，使 block_residual 可以
+                # 与 hidden_states 一样被 chunk_mbs 按 batch 维切分
+                batch_size, seq_len, hidden_size = hidden_states.shape
+                block_residual = block_residual.view(batch_size, seq_len, -1, hidden_size)
                 hidden_states, block_residual = decoder_layer(
                     hidden_states,
                     attention_mask=layer_mask,
@@ -1493,11 +1490,12 @@ class KimiLinearModel(KimiPreTrainedModel):
 
     def _apply_output_attn_res(self, hidden_states, block_residual):
         batch_size, seq_len, hidden_size = hidden_states.shape
-        return _apply_attn_res(
+        return apply_attn_res(
             hidden_states.view(-1, hidden_size),
             block_residual,
             self.output_attn_res_proj,
             self.output_attn_res_norm,
+            self.attn_res_implementation
         ).view(batch_size, seq_len, hidden_size)
 
 
@@ -1517,9 +1515,9 @@ class KimiLinearForCausalLM(KimiPreTrainedModel, GenerationMixin):
 
         self.kda_implementation = config.kda_implementation
         if self.kda_implementation == "ascendc":
-            from mindspeed_mm.fsdp.ops.ascendc.chunk_kda_ascendc import apply_ascendc_chunk_kda_patch
+            from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_ascendc import apply_ascendc_chunk_kda_patch
             apply_ascendc_chunk_kda_patch()
-            print(f"Info: apply chunk kda function patch")
+            print(f"Info: apply chunk kda ascendc function patch")
 
         # Initialize weights and apply final processing
         self.post_init()

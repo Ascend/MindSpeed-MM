@@ -80,13 +80,13 @@ class KimiK3ForConditionalGeneration(WeightInitMixin, _KimiK3ForConditionalGener
         if getattr(transformer_config, "vision_config", None) is not None:
             transformer_config.vision_config.skip_flash_attn_recompute = skip_flash_attn_recompute
 
-        # KDA kernel selection: 'triton' (chunk_kda from triton_ascend_kernels) or
-        # 'eager' (in-repo small-op implementation chunk_kda_naive).
+        # KDA kernel selection: 'triton' (chunk_kda from triton_ascend_kernels),
+        # 'ascendc' (AscendC-patched chunk_kda), or 'eager' (in-repo small-op implementation chunk_kda_naive).
         kda_implementation = getattr(model_args, "kda_implementation", "triton")
         if kda_implementation not in ("triton", "eager", "ascendc"):
             raise ValueError(
                 f"Unsupported kda_implementation: {kda_implementation}. "
-                "Expected 'triton', 'eager', or 'ascendc'."
+                "Expected 'triton', 'eager', 'ascendc'."
             )
         transformer_config.text_config.kda_implementation = kda_implementation
 
@@ -100,9 +100,25 @@ class KimiK3ForConditionalGeneration(WeightInitMixin, _KimiK3ForConditionalGener
             )
         transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
 
-        transformer_config.text_config.use_fused_situ_glu = getattr(
-            model_args, "use_fused_situ_glu", False
-        )
+        # SituGLU kernel selection: 'ascendc' (fused CANN op from cann_ops_nn),
+        # 'triton' (fused op from triton-ascend-kernels) or 'eager' (torch small-op).
+        situ_glu_implementation = getattr(model_args, "situ_glu_implementation", "ascendc")
+        transformer_config.text_config.situ_glu_implementation = situ_glu_implementation
+        if situ_glu_implementation not in ("triton", "ascendc", "eager"):
+            raise ValueError(
+                f"Unsupported situ_glu_implementation: {situ_glu_implementation}. "
+                "Expected 'eager', 'triton' or 'ascendc'."
+            )
+
+        # attn_res kernel selection: 'ascendc' (fused CANN op from cann_ops_transformer)
+        # or 'eager' (torch small-op).
+        attn_res_implementation = getattr(model_args, "attn_res_implementation", "ascendc")
+        transformer_config.text_config.attn_res_implementation = attn_res_implementation
+        if attn_res_implementation not in ("ascendc", "eager"):
+            raise ValueError(
+                f"Unsupported attn_res_implementation: {attn_res_implementation}. "
+                "Expected 'eager' or 'ascendc'."
+            )
 
         return transformer_config
 

@@ -88,11 +88,13 @@ model:
   trust_remote_code: true
   use_grouped_expert_matmul: true
   # KDA算子实现：ascendc (fla-npu融合算子) / triton (triton-ascend-kernels融合算子)/ eager (torch算子实现)
-  kda_implementation: eager
+  kda_implementation: triton
   # KDA短卷积算子实现：triton / ascendc
-  causal_conv1d_implementation: triton
-  # situ_glu融合算子
-  use_fused_situ_glu: false
+  causal_conv1d_implementation: ascendc
+  # situ_glu融合算子实现: ascendc (ops-nn融合算子) / triton (triton-ascend-kernels融合算子) / eager (torch算子实现)
+  situ_glu_implementation: ascendc
+  # attn_res融合算子实现: ascendc (ops-transformer融合算子) / eager (torch算子实现)
+  attn_res_implementation: ascendc
   # 选择性重计算：attention 相关融合算子（ViT/MLA 的 FA、KDA）不参与重算，
   skip_flash_attn_recompute: true
   skip_kda_recompute: true
@@ -116,7 +118,14 @@ features:
     apply_modules:
       - vision_tower.encoder.blocks.{*}
       - language_model.model.layers.{*}
-  enable_chunk_mbs: false
+  enable_chunk_mbs: true
+  chunkmbs_plan:
+    apply_modules:
+      - language_model.model.layers.{*}
+    chunk_mbs: 2 # 这个表示的是chunk之后的micro batchsize
+    batch_dim: 0
+    chunk_arg_indexs: [0]
+    chunk_kwarg_names: ["attention_mask", "cache_position", "block_residual"]
   # ep balance
   enable_ep_balance: false
   ep_balance_plan:
@@ -124,7 +133,7 @@ features:
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  micro_batch_size: 4
   gradient_accumulation_steps: 1
   seed: 42
   lr: 1.0e-5

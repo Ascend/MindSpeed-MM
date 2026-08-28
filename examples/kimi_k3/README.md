@@ -15,6 +15,8 @@
     - [2. 环境搭建](#2-环境搭建)
     - [3. 安装配套版本的Triton-Ascend](#3-安装配套版本的triton-ascend)
     - [4. 安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc)
+    - [5. 安装ops-nn以适配AscendC版本SituGLU](#5-安装ops-nn以适配ascendc版本situglu)
+    - [6. 安装ops-transformer以适配AscendC版本attn\_res](#6-安装ops-transformer以适配ascendc版本attn_res)
   - [数据集准备及处理](#数据集准备及处理)
   - [训练](#训练)
     - [1. 准备工作](#1-准备工作)
@@ -38,6 +40,8 @@ url=https://huggingface.co/moonshotai/Kimi-K3/tree/main
 ### 变更记录
 
 2026.07.26: 首次支持Kimi-K3模型
+
+2026.08.27: 新增SituGLU、attn_res AscendC融合算子支持及配套安装说明
 
 ---
 <a id="jump1"></a>
@@ -127,6 +131,65 @@ bash build.sh
 pip list | grep fla_npu
 ```
 
+### 5. 安装ops-nn以适配AscendC版本SituGLU
+
+Kimi-K3 的 MLP 激活采用 SituGLU 结构：对 gate 分支施加 SiTU 激活 `beta * tanh(gate / beta) * sigmoid(gate)`，再与 up 分支逐元素相乘；当模型配置 `linear_beta` 时，up 分支会先经过 `linear_beta * tanh(up / linear_beta)` 变换。SiTU 可视为带饱和门控的 SiLU（Swish）推广形式：`beta` 为输出的饱和界，当 `beta` 较大时 SiTU 近似退化为 SiLU。
+
+`situ_glu_implementation: ascendc` 时，上述"激活 + 门控乘"计算由 ops-nn 仓的 AscendC 融合算子一次完成（前向 `situ_glu`、反向 `situ_glu_grad`），算子介绍见：[ops-nn situ_glu](https://gitcode.com/cann/ops-nn/tree/master/activation/situ_glu)；`triton` 使用仓内 Triton 融合算子（`mindspeed_mm/fsdp/ops/glu/situ_triton.py`，依赖 Triton-Ascend）；`eager` 为 torch 小算子实现，可用于功能对齐验证。
+
+使用 AscendC 版本 SituGLU 需安装 ops-nn，安装步骤如下：
+
+```shell
+# 拉取代码
+git clone https://gitcode.com/cann/ops-nn.git && cd ops-nn
+# 根据芯片类型进行编译
+source /usr/local/Ascend/cann/set_env.sh
+bash build.sh --pkg --soc=${soc_version} --ops=situ_glu -j16
+# 安装算子包
+./build_out/*.run
+cd torch_extension
+conda activate ${conda_env_name} # 激活对应conda环境
+pip install dist/*.whl --force-reinstall --no-deps
+```
+
+产品名对应的`${soc_version}`取值如下，请按实际场景传参：
+
+- Atlas A2 训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
+- Atlas A3 训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
+- 950系列产品：取值为ascend950
+
+### 6. 安装ops-transformer以适配AscendC版本attn_res
+
+Kimi-K3 采用 attn_res（attention residual）机制替代传统 Transformer 的固定残差连接：模型每 `attn_res_block_size` 层将当前 hidden states 追加到 `block_residual` 残差历史中；在每层的注意力与 MLP 计算前（以及模型输出位置），将残差历史与当前前缀和拼接，经 RMSNorm 归一化后，用可学习的投影权重对每个历史块打分，再经 softmax 加权融合得到该位置的残差输入，实现跨层残差路径的软选择。
+
+`attn_res_implementation: ascendc` 时，上述"归一化 + 打分 + 加权融合"计算使用 ops-transformer 仓的 AscendC 融合算子完成，需安装 ops-transformer；`eager` 为 torch 小算子实现，可用于功能对齐验证。
+
+> [!NOTE]
+>
+> attn_res 算子代码位于 ops-transformer 仓的 MR9720 分支，安装时需先按如下步骤检出该MR分支。
+
+安装步骤如下：
+
+```shell
+# 拉取代码
+git clone https://gitcode.com/cann/ops-transformer.git && cd ops-transformer
+# 检出attn_res算子所在的MR分支
+git fetch https://gitcode.com/cann/ops-transformer.git +refs/merge-requests/9720/head:pr_9720
+git checkout pr_9720
+# 根据芯片类型进行编译
+source /usr/local/Ascend/cann/set_env.sh
+bash build_install_attn_res.sh --soc=${soc_version}
+# 安装算子包
+conda activate ${conda_env_name} # 激活对应conda环境
+pip install torch_extension/dist/*.whl --force-reinstall --no-deps
+```
+
+产品名对应的`${soc_version}`取值如下，请按实际场景传参：
+
+- Atlas A2 训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
+- Atlas A3 训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
+- 950系列产品：取值为ascend950
+
 ---
 
 <a id="jump2"></a>
@@ -197,8 +260,10 @@ NODE_RANK: 当前节点序号
 | `num_to_backward_prefetch` | `parallel->fsdp_plan` | 反向计算时预取后续层参数 | 减少通信等待开销 |
 | `enable_preload` | `data->dataloader_param` | 数据预加载开关 | 开启后数据加载与计算重叠，减少训练等待时间 |
 | `use_grouped_expert_matmul` | `model` | MoE专家分组矩阵乘融合算子开关 | 开启后使用NPU融合算子加速MoE专家计算 |
-| `kda_implementation` | `model` | KDA算子实现选择 | `fused`: triton-ascend-kernels融合大算子（默认）<br>`naive`: 仓内小算子实现，可用于功能对齐验证 |
+| `kda_implementation` | `model` | KDA算子实现选择 | `triton`: triton-ascend-kernels融合算子（默认），需安装Triton-Ascend及配套算子库<br>`ascendc`: AscendC融合算子（仅NPU）<br>`eager`: 仓内小算子实现，可用于功能对齐验证 |
 | `causal_conv1d_implementation` | `model` | KDA短卷积算子实现选择 | `triton`: triton实现（默认）<br>`ascendc`: fla_npu AscendC融合算子（仅NPU），需安装fla-npu，参考[安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc) |
+| `situ_glu_implementation` | `model` | SituGLU算子实现选择 | `ascendc`: ops-nn AscendC融合算子（默认，仅NPU），需安装ops-nn，参考[安装ops-nn以适配AscendC版本SituGLU](#5-安装ops-nn以适配ascendc版本situglu)<br>`triton`: 仓内Triton融合算子（依赖Triton-Ascend）<br>`eager`: torch小算子实现，可用于功能对齐验证 |
+| `attn_res_implementation` | `model` | attn_res算子实现选择 | `ascendc`: ops-transformer AscendC融合算子（默认，仅NPU），需安装ops-transformer，参考[安装ops-transformer以适配AscendC版本attn_res](#6-安装ops-transformer以适配ascendc版本attn_res)<br>`eager`: torch小算子实现，可用于功能对齐验证 |
 | `skip_flash_attn_recompute` | `model` | 跳过full attention层flash attention重计算 | 选择性重计算，需同时使能重计算和`enable_activation_offload` |
 | `skip_kda_recompute` | `model` | 跳过linear attention层KDA重计算 | 选择性重计算，需同时使能重计算和`enable_activation_offload` |
 | `recompute` | `features` | 重计算开关 | 开启后可以节省显存占用 |

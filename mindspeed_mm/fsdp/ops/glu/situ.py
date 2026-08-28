@@ -10,7 +10,6 @@ from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
 if IS_NPU_AVAILABLE:
     import torch_npu
-    import cann_ops_nn.ops
 
 def situ_glu_eager(
     x: torch.Tensor,
@@ -96,12 +95,26 @@ def fused_situ_glu(
     beta: float = 1.0,
     linear_beta: float = 0.0,
     activate_left: bool = True,
-    use_fused: bool | None = None,
+    situ_glu_implementation: str = "eager"
 ) -> torch.Tensor:
-    if use_fused is None:
-        use_fused = IS_NPU_AVAILABLE
-
-    if use_fused:
-        return SituGLUFunction.apply(x, dim, beta, linear_beta, activate_left)
-    else:
+    if not IS_NPU_AVAILABLE or situ_glu_implementation == "eager":
         return situ_glu_eager(x, dim=dim, beta=beta, linear_beta=linear_beta, activate_left=activate_left)
+    elif situ_glu_implementation == "ascendc":
+        import cann_ops_nn.ops
+        return SituGLUFunction.apply(x, dim, beta, linear_beta, activate_left)
+    elif situ_glu_implementation == "triton":
+        # triton kernel 只支持最后一维切分且 gate 在左的布局
+        if dim != -1 or not activate_left:
+            raise ValueError(
+                "Triton situ_glu only supports dim=-1 and activate_left=True."
+            )
+        from mindspeed_mm.fsdp.ops.glu.situ_triton import situ_and_mul
+        # eager/ascendc 语义中 linear_beta 为 0.0 表示不启用，triton kernel 以 None 表示，
+        # 直接传 0.0 会在 kernel 内产生除零
+        linear_beta = linear_beta if linear_beta not in (0.0, None) else None
+        return situ_and_mul(x, beta=beta, linear_beta=linear_beta)
+    else:
+        raise ValueError(
+            f"Unsupported situ_glu_implementation: {situ_glu_implementation}. "
+            "Expected 'eager', 'triton' or 'ascendc'."
+        )
