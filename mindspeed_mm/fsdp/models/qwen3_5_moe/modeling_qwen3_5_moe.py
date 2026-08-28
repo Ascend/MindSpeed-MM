@@ -2500,8 +2500,8 @@ class Qwen3_5MoeForCausalLM(Qwen3_5MoePreTrainedModel, GenerationMixin):
         transformer_config.router_aux_loss_offload = feature_args.loss_cfg.router_aux_loss_offload
         # mtp
         mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
-        if mtp_num_layers not in (0, 1):
-            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be one of: 0, 1.")
+        if mtp_num_layers < 0:
+            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be a non-negative integer.")
         transformer_config.mtp_num_layers = mtp_num_layers
 
         # chunkloss
@@ -2678,8 +2678,8 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         transformer_config.text_config.router_aux_loss_offload = feature_args.loss_cfg.router_aux_loss_offload
         # mtp
         mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
-        if mtp_num_layers not in (0, 1):
-            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be one of: 0, 1.")
+        if mtp_num_layers < 0:
+            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be a non-negative integer.")
         transformer_config.text_config.mtp_num_layers = mtp_num_layers
 
         # chunkloss

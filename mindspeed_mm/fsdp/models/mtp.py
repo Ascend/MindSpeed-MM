@@ -65,9 +65,10 @@ class MultiTokenPredictionBlock(nn.Module):
     ):
         super().__init__()
         self.config = config
+        num_physical_layers = int(config.mtp_num_layers > 0)
         self.layers = nn.ModuleList([
             layer_cls(config, i, is_mtp=True)
-            for i in range(config.mtp_num_layers)
+            for i in range(num_physical_layers)
         ])
         self.pre_fc_norm_embedding = norm_cls(config.hidden_size, eps=config.rms_norm_eps)
         self.pre_fc_norm_hidden = norm_cls(config.hidden_size, eps=config.rms_norm_eps)
@@ -132,7 +133,8 @@ class MultiTokenPredictionBlock(nn.Module):
             global_avg_num_tokens = avg_per_step_token_num.detach().clone()
             torch.distributed.all_reduce(global_avg_num_tokens, op=torch.distributed.ReduceOp.AVG)
 
-        for decoder_layer in self.layers:
+        for _ in range(self.config.mtp_num_layers):
+            decoder_layer = self.layers[0]
             input_ids = shift_tensor(input_ids, shifts=-1, dims=-1)
             labels = shift_tensor(labels, shifts=-1, dims=-1, fill_value=-100)
             inputs_embeds = embed_tokens(input_ids)

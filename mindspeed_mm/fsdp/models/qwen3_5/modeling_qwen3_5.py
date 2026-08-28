@@ -2270,8 +2270,8 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
 
         # mtp
         mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
-        if mtp_num_layers not in (0, 1):
-            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be one of: 0, 1.")
+        if mtp_num_layers < 0:
+            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be a non-negative integer.")
         transformer_config.text_config.mtp_num_layers = mtp_num_layers
 
         # chunkloss
