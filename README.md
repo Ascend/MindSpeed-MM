@@ -2,6 +2,10 @@
 # <p align="center"> <img src="sources/images/mm_logo.png" height="103px" width="700px"> </p>
 
 <p align="center">
+    简体中文 | <a href="./README_en.md">English</a>
+</p>
+
+<p align="center">
     <a href="./LICENSE">
         <img alt="Badge" src="https://img.shields.io/badge/License-MIT-blue.svg">
     </a>
