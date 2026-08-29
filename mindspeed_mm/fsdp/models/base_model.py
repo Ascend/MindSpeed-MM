@@ -53,6 +53,8 @@ class GenerativeBaseModel(BaseModel):
     # Registry key of ``WEIGHT_TRANSFORM_PIPELINES`` selecting the
     # key-conversion pipeline for diffusers checkpoint sources (e.g.
     # ``"wan2_2"``).  ``None`` loads weights without key conversion.
+    # Can be overridden per sub-model via the ``weight_transform_model_type``
+    # yaml config key, so selecting a pipeline needs no code change.
     weight_transform_model_type: Optional[str] = None
 
     def get_weight_load_module(self):
@@ -60,39 +62,62 @@ class GenerativeBaseModel(BaseModel):
         return self
 
     def resolve_weight_source(self, config):
-        """Resolve ``(ckpt_path, declared_format, conversion_dir)``; overridable for construction-time fallbacks."""
-        from mindspeed_mm.fsdp.checkpoint.convert import resolve_checkpoint_source
+        """Resolve ``(ckpt_path, declared_format)`` from the sub-model config.
 
-        return resolve_checkpoint_source(config)
+        ``checkpoint_path`` wins over ``from_pretrained`` when set;
+        ``declared_format`` is the optional ``load_format`` config value
+        (``"auto"``/``"dcp"``/``"hf"``/``"diffusers"``); overridable for
+        construction-time fallbacks.
+        """
+        cfg = config.to_dict() if hasattr(config, "to_dict") else dict(config)
+        ckpt_path = cfg.get("checkpoint_path") or cfg.get("from_pretrained")
+        declared_format = cfg.get("load_format") or "auto"
+        return ckpt_path, declared_format
 
     def setup_weights(self, config):
-        """Default generative-model weight setup: pretrained load or random init; a failed load raises."""
-        from mindspeed_mm.fsdp.checkpoint.convert import (
-            load_checkpoint_with_conversion,
-            resolve_load_format,
+        """Default generative-model weight setup: pretrained load or random init; a failed load raises.
+
+        Loading reuses the mainline checkpoint interfaces directly: DCP
+        directories go through ``load_dcp_weights``; everything else (HF or
+        diffusers safetensors, distinguished by filename inside
+        ``locate_hf_weight_files``) goes through ``load_hf_weights`` with the
+        key-conversion pipeline selected by ``weight_transform_model_type``.
+        """
+        from mindspeed_mm.fsdp.checkpoint.convert import build_weight_transform
+        from mindspeed_mm.fsdp.checkpoint.dcp_utils import (
+            load_dcp_weights,
+            looks_like_dcp_checkpoint_dir,
         )
+        from mindspeed_mm.fsdp.checkpoint.hf_utils import load_hf_weights
         from mindspeed_mm.fsdp.utils.utils import setup_module_weights
 
         module = self.get_weight_load_module()
-        ckpt_path, declared_format, conversion_dir = self.resolve_weight_source(config)
+        ckpt_path, declared_format = self.resolve_weight_source(config)
+        cfg = config.to_dict() if hasattr(config, "to_dict") else dict(config)
+        # The yaml key takes priority over the class-attribute default.
+        model_type = cfg.get("weight_transform_model_type") or self.weight_transform_model_type
 
         def load_fn():
-            load_format = resolve_load_format(ckpt_path, declared_format)
+            is_dcp = declared_format == "dcp" or (
+                declared_format == "auto" and looks_like_dcp_checkpoint_dir(ckpt_path)
+            )
             logger.info(
-                "Loading %s weights: path=%s load_format=%s",
+                "Loading %s weights: path=%s format=%s",
                 type(self).__name__,
                 ckpt_path,
-                load_format,
+                "dcp" if is_dcp else "safetensors",
             )
-            # Raises on failure: silently falling back to random
-            # initialization would train from garbage weights.
-            load_checkpoint_with_conversion(
-                module,
-                ckpt_path,
-                load_format,
-                conversion_output_dir=conversion_dir,
-                model_type=self.weight_transform_model_type,
-            )
+            if is_dcp:
+                load_dcp_weights(module, ckpt_path)
+            else:
+                weight_transform = None
+                if model_type is not None:
+                    weight_transform = build_weight_transform(
+                        model_type, hf_dir=ckpt_path
+                    )
+                # Raises on failure: silently falling back to random
+                # initialization would train from garbage weights.
+                load_hf_weights(module, ckpt_path, weight_transform=weight_transform)
             return True
 
         def init_fn():

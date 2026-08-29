@@ -47,36 +47,46 @@ def _lora_base_key_map(param_names: Set[str]) -> Dict[str, str]:
     return {bare: base for base, bare in base_to_bare.items()}
 
 
+# Diffusers-style weight file names, used as a fallback by the HF locator so a
+# single locator covers both ecosystems (e.g. Wan2.2 diffusers checkpoints).
+DIFFUSERS_WEIGHTS_NAME = "diffusion_pytorch_model.safetensors"
+DIFFUSERS_WEIGHTS_INDEX_NAME = "diffusion_pytorch_model.safetensors.index.json"
+
+
 def locate_hf_weight_files(weights_path: str) -> List[HFWeightFileStream]:
     """Resolve the safetensors files under *weights_path* into stream readers.
 
-    Supports both standard HF layouts:
-      - single ``model.safetensors``
-      - sharded ``model-*-of-*.safetensors`` described by ``model.safetensors.index.json``
+    Supports both HF and diffusers layouts:
+      - single ``model.safetensors`` / ``diffusion_pytorch_model.safetensors``
+      - sharded files described by the corresponding ``*.index.json``
       - direct path to a .safetensors file
     """
     if os.path.isfile(weights_path) and weights_path.endswith(".safetensors"):
         return [HFWeightFileStream(weights_path)]
 
-    single = os.path.join(weights_path, SAFE_WEIGHTS_NAME)
-    if os.path.isfile(single):
-        return [HFWeightFileStream(single)]
+    for weights_name, index_name in (
+        (SAFE_WEIGHTS_NAME, SAFE_WEIGHTS_INDEX_NAME),
+        (DIFFUSERS_WEIGHTS_NAME, DIFFUSERS_WEIGHTS_INDEX_NAME),
+    ):
+        single = os.path.join(weights_path, weights_name)
+        if os.path.isfile(single):
+            return [HFWeightFileStream(single)]
 
-    index = os.path.join(weights_path, SAFE_WEIGHTS_INDEX_NAME)
-    if os.path.isfile(index):
-        with open(index, "r", encoding="utf-8") as f:
-            weight_map = json.load(f)["weight_map"]
-        streams = []
-        for name in sorted(set(weight_map.values())):
-            path = os.path.join(weights_path, name)
-            if not os.path.isfile(path):
-                raise FileNotFoundError(
-                    f"Shard '{name}' referenced by {index} is missing: {path}"
-                )
-            streams.append(HFWeightFileStream(path))
-        return streams
+        index = os.path.join(weights_path, index_name)
+        if os.path.isfile(index):
+            with open(index, "r", encoding="utf-8") as f:
+                weight_map = json.load(f)["weight_map"]
+            streams = []
+            for name in sorted(set(weight_map.values())):
+                path = os.path.join(weights_path, name)
+                if not os.path.isfile(path):
+                    raise FileNotFoundError(
+                        f"Shard '{name}' referenced by {index} is missing: {path}"
+                    )
+                streams.append(HFWeightFileStream(path))
+            return streams
 
-    raise ValueError(f"No HF safetensors weights found under {weights_path}.")
+    raise ValueError(f"No HF safetensors or diffusers weights found under {weights_path}.")
 
 
 def convert_weight_key(key: str, model: torch.nn.Module) -> str:

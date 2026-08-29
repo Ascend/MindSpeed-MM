@@ -231,6 +231,34 @@ class DistributedCheckpointer(CheckpointerBase):
         tracker_filename = get_checkpoint_tracker_filename(checkpoint_dir)
         if os.path.isfile(tracker_filename):
             iteration, release = read_metadata(tracker_filename)
+        else:
+            # No tracker file: fall back to a unique sub-directory that actually
+            # contains DCP data (e.g. checkpoints left by online conversion or by
+            # an interrupted tracker write), instead of blindly using iter_-000001.
+            candidates = []
+            if os.path.isdir(checkpoint_dir):
+                candidates = [
+                    sub for sub in os.listdir(checkpoint_dir)
+                    if sub.startswith("iter_")
+                    and os.path.isfile(os.path.join(checkpoint_dir, sub, ".metadata"))
+                ]
+            if os.path.isfile(os.path.join(checkpoint_dir, "release", ".metadata")):
+                release = True
+            elif len(candidates) == 1:
+                iteration = int(candidates[0].replace("iter_", ""))
+            elif not candidates:
+                raise ValueError(
+                    f"No tracker file and no valid iter_*/release checkpoint with "
+                    f".metadata found under {checkpoint_dir}. The checkpoint may be "
+                    "incomplete (e.g. an interrupted save); remove the directory and "
+                    "re-run the conversion/save."
+                )
+            else:
+                raise ValueError(
+                    f"No tracker file under {checkpoint_dir} and multiple iter_* "
+                    f"candidates {sorted(candidates)}; cannot decide which to load. "
+                    "Restore the tracker file or remove stale directories."
+                )
 
         checkpoint_dir = get_checkpoint_name(checkpoint_dir, iteration, release)
 

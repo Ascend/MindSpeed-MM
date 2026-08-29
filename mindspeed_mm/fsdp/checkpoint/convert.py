@@ -57,6 +57,33 @@ def rename_key(key: str, hf_prefix: str, dcp_prefix: str) -> str:
     return f"{dcp_prefix}{key}"
 
 
+def convert_diffusers_key(
+    key: str,
+    convert_mapping: Dict[str, str],
+    str_replace_mapping: Dict[str, str],
+) -> Optional[str]:
+    """Convert one diffusers key to a native key using the supplied exact
+    ``convert_mapping`` and ordered ``str_replace_mapping``.
+
+    Returns ``None`` for keys to skip (e.g. ``_extra_state``).
+    """
+    # Skip diffusers internal keys
+    if key.endswith("_extra_state"):
+        return None
+
+    # Exact key rename
+    if key in convert_mapping:
+        return convert_mapping[key]
+
+    # Sub-string replacements (applied in order; single-character patterns are
+    # skipped deliberately to avoid destructive replaces)
+    for old_str, new_str in str_replace_mapping.items():
+        if len(old_str) > 1:
+            key = key.replace(old_str, new_str)
+
+    return key
+
+
 def merge_moe_expert_weights(
     state_dict: Dict[str, torch.Tensor],
     hf_keys: Tuple[str, ...],
@@ -283,7 +310,95 @@ class Qwen35WeightTransformPipeline(WeightTransformPipeline):
         return {key: tensor}
 
 
+class DiffusersKeyMapTransformPipeline(WeightTransformPipeline):
+    """Generic diffusers -> native per-tensor transform pipeline driven by
+    subclass key maps (``CONVERT_MAPPING`` / ``STR_REPLACE_MAPPING``).
+
+    New models only ship the mapping tables and register a subclass in
+    ``WEIGHT_TRANSFORM_PIPELINES`` (e.g. ``Wan22DiffusersTransformPipeline``);
+    the checkpoint layer carries no model-specific knowledge. Saving back to
+    diffusers format is not supported.
+    """
+
+    CONVERT_MAPPING: Dict[str, str] = {}
+    STR_REPLACE_MAPPING: Dict[str, str] = {}
+
+    def __init__(self, hf_dir: Optional[str] = None, **kwargs) -> None:
+        # ``hf_dir``/``mtp_num_layers`` are accepted (and ignored) so the class
+        # can be built through ``build_weight_transform`` / ``HFCheckpointer``
+        # with the same call signature as config-driven pipelines.
+        super().__init__()
+
+    def hf_to_dcp(
+        self, key: str, tensor: torch.Tensor
+    ) -> Optional[Tuple[str, torch.Tensor]]:
+        """Rename one diffusers key to the native layout; returns ``None`` for
+        dropped tensors (e.g. diffusers-internal ``_extra_state`` entries)."""
+        key = convert_diffusers_key(key, self.CONVERT_MAPPING, self.STR_REPLACE_MAPPING)
+        if key is None:
+            return None
+        return key, tensor
+
+    def dcp_to_hf(
+        self, key: str, tensor: torch.Tensor
+    ) -> Dict[str, torch.Tensor]:
+        raise NotImplementedError(
+            "Saving weights in diffusers format is not supported."
+        )
+
+
+# Wan2.2 diffusers -> native WanModel key mapping tables.
+
+# Exact key renames (old_key -> new_key)
+WAN22_DIFFUSERS_CONVERT_MAPPING = {
+    "condition_embedder.text_embedder.linear_1.bias": "text_embedding.0.bias",
+    "condition_embedder.text_embedder.linear_1.weight": "text_embedding.0.weight",
+    "condition_embedder.text_embedder.linear_2.bias": "text_embedding.2.bias",
+    "condition_embedder.text_embedder.linear_2.weight": "text_embedding.2.weight",
+    "condition_embedder.time_embedder.linear_1.bias": "time_embedding.0.bias",
+    "condition_embedder.time_embedder.linear_1.weight": "time_embedding.0.weight",
+    "condition_embedder.time_embedder.linear_2.bias": "time_embedding.2.bias",
+    "condition_embedder.time_embedder.linear_2.weight": "time_embedding.2.weight",
+    "condition_embedder.time_proj.bias": "time_projection.1.bias",
+    "condition_embedder.time_proj.weight": "time_projection.1.weight",
+    "scale_shift_table": "head.modulation",
+    "proj_out.bias": "head.head.bias",
+    "proj_out.weight": "head.head.weight",
+}
+
+# Sub-string replacements applied to every key
+WAN22_DIFFUSERS_STR_REPLACE_MAPPING = {
+    "attn1.norm_q": "self_attn.norm_q",
+    "attn1.norm_k": "self_attn.norm_k",
+    "attn2.norm_q": "cross_attn.norm_q",
+    "attn2.norm_k": "cross_attn.norm_k",
+    "attn1.to_q.": "self_attn.q.",
+    "attn1.to_k.": "self_attn.k.",
+    "attn1.to_v.": "self_attn.v.",
+    "attn1.to_out.0.": "self_attn.o.",
+    "attn2.to_q.": "cross_attn.q.",
+    "attn2.to_k.": "cross_attn.k.",
+    "attn2.to_v.": "cross_attn.v.",
+    "attn2.to_out.0.": "cross_attn.o.",
+    ".ffn.net.0.proj.": ".ffn.0.",
+    ".ffn.net.2.": ".ffn.2.",
+    "scale_shift_table": "modulation",
+    ".norm2.": ".norm3.",
+}
+
+
+class Wan22DiffusersTransformPipeline(DiffusersKeyMapTransformPipeline):
+    """Wan2.2 diffusers -> native transform pipeline, driven by the tables above."""
+
+    CONVERT_MAPPING = WAN22_DIFFUSERS_CONVERT_MAPPING
+    STR_REPLACE_MAPPING = WAN22_DIFFUSERS_STR_REPLACE_MAPPING
+
+
 WEIGHT_TRANSFORM_PIPELINES = {
     "qwen3_5": Qwen35WeightTransformPipeline,
     "qwen3_5_moe": Qwen35WeightTransformPipeline,
+    "wan2_2": Wan22DiffusersTransformPipeline,
 }
+# Note: ``DiffusersKeyMapTransformPipeline`` is a base class with empty mapping
+# tables and must NOT be registered directly; new diffusers-source models add a
+# concrete subclass with their key tables and register it here keyed by model_id.

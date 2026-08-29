@@ -63,8 +63,16 @@ def main() -> None:
     parser.add_argument("--to_bf16", action="store_true", help="Convert exported HF weights to BF16.")
     parser.add_argument("--keep_origin_mtp_weights", action="store_true", help="Keep original MTP weights if absent in DCP.")
     parser.add_argument("--num_workers", type=int, default=0, help="Parallel shard workers; 0 means serial.")
+    parser.add_argument("--plugin", nargs="*", default=None,
+                        help="Optional plugin packages to import before conversion, so models can register "
+                             "their weight transform pipelines (e.g. mindspeed_mm/fsdp/models/wan2_2).")
 
     args = parser.parse_args()
+
+    if args.plugin:
+        from mindspeed_mm.fsdp.utils.register import import_plugin
+        import_plugin(args.plugin)
+
     if args.command == "hf_to_dcp":
         hf_to_dcp(
             model_id=args.model_id,

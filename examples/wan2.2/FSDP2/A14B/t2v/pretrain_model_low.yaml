@@ -1,0 +1,213 @@
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - text_encoder
+      - predictor.blocks.{*}
+      - predictor.blocks.{*}.self_attn
+      - predictor.blocks.{*}.cross_attn
+      - predictor.blocks.{*}.ffn
+      - predictor.head
+    ignored_modules:
+      - ae
+    param_dtype: bf16
+    reduce_dtype: fp32
+    cast_forward_inputs: true
+    reshard_after_forward: true
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+    cpu_offload: false
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+
+data:
+  dataset_param:
+    dataset_type: wan2_2
+    preprocess_parameters:
+      video_processor_type: OpensoraplanVideoProcessor
+      video_reader_type: DecordVideo
+      image_reader_type: Image
+      num_frames: 81
+      min_num_frames: 1
+      frame_interval: 1
+      auto_interval: false
+      max_height: 480
+      max_width: 832
+      max_hxw: 399360
+      train_fps: 24
+      speed_factor: 1.0
+      drop_short_ratio: 0.0
+      cfg: 0.0
+      hw_stride: 8
+      force_resolution: false
+      hw_aspect_thr: 5.0
+      truncate_t_by_sp: false
+      train_pipeline:
+        video:
+          - trans_type: ResizeVideo
+            param:
+              transform_size: auto
+              interpolation_mode: bilinear
+              antialias: true
+              mode: shortside
+          - trans_type: ToTensorVideo
+          - trans_type: norm_fun
+            param:
+              mean: 0.5
+              std: 0.5
+          - trans_type: CenterCropResizeVideo
+            param:
+              use_short_edge: false
+              top_crop: false
+              align_corners: false
+              antialias: true
+              transform_size: auto
+    basic_parameters:
+      data_path: ./examples/wan2.2/data.txt
+      data_storage_mode: combine
+    use_text_processer: true
+    enable_text_preprocessing: true
+    text_preprocess_methods:
+      - method: basic_clean
+      - method: whitespace_clean
+    tokenizer_config:
+      autotokenizer_name: AutoTokenizer
+      hub_backend: hf
+      from_pretrained: /weights/Wan2.2-T2V-A14B-Diffusers/tokenizer
+      model_max_length: 512
+  dataloader_param:
+    dataloader_mode: sampler
+    sampler_type: BaseRandomBatchSampler
+    drop_last: true
+    pin_memory: true
+    shuffle: false
+    num_workers: 8
+    collate_param:
+      model_name: wan2_2
+
+model:
+  model_id: wan2_2_container
+  task: t2v
+  models:
+    ae:
+      model_id: wan_video_vae
+      from_pretrained: /weights/Wan2.2-T2V-A14B-Diffusers/vae
+      dtype: bf16
+      enable_tiling: false
+      tiling_param:
+        tile_sample_min_height: 256
+        tile_sample_min_width: 256
+        tile_sample_stride_height: 192
+        tile_sample_stride_width: 192
+      norm_latents: true
+      norm_mode: channel_specified_shift_scale
+      do_sample: false
+      meta_init: false
+      freeze: true
+
+    text_encoder:
+      model_id: UMT5
+      hub_backend: hf
+      from_pretrained: /weights/Wan2.2-T2V-A14B-Diffusers/text_encoder
+      load_format: hf
+      dtype: bf16
+      skip_to_device: false
+      meta_init: true
+      freeze: true
+
+    predictor:
+      model_id: wan2_2_predictor
+      model_type: wan2_2-t2v
+      weight_transform_model_type: wan2_2
+      dtype: bf16
+      from_pretrained: /weights/Wan2.2-T2V-A14B-Diffusers/transformer_2
+      load_format: auto
+      patch_size: [1, 2, 2]
+      text_len: 512
+      in_dim: 16
+      hidden_size: 5120
+      ffn_dim: 13824
+      freq_dim: 256
+      text_dim: 4096
+      img_dim: 1280
+      out_dim: 16
+      num_heads: 40
+      num_layers: 40
+      qk_norm: true
+      cross_attn_norm: true
+      eps: 1.0e-6
+      attn_implementation: flash_attention_2
+      mask_text_padding: false
+      meta_init: true
+      freeze: false
+
+features:
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - predictor.blocks.{*}
+    use_reentrant: false
+  enable_activation_offload: true
+  activation_offload_plan:
+    apply_modules:
+      - predictor.blocks.{*}
+  loss_cfg:
+    loss_type: raw
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: constant
+  lr_warmup_ratio: 0.0
+  lr_min: 1.0e-5
+  weight_decay: 0.01
+  train_iters: 20
+  clip_grad: 1.0
+  optimizer: adamw
+  adam_fused: false
+  save: outputs
+  save_interval: 10000
+  log_interval: 1
+  val_interval: 0
+  use_deter_comp: false
+  init_model_with_meta_device: true
+  load_format: auto
+  save_format: dcp
+  no_load_optim: true
+  no_load_rng: true
+  no_save_optim: true
+  no_save_rng: true
+  plugin:
+    - mindspeed_mm/fsdp/models/wan2_2
+    - mindspeed_mm/fsdp/data/datasets/wan2_2
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false

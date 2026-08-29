@@ -58,13 +58,13 @@ class _SimpleTextEncoder(nn.Module, GenerativeBaseModel):
         return self.model
 
     def resolve_weight_source(self, config):
-        from mindspeed_mm.fsdp.checkpoint.convert import resolve_checkpoint_source
-
-        return resolve_checkpoint_source(
-            config,
-            fallback_from_pretrained=self._from_pretrained,
-            fallback_format=self._load_format,
-        )
+        # The wrapped transformers model's weights path/format may be passed at
+        # construction time; fall back to them when the yaml config does not
+        # carry ``from_pretrained`` / ``load_format``.
+        cfg = config.to_dict() if hasattr(config, "to_dict") else dict(config)
+        ckpt_path = cfg.get("checkpoint_path") or cfg.get("from_pretrained") or self._from_pretrained
+        declared_format = cfg.get("load_format") or self._load_format or "auto"
+        return ckpt_path, declared_format
 
     def post_load(self, loaded: bool):
         # UMT5/T5 checkpoints store the token embedding as ``shared.weight`` and
@@ -167,9 +167,9 @@ def build_text_encoder(config: dict):
     import transformers
     text_encoder = getattr(transformers, automodel_name)(transformer_config).to(torch_dtype)
 
-    # Weight-source arbitration (load_format / checkpoint_format / hub_backend
-    # aliases) is done by resolve_checkpoint_source at setup_weights time; the
-    # raw values are only kept as fallbacks here.
+    # The raw path/format are kept on the wrapper as fallbacks; the actual
+    # weight-source resolution happens in resolve_weight_source at
+    # setup_weights time.
     output_key = cfg.pop("output_key", "last_hidden_state")
     hidden_state_skip_layer = cfg.pop("hidden_state_skip_layer", None)
     ucg_rate = cfg.pop("ucg_rate", None)

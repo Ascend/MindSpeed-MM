@@ -1,5 +1,7 @@
 from typing import Optional, List, cast
+import glob
 import inspect
+import logging
 import warnings
 import dataclasses
 import os
@@ -16,6 +18,11 @@ from torch.distributed.checkpoint.logger import _dcp_method_logger
 from torch.distributed.checkpoint.filesystem import _StoragePrefix, _StorageInfo
 from torch.distributed.checkpoint import FileSystemReader
 from tqdm import tqdm
+
+from mindspeed.fsdp.utils.log import print_rank
+
+
+logger = logging.getLogger(__name__)
 
 
 def partial_save_dcp_state_dict(
@@ -360,3 +367,60 @@ class ProgressLoadPlanner(DefaultLoadPlanner):
     def commit_tensor(self, read_item, tensor: torch.Tensor) -> None:
         super().commit_tensor(read_item, tensor)
         self._advance_progress()
+
+
+def looks_like_dcp_checkpoint_dir(path: str) -> bool:
+    """Whether *path* looks like a torch.distributed.checkpoint directory.
+
+    A DCP directory has a tracker file, ``.distcp`` shards, or an
+    ``iter_*``/``release`` sub-directory containing ``.metadata``. A hollow
+    ``iter_*`` directory (e.g. left behind by an interrupted save) is not a
+    usable checkpoint, since DCP always writes ``.metadata`` into it.
+    """
+    from mindspeed_mm.fsdp.checkpoint.utils import get_checkpoint_tracker_filename
+
+    if not path or not os.path.isdir(path):
+        return False
+    if os.path.isfile(get_checkpoint_tracker_filename(path)):
+        return True
+    if glob.glob(os.path.join(path, "**", ".distcp"), recursive=True):
+        return True
+    if os.path.isfile(os.path.join(path, "release", ".metadata")):
+        return True
+    for sub in os.listdir(path):
+        if sub.startswith("iter_") and os.path.isfile(os.path.join(path, sub, ".metadata")):
+            return True
+    return False
+
+
+def load_dcp_weights(
+    model: torch.nn.Module,
+    checkpoint_path: str,
+    *,
+    load_rank0_and_broadcast: bool = False,
+    enable_lora: bool = False,
+    load_strict: bool = False,
+) -> bool:
+    """Load a DCP checkpoint into *model*.
+
+    *checkpoint_path* is the top-level directory; the concrete ``iter_*`` /
+    ``release`` directory is resolved from the tracker file (with a
+    fallback to a unique valid sub-directory when the tracker is missing).
+    """
+    # Imported lazily: dcp_checkpointer imports this module, so a top-level
+    # import here would be circular.
+    from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
+
+    print_rank(
+        logger.info,
+        f"Loading DCP weights from {checkpoint_path} into {type(model).__name__}",
+    )
+    state = {"model": model}
+    DistributedCheckpointer.load(
+        path=checkpoint_path,
+        state=state,
+        load_rank0_and_broadcast=load_rank0_and_broadcast,
+        load_strict=load_strict,
+        enable_lora=enable_lora,
+    )
+    return True
