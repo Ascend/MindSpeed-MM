@@ -136,6 +136,36 @@ class LossArguments(BaseArguments):
         default=False,
         metadata={"help": "Whether apply router auxiliary loss offload"},
     )
+    router_aux_loss_type: Literal["local", "global"] = field(
+        default="local",
+        metadata={
+            "help": "Router auxiliary loss scope. 'local' uses per-microbatch statistics; "
+                    "'global' follows Megatron-LM global_aux_loss semantics by aggregating "
+                    "expert token counts across the HSDP group. Global mode requires "
+                    "loss_type='per_token_loss'; when recompute is enabled, "
+                    "recompute_plan.use_reentrant must be false."
+        },
+    )
+    router_aux_loss_use_attention_mask: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether global router auxiliary loss excludes masked tokens using a 2D "
+                    "[batch, sequence] attention mask. When false, every router input row is "
+                    "included."
+        },
+    )
+
+    @model_validator(mode="after")
+    def _validate_global_aux_loss(self):
+        if (
+            self.router_aux_loss_type == "global"
+            and self.router_aux_loss_coef > 0.0
+            and self.loss_type != "per_token_loss"
+        ):
+            raise ValueError(
+                "Global router aux loss requires loss_type='per_token_loss'."
+            )
+        return self
 
 
 class ActivationOffloadPlanConfig(BaseArguments):

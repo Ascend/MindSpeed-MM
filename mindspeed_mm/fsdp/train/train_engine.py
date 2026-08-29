@@ -22,6 +22,7 @@ from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
 from mindspeed_mm.fsdp.data.dataloader.dataloader import Preloader
 from mindspeed_mm.fsdp.utils.constants import MEMORY_REPORT_ITERATION
 from mindspeed_mm.fsdp.train.training_context import TrainingStage, TrainingContext
+from mindspeed_mm.utils.aux_loss import reset_global_aux_loss_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,13 @@ class TrainEngine:
 
         return averaged_losses
 
+    def is_global_router_aux_loss_enabled(self) -> bool:
+        loss_cfg = self.args.features.loss_cfg
+        return (
+            getattr(loss_cfg, "router_aux_loss_type", "local") == "global"
+            and loss_cfg.router_aux_loss_coef > 0.0
+        )
+
     def get_batch(self, data_iterator):
         """Generate a batch."""
         if data_iterator is not None:
@@ -145,10 +153,13 @@ class TrainEngine:
     def train_step(self, train_dataloader_iter):
         """Perform a single training step with gradient accumulation."""
         args = self.args
+        global_aux_loss_enabled = self.is_global_router_aux_loss_enabled()
         total_loss = 0
         total_aux_loss = None
         all_mtp_loss = None
         ps = get_parallel_state()
+        if global_aux_loss_enabled:
+            reset_global_aux_loss_tracker()
         # Gradient accumulation
         for step in range(args.training.gradient_accumulation_steps):
             # Wait for the preloaded batch to be ready
@@ -221,6 +232,8 @@ class TrainEngine:
 
         try:
             for batch_data in self.val_dataloader:
+                if self.is_global_router_aux_loss_enabled():
+                    reset_global_aux_loss_tracker()
                 param_dtype = self.args.parallel.fsdp_plan.param_dtype
                 batch_data = move_to_device(batch_data, get_dtype(param_dtype) if param_dtype else None)
                 self.set_loss_func(batch_data)

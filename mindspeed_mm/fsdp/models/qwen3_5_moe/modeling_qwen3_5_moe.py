@@ -56,6 +56,7 @@ from transformers.models.qwen3_5_moe.configuration_qwen3_5_moe import Qwen3_5Moe
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+from mindspeed_mm.fsdp.utils.constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
 
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
@@ -2676,6 +2677,12 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         # aux loss
         transformer_config.text_config.router_aux_loss_coef = feature_args.loss_cfg.router_aux_loss_coef
         transformer_config.text_config.router_aux_loss_offload = feature_args.loss_cfg.router_aux_loss_offload
+        transformer_config.text_config.router_aux_loss_type = getattr(
+            feature_args.loss_cfg, "router_aux_loss_type", "local"
+        )
+        transformer_config.text_config.router_aux_loss_use_attention_mask = getattr(
+            feature_args.loss_cfg, "router_aux_loss_use_attention_mask", False
+        )
         # mtp
         mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
         if mtp_num_layers < 0:
@@ -2816,6 +2823,25 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         "A woman in a plaid shirt sits on a sandy beach at sunset, smiling as she gives a high-five to a yellow Labrador Retriever wearing a harness. The ocean waves roll in the background."
         ```"""
 
+        router_aux_loss_type = getattr(self.config.text_config, "router_aux_loss_type", "local")
+        router_aux_loss_use_attention_mask = getattr(
+            self.config.text_config, "router_aux_loss_use_attention_mask", False
+        )
+        global_step_num_tokens = None
+        aux_gradient_accumulation_steps = None
+        if router_aux_loss_type == "global":
+            # Capture GA metadata before per-token LM loss normalizes the
+            # average token count across ranks in-place.
+            global_step_num_tokens = kwargs.get(GLOBAL_STEP_TOKEN_NUM)
+            avg_per_step_token_num = kwargs.get(AVG_PER_STEP_TOKEN_NUM)
+            if isinstance(global_step_num_tokens, torch.Tensor) and isinstance(
+                avg_per_step_token_num, torch.Tensor
+            ):
+                aux_gradient_accumulation_steps = (
+                    global_step_num_tokens.detach().float()
+                    / torch.clamp(avg_per_step_token_num.detach().float(), min=1.0)
+                )
+
         if self.router_aux_loss_offload:
             clear_offload_grad()
 
@@ -2856,8 +2882,11 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         aux_loss = None
 
         if kwargs.get("output_router_logits", False):
-            if attention_mask is not None:
-                attention_mask = split_forward_gather_backward_with_cp(attention_mask, dim=1)
+            aux_attention_mask = attention_mask
+            if router_aux_loss_type == "global" and not router_aux_loss_use_attention_mask:
+                aux_attention_mask = None
+            elif attention_mask is not None and ps.is_cp_enable():
+                aux_attention_mask = split_forward_gather_backward_with_cp(attention_mask, dim=1)
 
             gate_logits = outputs.router_logits
 
@@ -2868,8 +2897,15 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
                 gate_logits,
                 self.config.text_config.num_experts,
                 self.config.text_config.num_experts_per_tok,
-                attention_mask,
+                aux_attention_mask,
                 context_parallel_group=ps.get_cp_group(),
+                aux_loss_type=router_aux_loss_type,
+                global_aux_loss_group=ps.get_hsdp_group(),
+                data_parallel_group=ps.get_dp_group(),
+                global_step_num_tokens=global_step_num_tokens,
+                gradient_accumulation_steps=aux_gradient_accumulation_steps,
+                router_aux_loss_use_attention_mask=router_aux_loss_use_attention_mask,
+                tracker_key=f"qwen3_5_moe:{id(self)}",
             )
             if labels is not None:
                 loss += self.config.text_config.router_aux_loss_coef * aux_loss.to(
