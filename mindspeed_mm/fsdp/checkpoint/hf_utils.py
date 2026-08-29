@@ -11,11 +11,13 @@ from pydantic import FilePath
 from safetensors import safe_open
 from safetensors.torch import save_file
 import torch
+from tqdm import tqdm
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 
 from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.checkpoint.utils import remove_base_layer_keys
-from mindspeed_mm.fsdp.utils.utils import tensor_to_dtensor
+from mindspeed_mm.fsdp.utils.utils import tensor_to_dtensor_local
 
 logger = logging.getLogger(__name__)
 
@@ -107,13 +109,8 @@ def _resolve_leaf(model: torch.nn.Module, name: str) -> Tuple[torch.nn.Module, s
 def write_full_tensor(model: torch.nn.Module, name: str, full_tensor: torch.Tensor) -> None:
     """Write *full_tensor* into the model at *name* (parameter or buffer).
 
-    For a sharded parameter (a DTensor created by ``fully_shard``), the target
-    already carries its ``device_mesh`` / ``placements``; we move the full
-    tensor onto the mesh device and let ``tensor_to_dtensor`` carve out this
-    rank's shard (a local Replicate -> Shard redistribute, no comm). For a
-    plain tensor (replicated parameter or buffer), we just move dtype/device
-    and copy. The write is always in place since FSDP2 holds the parameter
-    object.
+    For a sharded parameter, slice the CPU tensor to this rank's shard before
+    moving it to the device. Plain tensors are moved and copied directly.
     """
     leaf_module, local_name = _resolve_leaf(model, name)
 
@@ -125,9 +122,10 @@ def write_full_tensor(model: torch.nn.Module, name: str, full_tensor: torch.Tens
         raise ValueError(f"'{name}' is neither a parameter nor a buffer of the model.")
 
     if hasattr(target, "device_mesh"):  # sharded -> a DTensor
-        full_tensor = full_tensor.to(device=target.to_local().device, dtype=target.dtype)
-        shard = tensor_to_dtensor(full_tensor, target.device_mesh, target.placements)
-        target.copy_(shard)
+        # Slice on CPU first, then move only this rank's shard to the NPU.
+        full_tensor = tensor_to_dtensor_local(full_tensor, target.device_mesh, target.placements)
+        # Return the local tensor shard stored on the current rank.
+        target.to_local().copy_(full_tensor.to(device=target.device, dtype=target.dtype))
     else:  # plain tensor (replicated on every rank)
         target.copy_(full_tensor.to(device=target.device, dtype=target.dtype))
 
@@ -204,7 +202,11 @@ def load_hf_weights(
     lora_base_map = _lora_base_key_map(param_names) if enable_lora else {}
     unexpected_keys: Set[str] = set()
 
-    for shard_stream in locate_hf_weight_files(hf_dir):
+    for shard_stream in tqdm(
+        locate_hf_weight_files(hf_dir),
+        desc="Loading checkpoint shards",
+        disable=envs.get("LOCAL_RANK", -1) > 0,
+    ):
         for raw_key, full_tensor in shard_stream:
             key = convert_weight_key(raw_key, model)
             if weight_transform is not None:

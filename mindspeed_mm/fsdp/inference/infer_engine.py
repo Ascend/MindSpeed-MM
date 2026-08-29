@@ -64,7 +64,8 @@ class InferEngine:
             if result["inference_duration"] > 0
             else 0.0
         )
-        print_rank(print, f"\nImage path: {item.get('image', '')}")
+        if "image" in item:
+            print_rank(print, f"\nImage path: {item['image']}")
         if "videos" in item:
             print_rank(print, f"Video path: {item['videos']}")
         print_rank(print, f"Prompt: {item['text']}")

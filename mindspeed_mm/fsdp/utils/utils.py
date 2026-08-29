@@ -2,7 +2,7 @@ from typing import Dict, Any, Callable, Optional
 import time
 
 import torch
-from torch.distributed.tensor import DTensor, Replicate
+from torch.distributed.tensor import DTensor, Replicate, Shard
 
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.utils.device import (
@@ -102,10 +102,23 @@ def setup_module_weights(
 
 
 def tensor_to_dtensor(t: torch.Tensor, device_mesh, placements):
+    """Convert a full tensor replicated on each mesh rank to the target DTensor layout."""
     replicate = [Replicate() for _ in range(device_mesh.ndim)]
+    # Wrap each rank's full local tensor as a replicated DTensor without changing its data layout.
     ori_dtensor = DTensor.from_local(local_tensor=t, device_mesh=device_mesh, placements=replicate)
+    # Convert the replicated DTensor to the requested placements.
     new_dtensor = ori_dtensor.redistribute(device_mesh=device_mesh, placements=placements)
     return new_dtensor
+
+
+def tensor_to_dtensor_local(t: torch.Tensor, device_mesh, placements):
+    """Extract the current rank's local shard from a full tensor."""
+    coordinate = device_mesh.get_coordinate()
+    for mesh_dim, placement in enumerate(placements):
+        if isinstance(placement, Shard):
+            # Split the full tensor and select the current rank's shard.
+            t = placement._replicate_to_shard(t, device_mesh, mesh_dim, coordinate[mesh_dim])
+    return t
 
 
 def init_model_weights(model):
