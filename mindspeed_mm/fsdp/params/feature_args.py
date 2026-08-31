@@ -95,6 +95,18 @@ class RecomputePlanConfig(BaseArguments):
                           "activates via the non-reentrant checkpoint's context_fn). Nested zones "
                           "resolve to the innermost scope; overlapping scopes: first in the list wins."},
     )
+    flatten_inputs: bool = field(
+        default=False,
+        metadata={"help": "Call-shape normalization at the non-reentrant checkpoint boundary: "
+                          "the full (args, kwargs) input tree is flattened into unique leaves "
+                          "passed positionally through checkpoint, so every boundary tensor goes "
+                          "through save_for_backward (saved_tensors_hooks, e.g. ActStash) "
+                          "instead of being held by the checkpoint frame until backward. "
+                          "Structure is rebuilt inside the checkpoint before the wrapped forward "
+                          "runs; semantics-preserving (objects aliased across slots share one "
+                          "leaf). Covers keyword-only params, **kwargs contents and tensors "
+                          "inside containers. Default False keeps the stock PyTorch call shape."},
+    )
 
 
 class ChunkLossPlanConfig(BaseArguments):

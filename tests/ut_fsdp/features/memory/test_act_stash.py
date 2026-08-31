@@ -1,4 +1,5 @@
 import copy
+import inspect
 
 import pytest
 import torch
@@ -11,6 +12,7 @@ from mindspeed_mm.fsdp.features.memory.act_stash import (
     apply_act_stash_modules,
     get_act_stash_modules,
 )
+from mindspeed_mm.fsdp.features.memory.recompute import recompute_wrapper
 from mindspeed_mm.fsdp.features.memory.slab_arena import SlabArena
 from mindspeed_mm.fsdp.features.memory.swap_core import SwapCache, SwapHandle
 from mindspeed_mm.fsdp.utils.device import get_device_type
@@ -238,11 +240,11 @@ class TestPrefetchArmsOnReversePops:
         _skip_if_cpu()
         device = _get_device()
         torch.manual_seed(42)
-        model = TinyModel(depth=2).to(device)
-        # capacity=0: deterministic eviction (put returns with the tensor
-        # already in DDR); pops read back from DDR, and the second
-        # iteration's chain prefetch issues real H2D loads
-        cache = _make_cache(capacity_bytes=0)
+        model = TinyModel(depth=3).to(device)
+        # capacity is a hard cap: 4096B < 3x2048B total, so the oldest put's
+        # D2H is waited out during forward (DDR_ONLY), while the remaining
+        # budget admits one in-flight prefetch in the second iteration
+        cache = _make_cache(capacity_bytes=4096)
         cache.enable_prefetch = True
         apply_act_stash_modules(model, ["layers.{*}"], cache)
 
@@ -254,6 +256,278 @@ class TestPrefetchArmsOnReversePops:
         stats = cache._iter_stats
         assert stats['prefetch_issued'] == 1
         assert stats['hbm_hit'] >= 1  # the prefetched tensor is consumed from HBM
+
+    def test_zero_capacity_hard_cap_blocks_prefetch(self):
+        _skip_if_cpu()
+        device = _get_device()
+        torch.manual_seed(42)
+        model = TinyModel(depth=2).to(device)
+        # capacity>=0 is a hard cap: 0 is zero budget, so prefetch admission
+        # is refused for every handle; pops still swap in on demand (ddr_load)
+        cache = _make_cache(capacity_bytes=0)
+        cache.enable_prefetch = True
+        apply_act_stash_modules(model, ["layers.{*}"], cache)
+
+        x = torch.randn(8, 64, device=device, requires_grad=True)
+        _run_fwd_bwd(model, x)  # iteration 1: learns the pop order
+        cache.clear()
+        _run_fwd_bwd(model, x)  # iteration 2: graph armed, budget zero
+
+        stats = cache._iter_stats
+        assert stats['prefetch_issued'] == 0
+        assert stats['prefetch_skip_capacity'] == 1
+        assert stats['ddr_load'] == 2  # both pops read back from DDR on demand
+
+
+class TestFlattenInputs:
+    """recompute 包装层的输入树展平（recompute_plan.flatten_inputs，默认关
+    = 纯 PyTorch 调用形态）：开启后 (args, kwargs) 全树按 pytree 展平、按身份
+    去重为唯一叶子，作位置参数过 checkpoint（ckpt 内部还原结构后调原函数），
+    全部边界张量经 save_for_backward 进 stash pack、forward 末即释放 HBM、梯度
+    逐位不变；keyword-only / **kwargs / 容器内张量 / *args 签名全覆盖（机制探针
+    见 probe_pytree_flatten.py）"""
+
+    class AttnLike(torch.nn.Module):
+        def forward(self, hidden_states, aux=None):
+            return hidden_states * aux if aux is not None else hidden_states * 2.0
+
+    class AttnKwOnly(torch.nn.Module):
+        def forward(self, hidden_states, *, aux):
+            return hidden_states * aux
+
+    class AttnVarKw(torch.nn.Module):
+        def forward(self, hidden_states, **kw):
+            return hidden_states * kw["aux"]
+
+    class AttnGap(torch.nn.Module):
+        def forward(self, hidden_states, scale=1.0, aux=None):
+            return hidden_states * scale * aux
+
+    class AttnVarArgs(torch.nn.Module):
+        def forward(self, *args, **kw):
+            return args[0] * kw["aux"]
+
+    class AttnContainer(torch.nn.Module):
+        def forward(self, hidden_states, extras):
+            return hidden_states * extras["scale"] * (extras["gates"][0] + extras["gates"][1])
+
+    class AttnAliasMut(torch.nn.Module):
+        """b1/b2 同为调用方的同一对象 a：forward 内跨槽位原地改写累积。"""
+
+        def forward(self, hidden_states, b1, b2):
+            b1.mul_(2.0)
+            b2.mul_(2.0)
+            return hidden_states * b1 * b2
+
+    def _run(self, inner, flatten, rows=8):
+        """norm + ckpt(inner, kwargs 传入 hidden_states/aux)：stash hooks 包外层，
+        与生产接线序一致。返回 (cache, out, x)。"""
+        device = _get_device()
+        torch.manual_seed(42)
+        norm = torch.nn.LayerNorm(64).to(device)
+        inner = inner.to(device)
+        cache = _make_cache(capacity_bytes=0)
+        wrapped = recompute_wrapper(inner.forward, use_reentrant=False,
+                                    flatten_inputs=flatten)
+        x = torch.randn(rows, 64, device=device, requires_grad=True)
+        with ActStashHooks(cache):
+            h = norm(x)
+            out = wrapped(hidden_states=h, aux=torch.full_like(h, 0.5))
+        out.sum().backward()
+        return cache, out, x
+
+    def _reference(self, inner):
+        device = _get_device()
+        torch.manual_seed(42)
+        norm = torch.nn.LayerNorm(64).to(device)
+        inner = inner.to(device)
+        x = torch.randn(8, 64, device=device, requires_grad=True)
+        out = inner(norm(x), aux=torch.full_like(x, 0.5))
+        out.sum().backward()
+        return out.detach(), x.grad.clone()
+
+    def test_default_off_keeps_kwargs_blind(self):
+        _skip_if_cpu()
+        cache, _, _ = self._run(self.AttnLike(), flatten=False)
+        # 边界输入在 kwargs 里：只有 norm 的 saved tensors 进 pack，无边界 put
+        assert cache._iter_stats['put_cnt'] == 3  # norm 的 input/mean/rstd
+        # 不显式传 flag 时与 False 等价（默认关）
+        device = _get_device()
+        torch.manual_seed(42)
+        norm = torch.nn.LayerNorm(64).to(device)
+        inner = self.AttnLike().to(device)
+        cache2 = _make_cache(capacity_bytes=0)
+        wrapped = recompute_wrapper(inner.forward, use_reentrant=False)
+        x = torch.randn(8, 64, device=device, requires_grad=True)
+        with ActStashHooks(cache2):
+            h = norm(x)
+            wrapped(hidden_states=h, aux=torch.full_like(h, 0.5))
+        assert cache2._iter_stats['put_cnt'] == 3
+
+    def test_on_packs_named_kwargs_bitwise(self):
+        _skip_if_cpu()
+        cache, out, x = self._run(self.AttnLike(), flatten=True)
+        # 边界 hidden_states+aux 摊平进 save_for_backward：+2 且全部被消费
+        assert cache._iter_stats['put_cnt'] == 5
+        assert cache._iter_stats['pop_cnt'] == 5
+        out_ref, g_ref = self._reference(self.AttnLike())
+        assert torch.equal(out.detach(), out_ref)
+        assert torch.equal(x.grad, g_ref)
+
+    def test_on_releases_hbm_at_forward_end(self):
+        _skip_if_cpu()
+        # 32MB 边界 tensor：off 时被 ckpt frame 持有到 backward，on 时驱逐即释。
+        # forward 收进函数作用域，让局部引用随返回释放（否则测的是测试自身）
+        def _fwd_only(flatten):
+            device = _get_device()
+            torch.manual_seed(42)
+            norm = torch.nn.LayerNorm(64).to(device)
+            inner = self.AttnLike().to(device)
+            cache = _make_cache(capacity_bytes=0)
+            wrapped = recompute_wrapper(inner.forward, use_reentrant=False,
+                                        flatten_inputs=flatten)
+            x = torch.randn(131072, 64, device=device, requires_grad=True)
+            with ActStashHooks(cache):
+                h = norm(x)
+                out = wrapped(hidden_states=h, aux=torch.full_like(h, 0.5))
+            return out, x
+
+        for flatten in (False, True):
+            device = _get_device()
+            mem = torch.npu if device.type == 'npu' else torch.cuda
+            mem.synchronize()
+            base = mem.memory_allocated()
+            out, x = _fwd_only(flatten)
+            mem.synchronize()
+            alive = mem.memory_allocated() - base
+            if flatten:
+                assert alive < 96 * 2**20  # h/aux 已驱逐：仅剩 out+x(64MB)+少量
+            else:
+                assert alive > 120 * 2**20  # h+aux 被 frame 持有：out+x+h+aux ≈ 128MB
+            del out, x
+
+    def test_covers_signature_edge_shapes(self):
+        _skip_if_cpu()
+        # keyword-only / **kwargs / 前缀缺洞：全树展平不看签名，aux 照样进 pack（+2）
+        for inner in (self.AttnKwOnly(), self.AttnVarKw(), self.AttnGap()):
+            cache, out, x = self._run(inner, flatten=True)
+            assert cache._iter_stats['put_cnt'] == 5  # norm 3 + hidden_states + aux
+            assert cache._iter_stats['pop_cnt'] == 5
+            _, g_ref = self._reference(inner)
+            assert torch.equal(x.grad, g_ref)
+
+    def test_covers_varargs_signature(self):
+        _skip_if_cpu()
+        # *args/**kw 签名：prefix 摊平整体退回的形态，展平不看签名照常覆盖
+        device = _get_device()
+        torch.manual_seed(42)
+        norm = torch.nn.LayerNorm(64).to(device)
+        inner = self.AttnVarArgs().to(device)
+        cache = _make_cache(capacity_bytes=0)
+        wrapped = recompute_wrapper(inner.forward, use_reentrant=False, flatten_inputs=True)
+        x = torch.randn(8, 64, device=device, requires_grad=True)
+        with ActStashHooks(cache):
+            h = norm(x)
+            out = wrapped(h, aux=torch.full_like(h, 0.5))
+        out.sum().backward()
+        assert cache._iter_stats['put_cnt'] == 5  # norm 3 + h + aux
+        assert cache._iter_stats['pop_cnt'] == 5
+        # 参考：无 hooks 无 ckpt
+        torch.manual_seed(42)
+        norm2 = torch.nn.LayerNorm(64).to(device)
+        inner2 = self.AttnVarArgs().to(device)
+        x2 = torch.randn(8, 64, device=device, requires_grad=True)
+        inner2(norm2(x2), aux=torch.full_like(x2, 0.5)).sum().backward()
+        assert torch.equal(x.grad, x2.grad)
+
+    def test_covers_nested_container_bitwise(self):
+        _skip_if_cpu()
+        # 嵌套容器（dict 套 list）内的张量随整树展平进 pack（+4）
+        device = _get_device()
+        torch.manual_seed(42)
+        norm = torch.nn.LayerNorm(64).to(device)
+        inner = self.AttnContainer().to(device)
+        cache = _make_cache(capacity_bytes=0)
+        wrapped = recompute_wrapper(inner.forward, use_reentrant=False, flatten_inputs=True)
+        x = torch.randn(8, 64, device=device, requires_grad=True)
+        with ActStashHooks(cache):
+            h = norm(x)
+            extras = {"scale": torch.full_like(h, 0.5),
+                      "gates": [torch.full_like(h, 0.25), torch.full_like(h, 0.25)]}
+            out = wrapped(hidden_states=h, extras=extras)
+        out.sum().backward()
+        assert cache._iter_stats['put_cnt'] == 7  # norm 3 + h + scale + 2 gates
+        assert cache._iter_stats['pop_cnt'] == 7
+        torch.manual_seed(42)
+        norm2 = torch.nn.LayerNorm(64).to(device)
+        inner2 = self.AttnContainer().to(device)
+        x2 = torch.randn(8, 64, device=device, requires_grad=True)
+        h2 = norm2(x2)
+        extras2 = {"scale": torch.full_like(h2, 0.5),
+                   "gates": [torch.full_like(h2, 0.25), torch.full_like(h2, 0.25)]}
+        inner2(h2, extras2).sum().backward()
+        assert torch.equal(x.grad, x2.grad)
+
+    def test_alias_dedup_bitwise(self):
+        _skip_if_cpu()
+        # b1/b2 同为 a：按身份去重后单份 pack（+2 = h + a），recompute 恢复共享
+        # 对象保住别名语义，跨槽位原地改写累积复现 forward，梯度逐位 == 无 ckpt 参考
+        device = _get_device()
+        torch.manual_seed(42)
+        norm = torch.nn.LayerNorm(64).to(device)
+        inner = self.AttnAliasMut().to(device)
+        cache = _make_cache(capacity_bytes=0)
+        wrapped = recompute_wrapper(inner.forward, use_reentrant=False, flatten_inputs=True)
+        x = torch.randn(8, 64, device=device, requires_grad=True)
+        with ActStashHooks(cache):
+            h = norm(x)
+            a = torch.ones(64, device=device)
+            out = wrapped(hidden_states=h, b1=a, b2=a)
+        out.sum().backward()
+        assert cache._iter_stats['put_cnt'] == 5  # norm 3 + h + a（a 单份）
+        assert cache._iter_stats['pop_cnt'] == 5
+        torch.manual_seed(42)
+        norm2 = torch.nn.LayerNorm(64).to(device)
+        inner2 = self.AttnAliasMut().to(device)
+        x2 = torch.randn(8, 64, device=device, requires_grad=True)
+        a2 = torch.ones(64, device=device)
+        inner2(norm2(x2), a2, a2).sum().backward()
+        assert torch.equal(x.grad, x2.grad)
+
+    def test_generic_wrapper_flattens_without_signature(self):
+        _skip_if_cpu()
+        # 生产接线序（recompute.py:22-30）：op replay 先把 attn forward 换成
+        # OpReplayPatcher（通用 __call__(*args, **kwargs)），recompute_wrapper 再包
+        # checkpoint。展平不调被包函数的签名，通用包装不再构成盲区。
+
+        class GenericWrapper:
+            """模拟 OpReplayPatcher 的签名形态（不设 __signature__）。"""
+
+            def __init__(self, fn):
+                self._fn = fn
+
+            def __call__(self, *args, **kwargs):
+                return self._fn(*args, **kwargs)
+
+        inner = self.AttnLike().to(_get_device())
+        inner.forward = GenericWrapper(inner.forward)
+        cache, out, x = self._run(inner, flatten=True)
+        assert cache._iter_stats['put_cnt'] == 5
+        _, g_ref = self._reference(self.AttnLike())
+        assert torch.equal(x.grad, g_ref)
+
+    def test_op_replay_patcher_exposes_wrapped_signature(self):
+        # OpReplayPatcher.__call__ 是通用签名；透出被包 forward 的签名，
+        # 供下游 inspect.signature 消费者（recompute 包装层的 past_key_values
+        # 注入判断）看到真实签名
+        from mindspeed_mm.fsdp.features.memory.op_replay import OpReplayPatcher
+        patcher = OpReplayPatcher(self.AttnLike(), controller=None, scope=None)
+        assert list(inspect.signature(patcher).parameters) == ['hidden_states', 'aux']
+
+    def test_config_field_default_false(self):
+        from mindspeed_mm.fsdp.params.feature_args import RecomputePlanConfig
+        assert RecomputePlanConfig().flatten_inputs is False
+        assert RecomputePlanConfig(flatten_inputs=True).flatten_inputs is True
 
 
 class TestWiring:

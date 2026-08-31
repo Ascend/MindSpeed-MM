@@ -3,6 +3,7 @@ import logging
 import inspect
 import functools
 
+from torch.utils._pytree import tree_flatten, tree_unflatten
 from torch.utils.checkpoint import checkpoint
 from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
@@ -26,7 +27,8 @@ def recompute_modules(model, plan, op_cache=None):
 
     for name, module in modules:
         print_rank(logger.info, f'Applying recompute to module: {name}')
-        module.forward = recompute_wrapper(module.forward, plan.use_reentrant, context_fn)
+        module.forward = recompute_wrapper(module.forward, plan.use_reentrant, context_fn,
+                                           plan.flatten_inputs)
 
     return model
 
@@ -65,10 +67,46 @@ def get_recompute_modules(modules, plan):
     return matched_modules
 
 
-def recompute_wrapper(function, use_reentrant, context_fn=None):
+def _flatten_call(function, args, kwargs):
+    """Flatten the full (args, kwargs) input tree into unique leaves plus a
+    rebuild recipe (call-shape normalization, semantics-preserving).
+
+    Non-reentrant checkpoint only routes top-level positional tensors through
+    save_for_backward (saved_tensors_hooks); kwargs are captured by reference in
+    the checkpoint frame and held until backward. Flattening every leaf
+    (keyword-only / **kwargs contents / tensors inside containers included) into
+    positional arguments moves them all into the save_for_backward channel so
+    tenants like ActStash can swap them out. The shim inside the checkpoint
+    rebuilds the original structure before calling the wrapped function, so the
+    function sees exactly the call it was invoked with.
+
+    Leaves are deduplicated by identity: an object aliased across several slots
+    occupies one leaf position, so recompute restores the alias (same object)
+    instead of silently forking it into independent copies, and the saved
+    channel packs it once instead of once per slot.
+    """
+    flat, spec = tree_flatten((args, kwargs))
+    unique_leaves, index, slots = [], {}, []
+    for leaf in flat:
+        key = id(leaf)
+        if key not in index:
+            index[key] = len(unique_leaves)
+            unique_leaves.append(leaf)
+        slots.append(index[key])
+
+    def flattened_function(*leaves):
+        rebuild = [leaves[slot] for slot in slots]
+        original_args, original_kwargs = tree_unflatten(rebuild, spec)
+        return function(*original_args, **original_kwargs)
+
+    return flattened_function, unique_leaves
+
+
+def recompute_wrapper(function, use_reentrant, context_fn=None, flatten_inputs=False):
     # Only inject the transformers-style cache kwarg when the wrapped forward
     # actually accepts it. Native Wan blocks do not take this argument.
-    has_past_key_values = 'past_key_values' in inspect.signature(function).parameters
+    sig = inspect.signature(function)
+    has_past_key_values = 'past_key_values' in sig.parameters
 
     def wrapper(*args, **kwargs):
         if has_past_key_values:
@@ -77,6 +115,10 @@ def recompute_wrapper(function, use_reentrant, context_fn=None):
         if context_fn is not None and not use_reentrant:
             ckpt_kwargs['context_fn'] = context_fn
         if not use_reentrant:
+            if flatten_inputs:
+                flattened_function, unique_leaves = _flatten_call(function, args, kwargs)
+                return checkpoint(flattened_function, *unique_leaves,
+                                  use_reentrant=use_reentrant, **ckpt_kwargs)
             return checkpoint(function, *args, use_reentrant=use_reentrant, **ckpt_kwargs, **kwargs)
         else:
             bound_function = functools.partial(function, **kwargs)

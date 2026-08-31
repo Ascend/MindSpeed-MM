@@ -24,6 +24,7 @@ nesting recompute coverage with a ValueError when op replay is active.
 """
 import contextlib
 import functools
+import inspect
 import logging
 import warnings
 from collections import defaultdict
@@ -370,6 +371,10 @@ class OpReplayPatcher:
         self.controller = controller
         self.scope = scope
         self._orig_forward = module.forward
+        # Expose the wrapped forward's signature (PEP 362): __call__'s generic
+        # (*args, **kwargs) would otherwise make signature consumers (e.g. the
+        # recompute wrapper's past_key_values check) see VAR_POSITIONAL.
+        self.__signature__ = inspect.signature(self._orig_forward)
 
     def __call__(self, *args, **kwargs):
         with self.controller.replay_zone(self.scope):

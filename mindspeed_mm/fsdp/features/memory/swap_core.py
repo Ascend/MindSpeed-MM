@@ -557,7 +557,9 @@ class SwapCache:
                 step += 1
                 continue
             # Only DDR_ONLY can reach here (every other state is usable above).
-            if (self.capacity_bytes is not None and self.capacity_bytes > 0
+            # capacity>=0 is a hard cap: 0 means zero budget, so every
+            # prefetch is refused (demand pop still swaps in via consume).
+            if (self.capacity_bytes is not None
                     and handle.bytes() > self.capacity_bytes - self.hbm_bytes):
                 self._iter_stats['prefetch_skip_capacity'] += 1
                 break
