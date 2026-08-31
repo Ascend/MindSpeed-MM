@@ -1,4 +1,12 @@
+# On Python 3.12, the three packages below must be installed BEFORE this file is
+# processed (see README): pip builds all source packages (pyworld, openai-whisper)
+# before installing any requirement listed here, so these pins alone cannot make
+# those builds succeed. Do not remove them either, they keep the final state fixed.
 setuptools<=81.0.0
+# pyworld==0.3.4 is built from source on Python 3.12 and is not compatible
+# with the NumPy 2.x C API. Pin SciPy as well so its resolver does not upgrade NumPy.
+numpy==1.26.4
+scipy==1.13.1
 onnxruntime==1.23.2
 openai-whisper==20231117
 soundfile==0.13.1

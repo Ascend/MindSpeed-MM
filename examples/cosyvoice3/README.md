@@ -60,8 +60,14 @@ cd ../MindSpeed-MM
 pip install -e .
 
 # 安装其它依赖
-pip install -r examples/cosyvoice3/requirements.txt
+# Python 3.12环境下，需先安装固定版本的setuptools与NumPy/SciPy，再安装其余依赖
+pip install "setuptools<=81.0.0" "numpy==1.26.4" "scipy==1.13.1"
+pip install --no-build-isolation -r examples/cosyvoice3/requirements.txt
 ```
+
+> [!NOTE]
+>
+> Python 3.12环境下，`pyworld==0.3.4`需要从源码构建，暂不兼容NumPy 2.x的C API；`openai-whisper`的构建依赖`pkg_resources`，而新版setuptools（82及以上）已将其移除。由于pip会先构建所有源码包、再安装requirements中的任何版本约束，`requirements.txt`中的固定版本在构建阶段不可见，因此必须先单独安装`setuptools<=81.0.0`与`numpy==1.26.4`、`scipy==1.13.1`，请勿移除上述前置安装步骤。`--no-build-isolation`使构建过程使用当前环境中已降级的setuptools。
 
 ---
 
