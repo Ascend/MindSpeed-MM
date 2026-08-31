@@ -54,7 +54,7 @@ def _process_single_file(idx, safe_path, save_path, weight_transform, add_checkp
         idx: File index, used as part_idx for DCP storage prefix.
         safe_path: Path to the safetensors file to load.
         save_path: Directory path to save the DCP shard.
-        weight_transform: Weight transform pipeline selected by model ID.
+        weight_transform: Optional weight transform pipeline selected by model ID.
         add_checkpoint_version: If True, add checkpoint_version to the save dict.
     """
     save_path = Path(save_path)
@@ -66,7 +66,7 @@ def _process_single_file(idx, safe_path, save_path, weight_transform, add_checkp
     state_dict = load_file(str(safe_path), device="cpu")
     converted_state_dict = {}
     for key, tensor in state_dict.items():
-        converted = weight_transform.hf_to_dcp(key, tensor)
+        converted = weight_transform.hf_to_dcp(key, tensor) if weight_transform else (key, tensor)
         if converted is None:
             continue
         key, tensor = converted
@@ -85,7 +85,7 @@ def _process_single_file(idx, safe_path, save_path, weight_transform, add_checkp
 def hf_to_dcp_sharded(
     hf_dir: str,
     dcp_dir: str,
-    weight_transform,
+    weight_transform=None,
     num_workers: int = 0,
 ):
     """
@@ -94,7 +94,7 @@ def hf_to_dcp_sharded(
     Args:
         hf_dir: Path to HF format checkpoint directory
         dcp_dir: Path to save DCP format model
-        weight_transform: Weight transform pipeline selected by model ID.
+        weight_transform: Optional weight transform pipeline selected by model ID.
         num_workers: Number of parallel workers. Default is 0 (serial execution).
     """
     iter_name = "release"
@@ -243,7 +243,7 @@ def _process_single_dcp_shard(
         load_dir: Directory path to load the DCP checkpoint.
         save_dir: Directory path to save the HF shard.
         metadata: Full DCP metadata. It is read-only in this worker.
-        weight_transform: Weight transform pipeline selected by model ID.
+        weight_transform: Optional weight transform pipeline selected by model ID.
         to_bf16: Whether to convert weights to BF16.
         hf_metadata: Metadata written into the target safetensors file.
     """
@@ -259,7 +259,7 @@ def _process_single_dcp_shard(
 
     converted_state_dict = {}
     for key, tensor in partial_state_dict.items():
-        converted = weight_transform.dcp_to_hf(key, tensor)
+        converted = weight_transform.dcp_to_hf(key, tensor) if weight_transform else {key: tensor}
         for converted_key, converted_tensor in converted.items():
             if to_bf16:
                 converted_tensor = converted_tensor.to(dtype=torch.bfloat16)
@@ -275,7 +275,7 @@ def merge_dcp_to_hf_sharded(
     save_dir: str | Path,
     model_assets_dir: str | Path,
     select_key_convert_func: Optional[callable],
-    weight_transform,
+    weight_transform=None,
     trust_remote_code: bool = True,
     to_bf16: bool = False,
     num_workers: int = 0,
@@ -288,7 +288,7 @@ def merge_dcp_to_hf_sharded(
         save_dir: Path to save HF format model.
         model_assets_dir: Path to model assets (config, tokenizer, index, etc.).
         select_key_convert_func: Optional function to map HF keys to DCP keys for selection.
-        weight_transform: Weight transform pipeline selected by model ID.
+        weight_transform: Optional weight transform pipeline selected by model ID.
         trust_remote_code: Whether to trust remote code when loading HF assets.
         to_bf16: Whether to convert weights to BF16.
         num_workers: Number of parallel workers. Default is 0 (serial execution).
@@ -316,9 +316,10 @@ def merge_dcp_to_hf_sharded(
         with open(index_file, "r", encoding="utf-8") as f:
             weight_map = json.load(f)["weight_map"]
 
+        hf_to_dcp_mapping = weight_transform.hf_to_dcp_mapping if weight_transform else {}
         hf_to_dcp_key_mapping = {
             hf_key: dcp_key
-            for hf_keys, dcp_key in weight_transform.hf_to_dcp_mapping.items()
+            for hf_keys, dcp_key in hf_to_dcp_mapping.items()
             for hf_key in hf_keys
         }
         file_to_selected_keys = {}

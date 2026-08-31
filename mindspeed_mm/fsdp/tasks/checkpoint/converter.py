@@ -16,7 +16,7 @@ def hf_to_dcp(
     dcp_dir: str,
     num_workers: int = 0,
 ) -> None:
-    """Convert a Hugging Face checkpoint to DCP with a registered weight pipeline."""
+    """Convert a Hugging Face checkpoint to DCP with an optional weight pipeline."""
     weight_transform = build_weight_transform(model_id, hf_dir=hf_dir)
     hf_to_dcp_sharded(
         hf_dir=hf_dir,
@@ -35,7 +35,7 @@ def dcp_to_hf(
     num_workers: int = 0,
     keep_origin_mtp_weights: bool = False,
 ) -> None:
-    """Convert a DCP checkpoint to Hugging Face with a registered weight pipeline."""
+    """Convert a DCP checkpoint to Hugging Face with an optional weight pipeline."""
     weight_transform = build_weight_transform(model_id, hf_dir=origin_hf_dir)
     merge_dcp_to_hf_sharded(
         load_dir=dcp_dir,
@@ -56,7 +56,7 @@ def dcp_to_hf(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Convert checkpoints with a registered weight transform pipeline")
     parser.add_argument("command", choices=("hf_to_dcp", "dcp_to_hf"), help="Conversion direction.")
-    parser.add_argument("--model_id", required=True, help="Select the corresponding weight transform pipeline by model ID.")
+    parser.add_argument("--model_id", required=True, help="Select an optional model-specific weight transform pipeline by model ID.")
     parser.add_argument("--hf_dir", required=True, help="HF input directory for hf_to_dcp; HF output directory for dcp_to_hf.")
     parser.add_argument("--dcp_dir", required=True, help="DCP output directory for hf_to_dcp; DCP input directory for dcp_to_hf.")
     parser.add_argument("--origin_hf_dir", help="Original HF assets directory for dcp_to_hf.")

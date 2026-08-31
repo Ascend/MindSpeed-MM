@@ -52,6 +52,10 @@ training:
 以 Qwen3.5 MoE 为例，先执行 HF → DCP 离线转换：
 
 ```bash
+# 根据实际情况修改 ascend-toolkit 路径
+source /usr/local/Ascend/cann/set_env.sh
+export NON_MEGATRON=true
+
 python -m mindspeed_mm.fsdp.tasks.checkpoint.converter hf_to_dcp \
     --model_id qwen3_5_moe \
     --hf_dir /path/to/hf_model \
@@ -86,6 +90,10 @@ training:
 DCP 权重保存后，可通过以下命令转换回 HF 权重：
 
 ```bash
+# 根据实际情况修改 ascend-toolkit 路径
+source /usr/local/Ascend/cann/set_env.sh
+export NON_MEGATRON=true
+
 python -m mindspeed_mm.fsdp.tasks.checkpoint.converter dcp_to_hf \
     --model_id qwen3_5_moe \
     --dcp_dir /path/to/dcp_model/iter_000xx \

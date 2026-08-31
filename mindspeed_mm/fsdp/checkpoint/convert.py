@@ -158,15 +158,9 @@ def split_moe_expert_weights(
     return result
 
 
-def build_weight_transform(model_id: str, hf_dir: str):
+def build_weight_transform(model_id: str, hf_dir: str) -> Optional["WeightTransformPipeline"]:
     transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id)
-    if transform_cls is None:
-        supported_model_ids = ", ".join(sorted(WEIGHT_TRANSFORM_PIPELINES))
-        raise ValueError(
-            f"No weight transform pipeline registered for model_id={model_id!r}. "
-            f"Supported model ids: {supported_model_ids}"
-        )
-    return transform_cls(hf_dir=hf_dir)
+    return transform_cls(hf_dir=hf_dir) if transform_cls is not None else None
 
 
 class WeightTransformPipeline(ABC):
@@ -395,7 +389,6 @@ class Wan22DiffusersTransformPipeline(DiffusersKeyMapTransformPipeline):
 
 
 WEIGHT_TRANSFORM_PIPELINES = {
-    "qwen3_5": Qwen35WeightTransformPipeline,
     "qwen3_5_moe": Qwen35WeightTransformPipeline,
     "wan2_2": Wan22DiffusersTransformPipeline,
 }
