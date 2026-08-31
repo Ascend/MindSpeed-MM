@@ -20,6 +20,7 @@ import torch
 import torch.distributed as dist
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
+import soundfile as sf
 import torchaudio
 import tiktoken
 from librosa.filters import mel as librosa_mel_fn
@@ -270,7 +271,12 @@ def audio_filter(data,
             Iterable[{key, wav, label, sample_rate}]
     """
     for sample in data:
-        sample['speech'], sample['sample_rate'] = torchaudio.load(BytesIO(sample['audio_data']))
+        # torchaudio>=2.10's load() always goes through TorchCodec, which
+        # requires CUDA libraries unavailable on Ascend CPU-only torch;
+        # use soundfile instead. sf.read returns [time, channel], transpose
+        # to keep the original [channel, time] layout.
+        pcm, sample_rate = sf.read(BytesIO(sample['audio_data']), dtype='float32', always_2d=True)
+        sample['speech'], sample['sample_rate'] = torch.from_numpy(pcm.T), sample_rate
         sample['speech'] = sample['speech'].mean(dim=0, keepdim=True)
         del sample['audio_data']
         # sample['wav'] is torch.Tensor, we have 100 frames every second

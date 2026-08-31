@@ -19,12 +19,17 @@ import torch
 from tqdm import tqdm
 import onnxruntime
 import numpy as np
+import soundfile as sf
 import torchaudio
 import whisper
 
 
 def single_job(utt):
-    audio, sample_rate = torchaudio.load(utt2wav[utt], backend='soundfile')
+    # torchaudio>=2.10's load() ignores the backend argument and always uses
+    # TorchCodec, which requires CUDA libraries unavailable on Ascend CPU-only
+    # torch; use soundfile instead.
+    data, sample_rate = sf.read(utt2wav[utt], dtype='float32', always_2d=True)
+    audio = torch.from_numpy(data.T)
     if sample_rate != 16000:
         audio = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=16000)(audio)
     # Convert audio to mono

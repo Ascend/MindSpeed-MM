@@ -15,6 +15,7 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import onnxruntime
+import soundfile as sf
 import torch
 import torchaudio
 import torchaudio.compliance.kaldi as kaldi
@@ -22,7 +23,10 @@ from tqdm import tqdm
 
 
 def single_job(utt):
-    audio, sample_rate = torchaudio.load(utt2wav[utt])
+    # torchaudio>=2.10's load() always goes through TorchCodec, which requires
+    # CUDA libraries unavailable on Ascend CPU-only torch; use soundfile instead.
+    data, sample_rate = sf.read(utt2wav[utt], dtype='float32', always_2d=True)
+    audio = torch.from_numpy(data.T)
     if sample_rate != 16000:
         audio = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=16000)(audio)
     feat = kaldi.fbank(audio,
