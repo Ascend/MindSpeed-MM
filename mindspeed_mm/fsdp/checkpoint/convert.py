@@ -303,6 +303,119 @@ class Qwen35WeightTransformPipeline(WeightTransformPipeline):
         tensor = permute_moe_expert(key, tensor, self.expert_weight_patterns)
         return {key: tensor}
 
+class Glm53FlashWeightTransformPipeline(WeightTransformPipeline):
+    RENAME_RULES = [
+        (re.compile(r"\.hc_attn_(base|fn|scale)$"), r".attn_hc.\1"),
+        (re.compile(r"\.hc_ffn_(base|fn|scale)$"), r".ffn_hc.\1"),
+        (re.compile(r"\.self_attn\.(A_log|dt_bias)$"), r".self_attn.forget_gate.\1"),
+        (re.compile(r"\.self_attn\.(f_a_proj|f_b_proj)\."), r".self_attn.forget_gate.\1."),
+    ]
+    RENAME_RULES_REVERSED = [
+        (re.compile(r"\.attn_hc\.(base|fn|scale)$"), r".hc_attn_\1"),
+        (re.compile(r"\.ffn_hc\.(base|fn|scale)$"), r".hc_ffn_\1"),
+        (re.compile(r"\.self_attn\.forget_gate\.(A_log|dt_bias)$"), r".self_attn.\1"),
+        (re.compile(r"\.self_attn\.forget_gate\.(f_a_proj|f_b_proj)\."), r".self_attn.\1."),
+    ]
+
+    CONV_ORDER = ("q", "k", "v")
+    CONV_RE = re.compile(r"^(?P<prefix>.*\.self_attn)\.(?P<which>[qkv])_conv1d\.weight$")
+
+    def __init__(self, hf_dir: str, mtp_num_layers: Optional[int] = None) -> None:
+        super().__init__()
+        config = AutoConfig.from_pretrained(hf_dir, trust_remote_code=True)
+        text_config = getattr(config, "text_config", config)
+
+        num_experts = getattr(text_config, "n_routed_experts", 0)
+        mlp_layer_types = getattr(text_config, "mlp_layer_types", None) or []
+        num_layers = getattr(text_config, "num_hidden_layers", len(mlp_layer_types))
+
+        for layer_idx, mlp_type in enumerate(mlp_layer_types[:num_layers]):
+            if mlp_type != "sparse" or num_experts <= 0:
+                continue
+            weight_path = f"model.language_model.layers.{layer_idx}.mlp.experts"
+            gate_up_hf_keys = tuple(
+                f"{weight_path}.{expert}.{projection}.weight"
+                for expert in range(num_experts)
+                for projection in ("gate_proj", "up_proj")
+            )
+            down_hf_keys = tuple(
+                f"{weight_path}.{expert}.down_proj.weight" for expert in range(num_experts)
+            )
+            self.hf_to_dcp_mapping[gate_up_hf_keys] = f"{weight_path}.gate_up_proj"
+            self.hf_to_dcp_mapping[down_hf_keys] = f"{weight_path}.down_proj"
+
+        self.dcp_to_hf_mapping = {
+            dcp_key: hf_keys for hf_keys, dcp_key in self.hf_to_dcp_mapping.items()
+        }
+
+        self._buffered_weights: Dict[str, torch.Tensor] = {}
+        self._buffered_conv: Dict[str, Dict[str, torch.Tensor]] = {}
+
+    @staticmethod
+    def _rename(key: str, rules) -> str:
+        for pattern, replacement in rules:
+            new_key, n = pattern.subn(replacement, key)
+            if n:
+                return new_key
+        return key
+
+    def hf_to_dcp(
+        self, key: str, tensor: torch.Tensor
+    ) -> Optional[Tuple[str, torch.Tensor]]:
+        """Convert a Huggingface weight to DCP format.
+        Shape symbols:
+            e: Expert index.  E: Number of experts.
+            H: Hidden size.   I: Intermediate size.  C: Conv kernel size.
+        """
+        # 1. experts.{e}.{gate,up}_proj.weight [I, H] -> experts.gate_up_proj [E, 2I, H]
+        #    experts.{e}.down_proj.weight     [H, I] -> experts.down_proj    [E, H, I]
+        for hf_keys, dcp_key in self.hf_to_dcp_mapping.items():
+            if key not in hf_keys:
+                continue
+            self._buffered_weights[key] = tensor
+            return merge_moe_expert_weights(
+                state_dict=self._buffered_weights,
+                hf_keys=hf_keys,
+                dcp_key=dcp_key,
+                transpose=False,
+            )
+
+        # 2. conv1d：Concatenates three [qkv_dim, 1, C] tensors into [3 * qkv_dim, 1, C] in the order of q, k, v.
+        match = self.CONV_RE.match(key)
+        if match:
+            prefix = match.group("prefix")
+            group = self._buffered_conv.setdefault(prefix, {})
+            group[match.group("which")] = tensor
+            if len(group) < len(self.CONV_ORDER):
+                return None
+            merged = torch.cat([group[which] for which in self.CONV_ORDER], dim=0)
+            del self._buffered_conv[prefix]
+            return f"{prefix}.conv1d.weight", merged
+
+        # 3. rename only
+        return self._rename(key, self.RENAME_RULES), tensor
+    @staticmethod
+    def _to_full(tensor: torch.Tensor) -> torch.Tensor:
+        from torch.distributed.tensor import DTensor
+        return tensor.full_tensor().cpu() if isinstance(tensor, DTensor) else tensor
+
+    def dcp_to_hf(self, key: str, tensor: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Convert a DCP weight to Huggingface format. 是 hf_to_dcp 的逆。"""
+        hf_keys = self.dcp_to_hf_mapping.get(key)
+        if hf_keys is not None:
+            return split_moe_expert_weights(
+                tensor=self._to_full(tensor), hf_keys=hf_keys, dcp_key=key, transpose=False
+            )
+
+        if key.endswith(".self_attn.conv1d.weight"):
+            prefix = key[: -len(".conv1d.weight")]
+            chunks = torch.chunk(self._to_full(tensor), len(self.CONV_ORDER), dim=0)
+            return {
+                f"{prefix}.{which}_conv1d.weight": chunk.contiguous()
+                for which, chunk in zip(self.CONV_ORDER, chunks)
+            }
+
+        return {self._rename(key, self.RENAME_RULES_REVERSED): tensor}
 
 class DiffusersKeyMapTransformPipeline(WeightTransformPipeline):
     """Generic diffusers -> native per-tensor transform pipeline driven by
@@ -391,6 +504,7 @@ class Wan22DiffusersTransformPipeline(DiffusersKeyMapTransformPipeline):
 WEIGHT_TRANSFORM_PIPELINES = {
     "qwen3_5_moe": Qwen35WeightTransformPipeline,
     "wan2_2": Wan22DiffusersTransformPipeline,
+    "glm5_next": Glm53FlashWeightTransformPipeline,
 }
 # Note: ``DiffusersKeyMapTransformPipeline`` is a base class with empty mapping
 # tables and must NOT be registered directly; new diffusers-source models add a

@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 from typing_extensions import override
 
+import transformers
+from packaging import version
 from transformers import PreTrainedTokenizer
 
 from .convert import Role
@@ -638,6 +640,24 @@ _register_template(
 
 
 _register_template(
+    name="glm5_next",
+    params=RegisterParams(
+        format_user=StringFormatter(slots=["<|user|>\n{{content}}<|assistant|>"]),
+        format_assistant=StringFormatter(slots=["\n{{content}}"]),
+        format_system=StringFormatter(slots=["<|system|>\n{{content}}"]),
+        format_observation=StringFormatter(slots=["<|observation|>\n{{content}}<|assistant|>"]),
+
+        format_prefix=EmptyFormatter(slots=["[gMASK]<sop>"]),
+        stop_words=["<|user|>", "<|observation|>", "</answer>"],
+        efficient_eos=True,
+        enable_thinking=False,
+    ),
+    mm_plugin=get_mm_plugin(name="glm4.1v", image_token="<|image|>", video_token="<|video|>"),
+    template_class=ReasoningTemplate
+)
+
+
+_register_template(
     name="default",
     params=RegisterParams(
         format_user=StringFormatter(slots=["Human: {{content}}", {"eos_token"}, "\nAssistant:"]),
@@ -755,9 +775,10 @@ def get_template_and_fix_tokenizer(tokenizer: "PreTrainedTokenizer", template: s
         logger.info("Add pad token: {}".format(tokenizer.pad_token))
 
     if stop_words:
-        num_added_tokens = tokenizer.add_special_tokens(
-            dict(additional_special_tokens=stop_words), replace_additional_special_tokens=False
-        )
+        if version.parse(transformers.__version__).major >= 5:
+            num_added_tokens = tokenizer.add_special_tokens(dict(additional_special_tokens=stop_words), replace_extra_special_tokens=False)
+        else:
+            num_added_tokens = tokenizer.add_special_tokens(dict(additional_special_tokens=stop_words), replace_additional_special_tokens=False)
         logger.info("Add {} to stop words.".format(",".join(stop_words)))
         if num_added_tokens > 0:
             logger.warning(

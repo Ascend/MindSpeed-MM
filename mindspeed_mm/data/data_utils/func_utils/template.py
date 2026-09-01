@@ -22,6 +22,9 @@ from typing_extensions import override
 
 from transformers import PreTrainedTokenizer
 
+import transformers
+from packaging import version
+
 from mindspeed_mm.data.data_utils.func_utils.convert import Role
 from mindspeed_mm.data.data_utils.func_utils.formatters import EmptyFormatter, Formatter, StringFormatter, FunctionFormatter, ToolFormatter
 from mindspeed_mm.data.data_utils.func_utils.formatters import SLOTS
@@ -531,9 +534,11 @@ def get_template_and_fix_tokenizer(tokenizer: "PreTrainedTokenizer", template: s
         logger.info("Add pad token: {}".format(tokenizer.pad_token))
 
     if stop_words:
-        num_added_tokens = tokenizer.add_special_tokens(
-            dict(additional_special_tokens=stop_words), replace_additional_special_tokens=False
-        )
+        if version.parse(transformers.__version__).major >= 5:
+            num_added_tokens = tokenizer.add_special_tokens(dict(additional_special_tokens=stop_words), replace_extra_special_tokens=False)
+        else:
+            num_added_tokens = tokenizer.add_special_tokens(dict(additional_special_tokens=stop_words), replace_additional_special_tokens=False)
+
         logger.info("Add {} to stop words.".format(",".join(stop_words)))
         if num_added_tokens > 0:
             logger.warning(
