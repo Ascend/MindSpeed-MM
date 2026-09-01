@@ -1,0 +1,159 @@
+# 并行策略
+parallel:
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - model.visual
+      - model.visual.blocks.{*}
+      - model.language_model.embed_tokens
+      - model.language_model
+      - model.language_model.layers.{*}
+      - lm_head
+    param_dtype: bf16
+    reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 16
+  ep_plan:
+    apply_modules:
+      - model.language_model.layers.{*}.mlp.experts
+
+data:
+  dataset_param:
+    dataset_type: huggingface
+    attr:
+      images: images
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH /path/to/GLM-5.3-Flash-BF16
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 0
+      video_fps: 2.0
+      video_maxlen: 64
+
+    basic_parameters:
+      cutoff_len: 8192
+      template: glm5_next
+      enable_thinking: false
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: /data/coco/
+      dataset: &DATASET_PATH /data/coco/mllm_format_llava_instruct_data.json
+      cache_dir: ./cache_dir/
+      overwrite_cache: true
+      preprocess_on_fly: true
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+
+  dataloader_param:
+    pin_memory: true
+    shuffle: false
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      collator_id: qwen3vl
+      ignore_pad_token_for_loss: true
+    enable_preload: false
+
+model:
+  model_id: glm5_next
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  attn_implementation: sdpa
+  kda_implementation: fused
+  causal_conv1d_implementation: triton
+  dsa_implementation: sfa
+  indexer_implementation: triton
+
+features:
+  loss_cfg:
+    loss_type: default
+    router_aux_loss_coef: 0.0
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - model.visual.blocks.{*}
+      - model.language_model.layers.{*}
+  enable_chunk_loss: true
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 1024
+  enable_activation_offload: true
+  activation_offload_plan:
+    apply_modules:
+      - model.visual.blocks.{*}
+      - model.language_model.layers.{*}
+  enable_chunk_mbs: false
+  chunkmbs_plan:
+    apply_modules:
+      - model.language_model.layers.{*}
+    chunk_mbs: 2
+    batch_dim: 0
+    chunk_arg_indexs: [0]
+    chunk_kwarg_names: ["position_ids", "attention_mask"]
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 1234
+  lr: 1.0e-5
+  lr_decay_style: constant
+  lr_warmup_ratio: 0
+  weight_decay: 0
+  train_iters: 4000
+  clip_grad: 0.0
+  init_model_with_meta_device: true
+  optimizer: adamw
+  adam_fused: true
+  save_interval: 1000
+  no_load_optim: true
+  no_load_rng: true
+  no_save_optim: true
+  no_save_rng: true
+  load_rank0_and_broadcast: true
+  load: /path/to/weight/GLM-5.3-Flash
+  save_format: dcp
+  save: ./save_path
+  use_deter_comp: true
+  plugin:
+    - mindspeed_mm/fsdp/models/glm5_next
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 2
+      end_step: 3
+      data_simplification: true
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+    enable: false
+    start_step: 10
+    end_step: 12
+    save_path: ./memory_snapshot
+    dump_ranks: [0]
+    stacks: all
+    max_entries: null
+    mem_info: false
