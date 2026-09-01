@@ -31,7 +31,13 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import split_f
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, generate_ulysses_cu_seqlen_params
 
 
-def shift_tensor(tensor, shifts=-1, dims=-1, fill_value=0):
+def shift_tensor(tensor, shifts=-1, dims=-1, fill_value=0, cu_seqlens=None):
+    """Shift a tensor and clear positions that would cross packed boundaries."""
+    if cu_seqlens is not None:
+        shifted = torch.roll(tensor.reshape(-1), shifts=shifts, dims=0)
+        shifted.index_fill_(0, cu_seqlens[1:] - 1, fill_value)
+        return shifted.view_as(tensor)
+
     shifted = torch.roll(tensor, shifts=shifts, dims=dims)
     shifted.select(dims, shifts).fill_(fill_value)
     return shifted
@@ -133,27 +139,44 @@ class MultiTokenPredictionBlock(nn.Module):
             global_avg_num_tokens = avg_per_step_token_num.detach().clone()
             torch.distributed.all_reduce(global_avg_num_tokens, op=torch.distributed.ReduceOp.AVG)
 
+        ps = get_parallel_state()
+        use_packing = "cu_seqlens" in kwargs and kwargs["cu_seqlens"] is not None
+        cu_seqlens = None
+        if use_packing:
+            text_position_ids = position_ids[0] if position_ids.ndim == 3 else position_ids
+            kwargs.update(generate_ulysses_cu_seqlen_params(
+                text_position_ids, need_cpu_tensor=ps.is_ulysses_enable()
+            ))
+            cu_seqlens = kwargs["cu_seqlens"].squeeze(0).to(device=input_ids.device, dtype=torch.long)
+
         for _ in range(self.config.mtp_num_layers):
             decoder_layer = self.layers[0]
-            input_ids = shift_tensor(input_ids, shifts=-1, dims=-1)
-            labels = shift_tensor(labels, shifts=-1, dims=-1, fill_value=-100)
+            input_ids = shift_tensor(input_ids, cu_seqlens=cu_seqlens)
+            labels = shift_tensor(labels, fill_value=-100, cu_seqlens=cu_seqlens)
+            if cu_seqlens is not None:
+                # The shared causal loss shifts once more; mask starts to protect the preceding sequence.
+                labels.view(-1).index_fill_(0, cu_seqlens[1:-1], -100)
             inputs_embeds = embed_tokens(input_ids)
 
             position_ids, text_position_ids, cache_position = self._prepare_position_ids(
                 position_ids, inputs_embeds, past_key_values, cache_position
             )
 
-            causal_mask = create_causal_mask(
-                config=self.config,
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                cache_position=cache_position,
-                past_key_values=past_key_values,
-                position_ids=text_position_ids,
-            )
-            ps = get_parallel_state()
+            if use_packing:
+                causal_mask = None
+            else:
+                causal_mask = create_causal_mask(
+                    config=self.config,
+                    inputs_embeds=inputs_embeds,
+                    attention_mask=attention_mask,
+                    cache_position=cache_position,
+                    past_key_values=past_key_values,
+                    position_ids=text_position_ids,
+                )
+
             if ps.is_ulysses_enable():
-                kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
+                if not use_packing:
+                    kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
                 position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
                 text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
                 inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
