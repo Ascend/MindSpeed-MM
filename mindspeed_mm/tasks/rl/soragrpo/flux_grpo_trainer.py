@@ -91,7 +91,7 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
             text_ids = repeat_tensor(text_ids)
             if isinstance(caption, str):
                 caption = [caption] * args.num_generations
-            elif isinstance(caption, list):
+            elif isinstance(caption, (list, tuple)):
                 caption = [
                     item
                     for item in caption
@@ -252,7 +252,7 @@ class FluxGRPOTrainer(SoraGRPOTrainer):
             if args.save_images:
                 for idx, image in zip(batch_idx, batch_decoded_images):
                     os.makedirs(f"./images/flux_grpo/step{self.step_counter}", exist_ok=True)
-                    self._image_save_executor.submit(self._image_save_async, image, f"./images/flux_grpo/step{self.step_counter}/rank{rank}_idx{idx}.png")
+                    self._image_save_executor.submit(self._save_image_async, image, f"./images/flux_grpo/step{self.step_counter}/rank{rank}_idx{idx}.png")
 
             batch_caption = [caption[i] for i in batch_idx]
             if args.use_hpsv2:
