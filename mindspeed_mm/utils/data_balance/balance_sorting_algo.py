@@ -1,13 +1,13 @@
 # Sorting algorithm for data balance
+import sys
 import torch
-from google.protobuf.internal.wire_format import INT64_MAX
 
 
 def post_global_balancing_greedy_without_pad(
         global_data_length: torch.Tensor,
         num_replicas: int,
         image_encoder_dp: int = None,
-        max_batch_capacity: int = INT64_MAX
+        max_batch_capacity: int = sys.maxsize
 ) -> list[list[tuple[int, int, torch.Tensor]]]:
     if image_encoder_dp is None:
         image_encoder_dp = num_replicas

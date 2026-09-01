@@ -29,7 +29,7 @@ try:
 except Exception as e:
     print(f"Failed to import decord module. The reason of decord unavailable is {e}")
 
-import orjson
+import json
 import av
 import ftfy
 import torch
@@ -37,7 +37,6 @@ import torchvision
 import numpy as np
 import pandas as pd
 from PIL import Image
-from bs4 import BeautifulSoup
 from einops import rearrange
 import torch.nn.functional as F
 from torchvision.datasets.folder import IMG_EXTENSIONS, pil_loader
@@ -95,9 +94,9 @@ class DataFileReader:
             else:
                 return data_out
         elif data_path.endswith(".json"):
-            return orjson_load(data_path)
+            return json_load(data_path)
         elif data_path.endswith(".jsonl"):
-            return orjson_load(data_path)
+            return json_load(data_path)
         elif data_path.endswith(".parquat"):
             data_out = pd.read_parquat(data_path)
             return data_out.to_dict("records")
@@ -196,7 +195,7 @@ class JsonLoader:
             total_contents = self._multiprocess_share_memory()
         else:
             for path in self.json_path:
-                json_content = orjson_load(path)
+                json_content = json_load(path)
                 print(f"Building {path}...")
                 if path in self.process_funcs:
                     for fn in self.process_funcs[path]:
@@ -229,7 +228,7 @@ class JsonLoader:
                         data_len = int.from_bytes(bytes(existing_shm.buf[:8]), 'big')
                         content = existing_shm.buf[8:8 + data_len]
                         content = bytes(content)
-                        total_contents += orjson.loads(content)
+                        total_contents += json.loads(content)
                         existing_shm.close()
                     except Exception as error:
                         print(f"Process {future_to_task[future][1]} file failed when using multiprocess: {error}")
@@ -245,12 +244,12 @@ class JsonLoader:
 
     def _share_memory_process_func(self, path, shm_name):
         """Child process function: load single file and write to shared memory"""
-        json_content = orjson_load(path)
+        json_content = json_load(path)
         print(f"Building {path}...")
         if path in self.process_funcs:
             for fn in self.process_funcs[path]:
                 json_content = fn["func"](json_content, *fn["args"], **fn["kwargs"])
-        modified_bytes = orjson.dumps(json_content)
+        modified_bytes = json.dumps(json_content).encode("utf-8")
         existing_shm = shared_memory.SharedMemory(name=shm_name)
         existing_shm.buf[:8] = len(modified_bytes).to_bytes(8, "big")
         existing_shm.buf[8:len(modified_bytes) + 8] = modified_bytes
@@ -532,7 +531,7 @@ class TextProcesser:
             caption,
         )  # regex for urls
         # html:
-        caption = BeautifulSoup(caption, features="html.parser").text
+        caption = html.unescape(re.sub(r"<[^>]+>", "", caption))
 
         # @<nickname>
         caption = re.sub(r"@[\w\d]+\b", "", caption)
@@ -942,14 +941,14 @@ def check_none(value):
     return False
 
 
-def orjson_load(data_path):
+def json_load(data_path):
     if data_path.endswith(".json"):
         with open(data_path, 'rb') as file:
-            content = orjson.loads(file.read())
+            content = json.loads(file.read())
     elif data_path.endswith(".jsonl"):
         content = []
         with open(data_path, 'rb') as file:
             for line in file:
                 if line.strip():
-                    content.append(orjson.loads(line))
+                    content.append(json.loads(line))
     return content

@@ -1,7 +1,6 @@
 import json
 import os
 
-import imageio
 import pandas as pd
 import torch
 from megatron.core import mpu
@@ -10,6 +9,7 @@ from peft.config import PeftConfigMixin
 
 from mindspeed_mm.data import build_mm_dataloader
 from mindspeed_mm.data.data_utils.utils import build_iterations
+from mindspeed_mm.utils.video_io import save_video_mp4
 from mindspeed_mm.tasks.evaluation.gen_impl.base_gen import BaseGenEvalImpl
 from mindspeed_mm.tasks.inference.pipeline.utils.sora_utils import safe_load_image
 from mindspeed_mm.utils.utils import get_dtype, get_device
@@ -260,9 +260,9 @@ class VbenchGenEvalImpl(BaseGenEvalImpl):
         if isinstance(videos, (list, tuple)) or videos.ndim == 5:  # [b, t, h, w, c]
             for i, video in enumerate(videos):
                 save_path_i = os.path.join(save_path, f"{save_names[i]}.mp4")
-                imageio.mimwrite(save_path_i, video, fps=fps, quality=6)
+                save_video_mp4(video, save_path_i, fps=fps)
         elif videos.ndim == 4:
             save_path = os.path.join(save_path, f"{save_names[0]}.mp4")
-            imageio.mimwrite(save_path, videos, fps=fps, quality=6)
+            save_video_mp4(videos, save_path, fps=fps)
         else:
             raise ValueError("The video must be in either [b, t, h, w, c] or [t, h, w, c] format.")

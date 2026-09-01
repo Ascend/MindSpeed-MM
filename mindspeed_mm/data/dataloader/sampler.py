@@ -12,7 +12,6 @@ import torch.distributed as dist
 from torch.utils.data import DataLoader, Dataset, Sampler
 from torch.utils.data.distributed import DistributedSampler
 from megatron.legacy.data.data_samplers import RandomSeedDataset
-from pandarallel import pandarallel
 from transformers import AutoProcessor
 
 from mindspeed_mm.data.datasets.t2v_dataset import DynamicVideoTextDataset
@@ -673,8 +672,7 @@ class BucketBatchSampler(BaseRandomBatchSampler):
                 batch = []
 
 
-# use pandarallel to accelerate bucket processing
-# NOTE: pandarallel should only access local variables
+# compute bucket_id for each data sample (row-wise apply)
 def apply(data, method=None, frame_interval=None, seed=None, num_bucket=None, fps_max=None):
     return method(
         data["num_frames"],
@@ -828,9 +826,8 @@ class VariableVideoBatchSampler(DistributedSampler):
     def group_by_bucket(self) -> dict:
         bucket_sample_dict = OrderedDict()
 
-        pandarallel.initialize(nb_workers=self.num_bucket_build_workers, progress_bar=False)
         logging.info("Building buckets...")
-        bucket_ids = self.dataset.data_samples.parallel_apply(
+        bucket_ids = self.dataset.data_samples.apply(
             apply,
             axis=1,
             method=self.bucket.get_bucket_id,

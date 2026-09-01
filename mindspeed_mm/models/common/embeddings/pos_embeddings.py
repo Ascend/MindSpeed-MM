@@ -1,9 +1,7 @@
 import math
 from math import pi
 import functools
-from typing import Optional, List
-from beartype import beartype
-from beartype.typing import Literal, Union, Optional
+from typing import List, Literal, Optional, Union
 from einops import rearrange, repeat
 import numpy as np
 import torch
@@ -385,7 +383,6 @@ def apply_rotary_emb(freqs, t, start_index=0, scale=1., seq_dim=-2):
 
 
 class NpuRotaryEmbedding(nn.Module):
-    @beartype
     def __init__(
         self,
         dim,
@@ -524,7 +521,6 @@ class NpuRotaryEmbedding(nn.Module):
 
         return rotated_q, rotated_k
 
-    @beartype
     def get_scale(
         self,
         t: Tensor,

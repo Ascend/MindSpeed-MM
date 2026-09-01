@@ -19,7 +19,7 @@ import os
 
 from PIL.Image import Image
 import ftfy
-import regex as re
+import re
 import torch
 from torchvision.transforms import v2
 from torchvision.transforms.functional import center_crop

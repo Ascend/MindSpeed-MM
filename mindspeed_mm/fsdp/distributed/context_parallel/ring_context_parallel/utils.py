@@ -8,7 +8,6 @@ import torch_npu
 import torch.distributed as dist
 import numpy as np
 from einops import rearrange
-from scipy.sparse.linalg import eigsh
 from mindspeed.ops.npu_ring_attention_update import npu_ring_attention_update
 
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
