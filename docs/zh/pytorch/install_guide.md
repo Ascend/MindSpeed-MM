@@ -50,9 +50,9 @@
 
    最新镜像均配套[MindSpeed MM的26.1.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0)，请按需[获取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
 
-   - <term>Atlas A5 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11
+   - <term>Atlas 950 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11
 
-   - <term>Atlas A5 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
+   - <term>Atlas 950 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
 
    - <term>Atlas A3 训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
 
@@ -122,7 +122,7 @@
           mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
       ```
 
-    具体参数配置说明可查看MindSpeed MM Docker镜像概述的[构建脚本参数说明](../../../docker/OVERVIEW.zh.md#构建脚本参数说明)
+    具体参数配置说明可查看MindSpeed MM Docker镜像概述的[构建脚本参数说明](../../../docker/OVERVIEW.zh.md#构建脚本参数说明)。
 
 3. 加载容器并确认环境状态
 
@@ -140,7 +140,7 @@
 安装MindSpeed MM有如下两种方式：
 
   - 手动安装：灵活指定需要使用的第三方依赖及MindSpeed MM。
-  - 一键安装：快速安装最新配套的第三方依赖及MindSpeed MM，当前只有qwen3，qwen3.5模型支持，请按照实际需求选择。
+  - 一键安装：快速安装最新配套的第三方依赖及MindSpeed MM，当前只有Qwen3，Qwen3.5模型支持，请按照实际需求选择。
 
 #### 一键安装
 
@@ -207,7 +207,7 @@
 
   2. 安装CANN
 
-      安装配套版本的NPU驱动固件、CANN软件（Toolkit、ops和NNAL）并配置CANN环境变量，具体请参考《[CANN 软件安装](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910/softwareinst/instg/instg_0000.html)》。
+      安装配套版本的NPU驱动固件、CANN软件（Toolkit、ops和NNAL）并配置CANN环境变量，具体请参考《[CANN 快速安装](https://www.hiascend.com/zh/cann/download?versionId=783&ids=d806%2Ch0501%2Ch0601%2Ch0702&currentTab=0)》。
 
       CANN软件提供进程级环境变量设置脚本，训练或推理场景下使用NPU执行业务代码前需要调用该脚本，否则业务代码将无法执行。
 
@@ -269,5 +269,5 @@
 
       ```shell
       # 注意：triton-ascend 3.2.0 及以下 Triton-Ascend和Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
-      pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+      pip install triton-ascend==3.2.2 --extra-index-url=https://mirrors.huaweicloud.com/ascend/repos/pypi
       ```
