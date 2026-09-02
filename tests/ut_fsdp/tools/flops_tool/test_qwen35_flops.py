@@ -1,8 +1,48 @@
 from unittest.mock import MagicMock, patch, PropertyMock
+from types import SimpleNamespace
+
 from mindspeed_mm.fsdp.tools.flops_tool.flops_qwen3_5 import Qwen35FlopsCounter
 
 
 class TestQwen35FlopsCounter:
+
+    @staticmethod
+    def _make_flat_text_config():
+        """
+        Build a text-only flat config (e.g. Qwen3.8) without text_config/vision_config nesting.
+        """
+        return SimpleNamespace(
+            hidden_size=1024,
+            vocab_size=10000,
+            num_hidden_layers=2,
+            num_attention_heads=16,
+            num_key_value_heads=16,
+            full_attention_interval=2,
+            num_experts=8,
+            num_experts_per_tok=2,
+            moe_intermediate_size=1024,
+            shared_expert_intermediate_size=512,
+            linear_num_key_heads=8,
+            linear_key_head_dim=64,
+            linear_num_value_heads=8,
+            linear_value_head_dim=64,
+            linear_conv_kernel_dim=16,
+        )
+
+    @staticmethod
+    def _make_vision_config():
+        return SimpleNamespace(
+            num_heads=8,
+            depth=2,
+            hidden_size=512,
+            intermediate_size=2048,
+            out_hidden_size=512,
+            spatial_merge_size=2,
+            in_channels=3,
+            temporal_patch_size=2,
+            patch_size=14,
+            deepstack_visual_indexes=[4, 17, 28],
+        )
 
     @patch("transformers.AutoConfig")
     def setup_method(self, method, mock_autoconfig):
@@ -107,3 +147,53 @@ class TestQwen35FlopsCounter:
         _, kwargs = mock_estimate_family.call_args
         assert "images_seqlens" in kwargs
         assert kwargs["images_seqlens"] == images_seqlens
+
+    def test_text_only_config_skips_vit(self):
+        """
+        Test Scenario: text-only flat config (e.g. Qwen3.8) without text_config/vision_config.
+        Objective: ViT FLOPs are auto-skipped even if vision tokens are given.
+        """
+        counter = Qwen35FlopsCounter(config=self._make_flat_text_config())
+
+        flops_text = counter.estimate_flops(batch_seqlens=[128, 256], step_time=1.0)
+        flops_with_images = counter.estimate_flops(
+            batch_seqlens=[128, 256], images_seqlens=[100], step_time=1.0
+        )
+
+        assert flops_text > 0
+        assert flops_with_images == flops_text
+
+    def test_multimodal_config_includes_vit_flops(self):
+        """
+        Test Scenario: composite config with text_config and vision_config.
+        Objective: ViT FLOPs are added when image tokens are given.
+        """
+        config = SimpleNamespace(
+            text_config=self._make_flat_text_config(),
+            vision_config=self._make_vision_config(),
+        )
+        counter = Qwen35FlopsCounter(config=config)
+
+        flops_text = counter.estimate_flops(batch_seqlens=[128, 256], step_time=1.0)
+        flops_with_images = counter.estimate_flops(
+            batch_seqlens=[128, 256], images_seqlens=[100], step_time=1.0
+        )
+
+        assert flops_text > 0
+        assert flops_with_images > flops_text
+
+    def test_multimodal_config_default_vit_seqlens_not_crash(self):
+        """
+        Test Scenario: images_seqlens is the argparse default 0.
+        Objective: no crash and no ViT FLOPs are added.
+        """
+        config = SimpleNamespace(
+            text_config=self._make_flat_text_config(),
+            vision_config=self._make_vision_config(),
+        )
+        counter = Qwen35FlopsCounter(config=config)
+
+        flops_default = counter.estimate_flops(batch_seqlens=[128], images_seqlens=0, step_time=1.0)
+        flops_text = counter.estimate_flops(batch_seqlens=[128], step_time=1.0)
+
+        assert flops_default == flops_text

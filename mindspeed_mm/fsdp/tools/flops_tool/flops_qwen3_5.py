@@ -206,10 +206,16 @@ class Qwen35FlopsCounter:
 
     def _estimate_qwen3_5_family_flops(self, tokens_sum, batch_seqlens, **kargs):
         """
-        Estimate the FLOPS of the Qwen3.5 model family (dense/MoE MLP + hybrid attention + ViT).
+        Estimate the FLOPS of the Qwen3.5 model family (dense/MoE MLP + hybrid attention,
+        with optional ViT).
 
         Handles both Qwen3.5 (dense) and Qwen3.5-MoE by checking for MoE-specific config
-        attributes. Both variants share hybrid attention and ViT; only the MLP differs.
+        attributes. Both variants share hybrid attention; only the MLP differs.
+
+        The model structure is auto-detected from the config: multimodal configs nest the
+        text model in `text_config` and carry a `vision_config` (ViT FLOPs are added when
+        image tokens are given), while text-only configs (e.g. Qwen3.8) expose the text
+        attributes directly and skip the ViT part.
 
         Text model (from text_config):
             Dense MLP per layer (SwiGLU, 3 projections):
@@ -238,9 +244,13 @@ class Qwen35FlopsCounter:
             Per layer: 2 * seq_len^2 * head_dim * num_attention_heads (Q@K + attn@V)
             fwd + bwd (3x) -> 6x total -> coefficient 12
 
-        Vision encoder: delegates to _estimate_qwen3_vit_flop.
+        Vision encoder: delegates to _estimate_qwen3_vit_flop (multimodal only).
         """
-        text_config = self.config.text_config
+        # Auto-detect model structure: multimodal configs nest the text model in
+        # `text_config` and carry a `vision_config`; text-only configs (e.g. Qwen3.8)
+        # expose the text attributes directly and have no vision module.
+        text_config = getattr(self.config, "text_config", None) or self.config
+        vision_config = getattr(self.config, "vision_config", None)
         hidden_size = text_config.hidden_size
         vocab_size = text_config.vocab_size
         num_hidden_layers = text_config.num_hidden_layers
@@ -283,11 +293,16 @@ class Qwen35FlopsCounter:
         # GatedDeltaNet chunked flops (for all GDN layers)
         gdn_flops = self._compute_gdn_chunk_flops(text_config, tokens_sum, num_full_attn_layers)
 
-        # vit flops (Qwen3-VL ViT)
+        # vit flops (Qwen3-VL ViT), only for multimodal models with a vision module
         images_seqlens = kargs.get("images_seqlens", None)
-        if images_seqlens is not None:
-            vit_flops = self._estimate_qwen3_vit_flop(images_seqlens, self.config.vision_config)
+        if images_seqlens and vision_config is not None:
+            vit_flops = self._estimate_qwen3_vit_flop(images_seqlens, vision_config)
         else:
+            if images_seqlens:
+                print(
+                    "Warning: vision tokens are given but the model config has no vision_config, "
+                    "ViT FLOPs are skipped."
+                )
             vit_flops = 0
 
         # all_layer & all_token fwd & bwd flops
@@ -314,8 +329,14 @@ class Qwen35FlopsCounter:
 
 
 def get_args():
-    parser = argparse.ArgumentParser(description="Qwen3.5 and Qwen3.6 FLOPs Calculation Tool")
-    parser.add_argument("--vit_seqlens", type=int, default=0, nargs="+", help="seqlen in vit")
+    parser = argparse.ArgumentParser(description="Qwen3.5/Qwen3.6 and text-only Qwen3.8 FLOPs Calculation Tool")
+    parser.add_argument(
+        "--vit_seqlens",
+        type=int,
+        default=0,
+        nargs="+",
+        help="seqlen in vit, only used when the model has a vision module",
+    )
     parser.add_argument("--llm_seqlens", type=int, default=16384, nargs="+", help="seqlen in language_model")
     parser.add_argument("--hf_path", type=str, default="/home/weights/Qwen3.5-35B-A3B/", help="HuggingFace config path")
     parser.add_argument("--device_num", type=int, default=1, help="Device num")
@@ -345,10 +366,20 @@ if __name__ == "__main__":
 """
 e.g.:
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
+
+# multimodal model (with ViT):
 python mindspeed_mm/fsdp/tools/flops_tool/flops_qwen3_5.py \
     --vit_seqlens 1024 \
     --llm_seqlens 16384 \
     --hf_path /home/weights/Qwen3.5-35B-A3B/ \
+    --device_num 1 \
+    --gbs 1 \
+    --step_time 6.9
+
+# text-only model (no ViT, e.g. Qwen3.8), omit --vit_seqlens:
+python mindspeed_mm/fsdp/tools/flops_tool/flops_qwen3_5.py \
+    --llm_seqlens 16384 \
+    --hf_path /home/weights/Qwen3.8-2.4T-A95B/ \
     --device_num 1 \
     --gbs 1 \
     --step_time 6.9
