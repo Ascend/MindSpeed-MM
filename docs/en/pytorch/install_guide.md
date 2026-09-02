@@ -4,7 +4,7 @@ This document describes how to quickly install MindSpeed MM, a multimodal model 
 
 ## Supported Hardware and OSs
 
-**Table 1** Product hardware support
+**Table 1** Supported product hardware
 
 | Product | Support for Training |
 |--|:-:|
@@ -21,19 +21,19 @@ This document describes how to quickly install MindSpeed MM, a multimodal model 
 >
 > In the table, √ indicates that the product is supported, and x indicates that the product is not supported.
 
-- For the OSs supported by each hardware product in bare-metal deployment scenarios, see the [Compatibility Query Assistant](https://www.hiascend.com/hardware/compatibility).
+<!-- - For the OSs supported by each hardware product in bare-metal deployment scenarios, see the [Compatibility Query Assistant](https://www.hiascend.com/hardware/compatibility).
 
-- For the OSs supported by each hardware product in virtual machine and container deployment scenarios, see [OS Compatibility](https://www.hiascend.com/document/detail/en/CANNCommunityEdition/910/softwareinst/instg/instg_0101.html?OS=openEuler&InstallType=netyum) in *CANN Software Installation*.
+ > - For the OSs supported by each hardware product in virtual machine and container deployment scenarios, the "OS Compatibility" section in [CANN Quick Installation](https://www.hiascend.com/en/cann/download?versionId=791&ids=d806%2Ch0501%2Ch0601%2Ch0703).-->
 
 ## Installation Preparations
 
 See [Related Product Versions](../release_notes_mm.md#related-product-version-compatibility) in *Release Notes* to download and install the corresponding software versions.
 
-Click [Firmware and Driver](https://hiascend.com/hardware/firmware-drivers) to install the firmware and driver.
+Click [Firmware and Driver](https://hiascend.com/en/hardware/firmware-drivers) to install the firmware and driver.
 
 > [!NOTICE]
 >
-> You are advised to use a non-root user to install and run the program and properly control permissions on the installer directories and files. Set the directory permissions to 750 and the file permissions to 640. You can control the permissions of installed files by setting `umask` to a value such as `0027`. For more security information, see "File Permission Control" for each component in [Security Statement](../../../SECURITYNOTE.md).
+> You are advised to use a non-root user to install and run the program and properly control permissions on the installer directories and files. Set the directory permissions to 750 and the file permissions to 640. You can control the permissions of installed files by setting `umask` to a value such as `0027`. For more security information, see "File Permission Control" for each component in [Security Statement](../../../SECURITYNOTE_en.md).
 
 ## Installing MindSpeed MM
 
@@ -41,18 +41,26 @@ Click [Firmware and Driver](https://hiascend.com/hardware/firmware-drivers) to i
 
 > [!NOTE]
 >
-> - Before using an image, confirm the machine model. The latest images support only the AArch64 architecture. Run the `uname -a` command to check whether the current environment meets the requirements.
+> - Before using an image, confirm the machine model. The latest images support both AArch64 and X86_64 architectures. Run the `uname -a` command to check whether the current environment meets the requirements.
 > - The matching images contain CANN 9.1.0 and TorchNPU 26.1.0. Select an image as required.
 > - If the current environment is incompatible with the provided images, use [Method 2: Installation from Source](#method-2-installation-from-source).
-> - New images will be updated on the 26.1.0 branch in the future. If you need to build custom images, please refer to [Overview](../../../docker/OVERVIEW.md).
+> - If you need to build custom images, please refer to [Overview](../../../docker/OVERVIEW.md).
 
 1. Pull an image.
 
     The latest images are all compatible with the [MindSpeed MM 26.1.0 branch](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0). This image will be available soon. For now, you can use the corresponding image for the MindSpeed MM 26.0.0 branch. Please [pull the image](https://www.hiascend.com/en/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e) as needed.
 
-    - <term>Atlas A2 training products</term>: 26.0.0-910b-openeuler24.03-py3.11-aarch64
+   - <term>Ascend 950 products</term>: v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11
 
-    - <term>Atlas A3 training products</term>: 26.0.0-a3-openeuler24.03-py3.11-aarch64
+   - <term>Ascend 950 products</term>: v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
+
+   - <term>Atlas A3 training products</term>: v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
+
+   - <term>Atlas A3 training products</term>: v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
+   
+   - <term>Atlas A2 training products</term>: v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11
+
+   - <term>Atlas A2 training products</term>: v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu22.04-py3.11
 
     ```bash
        # Check whether the image is pulled successfully
@@ -74,7 +82,7 @@ Click [Firmware and Driver](https://hiascend.com/hardware/firmware-drivers) to i
 
      ```bash
      docker run -it --rm \
-         mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
      ```
 
    - Example 2: Run with an NPU device (device `/dev/davinci1` is used as an example)
@@ -82,17 +90,17 @@ Click [Firmware and Driver](https://hiascend.com/hardware/firmware-drivers) to i
      ```bash
      # Modify the ascend-toolkit path based on the actual environment
      # Assume that the NPU device is installed at /dev/davinci1 and the NPU driver is installed in /usr/local/Ascend
-     docker run -it --rm \
-         --device=/dev/davinci1 \
-         --device=/dev/davinci_manager \
-         --device=/dev/devmm_svm \
-         --device=/dev/hisi_hdc \
-         -v /usr/local/dcmi:/usr/local/dcmi \
-         -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
-         -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
-         -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
-         -v /etc/ascend_install.info:/etc/ascend_install.info \
-         mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+      docker run -it --rm \
+          --device=/dev/davinci1 \
+          --device=/dev/davinci_manager \
+          --device=/dev/devmm_svm \
+          --device=/dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
      ```
 
    - Example 3: Run with a mounted data directory (device `/dev/davinci1` is used as an example)
@@ -100,21 +108,21 @@ Click [Firmware and Driver](https://hiascend.com/hardware/firmware-drivers) to i
      ```bash
      # Modify the ascend-toolkit path based on the actual environment
      docker run -it --rm \
-         --device=/dev/davinci1 \
-         --device=/dev/davinci_manager \
-         --device=/dev/devmm_svm \
-         --device=/dev/hisi_hdc \
-         -v /usr/local/dcmi:/usr/local/dcmi \
-         -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
-         -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
-         -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
-         -v /etc/ascend_install.info:/etc/ascend_install.info \
-         -v /path/to/data:/data \
-         -v /path/to/weights:/weights \
-         mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+          --device=/dev/davinci1 \
+          --device=/dev/davinci_manager \
+          --device=/dev/devmm_svm \
+          --device=/dev/hisi_hdc \
+          -v /usr/local/dcmi:/usr/local/dcmi \
+          -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi \
+          -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
+          -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
+          -v /etc/ascend_install.info:/etc/ascend_install.info \
+          -v /path/to/data:/data \
+          -v /path/to/weights:/weights \
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
      ```
 
-    For parameter configuration, see [Build Script Parameter Description](../../../docker/OVERVIEW.md#Built-in Environments) of MindSpeed MM Docker.
+    For parameter configuration, see [Build Script Parameter Description](../../../docker/OVERVIEW.md#build-script-parameter-description) of MindSpeed MM Docker.
 
 3. Access the container and check the environment status.
 
@@ -136,7 +144,7 @@ You can install MindSpeed MM in either of the following ways:
 
 #### One-Click Installation
 
-Currently, the [Qwen3-VL](../../../examples/qwen3vl/) and [Qwen3.5](../../../examples/qwen3_5/) models support one-click installation.
+Currently, the [Qwen3-VL](../../../examples/qwen3vl) and [Qwen3.5](../../../examples/qwen3_5) models support one-click installation.
 
 The one-click command installs PyTorch, TorchNPU, Megatron-LM, MindSpeed, and MindSpeed MM in sequence. Because Megatron-LM does not yet fully support installation through `pip install`, the command copies its source code for use.
 
@@ -165,7 +173,7 @@ The installation of the Qwen3.5 model is used as an example:
    | -y, --yes | Confirms reinstallation of all software. | No | - |
    | -n, --no | Automatically skips installation of third-party dependencies. | No | - |
    | -mt, --megatron | Installs Megatron-LM. | No | Megatron-LM 0.12.0 is installed by default. |
-   | -ic, --install-cann | Installs CANN. | No | CANN 8.5.0 is installed by default. |
+   | -ic, --install-cann | Installs CANN. | No | CANN 9.1.0 is installed by default. |
    | -h, --help | Displays installation help. | No | - |
 
 3. If PyTorch or TorchNPU is installed, respond to the installation prompt as follows. Otherwise, skip this step.
@@ -199,7 +207,7 @@ This method applies to users who install PyTorch and other third-party libraries
 
 2. Install CANN.
 
-   Install matching versions of the NPU driver and firmware and CANN software (Toolkit, ops, and NNAL), and configure the CANN environment variables. For details, see [CANN Software Installation](https://www.hiascend.com/document/detail/en/CANNCommunityEdition/910/softwareinst/instg/instg_0000.html).
+   Install matching versions of the NPU driver and firmware and CANN software (Toolkit, ops, and NNAL), and configure the CANN environment variables. For details, see [CANN Quick Installation](https://www.hiascend.com/en/cann/download?versionId=783&ids=d806%2Ch0501%2Ch0601%2Ch0702&currentTab=0).
 
    CANN provides a process-level environment variable configuration script. Before you run service code on an NPU in training or inference scenarios, run this script. Otherwise, the service code cannot run.
 
@@ -212,7 +220,7 @@ This method applies to users who install PyTorch and other third-party libraries
 
 3. Install PyTorch and TorchNPU.
 
-   See [Installing TorchNPU](https://www.hiascend.com/document/detail/en/Pytorch/latest/installguide/swinstall/docs/en/installation_guide/installation_via_binary_package.md) in *TorchNPU Installation Guide* to obtain matching PyTorch and TorchNPU packages.
+   See [Installing TorchNPU](https://www.hiascend.com/document/detail/en/Pytorch/2610/installguide/swinstall/docs/en/installation_guide/installation_via_binary_package.md) in *TorchNPU Installation Guide* to obtain matching PyTorch and TorchNPU packages.
    You can use the following commands as a reference:
 
         ```shell
@@ -255,11 +263,11 @@ This method applies to users who install PyTorch and other third-party libraries
 
 7. Install Triton-Ascend.
 
-      To install the corresponding version of Triton-Ascend, please refer to [Installing Triton-Ascend via pip](https://triton-ascend.readthedocs.io/en/latest/installation_guide.html) in the Triton-Ascend documentation for the installation instructions for the matching version.
+      To install the corresponding version of Triton-Ascend, please refer to [Triton-Ascend Installation Guide](https://triton-ascend.readthedocs.io/en/latest/installation_guide.html) to obtain the matching Triton-Ascend installation command.
 
       The following installation command can be used as a reference:
 
       ```shell
-      # Note: For triton-ascend 3.2.0 and below, Triton-Ascend and Triton cannot coexist. You need to uninstall the community Triton first, then install Triton-Ascend.
-      pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+      # Note: For Triton-Ascend 3.2.0 and below, Triton-Ascend and Triton cannot coexist. You need to uninstall the community Triton first, then install Triton-Ascend.
+      pip install triton-ascend==3.2.2 --extra-index-url=https://mirrors.huaweicloud.com/ascend/repos/pypi
       ```
