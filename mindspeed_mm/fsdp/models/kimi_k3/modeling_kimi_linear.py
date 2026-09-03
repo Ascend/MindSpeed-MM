@@ -65,7 +65,7 @@ from mindspeed_mm.fsdp.ops.attn_res.attn_res import apply_attn_res
 if IS_NPU_AVAILABLE:
     import torch_npu
     from mindspeed_mm.fsdp.ops.gdn.triton.utils import tensor_cache
-    from triton_ascend_kernels.attention.fla.kda.chunk import chunk_kda
+    from mindspeed_mm.fsdp.ops.kda.triton_ascend.chunk import chunk_kda
     from mindspeed_mm.fsdp.ops.kda.short_conv import ShortConvolution
 else:
     from fla.modules import ShortConvolution
@@ -833,12 +833,9 @@ class KimiDeltaAttention(nn.Module):
 
         if mode == 'chunk':
             kda_implementation = getattr(self.config, "kda_implementation", "triton")
-            if kda_implementation in ("triton", "ascendc"):
-                if IS_NPU_AVAILABLE:
-                    use_beta_sigmoid_in_kernel = False
-                    beta = torch.sigmoid(beta)
-                else:
-                    use_beta_sigmoid_in_kernel = True
+            if kda_implementation == "triton":
+                # kda triton实现
+                from mindspeed_mm.fsdp.ops.kda.triton_ascend.chunk import chunk_kda
                 o, recurrent_state = chunk_kda(
                     q=q,
                     k=k,
@@ -851,12 +848,34 @@ class KimiDeltaAttention(nn.Module):
                     output_final_state=True,
                     use_qk_l2norm_in_kernel=True,
                     use_gate_in_kernel=True,
-                    use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
+                    use_beta_sigmoid_in_kernel=True,
                     safe_gate=self.gate_lower_bound is not None,
                     lower_bound=self.gate_lower_bound,
                     transpose_state_layout=True,
                     cu_seqlens=cu_seqlens,
                     skip_recompute=getattr(self.config, "skip_kda_recompute", False),
+                )
+            elif kda_implementation == "ascendc":
+                # kda ascendc 实现
+                from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_ascendc_kimi import chunk_kda_ascendc
+                o, recurrent_state = chunk_kda_ascendc(
+                    q=q,
+                    k=k,
+                    v=v,
+                    g=g,
+                    beta=beta,
+                    A_log=A_log,
+                    dt_bias=dt_bias,
+                    initial_state=recurrent_state,
+                    output_final_state=False,
+                    disable_recompute=True,
+                    use_qk_l2norm_in_kernel=True,
+                    use_gate_in_kernel=True,
+                    use_beta_sigmoid_in_kernel=True,
+                    safe_gate=self.gate_lower_bound is not None,
+                    lower_bound=self.gate_lower_bound,
+                    transpose_state_layout=True,
+                    cu_seqlens=cu_seqlens,
                 )
             elif kda_implementation == "eager":
                 # 小算子版本
@@ -1512,13 +1531,6 @@ class KimiLinearForCausalLM(KimiPreTrainedModel, GenerationMixin):
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(
             config.hidden_size, config.vocab_size, bias=False)
-
-        self.kda_implementation = config.kda_implementation
-        if self.kda_implementation == "ascendc":
-            from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_ascendc import apply_ascendc_chunk_kda_patch
-            apply_ascendc_chunk_kda_patch()
-            print(f"Info: apply chunk kda ascendc function patch")
-
         # Initialize weights and apply final processing
         self.post_init()
 

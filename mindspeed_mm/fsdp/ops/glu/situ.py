@@ -10,6 +10,7 @@ from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
 if IS_NPU_AVAILABLE:
     import torch_npu
+    import cann_ops_nn
 
 def situ_glu_eager(
     x: torch.Tensor,
@@ -59,7 +60,7 @@ class SituGLUFunction(torch.autograd.Function):
         ctx.activate_left = activate_left
         ctx.save_for_backward(x)
 
-        out = torch.ops.cann_ops_nn.situ_glu(
+        out = cann_ops_nn.situ_glu(
             x,
             dim=dim,
             beta=beta,
@@ -75,7 +76,7 @@ class SituGLUFunction(torch.autograd.Function):
     ) -> tuple:
         x, = ctx.saved_tensors
 
-        grad_x = torch.ops.cann_ops_nn.situ_glu_grad(
+        grad_x = cann_ops_nn.situ_glu_grad(
             grad_output,
             x,
             dim=ctx.dim,

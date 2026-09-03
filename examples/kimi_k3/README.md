@@ -17,6 +17,7 @@
     - [4. 安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc)
     - [5. 安装ops-nn以适配AscendC版本SituGLU](#5-安装ops-nn以适配ascendc版本situglu)
     - [6. 安装ops-transformer以适配AscendC版本attn\_res](#6-安装ops-transformer以适配ascendc版本attn_res)
+    - [7. 安装MindSpeed-Ops以支持Triton版本causal conv1d](#7-安装mindspeed-ops以支持triton版本causal-conv1d)
   - [数据集准备及处理](#数据集准备及处理)
   - [训练](#训练)
     - [1. 准备工作](#1-准备工作)
@@ -77,37 +78,44 @@ bash scripts/install.sh --msbranch master && pip install tiktoken==0.12.0  trans
 
 Kimi-K3 的 KDA（Kimi Delta Attention）等线性注意力融合算子基于 Triton 实现，在昇腾环境下需要安装配套版本的 Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
 
-KDA 算子实现依赖 `triton-ascend-kernels` 算子库（`modeling_kimi_linear.py` 中的 `chunk_kda` 来自该包），且需要使用本仓提供的 `chunk.py` 替换算子库中的同名文件，安装步骤如下：
+KDA 算子实现依赖 `triton-ascend-kernels` 算子库（`modeling_kimi_linear.py` 中的 `chunk_kda` 来自该包）安装步骤如下：
+
+atlas A2&A3训练产品安装步骤
 
 ```shell
 # 拉取 triton-ascend-kernels 代码仓
-git clone https://gitcode.com/Ascend/triton-ascend-kernels.git
+git clone https://gitcode.com/fengrui886/triton-ascend-kernels
 cd triton-ascend-kernels
-
-# 拉取配套的MR288分支
-git fetch https://gitcode.com/Ascend/triton-ascend-kernels.git +refs/merge-requests/288/head:pr_288
-git checkout pr_288
-
-# 使用本仓提供的chunk.py替换算子库中的同名文件
-# MM_PATH配置为MindSpeed-MM根目录路径
-cp -f ${MM_PATH}/mindspeed_mm/fsdp/ops/kda/triton_ascend/chunk.py \
-  src/triton_ascend_kernels/attention/fla/kda/chunk.py
+git checkout kda_a3
 
 # 安装
-# 注意：triton-ascend-kernels 的 pyproject.toml 中固定了 pta、triton-ascend 的版本，直接安装会覆盖环境中现有版本，安装前请建议注释掉该文件中对应的版本约束。
-pip install -e .
+pip install -e . --no-build-isolation --no-deps
+```
+
+950系列产品安装步骤
+
+```shell
+# 拉取 triton-ascend-kernels 代码仓
+git clone https://gitcode.com/shenzhaofeng/triton-ascend-kernels.git
+cd triton-ascend-kernels
+
+# 拉取配套分支
+git checkout kda_a5
+
+# 安装
+pip install -e . --no-build-isolation --no-deps
 ```
 
 ### 4. 安装fla-npu以适配AscendC
 
-Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。
+Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以及KDA算子（`kimi_delta_attention: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。注意：`kimi_delta_attention: ascendc` 算子当前仅支持ascend910_93, 暂不支持950系列（支持中）。
 
 拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
 
 ```bash
-git clone https://github.com/flashserve/flash-linear-attention-npu
+git clone https://github.com/Ensley0304/flash-linear-attention-npu.git
 cd flash-linear-attention-npu
-git checkout c2e3d83f
+git checkout 0af57d0f7bd
 ```
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
@@ -119,10 +127,15 @@ git checkout c2e3d83f
 source /usr/local/Ascend/cann/set_env.sh
 
 # 编译算子 run 包，--soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
-bash build.sh --soc=ascend910b --pkg --vendor_name=fla_npu
+bash build.sh --soc=ascend910_93 --pkg --vendor_name=fla_npu
 bash build_out/fla-npu-*.run
 cd torch_custom/fla_npu/
 bash build.sh
+
+# 导入环境变量
+FLA_NPU_PATH=$(python3 -c "import fla_npu, os; print(os.path.dirname(fla_npu.__file__))")
+export ASCEND_CUSTOM_OPP_PATH="${FLA_NPU_PATH}/opp/vendors/fla_npu_transformer:${FLA_NPU_PATH}/opp/vendors/fla_npu_transformer/op_api/lib:${ASCEND_CUSTOM_OPP_PATH}"
+
 ```
 
 检验fla_npu是否安装成功
@@ -142,14 +155,17 @@ Kimi-K3 的 MLP 激活采用 SituGLU 结构：对 gate 分支施加 SiTU 激活 
 ```shell
 # 拉取代码
 git clone https://gitcode.com/cann/ops-nn.git && cd ops-nn
+git checkout b7af75e68cc07
 # 根据芯片类型进行编译
 source /usr/local/Ascend/cann/set_env.sh
-bash build.sh --pkg --soc=${soc_version} --ops=situ_glu -j16
+bash build.sh --pkg --soc=${soc_version} --ops=situ_glu,situ_glu_grad -j16
 # 安装算子包
 ./build_out/*.run
-cd torch_extension
-conda activate ${conda_env_name} # 激活对应conda环境
-pip install dist/*.whl --force-reinstall --no-deps
+cd ops-nn
+bash build.sh --torch_extension
+pip install build_out/*.whl
+# 使用需导入安装过程中提示的环境变量
+export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_nn/op_api/lib/:${LD_LIBRARY_PATH}
 ```
 
 产品名对应的`${soc_version}`取值如下，请按实际场景传参：
@@ -182,6 +198,8 @@ bash build_install_attn_res.sh --soc=${soc_version}
 # 安装算子包
 conda activate ${conda_env_name} # 激活对应conda环境
 pip install torch_extension/dist/*.whl --force-reinstall --no-deps
+# 导入安装过程中提示的环境变量 
+source xxx/ops-transformer/install/vendors/custom_transformer/bin/set_env.bash
 ```
 
 产品名对应的`${soc_version}`取值如下，请按实际场景传参：
@@ -189,6 +207,19 @@ pip install torch_extension/dist/*.whl --force-reinstall --no-deps
 - Atlas A2 训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
 - Atlas A3 训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
 - 950系列产品：取值为ascend950
+
+### 7. 安装MindSpeed-Ops以支持Triton版本causal conv1d
+
+Kimi-K3 的 KDA 短卷积算子在 `causal_conv1d_implementation: triton` 时使用 MindSpeed-Ops 仓提供的 Triton 版本 causal conv1d 融合算子实现，需安装 MindSpeed-Ops。
+
+安装步骤如下：
+
+```shell
+# 拉取代码
+git clone https://gitcode.com/Ascend/MindSpeed-Ops.git && cd MindSpeed-Ops
+# 安装
+pip install -e . --no-build-isolation --no-deps
+```
 
 ---
 

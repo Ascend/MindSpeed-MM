@@ -106,7 +106,9 @@ features:
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: language_model.lm_head
-    chunk_size: 1024
+    chunk_size: null   # legacy: None→1024（token 分块）；cce: 复用为 seq_chunk_size，None=单段
+    impl_type: cce     # legacy | cce；非 cce 时 vocab_tile_size 自动置 None
+    vocab_tile_size: 4096  # 默认 8192 减半 tile 数、slot 显存翻倍
   recompute: true
   recompute_plan:
     apply_modules:

@@ -1431,9 +1431,6 @@ class KimiK3ForConditionalGeneration(KimiK3PreTrainedModel):
 
         if enable_chunk_loss:
             logits = None
-            chunk_size = getattr(self, "chunk_size", 1024)
-            self.loss_function = build_loss_func(
-                loss_type="default", chunk_size=chunk_size, labels=labels)
             loss = self.language_model.lm_head(hidden_states, self.loss_function)
         else:
             logits = self.language_model.lm_head(hidden_states)
