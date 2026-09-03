@@ -760,7 +760,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
 
             cu_seqlens = None
             if "cu_seqlens" in kwargs and kwargs.get("cu_seqlens") is not None:
-                cu_seqlens = kwargs.get("cu_seq_lens_q").to(torch.int64)
+                cu_seqlens = kwargs.get("cu_seqlens").to(torch.int64)
 
             if self.causal_conv1d_implementation == IMPL_TRITON:
                 conv_weight = conv_weight.squeeze(1)
