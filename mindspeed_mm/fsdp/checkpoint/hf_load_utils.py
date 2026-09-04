@@ -151,6 +151,36 @@ def _lora_base_key_map(param_names: Set[str]) -> Dict[str, str]:
     return {bare: base for base, bare in base_to_bare.items()}
 
 
+def find_embedding_module(model, method_name, embedding_name):
+    """Find an embedding module through standard APIs or common LM wrappers."""
+    modules = [model]
+
+    while modules:
+        module = modules.pop(0)
+        if module is None:
+            continue
+
+        method = getattr(module, method_name, None)
+        if callable(method):
+            try:
+                embedding = method()
+            except (AttributeError, NotImplementedError):
+                embedding = None
+            if embedding is not None:
+                return embedding
+
+        embedding = getattr(module, embedding_name, None)
+        if embedding is not None:
+            return embedding
+
+        modules.extend(
+            getattr(module, child_name, None)
+            for child_name in ("thinker", "language_model", "model")
+        )
+
+    return None
+
+
 def _retie_embeddings(model: torch.nn.Module) -> None:
     """Re-tie input/output embeddings when the config requests it.
 
@@ -173,8 +203,8 @@ def _retie_embeddings(model: torch.nn.Module) -> None:
         return
 
     try:
-        input_embeddings = model.get_input_embeddings()
-        output_embeddings = model.get_output_embeddings()
+        input_embeddings = find_embedding_module(model, "get_input_embeddings", "embed_tokens")
+        output_embeddings = find_embedding_module(model, "get_output_embeddings", "lm_head")
         if input_embeddings is None or output_embeddings is None:
             return
         # Object-reference assignment -- after this both modules share the same
