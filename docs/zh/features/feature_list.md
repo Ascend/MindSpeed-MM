@@ -176,13 +176,13 @@
   </tr>
   <tr>
     <td class="tg-citn">Canonical Model</td>
-    <td class="tg-jajh"><a href="canonical_model.md">Canonical Model</a></td>
+    <td class="tg-jajh"><a href="other/canonical_model.md">Canonical Model</a></td>
 
   </tr>
   <tr>
     <td class="tg-whwg">确定性计算</td>
     <td class="tg-citn">Deterministic</td>
-    <td class="tg-jajh"><a href="deterministic_computing.md">Deterministic Computing</a></td>
+    <td class="tg-jajh"><a href="other/deterministic_computing.md">Deterministic Computing</a></td>
 
   </tr>
   <tr>

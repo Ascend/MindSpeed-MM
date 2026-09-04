@@ -42,7 +42,7 @@ Megatron 对模型核心模块做了融合及交织重排操作，以Qwen2.5-VL�
 - **Transformers 标准实现**：将 `hidden_states` 分别输入独立的 `q_proj`、`k_proj`、`v_proj` 层，直接得到 q、k、v 三个矩阵；
 - **Megatron 实现**：将原模型的 `q_proj`、`k_proj`、`v_proj` 三层矩阵拆分后重新排列，融合为 `linear_qkv` 单层，`hidden_states` 输入该层后先得到融合的 qkv 输出张量，再经拆分与重排后得到 q、k、v 三个矩阵。
 
-![Megatron下qkv计算实现差异](../../../sources/images/canonical_model/img.png)
+![Megatron下qkv计算实现差异](../../../../sources/images/canonical_model/img.png)
 
 **影响分析：**
 
@@ -63,7 +63,7 @@ Megatron 同时将 MLP 层中的 `gate_proj` 和 `up_proj` 两层融合为 `line
 
 Megatron 对上述模块的融合操作，会导致 LoRA 微调场景下的参数规模与 Transformers 标准实现不匹配：例如 qkv 层的 LoRA-A 矩阵参数量仅为标准实现的 1/3，造成算法逻辑层面的不等价。最终导致两种框架下训练得到的 LoRA 权重无法跨框架兼容转换和加载。
 
-![Megatron LoRA场景qkv计算实现差异](../../../sources/images/canonical_model/img_1.png)
+![Megatron LoRA场景qkv计算实现差异](../../../../sources/images/canonical_model/img_1.png)
 
 **具体影响：**
 
@@ -126,4 +126,4 @@ Megatron 对上述模块的融合操作，会导致 LoRA 微调场景下的参�
 
 - 启用 `canonical_model` 后，模型结构将与 Transformers 标准实现一致，但可能略微影响训练性能
 - 已有的非标准等价模型权重需要重新转换后才能与标准等价模式配合使用
-- 更多模型的标准等价支持正在开发中，请关注 [特性列表](feature_list.md)
+- 更多模型的标准等价支持正在开发中，请关注 [特性列表](../feature_list.md)

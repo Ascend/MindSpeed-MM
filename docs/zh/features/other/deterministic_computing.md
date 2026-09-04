@@ -17,7 +17,7 @@
 在MindSpeed MM中，根据训练后端启用确定性计算：
 
 - **原生 FSDP2（native FSDP2）**：在模型 YAML 配置文件的 `training` 段设置 `use_deter_comp: true`。
-- **MCORE / 基于 Megatron 的 FSDP2（megatron-FSDP2）**：在训练脚本中添加 `--use-deter-comp` 参数。
+- **Mcorecore / 基于 Megatron 的 FSDP2（Mcore-FSDP2）**：在训练脚本中添加 `--use-deter-comp` 参数。
 
 ### 替代方案
 

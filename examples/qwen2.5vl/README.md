@@ -519,7 +519,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 Megatron框架下的qwen2.5VL模型结构相比于Hugging Face的模型结构实现有差异，对训练效果造成的影响。
 
-开启该功能可以使用完全与Hugging Face一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](../../docs/zh/features/canonical_model.md)
+开启该功能可以使用完全与Hugging Face一致的模型结构进行训练。Lora微调场景建议开启该功能。详细介绍参考：[canonical_model.md](../../docs/zh/features/other/canonical_model.md)
 
 开启方式：
 `model_xxb.json`使能`canonical_model`

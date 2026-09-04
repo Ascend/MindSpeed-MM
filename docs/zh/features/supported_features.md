@@ -119,7 +119,7 @@
   </tr>
   <tr>
     <td class="tg-citn">确定性计算</td>
-    <td class="tg-jajh"><a href="deterministic_computing.md">Deterministic Computing</a></td>
+    <td class="tg-jajh"><a href="other/deterministic_computing.md">Deterministic Computing</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">✓</td>
   </tr>
