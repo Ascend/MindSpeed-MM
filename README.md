@@ -80,27 +80,27 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 
-- [Jul. 27, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Kimi-K3](./examples/kimi_k3)模型【Prototype】
-- [Apr. 17, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3.6](./examples/qwen3_6)模型【Prototype】
-- [Mar. 24, 2026]: 🚀 MindSpeed MM基于FSDP2支持[LTX2](./examples/ltx2)模型【Prototype】
+- [Jul. 27, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Kimi-K3](./examples/kimi_k3)模型【beta】
+- [Apr. 17, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3.6](./examples/qwen3_6)模型【beta】
+- [Mar. 24, 2026]: 🚀 MindSpeed MM基于FSDP2支持[LTX2](./examples/ltx2)模型【beta】
 - [Mar. 09, 2026]: 🚀 MindSpeed MM基于FSDP2支持[FunASR](./examples/funasr)模型
-- [Feb. 16, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3.5](./examples/qwen3_5)模型【Prototype】
+- [Feb. 16, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3.5](./examples/qwen3_5)模型【beta】
 - [Feb. 14, 2026]: 🚀 MindSpeed MM基于FSDP2支持[CosyVoice3](./examples/cosyvoice3)模型训练
-- [Feb. 13, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Kimi-K2.5](./examples/kimik2_5)模型【Prototype】
-- [Feb. 12, 2026]: 🚀 MindSpeed MM基于FSDP2支持[HunyuanVideo1.5](./examples/hunyuanvideo_1.5)模型训练demo【Prototype】
-- [Feb. 03, 2026]: 🚀 MindSpeed MM基于FSDP2支持[DeepseekOCR2](./examples/deepseekocr2/README.md)模型训练demo【Prototype】
+- [Feb. 13, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Kimi-K2.5](./examples/kimik2_5)模型【beta】
+- [Feb. 12, 2026]: 🚀 MindSpeed MM基于FSDP2支持[HunyuanVideo1.5](./examples/hunyuanvideo_1.5)模型训练demo【beta】
+- [Feb. 03, 2026]: 🚀 MindSpeed MM基于FSDP2支持[DeepseekOCR2](./examples/deepseekocr2/README.md)模型训练demo【beta】
 - [Jan. 29, 2026]: 🎉 昇腾镜像仓库上线[MindSpeed MM镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)
-- [Jan. 29, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3-TTS](./examples/qwen3tts)模型【Prototype】
-- [Jan. 28, 2026]: 🚀 MindSpeed MM基于FSDP2支持Magistral-Small-2509模型【Prototype】
-- [Jan. 08, 2026]: 🚀 MindSpeed MM支持FLUX.2模型【Prototype】
+- [Jan. 29, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3-TTS](./examples/qwen3tts)模型【beta】
+- [Jan. 28, 2026]: 🚀 MindSpeed MM基于FSDP2支持Magistral-Small-2509模型【beta】
+- [Jan. 08, 2026]: 🚀 MindSpeed MM支持FLUX.2模型【beta】
 - [Dec. 25, 2025]: 🎉 用户手册上线！体验链接：<https://mindspeed-mm.readthedocs.io/zh-cn/latest/>
-- [Dec. 03, 2025]: 🚀 MindSpeed MM基于FSDP2支持Glm4.5v模型训练demo【Prototype】
-- [Dec. 02, 2025]: 🚀 MindSpeed MM支持Self-Forcing基于Wan2.1-1.3B的DMD蒸馏 【Prototype】
+- [Dec. 03, 2025]: 🚀 MindSpeed MM基于FSDP2支持Glm4.5v模型训练demo【beta】
+- [Dec. 02, 2025]: 🚀 MindSpeed MM支持Self-Forcing基于Wan2.1-1.3B的DMD蒸馏 【beta】
 - [Nov. 27, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-235B模型
 - [Nov. 20, 2025]: 🚀 MindSpeed MM基于FSDP2支持Qwen3-Omni模型
-- [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型 【Prototype】
+- [Nov. 19, 2025]: 🚀 MindSpeed MM支持Qwen Image、Qwen Image Edit模型 【beta】
 - [Nov. 13, 2025]: 🚀 MindSpeed MM基于FSDP2支持InternVL3.5-30B模型
-- [Nov. 06, 2025]: 🚀 MindSpeed MM基于FSDP2支持DeepseekOCR模型训练demo【Prototype】
+- [Nov. 06, 2025]: 🚀 MindSpeed MM基于FSDP2支持DeepseekOCR模型训练demo【beta】
 - [Oct. 31, 2025]: 🚀 MindSpeed MM基于fully shard支持Qwen3VL-8B/30B模型
 - [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型
 - [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型
@@ -132,7 +132,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 - [Oct. 21, 2024]: 🚀 MindSpeed MM支持InternVL2、以及Qwen2VL模型
 - [Oct. 16, 2024]: 🌱 MindSpeed MM首版本1.0.RC3发布
 
-> 注意： **Prototype**特性未经过充分验证，可能存在不稳定和bug问题，**beta**表示非商用特性。
+> 注意： **beta**特性未经过充分验证，如发现不稳定和bug问题欢迎通过issue反馈。
 
 # 效果展示
 
