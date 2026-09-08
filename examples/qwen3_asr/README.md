@@ -13,7 +13,8 @@
   - [环境搭建](#2-环境搭建)
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
-  - [权重转换](#2-权重转换)
+  - [权重加载](#2-权重加载)
+  - [权重保存](#3-权重保存)
 - [数据集准备及处理](#数据集准备及处理)
   - [数据集下载](#1-数据集下载)
   - [数据集处理](#2-数据集处理)
@@ -70,6 +71,9 @@ cp -r mindspeed ../MindSpeed-MM/
 cd ../MindSpeed-MM
 pip install -e .
 
+# Qwen3-ASR插件要求transformers 4.57.6
+python -m pip install transformers==4.57.6
+
 # 安装音频处理依赖
 pip install librosa==0.11.0 soundfile==0.13.1
 ```
@@ -92,21 +96,62 @@ pip install librosa==0.11.0 soundfile==0.13.1
 
 <a id="jump2.2"></a>
 
-### 2. 权重转换
+### 2. 权重加载
+
+MindSpeed MM加载Qwen3-ASR模型时，需要先将Hugging Face格式权重转换为DCP格式：
 
 ```bash
 mm-convert GenericDCPConverter hf_to_dcp \
-  --hf_dir ./ckpt/hf_path/Qwen3-ASR-1.7B \
-  --dcp_dir ./ckpt/mm_path/Qwen3-ASR-1.7B-dcp-tie-noprefix \
-  --tie_weight_mapping '{"thinker.lm_head.weight":"thinker.model.embed_tokens.weight"}'
+--hf_dir ./ckpt/hf_path/Qwen3-ASR-1.7B \
+--dcp_dir ./ckpt/mm_path/Qwen3-ASR-1.7B-dcp-tie-noprefix \
+--tie_weight_mapping '{"thinker.lm_head.weight":"thinker.model.embed_tokens.weight"}'
 
 # 转换后的目录结构为：
 # ———— Qwen3-ASR-1.7B-dcp-tie-noprefix
 #   |—— release
 #   |—— latest_checkpointed_iteration.txt
+
+# 其中：
+# hf_dir：原始Hugging Face模型目录。
+# dcp_dir：转换后的DCP权重保存目录。
+# tie_weight_mapping：共享权重映射关系。
 ```
 
 并在`qwen3_asr_1.7B_config.yaml`中将`init_model_with_meta_device`参数配置为`true`，同时将`load`参数配置为转换后的DCP权重路径（写到`release`文件夹的上一级目录）。
+
+<a id="jump2.3"></a>
+
+### 3. 权重保存
+
+MindSpeed MM训练保存的权重为DCP格式。微调完成后，可将DCP格式权重转换为Hugging Face格式，用于推理部署或权重导出。转换工具的详细说明请参见《[checkpointer_guide](../../docs/zh/guides/development/checkpointer_guide.md)》。
+
+待转换的DCP权重目录结构样例如下：
+
+```bash
+# 待转换的dcp权重目录结构样例为：
+# ———— iter_0000001
+#   |—— .metadata
+#   |—— *.distcp
+
+# 根据实际情况修改ascend-toolkit路径
+source /usr/local/Ascend/cann/set_env.sh
+
+NON_MEGATRON=true python -m mindspeed_mm.fsdp.tasks.checkpoint.converter dcp_to_hf \
+--model_id qwen3_asr \
+--dcp_dir ./save_dir/qwen3_asr/iter_0000001 \
+--hf_dir ./ckpt/hf_path/Qwen3-ASR-1.7B-dcp2hf \
+--origin_hf_dir ./ckpt/hf_path/Qwen3-ASR-1.7B \
+--plugin mindspeed_mm/fsdp/models/qwen3_asr \
+--num_workers 0
+
+# 其中：
+# model_id：模型注册名称，Qwen3-ASR配置为qwen3_asr。
+# dcp_dir：保存的DCP格式权重目录，iter_0000001表示保存的第1步权重。
+# hf_dir：转换后的Hugging Face权重保存目录。
+# origin_hf_dir：原始Hugging Face模型目录，需与hf_to_dcp时使用的目录一致。
+# plugin：Qwen3-ASR模型插件目录，用于完成模型注册。
+# num_workers：并行转换进程数，0表示串行，可根据存储I/O能力调整。
+```
 
 ---
 <a id="jump3"></a>
