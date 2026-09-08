@@ -7,6 +7,8 @@ os.environ["USE_TF"] = "FALSE"
 
 import torch
 import torch.distributed as dist
+from torchdata.stateful_dataloader import StatefulDataLoader
+from torchdata.stateful_dataloader.sampler import StatefulDistributedSampler
 
 from mindspeed.fsdp.utils.log import print_rank, set_log_level
 from mindspeed.fsdp.utils.random import set_seed
@@ -48,7 +50,14 @@ class InferenceRunner:
         self.initialize()
         self.model = self.get_model()
         self.adapter = self.get_adapter()
-        self.engine = InferEngine(args, self.adapter)
+        self.inference_data = self.get_data()
+        self.inference_dataloader = self.get_dataloader(self.inference_data)
+        self.engine = InferEngine(
+            args,
+            self.adapter,
+            self.inference_dataloader,
+            len(self.inference_data),
+        )
 
     def initialize(self) -> None:
         """Initialize inference environment: logging, random seeds, distributed groups."""
@@ -130,13 +139,15 @@ class InferenceRunner:
             images = image
         else:
             raise ValueError(f"Inference sample {index} image must be a string or a list of strings")
-        videos = item.get("videos", [])
-        if videos is None:
+        video = item.get("video", [])
+        if video is None:
             videos = []
-        elif isinstance(videos, str):
-            videos = [videos]
-        elif not isinstance(videos, list) or not all(isinstance(path, str) for path in videos):
-            raise ValueError(f"Inference sample {index} videos must be a string or a list of strings")
+        elif isinstance(video, str):
+            videos = [video]
+        elif isinstance(video, list) and all(isinstance(path, str) for path in video):
+            videos = video
+        else:
+            raise ValueError(f"Inference sample {index} video must be a string or a list of strings")
         messages = [{"type": "image", "value": path} for path in images]
         messages.extend({"type": "video", "value": path} for path in videos)
         messages.append({"type": "text", "value": item["text"]})
@@ -159,11 +170,24 @@ class InferenceRunner:
                 raise ValueError(f"Inference sample {index} must be a JSON object")
         return data
 
-    def infer(self) -> list[tuple[dict, dict]]:
-        return self.engine.infer(
-            inference_data=self.get_data(),
-            sample_builder=self.get_sample,
+    @staticmethod
+    def get_dataloader(inference_data: Sequence[dict]) -> StatefulDataLoader:
+        sampler = StatefulDistributedSampler(
+            inference_data,
+            num_replicas=dist.get_world_size(),
+            rank=dist.get_rank(),
+            shuffle=False,
+            drop_last=False,
         )
+        return StatefulDataLoader(
+            inference_data,
+            sampler=sampler,
+            batch_size=None,
+            num_workers=0,
+        )
+
+    def infer(self) -> list[tuple[dict, dict]]:
+        return self.engine.infer(sample_builder=self.get_sample)
 
 
 if __name__ == "__main__":

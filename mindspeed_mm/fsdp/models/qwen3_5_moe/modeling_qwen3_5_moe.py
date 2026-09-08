@@ -816,7 +816,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                 mixed_qkv = F.silu(F.conv1d(mixed_qkv, weight=conv_weight, bias=self.conv1d.bias, padding=self.conv_kernel_size - 1, groups=local_key_dim * 2 + local_value_dim)[:, :, :mixed_qkv.shape[-1]])
                 mixed_qkv = mixed_qkv.transpose(1, 2)
 
-        if self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
+        if not use_precomputed_states and self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
             query, key, value = torch.split(
                 mixed_qkv,
                 [
@@ -851,7 +851,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         else:
             g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
         if self.num_v_heads // self.num_k_heads > 1:
-            if self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
+            if not use_precomputed_states and self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
                 query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
                 key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
             else:

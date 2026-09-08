@@ -73,8 +73,6 @@ parallel:
   fully_shard_parallel_size: auto
   fsdp_plan:
     apply_modules:
-      - model.visual
-      - model.visual.blocks.{*}
       - model.language_model.embed_tokens
       - model.language_model
       - model.language_model.layers.{*}
@@ -99,15 +97,15 @@ parallel:
 
 model:
   model_id: qwen3_5_moe
-  model_name_or_path: &HF_MODEL_LOAD_PATH /path/to/Qwen3.5-MoE
+  model_name_or_path: &HF_MODEL_LOAD_PATH /path/to/Qwen3.5-MoE  # 替换为 hf 权重路径
   trust_remote_code: true
   attn_implementation: flash_attention_2
-  gdn_implementation: eager
-  causal_conv1d_implementation: eager
+  gdn_implementation: ascendc
+  causal_conv1d_implementation: ascendc
   use_grouped_expert_matmul: true
 
 inference:
-  load: /path/to/Qwen3.5-MoE
+  load: /path/to/Qwen3.5-MoE  # 替换为 hf 权重路径
   load_format: auto
   init_model_with_meta_device: true
   seed: 42
@@ -125,7 +123,7 @@ inference:
 
 evaluation:
   dataset_type: vqa2_val
-  dataset_path: ./data/vqa2_val
+  dataset_path: ./data/vqa2_val  # 替换为数据集路径
   max_samples: null
   result_output_path: ./evaluation_outputs
 ```
