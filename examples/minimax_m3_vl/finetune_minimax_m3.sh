@@ -1,5 +1,4 @@
-ASCEND_SET_ENV=${ASCEND_SET_ENV:-/usr/local/Ascend/ascend-toolkit/set_env.sh}
-source "${ASCEND_SET_ENV}"
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 export NON_MEGATRON=${NON_MEGATRON:-true}
 export HCCL_CONNECT_TIMEOUT=${HCCL_CONNECT_TIMEOUT:-1200}

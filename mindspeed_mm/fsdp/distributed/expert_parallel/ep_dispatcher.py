@@ -9,7 +9,7 @@ from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
 from mindspeed_mm.fsdp.ops.moe_ops.gemm_mc2 import grouped_matmul_all2all, all2all_grouped_matmul
-from mindspeed_mm.fsdp.ops.swiglu import swiglu, clamp_swiglu, clipped_swiglu
+from mindspeed_mm.fsdp.ops.swiglu import swiglu, clamp_swiglu, clipped_swiglu, clipped_swiglu
 from mindspeed_mm.fsdp.distributed.expert_parallel.comm import (
     all_to_all,
     allgather_tokens_in_ep,

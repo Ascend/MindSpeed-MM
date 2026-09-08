@@ -52,6 +52,7 @@ from transformers.utils.import_utils import is_torchdynamo_compiling
 from transformers.utils.output_capturing import OutputRecorder, capture_outputs
 
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
+from mindspeed_mm.fsdp.ops.swiglu import clipped_swiglu
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from transformers import (
@@ -62,7 +63,15 @@ from transformers import (
 if IS_NPU_AVAILABLE:
     import torch_npu
 
+try:
+    import cann_ops_transformer
+
+    _CANN_OPS_TRANSFORMER_AVAILABLE = True
+except ImportError:
+    _CANN_OPS_TRANSFORMER_AVAILABLE = False
+
 _MINIMAX_M3_FLASH_ATTENTION = "flash_attention_2"
+_MINIMAX_M3_MSA = "minimax_m3_msa"
 
 
 def auto_docstring(*args, **kwargs):
@@ -194,11 +203,9 @@ class MiniMaxM3VLDenseMLP(nn.Module):
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         gate_up = self.gate_up_proj(hidden_states)
-        gate, up = gate_up.chunk(2, dim=-1)
-        gate = gate.clamp(max=self.swiglu_limit)
-        up = up.clamp(min=-self.swiglu_limit, max=self.swiglu_limit)
-        glu = gate * torch.sigmoid(gate * self.swiglu_alpha)
-        return self.down_proj((up + 1.0) * glu)
+        return self.down_proj(
+            clipped_swiglu(gate_up, swiglu_alpha=self.swiglu_alpha, swiglu_limit=self.swiglu_limit)
+        )
 
 
 @use_experts_implementation
@@ -221,6 +228,7 @@ class MiniMaxM3VLExperts(nn.Module):
         self._down_proj_t: torch.Tensor | None = None
         self._gate_up_proj_version: int = -1
         self._down_proj_version: int = -1
+
 
     def _get_grouped_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
         # Cache transposed moe tensor to adapt npu grouped-moe kernel.
@@ -309,17 +317,13 @@ class MiniMaxM3VLExperts(nn.Module):
             fc2_weight=down_proj,
             ep_group=ep_group,
             fused=ep_plan.use_npu_fused_ops,
-            activation_fn=self._apply_gate,
+            swiglu_alpha=self.swiglu_alpha,
+            swiglu_limit=self.swiglu_limit,
         )
         return hidden_states.to(input_dtype)
 
     def _apply_gate(self, gate_up: torch.Tensor) -> torch.Tensor:
-        # same as GPT OSS, but the weights are not interleaved
-        gate, up = gate_up.chunk(2, dim=-1)
-        gate = gate.clamp(max=self.swiglu_limit)
-        up = up.clamp(min=-self.swiglu_limit, max=self.swiglu_limit)
-        glu = gate * torch.sigmoid(gate * self.swiglu_alpha)
-        return (up + 1.0) * glu
+        return clipped_swiglu(gate_up, swiglu_alpha=self.swiglu_alpha, swiglu_limit=self.swiglu_limit)
 
 
 class MiniMaxM3VLTopKRouter(nn.Module):
@@ -499,6 +503,109 @@ def full_attention_fa_forward(
     )
 
 
+def minimax_m3_msa_attention_forward(
+    module: nn.Module,
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attention_mask: torch.Tensor | None,
+    scaling: float,
+    dropout: float = 0.0,
+    **kwargs: Unpack[TransformersKwargs],
+):
+    r"""MiniMax M3 sparse attention backed by cann_ops_transformer MSA kernel.
+
+    Consumes the per-query selected key-block indices produced by
+    `MiniMaxM3VLIndexer` and routes them to the CANN
+    `minimax_sparse_attention_split_kv` kernel via `build_k2q_csr`.
+
+    Expected kwargs (injected by `MiniMaxM3VLAttention.forward`):
+        block_indices: [B, S_q, topk_blocks] int tensor with `-1` right-padding
+                       for invalid slots (the indexer contract).
+        indexer: the `MiniMaxM3VLIndexer` module (used to read block_size / topk).
+        position_ids: optional [B, S_q] absolute query positions.
+    """
+    block_indices = kwargs.pop("block_indices", None)
+    indexer = kwargs.pop("indexer", None)
+    if block_indices is None or indexer is None:
+        raise RuntimeError(
+            "minimax_m3_msa requires `block_indices` and `indexer` from MiniMaxM3VLIndexer; "
+            "ensure the layer is a sparse-attention layer."
+        )
+    if not _CANN_OPS_TRANSFORMER_AVAILABLE:
+        raise RuntimeError(
+            "`cann_ops_transformer` is not installed; cannot use minimax_m3_msa attention."
+        )
+    if not IS_NPU_AVAILABLE or query.device.type != "npu":
+        raise RuntimeError(f"MiniMax M3 MSA requires NPU tensors, got {query.device.type}.")
+
+    batch, num_q_heads, q_len, head_dim = query.shape
+    num_kv_heads = key.shape[1]
+    kv_len = key.shape[2]
+    block_size = indexer.block_size
+    top_k = indexer.topk_blocks
+
+    # Kernel constraints: head_dim must be 128 and GQA group_size in [1, 16].
+    if head_dim != 128:
+        raise RuntimeError(f"minimax_m3_msa requires head_dim=128, got {head_dim}.")
+    group_size = num_q_heads // num_kv_heads
+    if not (1 <= group_size <= 16):
+        raise RuntimeError(
+            f"minimax_m3_msa requires num_q_heads/num_kv_heads in [1, 16], got {group_size} "
+            f"({num_q_heads}/{num_kv_heads})."
+        )
+
+    # The kernel requires contiguous BNSD memory; q/k/v are non-contiguous after transpose.
+    query = query.contiguous()
+    key = key.contiguous()
+    value = value.contiguous()
+
+    # actual_seq_lengths: real (non-cumsum) per-batch Q/KV lengths for contiguous KV.
+    # For prefill (q_len == kv_len) and decode (q_len == 1, kv_len == past + 1) the
+    # contiguous tensor extent equals the real sequence length under right-padding,
+    # which is the only padding contract the indexer guarantees (see its TODO).
+    actual_seq_lengths = torch.full((batch,), q_len, dtype=torch.int32, device=query.device)
+    actual_seq_lengths_kv = torch.full((batch,), kv_len, dtype=torch.int32, device=query.device)
+
+    # select_idx layout required by build_k2q_csr: [Nkv, B, S, topK].
+    # The indexer emits per-query block ids shared across all kv heads (max-pooled),
+    # so we broadcast the [B, S_q, topk] tensor along a new leading kv-head axis.
+    select_idx = block_indices.to(torch.int32).unsqueeze(0).expand(num_kv_heads, -1, -1, -1).contiguous()
+
+    k2q_row_ptr, k2q_q_indices, k2q_slot_indices = cann_ops_transformer.build_k2q_csr(
+        select_idx,
+        actual_seq_lengths,
+        actual_seq_lengths_kv,
+        block_size,
+        input_layout="BNSD",
+    )
+
+    attn_output, _softmax_lse = cann_ops_transformer.minimax_sparse_attention_split_kv(
+        query,
+        key,
+        value,
+        k2q_row_ptr,
+        k2q_q_indices,
+        k2q_slot_indices,
+        actual_seq_lengths,
+        actual_seq_lengths_kv,
+        num_kv_heads,
+        scaling,
+        block_size,
+        top_k,
+        input_layout="BNSD",
+    )
+
+    # Kernel returns BNSD; the caller (MiniMaxM3VLAttention.forward) reshapes
+    # `(*input_shape, -1)` i.e. [B, S_q, num_q_heads * head_dim], so transpose to BSND.
+    if attn_output.dim() == 4 and attn_output.shape[1] == num_q_heads:
+        attn_output = attn_output.transpose(1, 2).contiguous()
+    return attn_output, None
+
+
+ALL_ATTENTION_FUNCTIONS.register(_MINIMAX_M3_MSA, minimax_m3_msa_attention_forward)
+
+
 def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     """Applies Rotary Position Embedding to the query and key tensors.
 
@@ -531,7 +638,6 @@ def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     else:
         q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
         k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
-
     # Concatenate back to full shape
     q_embed = torch.cat([q_embed, q_pass], dim=-1)
     k_embed = torch.cat([k_embed, k_pass], dim=-1)
@@ -591,11 +697,19 @@ class MiniMaxM3VLAttention(nn.Module):
             key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx)
 
         attn_implementation = getattr(self.config, "_attn_implementation", None)
-        if attn_implementation == _MINIMAX_M3_FLASH_ATTENTION:
+        # MSA only applies to sparse layers (those with an indexer). Dense layers
+        # fall back to flash_attention_2 when MSA is configured for the text model.
+        if attn_implementation == _MINIMAX_M3_MSA and self.indexer is None:
+            effective_impl = _MINIMAX_M3_FLASH_ATTENTION
+        else:
+            effective_impl = attn_implementation
+        if effective_impl == _MINIMAX_M3_FLASH_ATTENTION:
             attention_interface: Callable = full_attention_fa_forward
+        elif effective_impl == _MINIMAX_M3_MSA:
+            attention_interface: Callable = minimax_m3_msa_attention_forward
         else:
             attention_interface = ALL_ATTENTION_FUNCTIONS.get_interface(
-                attn_implementation, eager_attention_forward
+                effective_impl, eager_attention_forward
             )
         block_indices = None
         if self.indexer is not None:
@@ -608,6 +722,7 @@ class MiniMaxM3VLAttention(nn.Module):
                 query_states.shape[0], -1
             )
             block_indices = self.indexer(hidden_states, position_embeddings, past_key_values, position_ids)
+            # MSA consumes block_indices directly; only dense paths expand them into a 4D mask.
             if attn_implementation in ("eager", "sdpa", _MINIMAX_M3_FLASH_ATTENTION):
                 attention_mask = self.indexer.build_block_mask(
                     block_indices,
@@ -626,6 +741,8 @@ class MiniMaxM3VLAttention(nn.Module):
             attention_mask,
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
+            block_indices=block_indices,
+            indexer=self.indexer,
             **kwargs,
         )
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
@@ -756,10 +873,15 @@ class MiniMaxM3VLIndexer(nn.Module):
         bias.scatter_(-1, safe, 0.0)
         bias = bias[..., :num_key_blocks]
 
-        # Broadcast the per-block keep/drop verdict back onto every key (block granularity), add head axis.
-        block_keep = (bias == 0.0).repeat_interleave(self.block_size, dim=-1)[..., :key_length].unsqueeze(1)
+        block_keep = (
+            (bias == 0.0)
+            .unsqueeze(-1)
+            .expand(batch, q_len, num_key_blocks, self.block_size)
+            .reshape(batch, q_len, -1)
+            [..., :key_length]
+            .unsqueeze(1)
+        )
 
-        # Compose block-selection with the existing mask, then emit a single additive float mask.
         if attention_mask is not None:
             padding_mask = attention_mask if attention_mask.dtype == torch.bool else attention_mask == 0
             keep = block_keep & padding_mask
@@ -832,7 +954,7 @@ class MiniMaxM3VLPreTrainedModel(PreTrainedModel):
     }
     input_modalities = ("image", "video", "text")
     _keys_to_ignore_on_load_unexpected = [r"(^|\.)mtp\..*"]
-    _compatible_flash_implementations = [_MINIMAX_M3_FLASH_ATTENTION]
+    _compatible_flash_implementations = [_MINIMAX_M3_FLASH_ATTENTION, _MINIMAX_M3_MSA]
 
     @torch.no_grad()
     def _init_weights(self, module):
@@ -1205,8 +1327,12 @@ def apply_rotary_pos_emb_vision(
     cos, sin = cos[None, :, None, :], sin[None, :, None, :]
     q_rot, q_pass = q[..., :rot_dim], q[..., rot_dim:]
     k_rot, k_pass = k[..., :rot_dim], k[..., rot_dim:]
-    q_rot = q_rot * cos + rotate_half(q_rot) * sin
-    k_rot = k_rot * cos + rotate_half(k_rot) * sin
+    if IS_NPU_AVAILABLE:
+        q_rot = torch_npu.npu_rotary_mul(q_rot, cos, sin)
+        k_rot = torch_npu.npu_rotary_mul(k_rot, cos, sin)
+    else:
+        q_rot = q_rot * cos + rotate_half(q_rot) * sin
+        k_rot = k_rot * cos + rotate_half(k_rot) * sin
     return torch.cat([q_rot, q_pass], dim=-1), torch.cat([k_rot, k_pass], dim=-1)
 
 
@@ -1551,20 +1677,22 @@ class MiniMaxM3VLModel(MiniMaxM3VLPreTrainedModel):
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
-        if inputs_embeds is None:
-            inputs_embeds = self.get_input_embeddings()(input_ids)
+        embed_weight = self.get_input_embeddings().weight
 
         image_features = None
         if pixel_values is not None:
             image_features = self.get_image_features(
                 pixel_values=pixel_values, image_grid_thw=image_grid_thw
-            ).pooler_output.to(inputs_embeds.device, inputs_embeds.dtype)
+            ).pooler_output.to(embed_weight.device, torch.bfloat16)
 
         video_features = None
         if pixel_values_videos is not None:
             video_features = self.get_video_features(
                 pixel_values_videos=pixel_values_videos, video_grid_thw=video_grid_thw
-            ).pooler_output.to(inputs_embeds.device, inputs_embeds.dtype)
+            ).pooler_output.to(embed_weight.device, torch.bfloat16)
+
+        if inputs_embeds is None:
+            inputs_embeds = self.get_input_embeddings()(input_ids)
 
         image_mask, video_mask = self.get_placeholder_mask(
             input_ids, inputs_embeds, image_features=image_features, video_features=video_features
@@ -1624,14 +1752,18 @@ def _fix_minimax_m3_vl_config(config: MiniMaxM3VLConfig, model_args=None, featur
         config, "_attn_implementation", None
     )
     if attn_implementation is not None:
-        if attn_implementation not in ("eager", "sdpa", _MINIMAX_M3_FLASH_ATTENTION):
+        if attn_implementation not in ("eager", "sdpa", _MINIMAX_M3_FLASH_ATTENTION, _MINIMAX_M3_MSA):
             raise ValueError(
-                f"MiniMax M3 VL only supports eager, sdpa, or {_MINIMAX_M3_FLASH_ATTENTION}; "
+                f"MiniMax M3 VL only supports eager, sdpa, {_MINIMAX_M3_FLASH_ATTENTION}, or {_MINIMAX_M3_MSA}; "
                 f"got {attn_implementation}."
             )
         config._attn_implementation = attn_implementation
         text_config._attn_implementation = attn_implementation
-        vision_config._attn_implementation = attn_implementation
+        # MSA only applies to text sparse layers; vision always uses dense attention,
+        # so force it to flash_attention_2 (NPU) when MSA is requested for the text model.
+        vision_config._attn_implementation = (
+            _MINIMAX_M3_FLASH_ATTENTION if attn_implementation == _MINIMAX_M3_MSA else attn_implementation
+        )
 
     text_config.use_cache = False
     config.use_cache = False
@@ -1747,7 +1879,6 @@ class MiniMaxM3SparseForConditionalGeneration(
             loss = self.lm_head(hidden_states[:, slice_indices, :], self.loss_function)
         else:
             logits = self.lm_head(hidden_states[:, slice_indices, :])
-
             loss = None
             if labels is not None:
                 loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)

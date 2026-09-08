@@ -6,9 +6,9 @@ parallel:
       - model.vision_tower.layers.{*}
       - model.multi_modal_projector
       - model.language_model.embed_tokens
+      - model.language_model
       - model.language_model.layers.{*}
       - model.language_model.layers.{*}.mlp.experts
-      - model.language_model.norm
       - lm_head
     hook_modules:
       - model.language_model.layers.{*}
@@ -23,6 +23,7 @@ parallel:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
     dispatcher: alltoall
+    use_npu_fused_ops: true
 
 data:
   dataset_param:
@@ -35,7 +36,7 @@ data:
       user_tag: user
       assistant_tag: assistant
     preprocess_parameters:
-      model_name_or_path: /path/to/MiniMax-M3
+      model_name_or_path: &HF_MODEL_PATH ./ckpt/hf_path/MiniMax-M3
       trust_remote_code: true
       use_fast_tokenizer: true
       split_special_tokens: false
@@ -51,7 +52,7 @@ data:
       train_on_prompt: false
       mask_history: false
       dataset_dir: ./data/COCO2017
-      dataset: &DATASET_PATH ./data/COCO2017/mllm_format_llava_instruct_data.json
+      dataset: ./data/COCO2017/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/minimax_m3_vl
       overwrite_cache: true
       preprocessing_batch_size: 8
@@ -79,14 +80,30 @@ model:
     - model.vision_tower
 
 features:
+  swap_plan:
+    capacity_mb: -1
+    keep_rate: 0.0
+    enable_prefetch: true
+    cpu_arena_slab_size_mb: null
+    cpu_arena_pool_policy: standard
+    pin_memory: true
+    eviction_policy: fifo
   loss_cfg:
     loss_type: default
     router_aux_loss_coef: 0.0
   recompute: true
   recompute_plan:
+    use_reentrant: false
     apply_modules:
       - model.vision_tower.layers.{*}
       - model.language_model.layers.{*}
+    op_replay_scopes:
+      - name: minimax_m3_text_attention
+        apply_modules:
+          - model.language_model.layers.{*}.self_attn
+        cache_ops:
+          - npu.npu_fusion_attention.default
+        save_rng: false
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
@@ -109,7 +126,7 @@ training:
   adam_fused: true
   save_interval: 1000
   save: ""
-  load: "/path/to/MiniMax-M3-dcp"
+  load: ./ckpt/dcp_path/MiniMax-M3-dcp
   load_format: dcp
   load_rank0_and_broadcast: false
   log_interval: 1
@@ -117,3 +134,29 @@ training:
   plugin:
     - mindspeed_mm/fsdp/models/minimax_m3_vl
     - mindspeed_mm/fsdp/data/datasets/huggingface
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+    enable: false
+    start_step: 1
+    end_step: 2
+    save_path: ./memory_snapshot
+    dump_ranks: [0]
+    stacks: all
+    max_entries: null
+    mem_info: false
