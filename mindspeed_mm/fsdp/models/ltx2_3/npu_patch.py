@@ -110,10 +110,6 @@ def _npu_apply_split_rotary_emb(
 
 
 def _npu_rms_norm(x: torch.Tensor, weight: torch.Tensor | None = None, eps: float = 1e-6) -> torch.Tensor:
-    """NPU 版 rms_norm，替换 ltx_core.utils.rms_norm。
-
-    torch_npu.npu_rms_norm 要求 weight 必须显式传入，weight 为 None 时构造默认全 1。
-    """
     if weight is None:
         weight = torch.ones(x.shape[-1], dtype=x.dtype, device=x.device)
     return torch_npu.npu_rms_norm(x, weight, epsilon=eps)[0]
