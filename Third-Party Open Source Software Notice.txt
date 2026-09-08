@@ -555,6 +555,14 @@ Copyright Notice included in the software:
 Copyright 2026 the MiniMax AI Team and HuggingFace Team. All rights reserved.
 
 Software Notice
+Software DiffSynth-Studio
+License: Apache License 2.0
+For the full text of the license, please go to the above.
+
+Copyright Notice included in the software:
+Copyright 2023 Zhongjie Duan
+
+Software Notice
 Software DanceGRPO
 License: Apache License 2.0
 For the full text of the license, please go to the above.

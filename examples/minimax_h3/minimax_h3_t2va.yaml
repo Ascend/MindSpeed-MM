@@ -1,0 +1,76 @@
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - blocks.{*}
+    param_dtype: bf16
+    reduce_dtype: fp32
+    output_dtype: bf16
+    cast_forward_inputs: false
+    cpu_offload: false
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+
+data:
+  dataset_param:
+    dataset_type: minimax_h3_precomputed
+    preprocess_parameters: {}
+    basic_parameters:
+      dataset_dir: ./data/minimax_h3/t2va_cache
+      dataset_repeat: 4
+  dataloader_param:
+    pin_memory: true
+    shuffle: false
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 4
+    enable_preload: true
+
+model:
+  model_id: minimax_h3
+  model_name_or_path: ./checkpoints/MiniMax-H3/FL2VA/transformer
+  attn_implementation: flash_attention_2
+
+features:
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - blocks.{*}
+    use_reentrant: false
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  lr: 1.0e-5
+  lr_decay_style: constant
+  lr_warmup_ratio: 0.0
+  lr_min: 1.0e-5
+  weight_decay: 0.01
+  train_iters: 50
+  clip_grad: 1.0
+  clip_grad_foreach: true
+  optimizer: adamw
+  adam_fused: true
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_eps: 1.0e-8
+  init_model_with_meta_device: true
+  load: ./checkpoints/MiniMax-H3/FL2VA/transformer
+  load_format: hf
+  no_load_optim: true
+  no_load_rng: true
+  use_deter_comp: true
+  allow_hf32: true
+  plugin:
+    - mindspeed_mm/fsdp/models/minimax_h3/modeling_minimax_h3_fsdp2
+    - mindspeed_mm/fsdp/data/datasets/minimax_h3/minimax_h3_precomputed_dataset
+
+tools:
+  profile:
+    enable: false
+  memory_profile:
+    enable: false
