@@ -80,6 +80,8 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 
+- [Sep. 01, 2026]: 🚀 MindSpeed MM基于FSDP2支持[GLM-5.3-Flash](./examples/glm5.3_flash)模型【beta】
+- [Aug. 14, 2026]: 🚀 MindSpeed MM基于FSDP2支持[MiniMax-M3](./examples/minimax_m3_vl)模型【beta】
 - [Jul. 27, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Kimi-K3](./examples/kimi_k3)模型【beta】
 - [Apr. 17, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3.6](./examples/qwen3_6)模型【beta】
 - [Mar. 24, 2026]: 🚀 MindSpeed MM基于FSDP2支持[LTX2](./examples/ltx2)模型【beta】

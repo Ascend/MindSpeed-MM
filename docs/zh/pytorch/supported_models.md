@@ -171,7 +171,7 @@
       <td> BF16 </td>
     </tr>
     <tr>
-      <td rowspan="16"> 多模态理解 </td>
+      <td rowspan="19"> 多模态理解 </td>
     </tr>
     <tr>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/llava1.5">LLaVA 1.5</a></td>
@@ -269,6 +269,27 @@
       <td><a href="https://huggingface.co/mistralai/Magistral-Small-2509">24B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
+      <td> BF16 </td>
+    </tr>
+    <tr>
+      <td><a href="../../../examples/kimi_k3">Kimi-K3</a></td>
+      <td><a href="https://huggingface.co/moonshotai/Kimi-K3">2.8T</a></td>
+      <td> 微调 </td>
+      <td> 1x16 </td>
+      <td> BF16 </td>
+    </tr>
+    <tr>
+      <td><a href="../../../examples/minimax_m3_vl">MiniMax-M3</a></td>
+      <td><a href="https://huggingface.co/MiniMaxAI/MiniMax-M3">427B</a></td>
+      <td> 微调 </td>
+      <td> 1x8 </td>
+      <td> BF16 </td>
+    </tr>
+    <tr>
+      <td><a href="../../../examples/glm5.3_flash">GLM-5.3-Flash</a></td>
+      <td><a href="https://huggingface.co/zai-org/GLM-5.3-Flash-BF16">321B</a></td>
+      <td> 微调 </td>
+      <td> 1x16 </td>
       <td> BF16 </td>
     </tr>
          <tr>
