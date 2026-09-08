@@ -10,9 +10,14 @@ MindSpeed-MM follows the [Agent Skills](https://agentskills.io/home) convention 
 
 | Path | Purpose |
 | --- | --- |
-| `skills/` | Skill index and implementation conventions. |
+| `skills/` | Skill authoring spec, skill template, and concrete skills. |
 | `knowledge/` | Shared knowledge context for agents. |
 | `setup_agent.sh` | Optional helper for linking `.agents` into local tool-specific directories. |
+
+| Knowledge file | Purpose |
+| --- | --- |
+| `knowledge/architecture.md` | Repository layers and dual-backend overview. |
+| `knowledge/task-flow-guide.md` | Backend decision tree and task-to-file quick reference. |
 
 ## Usage
 
@@ -42,7 +47,8 @@ See `knowledge/architecture.md` for the agent-facing architecture overview.
 
 | Skill | Domain | Status | Priority | Description |
 | --- | --- | --- | --- | --- |
-| mindspeed-mm-fsdp2-model-only-vlm-migration | Integration | Planned | P0 | 指导新模型接入 FSDP2 后端，覆盖参考样例、注册、配置、数据字段和端到端验收，当前阶段仅支持vlm迁移。 |
+| mindspeed-mm-fsdp2-model-only-migration | Integration | Delivered | P0 | 指导新模型接入 FSDP2 后端，覆盖参考样例、注册、配置、数据字段和端到端验收，当前阶段仅支持vlm迁移。 |
+| mindspeed-mm-fsdp2-ep-parallel | Integration | Delivered | P0 | 指导已完成 FSDP2 迁移的 MoE 模型接入专家并行，覆盖形态判定、权重布局、ep_plan 配置、dispatcher 选型与 EP 开关一致性验证。 |
 | performance-analysis-report | Optimization | Planned | P0 | 将 profiling 结果和训练日志整理为瓶颈分析报告与优化建议。 |
 | fsdp2-dataset-migration | Integration | Planned | P0 | 指导新数据集接入 FSDP2 数据链路，覆盖 dataset type、collator 和 batch key。 |
 | flops-mfu-analysis | Optimization | Planned | P0 | 基于模型配置、输入形状和运行指标估算 FLOPs 与 MFU。 |
@@ -55,4 +61,4 @@ See `knowledge/architecture.md` for the agent-facing architecture overview.
 | pr-description-generation | Collaboration | Planned | P2 | 根据 diff、测试结果、风险和用户影响生成 PR 描述与评审申请内容。 |
 | unit-test-authoring | Verification | Planned | P2 | 辅助编写符合仓库风格的单元测试 |
 
-See `skills/README.md` for the full skill index.
+See `skills/README.md` for the skill authoring spec, the skill index, and the anti-rot rules that keep skills from going stale as the framework evolves. New skills start from `skills/_template/SKILL.template.md`.

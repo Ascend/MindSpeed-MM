@@ -32,7 +32,9 @@ User request mentions:
 
 ### 1.1 Onboard a New VLM (Vision-Language Model)
 
-This is the most common FSDP2 task. Follow the detailed skill at `skills/mindspeed-mm-fsdp2-model-only-vlm-migration/SKILL.md`.
+This is the most common FSDP2 task. Follow the detailed skill `mindspeed-mm-fsdp2-model-only-migration` under `skills/`.
+
+If the model is a MoE model and you need expert parallelism after the migration is done, continue with the `mindspeed-mm-fsdp2-ep-parallel` skill.
 
 **Quick checklist**:
 
@@ -318,7 +320,8 @@ from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 
 | User Request | Start Here |
 |-------------|------------|
-| "Add model X to FSDP2" | `skills/.../SKILL.md` → `mindspeed_mm/fsdp/models/` → `examples/` |
+| "Add model X to FSDP2" | skill `mindspeed-mm-fsdp2-model-only-migration` → `mindspeed_mm/fsdp/models/` → `examples/` |
+| "Enable EP for MoE model X" | skill `mindspeed-mm-fsdp2-ep-parallel` → `examples/` |
 | "Add dataset Y" | `mindspeed_mm/fsdp/data/datasets/` → `data_collator.py` → YAML |
 | "Fix training OOM" | `features/memory/` → YAML `features` section |
 | "Convert checkpoint A→B" | `checkpoint/` → `converter.py` |
