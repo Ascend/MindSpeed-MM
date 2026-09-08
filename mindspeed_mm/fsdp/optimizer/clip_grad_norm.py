@@ -12,6 +12,7 @@ from torch.utils._foreach_utils import (
 )
 
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.optimizer.grad_norm_overlap import manager as _grad_norm_overlap_mgr
 from mindspeed_mm.fsdp.utils.device import get_device_type
 
 
@@ -117,24 +118,34 @@ def ep_fsdp2_clip_grad_norm(
 
 
 # compute local sum of param gard norm
+@torch.no_grad()
 def _local_pth_sum(params: List[torch.nn.Parameter], p: float) -> torch.Tensor:
     grads = [p.grad for p in params if p.grad is not None]
-    grads_local = [
-        g.to_local().detach().to(torch.float32) if isinstance(g, DTensor) else g.detach().to(torch.float32)
-        for g in grads
-    ]
+    # Keep prologue minimal: to_local() only (no_grad covers detach; foreach_norm(dtype=fp32)
+    # matches materialize-then-norm bitwise, so no per-param .to(torch.float32)).
+    grads_local = [g.to_local() if isinstance(g, DTensor) else g for g in grads]
+    # Mixed dtypes: the pre-overlap baseline materialized every grad to fp32
+    # first (single fp32 group per device); do the same here so mixed-dtype
+    # models keep the baseline's summation order and stay bitwise identical.
+    if len({g.dtype for g in grads_local}) > 1:
+        grads_local = [g.to(torch.float32) for g in grads_local]
     default_device = grads_local[0].device if len(grads_local) > 0 else torch.device(get_device_type())
     res = torch.tensor(0.0, device=default_device, dtype=torch.float32)
-    with torch.no_grad():
-        grouped_grads_local = _group_tensors_by_device_and_dtype([grads_local])
-        for (device, _), ([device_grads_local], _) in grouped_grads_local.items():
-            if _has_foreach_support(device_grads_local, device) or _device_has_foreach_support(device):
-                out = torch._foreach_pow_(torch._foreach_norm(device_grads_local, p), p)
-                res += torch.sum(torch.stack(out)).to(default_device)
+    grouped_grads_local = _group_tensors_by_device_and_dtype([grads_local])
+    for (device, dtype), ([device_grads_local], _) in grouped_grads_local.items():
+        if _has_foreach_support(device_grads_local, device) or _device_has_foreach_support(device):
+            # fp32 groups take the exact baseline kernel; only non-fp32 groups use the
+            # probe-verified dtype=fp32 direct-compute path.
+            if dtype == torch.float32:
+                norms = torch._foreach_norm(device_grads_local, p)
             else:
-                for grad_local in device_grads_local:
-                    gn = torch.norm(grad_local, p=p)
-                    res = res + (gn**p).to(default_device)
+                norms = torch._foreach_norm(device_grads_local, p, dtype=torch.float32)
+            out = torch._foreach_pow_(norms, p)
+            res += torch.sum(torch.stack(out)).to(default_device)
+        else:
+            for grad_local in device_grads_local:
+                gn = torch.norm(grad_local.to(torch.float32), p=p)
+                res = res + (gn**p).to(default_device)
     return res
 
 
@@ -185,7 +196,11 @@ def _fsdp2_reduce_group(
         return val
     else:
         p = float(norm_type)
-        val = _local_pth_sum(params, p)
+        val = None
+        if _grad_norm_overlap_mgr.enabled:
+            val = _grad_norm_overlap_mgr.consume(params, p)
+        if val is None:
+            val = _local_pth_sum(params, p)
         for _, group in reduce_groups:
             if group is not None:
                 dist.all_reduce(val, op=dist.ReduceOp.SUM, group=group)

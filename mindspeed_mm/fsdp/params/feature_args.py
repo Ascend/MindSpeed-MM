@@ -269,6 +269,15 @@ class FeatureArguments(BaseArguments):
         metadata={"help": "Whether skip moe pad tokens"}
     )
 
+    enable_grad_norm_overlap: bool = field(
+        default=False,
+        metadata={"help": "Whether to overlap per-tensor grad-norm computation with backward "
+                          "(grad norm overlap, FSDP2 only). The manager lifecycle is owned by the "
+                          "feature layer. Unsupported setups fall back to the stock serial path "
+                          "with a one-time warning (silently on non-FSDP paths); torch versions "
+                          "without the patched post_backward keep the feature off."}
+    )
+
     # Field normalization for the chunk loss plan. This is the single authority that
     # owns enable/disable and impl-specific normalization for chunkloss_plan:
     #

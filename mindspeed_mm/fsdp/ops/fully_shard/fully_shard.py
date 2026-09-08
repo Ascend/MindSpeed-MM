@@ -54,6 +54,7 @@ from torch.distributed._composable_state import _insert_module_state
 from torch.distributed.utils import _get_root_modules
 from torch.distributed.device_mesh import _get_device_handle
 from torch.distributed.tensor import DeviceMesh, Shard
+from torch.distributed._tensor import DTensor
 
 # FSDP Internal Imports
 # Note: These imports rely on internal PyTorch APIs which may change between versions.
@@ -607,6 +608,35 @@ def param_group_wait_for_unshard_pt29(self):
     self._all_gather_result = None  # free unless saved in `all_gather_state`
 
 
+# GradNormOverlap plumbing: the manager module is imported and the record hook
+# armed only when apply_fully_shard_patch() installs a patched post_backward.
+# Keeping the import at patch-application time (not module top) avoids pulling
+# the feature module in when this patch is never applied.
+_grad_norm_mgr = None
+
+
+def _collect_grad_norm_jobs(fsdp_params, device) -> tuple[list, list]:
+    """Extract plain (param, grad, event) jobs from FSDP internals for the
+    grad-norm-overlap manager, which itself stays FSDP-agnostic.
+
+    Returns (cpu_jobs, dev_jobs):
+    - cpu_jobs: [(param, grad_local, d2h_event_or_None)] for CPU-offloaded grads;
+    - dev_jobs: [(param, grad_local)] for grads resident on this group's device.
+    """
+    cpu_jobs, dev_jobs = [], []
+    for fp in fsdp_params:
+        grad = fp.sharded_param.grad
+        if grad is None:
+            continue  # e.g. HSDP intermediate micro-batch; later invocations overwrite
+        local = grad._local_tensor if isinstance(grad, DTensor) else grad
+        if getattr(fp, "offload_to_cpu", False):
+            cpu_jobs.append((fp.sharded_param, local, getattr(fp, "grad_offload_event", None)))
+        elif local.device.type == device.type:
+            dev_jobs.append((fp.sharded_param, local))
+        # else: unexpected placement — skip; consume falls back to the serial path
+    return cpu_jobs, dev_jobs
+
+
 def param_group_post_backward_pt27(self, *unused: Any):
     """
     Custom post-backward logic for gradient reduction and resharding.
@@ -714,6 +744,13 @@ def param_group_post_backward_pt27(self, *unused: Any):
             self._all_reduce_state = AllReduceState(
                 all_reduce_input, all_reduce_event
             )
+
+        # GradNormOverlap: hand this group's reduced grads to the overlap manager
+        # (CPU worker for offloaded grads, device side stream for device-resident
+        # grads; no-op unless features.enable_grad_norm_overlap is enabled)
+        if _grad_norm_mgr is not None and _grad_norm_mgr.enabled:
+            cpu_jobs, dev_jobs = _collect_grad_norm_jobs(fsdp_params_with_grad, self.device)
+            _grad_norm_mgr.record(cpu_jobs, dev_jobs, self._post_reduce_event)
 
 
 def param_group_post_backward_pt29(self, *unused: Any):
@@ -826,6 +863,11 @@ def param_group_post_backward_pt29(self, *unused: Any):
                 all_reduce_input, all_reduce_event
             )
 
+        # GradNormOverlap: same record hook as the pt27 variant above
+        if _grad_norm_mgr is not None and _grad_norm_mgr.enabled:
+            cpu_jobs, dev_jobs = _collect_grad_norm_jobs(fsdp_params_with_grad, self.device)
+            _grad_norm_mgr.record(cpu_jobs, dev_jobs, self._post_reduce_event)
+
 
 # -----------------------------------------------------------------------------
 # Patch Application
@@ -864,6 +906,14 @@ def apply_fully_shard_patch() -> None:
         FSDPParamGroup.post_backward = param_group_post_backward_pt29
     else:
         raise ValueError(f"The torch{torch.__version__} is not supported now.")
+
+    # Arm the GradNormOverlap record hook: every patched post_backward variant
+    # installed above carries the record call, so the manager is importable and
+    # marked exactly when a producer exists for this torch version.
+    global _grad_norm_mgr
+    from mindspeed_mm.fsdp.optimizer.grad_norm_overlap import manager as _grad_norm_overlap_manager
+    _grad_norm_mgr = _grad_norm_overlap_manager
+    _grad_norm_mgr.mark_hook_planted()
 
     # Override the public fully_shard API
     from torch.distributed import fsdp

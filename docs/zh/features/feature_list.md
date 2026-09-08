@@ -115,7 +115,7 @@
 
   </tr>
   <tr>
-    <td class="tg-citn" rowspan="3">性能优化</td>
+    <td class="tg-citn" rowspan="4">性能优化</td>
     <td class="tg-jajh"><a href="fpdt.md">FPDT</a></td>
 
   </tr>
@@ -125,6 +125,10 @@
   </tr>
   <tr>
     <td class="tg-jajh"><a href="parameter_lr_wd_tuning.md">Parameter LR/WD Tuning</a></td>
+
+  </tr>
+  <tr>
+    <td class="tg-jajh"><a href="grad_norm_overlap.md">Grad Norm Overlap</a></td>
 
   </tr>
   <tr>

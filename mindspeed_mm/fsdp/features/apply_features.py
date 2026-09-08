@@ -16,6 +16,7 @@ from ..features.memory.chunkloss.chunkloss_lm_head import apply_chunkloss_module
 from ..features.communication.chunk_mbs import get_chunkmbs_modules, apply_chunkmbs_module
 from ..features.memory.recompute import recompute_modules
 from ..features.memory.swap_manager import SwapManager
+from ..optimizer.grad_norm_overlap import manager as grad_norm_overlap_manager
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ class FeaturesApplier:
         # Created lazily when the first swap tenant is wired; the trainer
         # passes it to the TrainEngine for the per-step iteration boundary.
         self.swap_manager = None
+        # GradNormOverlap: lifecycle owned here (configure at construction,
+        # registry cleanup in on_step_end); TrainEngine/trainer stay unaware.
+        grad_norm_overlap_manager.configure(self.config.enable_grad_norm_overlap)
 
     def _ensure_swap_manager(self) -> SwapManager:
         if self.swap_manager is None:
@@ -39,6 +43,8 @@ class FeaturesApplier:
         # Features needing the same point compose here, not in the engine.
         if self.swap_manager is not None:
             self.swap_manager.step_end()
+        # GradNormOverlap: drop registry leftovers (enabled-gated no-op)
+        grad_norm_overlap_manager.clear()
 
     def get_needed_modules(self, modules, plan):
         matched_submodules = []
