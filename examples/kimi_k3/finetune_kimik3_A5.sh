@@ -10,7 +10,7 @@ export TASK_QUEUE_ENABLE=1
 export CPU_AFFINITY_CONF=1
 
 
-NPROC_PER_NODE=16
+NPROC_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1
@@ -28,7 +28,7 @@ DISTRIBUTED_ARGS="
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p logs
 torchrun ${DISTRIBUTED_ARGS} mindspeed_mm/fsdp/train/trainer.py \
-    examples/kimi_k3/kimik3_config.yaml \
+    examples/kimi_k3/kimik3_config_A5.yaml \
     2>&1 | tee "logs/train_${logfile}.log"
 STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
 GBS=`grep "global batch size" logs/train_${logfile}.log | awk -F 'global batch size:' '{print$2}' | awk -F '|' '{print$1}' | head -n 1 | awk '{print $1}'`

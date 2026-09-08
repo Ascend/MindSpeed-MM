@@ -113,12 +113,12 @@ Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以�
 拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
 
 ```bash
-git clone https://github.com/Ensley0304/flash-linear-attention-npu.git
+git clone https://github.com/flashserve/flash-linear-attention-npu.git
 cd flash-linear-attention-npu
-git checkout 0af57d0f7bd
+git checkout 3167fe36bd1
 ```
 
-安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/main/README.md)
 
 推荐使用以下安装命令
 
@@ -161,7 +161,6 @@ source /usr/local/Ascend/cann/set_env.sh
 bash build.sh --pkg --soc=${soc_version} --ops=situ_glu,situ_glu_grad -j16
 # 安装算子包
 ./build_out/*.run
-cd ops-nn
 bash build.sh --torch_extension
 pip install build_out/*.whl
 # 使用需导入安装过程中提示的环境变量
@@ -198,7 +197,7 @@ bash build_install_attn_res.sh --soc=${soc_version}
 # 安装算子包
 conda activate ${conda_env_name} # 激活对应conda环境
 pip install torch_extension/dist/*.whl --force-reinstall --no-deps
-# 导入安装过程中提示的环境变量 
+# 导入安装过程中提示的环境变量 替换'xxx'为实际路径
 source xxx/ops-transformer/install/vendors/custom_transformer/bin/set_env.bash
 ```
 
@@ -382,9 +381,8 @@ NNODES: 一共几个节点
 - **减层训练**：基于减层、减专家模型配置进行训练验证；
   - 调整层数：修改模型配置路径 `mindspeed_mm/fsdp/models/kimi_k3` 下 `config.json` 中的 `num_hidden_layers` 字段；
   - 调整专家个数：修改 `config.json` 中的 `num_experts` 字段，注意需与 `kimik3_config.yaml` 中的 `expert_parallel_size` 配套调整（专家个数需能被EP并行度整除）；
-  - 参考配置：当前 A3 单节点可配置 `num_hidden_layers=16`、`num_experts=32`；
-- **序列长度**：mbs=1时支持6k序列长度以下；
-- **权重加载**：当前采用随机初始化权重（加载预训练权重能力后续支持）；
+  - 参考配置: 当前单台昇腾950节点，可以配置`num_hidden_layers=8`、`num_experts=64`, 此模型配置下单机8卡最大可支持16k序列训练。`examples/kimi_k3/kimik3_config_A5.yaml` 是此场景下的单台950节点训练的推荐配置，可用于性能测试。
+
 - **CP 长序列训练**：支持 ulysses-cp 长序列训练，配置 `kimik3_config.yaml` 中 `parallel->ulysses_parallel_size` 调整并行度（值为1时不开启）。
 
 <a id="jump3.4"></a>
