@@ -153,6 +153,17 @@ class TrainingArguments(BaseArguments):
         default=5,
         metadata={"help": "Number of Newton-Schulz iterations for Muon orthogonalization."},
     )
+    muon_fallback_param_keywords: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Additional parameter-name keywords that should use AdamW fallback when optimizer is muon. "
+                "Built-in defaults are embedding, embed_tokens, output_layer and lm_head. "
+                "Example: ['custom_head', 'router'] also routes parameters whose names contain "
+                "custom_head or router to AdamW fallback."
+            )
+        },
+    )
     adam_fused: bool = field(
         default=True,
         metadata={"help": "Whether to use fused AdamW optimizer for better performance."},

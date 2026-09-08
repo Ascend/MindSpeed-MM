@@ -38,6 +38,7 @@ from mindspeed_mm.fsdp.optimizer.swap_optimizer import AdamWSwap
 
 
 logger = logging.getLogger(__name__)
+DEFAULT_MUON_FALLBACK_PARAM_KEYWORDS = ["embedding", "embed_tokens", "output_layer", "lm_head"]
 
 
 class MultiOptimizer(Optimizer, Stateful):
@@ -154,20 +155,32 @@ def _make_param_groups_for_subset(
     return groups
 
 
-# Check if a parameter is eligible for Muon optimization.
-def _is_muon_eligible(name: str, param: torch.nn.Parameter) -> bool:
-    is_2d_matrix = len(param.shape) == 2
-    return (
-        not name.endswith(".bias")
-        and "embedding" not in name
-        and "output_layer" not in name
-        and is_2d_matrix
-    )
+def _is_muon_eligible(
+    name: str,
+    param: torch.nn.Parameter,
+    fallback_param_keywords: Optional[Iterable[str]] = None,
+) -> bool:
+    if len(param.shape) != 2:
+        return False
+
+    lower_name = (name or "").lower()
+    if lower_name.endswith(".bias"):
+        return False
+
+    keywords = list(DEFAULT_MUON_FALLBACK_PARAM_KEYWORDS)
+    if fallback_param_keywords:
+        if isinstance(fallback_param_keywords, str):
+            keywords.append(fallback_param_keywords)
+        else:
+            keywords.extend(fallback_param_keywords)
+
+    return not any(keyword and keyword.lower() in lower_name for keyword in keywords)
 
 
 def _mark_muon_param_groups(
     model: "nn.Module",
     param_groups: Sequence[Dict[str, Any]],
+    muon_fallback_param_keywords: Optional[Iterable[str]] = None,
 ) -> List[Dict[str, Any]]:
     name_by_param = {p: n for n, p in model.named_parameters()}
     marked_groups: List[Dict[str, Any]] = []
@@ -181,7 +194,7 @@ def _mark_muon_param_groups(
             if not p.requires_grad:
                 continue
             param_name = name_by_param.get(p, "")
-            if _is_muon_eligible(param_name, p):
+            if _is_muon_eligible(param_name, p, muon_fallback_param_keywords):
                 muon_params.append(p)
             else:
                 fallback_params.append(p)
@@ -229,6 +242,7 @@ def build_optimizer(
     matched_adamw_rms: float = 0.2,
     muon_momentum: float = 0.95,
     ns_steps: int = 5,
+    muon_fallback_param_keywords: Optional[List[str]] = None,
     lr_scaling_plan: Optional[List] = None,
     mem_fraction_static: float = 0.8,
 ) -> "torch.optim.Optimizer":
@@ -250,6 +264,7 @@ def build_optimizer(
             matched_adamw_rms=matched_adamw_rms,
             muon_momentum=muon_momentum,
             ns_steps=ns_steps,
+            muon_fallback_param_keywords=muon_fallback_param_keywords,
             mem_fraction_static=mem_fraction_static,
         )
     # Other cases remain the same
@@ -276,7 +291,7 @@ def build_optimizer(
             param_groups.append({"params": no_decay_parameters, "weight_decay": 0.0})
 
     if optimizer_type == "muon":
-        param_groups = _mark_muon_param_groups(model, param_groups)
+        param_groups = _mark_muon_param_groups(model, param_groups, muon_fallback_param_keywords)
         logger.info(f"Muon parameter groups: {param_groups}")
         optim = Muon(
             param_groups,
@@ -385,6 +400,7 @@ def build_ep_fsdp2_optimizer(
     matched_adamw_rms: float = 0.2,
     muon_momentum: float = 0.95,
     ns_steps: int = 5,
+    muon_fallback_param_keywords: Optional[List[str]] = None,
     mem_fraction_static: float = 0.8,
 ):
     """
@@ -475,7 +491,7 @@ def build_ep_fsdp2_optimizer(
         foreach = not fused
         fused_ = fused
         if optimizer_type == "muon":
-            groups = _mark_muon_param_groups(model, groups)
+            groups = _mark_muon_param_groups(model, groups, muon_fallback_param_keywords)
             return Muon(
                 groups,
                 lr=lr,

@@ -16,7 +16,8 @@ Muon 的主要优势在于能够利用神经网络隐藏层权重的矩阵结构
 
 FSDP2 后端下的 Muon 优化器会先根据参数名称和形状拆分参数组：
 
-- 二维矩阵参数，且参数名不以 `.bias` 结尾、不包含 `embedding`、不包含 `output_layer`，使用 Muon 更新；
+- 二维矩阵参数，且参数名不以 `.bias` 结尾、不命中 Muon 回退规则，使用 Muon 更新；
+- 名称包含 `embedding`、`embed_tokens`、`output_layer`、`lm_head` 的参数，会使用 AdamW 回退；
 - 其他参数自动回退到 AdamW 更新逻辑；
 - 原有的学习率、权重衰减、no decay 分组等配置继续保留。
 
@@ -40,6 +41,11 @@ training:
   matched_adamw_rms: 0.2
   muon_momentum: 0.95
   ns_steps: 5
+  # 可选：在内置回退规则外，追加业务模型中需要回退 AdamW 的参数名关键词。
+  # 例如 custom_head 会让 custom_head.weight 使用 AdamW fallback。
+  muon_fallback_param_keywords:
+    - custom_head
+    - router
 ```
 
 ## 参数详解
@@ -60,6 +66,12 @@ training:
   - 描述：Newton-Schulz 正交化迭代步数。
   - 默认值：`5`。
   - 说明：步数越大，正交化计算越充分，但开销也会增加。
+
+- **`muon_fallback_param_keywords`**
+  - 描述：追加需要使用 AdamW 回退逻辑的参数名关键词。
+  - 默认值：内置 `embedding`、`embed_tokens`、`output_layer`、`lm_head`；配置该字段时会在内置规则基础上追加。
+  - 示例：配置 `custom_head`、`router` 后，参数名包含这些关键词的参数，例如 `custom_head.weight`、`language_model.router.weight`，也会使用 AdamW fallback。
+  - 说明：Qwen/HuggingFace 风格的 `embed_tokens`、`lm_head` 会默认回退，不需要为 Qwen3 单独配置。
 
 - **`lr`**
   - 描述：基础学习率。

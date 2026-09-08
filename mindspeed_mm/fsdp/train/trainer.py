@@ -374,6 +374,7 @@ class Trainer:
             matched_adamw_rms=args.training.matched_adamw_rms,
             muon_momentum=args.training.muon_momentum,
             ns_steps=args.training.ns_steps,
+            muon_fallback_param_keywords=args.training.muon_fallback_param_keywords,
             lr_scaling_plan=args.training.lr_scaling_plan,
             mem_fraction_static=args.training.mem_fraction_static,
         )
