@@ -70,7 +70,7 @@ class Trainer:
         self.initialize()
 
         # Initialize model parallelization and feature application
-        self.model_parallel_applier = ParallelApplier(args.parallel, args.training)
+        self.model_parallel_applier = ParallelApplier(args.parallel, args.training, feature_config=args.features)
         self.model_features_applier = FeaturesApplier(args.features)
 
         # Reset memory profiler
@@ -94,7 +94,7 @@ class Trainer:
         self.lr_scheduler = self.get_scheduler()
 
         # must behind lr_schedule builder
-        if args.training.quantization_plan.recipe_name:
+        if args.training.quantization_plan.quant_recipe:
             self.model_features_applier.apply_optimizer_hook(self.model, self.optimizer)
 
         # Create the training engine

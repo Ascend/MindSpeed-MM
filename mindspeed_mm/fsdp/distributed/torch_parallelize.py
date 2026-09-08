@@ -6,12 +6,14 @@ from .fully_shard_parallel import fully_shard_parallel_modules, set_modules_to_p
 from .parallel_state import get_parallel_state
 from ..params.parallel_args import ParallelArguments
 from ..params.training_args import TrainingArguments
+from ..params.feature_args import FeatureArguments
 
 
 class ParallelApplier:
-    def __init__(self, parallel_config: ParallelArguments, training_config: TrainingArguments):
+    def __init__(self, parallel_config: ParallelArguments, training_config: TrainingArguments, feature_config=None):
         self.config = parallel_config
         self.training_config = training_config
+        self.feature_config = feature_config
         self.parallel_state = get_parallel_state()
 
     def apply_fsdp_modules(self, model, training_config):
@@ -44,19 +46,24 @@ class ParallelApplier:
 
     def apply_quantization_modules(self, model):
         """Apply quantization based on quantization_format + quantization_recipe"""
-        if not self.training_config.quantization_plan.recipe_name:
+        if not self.training_config.quantization_plan.quant_recipe:
             return
         try:
-            # recompute must set all now, TODO fix this bug
-            if self.config.recompute:
-                self.training_config.quantization_plan.fsdp_low_precision_all_gather_mode = "all"
+            quantization_plan = self.training_config.quantization_plan
+            quantization_plan.fsdp_world_size = self.config.fully_shard_parallel_size
+            quantization_plan._recompute_aware = (
+                bool(self.feature_config)
+                and self.feature_config.recompute
+                and quantization_plan.enable_fsdp_low_precision_all_gather
+                and quantization_plan.fsdp_low_precision_all_gather_mode == "on-demand"
+            )
 
-            from mindspeed.fsdp.quantization.converter.model_converter import build_model_converter
+            from fsdp_turbo.quantization.converter.model_converter import build_model_converter
 
             model_converters = build_model_converter(self.training_config.quantization_plan)
             model_converters.convert(model)
         except Exception as e:
-            raise RuntimeError(f"Failed to convert quantization plan") from e
+            raise RuntimeError("Failed to convert quantization plan") from e
 
     def __call__(self, model):
         # Apply configuration-based parallel strategies

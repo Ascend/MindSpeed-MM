@@ -1,6 +1,6 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
 from dataclasses import field, dataclass
-from typing import List, Literal, Optional, Any
+from typing import List, Literal, Optional, Any, Dict
 import logging
 
 from mindspeed_mm.fsdp import envs
@@ -12,26 +12,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class QuantizeConfig:
-    recipe_name: str = None
-    apply_modules: list[str] = field(default_factory=list)
-    ignored_modules: list[str] = field(default_factory=list)
-    quant_converters: list[str] = field(default_factory=list)
-    extra_args: dict[str, Any] = field(default_factory=dict)  # for future extensibility
+    quant_format: Optional [str] = None
+    quant_recipe: Optional [str] = None
+    block_size: int = 32
+    quant_apply_modules: List [str] = None
+    quant_ignored_modules: List [str] = None
+    converters: List [str] = None
     enable_fsdp_low_precision_all_gather: bool = True
-    fsdp_low_precision_all_gather_mode: Literal["on-demand", "all"] = "on-demand"
-
-    @property
-    def recipe(self):
-        if hasattr(self, '_recipe'):
-            return self._recipe
-
-        from mindspeed.fsdp.quantization.config import QuantRecipe
-
-        self._recipe = QuantRecipe.from_recipe_name(self.recipe_name)
-        return self._recipe
-
-    def get_key_dtype(self, key: str):
-        return self.recipe().get_key_dtype(key)
+    fsdp_low_precision_all_gather_mode: str = "on-demand"
+    _recompute_aware: bool = field (default=False, repr=False)
+    fsdp_world_size: int = 1
+    quant_gmm: bool = False
+    gemm_gradient_accumulation_fusion: bool = False
+    extra_args: Dict [str, Any] = field (default_factory=dict)  # for future extensibility
 
 
 class Profiler(BaseArguments):

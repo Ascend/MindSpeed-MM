@@ -4,16 +4,18 @@ parallel:
   fully_shard_parallel_size: auto
   fsdp_plan:
     apply_modules:
-      - model.visual.blocks.{*}
-      - model.visual.merger
-      - model.visual.deepstack_merger_list.{*}
       - model.visual
+      - model.visual.blocks.{*}
+      - model.visual.deepstack_merger_list.{*}
+      - model.visual.merger
       - model.language_model.embed_tokens
-      - model.language_model.layers.{*}
       - model.language_model
+      - model.language_model.layers.{*}
       - lm_head
     param_dtype: bf16
     reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
@@ -59,7 +61,7 @@ data:
       overwrite_cache: false
       preprocessing_batch_size: 1000
       preprocessing_num_workers: 16
-      max_samples: 10000
+      max_samples: null
 
   # 数据加载
   dataloader_param:
@@ -70,7 +72,7 @@ data:
     sampler_type: BaseRandomBatchSampler
     num_workers: 8
     collate_param:
-      model_name: qwen3vl
+      collator_id: qwen3vl
       ignore_pad_token_for_loss: true
     enable_preload: false
 
@@ -123,12 +125,18 @@ training:
     - mindspeed_mm/fsdp/models/qwen3vl
     - mindspeed_mm/fsdp/data/datasets/huggingface
   quantization_plan:
-    recipe_name: mxfp8
-    apply_modules: ["model.language_model.layers.{*}"]
-    ignored_modules: ["*lm_head", "*gate"]
+    quant_recipe: mxfp8
+    quant_format: e4m3
+    block_size: 32
+    quant_apply_modules: ["model.language_model.layers.{*}"]
+    quant_ignored_modules: ["*lm_head", "*gate"]
     enable_fsdp_low_precision_all_gather: true
-    fsdp_low_precision_all_gather_mode: "on-demand"
-    quant_converters: [quantize.linear.mx, quantize.moe.mx]
+    fsdp_low_precision_all_gather_mode: "all"
+    converters: [quantize.linear.mx, quantize.moe.mx]
+  no_load_optim: true  # Do not load optimizer state; remove if loading is needed.
+  no_load_rng: true  # Do not load RNG state; remove if loading is needed.
+  no_save_optim: true  # Do not save optimizer state; remove if saving is needed.
+  no_save_rng: true  # Do not save RNG state; remove if saving is needed.
 
 # 工具配置
 tools:

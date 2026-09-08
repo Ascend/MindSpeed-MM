@@ -607,16 +607,16 @@ class Qwen3VLMoeVisionAttention(nn.Module):
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb_vision(query_states, key_states, cos, sin)# tnd
 
-        query_states = query_states.transpose(0, 1).unsqueeze(0)# bnsd
-        key_states = key_states.transpose(0, 1).unsqueeze(0)
-        value_states = value_states.transpose(0, 1).unsqueeze(0)
-
         attention_interface: Callable = eager_attention_forward
         if self.config._attn_implementation != "eager":
             attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
         # Modification: pass total_visual_seqlen
         if self.config._attn_implementation == "flash_attention_2":
+            query_states = query_states.unsqueeze(0)# bnsd
+            key_states = key_states.unsqueeze(0)
+            value_states = value_states.unsqueeze(0)
+
             # Flash Attention 2: Use cu_seqlens for variable length attention
             max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
             attn_output, _ = attention_interface(
@@ -634,10 +634,14 @@ class Qwen3VLMoeVisionAttention(nn.Module):
                 is_causal=False,
                 ring_in_bnsd=False,
                 total_seq_len=get_seq_len("visual"),
+                input_layout="1TND",
                 seq_split_lens=cal_split_sizes_multi(get_seq_len("per_visual"), get_parallel_state().get_ring_group_size()),
                 **kwargs,
             )
         else:
+            query_states = query_states.transpose(0, 1).unsqueeze(0)
+            key_states = key_states.transpose(0, 1).unsqueeze(0)
+            value_states = value_states.transpose(0, 1).unsqueeze(0)
             # Other implementations: Process each chunk separately
             lengths = cu_seqlens[1:] - cu_seqlens[:-1]
             splits = [torch.split(tensor, lengths.tolist(), dim=2) for tensor in (query_states, key_states, value_states)]

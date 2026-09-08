@@ -2,6 +2,7 @@
 import logging
 import inspect
 import functools
+from contextlib import nullcontext, ExitStack
 
 from torch.utils._pytree import tree_flatten, tree_unflatten
 from torch.utils.checkpoint import checkpoint
@@ -12,6 +13,55 @@ from .op_replay import build_op_replay_context_fn
 
 
 logger = logging.getLogger(__name__)
+_MXFP8_RECOMPUTE_CACHE = None
+
+
+def _load_mxfp8_recompute_phase():
+    global _MXFP8_RECOMPUTE_CACHE
+    if _MXFP8_RECOMPUTE_CACHE is not None:
+        return _MXFP8_RECOMPUTE_CACHE
+    try:
+        from fsdp_turbo.quantization.core.recompute_phase import (
+            mark_module_for_recompute,
+            mxfp8_recompute_context,
+        )
+        _MXFP8_RECOMPUTE_CACHE = (mark_module_for_recompute, mxfp8_recompute_context)
+    except ImportError:
+        _MXFP8_RECOMPUTE_CACHE = (None, None)
+    return _MXFP8_RECOMPUTE_CACHE
+
+
+def _compose_checkpoint_contexts(fns):
+    def composed():
+        contexts = [fn() for fn in fns]
+        fwd_ctxs, bwd_ctxs = zip(*contexts)
+        class _Composed:
+            def __init__(self, managers):
+                self._managers = managers
+            def __enter__(self):
+                self._stack = ExitStack()
+                for m in self._managers:
+                    self._stack.enter_context(m)
+                return self
+            def __exit__(self, *args):
+                return self._stack.__exit__(*args)
+        return _Composed(fwd_ctxs), _Composed(bwd_ctxs)
+    return composed
+
+
+def _build_checkpoint_context_fn(module, context_fn, mxfp8_ctx_fn):
+    ctx_list = []
+    if context_fn is not None:
+        ctx_list.append(context_fn)
+    if mxfp8_ctx_fn is not None:
+        def _mxfp8_ctx(mod=module):
+            return nullcontext(), mxfp8_ctx_fn(mod)
+        ctx_list.append(_mxfp8_ctx)
+    if not ctx_list:
+        return None
+    if len(ctx_list) == 1:
+        return ctx_list[0]
+    return _compose_checkpoint_contexts(ctx_list)
 
 
 def recompute_modules(model, plan, op_cache=None):
@@ -25,11 +75,15 @@ def recompute_modules(model, plan, op_cache=None):
     if context_fn is not None:
         _check_no_nested_checkpoints(modules)
 
+    mxfp8_mark_fn, _ = _load_mxfp8_recompute_phase()
     for name, module in modules:
         print_rank(logger.info, f'Applying recompute to module: {name}')
-        module.forward = recompute_wrapper(module.forward, plan.use_reentrant, context_fn,
-                                           plan.flatten_inputs)
-
+        if mxfp8_mark_fn is not None:
+            mxfp8_mark_fn(module)
+        module.forward = recompute_wrapper(
+            module.forward, plan.use_reentrant, context_fn,
+            plan.flatten_inputs, module
+        )
     return model
 
 
@@ -102,7 +156,7 @@ def _flatten_call(function, args, kwargs):
     return flattened_function, unique_leaves
 
 
-def recompute_wrapper(function, use_reentrant, context_fn=None, flatten_inputs=False):
+def recompute_wrapper(function, use_reentrant, context_fn=None, flatten_inputs=False, module=None):
     # Only inject the transformers-style cache kwarg when the wrapped forward
     # actually accepts it. Native Wan blocks do not take this argument.
     sig = inspect.signature(function)
@@ -112,9 +166,12 @@ def recompute_wrapper(function, use_reentrant, context_fn=None, flatten_inputs=F
         if has_past_key_values:
             kwargs['past_key_values'] = None  # transformers kv cache must be set None, or model use_cache=False
         ckpt_kwargs = {}
-        if context_fn is not None and not use_reentrant:
-            ckpt_kwargs['context_fn'] = context_fn
         if not use_reentrant:
+            _, mxfp8_ctx_fn = _load_mxfp8_recompute_phase()
+            built_ctx_fn = _build_checkpoint_context_fn(module, context_fn, mxfp8_ctx_fn)
+            if built_ctx_fn is not None:
+                ckpt_kwargs['context_fn'] = built_ctx_fn
+
             if flatten_inputs:
                 flattened_function, unique_leaves = _flatten_call(function, args, kwargs)
                 return checkpoint(flattened_function, *unique_leaves,

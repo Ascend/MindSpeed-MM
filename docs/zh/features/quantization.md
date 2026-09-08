@@ -1,9 +1,23 @@
 # MindSpeed MM FSDP2后端低精度训练指南
 
+## 适用后端
+
+FSDP2
+
 ## 介绍
 
-本指南旨在帮助用户在 MindSpeedMM 框架下，基于 FSDP2 后端实现低精度训练（如 mxfp8 等），
-提升训练效率与显存利用率。通过配置量化配方（QuantizationRecipe）与低精度all-gather模式，可在保持模型精度的前提下，显著降低通信开销与内存占用，适用于大模型训练场景。
+本指南旨在帮助用户在 MindSpeed-MM 框架下，基于 FSDP2 后端实现低精度训练（如 mxfp8 等），
+提升训练效率与显存利用率。通过配置量化配置（QuantizeConfig）与低精度all-gather模式，可在保持模型精度的前提下，显著降低通信开销与内存占用，适用于大模型训练场景。
+
+## 前置依赖
+ 
+使用前需安装FSDPTurbo：
+ 
+```bash
+git clone https://gitcode.com/Ascend/FSDPTurbo.git
+cd FSDPTurbo
+pip install -e .
+```
 
 ## 使用方法
 
@@ -11,18 +25,20 @@
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `recipe_name` | str | mxfp8（必填） | 使用的量化配方名,同时也是使能量化的标识 |
-| `apply_modules` | str | 'model.layers.{*}' | 应用量化的层或模块 |
-| `ignored_modules` | str | '*lm_head'，'*gate' | 不应用量化的子模块列表 |
-| `quant_converters` | str | 'quantize.linear.mx', 'quantize.moe.mx' | 使用的量化转换器列表,分别表示对linear线性层和moe里的gmm做量化 |
-| `enable_fsdp_low_precision_all_gather` | bool | `True` | 是否启用低精度通信 |
-| `fsdp_low_precision_all_gather_mode` | str | 'on-demand' | FSDP低精度all-gather，按需聚合前向或反向权重 |
+| `quant_recipe` | str | null | 使用的量化配方名，同时也是使能量化的标识，支持 `mxfp8` |
+| `quant_format` | str | null | 量化数据类型格式，支持 `e4m3`、`hybrid` |
+| `block_size` | int | 32 | 每次量化的元素个数 |
+| `quant_apply_modules` | List[str] | [] | 应用量化的层或模块列表，如 `["model.language_model.layers.{*}"]` |
+| `quant_ignored_modules` | List[str] | [] | 不应用量化的子模块列表，如 `["*lm_head", "*gate"]` |
+| `converters` | List[str] | [] | 量化转换器列表，支持 `quantize.linear.mx`、`quantize.moe.mx` |
+| `enable_fsdp_low_precision_all_gather` | bool | `true` | 是否启用低精度通信 |
+| `fsdp_low_precision_all_gather_mode` | str | `on-demand` | FSDP低精度all-gather模式, 支持 `on-demand`、 `all` |
 
 ### 2. 核心参数说明
 
-#### ✅recipe_name
+#### ✅quant_recipe
 
-recipe_name的格式为：
+quant_recipe的格式为：
 
 ```python
 <scaling_strategy>_<scaling_granularity>[-blocksize0-blocksize1-blocksize2]_<inputs_dtype>_<weight_dtype>_<grads_dtype>
@@ -37,36 +53,47 @@ recipe_name的格式为：
 
 #### 预定义配方示例
 
-- `mxfp8`: `dynamic_MX-1-1-32_E4M3_E4M3_E4M3`
+- `mxfp8`: `dynamic_mx-1-1-32_E4M3_E4M3_E4M3`
 → 支持 MX 量化策略，适用于大多数场景。
 
 > ⚠️ 当前仅支持 `mxfp8` 缩放策略，后续将支持更多策略与配方。
 
-#### ✅apply_modules
+#### ✅quant_format
+
+量化数据类型格式，用于指定量化后的数值格式，例如 `e4m3`，不区分大小写。
+
+#### ✅block_size
+
+每次量化的元素个数，默认为 32。控制量化时分组粒度，较小的块大小可提供更精细的量化，可能带来更好的精度保持。
+
+> ⚠️ 当前仅支持 `32` 量化块大小。
+
+#### ✅quant_apply_modules
 
 指定需要应用量化的层或模块，支持通配符。
+
 **示例：**
 
 ```python
-'model.layers.{*}'          # 应用于所有 Transformer 层
-'model.layers.0.self_attn' # 应用于第 0 层的自注意力模块
+["model.layers.{*}"]                # 应用于所有 Transformer 层
+["model.layers.0.self_attn"]        # 应用于第 0 层的自注意力模块
 ```
 
-#### ✅ignored_modules
+#### ✅quant_ignored_modules
 
 指定不应用量化的子模块列表，支持通配符。
 
 ```python
-'*q_proj'        # 不应用量化到所有的q_proj子模块
-'*gate'          # 不应用量化到mlp中的gate部分
+["*lm_head"]       # 不应用量化到 lm_head 模块
+["*gate"]          # 不应用量化到 MLP 中的 gate 部分
 ```
 
-#### ✅quant_converters
+#### ✅converters
 
-指定使用的量化转换器，目前支持以下类型：
+指定使用的量化转换器列表，目前支持以下类型：
 
 - `quantize.linear.mx`：适用于普通线性层（如 FFN、Attention）的 MX 策略线性量化。
-- `quantize.moe.mx`：专用于 MoE 模型专家模块中GMM的 MX 量化。
+- `quantize.moe.mx`：专用于 MoE 模型专家模块中 GMM 的 MX 量化。
 
 > 💡 在 MoE 模型中可以同时使用 `quantize.linear.mx` 和 `quantize.moe.mx`。
 
@@ -85,8 +112,7 @@ recipe_name的格式为：
 | `on-demand` | 仅在前向或反向传播时，通信当前所需的权重 |
 | `all` | 前向和反向均通信全部权重 |
 
-> ⚠️ 若启用重计算，系统将自动切换为 'all' 模式，确保计算一致性。
-> ⚠️ all模式下AG通信全部权重会造成通信量翻倍，时间通信时间相较于bf16无明显变化；同时因需要通信缩放因子等必须参数，显存会有略微增长。
+> ⚠️ `all` 模式下 AG 通信全部权重会造成通信量翻倍，通信时间相较于 bf16 无明显变化；同时因需要通信缩放因子等额外参数，显存会有略微增长。
 
 ### 3. 示例脚本
 
@@ -95,15 +121,17 @@ recipe_name的格式为：
 ```yaml
 training:
   quantization_plan:
-    recipe_name: mxfp8
-    apply_modules: ['model.layers.{*}']
-    ignored_modules: ['*lm_head', '*gate']
-    quant_converters: ['quantize.linear.mx', 'quantize.moe.mx']
-    enable_fsdp_low_precision_all_gather: True
-    fsdp_low_precision_all_gather_mode: 'on-demand'
+    quant_recipe: mxfp8
+    quant_format: e4m3
+    block_size: 32
+    quant_apply_modules: ["model.layers.{*}"]
+    quant_ignored_modules: ["*lm_head", "*gate"]
+    converters: ["quantize.linear.mx", "quantize.moe.mx"]
+    enable_fsdp_low_precision_all_gather: true
+    fsdp_low_precision_all_gather_mode: "on-demand"
 ```
 
-只需要在原有的训练配置文件基础上，在training字段下添加 `quantization_plan` 中的量化相关参数，即可启用低精度训练与通信。
+只需要在原有的训练配置文件基础上，在 `training` 字段下添加 `quantization_plan` 中的量化相关参数，即可启用低精度训练与通信。参考示例配置文件：`examples/qwen3vl/qwen3vl_30B_config_v1_A5.yaml`。
 
 ## 注意事项
 

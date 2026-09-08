@@ -125,7 +125,7 @@ class FeaturesApplier:
         apply_chunkmbs_module(chunk_mbs_modules=chunk_mbs_modules, chunkmbs_cfg=self.config.chunkmbs_plan)
 
     def apply_optimizer_hook(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer):
-        from mindspeed.fsdp.quantization.core.cache import hook_optimizer_step
+        from fsdp_turbo.quantization.cache import hook_optimizer_step
 
         hook_optimizer_step(model, optimizer)
 
