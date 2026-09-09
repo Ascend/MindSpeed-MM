@@ -85,9 +85,22 @@
 
   </tr>
   <tr>
-    <td class="tg-t1fb" rowspan="4">显存优化</td>
+    <td class="tg-t1fb" rowspan="7">显存优化</td>
     <td class="tg-citn">Offload</td>
     <td class="tg-i1fi"><a href="async_activation_offload.md">Async Activation Offload</a></td>
+
+  </tr>
+  <tr>
+    <td class="tg-citn" rowspan="3">张量交换</td>
+    <td class="tg-i1fi"><a href="swap_core.md">Swap Core（张量交换底座）</a></td>
+
+  </tr>
+  <tr>
+    <td class="tg-i1fi"><a href="op_replay.md">Op Replay</a></td>
+
+  </tr>
+  <tr>
+    <td class="tg-i1fi"><a href="act_stash.md">Act Stash</a></td>
 
   </tr>
   <tr>
@@ -105,7 +118,7 @@
 
   </tr>
   <tr>
-    <td class="tg-t1fb" rowspan="5">优化特性</td>
+    <td class="tg-t1fb" rowspan="7">优化特性</td>
     <td class="tg-citn" rowspan="2">损失优化</td>
     <td class="tg-i1fi"><a href="chunkloss.md">Chunk Loss</a></td>
 
@@ -115,11 +128,16 @@
 
   </tr>
   <tr>
-    <td class="tg-citn" rowspan="4">性能优化</td>
+    <td class="tg-citn" rowspan="2">性能优化</td>
     <td class="tg-jajh"><a href="fpdt.md">FPDT</a></td>
 
   </tr>
   <tr>
+    <td class="tg-jajh"><a href="grad_norm_overlap.md">Grad Norm Overlap</a></td>
+
+  </tr>
+  <tr>
+    <td class="tg-citn" rowspan="3">优化器</td>
     <td class="tg-jajh"><a href="dummy_optimizer.md">Dummy Optimizer</a></td>
 
   </tr>
@@ -128,7 +146,7 @@
 
   </tr>
   <tr>
-    <td class="tg-jajh"><a href="grad_norm_overlap.md">Grad Norm Overlap</a></td>
+    <td class="tg-jajh"><a href="fsdp2_muon_optimizer.md">FSDP2 Muon Optimizer</a></td>
 
   </tr>
   <tr>

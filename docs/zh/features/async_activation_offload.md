@@ -1,5 +1,9 @@
 # Async Activation Offload
 
+## 适用后端
+
+FSDP2 + MCORE
+
 ## 背景与挑战
 
 随着大模型参数规模的增长和序列长度的上升，训练过程中对显存的需求急剧上升。目前对激活值显存的优化方案主要依赖于重计算技术和序列并行技术。这些技术存在以下瓶颈：
@@ -42,3 +46,5 @@ with async_save_on_cpu(
 
 - 多模态模型长序列场景：self attention的计算量随序列长度呈平方关系增长，使用该方案卸载self attention前向计算的激活值，并在重计算时跳过self attention的重计算。典型场景下端到端性能收益20%以上。
 - FSDP2场景：FSDP2分布式策略下，对模型参数进行切分和聚合，较短序列长度下，计算耗时无法掩盖通信耗时。可以使用该方案，将重计算入口的激活值卸载，节省出显存后增大micro batch size或序列长度提高计算比例。典型场景下端到端性能收益60%以上。
+
+> 本文描述的是自管理实现的激活offload（legacy路径）；基于统一张量交换底座的激活卸载实现（Act Stash）参见 [Act Stash](act_stash.md)，底座特性见 [Swap Core](swap_core.md)。
