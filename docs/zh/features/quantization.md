@@ -94,8 +94,10 @@ quant_recipe的格式为：
 
 - `quantize.linear.mx`：适用于普通线性层（如 FFN、Attention）的 MX 策略线性量化。
 - `quantize.moe.mx`：专用于 MoE 模型专家模块中 GMM 的 MX 量化。
+- `quantize.linear.w8a16`：QAT W8A16 线性层量化，权重 fake-quant 到 FP8 e4m3，激活保持高精度，反向使用 STE。详见 [QAT W8A16 量化训练指南](qat_w8a16.md)。
 
 > 💡 在 MoE 模型中可以同时使用 `quantize.linear.mx` 和 `quantize.moe.mx`。
+> 💡 使用 `quantize.linear.w8a16` 时需将 `quant_recipe` 设为 `w8a16`，详见 [QAT W8A16 量化训练指南](qat_w8a16.md)。
 
 #### ✅enable_fsdp_low_precision_all_gather
 
