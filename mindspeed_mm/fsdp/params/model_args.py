@@ -52,6 +52,14 @@ class ModelArguments(BaseArguments):
         default=0.1,
         metadata={"help": "Mtp loss scaling factor."},
     )
+    chunk_layer_chunks: int = field(
+        default=1,
+        metadata={"help": "Number of serial sequence chunks evaluated inside each selected decoder layer."},
+    )
+    chunk_layer_types: List[str] = field(
+        default_factory=lambda: ["full_attention", "linear_attention"],
+        metadata={"help": "Qwen3.5 decoder layer types on which chunk_layer is enabled."},
+    )
     models: Optional[Dict[str, Any]] = field(
         default=None,
         metadata={

@@ -34,6 +34,7 @@ from .utils import get_vector_num, input_guard, prepare_chunk_indices
         "HAS_WEIGHT": lambda args: args["weight"] is not None,
         "HAS_BIAS": lambda args: args["bias"] is not None,
         "HAS_RESIDUAL": lambda args: args["residual"] is not None,
+        "HAS_GRAD_OUTPUT": lambda args: args["grad_output"] is not None,
         "USE_INITIAL_STATE": lambda args: args["initial_state"] is not None,
         "IS_VARLEN": lambda args: args["cu_seqlens"] is not None,
     }
@@ -42,6 +43,7 @@ from .utils import get_vector_num, input_guard, prepare_chunk_indices
 def causal_conv1d_fwd_kernel(
     x,
     y,
+    grad_output,
     weight,
     bias,
     residual,
@@ -58,6 +60,7 @@ def causal_conv1d_fwd_kernel(
     HAS_WEIGHT: tl.constexpr,
     HAS_BIAS: tl.constexpr,
     HAS_RESIDUAL: tl.constexpr,
+    HAS_GRAD_OUTPUT: tl.constexpr,
     USE_INITIAL_STATE: tl.constexpr,
     IS_VARLEN: tl.constexpr,
     NUM_CHKS: tl.int32,
@@ -148,24 +151,51 @@ def causal_conv1d_fwd_kernel(
         if HAS_BIAS:
             b_y += tl.load(bias + o_d, mask=m_d).to(tl.float32)
 
-        if ACTIVATION == 'swish' or ACTIVATION == 'silu':  # pylint: disable=consider-using-in
-            b_y = b_y * tl.sigmoid(b_y)
-
-        if HAS_RESIDUAL:
+        if HAS_GRAD_OUTPUT:
             if is_tail_chunk:
-                o_t_r = i_t * BT + tl.arange(0, BT)
-                m_t_r = (o_t_r >= 0) & (o_t_r < T_len)
-                b_residual = tl.load(
-                    residual + bos * D + o_t_r[:, None] * D + o_d[None, :],
-                    mask=m_t_r[:, None] & m_d[None, :],
+                o_t_g = i_t * BT + tl.arange(0, BT)
+                m_t_g = (o_t_g >= 0) & (o_t_g < T_len)
+                b_grad_output = tl.load(
+                    grad_output + bos * D + o_t_g[:, None] * D + o_d[None, :],
+                    mask=m_t_g[:, None] & m_d[None, :],
                     other=0.0,
-                )
+                ).to(tl.float32)
             else:
-                p_residual = tl.make_block_ptr(
-                    residual + bos * D, (T_len, D), (D, 1), (i_t * BT, i_d * BD), (BT, BD), (1, 0)
+                p_grad_output = tl.make_block_ptr(
+                    grad_output + bos * D,
+                    (T_len, D),
+                    (D, 1),
+                    (i_t * BT, i_d * BD),
+                    (BT, BD),
+                    (1, 0),
                 )
-                b_residual = tl.load(p_residual, boundary_check=(0, 1))
-            b_y += b_residual
+                b_grad_output = tl.load(
+                    p_grad_output,
+                    boundary_check=(0, 1),
+                ).to(tl.float32)
+            b_sigmoid = tl.sigmoid(b_y)
+            b_y = b_grad_output * b_sigmoid * (
+                1.0 + b_y * (1.0 - b_sigmoid)
+            )
+        else:
+            if ACTIVATION == 'swish' or ACTIVATION == 'silu':  # pylint: disable=consider-using-in
+                b_y = b_y * tl.sigmoid(b_y)
+
+            if HAS_RESIDUAL:
+                if is_tail_chunk:
+                    o_t_r = i_t * BT + tl.arange(0, BT)
+                    m_t_r = (o_t_r >= 0) & (o_t_r < T_len)
+                    b_residual = tl.load(
+                        residual + bos * D + o_t_r[:, None] * D + o_d[None, :],
+                        mask=m_t_r[:, None] & m_d[None, :],
+                        other=0.0,
+                    )
+                else:
+                    p_residual = tl.make_block_ptr(
+                        residual + bos * D, (T_len, D), (D, 1), (i_t * BT, i_d * BD), (BT, BD), (1, 0)
+                    )
+                    b_residual = tl.load(p_residual, boundary_check=(0, 1))
+                b_y += b_residual
 
         if is_tail_chunk:
             o_t_y = i_t * BT + tl.arange(0, BT)
@@ -524,6 +554,7 @@ def causal_conv1d_fwd_impl(
     output_final_state: bool = False,
     activation: Optional[str] = None,
     cu_seqlens: Optional[torch.Tensor] = None,
+    grad_output: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     shape = x.shape
     if x.shape[-1] != weight.shape[-1]:
@@ -559,6 +590,7 @@ def causal_conv1d_fwd_impl(
     causal_conv1d_fwd_kernel[grid](
         x=x,
         y=y,
+        grad_output=grad_output,
         weight=weight,
         bias=bias,
         residual=residual,
@@ -599,6 +631,7 @@ def causal_conv1d_bwd_impl(
     initial_state: Optional[torch.Tensor] = None,
     activation: str = None,
     cu_seqlens: Optional[torch.Tensor] = None,
+    preactivation: Optional[torch.Tensor] = None,
 ):
     shape = x.shape
     if x.shape[-1] != weight.shape[-1]:
@@ -630,15 +663,15 @@ def causal_conv1d_bwd_impl(
     # We use BT=8, BD=32 as safe defaults that work for all W≤8 and all dtypes.
     # This matches the front-end's conservative approach but accounts for the
     # extra gradient buffers in backward.
-    if initial_state is not None:
-        BD = 32
+    fused_gradient_path = (
+        activation is None and initial_state is None and dht is None
+    )
+    if fused_gradient_path:
+        BT = min(32, triton.next_power_of_2(triton.cdiv(max(16, B * T), NUM_CORES)))
+    elif initial_state is not None:
         BT = min(8, triton.next_power_of_2(triton.cdiv(max(16, B * T), NUM_CORES)))
     else:
-        BD = 32
         BT = min(32, triton.next_power_of_2(triton.cdiv(max(16, B * T), NUM_CORES)))
-    if D % BD != 0:
-        raise ValueError("D must be divisible by BD.")
-    NUM_BLKS_D = triton.cdiv(D, BD)
 
     if cu_seqlens is not None:
         chunk_indices = prepare_chunk_indices(cu_seqlens, BT)
@@ -651,8 +684,18 @@ def causal_conv1d_bwd_impl(
         NT = triton.cdiv(T, BT)
         NUM_CHKS = NT * B
 
-    y = None
-    if activation is not None:
+    # State gradients increase UB pressure; packed inputs use a smaller D tile.
+    if fused_gradient_path:
+        # The fused path holds no state-gradient tiles, so it can use a wider tile.
+        BD = 64
+    else:
+        BD = 16 if initial_state is not None and dht is not None and cu_seqlens is not None else 32
+    if D % BD != 0:
+        raise ValueError("D must be divisible by BD.")
+    NUM_BLKS_D = triton.cdiv(D, BD)
+
+    y = preactivation
+    if activation is not None and y is None:
         y, _ = causal_conv1d_fwd_impl(
             x=x,
             weight=weight,

@@ -77,7 +77,6 @@ from mindspeed_mm.utils.aux_loss import load_balancing_loss_func_optimized
 from mindspeed_mm.fsdp.features.memory.grad_offload import clear_offload_grad
 from mindspeed_mm.fsdp.features.memory.aux_loss_grad_offload import offload_wrapper, restore_wrapper
 from mindspeed_mm.fsdp.models.mtp import MultiTokenPredictionBlock
-
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
 _VISUAL_PER_SEQ_LEN = None
@@ -677,6 +676,7 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         attention_mask: torch.Tensor | None = None,
         **kwargs: Unpack[TransformersKwargs],
     ):
+        chunk_layer_args = kwargs.pop("chunk_layer_args", None)
         hidden_states = apply_mask_to_padding_states(hidden_states, attention_mask)
 
         # Set up dimensions for reshapes later
@@ -706,6 +706,16 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
 
         # Modification: Ulysses SP all-to-all for linear attention heads.
         ps = get_parallel_state()
+        if chunk_layer_args is not None:
+            if use_precomputed_states or cache_params is not None:
+                raise ValueError("chunk_layer state chaining cannot be combined with inference cache")
+            if ps.is_ulysses_enable():
+                raise ValueError("GDN chunk_layer currently requires Ulysses/sequence parallel size 1")
+            if self.causal_conv1d_implementation != IMPL_TRITON or self.gdn_implementation != IMPL_TRITON:
+                raise ValueError(
+                    "GDN chunk_layer state chaining currently requires both "
+                    "causal_conv1d_implementation='triton' and gdn_implementation='triton'"
+                )
         if ps.is_ulysses_enable():
             ulysses_group = ps.get_ulysses_group()
             ulysses_size = ps.get_ulysses_group_size()
@@ -743,6 +753,8 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
             local_value_dim = self.value_dim
 
 
+        final_conv_state = None
+        initial_delta_state = None
         if use_precomputed_states:
             # 2. Convolution sequence transformation
             # NOTE: the conv state is updated in `causal_conv1d_update`
@@ -775,12 +787,44 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
 
             if self.causal_conv1d_implementation == IMPL_TRITON:
                 conv_weight = conv_weight.squeeze(1)
-                mixed_qkv, _ = self.causal_conv1d_fn(
+                if chunk_layer_args is not None:
+                    # Restore recurrent states carried by the preceding chunk.
+                    empty_conv_state = hidden_states.new_zeros(
+                        (
+                            1,
+                            local_key_dim * 2 + local_value_dim,
+                            self.conv_kernel_size,
+                        )
+                    )
+                    empty_delta_state = hidden_states.new_zeros(
+                        (
+                            1,
+                            local_num_v_heads,
+                            self.head_k_dim,
+                            self.head_v_dim,
+                        ),
+                        dtype=torch.float32,
+                    )
+                    (initial_conv_state, initial_delta_state), _ = (
+                        chunk_layer_args["layer_cache"].prepare_cache(
+                            (empty_conv_state, empty_delta_state),
+                            chunk_layer_args["history_cache"],
+                            chunk_layer_args["chunk_idx"],
+                        )
+                    )
+                    if chunk_layer_args["chunk_idx"] == 0:
+                        # The first chunk uses causal zero padding, not a saved state.
+                        initial_conv_state = None
+                else:
+                    initial_conv_state = None
+                mixed_qkv, final_conv_state = self.causal_conv1d_fn(
                     x=mixed_qkv,
                     weight=conv_weight.transpose(-1, -2).contiguous(),
                     bias=self.conv1d.bias,
+                    initial_state=initial_conv_state,
                     activation=self.activation,
                     cu_seqlens=cu_seqlens,
+                    output_final_state=chunk_layer_args is not None,
                 )
             elif self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
                 conv_weight = conv_weight.squeeze(1)
@@ -867,8 +911,8 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                     g=g,
                     beta=beta,
                     cu_seqlens=cu_seqlens,
-                    initial_state=None,
-                    output_final_state=cache_params is not None,
+                    initial_state=initial_delta_state,
+                    output_final_state=cache_params is not None or chunk_layer_args is not None,
                     use_qk_l2norm_in_kernel=True,
                     skip_recompute=self.skip_gdn_recompute
                 )
@@ -882,6 +926,18 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
                     initial_state=None,
                     output_final_state=cache_params is not None,
                     use_qk_l2norm_in_kernel=True,
+                )
+
+            if chunk_layer_args is not None:
+                if final_conv_state is None or last_recurrent_state is None:
+                    raise RuntimeError("chunk_layer requires causal_conv1d and GDN final states")
+                # Save final states as the next chunk's differentiable carry.
+                chunk_layer_args["output_cache"] = chunk_layer_args[
+                    "layer_cache"
+                ].append(
+                    (final_conv_state, last_recurrent_state),
+                    chunk_layer_args["history_cache"],
+                    chunk_layer_args["chunk_idx"],
                 )
 
         else:
@@ -1057,6 +1113,20 @@ class Qwen3_5MoeAttention(nn.Module):
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
+        chunk_layer_args = kwargs.pop("chunk_layer_args", None)
+        if chunk_layer_args is not None:
+            if past_key_values is not None:
+                raise ValueError("chunk_layer cannot be combined with generation KV cache")
+            # Extend this chunk with its differentiable K/V history.
+            (key_states, value_states), cache_kwargs = chunk_layer_args[
+                "layer_cache"
+            ].prepare_cache(
+                (key_states, value_states),
+                chunk_layer_args["history_cache"],
+                chunk_layer_args["chunk_idx"],
+            )
+            kwargs.update(cache_kwargs)
+
         if past_key_values is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
@@ -1066,7 +1136,7 @@ class Qwen3_5MoeAttention(nn.Module):
             self.config._attn_implementation, eager_attention_forward
         )
         # CP Modification: add total_seq_len for Attention
-        total_seq_len = get_seq_len("total")
+        total_seq_len = query_states.shape[2] if chunk_layer_args is not None else get_seq_len("total")
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -1086,6 +1156,15 @@ class Qwen3_5MoeAttention(nn.Module):
         attn_output = attn_output * torch.sigmoid(gate)
 
         attn_output = self.o_proj(attn_output)
+        if chunk_layer_args is not None:
+            # Preserve only the K/V tail required by the next chunk.
+            chunk_layer_args["output_cache"] = chunk_layer_args[
+                "layer_cache"
+            ].append(
+                (key_states, value_states),
+                chunk_layer_args["history_cache"],
+                chunk_layer_args["chunk_idx"],
+            )
         return attn_output, attn_weights
 
 
@@ -1324,8 +1403,79 @@ class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
         self.input_layernorm = Qwen3_5MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = Qwen3_5MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.layer_idx = layer_idx
+        self.chunk_layer_chunks = getattr(config, "chunk_layer_chunks", 1)
+        self.chunk_layer_types = tuple(
+            getattr(config, "chunk_layer_types", ("full_attention", "linear_attention"))
+        )
+
 
     def forward(
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        cache_position: torch.LongTensor | None = None,
+        **kwargs: Unpack[FlashAttentionKwargs],
+    ) -> torch.FloatTensor:
+        return self._forward_impl(
+            hidden_states=hidden_states,
+            position_embeddings=position_embeddings,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            cache_position=cache_position,
+            **kwargs,
+        )
+
+    def _forward_chunk_once(
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        plan,
+        layer_cache,
+        chunk_idx: int,
+        history_cache: tuple[torch.Tensor | None, torch.Tensor | None],
+        position_ids: torch.LongTensor | None,
+        cache_position: torch.LongTensor | None,
+        base_kwargs: dict[str, Any],
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Run one decoder chunk and return its differentiable carry cache."""
+        chunk_info = plan.chunk_infos[chunk_idx]
+        chunk_args = {
+            "layer_cache": layer_cache,
+            "chunk_idx": chunk_idx,
+            "history_cache": history_cache,
+            "output_cache": None,
+        }
+        chunk_kwargs = base_kwargs.copy()
+        chunk_kwargs["chunk_layer_args"] = chunk_args
+        if plan.layout == "tnd":
+            chunk_kwargs.update(
+                {
+                    "cu_seqlens": chunk_info["local_cu_seqlens"],
+                    "cu_seq_lens_q": chunk_info["local_cu_seqlens"],
+                    "cu_seq_lens_k": chunk_info["local_cu_seqlens"],
+                    "max_length_q": chunk_info["max_local_seqlen"],
+                    "max_length_k": chunk_info["max_local_seqlen"],
+                }
+            )
+        output = self._forward_impl(
+            hidden_states=hidden_states,
+            position_embeddings=position_embeddings,
+            attention_mask=None,
+            position_ids=position_ids,
+            past_key_values=None,
+            cache_position=cache_position,
+            **chunk_kwargs,
+        )
+        output_cache = chunk_args["output_cache"]
+        if output_cache is None:
+            raise RuntimeError("chunk attention did not append its output cache")
+        return output, *output_cache
+
+    def _forward_impl(
         self,
         hidden_states: torch.Tensor,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
@@ -2688,6 +2838,20 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         if mtp_num_layers < 0:
             raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be a non-negative integer.")
         transformer_config.text_config.mtp_num_layers = mtp_num_layers
+
+        chunk_layer_chunks = getattr(model_args, "chunk_layer_chunks", 1)
+        if chunk_layer_chunks < 1:
+            raise ValueError(f"chunk_layer_chunks must be >= 1, got {chunk_layer_chunks}")
+        chunk_layer_types = list(getattr(model_args, "chunk_layer_types", []))
+        valid_chunk_layer_types = {"full_attention", "linear_attention"}
+        invalid_chunk_layer_types = set(chunk_layer_types) - valid_chunk_layer_types
+        if invalid_chunk_layer_types:
+            raise ValueError(
+                f"Invalid chunk_layer_types={sorted(invalid_chunk_layer_types)}; "
+                f"valid values are {sorted(valid_chunk_layer_types)}"
+            )
+        transformer_config.text_config.chunk_layer_chunks = chunk_layer_chunks
+        transformer_config.text_config.chunk_layer_types = chunk_layer_types
 
         # chunkloss
         transformer_config.text_config.enable_chunk_loss = getattr(feature_args, "enable_chunk_loss", False)

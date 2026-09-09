@@ -13,6 +13,11 @@ from ..params.parallel_args import ParallelArguments
 from ..features.memory.async_offload import async_offload_modules, get_offload_modules
 from ..features.memory.act_stash import apply_act_stash_modules
 from ..features.memory.chunkloss.chunkloss_lm_head import apply_chunkloss_module, get_chunkloss_module
+from ..features.memory.chunk_layer import (
+    finalize_chunk_layer_modules,
+    get_chunk_layer_modules,
+    prepare_chunk_layer_modules,
+)
 from ..features.communication.chunk_mbs import get_chunkmbs_modules, apply_chunkmbs_module
 from ..features.memory.recompute import recompute_modules
 from ..features.memory.swap_manager import SwapManager
@@ -83,6 +88,82 @@ class FeaturesApplier:
         activation_offload_modules = get_offload_modules(model, plan.apply_modules)
         async_offload_modules(activation_offload_modules)
 
+    def _validate_chunk_layer_requirements(self, model):
+        """Validate all prerequisites for every enabled chunk layer."""
+        chunk_layer_modules = get_chunk_layer_modules(model)
+        if not chunk_layer_modules:
+            return
+
+        chunk_layer_names = [name for name, _ in chunk_layer_modules]
+        for name, module in chunk_layer_modules:
+            if getattr(module, "layer_type", None) != "full_attention":
+                continue
+
+            self_attn = getattr(module, "self_attn", None)
+            if self_attn is None:
+                raise ValueError(
+                    f"chunk_layer full-attention module {name} does not expose self_attn"
+                )
+
+            is_causal = getattr(self_attn, "is_causal", None)
+            if is_causal is not True:
+                raise NotImplementedError(
+                    "chunk_layer currently supports causal attention only; "
+                    f"module {name} has self_attn.is_causal={is_causal!r}"
+                )
+
+        if not getattr(self.config, "enable_activation_offload", False):
+            raise ValueError(
+                "chunk_layer with chunk_layer_chunks > 1 requires "
+                "features.enable_activation_offload=true; enabled modules: "
+                f"{', '.join(chunk_layer_names)}"
+            )
+
+        plan = getattr(self.config, "activation_offload_plan", None)
+        if getattr(plan, "impl", "legacy") != "stash":
+            raise ValueError(
+                "chunk_layer with chunk_layer_chunks > 1 requires "
+                "features.activation_offload_plan.impl='stash'; "
+                "legacy activation offload is not supported"
+            )
+
+        apply_modules = getattr(plan, "apply_modules", None)
+        if not apply_modules:
+            raise ValueError(
+                "chunk_layer with chunk_layer_chunks > 1 requires a non-empty "
+                "features.activation_offload_plan.apply_modules"
+            )
+
+        offloaded_module_ids = {
+            id(module)
+            for _, module, _, _ in get_offload_modules(model, apply_modules)
+        }
+        missing = [
+            name
+            for name, module in chunk_layer_modules
+            if id(module) not in offloaded_module_ids
+        ]
+        if missing:
+            raise ValueError(
+                "features.activation_offload_plan.apply_modules must cover every "
+                "enabled chunk_layer module; missing modules: "
+                f"{', '.join(missing)}"
+            )
+
+    def apply_prepare_chunk_layer_modules(self, model):
+        """Install the single-chunk decoder only when chunk_layer is enabled."""
+        self._validate_chunk_layer_requirements(model)
+        if not get_chunk_layer_modules(model):
+            return
+        prepare_chunk_layer_modules(model)
+
+    def apply_finalize_chunk_layer_modules(self, model):
+        """Install the outer scheduler and bind its shared swap cache."""
+        if not get_chunk_layer_modules(model):
+            return
+        swap_cache = self._ensure_swap_manager().get_cache("chunk_layer")
+        finalize_chunk_layer_modules(model, swap_cache=swap_cache)
+
     def apply_chunkloss(self, model):
         plan = self.config.chunkloss_plan
         if self.config.enable_chunk_loss:
@@ -131,18 +212,20 @@ class FeaturesApplier:
 
     def pre_fully_shard_apply(self, model):
         # The order of these operations is critical and must not be changed.
-        # 1. Recompute: wraps forwards with checkpoint to save memory by recomputing.
-        #    Op replay (recompute_plan.op_replay_scopes) is a policy of the checkpoint
-        #    boundary and is wired inside recompute_modules (zones patched before
-        #    the wrap, replay activated via the checkpoint's context_fn).
-        # 2. Activation Offload: Wraps the logic to move activations to CPU to free up device memory.
-        # 3. Chunk MBS: Splits the input batch into micro-batches. This must be the outermost wrapper
-        #    to ensure that the micro-batch slicing logic executes *before* the data enters the
-        #    recomputation and offloading logic.
+        # 1. Prepare Chunk Layer: Replaces the decoder forward with the single-chunk forward so
+        #    recompute and activation offload are applied to each chunk independently.
+        # 2. Recompute: Wraps the single-chunk forward to trade computation for activation memory.
+        #    Op replay (recompute_plan.op_replay_scopes) remains a policy of this checkpoint
+        #    boundary and is wired inside recompute_modules.
+        # 3. Activation Offload: Wraps the single-chunk forward to move saved activations to CPU.
+        # 4. Finalize Chunk Layer: Installs the chunk scheduler outside recompute and offload.
+        # 5. Chunk MBS: Splits the input batch into micro-batches. This must be the outermost wrapper
+        #    so micro-batch slicing runs before chunking, recomputation, and activation offload.
+        self.apply_prepare_chunk_layer_modules(model)
         self.apply_recompute_models(model=model)
         self.apply_activation_offload_modules(model=model)
+        self.apply_finalize_chunk_layer_modules(model)
         self.apply_chunk_mbs(model=model)
-
         self.apply_chunkloss(model=model)
 
     def post_fully_shard_apply(self, model):

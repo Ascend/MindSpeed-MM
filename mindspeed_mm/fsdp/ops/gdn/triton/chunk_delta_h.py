@@ -301,7 +301,9 @@ def chunk_gated_delta_rule_fwd_h(
     'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
 })
 @triton.autotune(
-    configs=get_autotune_config(multibuffer_list=(True, False)),
+    # The multibuffer variant can issue out-of-range MTE accesses while
+    # benchmarking long, stateful TND chunks on Ascend.
+    configs=get_autotune_config(multibuffer_list=(False,)),
     key=['H', 'K', 'V', 'BT', 'BV', 'USE_G', 'IS_VARLEN'],
 )
 @triton.jit(do_not_specialize=['T'])

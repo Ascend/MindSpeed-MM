@@ -12,6 +12,9 @@ from mindspeed_mm.fsdp.ops.gdn.triton.convolution import (
     causal_conv1d_fwd_impl,
     causal_conv1d_bwd_impl,
 )
+from mindspeed_mm.fsdp.ops.gdn.triton.stateful_convolution import (
+    native_stateful_causal_conv1d,
+)
 
 from mindspeed_mm.fsdp.ops.gdn.triton.utils import is_arch35
 
@@ -35,6 +38,9 @@ class CausalConv1dFunction(torch.autograd.Function):
         cu_seqlens: Optional[torch.Tensor] = None,
         output_final_state: bool = False,
     ):
+        # Preserve None for unused outputs to avoid a dense zero final-state gradient.
+        ctx.set_materialize_grads(False)
+
         if is_arch35():
             raise NotImplementedError("causal_conv1d is not supported on arch35")
 
@@ -107,6 +113,23 @@ def causal_conv1d(
     cu_seqlens: Optional[torch.Tensor] = None,
     output_final_state: bool = False,
 ):
+    # Handle state natively instead of materializing a differentiable prefix.
+    if initial_state is not None or output_final_state:
+        if is_arch35():
+            raise NotImplementedError(
+                "stateful causal_conv1d is not supported on arch35"
+            )
+        return native_stateful_causal_conv1d(
+            x=x,
+            weight=weight,
+            bias=bias,
+            residual=residual,
+            initial_state=initial_state,
+            activation=activation,
+            cu_seqlens=cu_seqlens,
+            output_final_state=output_final_state,
+        )
+
     return CausalConv1dFunction.apply(
         x,
         weight,
