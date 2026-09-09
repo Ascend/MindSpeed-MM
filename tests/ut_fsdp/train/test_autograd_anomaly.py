@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import pytest
 
 from mindspeed_mm.fsdp.train import trainer as trainer_module
+from mindspeed_mm.fsdp.utils import dtensor_compat
 
 
 @pytest.mark.parametrize("enabled", [False, True])
@@ -36,6 +37,12 @@ def test_trainer_initialization_configures_autograd_anomaly_detection(
     monkeypatch.setattr(trainer_module, "get_torch_device", Mock())
     monkeypatch.setattr(trainer_module, "set_accelerator_compatible", Mock())
     monkeypatch.setattr(trainer_module, "set_log_level", Mock())
+    register_dtensor_ops = Mock()
+    monkeypatch.setattr(
+        dtensor_compat,
+        "register_dtensor_anomaly_detection_ops",
+        register_dtensor_ops,
+    )
     monkeypatch.setattr(trainer_module.envs, "MM_DETECT_ANOMALY", enabled)
     monkeypatch.setattr(trainer_module.envs, "get", Mock(return_value=0))
     monkeypatch.setattr(trainer_module.torch.accelerator, "set_device_index", Mock())
@@ -50,6 +57,10 @@ def test_trainer_initialization_configures_autograd_anomaly_detection(
         trainer.initialize()
 
         detect_anomaly.assert_called_once_with(enabled)
+        if enabled:
+            register_dtensor_ops.assert_called_once_with()
+        else:
+            register_dtensor_ops.assert_not_called()
 
         value = trainer_module.torch.tensor([-1.0], requires_grad=True)
         if enabled:

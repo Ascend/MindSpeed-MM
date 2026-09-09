@@ -159,6 +159,12 @@ class Trainer:
         # Enable before model execution so backward failures include the
         # corresponding forward traceback.
         detect_anomaly = envs.MM_DETECT_ANOMALY
+        if detect_anomaly:
+            from mindspeed_mm.fsdp.utils.dtensor_compat import (
+                register_dtensor_anomaly_detection_ops,
+            )
+
+            register_dtensor_anomaly_detection_ops()
         torch.autograd.set_detect_anomaly(detect_anomaly)
         if detect_anomaly:
             print_rank(
