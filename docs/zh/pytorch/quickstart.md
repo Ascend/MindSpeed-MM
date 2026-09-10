@@ -1,6 +1,6 @@
-# 快速入门：Qwen2.5-VL模型微调和Wan2.1模型微调
+# 快速入门：Qwen2.5-VL模型微调和Wan2.2模型微调
 
-MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别以Qwen2.5-VL（理解模型）和Wan2.1（生成模型）两个典型模型为例，介绍MindSpeed MM的使用方法，引导开发者快速上手预置模型在昇腾NPU上的高效运行。
+MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别以Qwen2.5-VL（理解模型）和Wan2.2（生成模型）两个典型模型为例，介绍MindSpeed MM的使用方法，引导开发者快速上手预置模型在昇腾NPU上的高效运行。
 
 ## 多模态理解模型
 
@@ -257,7 +257,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 
 ## 多模态生成模型
 
-本章节以Wan2.1-T2V-1.3B为例，指导用户在单机场景下如何完成多模态生成模型的微调。
+本章节以Wan2.2-T2V-A14B为例，指导用户在单机场景下如何完成多模态生成模型的微调。
 
 ### 环境准备
 
@@ -288,38 +288,51 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 
 1. 权重下载
 
-   从Hugging Face下载对应的模型权重[Wan2.1-T2V-1.3B-Diffusers](https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers/tree/main)。
+    从Huggingface库下载模型权重: [Wan2.2-T2V-A14B-Diffusers](https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers)
+    在MindSpeed-MM下创建`weights/Wan2.2-T2V-A14B-Diffusers/`，并将下载的模型权重保存到该目录下。
+    > [!NOTE]
+    >
+    > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
 
-   > [!NOTE]
-   >
-   > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+2. 权重转换
 
-2. 权重文件保存
-
-   在MindSpeed-MM下创建`weights/Wan2.1-T2V-1.3B-Diffusers/`，并将下载的模型权重保存到该目录下。
-
-3. 权重转换
-
-    需要对下载后的Wan2.1模型权重`transformer`部分进行权重转换，运行权重转换工具：
+    需要对下载后的Wan2.2模型权重`transformer`部分进行权重转换，运行权重转换工具：
 
     ```shell
     mm-convert WanConverter hf_to_mm \
-    --cfg.source_path ./weights/Wan2.1-T2V-1.3B-Diffusers/transformer/ \
-    --cfg.target_path ./weights/Wan2.1-T2V-1.3B-Diffusers/transformer_mm/
+    --cfg.source_path ./weights/Wan2.2-T2V-A14B-Diffusers/transformer/ \
+    --cfg.target_path ./weights/Wan2.2-T2V-A14B-Diffusers/transformer_mm/
+    ```
+
+    > [!NOTE]
+    >
+    > huggingface Diffusers权重中包含两个transformer权重， 其中transformer文件夹对应高噪声（high）模型权重，transformer_2文件夹对应低噪声（low）模型权重
+
+    若需要转化为DCP格式权重，可参考以下方式：
+
+    ```shell
+    mm-convert WanConverter mm_to_dcp \
+    --cfg.source_path ./weights/Wan2.2-T2V-A14B-Diffusers/transformer_mm/ \
+    --cfg.target_path ./weights/Wan2.2-T2V-A14B-Diffusers/transformer_dcp/
     ```
 
     **表 5** 权重转换工具参数解析
 
     | 参数 |说明 |
     | :-- | :--- |
-    |WanConverter|Wan2.1模型转换工具|
+    |WanConverter|Wan2.2/Wan2.1模型转换工具|
     |hf_to_mm|Hugging Face模型转换MindSpeed MM模型权重|
+    |hf_to_dcp|Hugging Face模型转换DCP（FSDP2分布式）模型权重|
     | source_path | 原始权重路径|
     | target_path | 转换或切分后权重保存路径 |
 
 ### 数据预处理
+    
+在`MindSpeed-MM`下创建`dataset`目录，随后在`dataset`下创建目录`videos`和文件`data.json`，并将需要处理的视频保存在`videos`中。数据集中所有的视频-文本对信息保存在`data.json`中。（数据集可以使用[Open-Sora-Dataset pixabay_v2 数据集](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/tree/main/pixabay_v2_tar),对应的数据标注文件为[video_pixabay_65f_601513.json](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/blob/main/anno_jsons/video_pixabay_65f_601513.json)，格式需要处理成下文示例形式）
 
-在`MindSpeed-MM`下创建`dataset`目录，随后在`dataset`下创建目录`videos`和文件`data.json`，并将需要处理的视频保存在`videos`中。数据集中所有的视频-文本对信息保存在`data.json`中。
+> [!NOTE]
+>
+> 完整数据集较大[1.22TB]，可以选择下载部分folder的数据进行测试，例如只下载folder_01到folder_04的数据，约100GB。但注意需要处理 ``video_pixabay_65f_601513.json`` 文件，删除对应未下载视频的数据项。
 
 具体目录结构示例如下：
 
@@ -367,11 +380,11 @@ dataset
 |height|视频高度|根据用户实际情况配置|
 |width|视频宽度|根据用户实际情况配置|
 
-### 特征提取
+### 参数配置
 
 1. 配置data.txt
 
-    修改`examples/wan2.1/feature_extract/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔。作如下修改：
+    修改`examples/wan2.2/data.txt`文件，其中每一行表示一个数据集，第一个参数表示数据文件夹的路径，第二个参数表示`data.json`文件的路径，用`,`分隔。作如下修改：
 
     ```text
     ./dataset,./dataset/data.json
@@ -379,11 +392,11 @@ dataset
 
 2. 配置data.json
 
-    修改`examples/wan2.1/feature_extract/data.json`文件，根据实际情况配置如下参数：
-    - `num_frames`：表示最大帧数，默认为81，超过则随机选取其中的`num_frames`帧。
+    修改`examples/wan2.2/A14B/t2v/data.json`文件，根据实际情况配置如下参数：
+    - `num_frames`：表示最大帧数，默认为49，超过则随机选取其中的`num_frames`帧。
     - `max_height`：表示最大高度，默认为480，超过则centercrop到最大分辨率。
     - `max_width`：表示最大宽度，默认为832，超过则centercrop到最大分辨率。
-    - `from_pretrained`：表示tokenizer权重所对应路径，默认为"weights/Wan2.1-T2V-1.3B-Diffusers/tokenizer"。
+    - `from_pretrained`：表示tokenizer权重所对应路径，参考路径为"weights/Wan2.2-T2V-A14B-Diffusers/tokenizer"。
 
     ```json
     "preprocess_parameters": {
@@ -395,7 +408,7 @@ dataset
     "tokenizer_config":
     {
         ......
-        "from_pretrained": "weights/Wan2.1-T2V-1.3B-Diffusers/tokenizer",
+        "from_pretrained": "weights/Wan2.2-T2V-A14B-Diffusers/tokenizer",
         ......
     }
     }
@@ -403,66 +416,139 @@ dataset
 
 3. 配置model_t2v.json
 
-    修改`examples/wan2.1/feature_extract/model_t2v.json`文件，其中`from_pretrained`为下载的权重所对应路径，包括vae和text_encoder。根据实际情况修改参数：
+    修改`examples/wan2.2/A14B/t2v/pretrain_model_high.json、*examples/wan2.2/A14B/t2v/pretrain_model_low.json*`文件，其中`from_pretrained`为下载的权重所对应路径，包括vae和text_encoder。根据实际情况修改参数：
 
     ```json
     {
         "ae": {
             ......
-            "from_pretrained": "weights/Wan2.1-T2V-1.3B-Diffusers/vae",
+            "from_pretrained": "weights/Wan2.2-T2V-A14B-Diffusers/vae",
             ......
         },
         "text_encoder": {
             ......
-            "from_pretrained": "weights/Wan2.1-T2V-1.3B-Diffusers/text_encoder"
+            "from_pretrained": "weights/Wan2.2-T2V-A14B-Diffusers/text_encoder"
         }
     }
     ```
 
-4. 配置tools.json
+4. 配置pretrain_high.sh、*pretrain_low.sh*
 
-    修改`mindspeed_mm/tools/tools.json`，其中`sorafeature`的`save_path`为提取后的特征保存路径：
+    一个单机8卡的高噪模型微调脚本示例如下(examples/wan2.2/A14B/t2v/pretrain_high.sh)，注意需要修改 LOAD_PATH 为MM格式权重实际存放路径， SAVE_PATH 修改为微调后权重保存路径。
 
-    ```json
-        "sorafeature":{
-        "save_path": "./sora_features"
-    }
+    ```sh
+    #!/bin/bash
+    # 根据实际情况修改 ascend-toolkit 路径
+    source /usr/local/Ascend/cann/set_env.sh
+    # 该变量只用于规避megatron对其校验，对npu无效
+    export CUDA_DEVICE_MAX_CONNECTIONS=2 # 开启FSDP2时，不能置为1
+    export ASCEND_SLOG_PRINT_TO_STDOUT=0
+    export ASCEND_GLOBAL_LOG_LEVEL=3
+    export TASK_QUEUE_ENABLE=1
+    export COMBINED_ENABLE=1
+    export CPU_AFFINITY_CONF=1
+    export HCCL_CONNECT_TIMEOUT=1200
+    export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+    NPUS_PER_NODE=8
+    MASTER_ADDR=localhost
+    MASTER_PORT=6000
+    NNODES=1
+    NODE_RANK=0
+    WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
+
+    TP=1
+    PP=1
+    VP=1
+    CP=1
+    MBS=1
+    GRAD_ACC_STEP=1
+    DP=$(($WORLD_SIZE/$TP/$PP/$CP))
+    GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
+
+    MM_DATA="./examples/wan2.2/A14B/t2v/data.json"
+    MM_MODEL="./examples/wan2.2/A14B/t2v/pretrain_model_high.json"
+    MM_TOOL="./mindspeed_mm/tools/tools.json"
+    LOAD_PATH="./weights/Wan2.2-T2V-A14B-Diffusers/transformer/"
+    SAVE_PATH="path to save your high noise expert wandit weights"
+    FSDP_CONFIG="./examples/wan2.2/A14B/fsdp2_config.yaml"
+
+    DISTRIBUTED_ARGS="
+        --nproc_per_node $NPUS_PER_NODE \
+        --nnodes $NNODES \
+        --node_rank $NODE_RANK \
+        --master_addr $MASTER_ADDR \
+        --master_port $MASTER_PORT
+    "
+
+    GPT_ARGS="
+        --tensor-model-parallel-size ${TP} \
+        --pipeline-model-parallel-size ${PP} \
+        --virtual-pipeline-model-parallel-size ${VP} \
+        --context-parallel-size ${CP} \
+        --context-parallel-algo ulysses_cp_algo \
+        --micro-batch-size ${MBS} \
+        --global-batch-size ${GBS} \
+        --num-workers 8 \
+        --lr 1e-5 \
+        --min-lr 1e-5 \
+        --adam-beta1 0.9 \
+        --adam-beta2 0.999 \
+        --adam-eps 1e-8 \
+        --lr-decay-style constant \
+        --weight-decay 1e-2 \
+        --lr-warmup-init 0 \
+        --lr-warmup-iters 0 \
+        --clip-grad 1.0 \
+        --train-iters 5000 \
+        --no-gradient-accumulation-fusion \
+        --no-load-optim \
+        --no-load-rng \
+        --no-save-optim \
+        --no-save-rng \
+        --bf16 \
+        --distributed-timeout-minutes 20 \
+        --use-fused-rmsnorm \
+        --use-torch-fsdp2 \
+        --untie-embeddings-and-output-weights \
+        --fsdp2-config-path ${FSDP_CONFIG} \
+        --optimizer-selection fused_torch_adamw \
+        --use-cpu-initialization \
+    "
+
+    MM_ARGS="
+        --mm-data $MM_DATA \
+        --mm-model $MM_MODEL \
+        --mm-tool $MM_TOOL
+    "
+
+    OUTPUT_ARGS="
+        --log-interval 1 \
+        --save-interval 10000 \
+        --eval-interval 10000 \
+        --eval-iters 10 \
+        --load $LOAD_PATH \
+        --save $SAVE_PATH \
+        --ckpt-format torch_dcp \
+    "
+
+    logfile=wan_high_$(date +%Y%m%d)_$(date +%H%M%S)
+    mkdir -p logs
+    torchrun $DISTRIBUTED_ARGS pretrain_sora.py \
+        $GPT_ARGS \
+        $MM_ARGS \
+        $OUTPUT_ARGS \
+        --distributed-backend nccl \
+        2>&1 | tee logs/train_${logfile}.log
     ```
-
-5. 配置特征提取脚本
-
-    修改`examples/wan2.1/feature_extract/feature_extraction.sh`中的`NPUS_PER_NODE`，默认参数为1，请修改为实际使用卡数。
-
-6. 启动特征提取
-
-    ```bash
-    bash examples/wan2.1/feature_extract/feature_extraction.sh
-    ```
-
+    
 ### 启动训练
 
-1. 参数配置检查
+按照上一步配置好的脚本，运行以下命令启动微调：
 
-    确认完成下表中所有配置文件的修改字段修改。
-
-    **表 7**  配置文件修改字段表
-
-    | 配置文件   |      字段       | 修改说明      |
-    | --- | :---: | :--- |
-    | examples/wan2.1/1.3b/t2v/data.txt    | 文件内容  | 提取后的特征保存路径 |
-    | examples/wan2.1/1.3b/t2v/feature_data.json   |   from_pretrained   | 修改为下载的权重所对应路径，与[权重下载及转换](#权重下载及转换)中的保持一致|
-    | examples/wan2.1/1.3b/t2v/pretrain.sh |    NPUS_PER_NODE    | 每个节点的卡数                                      |
-    | examples/wan2.1/1.3b/t2v/pretrain.sh |       NNODES        | 节点数量                                            |
-    | examples/wan2.1/1.3b/t2v/pretrain.sh |      LOAD_PATH      | 转换后的权重路径，与[权重下载及转换](#权重下载及转换)中的保持一致                         |
-    | examples/wan2.1/1.3b/t2v/pretrain.sh |      SAVE_PATH      | 训练过程中保存的权重路径                            |
-    | examples/wan2.1/1.3b/t2v/pretrain.sh |         CP          | 训练时的CP size（建议根据训练时设定的分辨率调整）   |
-
-2. 启动训练
-    feature_data.json中修改tokenizer权重路径
-
-    ```bash
-    bash examples/wan2.1/1.3b/t2v/pretrain.sh
-    ```
+```bash
+bash examples/wan2.2/A14B/t2v/pretrain_high.sh
+```
 
 ### 后续处理
 
@@ -471,8 +557,8 @@ dataset
 ```shell
 mm-convert WanConverter mm_to_hf \
 --cfg.source_path <path for your saved weight/> \
---cfg.target_path ./converted_weights/Wan2.1-T2V-1.3B-Diffusers/transformer/ \
---cfg.hf_dir weights/Wan2.1-T2V-1.3B-Diffusers/transformer/
+--cfg.target_path ./converted_weights/Wan2.2-T2V-A14B-Diffusers/transformer/ \
+--cfg.hf_dir weights/Wan2.2-T2V-A14B-Diffusers/transformer/
 ```
 
 >[!CAUTION]
@@ -483,4 +569,4 @@ mm-convert WanConverter mm_to_hf \
 
 多模态理解模型更多细节请参考《[Qwen2_5_VL 使用指南](../../../examples/qwen2.5vl/README.md)》。
 
-多模态生成模型更多细节请参考《[Wan2.1 使用指南](../../../examples/wan2.1/README.md)》。
+多模态生成模型更多细节请参考《[Wan2.2 使用指南](../../../examples/wan2.2/README.md)》。
