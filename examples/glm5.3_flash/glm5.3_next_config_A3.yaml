@@ -4,11 +4,12 @@ parallel:
   fsdp_plan:
     apply_modules:
       - model.visual
-      - model.visual.blocks.{*}
       - model.language_model.embed_tokens
       - model.language_model
       - model.language_model.layers.{*}
       - lm_head
+    hook_modules:
+      - model.language_model.layers.{*}
     param_dtype: bf16
     reduce_dtype: fp32
     num_to_forward_prefetch: 1
@@ -34,7 +35,7 @@ data:
       model_name_or_path: &HF_MODEL_LOAD_PATH /path/to/GLM-5.3-Flash-BF16
       use_fast_tokenizer: true
       split_special_tokens: false
-      image_max_pixels: 262144
+      image_max_pixels: 6553600
       image_min_pixels: 1024
       video_max_pixels: 16384
       video_min_pixels: 0
@@ -42,15 +43,16 @@ data:
       video_maxlen: 64
 
     basic_parameters:
-      cutoff_len: 8192
+      cutoff_len: 12288
       template: glm5_next
       enable_thinking: false
       train_on_prompt: false
       mask_history: false
       dataset_dir: /data/coco/
       dataset: &DATASET_PATH /data/coco/mllm_format_llava_instruct_data.json
+
       cache_dir: ./cache_dir/
-      overwrite_cache: true
+      overwrite_cache: false
       preprocess_on_fly: true
       preprocessing_batch_size: 1000
       preprocessing_num_workers: 16
@@ -58,7 +60,7 @@ data:
 
   dataloader_param:
     pin_memory: true
-    shuffle: false
+    shuffle: true
     dataloader_mode: sampler
     drop_last: true
     sampler_type: BaseRandomBatchSampler
@@ -73,26 +75,50 @@ model:
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   attn_implementation: sdpa
-  kda_implementation: fused
+  kda_implementation: ascendc
   causal_conv1d_implementation: triton
   dsa_implementation: sfa
   indexer_implementation: triton
 
 features:
-  loss_cfg:
-    loss_type: default
-    router_aux_loss_coef: 0.0
+  swap_plan:
+    capacity_mb: 16384
+    keep_rate: 0.25
+    enable_prefetch: True
+    cpu_arena_slab_size_mb: 2048.0
+    cpu_arena_pool_policy: standard
+    pin_memory: True
+    eviction_policy: fifo
   recompute: true
   recompute_plan:
     apply_modules:
       - model.visual.blocks.{*}
       - model.language_model.layers.{*}
+    op_replay_scopes:
+      - name: sfa
+        apply_modules:
+          - model.language_model.layers.{*}.self_attn
+        save_rng: true
+        cache_ops:
+          - npu.npu_sparse_flash_attention.default
+          - mindspeed_mm.chunk_kda_fwd.default
+      - name: vit
+        apply_modules:
+          - model.visual.blocks.{*}
+        cache_ops:
+          - npu.npu_fusion_attention.default
+  loss_cfg:
+    loss_type: default
+    router_aux_loss_coef: 0.0
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
-    chunk_size: 1024
+    impl_type: cce
+    vocab_tile_size: 4096
+    chunk_size: null
   enable_activation_offload: true
   activation_offload_plan:
+    impl: stash
     apply_modules:
       - model.visual.blocks.{*}
       - model.language_model.layers.{*}
@@ -106,28 +132,27 @@ features:
     chunk_kwarg_names: ["position_ids", "attention_mask"]
 
 training:
+  manual_gc_interval: 5
   micro_batch_size: 1
   gradient_accumulation_steps: 1
-  seed: 1234
+  seed: 42
   lr: 1.0e-5
-  lr_decay_style: constant
-  lr_warmup_ratio: 0
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.1
   weight_decay: 0
-  train_iters: 4000
+  train_iters: 5000
   clip_grad: 0.0
   init_model_with_meta_device: true
   optimizer: adamw
   adam_fused: true
-  save_interval: 1000
+  save_interval: 3500
   no_load_optim: true
   no_load_rng: true
   no_save_optim: true
   no_save_rng: true
   load_rank0_and_broadcast: true
-  load: /path/to/weight/GLM-5.3-Flash
-  save_format: dcp
-  save: ./save_path
-  use_deter_comp: true
+  load: /path/to/GLM-5.3-Flash-BF16
+  use_deter_comp: false
   plugin:
     - mindspeed_mm/fsdp/models/glm5_next
     - mindspeed_mm/fsdp/data/datasets/huggingface
@@ -140,12 +165,12 @@ tools:
     static_param:
       level: level1
       with_stack: false
-      with_memory: false
+      with_memory: true
       record_shapes: false
       with_cpu: true
-      save_path: ./profiling
-      start_step: 2
-      end_step: 3
+      save_path: /tmp/profiling
+      start_step: 10
+      end_step: 12
       data_simplification: true
       aic_metrics_type: PipeUtilization
   memory_profile:

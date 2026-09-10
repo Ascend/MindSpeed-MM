@@ -73,22 +73,65 @@ from torch.distributed.distributed_c10d import ProcessGroup
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 if IS_NPU_AVAILABLE:
     import torch_npu
-from triton_ascend_kernels.attention.fla.kda.chunk import chunk_kda
-from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_wrapper import chunk_kda_ascendc
-from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
-from mindspeed_mm.fsdp.ops.hc.sinkhorn import hc_split_sinkhorn
+
+_KERNEL_IMPORT_ERROR: dict = {}
+
+try:
+    from mindspeed_mm.fsdp.ops.kda.triton_ascend.chunk import chunk_kda
+except ImportError as err:
+    chunk_kda = None
+    _KERNEL_IMPORT_ERROR["kda_triton"] = err
+
+try:
+    from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_wrapper import chunk_kda_ascendc
+except ImportError as err:
+    chunk_kda_ascendc = None
+    _KERNEL_IMPORT_ERROR["kda_ascendc"] = err
+
+try:
+    from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
+except ImportError as err:
+    causal_conv1d = None
+    _KERNEL_IMPORT_ERROR["causal_conv1d_triton"] = err
+
+try:
+    from mindspeed_mm.fsdp.ops.gdn.causal_conv1d_ascendc import causal_conv1d_ascendc
+except ImportError as err:
+    causal_conv1d_ascendc = None
+    _KERNEL_IMPORT_ERROR["causal_conv1d_ascendc"] = err
+
+try:
+    from mindspeed_mm.fsdp.ops.hc.sinkhorn import hc_split_sinkhorn
+except ImportError as err:
+    hc_split_sinkhorn = None
+    _KERNEL_IMPORT_ERROR["hc_sinkhorn"] = err
+
+from mindspeed_mm.fsdp.ops.swiglu import swiglu
+
+
+def _require_kernel(kernel, key: str, option: str) -> None:
+    """Fail at model build when the config selects a kernel that did not import.
+
+    Without this the failure surfaces deep in the first forward, far from the
+    option that caused it.
+    """
+    if kernel is None:
+        raise RuntimeError(
+            f"{option} needs an Ascend kernel package that failed to import at "
+            f"startup; see the chained error. Choose another implementation to "
+            f"stay on the eager path, or fix the install."
+        ) from _KERNEL_IMPORT_ERROR.get(key)
 
 import logging
 logger = logging.getLogger(__name__)
 
 IMPL_EAGER = "eager"
-IMPL_FUSED = "fused"
 IMPL_TRITON = "triton"
 IMPL_ASCENDC = "ascendc"
 IMPL_DENSE = "dense"
 IMPL_SFA = "sfa"
-IMPL_FOR_KDA = (IMPL_EAGER, IMPL_FUSED, IMPL_ASCENDC)
-IMPL_FOR_CAUSAL_CONV = (IMPL_EAGER, IMPL_TRITON)
+IMPL_FOR_KDA = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC)
+IMPL_FOR_CAUSAL_CONV = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC)
 IMPL_FOR_DSA = (IMPL_DENSE, IMPL_SFA)
 IMPL_FOR_INDEXER = (IMPL_EAGER, IMPL_TRITON)
 
@@ -104,10 +147,10 @@ class Glm5NextTextRMSNorm(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        if IS_NPU_AVAILABLE:
+            return torch_npu.npu_rms_norm(hidden_states, self.weight.to(hidden_states.dtype), epsilon=self.variance_epsilon)[0]
         input_dtype = hidden_states.dtype
         hidden_states = hidden_states.to(torch.float32)
-        if IS_NPU_AVAILABLE:
-            return torch_npu.npu_rms_norm(hidden_states, self.weight.to(torch.float32), epsilon=self.variance_epsilon)[0].to(input_dtype)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         return self.weight * hidden_states.to(input_dtype)
@@ -122,19 +165,31 @@ class Glm5NextTextMLP(nn.Module):
         self.config = config
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
-        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
+        if config.hidden_act != "silu":
+            raise ValueError(
+                "Glm5NextTextMLP folds the activation into swiglu, which is silu-only; "
+                f"got hidden_act={config.hidden_act!r}."
+            )
+        self.gate_up_proj = nn.Linear(self.hidden_size, 2 * self.intermediate_size, bias=False)
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
-        self.act_fn = ACT2FN[config.hidden_act]
         self.swiglu_limit = config.swiglu_limit
+        self.register_buffer(
+            "_min_bound",
+            torch.cat([torch.full((self.intermediate_size,), float("-inf")),
+                       torch.full((self.intermediate_size,), -self.swiglu_limit)]),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_max_bound",
+            torch.full((2 * self.intermediate_size,), self.swiglu_limit),
+            persistent=False,
+        )
 
     def forward(self, x):
-        gate = self.gate_proj(x)
-        up = self.up_proj(x)
-        # Key difference using clamping
-        gate = gate.clamp(min=None, max=self.swiglu_limit)
-        up = up.clamp(min=-self.swiglu_limit, max=self.swiglu_limit)
-        return self.down_proj(self.act_fn(gate) * up)
+        gate_up = self.gate_up_proj(x)
+        gate_up = torch.clamp(gate_up, min=self._min_bound.to(gate_up.dtype),
+                              max=self._max_bound.to(gate_up.dtype))
+        return self.down_proj(swiglu(gate_up, dim=-1))
 
 
 # @use_experts_implementation
@@ -361,7 +416,7 @@ class Glm5NextTextHyperConnection(nn.Module):
         flat = self.input_norm(hidden_streams.flatten(start_dim=2).float())
         mixes = F.linear(flat, self.fn.float())
 
-        if IS_NPU_AVAILABLE:
+        if IS_NPU_AVAILABLE and hc_split_sinkhorn is not None:
             pre, post, comb = hc_split_sinkhorn(
                 mixes, self.scale, self.base, hc, self.hc_sinkhorn_iters, self.hc_eps
             )
@@ -707,7 +762,7 @@ class Glm5NextTextLinearAttention(nn.Module):
         self.num_heads = config.linear_num_heads
         self.head_dim = config.linear_head_dim
         self.qkv_dim = self.head_dim * self.num_heads
-        self.kda_implementation = getattr(config, "kda_implementation", IMPL_FUSED)
+        self.kda_implementation = getattr(config, "kda_implementation", IMPL_TRITON)
         self.causal_conv1d_implementation = getattr(config, "causal_conv1d_implementation", IMPL_TRITON)
 
         self.conv_kernel_size = config.linear_conv_kernel_dim
@@ -715,9 +770,7 @@ class Glm5NextTextLinearAttention(nn.Module):
         self.activation = config.hidden_act
         self.layer_norm_epsilon = config.rms_norm_eps
 
-        self.q_proj = nn.Linear(self.hidden_size, self.qkv_dim, bias=False)
-        self.k_proj = nn.Linear(self.hidden_size, self.qkv_dim, bias=False)
-        self.v_proj = nn.Linear(self.hidden_size, self.qkv_dim, bias=False)
+        self.qkv_proj = nn.Linear(self.hidden_size, self.qkv_dim * 3, bias=False)
 
         self.conv_dim = self.qkv_dim * 3
         self.conv1d = nn.Conv1d(
@@ -754,14 +807,7 @@ class Glm5NextTextLinearAttention(nn.Module):
         batch_size, seq_len = hidden_states.shape[:2]
         hidden_shape = (batch_size, seq_len, -1, self.head_dim)
 
-        mixed_qkv = torch.cat(
-            [
-                self.q_proj(hidden_states),
-                self.k_proj(hidden_states),
-                self.v_proj(hidden_states),
-            ],
-            dim=-1,
-        )
+        mixed_qkv = self.qkv_proj(hidden_states)
 
         # Acts for normal prefill but also for multi-token prefill continue
         use_precomputed_states = cache_params is not None and cache_params.has_previous_state(self.layer_idx)
@@ -799,6 +845,21 @@ class Glm5NextTextLinearAttention(nn.Module):
                     activation=self.activation,
                     cu_seqlens=cu_seqlens,
                 )
+            elif self.causal_conv1d_implementation == IMPL_ASCENDC:
+                conv_w = self.conv1d.weight.squeeze(1)          # [D, W]
+                parts = []
+                for i in range(3):
+                    sl = slice(i * self.qkv_dim, (i + 1) * self.qkv_dim)
+                    y, _ = causal_conv1d_ascendc(
+                        x=mixed_qkv[..., sl].contiguous(),
+                        weight=conv_w[sl],
+                        H=self.num_heads,
+                        bias=None if self.conv1d.bias is None else self.conv1d.bias[sl],
+                        activation=self.activation,
+                        cu_seqlens=cu_seqlens,
+                    )
+                    parts.append(y.transpose(1, 2).reshape(batch_size, -1, self.qkv_dim))
+                mixed_qkv = torch.cat(parts, dim=-1)
             else:
                 mixed_qkv = causal_conv1d_fn(
                     mixed_qkv.transpose(1, 2),
@@ -853,7 +914,7 @@ class Glm5NextTextLinearAttention(nn.Module):
                     A_log=self.forget_gate.A_log.float(),
                     dt_bias=self.forget_gate.dt_bias.float()
                 )
-            elif self.kda_implementation == (IMPL_FUSED):
+            elif self.kda_implementation == (IMPL_TRITON):
                 g = self.forget_gate.raw(hidden_states).view(hidden_shape)
                 core_attn_out, last_recurrent_state = chunk_kda(
                     q=query,
@@ -1900,16 +1961,25 @@ class Glm5NextVisionMLP(nn.Module):
         self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=bias)
         self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=bias)
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=bias)
-        self.act_fn = ACT2FN[config.hidden_act]
         self.swiglu_limit = config.swiglu_limit
+        self.register_buffer(
+            "_min_bound",
+            torch.cat([torch.full((self.intermediate_size,), float("-inf")),
+                    torch.full((self.intermediate_size,), -self.swiglu_limit)]),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_max_bound", torch.full((2 * self.intermediate_size,), self.swiglu_limit), persistent=False,
+        )
 
     def forward(self, hidden_state):
-        gate = self.gate_proj(hidden_state)
-        up = self.up_proj(hidden_state)
-        # Key difference using clamping
-        gate = gate.clamp(min=None, max=self.swiglu_limit)
-        up = up.clamp(min=-self.swiglu_limit, max=self.swiglu_limit)
-        return self.down_proj(self.act_fn(gate) * up)
+        gate_up = torch.cat([self.gate_proj.weight, self.up_proj.weight], dim=0)
+        bias = torch.cat([self.gate_proj.bias, self.up_proj.bias]) if self.gate_proj.bias is not None else None
+        gate_up = torch.nn.functional.linear(hidden_state, gate_up, bias)
+        gate_up = torch.clamp(gate_up, min=self._min_bound.to(gate_up.dtype), max=self._max_bound.to(gate_up.dtype))
+        # swiglu() is npu_swiglu on NPU and eager silu(x1) * x2 off it -- same
+        # dispatch Glm5NextTextMLP uses, so the two MLPs stay in step.
+        return self.down_proj(swiglu(gate_up, dim=-1))
 
 
 class Glm5NextVisionPatchMerger(nn.Module):
@@ -1946,6 +2016,8 @@ class Glm5NextRMSNorm(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        if IS_NPU_AVAILABLE:
+            return torch_npu.npu_rms_norm(hidden_states, self.weight.to(hidden_states.dtype), epsilon=self.variance_epsilon)[0]
         input_dtype = hidden_states.dtype
         hidden_states = hidden_states.to(torch.float32)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
@@ -1988,6 +2060,8 @@ class Glm5NextVisionAttention(nn.Module):
         self.proj = nn.Linear(config.hidden_size, config.hidden_size, bias=config.attention_bias)
         self.scaling = self.head_dim**-0.5
         self.config = config
+        if IS_NPU_AVAILABLE:
+            self.config._attn_implementation = "flash_attention_2"
         self.attention_dropout = config.attention_dropout
         self.is_causal = False
         self.q_norm = Glm5NextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
@@ -2527,6 +2601,10 @@ class Glm5NextForConditionalGeneration(Glm5NextPreTrainedModel, GenerationMixin)
             raise ValueError(
                 f"Invalid kda_implementation='{kda_implementation}'. Must be one of: {IMPL_FOR_KDA}."
             )
+        if kda_implementation == IMPL_TRITON:
+            _require_kernel(chunk_kda, "kda_triton", "kda_implementation='triton'")
+        elif kda_implementation == IMPL_ASCENDC:
+            _require_kernel(chunk_kda_ascendc, "kda_ascendc", "kda_implementation='ascendc'")
         transformer_config.text_config.kda_implementation = kda_implementation
         # conv1d impl
         causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()
@@ -2534,6 +2612,12 @@ class Glm5NextForConditionalGeneration(Glm5NextPreTrainedModel, GenerationMixin)
             raise ValueError(
                 f"Invalid causal_conv1d_implementation='{causal_conv1d_implementation}'. Must be one of: {IMPL_FOR_CAUSAL_CONV}."
             )
+        if causal_conv1d_implementation == IMPL_TRITON:
+            _require_kernel(causal_conv1d, "causal_conv1d_triton",
+                            "causal_conv1d_implementation='triton'")
+        elif causal_conv1d_implementation == IMPL_ASCENDC:
+            _require_kernel(causal_conv1d_ascendc, "causal_conv1d_ascendc",
+                            "causal_conv1d_implementation='ascendc'")
         transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
         # dsa impl
         dsa_implementation = getattr(model_args, "dsa_implementation", IMPL_DENSE).lower().strip()

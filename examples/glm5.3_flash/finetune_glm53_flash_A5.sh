@@ -1,4 +1,4 @@
-source /path/to/cann/cann-9.1.0/set_env.sh
+source /path/to/cann/cann-9.2.0/set_env.sh
 export NON_MEGATRON=true
 export MULTI_STREAM_MEMORY_REUSE=2
 export TASK_QUEUE_ENABLE=2
@@ -6,7 +6,7 @@ export ASCEND_LAUNCH_BLOCKING=0
 export ACLNN_CACHE_LIMIT=100000
 export CPU_AFFINITY_CONF=1
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
-NPUS_PER_NODE=16
+NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1
@@ -21,7 +21,7 @@ DISTRIBUTED_ARGS="
 "
 
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
-config_path=examples/glm5.3_flash/glm5.3_next_config_A3.yaml
+config_path=examples/glm5.3_flash/glm5.3_next_config_A5.yaml
 
 mkdir -p logs
 torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \

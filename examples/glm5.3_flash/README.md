@@ -13,7 +13,7 @@
   - [环境安装](#环境安装)
     - [1. 环境准备](#1-环境准备)
     - [2. 环境搭建](#2-环境搭建)
-    - [3. 安装配套版本的 Triton-Ascend](#3-安装配套版本的-triton-ascend)
+    - [3. 安装配套版本的Triton Ascend](#3-安装配套版本的triton-ascend)
     - [4. 安装 fla-npu](#4-安装-fla-npu)
   - [数据集准备及处理](#数据集准备及处理)
   - [训练](#训练)
@@ -29,7 +29,7 @@
 > 当前版本仅验证减层受限场景训练，使用前请先阅读[受限场景支持](#3-受限场景支持)章节。
 > 更多能力正在支持，敬请期待！
 
-当前目录提供GLM-5.3-Flash在MindSpeed-MM FSDP2训练流程中的示例配置。模型实现位于`mindspeed_mm/fsdp/models/glm5_next`，训练配置和启动脚本位于`examples/glm53_flash`。
+当前目录提供GLM-5.3-Flash在MindSpeed-MM FSDP2训练流程中的示例配置。模型实现位于`mindspeed_mm/fsdp/models/glm5_next`，训练配置和启动脚本位于`examples/glm5.3_flash`。
 
 ### 参考实现
 
@@ -58,10 +58,10 @@ url=https://huggingface.co/zai-org/GLM-5.3-Flash-BF16/tree/main
 
 | 组件 | 推荐版本 |
 |------|----------|
-| Python | 3.10 |
-| torch / TorchNPU | 2.7.1 |
-| CANN | 9.0.0 及以上 |
-| transformers | 5.16.0 |
+| Python | 3.12 |
+| torch | 2.10.0|
+| TorchNPU |2.10.0.post4 及以上 |
+| CANN | 9.1.0 及以上 |
 
 <a id="jump1.2"></a>
 
@@ -72,45 +72,58 @@ url=https://huggingface.co/zai-org/GLM-5.3-Flash-BF16/tree/main
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
+bash scripts/install.sh --msbranch master
+# 调整部分依赖库：
+pip uninstall -y torchaudio
+cd ..
 ```
 
 执行如下指令安装基础依赖：
 
 ```bash
-bash scripts/install.sh --msbranch master
-
 # 安装transformer库
-git clone https://github.com/huggingface/transformers.git
-cd transformers
-git checkout b6c0bfe04c823a7b2ca48f91b8b91b2a7741f309
-pip install -e .
-
+pip install transformers==5.16.1
 pip install tiktoken==0.12.0
 ```
 
-### 3. 安装配套版本的 Triton-Ascend
+### 3. 安装配套版本的Triton Ascend
 
-GLM-5.3-Flash的KDA（Kimi Delta Attention）等线性注意力融合算子基于Triton实现，在昇腾环境下需要安装配套版本的Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
+GLM-5.3-Flash的KDA（Kimi Delta Attention）等线性注意力融合算子基于Triton实现，在昇腾环境下需要安装配套版本的Triton-Ascend
+请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
 
-KDA 算子实现依赖`triton-ascend-kernels`算子库（`modeling_glm5_next.py` 中的 `chunk_kda` 来自该包），且需要使用本仓提供的`chunk.py`替换算子库中的同名文件，安装步骤如下：
+```shell
+# 供参考, 命令以文档为准
+pip install triton-ascend==3.2.2 --extra-index-url=https://mirrors.huaweicloud.com/ascend/repos/pypi
+```
+
+KDA 算子实现依赖`triton-ascend-kernels`算子库（`modeling_glm5_next.py` 中的 `chunk_kda` 来自该包），安装步骤如下：
+
+atlas A2&A3训练产品安装步骤
 
 ```shell
 # 拉取 triton-ascend-kernels 代码仓
-git clone https://gitcode.com/Ascend/triton-ascend-kernels.git
+git clone https://gitcode.com/fengrui886/triton-ascend-kernels
 cd triton-ascend-kernels
-
-# 拉取配套的MR288分支
-git fetch https://gitcode.com/Ascend/triton-ascend-kernels.git +refs/merge-requests/288/head:pr_288
-git checkout pr_288
-
-# 使用本仓提供的chunk.py替换算子库中的同名文件
-# MM_PATH 配置为 MindSpeed-MM 根目录路径
-cp -f ${MM_PATH}/mindspeed_mm/fsdp/ops/kda/triton_ascend/chunk.py \
-  src/triton_ascend_kernels/attention/fla/kda/chunk.py
+git checkout kda_a3
 
 # 安装
-# 注意：triton-ascend-kernels 的 pyproject.toml 中固定了 pta、triton-ascend 的版本，直接安装会覆盖环境中现有版本，安装前请建议注释掉该文件中对应的版本约束。
-pip install -e .
+pip install -e . --no-build-isolation --no-deps
+cd ..
+```
+
+950系列产品安装步骤
+
+```shell
+# 拉取 triton-ascend-kernels 代码仓
+git clone https://gitcode.com/shenzhaofeng/triton-ascend-kernels.git
+cd triton-ascend-kernels
+
+# 拉取配套分支
+git checkout kda_a5
+
+# 安装
+pip install -e . --no-build-isolation --no-deps
+cd ..
 ```
 
 ### 4. 安装 fla-npu
@@ -122,11 +135,25 @@ GLM-5.3-Flash适配包含 AscendC KDA wrapper，需安装 fla-npu 以保证相�
 ```bash
 git clone https://github.com/flashserve/flash-linear-attention-npu
 cd flash-linear-attention-npu
-git checkout c2e3d83f
+git checkout 2062460754c8
 ```
 
-安装步骤可参考 fla-npu 仓 README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/main/README.md), 参考"源码一键编译并生成 wheel"完整fla编译。
-安装后检验 fla-npu 是否安装成功：
+安装步骤可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/main/README.md), 参考"源码一键编译并生成 wheel"完整fla编译。
+
+```bash
+# fla需安装gawk
+python -m pip install -r requirements.txt
+# 检查编译环境满足要求, 如果不满足需解决
+python scripts/check_npu_env.py
+# FLA_NPU_SOC对应A2/A3/A5分别填ascend910b/ascend910_93/ascend950
+FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
+# 编译成功后安装
+./build_out/*.run
+pip install --force-reinstall --no-cache-dir --no-deps ./dist/*.whl
+cd ..
+```
+
+安装后检验fla-npu是否安装成功：
 
 ```bash
 pip list | grep fla
@@ -146,7 +173,7 @@ pip list | grep fla
 
 ### 1. 准备工作
 
-从 HuggingFace 下载 GLM-5.3-Flash 模型文件到本地目录，并将配置中的 `HF_MODEL_LOAD_PATH` 指向该目录：
+从 HuggingFace 下载 GLM-5.3-Flash 模型文件到本地目录，并将配置文件examples/glm5.3_flash/glm5.3_next_config.yaml中的 `HF_MODEL_LOAD_PATH` 指向该目录：
 
 ```yaml
 data:
@@ -175,19 +202,21 @@ training:
   load: /path/to/GLM-5.3-Flash
 ```
 
+如果不加载权重（随机初始化跑通功能），需要把`load`整行注释掉，并将`load_rank0_and_broadcast`置为`false`。
+
 <a id="jump3.2"></a>
 
 ### 2. 配置参数
 
-以下配置项在 `examples/glm53_flash/glm53_flash_config.yaml` 中设置：
+以下配置项在 `examples/glm5.3_flash/glm53_flash_config.yaml` 中设置：
 
 | 配置项 | 配置路径 | 参数说明 | 调整说明 |
 |--------|----------|----------|----------|
-| `expert_parallel_size` | `parallel` | EP 专家并行度 | 值为1时不开启，仅对MoE模型生效 |
-| `kda_implementation` | `model` | KDA 实现选择 | `fused` / `eager` |
-| `causal_conv1d_implementation` | `model` | KDA 短卷积实现选择 | `triton` / `eager` |
-| `dsa_implementation` | `model` | DSA 实现选择 | `dense` / `sfa` |
-| `indexer_implementation` | `model` | DSA indexer 实现选择 | `eager` / `triton` |
+| `expert_parallel_size` | `parallel` | EP专家并行度 | 值为1时不开启，仅对MoE模型生效 |
+| `kda_implementation` | `model` | KDA实现选择 | `ascendc` / `triton` / `eager` |
+| `causal_conv1d_implementation` | `model` | KDA短卷积实现选择 | `ascendc` / `triton` / `eager` |
+| `dsa_implementation` | `model` | DSA实现选择 | `dense` / `sfa` |
+| `indexer_implementation` | `model` | DSAindexer实现选择 | `eager` / `triton` |
 | `recompute` | `features` | 重计算开关 | 开启后节省显存占用 |
 | `enable_activation_offload` | `features` | 激活值异步卸载到Host侧内存开关 | 开启后降低Device显存占用，`apply_modules`指定需要开启该特性的module |
 | `enable_chunk_loss` | `features` | chunk loss 开关 | 默认开启，需与 `chunkloss_plan` 配套 |
@@ -218,7 +247,7 @@ training:
 
 【EP并行配置】
 
-根据实际的需求配置`kimik3_config.yaml`中的`expert_parallel_size`（值为1时不开启EP）。
+根据实际的需求配置`glm53_flash_config.yaml`中的`expert_parallel_size`（值为1时不开启EP）。
 
 【性能优化配置】
 
@@ -255,9 +284,9 @@ NODE_RANK=0
 
 - **减层训练**：基于减层、减专家模型配置进行训练验证；
   - 调整层数：修改模型配置路径下 `config.json` 中的 `num_hidden_layers` 字段, 减层时需同步调整`mlp_layer_types`、`layer_types`、`indexer_types`、`linear_attn_config.kda_layers`、`linear_attn_config.full_attn_layers`等字段，建议至少保留4层以上,包含KDA+DSA结构。
-  - 调整专家个数：修改 `config.json` 中的 `num_experts` 字段，注意需与 `glm5_next_config_deter.yaml` 中的 `expert_parallel_size` 配套调整（专家个数需能被EP并行度整除）；
-  - 参考配置：当前A3单节点可配置 `num_hidden_layers=4`、`num_experts=288`；
-- **序列长度**：mbs=1时支持8k序列长度以下；
+  - 调整专家个数：修改 `config.json` 中的 `num_experts` 字段，注意需与 `glm5.3_flash_config.yaml` 中的 `expert_parallel_size` 配套调整（专家个数需能被EP并行度整除）；
+  - 参考配置：当前可配置 `num_hidden_layers=4`、`num_experts=288`；
+- **序列长度**：mbs=1时支持16k序列长度以下；
 - **ep**: 不减专家数时,需开启专家并行,避免OOM。
 
 <a id="jump3.4"></a>
@@ -267,7 +296,8 @@ NODE_RANK=0
 完成环境、模型路径和数据路径配置后，执行：
 
 ```shell
-bash examples/glm53_flash/finetune_glm53_flash.sh
+cd MindSpeed-MM
+bash examples/glm5.3_flash/finetune_glm53_flash.sh
 ```
 
 训练日志默认写入 `logs/train_${logfile}.log`，脚本结束后会统计平均 step time 和 samples per second。

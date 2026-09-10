@@ -316,9 +316,12 @@ class Glm53FlashWeightTransformPipeline(WeightTransformPipeline):
         (re.compile(r"\.self_attn\.forget_gate\.(A_log|dt_bias)$"), r".self_attn.\1"),
         (re.compile(r"\.self_attn\.forget_gate\.(f_a_proj|f_b_proj)\."), r".self_attn.\1."),
     ]
-
     CONV_ORDER = ("q", "k", "v")
     CONV_RE = re.compile(r"^(?P<prefix>.*\.self_attn)\.(?P<which>[qkv])_conv1d\.weight$")
+    QKV_ORDER = ("q", "k", "v")
+    QKV_RE = re.compile(r"^(?P<prefix>.*\.self_attn)\.(?P<which>[qkv])_proj\.weight$")
+    MLP_ORDER = ("gate", "up")
+    MLP_RE = re.compile(r"^(?P<prefix>.*)\.(?P<which>gate|up)_proj\.weight$")
 
     def __init__(self, hf_dir: str, mtp_num_layers: Optional[int] = None) -> None:
         super().__init__()
@@ -350,6 +353,19 @@ class Glm53FlashWeightTransformPipeline(WeightTransformPipeline):
 
         self._buffered_weights: Dict[str, torch.Tensor] = {}
         self._buffered_conv: Dict[str, Dict[str, torch.Tensor]] = {}
+        layer_types = getattr(text_config, "layer_types", None) or []
+        self._qkv_prefixes = {
+            f"model.language_model.layers.{layer_idx}.self_attn"
+            for layer_idx, layer_type in enumerate(layer_types[:num_layers])
+            if layer_type == "linear_attention"
+        }
+        self._buffered_qkv: Dict[str, Dict[str, torch.Tensor]] = {}
+        self._mlp_prefixes = {
+            f"model.language_model.layers.{layer_idx}.mlp"
+            + ("" if mlp_type != "sparse" else ".shared_experts")
+            for layer_idx, mlp_type in enumerate(mlp_layer_types[:num_layers])
+        }
+        self._buffered_mlp: Dict[str, Dict[str, torch.Tensor]] = {}
 
     @staticmethod
     def _rename(key: str, rules) -> str:
@@ -379,8 +395,30 @@ class Glm53FlashWeightTransformPipeline(WeightTransformPipeline):
                 dcp_key=dcp_key,
                 transpose=False,
             )
+        # 2. qkv: Concatenates three [qkv_dim, H] tensors into [3 * qkv_dim, H] in the order of q, k, v.
+        match = self.QKV_RE.match(key)
+        if match and match.group("prefix") in self._qkv_prefixes:
+            prefix = match.group("prefix")
+            group = self._buffered_qkv.setdefault(prefix, {})
+            group[match.group("which")] = tensor
+            if len(group) < len(self.QKV_ORDER):
+                return None
+            merged = torch.cat([group[which] for which in self.QKV_ORDER], dim=0)
+            del self._buffered_qkv[prefix]
+            return f"{prefix}.qkv_proj.weight", merged
+        # 3. mlp gate/up: Concatenates two [I, H] tensors into [2I, H] in the order of gate, up.
+        match = self.MLP_RE.match(key)
+        if match and match.group("prefix") in self._mlp_prefixes:
+            prefix = match.group("prefix")
+            group = self._buffered_mlp.setdefault(prefix, {})
+            group[match.group("which")] = tensor
+            if len(group) < len(self.MLP_ORDER):
+                return None
+            merged = torch.cat([group[which] for which in self.MLP_ORDER], dim=0)
+            del self._buffered_mlp[prefix]
+            return f"{prefix}.gate_up_proj.weight", merged
 
-        # 2. conv1d：Concatenates three [qkv_dim, 1, C] tensors into [3 * qkv_dim, 1, C] in the order of q, k, v.
+        # 4. conv1d: Concatenates three [qkv_dim, 1, C] tensors into [3 * qkv_dim, 1, C] in the order of q, k, v.
         match = self.CONV_RE.match(key)
         if match:
             prefix = match.group("prefix")
@@ -392,7 +430,7 @@ class Glm53FlashWeightTransformPipeline(WeightTransformPipeline):
             del self._buffered_conv[prefix]
             return f"{prefix}.conv1d.weight", merged
 
-        # 3. rename only
+        # 5. rename only
         return self._rename(key, self.RENAME_RULES), tensor
     @staticmethod
     def _to_full(tensor: torch.Tensor) -> torch.Tensor:
@@ -406,7 +444,20 @@ class Glm53FlashWeightTransformPipeline(WeightTransformPipeline):
             return split_moe_expert_weights(
                 tensor=self._to_full(tensor), hf_keys=hf_keys, dcp_key=key, transpose=False
             )
-
+        if key.endswith(".self_attn.qkv_proj.weight"):
+            prefix = key[: -len(".qkv_proj.weight")]
+            chunks = torch.chunk(self._to_full(tensor), len(self.QKV_ORDER), dim=0)
+            return {
+                f"{prefix}.{which}_proj.weight": chunk.contiguous()
+                for which, chunk in zip(self.QKV_ORDER, chunks)
+            }
+        if key.endswith(".gate_up_proj.weight"):
+            prefix = key[: -len(".gate_up_proj.weight")]
+            chunks = torch.chunk(self._to_full(tensor), len(self.MLP_ORDER), dim=0)
+            return {
+                f"{prefix}.{which}_proj.weight": chunk.contiguous()
+                for which, chunk in zip(self.MLP_ORDER, chunks)
+            }
         if key.endswith(".self_attn.conv1d.weight"):
             prefix = key[: -len(".conv1d.weight")]
             chunks = torch.chunk(self._to_full(tensor), len(self.CONV_ORDER), dim=0)

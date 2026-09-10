@@ -12,6 +12,7 @@ post-sigmoid beta, no initial/final state.
 """
 
 import torch
+from torch.library import custom_op
 
 from triton_ascend_kernels.attention.fla.kda.fla_utils import (
     autocast_custom_bwd,
@@ -32,9 +33,45 @@ except (AttributeError, ImportError) as exc:
         "/opp/vendors/*/op_impl/*/ | grep chunk_kda\n"
         "Set kda_implementation: fused to keep training on the Triton path."
     ) from exc
+import torch.nn.functional as F
 
 CHUNK_SIZE = 64
 
+@custom_op("mindspeed_mm::chunk_kda_fwd", mutates_args=())
+def _chunk_kda_fwd_op(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    g: torch.Tensor,
+    beta: torch.Tensor,
+    scale: float,
+    safe_gate: bool,
+    lower_bound: float | None,
+    use_gate_in_kernel: bool,
+    A_log: torch.Tensor | None,
+    dt_bias: torch.Tensor | None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+           torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    (o, _final_state, g_cumsum, Aqk, Akk, w, _u, qg, kg, v_new, h,
+     _) = ascendc_chunk_kda_fwd(
+        q, k, v, g, beta,
+        float(scale),
+        CHUNK_SIZE,
+        layout="BSND",
+        initial_state=None,
+        output_final_state=False,
+        cu_seqlens=None,
+        chunk_indices=None,
+        safe_gate=bool(safe_gate),
+        lower_bound=lower_bound,
+        use_gate_in_kernel=bool(use_gate_in_kernel),
+        A_log=A_log,
+        dt_bias=dt_bias,
+        disable_recompute=True,
+        return_intermediate_states=False,
+        state_v_first=False,
+    )
+    return o, g_cumsum, Aqk, Akk, w, qg, kg, v_new, h
 
 def _bsnd_to_bnsd(tensor):
     if tensor is None:
@@ -132,26 +169,17 @@ class ChunkKDAAscendCFunction(torch.autograd.Function):
             q, q_rstd = l2norm_fwd(q)
             k, k_rstd = l2norm_fwd(k)
 
-        # disable_recompute keeps w/qg/kg/v_new/h alive for the fused backward.
-        (o, final_state, g_cumsum, Aqk, Akk, w, u, qg, kg, v_new, h,
-         _) = ascendc_chunk_kda_fwd(
+        # opreplay path
+        (o, g_cumsum, Aqk, Akk, w, qg, kg, v_new, h) = _chunk_kda_fwd_op(
             q, k, v, g, beta,
             float(scale),
-            CHUNK_SIZE,
-            layout="BSND",
-            initial_state=None,
-            output_final_state=False,
-            cu_seqlens=None,
-            chunk_indices=None,
-            safe_gate=bool(safe_gate),
-            lower_bound=lower_bound,
-            use_gate_in_kernel=bool(use_gate_in_kernel),
-            A_log=A_log if use_gate_in_kernel else None,
-            dt_bias=dt_bias if use_gate_in_kernel else None,
-            disable_recompute=True,
-            return_intermediate_states=False,
-            state_v_first=False,
+            bool(safe_gate),
+            lower_bound,
+            bool(use_gate_in_kernel),
+            A_log if use_gate_in_kernel else None,
+            dt_bias if use_gate_in_kernel else None,
         )
+        final_state = None
 
         _check_intermediates(q, v, g_cumsum, Aqk, Akk, w, qg, kg, v_new, h)
 
@@ -180,7 +208,7 @@ class ChunkKDAAscendCFunction(torch.autograd.Function):
         if ctx.use_gate_in_kernel and dt_bias is not None:
             gate_dt_bias = dt_bias.reshape(q.shape[2], q.shape[3]).contiguous()
 
-        dq_h, dk_h, dv_h, db_h, dg_h, dA, dbias = ascendc_chunk_kda_bwd(
+        dq_h, dk_h, dv_h, db_h, dg_h, dh0, dA, dbias = ascendc_chunk_kda_bwd(
             _bsnd_to_bnsd(q),
             _bsnd_to_bnsd(k),
             _bsnd_to_bnsd(v),
@@ -278,10 +306,18 @@ def chunk_kda_ascendc(
     if scale is None:
         scale = K ** -0.5
 
-    if scale is None:
-        scale = K ** -0.5
+    pad_len = (-T) % CHUNK_SIZE
+    if pad_len:
+        q = F.pad(q, (0, 0, 0, 0, 0, pad_len), value=1.0)
+        k = F.pad(k, (0, 0, 0, 0, 0, pad_len), value=1.0)
+        v = F.pad(v, (0, 0, 0, 0, 0, pad_len))
+        g = F.pad(g, (0, 0, 0, 0, 0, pad_len))
+        beta = F.pad(beta, (0, 0, 0, pad_len))
 
-    return ChunkKDAAscendCFunction.apply(
+    o, final_state = ChunkKDAAscendCFunction.apply(
         q, k, v, g, beta, A_log, dt_bias, scale,
         use_qk_l2norm_in_kernel, use_gate_in_kernel, safe_gate, lower_bound,
     )
+    if pad_len:
+        o = o[:, :T]
+    return o, final_state
