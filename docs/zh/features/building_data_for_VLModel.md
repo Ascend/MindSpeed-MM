@@ -27,9 +27,23 @@
 
 ```shell
 python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py \
-    --coco_path ./data/COCO2017 \
-    --llava_json_path ./data/llava_instruct_150k.json \
-    --output_json_path ./data/mllm_format_llava_instruct_data.json
+    --coco_path ./data/coco/COCO2017 \
+    --llava_json_path ./data/coco/llava_instruct_150k.json \
+    --output_json_path ./data/coco/mllm_format_llava_instruct_data.json
+```
+
+运行数据转换脚本后的目录结构示例如下：
+
+```text
+./data/
+└── coco/                                  # COCO数据集父目录（dataset_dir指向这里）
+    ├── COCO2017/                          # COCO 图像数据集（--coco_path 指向这里）
+    │   ├── train2017/
+    │   │   ├── 000000000001.jpg
+    │   │   └── ...
+    │   └── val2017/
+    ├── llava_instruct_150k.json           # 原始 LLaVA 标注文件
+    └── mllm_format_llava_instruct_data.json  # 转换后的标注文件（最终用于训练）
 ```
 
 并在训练开始前修改`xxx_config.yaml`中data配置：
@@ -40,9 +54,9 @@ data:
   dataset_param:
     basic_parameters:
       # 将该字段修改为COCO2017所在路径
-      dataset_dir: ./data/COCO2017
+      dataset_dir: ./data/coco
       # 将该字段修改为格式转换后json路径
-      dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
+      dataset: &DATASET_PATH ./data/coco/mllm_format_llava_instruct_data.json
       # 该参数用于限制只读取`max_samples`条数据，可用于快速验证功能，null即为全部数据
       max_samples: null
 ```
@@ -112,8 +126,8 @@ data:
 data:
   dataset_param:
     basic_parameters:
-      dataset_dir: ./data/COCO2017  # 将该字段修改为COCO2017所在路径
-      dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data1.json,./data/mllm_format_llava_instruct_data2.json  # 将该字段修改为格式转换后json路径
+      dataset_dir: ./data/coco  # 将该字段修改为COCO2017所在路径
+      dataset: &DATASET_PATH ./data/coco/mllm_format_llava_instruct_data1.json,./data/coco/mllm_format_llava_instruct_data2.json  # 将该字段修改为格式转换后json路径
 ```
 
 现在本框架已经支持纯文本/混合数据（有图像和无图像数据混合训练）。
@@ -161,7 +175,7 @@ data:
 
 ```shell
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-SAVE_DIR=./data/mocked_vl_data/
+SAVE_DIR=./data/fake/mocked_vl_data/
 mkdir -p $SAVE_DIR
 # 下方命令会生成包括512条样本的数据集，每条样本拥有10张1024*1024大小的图片以及16384的文本长度，--tokenizer_path需要指定当前待测模型的原始权重本地路径
 python mindspeed_mm/fsdp/tools/data_tool/generate_mock_data_for_vlmodel.py \
@@ -184,9 +198,9 @@ data:
       # 该参数指定模型训练的核心语言模块接受的最大序列长度，超出该配置的部分将被截断，建议构造数据是手动计算图文序列长度占比及总长度，尽可能与cutoff_len数值接近，否则会有截断图片占位符无法正常训练的风险
       cutoff_len: 16384
       # 将该字段修改构造数据的保存路径
-      dataset_dir: ./data/mocked_vl_data
+      dataset_dir: ./data/fake/mocked_vl_data
       # 将该字段修改为构造数据的json路径
-      dataset: &DATASET_PATH ./data/mocked_vl_data/mock_data_pic_num_10_textlen_16384.json
+      dataset: &DATASET_PATH ./data/fake/mocked_vl_data/mock_data_pic_num_10_textlen_16384.json
       # 该参数用于限制只读取`max_samples`条数据，可用于快速验证功能，null即为全部数据
       max_samples: null
 ```

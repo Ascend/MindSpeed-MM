@@ -414,7 +414,14 @@ check_existing_versions() {
     local current_torch_npu_version
     current_torch_npu_version=$(pip3 show torch_npu | grep "^Version:" | awk '{print $2}')
 
-    if [ "$current_torch_npu_version" = "$TORCH_VERSION" ]; then
+    # extract basic version (major.minor) for comparison
+    # Direct string comparison treats 2.10.0 and 2.10.0.post4 as different
+    # Compare only the first three segments to ignore .postX suffixes
+    local current_base target_base
+    current_base=$(echo "$current_torch_npu_version" | cut -d. -f1,2,3)
+    target_base=$(echo "$TORCH_VERSION" | cut -d. -f1,2,3)
+
+    if [ "$current_base" = "$target_base" ]; then
         echo "Current torch_npu version matches target version: $TORCH_VERSION"
         install_torch_npu=false
 

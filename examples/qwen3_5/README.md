@@ -39,6 +39,10 @@ commit_id=fc91372
 
 2026.02.10: 首次支持Qwen3_5模型
 
+环境变更记录：
+
+Latest:  2026.8.24:  为适配 CANN9.1.0 和 torch 2.10.0，将 Triton-Ascend 参考版本改为 3.2.2，fla-npu参考版本保持v26.6.0
+
 ---
 <a id="jump1"></a>
 
@@ -50,24 +54,37 @@ commit_id=fc91372
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](../../docs/zh/pytorch/install_guide.md)，完成 CANN 相关配置（驱动、固件及 Toolkit 工具包）。
 
 <a id="jump1.2"></a>
 
 ### 2. 环境搭建
 
-拉取MindSpeed MM代码仓，并进入代码仓根目录：
+拉取MindSpeed MM代码仓，并进入代码仓根目录(若需要使用低版本的python，可参考[安装指南](../../docs/zh/pytorch/install_guide.md)的拉取方法)：
 
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
 
+若存在自由指定依赖等手动安装需求，可以参考[安装指南](../../docs/zh/pytorch/install_guide.md)中的手动安装流程（注：Qwen3.5不需要安装该流程中的Megatron-LM库）
+
 执行如下指令一键安装：
 
 ```bash
-bash scripts/install.sh --msbranch master && bash examples/qwen3_5/install_extensions.sh
+bash scripts/install.sh --msbranch master && pip install transformers==5.2.0
 ```
+
+这里会自动安装 torch 以及 torch_npu 库，版本可以通过参数自行选择（默认 2.10.0），示例如下：
+
+```bash
+bash scripts/install.sh --msbranch master --torchversion 2.10.0 && pip install transformers==5.2.0
+```
+
+请参考[版本配套说明](../../docs/zh/release_notes_mm.md)和[Triton-Ascend3.2.2适配版本](https://github.com/triton-lang/triton-ascend/releases)选择适配的 pytorch/torch_npu 版本
+
+> [!NOTE]
+> 当前一键安装脚本torch_npu版本与torch为严格对应（无post后缀），建议按照链接中的适配版本自行安装带后缀的torch版本，否则可能无法通过后续环境检测脚本
 
 ### 3. 安装配套版本的Triton-Ascend
 
@@ -77,8 +94,11 @@ bash scripts/install.sh --msbranch master && bash examples/qwen3_5/install_exten
 
 ```shell
 # 注意：triton-ascend 3.2.0 及以下 Triton-Ascend 和 Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
-pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+pip install triton-ascend==3.2.2 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
 ```
+
+> [!NOTE]
+> 当前triton-ascend==3.2.2可能会遇到一些兼容问题，若安装triton-ascend==3.2.2问题无法解决，可以尝试退回triton-ascend==3.2.1，经测试3.2.1在python3.12环境下可以跑通完整流程
 
 ### 4. 安装fla-npu以适配AscendC
 
@@ -91,15 +111,15 @@ cd flash-linear-attention-npu
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/v26.6.0/README.md)
 
-> **说明：** 请确保操作系统已安装 `gawk`，否则后续安装会失败。可参考以下命令安装：
+> **说明：** 请确保操作系统已安装 `gawk`和`cmake`，否则后续安装会失败。可参考以下命令安装：
 
 ```shell
 # Ubuntu / Debian
 apt-get update
-apt-get install gawk
+apt-get install gawk cmake
 # openEuler / CentOS / RHEL
 yum update
-yum install gawk
+yum install gawk cmake
 ```
 
 推荐使用以下安装命令
