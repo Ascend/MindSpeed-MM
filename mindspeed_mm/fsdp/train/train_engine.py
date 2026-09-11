@@ -271,7 +271,14 @@ class TrainEngine:
 
         # Preload data
         if args.data and args.data.dataloader_param.enable_preload:
-            train_dataloader_iter = Preloader(train_dataloader_iter, param_dtype=param_dtype)
+            # Pass state_dict_fn to let Preloader capture dataloader state matching training progress
+            # (Preloader.last_consumed_state) after each batch consumption, before next prefetch starts.
+            # Without it, live dataloader position will stay one batch ahead of training progress due to prefetching.
+            train_dataloader_iter = Preloader(
+                train_dataloader_iter,
+                param_dtype=param_dtype,
+                state_dict_fn=self.train_dataloader.state_dict,
+            )
 
         self.model.train()
         if args.training.manual_gc_interval > 0:
@@ -337,7 +344,9 @@ class TrainEngine:
                 and args.training.save_interval > 0
                 and self.iteration % args.training.save_interval == 0
             ):
-                self.save(self.iteration, self.consumed_train_samples)
+                # With enable_preload, use Preloader‑captured dataloader state at batch consumption, which aligns with training progress.
+                dataloader_state = getattr(train_dataloader_iter, "last_consumed_state", None)
+                self.save(self.iteration, self.consumed_train_samples, dataloader_state)
             # Validation at specified intervals
             if (
                 args.training.val_interval > 0
@@ -354,7 +363,8 @@ class TrainEngine:
         memory_profiler.stop()
         # Final save after training completes
         if args.training.save:
-            self.save(self.iteration, self.consumed_train_samples)
+            dataloader_state = getattr(train_dataloader_iter, "last_consumed_state", None)
+            self.save(self.iteration, self.consumed_train_samples, dataloader_state)
 
     def _run_validation(self, iteration):
         print_rank(logger.info, f"Running validation at iteration {iteration}...")
@@ -426,8 +436,14 @@ class TrainEngine:
 
         return iteration, consumed_train_samples
 
-    def save(self, iteration, consumed_train_samples):
-        """Save checkpoint with model, optimizer, and training state."""
+    def save(self, iteration, consumed_train_samples, dataloader_state=None):
+        """Save checkpoint with model, optimizer, and training state.
+
+        Args:
+            iteration: Current training iteration.
+            consumed_train_samples: Number of consumed samples.
+            dataloader_state: Dataloader state aligned with training progress, defaults to None.
+        """
         args = self.args
 
         # Handle LoRA save modes
@@ -439,6 +455,9 @@ class TrainEngine:
                     iteration=iteration,
                 )
 
+        if dataloader_state is None:
+            dataloader_state = self.train_dataloader.state_dict()
+
         # Default save behavior (full model)
         state = {
             "model": self.model,
@@ -446,7 +465,7 @@ class TrainEngine:
                 "iteration": iteration,
                 "consumed_train_samples": consumed_train_samples,
                 "lr_scheduler": self.lr_scheduler.state_dict(),
-                "train_dataloader": self.train_dataloader.state_dict(),
+                "train_dataloader": dataloader_state,
             },
         }
         if not args.training.no_save_optim:

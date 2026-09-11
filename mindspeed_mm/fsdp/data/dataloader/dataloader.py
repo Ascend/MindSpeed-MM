@@ -273,11 +273,21 @@ class Preloader:
         batch = preloader.next()       # consume ready batch, start CPU prefetch
         forward(batch); backward(batch)
         preloader.trigger_h2d()        # launch H2D for next batch
+
+    Checkpoint state: background CPU prefetch keeps underlying dataloader one batch ahead of training loop.
+    A live state dict captured at save time records prefetched‑but‑unconsumed position, causing resume to skip one batch.
+    Provide state_dict_fn and next() captures dataloader state before next prefetch, so the sampler position matches
+    batches consumed by training loop, stored into last_consumed_state for checkpoint.
     """
 
-    def __init__(self, data_iterator, param_dtype=None):
+    def __init__(self, data_iterator, param_dtype=None, state_dict_fn=None):
         self.data_iterator = data_iterator
         self.param_dtype = param_dtype
+        # state_dict_fn: the underlying dataloader's state_dict method used to capture the dataloader state at the exact moment.
+        self.state_dict_fn = state_dict_fn
+        # last_consumed_state: dataloader state captured post‑batch‑consumption, before next prefetch.
+        # Its position matches actual training progress.
+        self.last_consumed_state = None
         self.device_type = get_device_type()
 
         # New h2d threads default to device 0 due to thread‑local device context.
@@ -369,6 +379,7 @@ class Preloader:
         if self._h2d_thread is not None:
             self._h2d_thread.join()
             self._h2d_thread = None
+
         # Re-raise any exception captured in the CPU prefetch thread or the H2D
         # thread, preserving the original traceback from where it originated.
         if self._fetch_error is not None:
@@ -379,11 +390,21 @@ class Preloader:
             _, exc_value, exc_tb = self._h2d_error
             self._h2d_error = None
             raise exc_value.with_traceback(exc_tb)
+
         get_current_stream().wait_stream(self.h2dstream)
         if self.next_batch is None:
             raise StopIteration("Dataloader has been exhausted, no more data available.")
         batch = self.next_batch
         self.next_batch = None
+
+        # Capture dataloader state BEFORE kicking off background prefetch for next batch.
+        # At this point yielded batches exactly match batches consumed by training loop.
+        # The returned batch was prefetched in prior round and already counted in sampler position;
+        # next batch prefetch has not started. Capturing after prefetch shifts sampler position
+        # one batch ahead, causing resumed training to consume misaligned batch on first step.
+        if self.state_dict_fn is not None:
+            self.last_consumed_state = self.state_dict_fn()
+
         # Kick off CPU prefetch for the next batch so it overlaps with the upcoming forward&backward.
         self._start_cpu_prefetch()
         return batch
