@@ -326,6 +326,10 @@ class TrainingArguments(BaseArguments):
         default=False,
         metadata={"help": "Whether to use deterministic computation for reproducibility."},
     )
+    distributed_timeout_minutes: int = field(
+        default=20,
+        metadata={"help": "Timeout minutes for torch.distributed."},
+    )
     allow_hf32: bool = field(
         default=None,
         metadata={"help": "This switch controls the value of `allow_hf32`."},

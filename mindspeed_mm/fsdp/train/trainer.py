@@ -4,7 +4,7 @@ import os
 
 os.environ["USE_TF"] = "FALSE"
 from functools import partial
-
+from datetime import timedelta
 import torch
 
 from mindspeed_mm.fsdp import envs
@@ -185,7 +185,8 @@ class Trainer:
         if not torch.distributed.is_initialized():
             torch.distributed.init_process_group(
                 backend=get_dist_comm_backend(cpu=args.parallel.fsdp_plan.cpu_offload),
-                device_id=torch.device(f"{get_device_type()}:{local_rank}")
+                device_id=torch.device(f"{get_device_type()}:{local_rank}"),
+                timeout=timedelta(minutes=args.training.distributed_timeout_minutes),
             )
 
         # Initialize parallel communication groups and mesh
@@ -248,12 +249,12 @@ class Trainer:
                         if getattr(sub_model, "_ms_mm_meta_init", False) and not getattr(
                             sub_model, "_weights_loaded", False
                         ):
-                            init_model_weights(sub_model)
+                            init_model_weights(sub_model, seed=args.training.seed)
             else:
                 to_empty_if_needed(model, device=device)
                 if args.training.load is None and not args.training.load_rank0_and_broadcast or args.training.lora.enable:
                     if not getattr(model, "_weights_loaded", False):
-                        init_model_weights(model)
+                        init_model_weights(model, seed=args.training.seed)
 
         if args.training.lora.enable:
             self.lora_weight_manager = LoraWeightManager(model, lora_config=args.training.lora)

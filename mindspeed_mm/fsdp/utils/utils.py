@@ -1,9 +1,11 @@
+import logging
 from typing import Dict, Any, Callable, Optional
 import time
 
 import torch
 from torch.distributed.tensor import DTensor, Replicate, Shard
 
+from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.utils.device import (
     get_memory_reserved,
@@ -14,6 +16,9 @@ from mindspeed_mm.fsdp.utils.device import (
 
 from .constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
 from .device import get_device_type, get_torch_device
+
+
+logger = logging.getLogger(__name__)
 
 
 def to_empty_if_needed(
@@ -121,7 +126,64 @@ def tensor_to_dtensor_local(t: torch.Tensor, device_mesh, placements):
     return t
 
 
-def init_model_weights(model):
+def _precreate_dtensor_rng_tracker(model, seed: Optional[int] = None):
+    """Pre-create the DTensor RNG tracker so that DTensor random ops never
+    trigger a world-group collective during weight initialization.
+
+    Background: after ``fully_shard``, parameters are ``DTensor``s. In-place
+    random init ops such as ``module.weight.data.normal_()`` go through
+    DTensor dispatch (``torch.distributed.tensor._dispatch.OpDispatcher``).
+    On the first DTensor random op, torch lazily constructs the global
+    ``OffsetBasedRNGTracker`` with ``run_state_sync=True`` (default), whose
+    constructor executes ``dist.broadcast(rng_state, 0)`` on the *default*
+    (world) process group (see ``torch/distributed/tensor/_random.py``).
+    That broadcast blocks until every world rank reaches its first DTensor
+    random op, so any straggler or interleaving with other world-group
+    collectives (checkpoint broadcast, barriers, ...) deadlocks the cluster;
+    large clusters make this window likely to be hit.
+
+    Constructing the tracker here with ``manual_seed`` uses
+    ``run_state_sync=False`` (no broadcast) and seeds it with a rank-agreed
+    value, keeping torch's per-shard RNG offset semantics (replicas of the
+    same shard stay identical, distinct shards get distinct random streams).
+
+    Args:
+        model: Model whose DTensor params provide the device mesh.
+        seed: Rank-agreed base seed. Must be identical on all ranks
+            (e.g. the training ``seed`` config). Defaults to
+            ``torch.initial_seed()`` (only valid if all ranks seeded
+            identically, e.g. via ``seed_all``).
+    """
+    try:
+        from torch.distributed.tensor import _random as dtensor_random
+    except ImportError:
+        try:
+            from torch.distributed._tensor import _random as dtensor_random  # torch < 2.7
+        except ImportError:
+            return
+    if dtensor_random._rng_tracker is not None:
+        # Already created elsewhere (possibly by another sub-model); reuse it.
+        return
+    dtensor_param = next(
+        (p for p in model.parameters() if isinstance(p, DTensor)), None
+    )
+    if dtensor_param is None:
+        return
+    if not dtensor_random.is_rng_supported_mesh(dtensor_param.device_mesh):
+        return
+    if seed is None:
+        seed = torch.initial_seed()
+    # manual_seed creates OffsetBasedRNGTracker(mesh, run_state_sync=False)
+    # and sets the parallel seed: no broadcast, deterministic shard offsets.
+    dtensor_random.manual_seed(seed, dtensor_param.device_mesh)
+    print_rank(
+        logger.info,
+        f"[DTensorRNG] Pre-created DTensor RNG tracker before weight init "
+        f"(seed={seed}, no world-group broadcast).",
+    )
+
+
+def init_model_weights(model, seed: Optional[int] = None):
     post_init_modules = []
 
     def _pre_init_weights():
@@ -147,6 +209,7 @@ def init_model_weights(model):
                     dtensor = tensor_to_dtensor(module.weight.data, device_mesh, placements)
                     module.weight = torch.nn.Parameter(dtensor, requires_grad=module.weight.requires_grad)
 
+    _precreate_dtensor_rng_tracker(model, seed)
     _pre_init_weights()
     model.init_weights()
     _post_init_weights()
