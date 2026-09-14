@@ -4,16 +4,18 @@ parallel:
   fully_shard_parallel_size: auto
   fsdp_plan:
     apply_modules:
+      - model.language_model.embed_tokens
+      - model.visual
+      - model.visual.deepstack_merger_list.{*}
       - model.visual.blocks.{*}
       - model.visual.merger
-      - model.visual.deepstack_merger_list.{*}
-      - model.visual
-      - model.language_model.embed_tokens
-      - model.language_model.layers.{*}
       - model.language_model
+      - model.language_model.layers.{*}
       - lm_head
     param_dtype: bf16
     reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
   ring_attention_size: 1
   ulysses_parallel_size: 1
   expert_parallel_size: 1
@@ -125,7 +127,7 @@ training:
   # save: save_path
   use_deter_comp: false
   plugin:
-    - mindspeed_mm/fsdp/models/qwen3vl
+    - mindspeed_mm/fsdp/models/qwen3vl_moe
     - mindspeed_mm/fsdp/data/datasets/huggingface
 
 # 工具配置

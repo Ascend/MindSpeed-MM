@@ -4,11 +4,11 @@ parallel:
   fully_shard_parallel_size: auto
   fsdp_plan:
     apply_modules:
-      - model.visual
-      - model.visual.blocks.{*}
-      - model.visual.deepstack_merger_list.{*}
-      - model.visual.merger
       - model.language_model.embed_tokens
+      - model.visual
+      - model.visual.deepstack_merger_list.{*}
+      - model.visual.blocks.{*}
+      - model.visual.merger
       - model.language_model
       - model.language_model.layers.{*}
       - lm_head
@@ -122,7 +122,7 @@ training:
   # save: save_path
   use_deter_comp: false
   plugin:
-    - mindspeed_mm/fsdp/models/qwen3vl
+    - mindspeed_mm/fsdp/models/qwen3vl_moe
     - mindspeed_mm/fsdp/data/datasets/huggingface
   quantization_plan:
     quant_recipe: mxfp8
