@@ -327,7 +327,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
     | target_path | 转换或切分后权重保存路径 |
 
 ### 数据预处理
-    
+
 在`MindSpeed-MM`下创建`dataset`目录，随后在`dataset`下创建目录`videos`和文件`data.json`，并将需要处理的视频保存在`videos`中。数据集中所有的视频-文本对信息保存在`data.json`中。（数据集可以使用[Open-Sora-Dataset pixabay_v2 数据集](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/tree/main/pixabay_v2_tar),对应的数据标注文件为[video_pixabay_65f_601513.json](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/blob/main/anno_jsons/video_pixabay_65f_601513.json)，格式需要处理成下文示例形式）
 
 > [!NOTE]
@@ -541,7 +541,7 @@ dataset
         --distributed-backend nccl \
         2>&1 | tee logs/train_${logfile}.log
     ```
-    
+
 ### 启动训练
 
 按照上一步配置好的脚本，运行以下命令启动微调：
@@ -567,6 +567,6 @@ mm-convert WanConverter mm_to_hf \
 
 ## 参考
 
-多模态理解模型更多细节请参考《[Qwen2_5_VL 使用指南](../../../examples/qwen2.5vl/README.md)》。
+多模态理解模型更多细节请参考《[Qwen2_5_VL 使用指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/examples/qwen2.5vl/README.md)》。
 
 多模态生成模型更多细节请参考《[Wan2.2 使用指南](../../../examples/wan2.2/README.md)》。

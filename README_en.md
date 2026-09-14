@@ -91,7 +91,7 @@ The key directories are as follows. For a detailed directory introduction, see [
 - [Feb. 14, 2026]: 🚀 MindSpeed MM supports [CosyVoice3](./examples/cosyvoice3) model training based on FSDP2
 - [Feb. 13, 2026]: 🚀 MindSpeed MM supports the [Kimi-K2.5](./examples/kimik2_5) model based on FSDP2 [Prototype]
 - [Feb. 12, 2026]: 🚀 MindSpeed MM supports the [HunyuanVideo1.5](./examples/hunyuanvideo_1.5) model training demo based on FSDP2 [Prototype]
-- [Feb. 03, 2026]: 🚀 MindSpeed MM supports the [DeepseekOCR2](./examples/deepseekocr2/README.md) model training demo based on FSDP2 [Prototype]
+- [Feb. 03, 2026]: 🚀 MindSpeed MM supports the [DeepseekOCR2](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/deepseekocr2/README.md) model training demo based on FSDP2 [Prototype]
 - [Jan. 29, 2026]: 🎉 The Ascend image repository has launched the [MindSpeed MM image](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)
 - [Jan. 29, 2026]: 🚀 MindSpeed MM supports the [Qwen3-TTS](./examples/qwen3tts) model based on FSDP2 [Prototype]
 - [Jan. 28, 2026]: 🚀 MindSpeed MM supports the Magistral-Small-2509 model based on FSDP2 [Prototype]
@@ -108,7 +108,7 @@ The key directories are as follows. For a detailed directory introduction, see [
 - [Oct. 22, 2025]: 🚀 MindSpeed MM supports the Wan2.2 series models based on fully shard
 - [Sep. 08, 2025]: 🚀 MindSpeed MM supports the FLUX.1-Kontext model
 - [Sep. 8, 2025]: 🚀 MindSpeed MM supports FLUX **reinforcement learning** DanceGRPO training
-- **[Sep. 03, 2025]: 🎉 Reinforcement learning is now available! MindSpeed MM supports Qwen2.5VL 7B/32B [GRPO training](./examples/verl_examples/qwen2.5vl/README.md)**
+- **[Sep. 03, 2025]: 🎉 Reinforcement learning is now available! MindSpeed MM supports Qwen2.5VL 7B/32B [GRPO training](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/verl_examples/qwen2.5vl/README.md)**
 - [Aug. 15, 2025]: 🤝 MindSpeed MM **natively supports** the Lumina-mGPT 2.0 model
 - [Jul. 29, 2025]: 🌴 MindSpeed MM supports core version 0.12.1
 - [Jul. 10, 2025]: 🚀 MindSpeed MM supports the InternVL3-8B/78B model
@@ -145,7 +145,7 @@ The key directories are as follows. For a detailed directory introduction, see [
 
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
   <tr>
-      <td>          
+      <td>
           <img src="sources/videos/video_wan_T2V.gif" width="80%" controls autoplay loop>
           <p>Prompt: Ultra HD, 4K, cinematic composition, low contrast ratio, low saturation, cool tone; The queen wears an iron crown and rides on the dragon over the city. She holds a big flag that shows:" MindSpeed MM".</p>
       </td>
@@ -156,11 +156,11 @@ The key directories are as follows. For a detailed directory introduction, see [
 
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
   <tr>
-      <td>          
+      <td>
           <img src="sources/videos/video_osp15mini_1.gif" width="100%" controls autoplay loop>
           <p>Prompt: A fluffy white rabbit with soft, velvety fur and twitching pink nose sits curiously near a rustic wooden fence, surrounded by a lush garden of vibrant wildflowers and tall grasses swaying gently in the breeze. The rabbit's large, expressive eyes scan the environment, reflecting the golden hues of the setting sun. As it nibbles on a patch of clover, its ears perk up at the distant sound of chirping birds. The fence, weathered and covered in patches of moss, adds a charming, pastoral backdrop to this serene scene, capturing the essence of a peaceful countryside moment.</p>
       </td>
-      <td>          
+      <td>
           <img src="sources/videos/video_osp15mini_2.gif" width="100%" controls autoplay loop>
           <p>Prompt: A majestic Berlin tower stands tall against the night sky, its structure bathed in a mesmerizing array of vibrant lights, casting a kaleidoscope of colors across the cityscape. The tower's intricate architectural details are highlighted by the illumination, creating a stunning contrast against the deep indigo sky. As the camera pans upward, the lights shift, revealing a dynamic play of shadows and hues that dance across the tower's surface. The surrounding city lights twinkle in harmony, enhancing the tower's grandeur and creating a breathtaking visual symphony that captures the essence of Berlin's vibrant nightlife.</p>
       </td>
@@ -171,11 +171,11 @@ The key directories are as follows. For a detailed directory introduction, see [
 
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
   <tr>
-      <td>          
+      <td>
           <img src="sources/images/qwen_image.png" width="800">
           <p>Prompt for generation: A coffee shop entrance features a chalkboard sign reading "MindSpeed Coffee 😊 $2 per cup," with a neon light displaying "MindSpeed MM". Next to it hangs a poster showing a beautiful Chinese woman, and beneath the poster is written "Welcome to use MindSpeed MM". Ultra HD, 4K, cinematic composition. (Qwen-Image)</p>
       </td>
-      <td>          
+      <td>
           <img src="sources/images/flux_kontext.png" width="1500">
           <p>Prompt for edition: Change the decoration of the coffee shop to a modern style with white painting. (Flux.1-Kontext)</p>
       </td>
@@ -186,7 +186,7 @@ The key directories are as follows. For a detailed directory introduction, see [
 
 <table border="0" style="width: 100%; text-align: left; margin-top: 20px;">
   <tr>
-      <td>          
+      <td>
           <p>Input image for both models:</p>
           <img src="sources/images/view.jpg" width="1000" height="700">
           <p>Input text for both models: Please describe the image shortly</p>
@@ -319,7 +319,7 @@ For details, see the profiling section in [README](./docs/en/tools.md).
 
 ## MindStudio Insight Performance Analysis Tool
 
-For performance tuning in large-model cluster scenarios, MindStudio Insight is recommended as an excellent visualization tuning tool. 
+For performance tuning in large-model cluster scenarios, MindStudio Insight is recommended as an excellent visualization tuning tool.
 MindStudio Insight provides visualizations including the Timeline view, communication analysis, and computation time, helping users analyze potential performance bottlenecks and guiding them on how to eliminate or reduce these bottlenecks.
 
 For installation and usage details, see [*MindStudio Insight Operation Guide*](https://msinsight.readthedocs.io/zh-cn/latest/zh/user_guide/basic_operations.html)

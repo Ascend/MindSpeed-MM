@@ -204,7 +204,7 @@
     }
     ```
 
-    配置模型微调脚本，详细配置请参考[Qwen2.5VL-32B微调脚本](../../../examples/qwen2.5vl/finetune_qwen2_5_vl_32b.sh)，开启边云协同特性需要在训练脚本中增加以下参数：
+    配置模型微调脚本，详细配置请参考[Qwen2.5VL-32B微调脚本](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/qwen2.5vl/finetune_qwen2_5_vl_32b.sh)，开启边云协同特性需要在训练脚本中增加以下参数：
 
     ```shell
     --virtual-pipeline-model-parallel-size 3         # 虚拟Pipeline Stage数，必须配置为3

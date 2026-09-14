@@ -204,7 +204,7 @@ This document uses the Qwen2.5VL-32B-Instruct model as an example (VIT: 32 hidde
     }
     ```
 
-    Configure the model fine-tuning script. For detailed configuration, refer to [Qwen2.5VL-32B fine-tuning script](../../../examples/qwen2.5vl/finetune_qwen2_5_vl_32b.sh). To enable the edge-cloud collaboration feature, add the following parameters to the training script:
+    Configure the model fine-tuning script. For detailed configuration, refer to [Qwen2.5VL-32B fine-tuning script](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/qwen2.5vl/finetune_qwen2_5_vl_32b.sh). To enable the edge-cloud collaboration feature, add the following parameters to the training script:
 
     ```shell
     --virtual-pipeline-model-parallel-size 3         # Number of virtual pipeline stages. Must be set to 3.
@@ -237,4 +237,3 @@ This document uses the Qwen2.5VL-32B-Instruct model as an example (VIT: 32 hidde
 - The parallel configuration of training parameters (such as TP/PP) must be consistent with the configuration used during weight conversion.
 - Edge-cloud collaborative distributed training adopts the U-shaped partitioning scheme, where the first and last model layers are colocated on the edge side, so raw samples do not need to be uploaded to the cloud.
 - Cross-domain collaborative training achieves efficient edge-cloud training through pipeline scheduling optimization and computation-communication overlap.
-  

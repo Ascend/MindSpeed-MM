@@ -104,7 +104,7 @@ Developer Getting Started Prerequisites:
     ```
 
     > [!NOTE]
-    > 
+    >
     > The Qwen2_5_VL and Qwen2_VL share the same data conversion logic, so the data conversion script from Qwen2_VL is used to meet the requirements.
 
 ### Fine-tuning
@@ -481,6 +481,6 @@ mm-convert WanConverter mm_to_hf \
 
 ## Reference
 
-[Qwen2.5-VL User Guide](../../../examples/qwen2.5vl/README.md).
+[Qwen2.5-VL User Guide](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/qwen2.5vl/README.md).
 
 [Wan2.1 User Guide](../../../examples/wan2.1/README.md).

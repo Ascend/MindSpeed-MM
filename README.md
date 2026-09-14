@@ -90,7 +90,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 - [Feb. 14, 2026]: 🚀 MindSpeed MM基于FSDP2支持[CosyVoice3](./examples/cosyvoice3)模型训练
 - [Feb. 13, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Kimi-K2.5](./examples/kimik2_5)模型【beta】
 - [Feb. 12, 2026]: 🚀 MindSpeed MM基于FSDP2支持[HunyuanVideo1.5](./examples/hunyuanvideo_1.5)模型训练demo【beta】
-- [Feb. 03, 2026]: 🚀 MindSpeed MM基于FSDP2支持[DeepseekOCR2](./examples/deepseekocr2/README.md)模型训练demo【beta】
+- [Feb. 03, 2026]: 🚀 MindSpeed MM基于FSDP2支持[DeepseekOCR2](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/deepseekocr2/README.md)模型训练demo【beta】
 - [Jan. 29, 2026]: 🎉 昇腾镜像仓库上线[MindSpeed MM镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)
 - [Jan. 29, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Qwen3-TTS](./examples/qwen3tts)模型【beta】
 - [Jan. 28, 2026]: 🚀 MindSpeed MM基于FSDP2支持Magistral-Small-2509模型【beta】
@@ -107,7 +107,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 - [Oct. 22, 2025]: 🚀 MindSpeed MM基于fully shard支持Wan2.2系列模型
 - [Sep. 08, 2025]: 🚀 MindSpeed MM支持FLUX.1-Kontext模型
 - [Sep. 8, 2025]: 🚀 MindSpeed MM支持FLUX **强化学习** DanceGRPO训练
-- **[Sep. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](./examples/verl_examples/qwen2.5vl/README.md)**
+- **[Sep. 03, 2025]: 🎉 强化学习上线！ MindSpeed MM支持Qwen2.5VL 7B/32B [GRPO训练](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/verl_examples/qwen2.5vl/README.md)**
 - [Aug. 15, 2025]: 🤝 MindSpeed MM**原生支持**Lumina-mGPT 2.0模型
 - [Jul. 29, 2025]: 🌴 MindSpeed MM支持core 0.12.1版本
 - [Jul. 10, 2025]: 🚀 MindSpeed MM支持InternVL3-8B/78B模型
