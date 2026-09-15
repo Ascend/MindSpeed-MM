@@ -152,7 +152,8 @@ class LoraWeightManager:
             filename = "lora_adapter.safetensors"
 
         save_path_full = os.path.join(save_path, filename)
-        save_file(lora_state_dict, save_path_full)
+        if self._rank == 0:
+            save_file(lora_state_dict, save_path_full)
 
         num_saved_params = len(lora_state_dict)
 
