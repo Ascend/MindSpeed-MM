@@ -320,7 +320,7 @@ python ./examples/data_preprocess/geo3k.py --local_dir=./data/geo3k
 | `response_length/max`                   | 最长生成长度，当前 batch 中生成最长的 response 长度          |
 | `prompt_length/mean`                    | 平均输入长度，输入 prompt 的平均长度                         |
 | `prompt_length/max`                     | 最长输入长度，当前 batch 中最长的 prompt长度                 |
-| `prompt_length/min`                     | 最短输入长度，当前 batch 中最长的 prompt长度                 |
+| `prompt_length/min`                     | 最短输入长度，当前 batch 中最短的 prompt长度                 |
 | `perf/total_num_tokens`                               | 总tokens数                                       |
 | `perf/time_per_step`                            | 每步耗时                                         |
 | `perf/throughput`                              | 吞吐指标                                         |

@@ -546,7 +546,7 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
     "dataset_param": {
         ...
         "basic_parameters": {
-            "template": "qwen3_omni_nothink",
+            "template": "qwen3_omni_nothink"
         },
         "attr": {
           ...

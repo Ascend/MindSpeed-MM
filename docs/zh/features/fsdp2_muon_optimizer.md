@@ -7,7 +7,6 @@ Muon 的主要优势在于能够利用神经网络隐藏层权重的矩阵结构
 公开使用案例包括：
 
 - [Kimi K2](https://github.com/MoonshotAI/Kimi-K2) 在 1T MoE 规模上使用 Muon/MuonClip 训练；
-- [DeepSeek-V4](https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf) 技术报告中给出了面向 DeepSeek-V4 的 Muon Optimizer 训练算法；
 - [HunyuanVideo-1.5](https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5/blob/main/README_CN.md) 使用 Muon 优化器训练，并建议继续训练或 LoRA 微调时使用 Muon；
 - [NVIDIA NeMo-RL](https://docs.nvidia.com/nemo/rl/latest/guides/muon-optimizer.html) 给出了在 Qwen3-235B-A22B SFT 和 Qwen2.5-7B DAPO 场景中使用 Muon 的示例。
 

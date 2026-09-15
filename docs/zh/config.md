@@ -210,6 +210,16 @@ config_manager = ConfigManager(
     allow_register_yaml_fields=True
 )
 
+# 创建时可以从代码传入配置
+config_manager = ConfigManager(
+    additional_args={
+        "learning_rate": 2e-4,
+        "model": {
+            "model_name": "custom_model"
+        }
+    }
+)
+
 # 注册动态字段
 config_manager.register_dynamic_field(
     name="dynamic_field",
@@ -224,16 +234,6 @@ config_manager.register_dynamic_field(
     value_type=str,
     default="nested_default",
     description="嵌套动态字段"
-)
-
-# 从代码传入配置
-config_manager = ConfigManager(
-    additional_args={
-        "learning_rate": 2e-4,
-        "model": {
-            "model_name": "custom_model"
-        }
-    }
 )
 ```
 

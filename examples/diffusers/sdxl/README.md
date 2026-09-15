@@ -231,6 +231,7 @@
                 break
 
             # 以下是新增代码
+            step_total_time = time.time() - step_end_time
             accelerator.print(f"step_train_time: {step_total_time}")
             accelerator.print(f"step_data_time: {step_data_time}")
             accelerator.print(

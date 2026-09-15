@@ -324,7 +324,7 @@ bash examples/qwen2vl/finetune_qwen2vl_7b.sh
 
 ```shell
 NPUS_PER_NODE=8
-MASTER_ADDR=localhost
+MASTER_ADDR="your master node IP" # 需要修改为主节点的IP地址（不能为localhost）
 MASTER_PORT=6000
 NNODES=2
 NODE_RANK=0

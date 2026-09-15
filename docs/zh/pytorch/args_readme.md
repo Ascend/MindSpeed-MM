@@ -1,15 +1,14 @@
 # 本文档为MindSpeed MM套件中对于运行脚本常用命令参数做解释说明
 
-- [本文档为MindSpeed MM套件中对于运行脚本常用命令参数做解释说明](#本文档为MindSpeed MM套件中对于运行脚本常用命令参数做解释说明)
-  - [GPT\_ARGS下参数注释](#gpt_args下参数注释)
-    - [一般参数](#一般参数)
-    - [显存优化](#显存优化)
-      - [重计算](#重计算)
-      - [FSDP2](#fsdp2)
-    - [加速特性](#加速特性)
-  - [MOE\_ARGS下参数解释](#moe_args下参数解释)
-  - [OUTPUT\_ARGS下参数解释说明](#output_args下参数解释说明)
-  - [环境变量参数解释](#环境变量参数解释)
+- [GPT\_ARGS下参数注释](#gpt_args下参数注释)
+  - [一般参数](#一般参数)
+  - [显存优化](#显存优化)
+    - [重计算](#重计算)
+    - [FSDP2](#fsdp2)
+  - [加速特性](#加速特性)
+- [MOE\_ARGS下参数解释](#moe_args下参数解释)
+- [OUTPUT\_ARGS下参数解释说明](#output_args下参数解释说明)
+- [环境变量参数解释](#环境变量参数解释)
 
 ## GPT_ARGS下参数注释
 
@@ -113,7 +112,7 @@
 
 | 环境变量                                                                                                                                  | 描述 | 取值说明 |
 |---------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
-| CUDA_DEVICE_MAX_CONNECTIONS                                                                                                           | 用于控制多GPU系统下主机端并行连接的设备数量 | 需要配置为整数，取值范围`[1, 32]`；开启序列并行时需设置为1 |
+| CUDA_DEVICE_MAX_CONNECTIONS                                                                                                           | 该参数用于规避megatron对其校验，对npu无效(用于控制多GPU系统下主机端并行连接的设备数量) | 需要配置为整数，取值范围`[1, 32]`；开启序列并行时需设置为1 |
 | [ASCEND_SLOG_PRINT_TO_STDOUT](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0121.html) | 是否开启日志打印，开启后日志不会保存在log文件中，而是将产生的日志直接打印显示 | `0`: 关闭日志打屏<br>`1`: 开启日志打屏 |
 | [ASCEND_GLOBAL_LOG_LEVEL](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0122.html)     | 设置应用类日志的日志级别及各模块日志级别，仅支持调试日志 | `0`: 对应DEBUG级别<br>`1`: 对应INFO级别<br>`2`: 对应WARNING级别<br>`3`: 对应ERROR级别<br>`4`: 对应NULL级别，不输出日志 <br>注意设置为DEBUG级别后，可能会因日志流量过大影响业务性能 |
 | [TASK_QUEUE_ENABLE](https://www.hiascend.com/document/detail/zh/Pytorch/730/comref/Envvariables/Envir_007.html)                       | 用于控制开启task_queue算子下发队列优化的等级 | `0`: 关闭<br>`1`: 开启Level 1优化<br>`2`: 开启Level 2优化 |

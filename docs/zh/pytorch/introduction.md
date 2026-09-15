@@ -52,7 +52,7 @@ A->>+B: pretrain
 B->>+D: initialize_megatron
 D->>-B: init args/global_vars/distributed
 B->>+B: apply_patches_from_config
-B->>+D: steup_model_and_optimizer
+B->>+D: setup_model_and_optimizer
 D->>+D: get_model
 D->>+A: model_provider
 A->>-D: return model

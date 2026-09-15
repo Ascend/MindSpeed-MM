@@ -29,7 +29,6 @@
 <col style="width: 167px">
 <col style="width: 158px">
 <col style="width: 187px">
-<col style="width: 252px">
 </colgroup>
 <thead>
   <tr>
@@ -80,10 +79,10 @@
     <td class="tg-i1fi"><a href="automatic_parallelism_mm.md">Automatic Parallelism</a></td>
 
   </tr>
-    <td class="tg-citn">张量并行</td>
-    <td class="tg-i1fi"><a href="">tensor-parallel</a></td>
-
   <tr>
+    <td class="tg-citn">张量并行</td>
+    <td class="tg-i1fi"><a href="https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md">tensor-parallel</a></td>
+
   </tr>
   <tr>
     <td class="tg-t1fb" rowspan="4">显存优化</td>

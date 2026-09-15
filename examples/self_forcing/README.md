@@ -3,7 +3,7 @@
 <p align="left">
 </p>
 
-- [self-forcing](#self-forcing)
+- [Self-Forcing](#self-forcing)
   - [模型介绍](#模型介绍)
   - [版本说明](#版本说明)
     - [参考实现](#参考实现)
@@ -88,7 +88,7 @@
           --config_path configs/self_forcing_dmd.yaml \
           --output_folder videos/self_forcing_dmd \
           --checkpoint_path checkpoints/self_forcing_dmd.pt \
-          --data_path prompts/MovieGenVideoBench_extended.txt \
+          --data_path prompts/vidprom_filtered_extended.txt \
           --use_ema
       ```
 

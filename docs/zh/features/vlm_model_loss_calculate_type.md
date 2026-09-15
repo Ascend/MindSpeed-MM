@@ -99,7 +99,7 @@ features:
 
 ```json
 "loss_cfg": {
-    "loss_type": "default/per_sample_loss/per_token_loss"
+    "loss_type": "default"  // 可选default / per_sample_loss / per_token_loss
 }
 ```
 
