@@ -97,6 +97,7 @@ def prepare_sampler_dataloader(
     persistent_workers=None,
     process_group: Optional[ProcessGroup] = None,
     data_sharding=False,
+    infinite_sampler=False,
     sampler_type="stateful_distributed_sampler",
     collate_param=None,
     dataset_param=None,
@@ -118,6 +119,11 @@ def prepare_sampler_dataloader(
         pin_memory (bool, optional): Whether to pin memory address in CPU memory. Defaults to False.
         num_workers (int, optional): Number of worker threads for this dataloader. Defaults to 0.
         kwargs (dict): optional parameters for ``torch.utils.data.DataLoader``
+        infinite_sampler (bool, optional): If ``True``, the batch sampler keeps yielding across
+            epoch boundaries so the DataLoader iterator never exhausts. The next epoch's batch
+            tasks are then dispatched (via the DataLoader's replenish mechanism) while the last
+            batch of the current epoch is still being consumed, which removes the
+            epoch-boundary data stall. Only used by ``BaseRandomBatchSampler``. Defaults to False.
 
     Returns:
         :class:`torch.utils.data.DataLoader`: A DataLoader used for training or testing.
@@ -137,6 +143,7 @@ def prepare_sampler_dataloader(
             shuffle=shuffle,
             drop_last=drop_last,
             data_sharding=data_sharding,
+            infinite=infinite_sampler,
         )
         collate_fn = None
 

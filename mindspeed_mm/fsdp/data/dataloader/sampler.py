@@ -35,6 +35,7 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
         seed: int = 0,
         drop_last: bool = True,
         data_sharding: bool = False,
+        infinite: bool = False,
     ):
         super().__init__(dataset, num_replicas, rank, shuffle, seed, drop_last)
         self.total_samples = len(dataset)
@@ -42,6 +43,7 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
         self.consumed_samples = 0
         self.next_consumed_samples = None
         self.data_sharding = data_sharding
+        self.infinite = infinite
         self.epoch = 0
         self.micro_batch_times_data_parallel_size = \
             self.micro_batch_size * self.num_replicas
@@ -59,6 +61,13 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
             self.consumed_samples = self.next_consumed_samples
             self.next_consumed_samples = None
 
+        # infinite sampler keeps yielding across epoch boundaries to prevent data stall.
+        while True:
+            yield from self._iter_one_epoch()
+            if not self.infinite:
+                break
+
+    def _iter_one_epoch(self):
         active_total_samples = self.total_samples - self.last_batch_size
         self.epoch = self.consumed_samples // active_total_samples
         current_epoch_samples = self.consumed_samples % active_total_samples

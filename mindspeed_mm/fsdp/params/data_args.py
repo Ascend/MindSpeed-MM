@@ -50,6 +50,17 @@ class DataloaderArguments(BaseArguments):
         default=False,
         metadata={"help": "Whether to enable async data preloading to overlap CPU-H2D transfer with training."},
     )
+    infinite_sampler: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether the batch sampler keeps yielding across epoch boundaries so the "
+            "DataLoader iterator never exhausts. The next epoch's batch tasks are dispatched "
+            "while the last batch of the current epoch is still being consumed, removing the "
+            "epoch‑boundary data stall. Only applies to the BaseRandomBatchSampler train dataloader. "
+            "Note: Enabling this increases in‑flight batches to prefetch_factor * num_workers, "
+            "which raises host memory usage. (When num_workers>0, prefetch_factor defaults to 2)."
+        },
+    )
 
 
 class DataArguments(BaseArguments):
