@@ -96,6 +96,12 @@ class LoraModelState(ModelState):
 
     @torch.no_grad()
     def load_state_dict(self, state_dict):
+        if self.key_mapping is None:
+            # key_mapping is normally populated as a side effect of state_dict(),
+            # which the current DCP implementation happens to call first. Rebuild
+            # it from the live model so load does not depend on that call order.
+            _model_state_dict = super().state_dict()
+            self.key_mapping = remove_base_layer_keys(_model_state_dict)
         restore_base_layer_keys(state_dict, self.key_mapping)
         set_model_state_dict(model=self.model, model_state_dict=state_dict)
 
