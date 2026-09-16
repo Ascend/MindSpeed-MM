@@ -32,6 +32,7 @@ import torch.distributed as dist
 import torch.nn as nn
 
 from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.checkpoint.utils import get_checkpoint_name
 
 try:
     from torch.distributed._tensor import DTensor
@@ -108,6 +109,7 @@ class LoraWeightManager:
         self,
         save_path: str,
         iteration: Optional[int] = None,
+        save_ckpt_dtype: Optional[torch.dtype] = None,
     ) -> Tuple[int, int]:
         """Save only LoRA adapter weights.
 
@@ -118,6 +120,7 @@ class LoraWeightManager:
         Args:
             save_path: Directory path to save LoRA weights.
             iteration: Optional iteration number for checkpoint naming.
+            save_ckpt_dtype: Optional dtype used for the saved adapter weights.
 
         Returns:
             Tuple of (num_saved_params, num_lora_params) where:
@@ -135,14 +138,22 @@ class LoraWeightManager:
                 "Please install it with: pip install safetensors"
             ) from e
 
-        os.makedirs(save_path, exist_ok=True)
+        output_dir = (
+            get_checkpoint_name(save_path, iteration, release=False)
+            if iteration is not None
+            else save_path
+        )
+        os.makedirs(output_dir, exist_ok=True)
 
         lora_state_dict: Dict[str, torch.Tensor] = {}
         num_lora_params = 0
 
         for name, param in self.model.named_parameters():
             if "lora" in name and "base_layer" not in name:
-                gathered_param = self._gather_dtensor(param.data)
+                param_data = param.data
+                if save_ckpt_dtype is not None and torch.is_floating_point(param_data):
+                    param_data = param_data.to(save_ckpt_dtype)
+                gathered_param = self._gather_dtensor(param_data)
                 lora_state_dict[name] = gathered_param
                 num_lora_params += gathered_param.numel()
 
@@ -151,7 +162,7 @@ class LoraWeightManager:
         else:
             filename = "lora_adapter.safetensors"
 
-        save_path_full = os.path.join(save_path, filename)
+        save_path_full = os.path.join(output_dir, filename)
         if self._rank == 0:
             save_file(lora_state_dict, save_path_full)
 
@@ -159,7 +170,7 @@ class LoraWeightManager:
 
         # Generate a PEFT-compatible adapter_config.json alongside the weights
         # so the output directory can be loaded directly by PEFT/vLLM/SGLang.
-        self.write_adapter_config(save_path)
+        self.write_adapter_config(output_dir)
 
         print_rank(
             logger.info,

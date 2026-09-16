@@ -33,6 +33,7 @@ class LoraArguments(BaseArguments):
 
     Attributes:
         enable: Whether to enable LoRA fine-tuning.
+        lora_save_only: Whether to export only LoRA weights instead of a full checkpoint.
         rank: Rank of the low-rank matrices.
         alpha: Scaling factor for LoRA weights.
         target_modules: List of target module names/patterns for LoRA.
@@ -43,6 +44,12 @@ class LoraArguments(BaseArguments):
     enable: bool = field(
         default=False,
         metadata={"help": "Enable LoRA fine-tuning."},
+    )
+    lora_save_only: bool = field(
+        default=False,
+        metadata={
+            "help": "When LoRA is enabled, export only adapter safetensors and its config."
+        },
     )
     rank: int = field(
         default=8,

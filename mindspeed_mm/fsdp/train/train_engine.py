@@ -445,15 +445,21 @@ class TrainEngine:
             dataloader_state: Dataloader state aligned with training progress, defaults to None.
         """
         args = self.args
+        save_ckpt_dtype = (
+            get_dtype(args.training.save_ckpt_dtype)
+            if args.training.save_ckpt_dtype
+            else None
+        )
 
-        # Handle LoRA save modes
-        if args.training.lora.enable:
-            # Save only LoRA adapter weights
-            if self.lora_weight_manager is not None:
-                self.lora_weight_manager.save_lora_only(
-                    save_path=args.training.save,
-                    iteration=iteration,
-                )
+        if args.training.lora.enable and args.training.lora.lora_save_only:
+            self.lora_weight_manager.save_lora_only(
+                save_path=args.training.save,
+                iteration=iteration,
+                save_ckpt_dtype=save_ckpt_dtype,
+            )
+            # Synchronize all processes after saving
+            torch.distributed.barrier()
+            return
 
         if dataloader_state is None:
             dataloader_state = self.train_dataloader.state_dict()
@@ -472,13 +478,14 @@ class TrainEngine:
             state["optimizer"] = self.optimizer
         if not args.training.no_save_rng:
             state["extra_state"]["torch_rng_state"] = torch.get_rng_state()
-        save_ckpt_dtype = get_dtype(args.training.save_ckpt_dtype) if args.training.save_ckpt_dtype else None
         self.save_checkpointer.save(
             args.training.save,
             state=state,
             iteration=iteration,
             save_async=args.training.save_async,
             enable_lora=args.training.lora.enable,
+            lora_alpha=args.training.lora.alpha,
+            lora_rank=args.training.lora.rank,
             save_ckpt_dtype=save_ckpt_dtype,
             model_assets_dir=args.model.model_name_or_path,
             model_id=args.model.model_id,

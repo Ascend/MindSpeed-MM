@@ -274,6 +274,11 @@ class Qwen35WeightTransformPipeline(WeightTransformPipeline):
         tensor = permute_moe_expert(key, tensor, self.expert_weight_patterns)
         return key, tensor
 
+    @staticmethod
+    def _to_full(tensor: torch.Tensor) -> torch.Tensor:
+        from torch.distributed.tensor import DTensor
+        return tensor.full_tensor().cpu() if isinstance(tensor, DTensor) else tensor
+
     def dcp_to_hf(
         self, key: str, tensor: torch.Tensor
     ) -> Dict[str, torch.Tensor]:
@@ -288,13 +293,13 @@ class Qwen35WeightTransformPipeline(WeightTransformPipeline):
         # Split merged MTP weights:
         # experts.gate_up_proj [E, H, 2I] -> experts.{e}.{gate,up}_proj.weight [I, H]
         # experts.down_proj [E, I, H] -> experts.{e}.down_proj.weight [H, I]
-        for dcp_key, hf_keys in self.dcp_to_hf_mapping.items():
-            if key != dcp_key:
-                continue
+        hf_keys = self.dcp_to_hf_mapping.get(key)
+        if hf_keys is not None:
+            # Gather before unbinding the sharded expert dimension.
             return split_moe_expert_weights(
-                tensor=tensor,
+                tensor=self._to_full(tensor),
                 hf_keys=hf_keys,
-                dcp_key=dcp_key,
+                dcp_key=key,
             )
 
         # Permute fused MoE weights:

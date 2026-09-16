@@ -44,6 +44,7 @@ training:
     # 配合 model.freeze 排除组件（见下文 target_modules 配置说明）
     target_modules: all-linear
     dropout: 0.0
+    lora_save_only: false
     init_lora_weights: true
     pretrained_lora_path: null
 ```
@@ -57,6 +58,7 @@ training:
 | `alpha` | int | `16` | 控制 LoRA 权重对原始权重的影响比例，数值越高影响越大。一般保持 `α/r` 为 2                                                                                                                     |
 | `target_modules` | str \| List[str] | `["q_proj", "k_proj", "v_proj"]` | 需要添加 LoRA 的模块名称，或者通配符模式，或特殊关键字 `all-linear`                                                                                                          |
 | `dropout` | float | `0.0` | LoRA 层的 dropout 比例，取值范围 `[0, 1)`                                                                                                                                 |
+| `lora_save_only` | bool | `false` | `true` 时只导出独立 LoRA safetensors 和 adapter 配置文件；`false` 时根据保存类型存储全量模型权重，DCP 格式时保存基础权重和 LoRA 权重，HF 格式时保存基础权重与 LoRA 权重融合后的权重。 |
 | `init_lora_weights` | bool \| str | `True` | 权重初始化方式。`True`；`False`；或选择以下字符串值：`"gaussian"`, `"eva"`, `"olora"`, `"pissa"`, `"pissa_niter_[number of iters]"`, `"corda"`, `"loftq"`, `"orthogonal"` |
 | `pretrained_lora_path` | str | `null` | 预训练 LoRA 权重路径（可选），支持 `.safetensors` 和 `.pt/.bin` 格式                                                                                                              |
 | `disable_peft_moe_conversion` | bool | `true` | 屏蔽 PEFT 对 MoE 模型 `gate_proj`/`up_proj`/`down_proj` 的 `target_modules→target_parameters` 自动重定向，使 LoRA 打在 `shared_expert` 的 `nn.Linear` 而非路由专家的 `nn.Parameter` 上。仅 MoE 模型相关 |
@@ -128,20 +130,18 @@ target_modules:
 training:
   lora:
     enable: true
-    pretrained_lora_path: ./save_path/iter_xxx  # 替换为 LoRA 权重保存路径
+    pretrained_lora_path: ./save_path/iter_00000xx/lora_adapter_iteration_xx.safetensors
 ```
 
 ## 权重保存
 
-### 仅保存 LoRA 权重
+通过 `training.lora.lora_save_only` 选择保存范围，默认值为 `false`，开启权重保存后有以下三种保存方式：
 
-训练过程中仅保存 LoRA 适配器权重，保存格式为 safetensors，保存的文件结构：
-
-```bash
-save_path/
-├── lora_adapter.safetensors
-└── ...
-```
+| 保存方式 | 关键配置 | 保存内容 | 适用场景 |
+| :--- | :--- | :--- | :--- |
+| 仅保存 LoRA | `lora_save_only: true` | 在权重保存目录下保存 LoRA 权重 safetensors 和 `adapter_config.json`，不保存基础权重及 optimizer、RNG 等训练状态 | 分发或复用 adapter，以及后续与基础模型离线融合 |
+| 保存 DCP checkpoint | `lora_save_only: false`、`save_format: dcp` | 保存未融合的基础权重和 LoRA 权重；optimizer、RNG 等状态由原有保存参数控制 | 断点续训 |
+| 保存 HF checkpoint | `lora_save_only: false`、`save_format: hf` | 按 `base + (alpha / rank) * B @ A` 融合并保存标准 HF 权重，不保留独立 LoRA 参数 | 推理、部署或发布完整模型 |
 
 ## 启动训练
 
@@ -155,17 +155,19 @@ bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 
 ## 合并lora权重到HuggingFace权重
 
+开启 `lora_save_only=true` 参数后仅保存 LoRA 权重，可通过以下脚本将其与原始 HF 权重离线合并：
+
 ```bash
 cd checkpoint/common
 python merge_lora_safetensors_to_base.py \
     --base_hf_dir ./Qwen3.5-27B \
-    --lora_safetensors ./save_path/lora_adapter_iteration_10.safetensors \
+    --lora_safetensors ./save_path/iter_00000xx/lora_adapter_iteration_xx.safetensors \
     --save_merged_hf_dir ./merged_qwen3_5_27B_lora
 ```
 
 ## lora断点续训
 
-断点续训时，yaml配置文件中`load`路径需要指向上次训练保存的 checkpoint 路径。断点续训前一次的训练必须配置`no_save_optim`、`no_save_rng`为false，断点续训时`no_load_optim`、`no_load_rng`设置为false，才能恢复优化器状态。断点续训完成后可使用权重转换脚本，合并lora权重到HuggingFace权重。
+完整断点续训需在上次保存时设置 `save_format=dcp`、`lora.lora_save_only=false`，并将 `no_save_optim`、`no_save_rng` 设为 `false`。恢复时，`load` 指向包含 `latest_checkpointed_iteration.txt` 的 checkpoint 根目录，`no_load_optim`、`no_load_rng` 设为 `false`。DCP 权重包含完整基础权重和 LoRA 权重，无需再设置 `pretrained_lora_path`。
 
 ## lora微调支持模型
 

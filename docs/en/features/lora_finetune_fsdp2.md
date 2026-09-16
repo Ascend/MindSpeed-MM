@@ -50,6 +50,7 @@ training:
       - "model.language_model.layers.{*}.mlp.up_proj"
       - "model.language_model.layers.{*}.mlp.down_proj"
     dropout: 0.0
+    lora_save_only: false
     init_lora_weights: true
     pretrained_lora_path: null
 ```
@@ -63,6 +64,7 @@ training:
 | `alpha` | int | `16` | Controls the influence ratio of LoRA weights on the original weights; a higher value means greater influence. Generally keep `α/r` at 2                                                                                                                     |
 | `target_modules` | List[str] | `["q_proj", "k_proj", "v_proj"]` | Module names or wildcard patterns to which LoRA is added                                                                                                                                            |
 | `dropout` | float | `0.0` | Dropout ratio of the LoRA layer, in the range `[0, 1)`                                                                                                                                 |
+| `lora_save_only` | bool | `false` | When `true`, export only standalone LoRA safetensors and the adapter configuration file. When `false`, save the full model weights according to the save format: DCP saves unmerged base weights and LoRA weights, while HF saves the base weights merged with the LoRA weights. |
 | `init_lora_weights` | bool \| str | `True` | Weight initialization method. `True`; `False`; or one of the following string values: `"gaussian"`, `"eva"`, `"olora"`, `"pissa"`, `"pissa_niter_[number of iters]"`, `"corda"`, `"loftq"`, `"orthogonal"` |
 | `pretrained_lora_path` | str | `null` | Path to pretrained LoRA weights (optional), supporting `.safetensors` and `.pt/.bin` formats                                                                                                              |
 
@@ -115,20 +117,18 @@ To load pretrained LoRA weights for resumable training, configure the `pretraine
 training:
   lora:
     enable: true
-    pretrained_lora_path: ./save_path/iter_xxx  # Replace with the LoRA weight save path.
+    pretrained_lora_path: ./save_path/iter_00000xx/lora_adapter_iteration_xx.safetensors
 ```
 
 ## Weight Saving
 
-### Saving Only LoRA Weights
+Use `training.lora.lora_save_only` to select what to save. The default is `false`. When weight saving is enabled, the following three modes are available:
 
-During training, only the LoRA adapter weights are saved in the safetensors format. The saved file structure is as follows:
-
-```bash
-save_path/
-├── lora_adapter.safetensors
-└── ...
-```
+| Save Mode | Key Configuration | Saved Content | Use Case |
+| :--- | :--- | :--- | :--- |
+| Save only LoRA | `lora_save_only: true` | Save LoRA weights in safetensors format and `adapter_config.json` in the weight output directory, without base weights or training state such as optimizer and RNG state | Distributing or reusing adapters, and merging them with the base model offline |
+| Save a DCP checkpoint | `lora_save_only: false`, `save_format: dcp` | Save unmerged base weights and LoRA weights; optimizer, RNG, and other state are controlled by the existing save parameters | Resuming training from a checkpoint |
+| Save an HF checkpoint | `lora_save_only: false`, `save_format: hf` | Merge weights using `base + (alpha / rank) * B @ A` and save standard HF weights, without retaining separate LoRA parameters | Inference, deployment, or publishing a full model |
 
 ## Starting Training
 
@@ -142,17 +142,19 @@ Once training starts, a LoRA configuration summary is automatically printed, inc
 
 ## Merging LoRA Weights into Hugging Face Weights
 
+When `lora_save_only=true`, only LoRA weights are saved. Use the following script to merge them with the original HF weights offline:
+
 ```bash
 cd checkpoint/common
 python merge_lora_safetensors_to_base.py \
     --base_hf_dir ./Qwen3.5-27B \
-    --lora_safetensors ./save_path/lora_adapter_iteration_10.safetensors \
+    --lora_safetensors ./save_path/iter_00000xx/lora_adapter_iteration_xx.safetensors \
     --save_merged_hf_dir ./merged_qwen3_5_27B_lora
 ```
 
 ## Resuming Training from Checkpoint for LoRA
 
-When resuming training from checkpoint, the `load` path in the YAML configuration file must point to the checkpoint path saved by the previous training run. The previous training run must have `no_save_optim` and `no_save_rng` set to `false.` To resume training, set `no_load_optim` and `no_load_rng` to `false` to restore the optimizer state. After resume training is complete, use the weight conversion script to merge the LoRA weights into Hugging Face weights.
+To fully resume training, the previous checkpoint must have been saved with `save_format=dcp`, `lora.lora_save_only=false`, and both `no_save_optim` and `no_save_rng` set to `false`. When resuming, set `load` to the checkpoint root directory containing `latest_checkpointed_iteration.txt`, and set both `no_load_optim` and `no_load_rng` to `false`. DCP checkpoints contain the full base weights and LoRA weights, so `pretrained_lora_path` does not need to be set.
 
 ## Notes
 

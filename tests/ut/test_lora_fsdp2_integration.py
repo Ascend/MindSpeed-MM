@@ -491,7 +491,7 @@ class TestLoraWeightManagerExtended:
         assert num_saved > 0
         assert num_elements > 0
         assert os.path.exists(
-            os.path.join(save_path, "lora_adapter_iteration_5.safetensors")
+            os.path.join(save_path, "iter_0000005", "lora_adapter_iteration_5.safetensors")
         )
 
     def test_save_lora_without_iteration(self, tmp_path: pathlib.Path) -> None:

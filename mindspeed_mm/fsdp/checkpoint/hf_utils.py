@@ -11,6 +11,7 @@ from pydantic import FilePath
 from safetensors import safe_open
 from safetensors.torch import save_file
 import torch
+from torch.distributed.tensor import DTensor, Replicate
 from tqdm import tqdm
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 
@@ -273,6 +274,49 @@ def get_model_save_state(
 
     model_state_cls = LoraModelState if enable_lora else ModelState
     return model_state_cls(model, save_ckpt_dtype).state_dict()
+
+
+@torch.no_grad()
+def merge_lora_weights(
+    state_dict: Dict[str, torch.Tensor],
+    scaling: float,
+) -> Dict[str, torch.Tensor]:
+    """Merge the default LoRA adapter into its base weights.
+
+    For a base linear weight ``W`` with shape ``[out_features, in_features]``,
+    PEFT stores ``lora_A`` with shape ``[rank, in_features]`` and ``lora_B``
+    with shape ``[out_features, rank]``.  The adapter update therefore has the
+    same shape as ``W`` and is computed as ``lora_B @ lora_A``.
+
+    FSDP2 can represent ``lora_A`` as a sharded DTensor.  The matrix product
+    must use the complete ``[rank, in_features]`` matrix (the rank dimension
+    is needed to contract with ``lora_B``), so ``lora_A`` is redistributed to
+    replicated placement before calculating the update.
+    """
+    suffix_a = ".lora_A.default.weight"
+    suffix_b = ".lora_B.default.weight"
+
+    for lora_a_key in [key for key in state_dict if key.endswith(suffix_a)]:
+        prefix = lora_a_key.removesuffix(suffix_a)
+        lora_b_key = f"{prefix}{suffix_b}"
+        base_key = f"{prefix}.weight"
+
+        base = state_dict[base_key]
+        lora_a = state_dict[lora_a_key]
+        lora_b = state_dict[lora_b_key]
+        if isinstance(lora_a, DTensor):
+            # A sharded lora_A contains only part of the rank dimension on
+            # each rank; aggregate it before the B @ A multiplication.
+            lora_a = lora_a.redistribute(
+                placements=[Replicate() for _ in range(lora_a.device_mesh.ndim)]
+            )
+        delta = torch.matmul(lora_b, lora_a)
+
+        state_dict[base_key] = base + scaling * delta
+        del state_dict[lora_a_key]
+        del state_dict[lora_b_key]
+
+    return state_dict
 
 
 @lru_cache

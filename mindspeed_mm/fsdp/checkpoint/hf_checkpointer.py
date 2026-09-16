@@ -24,6 +24,7 @@ from mindspeed_mm.fsdp.checkpoint.hf_utils import (
     get_model_save_state,
     get_dtype_size,
     find_safetensors_index,
+    merge_lora_weights,
     save_state_dict,
 )
 from mindspeed_mm.fsdp.utils.constants import FILE_MODE
@@ -46,6 +47,8 @@ class HuggingFaceCheckpointer(CheckpointerBase):
         model_assets_dir: str = None,
         model_id=None,
         enable_lora: bool = False,
+        lora_alpha: Optional[int] = None,
+        lora_rank: Optional[int] = None,
         mtp_num_layers: Optional[int] = None,
         **kwargs,
     ) -> None:
@@ -59,6 +62,8 @@ class HuggingFaceCheckpointer(CheckpointerBase):
             model_assets_dir: original huggingface checkpoint directory used to copy config, processor and shard mapping
             model_id: model id used to select model-specific weight transform pipeline
             enable_lora: whether to normalize PEFT base-layer keys before saving
+            lora_alpha: LoRA scaling numerator used for merged HF export
+            lora_rank: LoRA rank used for merged HF export
             mtp_num_layers: number of MTP layers enabled by the training model
         return:
             None
@@ -76,11 +81,18 @@ class HuggingFaceCheckpointer(CheckpointerBase):
                 fqn_to_filename_mapping = json.load(f)["weight_map"]
         transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id, None)
         weight_transform = transform_cls(hf_dir=model_assets_dir, mtp_num_layers=mtp_num_layers) if transform_cls else None
-        save_state = get_model_save_state(
-            state["model"],
-            save_ckpt_dtype=save_ckpt_dtype,
-            enable_lora=enable_lora,
-        )
+        save_state = get_model_save_state(model = state["model"], enable_lora=enable_lora)
+
+        # Merge LoRA weights into base weights.
+        if enable_lora:
+            save_state = merge_lora_weights(save_state, scaling=lora_alpha / lora_rank)
+
+        # Convert floating-point weights to the requested dtype before saving.
+        if save_ckpt_dtype is not None:
+            for key, tensor in save_state.items():
+                if (isinstance(tensor, torch.Tensor) and torch.is_floating_point(tensor)):
+                    save_state[key] = tensor.to(save_ckpt_dtype)
+
         if weight_transform is not None:
             new_state = {}
             for key, tensor in save_state.items():
