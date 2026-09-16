@@ -179,26 +179,23 @@ Kimi-K3 采用 attn_res（attention residual）机制替代传统 Transformer �
 
 `attn_res_implementation: ascendc` 时，上述"归一化 + 打分 + 加权融合"计算使用 ops-transformer 仓的 AscendC 融合算子完成，需安装 ops-transformer；`eager` 为 torch 小算子实现，可用于功能对齐验证。
 
-> [!NOTE]
->
-> attn_res 算子代码位于 ops-transformer 仓的 MR9720 分支，安装时需先按如下步骤检出该MR分支。
-
 安装步骤如下：
 
 ```shell
 # 拉取代码
 git clone https://gitcode.com/cann/ops-transformer.git && cd ops-transformer
-# 检出attn_res算子所在的MR分支
-git fetch https://gitcode.com/cann/ops-transformer.git +refs/merge-requests/9720/head:pr_9720
-git checkout pr_9720
+# 检出到对应commit id
+git checkout a041b05638
+
 # 根据芯片类型进行编译
 source /usr/local/Ascend/cann/set_env.sh
-bash build_install_attn_res.sh --soc=${soc_version}
-# 安装算子包
-conda activate ${conda_env_name} # 激活对应conda环境
+bash build.sh --pkg --soc=${soc_version} --ops=block_attention_residuals,block_attention_residuals_grad -j16
+bash build/cann-ops-transformer-custom_linux-aarch64.run
+# 编译安装torch 依赖
+bash build.sh --torch_extension
 pip install torch_extension/dist/*.whl --force-reinstall --no-deps
-# 导入安装过程中提示的环境变量 替换'xxx'为实际路径
-source xxx/ops-transformer/install/vendors/custom_transformer/bin/set_env.bash
+# 使用时需要导入按照过程中提示的环境变量
+export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_transformer/op_api/lib/:${LD_LIBRARY_PATH}
 ```
 
 产品名对应的`${soc_version}`取值如下，请按实际场景传参：

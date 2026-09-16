@@ -52,9 +52,8 @@ def apply_attn_res(
         hidden_states = torch.matmul(probs, v_float).squeeze(1)
         return hidden_states.to(v.dtype)
     elif attn_res_implementation == "ascendc":
-        from cann_ops_transformer.ops.attn_res import attn_res
-        return attn_res(prefix_sum, block_residual, proj.weight, norm.weight,
-                        norm_eps=norm.variance_epsilon)
+        import cann_ops_transformer
+        return cann_ops_transformer.block_attention_residuals(prefix_sum, block_residual, proj.weight, norm.weight)
     else:
         raise ValueError(
             f"Unsupported attn_res_implementation: {attn_res_implementation}. "
