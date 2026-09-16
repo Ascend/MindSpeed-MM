@@ -1,0 +1,20 @@
+--- /opt/qwen35_08b/qwen3_5_0.8B_ascendc_formal_dual_gloo.yaml	2026-09-15 10:34:46.503973470 +0000
++++ /opt/qwen35_08b/qwen3_5_0.8B_triton_formal_dual_gloo.yaml	2026-09-15 10:34:46.507973470 +0000
+@@ -68,7 +68,7 @@
+   attn_implementation: flash_attention_2
+   freeze:
+     - model.visual
+-  gdn_implementation: ascendc
++  gdn_implementation: triton
+   causal_conv1d_implementation: triton
+   skip_gdn_recompute: true
+   skip_flash_attn_recompute: true
+@@ -119,7 +119,7 @@
+   no_save_optim: true
+   no_save_rng: true
+   load: /opt/qwen35_08b/dcp
+-  save: /opt/qwen35_08b/save_ascendc_formal_dual_gloo
++  save: /opt/qwen35_08b/save_triton_formal_dual_gloo
+   use_deter_comp: false
+   plugin:
+     - mindspeed_mm/fsdp/models/qwen3_5
