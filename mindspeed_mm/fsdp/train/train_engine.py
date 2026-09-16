@@ -16,6 +16,7 @@ from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
+from mindspeed_mm.fsdp.log.metrics import metrics
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
 from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
@@ -330,9 +331,11 @@ class TrainEngine:
 
             loss_dict = self.train_step(train_dataloader_iter)
 
-            # Clip gradients when clip_grad>0 and get total grad_norm
+            # Clip gradients when clip_grad>0 and get total grad_norm.
             grad_norm = clip_grad_norm(
-                self.model, max_norm=args.training.clip_grad, foreach=args.training.clip_grad_foreach
+                self.model,
+                max_norm=args.training.clip_grad,
+                foreach=args.training.clip_grad_foreach,
             )
 
             # Update parameters
@@ -394,6 +397,7 @@ class TrainEngine:
         # Stop profiling if enabled
         profiler.stop()
         memory_profiler.stop()
+        metrics.close()
         # Final save after training completes
         if args.training.save:
             dataloader_state = getattr(train_dataloader_iter, "last_consumed_state", None)
@@ -411,11 +415,12 @@ class TrainEngine:
             log_string += f" validation loss: {val_loss.item():.6E} |"
 
             print_rank(logger.info, log_string)
+            metrics.record(iteration, {"val_loss": val_loss.item()}, kind="scalar", prefix="val")
         else:
             print_rank(logger.warning, f"Validation returned no results at iteration {iteration}")
 
     def training_log(
-        self, iteration, elapsed_time_per_iteration, curr_step_lr, consumed_train_samples, loss_dict, grad_norm
+        self, iteration, elapsed_time_per_iteration, curr_step_lr, consumed_train_samples, loss_dict, grad_norm,
     ):
         args = self.args
         log_string = f" [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
@@ -431,6 +436,20 @@ class TrainEngine:
             log_string += ' grad norm: {:.3f} |'.format(grad_norm)
 
         print_rank(logger.info, log_string)
+
+        # Overall training scalars go through the unified metrics entry point;
+        # the training loop does not need to know they land in TensorBoard.
+        # All writes happen here, gated by training.log_interval (the caller of
+        # this function), so there is a single, consistent write frequency.
+        # Overall scalars are already reduced across the DP group, so the main
+        # rank writes them directly.
+        scalars = dict(loss_dict)
+        scalars["learning_rate"] = curr_step_lr
+        scalars["consumed_samples"] = consumed_train_samples
+        scalars["elapsed_time_ms"] = elapsed_time_per_iteration * 1000.0
+        if grad_norm is not None:
+            scalars["grad_norm"] = grad_norm
+        metrics.record(iteration, scalars, kind="scalar", prefix="train")
 
     def load(self):
         """Load checkpoint and restore training state."""

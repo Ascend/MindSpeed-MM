@@ -34,6 +34,7 @@ from mindspeed_mm.fsdp.utils.register import import_plugin
 from mindspeed_mm.fsdp.params.argument import Arguments
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.tools.profiler import profiler
+from mindspeed_mm.fsdp.log.metrics import metrics, TensorBoardHandler
 from mindspeed_mm.fsdp.train.train_engine import TrainEngine
 from mindspeed_mm.fsdp.utils.lora_utils import (
     add_lora_to_model,
@@ -77,6 +78,11 @@ class Trainer:
         memory_profiler.reset(args.tools.memory_profile)
         # Reset profiler for performance analysis
         profiler.reset(args.tools.profile)
+        # Initialize metrics backends after the distributed environment is ready.
+        metrics.reset()
+        if args.tools.tensorboard.enable:
+            metrics.add_handler(TensorBoardHandler(args.tools.tensorboard))
+        metrics.setup()
 
         self.lora_weight_manager = None
         # Build core training components

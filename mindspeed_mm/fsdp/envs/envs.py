@@ -9,6 +9,7 @@ from .manager import (
     EnvironmentVariableManager,
     Validator,
     parse_exact_true,
+    validate_non_negative,
 )
 
 _manager = EnvironmentVariableManager()
@@ -99,6 +100,13 @@ _register(
     description=(
         "Enable PyTorch autograd anomaly detection for FSDP2 training debugging."
     ),
+)
+_register(
+    name="TENSORBOARD_MAIN_RANK",
+    default=0,
+    converter=int,
+    description="Global rank that writes TensorBoard scalars.",
+    validator=validate_non_negative,
 )
 
 _manager.validate_registry()

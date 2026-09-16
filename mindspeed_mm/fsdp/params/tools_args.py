@@ -9,6 +9,21 @@ from mindspeed_mm.config.arguments.base_args import BaseArguments
 logger = logging.getLogger(__name__)
 
 
+class Tensorboard(BaseArguments):
+    enable: bool = field(
+        default=False,
+        metadata={"help": "Enable TensorBoard recording of training scalars."},
+    )
+    dir: str = field(
+        default="./tensorboard",
+        metadata={"help": "Directory to write TensorBoard event files."},
+    )
+    interval: int = field(
+        default=1,
+        metadata={"help": "Reserved, not used. TensorBoard write frequency follows training.log_interval."},
+    )
+
+
 class StaticParam(BaseArguments):
     level: str = field(
         default="level1",
@@ -113,3 +128,4 @@ class MemoryProfiler(BaseArguments):
 class ToolsArguments(BaseArguments):
     profile: Profiler = field(default_factory=Profiler)
     memory_profile: MemoryProfiler = field(default_factory=MemoryProfiler)
+    tensorboard: Tensorboard = field(default_factory=Tensorboard)
