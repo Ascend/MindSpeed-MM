@@ -30,6 +30,25 @@ def reset_global_aux_loss_tracker(tracker_key: str | None = None) -> None:
         _GLOBAL_AUX_LOSS_TRACKER.pop(tracker_key, None)
 
 
+def average_global_aux_loss_for_logging(
+        aux_loss: torch.Tensor,
+        global_aux_loss_group=None,
+) -> torch.Tensor:
+    """Average rank-local global aux contributions for logging only."""
+    group_size = _get_group_size(global_aux_loss_group)
+    logged_aux_loss = aux_loss.detach().float()
+    if group_size <= 1:
+        return logged_aux_loss
+
+    logged_aux_loss = logged_aux_loss.clone()
+    torch.distributed.all_reduce(
+        logged_aux_loss,
+        op=torch.distributed.ReduceOp.SUM,
+        group=global_aux_loss_group,
+    )
+    return logged_aux_loss / group_size
+
+
 def _update_global_tokens_per_expert(
         tracker_key: str,
         global_tokens_per_expert: torch.Tensor,

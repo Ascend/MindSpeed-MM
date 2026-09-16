@@ -22,7 +22,10 @@ from mindspeed_mm.fsdp.utils.lora_utils import load_state_dict
 from mindspeed_mm.fsdp.data.dataloader.dataloader import Preloader
 from mindspeed_mm.fsdp.utils.constants import MEMORY_REPORT_ITERATION
 from mindspeed_mm.fsdp.train.training_context import TrainingStage, TrainingContext
-from mindspeed_mm.utils.aux_loss import reset_global_aux_loss_tracker
+from mindspeed_mm.utils.aux_loss import (
+    average_global_aux_loss_for_logging,
+    reset_global_aux_loss_tracker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +109,16 @@ class TrainEngine:
             and loss_cfg.router_aux_loss_coef > 0.0
         )
 
+    def get_router_aux_loss_num_layers_for_logging(self) -> int:
+        """Return the MoE layer count used by Megatron-style aux logging."""
+        model = getattr(self.model, "module", self.model)
+        config = getattr(model, "config", None)
+        text_config = getattr(config, "text_config", None)
+        num_layers = getattr(text_config, "num_hidden_layers", None)
+        if num_layers is None:
+            num_layers = getattr(config, "num_hidden_layers", None)
+        return num_layers if isinstance(num_layers, int) and num_layers > 0 else 1
+
     def get_batch(self, data_iterator):
         """Generate a batch."""
         if data_iterator is not None:
@@ -155,6 +168,7 @@ class TrainEngine:
         args = self.args
         global_aux_loss_enabled = self.is_global_router_aux_loss_enabled()
         total_loss = 0
+        total_lm_loss = 0 if global_aux_loss_enabled else None
         total_aux_loss = None
         all_mtp_loss = None
         ps = get_parallel_state()
@@ -178,6 +192,15 @@ class TrainEngine:
             output = self.model(**batch_data, use_cache=False)
             loss = output.loss / args.training.gradient_accumulation_steps
             total_loss += loss
+
+            if global_aux_loss_enabled:
+                output_aux_loss = getattr(output, 'aux_loss', None)
+                lm_loss = output.loss.detach()
+                if isinstance(output_aux_loss, torch.Tensor):
+                    lm_loss = lm_loss - args.features.loss_cfg.router_aux_loss_coef * output_aux_loss.detach().to(
+                        lm_loss.device
+                    )
+                total_lm_loss += lm_loss / args.training.gradient_accumulation_steps
 
             # mtp loss
             mtp_loss = getattr(output, 'mtp_loss', None)
@@ -209,12 +232,22 @@ class TrainEngine:
         total_loss = self.average_losses_across_data_parallel_group([total_loss])
         loss_dict["loss"] = total_loss.item()
 
+        if global_aux_loss_enabled:
+            total_lm_loss = self.average_losses_across_data_parallel_group([total_lm_loss])
+            loss_dict["lm loss"] = total_lm_loss.item()
+            if total_aux_loss is not None:
+                num_layers = self.get_router_aux_loss_num_layers_for_logging()
+                logged_aux_loss = average_global_aux_loss_for_logging(
+                    total_aux_loss, ps.get_hsdp_group()
+                )
+                loss_dict["aux loss"] = (logged_aux_loss / num_layers).item()
+
         if all_mtp_loss:
             for i in range(len(all_mtp_loss)):
                 all_mtp_loss[i] = self.average_losses_across_data_parallel_group([all_mtp_loss[i]])
                 loss_dict[f"mtp_{i+1} loss"] = all_mtp_loss[i].item()
 
-        if total_aux_loss:
+        if not global_aux_loss_enabled and total_aux_loss:
             loss_dict["aux loss"] = total_aux_loss.item()
 
         return loss_dict
