@@ -22,7 +22,7 @@
     - [LoRA微调（基于Megatron训练后端）](./features/lora_finetune.md)
     - [LoRA微调（基于FSDP2训练后端）](./features/lora_finetune_fsdp2.md)     
   - [数据处理](./features/seqpack.md)
-  - [确定性计算](./features/deterministic_computing.md)
+  - [确定性计算](features/other/deterministic_computing.md)
 - [模型迁移]()
   - [迁移指南（基于FSDP2训练后端）](./features/fsdp2_qwen3vl_migration_practice.md)
 - [模型性能调优](pytorch/performance_tuning.md)

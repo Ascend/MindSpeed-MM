@@ -16,7 +16,7 @@ Last updated: 12/08/2025. Author: zs-derrick
 
 下图是模型迁移的总体流程图介绍：
 
-![migration](../../../UserGuide/_static/dev_guide/migration/migration.png)
+![migration](../../../sources/images/dev_guide/migration/migration.png)
 
 为系统性地完成上述适配工作，我们将模型迁移过程分解为四个关键流程：
 
@@ -63,7 +63,7 @@ MindSpeed-MM 训练逻辑整体沿用 Megatron 风格，各类模型统一使用
 
 ### 🔄 核心接口调用流程
 
-![flowchart](../../../UserGuide/_static/dev_guide/migration/flowchart.png)
+![flowchart](../../../sources/images/dev_guide/migration/flowchart.png)
 
 ## 模型迁移
 
@@ -179,7 +179,7 @@ MindSpeed-MM 同时提供了一套优化的多模态数据集处理模块，包�
 
 ### 🧩 模型结构迁移
 
-![model](../../../UserGuide/_static/dev_guide/migration/model.png)
+![model](../../../sources/images/dev_guide/migration/model.png)
 
 在 MindSpeed-MM 框架中，所有训练模型都通过标准化的入口函数进行构建和执行：`model_provider` 构造模型，`forward_step` 执行前向结果，`loss_func` 计算训练损失。
 
@@ -415,7 +415,7 @@ offload_to_cpu: False
 
 针对模型结构复杂或特殊场景的定制化需求，我们提供了灵活的自定义切分方案。用户可以通过调用 `FSDP2Mixin` 提供的 `fully_shard` 接口，实现完全按需设计的切分和优化策略，获得对模型分布式训练的精细化控制能力，从而有效应对各类复杂架构与高性能训练场景。下图显示了 FSDP2Mixin 类的核心组成，用户可以根据各自需求对其方法进行重写：
 
-![fsdp2](../../../UserGuide/_static/dev_guide/migration/fsdp2.png)
+![fsdp2](../../../sources/images/dev_guide/migration/fsdp2.png)
 
 **自定义 fully_shard 实现示例**
 

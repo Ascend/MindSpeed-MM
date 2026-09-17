@@ -8,7 +8,7 @@ Last updated: 12/08/2025. Author: cxiaolong
 
 该流程主要包含环境搭建、数据集构建、模型构建、配置文件、训练入口、训练脚本、启动训练。
 
-![开发流程](../../../UserGuide/_static/dev_guide/new_model_dev/flow.png)
+![开发流程](../../../sources/images/dev_guide/new_model_dev/flow.png)
 
 ## Step1: 环境搭建
 
@@ -182,7 +182,7 @@ MindSpeed-MM 提供了丰富的 DataLoader 组件，调用入口为 `mindspeed_m
 
 MindSpeed-MM 中提供了一个 SoRAModel 作为所有扩散视频生成模型的组合类，模型继承关系如下。SoRAModel 是一个组合类，可以实例化成 Wan、HunyuanVideo 等具体的模型，由 TextEncoder、PredictModel、DiffusionModel、AEModel 多个部件组成。
 
-![sora model](../../../UserGuide/_static/dev_guide/new_model_dev/sora_model.png)
+![sora model](../../../sources/images/dev_guide/new_model_dev/sora_model.png)
 
 本教程将新构建一个 `CustomModel` 用于表示自定义的视频生成模型的组合类，它由 `PredictModel(CustomDiT)`、`TextEncoder(UMT5)`、`AEModel(WanVideoVAE)`、`DiffusionModel(WanFlowMatchScheduler)` 四部分组成。
 
