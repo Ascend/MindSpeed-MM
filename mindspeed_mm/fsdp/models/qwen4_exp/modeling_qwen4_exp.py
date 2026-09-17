@@ -30,6 +30,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from transformers import initialization as init
+from transformers import logging
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache
 from transformers.configuration_utils import PreTrainedConfig
@@ -68,8 +69,31 @@ from transformers.vision_utils import (
     get_vision_interpolation_indices_and_weights,
     get_vision_position_ids,
 )
-from transformers.models.auto.modeling_auto import AutoModel
-from transformers.models.qwen4_exp.configuration_qwen4_exp import Qwen4ExpConfig, Qwen4ExpTextConfig, Qwen4ExpVisionConfig
+from transformers import AutoModel
+from transformers.models.qwen4_exp.configuration_qwen4_exp import (
+    Qwen4ExpConfig,
+    Qwen4ExpTextConfig,
+    Qwen4ExpVisionConfig,
+)
+
+from torch.distributed.tensor import DTensor
+
+from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.utils.register import model_register
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE, get_device_type
+
+if IS_NPU_AVAILABLE:
+    import torch_npu
+
+logger = logging.get_logger(__name__)
+
+IMPL_EAGER = "eager"
+IMPL_TRITON = "triton"
+IMPL_TRITON_WITH_TRANSPOSE = "triton_with_transpose"
+IMPL_ASCENDC = "ascendc"
+IMPL_ASCENDC_LEGACY = "ascendc_legacy"
+IMPL_FOR_CAUSAL_CONV = (IMPL_EAGER, IMPL_TRITON, IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC)
+IMPL_FOR_GDN = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC, IMPL_ASCENDC_LEGACY)
 
 
 class Qwen4ExpTextRotaryEmbedding(nn.Module):
@@ -171,10 +195,13 @@ class Qwen4ExpTextRMSNorm(nn.Module):
         return out.flatten(-2) if self.group_size is not None else out
 
     def forward(self, x):
-        output = self._norm(x.float())
-        # Llama does x.to(float16) * w whilst Qwen4ExpText is (x * w).to(float16)
-        # See https://github.com/huggingface/transformers/pull/29402
-        output = output * (1.0 + self.weight.float())
+        if IS_NPU_AVAILABLE:
+            output = torch_npu.npu_rms_norm(x, 1.0 + self.weight, self.eps)[0]
+        else:
+            output = self._norm(x.float())
+            # Llama does x.to(float16) * w whilst Qwen4ExpText is (x * w).to(float16)
+            # See https://github.com/huggingface/transformers/pull/29402
+            output = output * (1.0 + self.weight.float())
         return output.type_as(x)
 
     def extra_repr(self):
@@ -191,14 +218,17 @@ class Qwen4ExpTextRMSNormGated(nn.Module):
 
     def forward(self, hidden_states, gate=None):
         input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        # Norm before gate
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        hidden_states = self.weight * hidden_states.to(input_dtype)
-        hidden_states = hidden_states * ACT2FN[self.activation](gate.to(torch.float32))
-
-        return hidden_states.to(input_dtype)
+        if IS_NPU_AVAILABLE:
+            hidden_states = torch_npu.npu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+            hidden_states = hidden_states * ACT2FN[self.activation](gate)
+        else:
+            hidden_states = hidden_states.to(torch.float32)
+            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            # Norm before gate
+            hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+            hidden_states = self.weight * hidden_states.to(input_dtype)
+            hidden_states = hidden_states * ACT2FN[self.activation](gate.to(torch.float32)).to(input_dtype)
+        return hidden_states
 
 
 def apply_mask_to_padding_states(hidden_states, attention_mask):
@@ -446,7 +476,69 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
         self.in_proj_b = nn.Linear(self.hidden_size, self.num_v_heads, bias=False)
         self.in_proj_a = nn.Linear(self.hidden_size, self.num_v_heads, bias=False)
 
-    @force_accelerate_hooks("conv1d")
+        self.causal_conv1d_implementation = getattr(config, "causal_conv1d_implementation", IMPL_EAGER)
+        self.gdn_implementation = getattr(config, "gdn_implementation", IMPL_EAGER)
+        self.skip_gdn_recompute = getattr(config, "skip_gdn_recompute", False)
+
+        if self.gdn_implementation == IMPL_ASCENDC and self.causal_conv1d_implementation == IMPL_TRITON and IS_NPU_AVAILABLE:
+            self.causal_conv1d_implementation = IMPL_TRITON_WITH_TRANSPOSE
+
+        if self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE and IS_NPU_AVAILABLE:
+            from mindspeed_mm.fsdp.ops.gdn.triton_core.causal_conv1d import causal_conv1d_triton
+            print_rank(logger.info, "Qwen4Exp causal_conv1d (with transpose) use NPU triton ops")
+            self.causal_conv1d_fn = causal_conv1d_triton
+        elif self.causal_conv1d_implementation == IMPL_TRITON and IS_NPU_AVAILABLE:
+            from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
+            print_rank(logger.info, "Qwen4Exp causal_conv1d use NPU triton ops")
+            self.causal_conv1d_fn = causal_conv1d
+        elif self.causal_conv1d_implementation == IMPL_ASCENDC and IS_NPU_AVAILABLE:
+            from mindspeed_mm.fsdp.ops.gdn.causal_conv1d_ascendc import causal_conv1d_ascendc
+            print_rank(logger.info, "Qwen4Exp causal_conv1d use NPU AscendC ops")
+            self.causal_conv1d_fn = causal_conv1d_ascendc
+        else:
+            self.causal_conv1d_implementation = IMPL_EAGER
+            self.causal_conv1d_fn = causal_conv1d_fn
+
+        if self.gdn_implementation == IMPL_TRITON:
+            if IS_NPU_AVAILABLE:
+                from mindspeed_mm.fsdp.ops.gdn.chunk_gated_delta_rule import chunk_gated_delta_rule
+                print_rank(logger.info, "Qwen4ExpTextGatedDeltaNet use NPU triton fused ops")
+                self.chunk_gated_delta_rule = chunk_gated_delta_rule
+            else:
+                raise ValueError(
+                    "gdn_implementation='triton' requires NPU, but NPU is not available. "
+                    "Please use gdn_implementation='eager'."
+                )
+        elif self.gdn_implementation == IMPL_ASCENDC:
+            if IS_NPU_AVAILABLE:
+                from mindspeed_mm.fsdp.ops.gdn.flash_gated_delta_rule import flash_gated_delta_rule
+                print_rank(logger.info, "Qwen4ExpTextGatedDeltaNet (without transpose) use NPU AscendC fused ops")
+                self.chunk_gated_delta_rule = flash_gated_delta_rule
+            else:
+                raise ValueError(
+                    "gdn_implementation='ascendc' requires NPU, but NPU is not available. "
+                    "Please use gdn_implementation='eager'."
+                )
+        elif self.gdn_implementation == IMPL_ASCENDC_LEGACY:
+            if IS_NPU_AVAILABLE:
+                from mindspeed_mm.fsdp.ops.gdn.flash_chunk_gated_delta_rule import chunk_gated_delta_rule
+                print_rank(logger.info, "Qwen4ExpTextGatedDeltaNet (with transpose) use NPU AscendC fused ops")
+                self.chunk_gated_delta_rule = chunk_gated_delta_rule
+            else:
+                raise ValueError(
+                    "gdn_implementation='ascendc_legacy' requires NPU, but NPU is not available. "
+                    "Please use gdn_implementation='eager'."
+                )
+        elif self.gdn_implementation == IMPL_EAGER:
+            self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
+            if self.skip_gdn_recompute:
+                raise NotImplementedError("gdn_implementation='eager' does not support skip_gdn_recompute now.")
+        else:
+            raise ValueError(
+                f"Invalid gdn_implementation='{self.gdn_implementation}'. Must be one of: {IMPL_FOR_GDN}."
+            )
+        self.recurrent_gated_delta_rule = torch_recurrent_gated_delta_rule
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -462,8 +554,7 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
             self.layer_idx, state_idx=0
         )
 
-        mixed_qkv = self.in_proj_qkv(hidden_states)
-        mixed_qkv = mixed_qkv.transpose(1, 2)
+        mixed_qkv = self.in_proj_qkv(hidden_states)  # b s (k+k+v)d
 
         z = self.in_proj_z(hidden_states)
         z = z.reshape(batch_size, seq_len, -1, self.head_v_dim)
@@ -471,59 +562,102 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
         b = self.in_proj_b(hidden_states)
         a = self.in_proj_a(hidden_states)
 
+        cu_seqlens = None
+        if kwargs.get("cu_seq_lens_q") is not None:
+            cu_seqlens = kwargs.get("cu_seq_lens_q").to(torch.int64)
+
         if use_precomputed_states and seq_len == 1 and not cache_params.layers[self.layer_idx].record_past:
             conv_state = cache_params.layers[self.layer_idx].conv_states[0]
             # Single-token cached decode: the fused per-step kernel updates the conv state in-place.
             mixed_qkv = causal_conv1d_update(
-                mixed_qkv,
+                mixed_qkv.transpose(1, 2),
                 conv_state,
                 self.conv1d.weight.squeeze(1),
                 self.conv1d.bias,
                 self.activation,
-            )
+            ).transpose(1, 2)
         else:
             if cache_params is not None:
-                mixed_qkv = cache_params.update_conv_state(
-                    mixed_qkv, self.layer_idx, conv_kernel_size=self.conv_kernel_size
+                mixed_qkv_t = mixed_qkv.transpose(1, 2)
+                mixed_qkv_t = cache_params.update_conv_state(
+                    mixed_qkv_t, self.layer_idx, conv_kernel_size=self.conv_kernel_size
                 )
+                mixed_qkv = mixed_qkv_t.transpose(1, 2)
 
-            mixed_qkv = causal_conv1d_fn(
+            # Modification: NPU causal_conv1d implementations (ported from qwen3_5)
+            if self.causal_conv1d_implementation == IMPL_TRITON:
+                mixed_qkv, _ = self.causal_conv1d_fn(
+                    x=mixed_qkv,
+                    weight=self.conv1d.weight.squeeze(1).transpose(-1, -2).contiguous(),
+                    bias=self.conv1d.bias,
+                    activation=self.activation,
+                    cu_seqlens=cu_seqlens,
+                )
+            elif self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
+                mixed_qkv, _ = self.causal_conv1d_fn(
+                    x=mixed_qkv,
+                    weight=self.conv1d.weight.squeeze(1),
+                    H=2 * self.num_k_heads + self.num_v_heads,
+                    bias=self.conv1d.bias,
+                    activation=self.activation,
+                    cu_seqlens=cu_seqlens,
+                )
+            elif self.causal_conv1d_implementation == IMPL_ASCENDC:
+                mixed_qkv = self.causal_conv1d_fn(
+                    x=mixed_qkv,
+                    weight=self.conv1d.weight.squeeze(1),
+                    H=2 * self.num_k_heads + self.num_v_heads,
+                    bias=self.conv1d.bias,
+                    activation=self.activation,
+                    cu_seqlens=cu_seqlens,
+                )[0]
+            else:
+                mixed_qkv = mixed_qkv.transpose(1, 2)
+                mixed_qkv = causal_conv1d_fn(
+                    mixed_qkv,
+                    self.conv1d.weight.squeeze(1),
+                    self.conv1d.bias,
+                    activation=self.activation,
+                ).transpose(1, 2)
+            if cache_params is not None:
+                mixed_qkv = mixed_qkv[:, :seq_len, :] if mixed_qkv.dim() == 3 else mixed_qkv[..., :seq_len]
+
+        if self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
+            # NPU kernels return a [b, H, s*d] layout, split per head
+            query, key, value = torch.split(
                 mixed_qkv,
-                self.conv1d.weight.squeeze(1),
-                self.conv1d.bias,
-                activation=self.activation,
-                **kwargs,
+                [self.num_k_heads, self.num_k_heads, self.num_v_heads],
+                dim=1,
+            )
+        else:
+            query, key, value = torch.split(
+                mixed_qkv,
+                [
+                    self.key_dim,
+                    self.key_dim,
+                    self.value_dim,
+                ],
+                dim=-1,
             )
 
-            # Drop the additional previous states
-            if cache_params is not None:
-                mixed_qkv = mixed_qkv[:, :, -seq_len:]
-
-        mixed_qkv = mixed_qkv.transpose(1, 2)
-        query, key, value = torch.split(
-            mixed_qkv,
-            [
-                self.key_dim,
-                self.key_dim,
-                self.value_dim,
-            ],
-            dim=-1,
-        )
-
-        query = query.reshape(batch_size, seq_len, -1, self.head_k_dim)
-        key = key.reshape(batch_size, seq_len, -1, self.head_k_dim)
-        value = value.reshape(batch_size, seq_len, -1, self.head_v_dim)
+            query = query.reshape(query.shape[0], query.shape[1], -1, self.head_k_dim)
+            key = key.reshape(key.shape[0], key.shape[1], -1, self.head_k_dim)
+            value = value.reshape(value.shape[0], value.shape[1], -1, self.head_v_dim)
 
         beta = b.sigmoid()
         # If the model is loaded in fp16, without the .float() here, A might be -inf
         g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
         if self.num_v_heads // self.num_k_heads > 1:
-            query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
-            key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
+            if self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
+                query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
+                key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
+            else:
+                query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
+                key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
 
         recurrent_state = cache_params.layers[self.layer_idx].recurrent_states[0] if use_precomputed_states else None
         if use_precomputed_states and seq_len == 1:
-            core_attn_out, last_recurrent_state = torch_recurrent_gated_delta_rule(
+            core_attn_out, last_recurrent_state = self.recurrent_gated_delta_rule(
                 query,
                 key,
                 value,
@@ -532,11 +666,22 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
                 initial_state=recurrent_state,
                 output_final_state=cache_params is not None,
                 use_qk_l2norm_in_kernel=True,
-                cu_seqlens=kwargs.pop("cu_seq_lens_q", None),
-                **kwargs,
+            )
+        elif self.gdn_implementation in (IMPL_TRITON, IMPL_ASCENDC, IMPL_ASCENDC_LEGACY):
+            core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
+                query,
+                key,
+                value,
+                g=g,
+                beta=beta,
+                cu_seqlens=cu_seqlens,
+                initial_state=recurrent_state,
+                output_final_state=cache_params is not None,
+                use_qk_l2norm_in_kernel=True,
+                skip_recompute=self.skip_gdn_recompute,
             )
         else:
-            core_attn_out, last_recurrent_state = torch_chunk_gated_delta_rule(
+            core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
                 query,
                 key,
                 value,
@@ -545,8 +690,6 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
                 initial_state=recurrent_state,
                 output_final_state=cache_params is not None,
                 use_qk_l2norm_in_kernel=True,
-                cu_seqlens=kwargs.pop("cu_seq_lens_q", None),
-                **kwargs,
             )
 
         # Update cache
@@ -595,13 +738,20 @@ def apply_rotary_pos_emb(q, k=None, cos=None, sin=None, unsqueeze_dim=1):
     # Keep half or full tensor for later concatenation
     q_rope, q_nope = q[..., :rotary_dim], q[..., rotary_dim:]
     # Apply rotary embeddings on the first half or full tensor
-    q_rope = (q_rope * cos) + (rotate_half(q_rope) * sin)
-    # Concatenate back to full shape
+    if IS_NPU_AVAILABLE and k is not None and q.dim() == 4:
+        # NPU optimized: fused rotary mul instead of separate rotate_half + multiply
+        q_rope = torch_npu.npu_rotary_mul(q_rope, cos, sin)
+    else:
+        q_rope = (q_rope * cos) + (rotate_half(q_rope) * sin)
+    # Concatenate back to full tensor
     q_rotated = torch.cat([q_rope, q_nope], dim=-1)
 
     if k is not None:
         k_rope, k_nope = k[..., :rotary_dim], k[..., rotary_dim:]
-        k_rope = (k_rope * cos) + (rotate_half(k_rope) * sin)
+        if IS_NPU_AVAILABLE and k.dim() == 4:
+            k_rope = torch_npu.npu_rotary_mul(k_rope, cos, sin)
+        else:
+            k_rope = (k_rope * cos) + (rotate_half(k_rope) * sin)
         k_rotated = torch.cat([k_rope, k_nope], dim=-1)
         return q_rotated, k_rotated
     else:
@@ -707,7 +857,8 @@ class Qwen4ExpTextQSAIndexer(nn.Module):
             (*selected_token_indices.shape[:-1], kv_length + 1), device=attention_mask.device, dtype=torch.bool
         )
         # We absorb all the -1 by scaterring them to the last index that we will drop
-        scatter_indices = torch.where(selected_token_indices >= 0, selected_token_indices, kv_length)
+        # scatter requires an int64 index; torch.where keeps selected_token_indices' int32 dtype
+        scatter_indices = torch.where(selected_token_indices >= 0, selected_token_indices, kv_length).to(torch.int64)
         selected_token_mask = selected_token_mask.scatter(-1, scatter_indices, True)[..., :kv_length].unsqueeze(1)
         # if using eager, convert to float mask
         if attention_mask.is_floating_point():
@@ -867,6 +1018,31 @@ class Qwen4ExpTextExperts(nn.Module):
         self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts, 2 * self.intermediate_dim, self.hidden_dim))
         self.down_proj = nn.Parameter(torch.empty(self.num_experts, self.hidden_dim, self.intermediate_dim))
         self.act_fn = ACT2FN[config.hidden_act]
+        self.use_grouped_expert_matmul = getattr(config, "use_grouped_expert_matmul", False)
+        if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE:
+            print_rank(logger.info, "Qwen4ExpTextExperts use NPU fused ops")
+
+        # EP load balancing (hot-expert duplication), mirroring Qwen3_5MoeExperts. The planner
+        # is weight-layout agnostic (it works on expert IDs), so it is safe to build here even
+        # though ep_forward feeds the dispatcher transposed [E, in, out] views of the stored
+        # [E, out, in] weights.
+        from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+
+        parallel_state = get_parallel_state()
+        self.enable_ep_balance = getattr(config, "enable_ep_balance", False) and parallel_state.is_ep_enable()
+        if self.enable_ep_balance:
+            from mindspeed_mm.fsdp.distributed.expert_parallel.ep_balance.ep_balance_strategy import EPBalanceStrategy
+
+            self.ep_balance_strategy = EPBalanceStrategy(
+                ep_group=parallel_state.get_ep_group(),
+                num_experts=self.num_experts,
+                max_dup_experts_num=getattr(config, "max_dup_experts_num", 2),
+            )
+
+            def hook_fn(*args, **kwargs):
+                self.ep_balance_strategy.planner.pop_plan_cache()
+
+            self.register_full_backward_hook(hook_fn)
 
     def forward(
         self,
@@ -874,6 +1050,25 @@ class Qwen4ExpTextExperts(nn.Module):
         top_k_index: torch.Tensor,
         top_k_weights: torch.Tensor,
     ) -> torch.Tensor:
+        if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE:
+            from mindspeed_mm.models.common.gmm import npu_group_gemm
+
+            permuted_hidden_states, row_ids_map = torch_npu.npu_moe_token_permute(
+                hidden_states, top_k_index.to(torch.int32)
+            )
+            tokens_per_expert = torch.histc(top_k_index, bins=self.num_experts, min=0, max=self.num_experts)
+            # Modification: npu_group_gemm computes x @ W and expects [E, in, out] weight layout, but this
+            # module stores weights nn.Linear-style [E, out, in] (see the eager fallback below, which uses
+            # F.linear). Feed transposed views — autograd maps the produced grads back onto the stored
+            # layout through the transpose nodes.
+            gate_up_proj = self.gate_up_proj.transpose(1, 2)
+            down_proj = self.down_proj.transpose(1, 2)
+            intermediate_hidden_states = npu_group_gemm(permuted_hidden_states, gate_up_proj, tokens_per_expert)
+            intermediate_activations = torch_npu.npu_swiglu(intermediate_hidden_states, dim=-1)
+            output = npu_group_gemm(intermediate_activations, down_proj, tokens_per_expert)
+            final_hidden_states = torch_npu.npu_moe_token_unpermute(output, row_ids_map, probs=top_k_weights)
+            return final_hidden_states
+
         final_hidden_states = torch.zeros_like(hidden_states)
         with torch.no_grad():
             expert_mask = torch.nn.functional.one_hot(top_k_index, num_classes=self.num_experts)
@@ -893,6 +1088,60 @@ class Qwen4ExpTextExperts(nn.Module):
             final_hidden_states.index_add_(0, token_idx, current_hidden_states.to(final_hidden_states.dtype))
 
         return final_hidden_states
+
+    def ep_forward(
+        self,
+        hidden_states: torch.Tensor,
+        top_k_index: torch.Tensor,
+        top_k_weights: torch.Tensor,
+        ep_group,
+        ep_plan,
+        **kwargs,
+    ) -> torch.Tensor:
+        """Expert-parallel entry injected by ``expert_parallelize_modules`` (mirrors
+        ``Qwen3_5MoeExperts.ep_forward``): tokens are dispatched to the expert owners by the plan's
+        dispatcher instead of the expert weights being gathered.
+
+        Layout note: this module stores weights nn.Linear-style ``[E, out, in]`` while the EP
+        dispatchers (``ep_dispatcher.ep_forward`` -> grouped matmul) expect ``[E, in, out]``
+        ``fc1_weight``/``fc2_weight``; pass transposed views so produced grads flow back onto the
+        stored layout. ``expert_parallel_size`` for this model must divide ``num_experts`` (checked
+        in ``dispatch_preprocess``). EP load balancing (``enable_ep_balance``, YAML
+        ``features.enable_ep_balance``) is wired here via ``EPBalanceStrategy``; the gradient
+        accumulation hooks must be registered on the SAME transposed views handed to the
+        dispatcher, because their ``add_dup_experts_grad`` reshape assumes the dispatcher-side
+        ``[E, in, out]`` layout.
+        """
+        gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
+        down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
+        fc1_weight = gate_up_proj.transpose(1, 2)
+        fc2_weight = down_proj.transpose(1, 2)
+
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward
+
+        if ep_plan.dispatcher != "alltoall":
+            raise NotImplementedError(
+                f"ep_plan.dispatcher='{ep_plan.dispatcher}' is not supported by Qwen4ExpTextExperts; use 'alltoall'."
+            )
+
+        if self.enable_ep_balance:
+            self.ep_balance_strategy.executor.register_backward_dup_experts_grad_acc_hook(fc1_weight, name="fc1")
+            self.ep_balance_strategy.executor.register_backward_dup_experts_grad_acc_hook(fc2_weight, name="fc2")
+
+        hidden_states = ep_forward(
+            self.num_experts,
+            top_k_weights,
+            top_k_index,
+            hidden_states,
+            fc1_weight=fc1_weight,
+            fc2_weight=fc2_weight,
+            ep_group=ep_group,
+            fused=ep_plan.use_npu_fused_ops,
+            ep_balance_strategy=self.ep_balance_strategy if self.enable_ep_balance else None,
+            seq_mask=kwargs.get("seq_mask", None),
+            skip_moe_pad_tokens=False,
+        )
+        return hidden_states
 
 
 class Qwen4ExpTextTopKRouter(nn.Module):
@@ -1269,10 +1518,8 @@ class Qwen4ExpPreTrainedModel(PreTrainedModel):
         if isinstance(module, Qwen4ExpTextGatedDeltaNet):
             init.ones_(module.dt_bias)
             # Lower bound kept away from 0 so log(A) never becomes -inf
-            init.copy_(
-                module.A_log,
-                torch.empty(module.num_v_heads, device=module.A_log.device).uniform_(0.01, 16).log_(),
-            )
+            # Modification: empty_like keeps DTensor attributes so copy_ works under FSDP2 sharding
+            init.copy_(module.A_log, torch.empty_like(module.A_log).uniform_(0.01, 16).log_())
         # We initialize with 0s to be 1 centered as the RMSNorm here does (1 + weight)
         elif isinstance(module, Qwen4ExpTextRMSNorm):
             init.zeros_(module.weight)
@@ -1970,8 +2217,8 @@ class Qwen4ExpModel(Qwen4ExpPreTrainedModel):
 
     def __init__(self, config):
         super().__init__(config)
-        self.visual = AutoModel.from_config(config.vision_config)
-        self.language_model = AutoModel.from_config(config.text_config)
+        self.visual = Qwen4ExpVisionModel(config.vision_config)
+        self.language_model = Qwen4ExpTextModel(config.text_config)
         self.rope_deltas = None  # cache rope_deltas here
 
         # Initialize weights and apply final processing
@@ -2338,6 +2585,7 @@ class Qwen4ExpCausalLMOutputWithPast(CausalLMOutputWithPast):
 
 
 @auto_docstring
+@model_register.register("qwen4_exp")
 class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin):
     _tied_weights_keys = {"lm_head.weight": "model.language_model.embed_tokens.weight"}
     # Reference: fix gemma3 grad acc #37208
@@ -2352,6 +2600,81 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
         self.lm_head = nn.Linear(config.text_config.hidden_size, config.text_config.vocab_size, bias=False)
 
         self.post_init()
+
+    @staticmethod
+    def overwrite_transformer_config(transformer_config, model_args, feature_args):
+        # gdn implementation
+        gdn_implementation = getattr(model_args, "gdn_implementation", IMPL_EAGER).lower().strip()
+        if gdn_implementation not in IMPL_FOR_GDN:
+            raise ValueError(
+                f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: {IMPL_FOR_GDN}."
+            )
+        transformer_config.text_config.gdn_implementation = gdn_implementation
+        # causal conv1d implementation
+        causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()
+        if causal_conv1d_implementation not in IMPL_FOR_CAUSAL_CONV:
+            raise ValueError(
+                f"Invalid causal_conv1d='{causal_conv1d_implementation}'. Must be one of: {IMPL_FOR_CAUSAL_CONV}."
+            )
+        transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
+
+        if (gdn_implementation == IMPL_ASCENDC) and (causal_conv1d_implementation == IMPL_EAGER):
+            raise ValueError(
+                f"Inconsistent implementations: gdn='{gdn_implementation}', "
+                f"causal_conv1d='{causal_conv1d_implementation}'. "
+                f"gdn can be 'ascendc' only if causal_conv1d is not 'eager'."
+            )
+
+        # skip flash attn recompute
+        skip_flash_attn_recompute = getattr(model_args, "skip_flash_attn_recompute", False)
+        if skip_flash_attn_recompute and gdn_implementation == IMPL_EAGER:
+            raise ValueError(
+                "skip_flash_attn_recompute cannot be True when gdn_implementation is 'eager'. "
+                "Please set skip_flash_attn_recompute to False or use a different gdn_implementation."
+            )
+        transformer_config.text_config.skip_flash_attn_recompute = skip_flash_attn_recompute
+        transformer_config.vision_config.skip_flash_attn_recompute = skip_flash_attn_recompute
+
+        # skip gdn recompute
+        transformer_config.text_config.skip_gdn_recompute = getattr(model_args, "skip_gdn_recompute", False)
+
+        # grouped expert matmul (NPU fused MoE)
+        transformer_config.text_config.use_grouped_expert_matmul = getattr(
+            model_args, "use_grouped_expert_matmul", False
+        )
+
+        # aux loss
+        transformer_config.text_config.router_aux_loss_coef = feature_args.loss_cfg.router_aux_loss_coef
+        transformer_config.text_config.router_aux_loss_offload = feature_args.loss_cfg.router_aux_loss_offload
+        transformer_config.text_config.router_aux_loss_type = getattr(
+            feature_args.loss_cfg, "router_aux_loss_type", "local"
+        )
+        transformer_config.text_config.router_aux_loss_use_attention_mask = getattr(
+            feature_args.loss_cfg, "router_aux_loss_use_attention_mask", False
+        )
+
+        # mtp
+        mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
+        if mtp_num_layers < 0:
+            raise ValueError(f"Invalid mtp_num_layers='{mtp_num_layers}'. Must be a non-negative integer.")
+        transformer_config.text_config.mtp_num_layers = mtp_num_layers
+
+        # chunkloss
+        transformer_config.text_config.enable_chunk_loss = getattr(feature_args, "enable_chunk_loss", False)
+        transformer_config.text_config.enable_dynamic_chunk_loss = getattr(
+            feature_args, "enable_dynamic_chunk_loss", False
+        )
+
+        # ep balance
+        transformer_config.text_config.enable_ep_balance = getattr(feature_args, "enable_ep_balance", False)
+        transformer_config.text_config.max_dup_experts_num = getattr(
+            feature_args.ep_balance_plan, "max_dup_experts_num", 2
+        )
+
+        # skip moe pad tokens
+        transformer_config.text_config.skip_moe_pad_tokens = getattr(feature_args, "skip_moe_pad_tokens", False)
+
+        return transformer_config
 
     @auto_docstring
     def get_video_features(
@@ -2455,11 +2778,17 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
-        logits = self.lm_head(hidden_states[:, slice_indices, :])
+        if getattr(self, "enable_chunk_loss", False) or getattr(self, "enable_dynamic_chunk_loss", False):
+            logits = None
+            loss = self.lm_head(hidden_states[:, slice_indices, :], self.loss_function)
+        else:
+            logits = self.lm_head(hidden_states[:, slice_indices, :])
 
-        loss = None
-        if labels is not None:
-            loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
+            loss = None
+            if labels is not None:
+                loss = self.loss_function(
+                    logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size
+                )
 
         aux_loss = None
         if kwargs.get("output_router_logits", False):
