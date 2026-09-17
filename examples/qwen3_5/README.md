@@ -318,6 +318,42 @@ mm-convert Qwen35Converter dcp_to_hf \
   - gdn_implementation和causal_conv1d_implementation分别支持`eager`，`triton`和`ascendc`配置，使用`ascendc`性能最佳，需要安装fla_npu库
   - 当gdn_implementation配置为`ascendc`时，causal_conv1d_implementation只支持和`triton`和`ascendc`，防止算子之间的布局不匹配
 
+【纯文本 SFT】
+
+当使用纯文本数据对 Qwen3.5 进行 SFT 时，可通过 `text_only` collator 避免假模态注入和无效的视觉塔计算。
+
+在 `xxx_config.yaml` 中配置：
+
+```yaml
+data:
+  dataloader_param:
+    collate_param:
+      collator_id: text_only
+      ignore_pad_token_for_loss: true
+
+model:
+  freeze:
+    - model.visual
+
+features:
+  recompute_plan:
+    apply_modules:
+      - model.language_model.layers.{*}
+  activation_offload_plan:
+    apply_modules:
+      - model.language_model.layers.{*}
+```
+
+注意事项：
+
+- 输入数据必须为纯文本，不得携带非空的 `images`、`videos` 或 `audios`；
+- 视觉塔必须冻结（`model.freeze: [model.visual]`）；
+- 视觉模块继续保留在 `fsdp_plan.apply_modules` 中，维持分片和 checkpoint 拓扑；
+- 从 recompute/offload 中移除视觉模块，仅保留语言模型层；
+- 需要训练视觉塔或使用多模态数据时，将 `collator_id` 切回 `qwen3vl`；
+- 已在 CANN 9.1.0、PyTorch 2.7.1 环境下完成 Qwen3.5-9B、Qwen3.6-27B 和 Qwen3-VL-30B-A3B-Instruct 的 FSDP2 纯文本单轮训练验证；
+- Qwen3.5-9B 另已在 CANN 9.1.0、PyTorch 2.10.0 环境下完成纯文本单轮训练验证。
+
 【单机运行配置】
 以qwen3_5模型为例：
 配置`examples/qwen3_5/finetune_qwen3_5.sh`参数如下

@@ -100,6 +100,40 @@ class DataCollatorForStep3VL:
         return self.data_collator(*args, **kwargs)
 
 
+class DataCollatorForTextOnly:
+    def __init__(self, ignore_pad_token_for_loss: bool, dataset_param=None, **kwargs):
+        process_args = ProcessorArguments(**dataset_param.preprocess_parameters.to_dict())
+        tokenizer_module = load_tokenizer(process_args)
+        tokenizer = tokenizer_module.get('tokenizer')
+
+        chat_template_path = dataset_param.basic_parameters.chat_template
+        if chat_template_path is not None:
+            tokenizer = update_tokenizer_with_chat_template(tokenizer, chat_template_path)
+            template = get_template_and_fix_tokenizer(tokenizer, None)
+        else:
+            template = get_template_and_fix_tokenizer(tokenizer, dataset_param.basic_parameters.template)
+
+        self.data_collator = MultiModalDataCollatorForSeq2Seq(
+            template=template,
+            model=kwargs.get("model", None),
+            pad_to_multiple_of=kwargs.get("pad_to_multiple_of", 8),
+            label_pad_token_id=IGNORE_INDEX if ignore_pad_token_for_loss else tokenizer.pad_token_id,
+            text_only=True,
+            **tokenizer_module,
+        )
+        ps = get_parallel_state()
+        if ps.is_cp_enable():
+            cp_size = ps.get_cp_group_size()
+            pad_to_multiple_of = self.data_collator.pad_to_multiple_of
+            if pad_to_multiple_of % cp_size != 0:
+                raise ValueError(f"pad_to_multiple_of {pad_to_multiple_of} must be divisible by context parallel size {cp_size}.")
+            if ps.ring_attention_size > 1 and pad_to_multiple_of % (2 * cp_size) != 0:
+                raise ValueError(f"pad_to_multiple_of {pad_to_multiple_of} must be divisible by context parallel size {cp_size} * 2 when using ring CP.")
+
+    def __call__(self, *args, **kwargs):
+        return self.data_collator(*args, **kwargs)
+
+
 class DataCollatorForQwen3ASR:
     def __init__(self, ignore_pad_token_for_loss: bool, dataset_param=None, **kwargs):
         process_args = ProcessorArguments(**dataset_param.preprocess_parameters.to_dict())
@@ -222,4 +256,8 @@ _register_data_collator(
 _register_data_collator(
     "step3_vl",
     DataCollatorForStep3VL,
+)
+_register_data_collator(
+    "text_only",
+    DataCollatorForTextOnly,
 )

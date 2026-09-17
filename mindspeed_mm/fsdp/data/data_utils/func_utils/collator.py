@@ -48,6 +48,15 @@ def postprocess_position_ids(new_postion_ids, packed_postion_ids):
     return torch.stack(result).transpose(0, 1)
 
 
+def _has_modal_content(value: Any) -> bool:
+    if value is None:
+        return False
+    try:
+        return len(value) > 0
+    except TypeError:
+        return True
+
+
 @dataclass
 class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
     r"""Data collator that supports VLMs.
@@ -57,6 +66,7 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
 
     template: Optional["Template"] = None
     processor: Optional["ProcessorMixin"] = None
+    text_only: bool = False
 
     def __post_init__(self):
         if self.template is None:
@@ -79,6 +89,20 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             self.get_rope_func = None
 
     def __call__(self, features: list[dict[str, Any]]) -> dict[str, "torch.Tensor"]:
+        if self.text_only:
+            text_features = []
+            for source_feature in features:
+                feature = dict(source_feature)
+                for key in ("images", "videos", "audios"):
+                    modal_value = feature.pop(key, None)
+                    if _has_modal_content(modal_value):
+                        raise ValueError(
+                            f"text_only collator received non-empty {key}. "
+                            "Use a multimodal collator for multimodal training."
+                        )
+                text_features.append(feature)
+            features = text_features
+
         batch_images, batch_videos, batch_audios = [], [], []
         batch_imglens, batch_vidlens, batch_audlens, batch_input_ids = [], [], [], []
         for feature in features:
@@ -95,7 +119,8 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
 
         fake_input_ids = []
         if (
-            self.template.mm_plugin.image_token is not None and sum(batch_imglens) == 0 and sum(batch_vidlens) == 0
+            not self.text_only
+            and self.template.mm_plugin.image_token is not None and sum(batch_imglens) == 0 and sum(batch_vidlens) == 0
         ):  # avoid process hanging in zero3/fsdp case
             fake_messages = [{"role": "user", "content": IMAGE_PLACEHOLDER}]
             fake_images = [Image.new("RGB", (64, 64), (255, 255, 255))]
@@ -111,7 +136,8 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             batch_imglens[0] = 1
 
         if (
-            self.template.mm_plugin.audio_token is not None and sum(batch_audlens) == 0
+            not self.text_only
+            and self.template.mm_plugin.audio_token is not None and sum(batch_audlens) == 0
         ):  # avoid process hanging in zero3/fsdp case
             fake_messages = [{"role": "user", "content": AUDIO_PLACEHOLDER}]
             fake_audios = [np.zeros(1600)]
@@ -142,16 +168,19 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
 
             batch_input_ids[0] = features[0]["input_ids"]
 
-        mm_inputs = self.template.mm_plugin.get_mm_inputs(
-            batch_images,
-            batch_videos,
-            batch_audios,
-            batch_imglens,
-            batch_vidlens,
-            batch_audlens,
-            batch_input_ids,
-            self.processor,
-        )
+        if self.text_only:
+            mm_inputs = {}
+        else:
+            mm_inputs = self.template.mm_plugin.get_mm_inputs(
+                batch_images,
+                batch_videos,
+                batch_audios,
+                batch_imglens,
+                batch_vidlens,
+                batch_audlens,
+                batch_input_ids,
+                self.processor,
+            )
         if "token_type_ids" in mm_inputs:
             token_type_ids = mm_inputs.pop("token_type_ids")
             for i, feature in enumerate(features):
@@ -239,6 +268,10 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             mm_inputs["cross_attention_mask"] = F.pad(cross_attention_mask, (0, 0, 0, 0, 0, seq_len - orig_len))
 
         features.update(mm_inputs)
+
+        if "position_ids" in features:
+            # Materialize expanded views to avoid overlapping writes during pin_memory.
+            features["position_ids"] = features["position_ids"].contiguous()
 
         if "image_bound" in features:  # for minicpmv inputs
             bsz, seq_length = features["input_ids"].shape
