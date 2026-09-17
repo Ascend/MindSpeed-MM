@@ -1,0 +1,119 @@
+# MagiHuman t2av 全参数微调配置
+
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto            # 按 world_size 分片 (>1 才是真 FSDP2; 卡数由启动脚本 NPUS_PER_NODE 决定)
+  fsdp_plan:
+    apply_modules:
+      - dit.block.layers.{*}
+    param_dtype: bf16
+    reduce_dtype: fp32
+    num_to_forward_prefetch: 2
+    num_to_backward_prefetch: 2
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+
+magihuman_dataset_custom: &MAGIHUMAN_DATASET_CUSTOM_AV
+  latents_dir: latents
+  conditions_dir: conditions
+  audio_latents_dir: audio_latents
+  with_audio: true
+  seed: 42
+  timestep_sampling_mode: logit_normal
+  timestep_sampling_params:
+    loc: 0.0
+    scale: 1.0
+  synthetic: false
+
+data:
+  dataset_param:
+    dataset_type: magihuman_precomputed
+    preprocess_parameters: {}
+    magihuman_dataset_custom: *MAGIHUMAN_DATASET_CUSTOM_AV
+    basic_parameters:
+      dataset_dir: <本地数据路径>/.precomputed
+      dataset: magihuman_precomputed
+      max_samples: null                      # null 表示使用全部样本
+  dataloader_param:
+    pin_memory: true
+    shuffle: false
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8                           # 预计算 latent 逐样本读盘, 用子进程与计算重叠
+    collate_param:
+      model_name: magihuman
+      ignore_pad_token_for_loss: false
+
+model:
+  model_id: magihuman
+  model_name_or_path: &MAGIHUMAN_CKPT <本地权重路径>   # MagiHuman base 分片 safetensors 目录
+  checkpoint_path: *MAGIHUMAN_CKPT
+  enable_gradient_checkpointing: false       # recompute 由 features.recompute_plan 驱动
+
+features:
+  loss_cfg:
+    loss_type: raw
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - dit.block.layers.{*}
+  enable_activation_offload: false
+  activation_offload_plan:
+    impl: legacy
+    apply_modules:
+      - dit.block.layers.{*}
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.02
+  lr_min: 1.0e-6
+  weight_decay: 0.01
+  train_iters: 5000
+  clip_grad: 1.0
+  init_model_with_meta_device: false
+  optimizer: adamw
+  adam_fused: false
+  no_load_optim: true  # Do not load optimizer state; remove if loading is needed.
+  no_load_rng: true  # Do not load RNG state; remove if loading is needed.
+  no_save_optim: true  # Do not save optimizer state; remove if saving is needed.
+  no_save_rng: true  # Do not save RNG state; remove if saving is needed.
+  load: ''  # 首次训练留空由model.model_name_or_path加载base权重, 也可替换为hf权重或转换后的dcp权重路径
+  load_format: auto  # 设置为auto时根据加载文件格式自动判断是hf权重还是dcp权重
+  save: outputs/magihuman_t2av/checkpoints
+  save_format: dcp
+  save_interval: 500
+  use_deter_comp: false
+  plugin:
+    - mindspeed_mm/fsdp/models/magihuman/magihuman_fsdp2
+    - mindspeed_mm/fsdp/data/datasets/magihuman
+
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+    enable: false
+    start_step: 1
+    end_step: 2
+    save_path: ./memory_snapshot
+    dump_ranks: [0]
+    stacks: all
+    max_entries: null
+    mem_info: false

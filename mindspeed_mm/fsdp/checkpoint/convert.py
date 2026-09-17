@@ -557,10 +557,47 @@ class Wan22DiffusersTransformPipeline(DiffusersKeyMapTransformPipeline):
     STR_REPLACE_MAPPING = WAN22_DIFFUSERS_STR_REPLACE_MAPPING
 
 
+class MagiHumanWeightTransformPipeline(WeightTransformPipeline):
+    """Weight transform pipeline for MagiHuman.
+
+    MagiHuman trains with the gated ``up_gate_proj`` rows grouped into two
+    contiguous halves, while the public checkpoint interleaves them. Only the
+    layout differs: keys, shapes and dtypes are identical on both sides, so this
+    pipeline never renames or buffers a tensor.
+    """
+
+    def __init__(
+        self,
+        hf_dir: str,
+        mtp_num_layers: Optional[int] = None,
+    ) -> None:
+        super().__init__()
+        # Imported lazily: the model package triggers `@model_register` on import,
+        # which must not be a side effect of loading this checkpoint module.
+        from mindspeed_mm.fsdp.models.magihuman.magihuman_fsdp2.weight_layout import (
+            convert_up_gate_checkpoint_tensor,
+        )
+
+        self._convert = convert_up_gate_checkpoint_tensor
+
+    def hf_to_dcp(
+        self, key: str, tensor: torch.Tensor
+    ) -> Optional[Tuple[str, torch.Tensor]]:
+        """De-interleave gated ``up_gate_proj`` rows into contiguous halves."""
+        return key, self._convert(key, tensor, to_internal=True)
+
+    def dcp_to_hf(
+        self, key: str, tensor: torch.Tensor
+    ) -> Dict[str, torch.Tensor]:
+        """Restore the upstream interleaved ``up_gate_proj`` row order."""
+        return {key: self._convert(key, tensor, to_internal=False)}
+
+
 WEIGHT_TRANSFORM_PIPELINES = {
     "qwen3_5_moe": Qwen35WeightTransformPipeline,
     "wan2_2": Wan22DiffusersTransformPipeline,
     "glm5_next": Glm53FlashWeightTransformPipeline,
+    "magihuman": MagiHumanWeightTransformPipeline,
 }
 # Note: ``DiffusersKeyMapTransformPipeline`` is a base class with empty mapping
 # tables and must NOT be registered directly; new diffusers-source models add a

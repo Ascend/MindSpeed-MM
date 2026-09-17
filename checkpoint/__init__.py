@@ -28,3 +28,4 @@ from checkpoint.sora_model.bagel_converter import BagelConverter
 from checkpoint.fsdp.generic_dcp_converter import GenericDCPConverter
 from checkpoint.fsdp.custom_model_converter.qwen3tts import Qwen3TTSConverter
 from checkpoint.fsdp.custom_model_converter.moss_tts import MOSSTTSConverter
+from checkpoint.fsdp.custom_model_converter.magihuman import MagiHumanConverter
