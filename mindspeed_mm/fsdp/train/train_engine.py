@@ -482,6 +482,19 @@ class TrainEngine:
                     print_rank(logger.warning, "No RNG state found in checkpoint, skipping RNG loading")
                 else:
                     torch.set_rng_state(state["extra_state"]["torch_rng_state"])
+            if not args.training.no_load_optim:
+                # [fix #3] saved_optim defaults to True for checkpoints saved before
+                # this flag existed (backward compatible). When False, the user asked
+                # to load optimizer but none was saved -> optimizer starts cold ->
+                # may diverge silently. Mirror the RNG guard above.
+                if not state["extra_state"].get("saved_optim", True):
+                    print_rank(
+                        logger.warning,
+                        "Optimizer state was not saved in this checkpoint "
+                        "(no_save_optim=true at save time) but no_load_optim=false "
+                        "at load: optimizer starts from scratch (cold Adam), which "
+                        "may cause divergence. Set no_load_optim=true to acknowledge."
+                    )
 
         # Synchronize all processes after loading
         torch.distributed.barrier()
@@ -528,6 +541,10 @@ class TrainEngine:
         }
         if not args.training.no_save_optim:
             state["optimizer"] = self.optimizer
+        # [fix #3] record whether optimizer was saved so the load path can detect
+        # save/load asymmetry (no_save_optim=true at save, no_load_optim=false at
+        # load), which otherwise silently leaves optimizer state at zero.
+        state["extra_state"]["saved_optim"] = not args.training.no_save_optim
         if not args.training.no_save_rng:
             state["extra_state"]["torch_rng_state"] = torch.get_rng_state()
         self.save_checkpointer.save(
