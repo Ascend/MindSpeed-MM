@@ -23,7 +23,9 @@
   - [准备工作](#1-准备工作)
   - [配置参数](#2-配置参数)
   - [启动微调](#3-启动微调)
+  - [LoRA 微调](#4-lora-微调)
 - [环境变量声明](#环境变量声明)
+- [注意事项](#注意事项)
 
 ## 版本说明
 
@@ -38,31 +40,52 @@ commit_id=7d9754a
 
 2026.04.17: 首次支持Qwen3.6-35B-A3B模型
 
+环境变更记录：
+
+Latest:  2026.9.16:  为适配 CANN9.1.0 和 torch 2.10.0，将 Triton-Ascend 参考版本改为 3.2.2，fla-npu参考版本保持v26.6.0
+
 ---
+<a id="jump1"></a>
 
 ## 环境安装
+
+<a id="jump1.1"></a>
 
 ### 1. 环境准备
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](../../docs/zh/pytorch/install_guide.md)，完成 CANN 相关配置（驱动、固件及 Toolkit 工具包）。
+
+<a id="jump1.2"></a>
 
 ### 2. 环境搭建
 
-拉取MindSpeed MM代码仓，并进入代码仓根目录：
+拉取MindSpeed MM代码仓，并进入代码仓根目录(若需要使用低版本的python，可参考[安装指南](../../docs/zh/pytorch/install_guide.md)的拉取方法)：
 
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
 
-执行如下指令安装：
+若存在自由指定依赖等手动安装需求，可以参考[安装指南](../../docs/zh/pytorch/install_guide.md)中的手动安装流程（注：Qwen3.6不需要安装该流程中的Megatron-LM库）
+
+执行如下指令一键安装：
 
 ```bash
-bash scripts/install.sh --msbranch master
-pip install transformers==5.2.0 triton-ascend==3.2.0 accelerate==1.2.0
+bash scripts/install.sh --msbranch master && pip install transformers==5.2.0
 ```
+
+这里会自动安装 torch 以及 torch_npu 库，版本可以通过参数自行选择（默认 2.10.0），示例如下：
+
+```bash
+bash scripts/install.sh --msbranch master --torchversion 2.10.0 && pip install transformers==5.2.0
+```
+
+请参考[版本配套说明](../../docs/zh/release_notes_mm.md)和[Triton-Ascend3.2.2适配版本](https://github.com/triton-lang/triton-ascend/releases)选择适配的 pytorch/torch_npu 版本
+
+> [!NOTE]
+> 当前一键安装脚本torch_npu版本与torch为严格对应（无post后缀），建议按照链接中的适配版本自行安装带后缀的torch版本，否则可能无法通过后续环境检测脚本
 
 ### 3. 安装配套版本的Triton-Ascend
 
@@ -72,8 +95,11 @@ pip install transformers==5.2.0 triton-ascend==3.2.0 accelerate==1.2.0
 
 ```shell
 # 注意：triton-ascend 3.2.0 及以下 Triton-Ascend 和 Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
-pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+pip install triton-ascend==3.2.2 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
 ```
+
+> [!NOTE]
+> 当前triton-ascend==3.2.2可能会遇到一些兼容问题，若安装triton-ascend==3.2.2问题无法解决，可以尝试退回triton-ascend==3.2.1，经测试3.2.1在python3.12环境下可以跑通完整流程
 
 ### 4. 安装fla-npu以适配AscendC
 
@@ -86,15 +112,15 @@ cd flash-linear-attention-npu
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/v26.6.0/README.md)
 
-> **说明：** 请确保操作系统已安装 `gawk`，否则后续安装会失败。可参考以下命令安装：
+> **说明：** 请确保操作系统已安装 `gawk`和`cmake`，否则后续安装会失败。可参考以下命令安装：
 
 ```shell
 # Ubuntu / Debian
 apt-get update
-apt-get install gawk
+apt-get install gawk cmake
 # openEuler / CentOS / RHEL
 yum update
-yum install gawk
+yum install gawk cmake
 ```
 
 推荐使用以下安装命令
@@ -126,7 +152,11 @@ pip list | grep fla
 
 ---
 
+<a id="jump2"></a>
+
 ## 权重下载及转换
+
+<a id="jump2.1"></a>
 
 ### 1. 权重下载
 
@@ -139,6 +169,8 @@ pip list | grep fla
 - 模型地址: [Qwen3.6-*B](https://huggingface.co/collections/Qwen/qwen36)；
 
  将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
+
+<a id="jump2.2"></a>
 
 ### 2. 权重加载
 
@@ -165,6 +197,8 @@ mm-convert Qwen35Converter hf_to_dcp \
 
 并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
 注意：如果MoE模型不支持mtp，可在执行`mm-convert`权重转换前将`ckpt/hf_path/xxxxxxx/config.json`中的`mtp_num_hidden_layers`设置为0，以跳过mtp专家权重合并，缩短转换时间。
+
+<a id="jump2.3"></a>
 
 ### 3. 权重保存
 
@@ -202,6 +236,7 @@ mm-convert Qwen35Converter dcp_to_hf \
 注意：如果模型没有开启mtp（即，在`xxx_config.yaml`中model下的`mtp_num_layers`字段配置为0或没有配置），默认转换后的权重中不会包含mtp层的权重，可以通过设置`--keep_origin_mtp_weights true`来保留mtp层的权重。
 
 ---
+<a id="jump3"></a>
 
 ## 数据集准备及处理
 
@@ -323,13 +358,17 @@ dataset:
 - `qwen3_6`：带 thinking，渲染 `reasoning_content` 为 `<think>` 块，适合含思考过程的轨迹；
 - `qwen3_6_nothink`：不带 thinking，助手回复为直接输出，适合纯文本终端类轨迹（如命令行 trace）。
 
-> 说明：完整可运行的示例配置可参考 `examples/qwen3_6/agentical_ascendc_sft/` 目录。
+> 说明：完整可运行的示例配置可参考 `examples/qwen3_6/` 目录。
 
 ## 微调
+
+<a id="jump4.1"></a>
 
 ### 1. 准备工作
 
 配置脚本前需要完成前置准备工作，包括：**环境安装**、**权重下载及转换**、**数据集准备及处理**，详情可查看对应章节。
+
+<a id="jump4.2"></a>
 
 ### 2. 配置参数
 
@@ -358,8 +397,48 @@ dataset:
 
 **注意在开启ulysses-cp时，请将`xxx_config.yaml`中的`attn_implementation`配置为`flash_attention_2`**
 
+【EP并行配置】
+
+根据实际的需求配置`xxx_config.yaml`中的`expert_parallel_size`（注意仅对MoE模型生效）
+
+根据`expert_parallel_size`可以自行选择更合适的`ep_plan.dispatcher`，推荐`expert_parallel_size`小于`topk`时，`dispatcher`选择`allgather`，`expert_parallel_size`大于`topk`时选择`alltoall`。
+
+【MoE aux loss配置】
+
+针对MoE模型，如果训练的过程中需要在交叉熵损失的基础上增加`router_aux_loss`使得训练过程中的专家负载分配区域平衡的话，可以配置`xxx_config.yaml`中的`features.loss_cfg.router_aux_loss_coef`字段，该字段表示负载均衡损失的系数。
+
+【mtp配置】
+当前模型支持配置mtp模块，在`xxx_config.yaml`中model下的`mtp_num_layers`字段配置为1，默认为0；`mtp_loss_scaling_factor`字段也支持配置，默认为0.1
+注意：qwen3.6的mtp layer目前只支持配置1层。
+
+【性能优化配置】
+
+- 重计算
+  - 在`features.recompute`配置，`true`表示开启，`false`表示关闭，默认开启。
+  - 开启后可以节省显存占用
+- [chunkloss](../../docs/zh/features/chunkloss.md)
+  - 在`features.enable_chunk_loss`配置，`true`表示开启，`false`表示关闭
+  - `features.chunkloss_plan.chunk_size`表示计算loss的时候在seq维度切分成大小为`chunk_size`的小块进行计算。
+  - 开启后可以大幅降低loss计算时的显存尖刺，节省整体显存占用
+- [async activation offload](../../docs/zh/features/async_activation_offload.md)
+  - 在`features.enable_activation_offload`配置，`true`表示开启，`false`表示关闭
+  - 开启后可以异步将重计算入口的激活值offload至host侧，在开启了重计算的场景下可以进一步节省显存。
+- [chunkmbs](../../docs/zh/features/chunkmbs.md)
+  - 在`features.enable_chunk_mbs`配置，`true`表示开启，`false`表示关闭
+  - `features.chunkmbs_plan.chunk_mbs`表示切分以后单次计算的`micro_batch_size`
+  - 开启该特性时需要同时使能重计算和async activation offload特性，可以增加FSDP2单次unshard对应的计算密度，提高整网吞吐。
+- 选择性重计算
+  - 在开启重计算的场景下，可以跳过linear attention层的gdn重计算，或者full attention层的flash attention重计算，并异步offload中间保存的tensor，在显存占用不变的条件下，减少计算量，提升训练吞吐
+  - 在`model.skip_gdn_recompute`配置是否跳过linear attention层gdn的重计算，`true`表示跳过，`false`表示不跳过
+  - 在`model.skip_flash_attn_recompute`配置是否跳过full attention层的flash attention的重计算，`true`表示跳过，`false`表示不跳过
+  - 开启该特性时需要同时使能重计算和async activation offload特性
+- `gdn_implementation`和`causal_conv1d_implementation`
+  - gdn_implementation和causal_conv1d_implementation分别支持`eager`，`triton`和`ascendc`配置，使用`ascendc`性能最佳，需要安装fla_npu库
+  - 当gdn_implementation配置为`ascendc`时，causal_conv1d_implementation只支持和`triton`和`ascendc`，防止算子之间的布局不匹配
+
 【单机运行配置】
-配置`examples\qwen3_6\finetune_qwen3_6_35B.sh`参数如下
+以qwen3_6模型为例：
+配置`examples/qwen3_6/finetune_qwen3_6_35B.sh`参数如下
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
@@ -384,6 +463,8 @@ NNODES: 一共几个节点
 
 ---
 
+<a id="jump4.3"></a>
+
 ### 3. 启动微调
 
 loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
@@ -392,6 +473,20 @@ loss计算方式差异会对训练效果造成不同的影响，在启动训练�
 ```shell
 bash examples/qwen3_6/finetune_qwen3_6_35B.sh
 ```
+
+<a id="jump4.4"></a>
+
+### 4. LoRA 微调
+
+将 `training.lora.enable` 设为 `true`，并按需配置其余参数，使用与全量微调相同的启动脚本进行LoRA微调。
+
+更详细的 LoRA 配置与参数说明见 [LoRA 微调特性文档](../../docs/zh/features/lora_finetune_fsdp2.md)。
+
+【并行策略调整建议】
+
+开启 LoRA 后，基础模型参数全部冻结，仅 LoRA 适配器参数参与训练，可训练参数量相比全量微调大幅下降，梯度与优化器状态的显存占用也随之显著降低。因此，建议结合可训练参数的实际体量重新评估 `parallel` 模块中的并行切分策略，而不必沿用全量微调的配置。例如，yaml配置文件中的 `fully_shard_parallel_size` 不必保持为 `auto`（即在全部设备上切分参数），可结合显存情况显式指定较小的切分度，以减少参数切分引入的通信开销；对于 MoE 类模型，LoRA 微调时可以根据实际情况将 `EP` 开至很低甚至无需开启。
+
+<a id="jump10"></a>
 
 ## 环境变量声明
 
@@ -413,3 +508,10 @@ bash examples/qwen3_6/finetune_qwen3_6_35B.sh
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
 ---
+<a id="jump11"></a>
+
+## 注意事项
+
+1. 在加载 processor 过程中，会因 `mistral_common` 三方库版本的兼容性问题导致无法找到 processor，进而训练报错退出，可通过以下方式解决：
+   - 卸载`mistral_common` 三方库：pip uninstall -y mistral_common
+   - 升级`mistral_common` 三方库至最新版本：pip install --upgrade mistral_common
