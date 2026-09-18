@@ -80,27 +80,10 @@ Kimi-K3 的 KDA（Kimi Delta Attention）等线性注意力融合算子基于 Tr
 
 KDA 算子实现依赖 `triton-ascend-kernels` 算子库（`modeling_kimi_linear.py` 中的 `chunk_kda` 来自该包）安装步骤如下：
 
-atlas A2&A3训练产品安装步骤
-
 ```shell
 # 拉取 triton-ascend-kernels 代码仓
-git clone https://gitcode.com/fengrui886/triton-ascend-kernels
+git clone https://gitcode.com/Ascend/triton-ascend-kernels.git
 cd triton-ascend-kernels
-git checkout kda_a3
-
-# 安装
-pip install -e . --no-build-isolation --no-deps
-```
-
-950系列产品安装步骤
-
-```shell
-# 拉取 triton-ascend-kernels 代码仓
-git clone https://gitcode.com/shenzhaofeng/triton-ascend-kernels.git
-cd triton-ascend-kernels
-
-# 拉取配套分支
-git checkout kda_a5
 
 # 安装
 pip install -e . --no-build-isolation --no-deps
