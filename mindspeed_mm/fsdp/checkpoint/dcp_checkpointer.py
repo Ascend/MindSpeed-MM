@@ -2,6 +2,7 @@
 # pylint: skip-file
 import gc
 import os
+from concurrent.futures import Future
 from typing import Any, Dict, Optional
 import logging
 
@@ -201,10 +202,26 @@ class DistributedCheckpointer(CheckpointerBase):
 
         cls.execute_save(save_state=save_state, storage_writer=storage_writer, save_async=save_async)
 
-        if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
-            tracker_filename = get_checkpoint_tracker_filename(path)
-            with open(tracker_filename, 'w', encoding='utf-8') as f:
-                f.write(str(iteration))
+        if save_async:
+            save_future = cls.dcp_save_future
+            tracker_future = Future()
+
+            def update_tracker(future):
+                """Update the tracker after the asynchronous checkpoint save completes."""
+                try:
+                    result = future.result()
+                    cls._write_tracker(path, iteration)
+                    print_rank(logger.info, f"Saved checkpoint to {checkpoint_dir}")
+                    tracker_future.set_result(result)
+                except BaseException as error:
+                    logger.exception("Failed to save checkpoint to %s", checkpoint_dir)
+                    tracker_future.set_exception(error)
+
+            save_future.add_done_callback(update_tracker)
+            cls.dcp_save_future = tracker_future
+            return
+
+        cls._write_tracker(path, iteration)
 
         print_rank(logger.info, f"Saved checkpoint to {checkpoint_dir}")
 
@@ -317,7 +334,8 @@ class DistributedCheckpointer(CheckpointerBase):
                 cls._async_process_group = dist.new_group(backend=get_dist_comm_backend(cpu=True))
 
             if cls.dcp_save_future is not None:
-                logger.info("[RANK %s] waiting for previous DCP saving session to end...", dist.get_rank())
+                if not cls.dcp_save_future.done():
+                    print_rank(logger.info, "Waiting for previous DCP saving session to end...")
                 cls.dcp_save_future.result()
                 cls.dcp_save_future = None
                 # block until all the ranks resolve their previous dcp async saving
@@ -338,6 +356,14 @@ class DistributedCheckpointer(CheckpointerBase):
             gc.collect()
             empty_cache()
             synchronize()
+
+    @staticmethod
+    def _write_tracker(path: str, iteration: int) -> None:
+        if dist.is_initialized() and dist.get_rank() != 0:
+            return
+        tracker_filename = get_checkpoint_tracker_filename(path)
+        with open(tracker_filename, 'w', encoding='utf-8') as f:
+            f.write(str(iteration))
 
     # Private helper methods
     @classmethod
