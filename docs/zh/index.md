@@ -20,7 +20,7 @@ pytorch/install_guide
 :caption: 开发指南:
 :maxdepth: 1
 
-pytorch/introduction
+introduction
 pytorch/model_migration_dev_guide
 pytorch/new_model_development
 ```

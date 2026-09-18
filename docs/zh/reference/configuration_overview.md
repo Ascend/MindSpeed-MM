@@ -19,11 +19,11 @@ MindSpeed-MM的配置参数主要有`模型配置`、`数据配置`、 `fsdp2配
 
 bash脚本配置入口如下：
 
-![image](../../../sources/images/config_in.png)
+![image](../../../sources/images/config/config_in.png)
 
 配置yaml文件如下：
 
-![image](../../../sources/images/config_in2.png)
+![image](../../../sources/images/config/config_in2.png)
 
 ## 配置解析
 

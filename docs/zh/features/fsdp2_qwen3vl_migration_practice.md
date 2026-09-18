@@ -256,7 +256,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
   --dcp_dir ckpt/Qwen3-VL-30B-A3B-Instruct-dcp
 ```
 
-然后把 YAML 里 `training.load` 取消注释，填转换得到的 DCP 目录 `ckpt/Qwen3-VL-30B-A3B-Instruct-dcp`。转换工具的更多用法见 [权重转换](../pytorch/weight_conversion.md)。
+然后把 YAML 里 `training.load` 取消注释，填转换得到的 DCP 目录 `ckpt/Qwen3-VL-30B-A3B-Instruct-dcp`。转换工具的更多用法见 [权重转换](mm_convert.md)。
 
 `plugin` 列表则把[模型接入](#模型接入)与[数据接入](#数据接入)的成果接进框架：启动时按顺序导入这两个目录，模型与数据集完成注册，`model_id`/`dataset_type` 才找得到对应实现。
 
@@ -317,6 +317,6 @@ iteration 2/10000 | consumed samples: 16 | elapsed time per iteration (ms): 2231
 - **精度对齐**：迁移的模型跑通后，建议与源仓（GPU/参考框架）对齐精度。具体做法是开启确定性计算（`training.use_deter_comp: true`）、固定随机种子、关闭数据 shuffle，消除随机性后对比两边的 loss 曲线是否一致；
 - **性能调优**：采集 Profiling、定位瓶颈、按需开启序列并行/预取/ChunkLoss 等，见 [性能调优](../pytorch/performance_tuning.md)；
 - **低成本微调**：显存预算有限时改用 [LoRA 微调（FSDP2）](./lora_finetune_fsdp2.md)；
-- **导出权重**：训练产物为 DCP 格式，用 `mm-convert GenericDCPConverter dcp_to_hf` 转回 HF 格式，见 [权重转换](../pytorch/weight_conversion.md)。
+- **导出权重**：训练产物为 DCP 格式，用 `mm-convert GenericDCPConverter dcp_to_hf` 转回 HF 格式，见 [权重转换](mm_convert.md)。
 
 本文以 Qwen3-VL 为例走完了完整迁移流程；更完整的接口说明与各配置段字段定义，可查阅 [FSDP2 迁移指南](./fsdp2_developer_migration_guide.md)。

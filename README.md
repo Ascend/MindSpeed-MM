@@ -290,7 +290,7 @@ MindSpeed MM 预置了覆盖多模态生成、多模态理解等任务的丰富�
 
 # 常用参数解释说明
 
-针对MindSpeed MM套件中运行所使用的参数做解释说明，具体见[README](./docs/zh/pytorch/args_readme.md)
+针对MindSpeed MM套件中运行所使用的参数做解释说明，具体见[README](./docs/zh/reference/training_arguments.md)
 
 # 特性规划
 

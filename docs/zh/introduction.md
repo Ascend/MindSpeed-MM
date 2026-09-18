@@ -28,3 +28,15 @@ MindSpeed MM 组件组成有预置模型、套件功能、多模态优化特性
  丰富的功能组件：分为高阶的抽象类（组装类）、原子模型类和公共组件，SoRAModel、VLModel、TransformersModel分别为多模态生成、理解、Transformers模型的高阶封装类，除此之外，还有text_decoder、audio、dit等基础的原子类；公共组件common包括了norm、rope、embedding、spec等通用组件；提供覆盖模型生命周期的完整工具链，包括：数据预处理与工程、大规模预训练、指令微调与领域适配、模型权重转换、高性能在线推理以及全面的自动化评估。
 
  多模态加速特性：包括多维高效并行算法（DP/PP/TP/CP/EP/FSDP2）、通算掩盖(Computation-Communication Overlap)、多模态负载均衡、动态显存管理（重计算、分级存储）、长序列优化等，确保训练效率最大化。
+
+## MindSpeed MM 双后端支持
+
+MindSpeed MM 支持两类训练后端：基于 PyTorch FSDP2 的 FSDP2 后端，以及基于 MindSpeed Core（即 Megatron-LM 内核）的 Megatron 后端。新增模型推荐使用 FSDP2 后端。
+
+### FSDP2 后端
+
+MindSpeed MM FSDP2 后端基于 PyTorch FSDP2 构建，在此基础上补充了面向昇腾平台的并行状态管理、模型注册、数据注册、DCP 检查点、重计算、LoRA、专家并行和多模态数据处理能力。该后端以独立的训练入口和一份 YAML 配置运行，不依赖 Megatron 命令行参数，已应用于包括 Wan2.2、Qwen3VL 在内的多个开源多模态模型训练任务。
+
+### Megatron 后端
+
+Megatron 后端采用 PTD（Pipeline, Tensor, Data）并行方案，支持异构并行、序列并行（Ulysses、RingAttention、USP）、融合算子与 Megatron 权重更新通信隐藏等特性。该后端复用 Megatron 训练入口，训练脚本需要编写 `GPT_ARGS`、`MM_ARGS`、`OUTPUT_ARGS` 等参数以通过 Megatron 的参数校验。

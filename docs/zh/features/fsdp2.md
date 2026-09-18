@@ -51,7 +51,7 @@ mm-convert GenericDCPConverter hf_to_dcp \
     --dcp_dir ckpt/dcp_path/xxx
 ```
 
-训练后导出 HF 权重（`dcp_to_hf`）、完整参数说明，以及个别模型的专用转换器，详见[权重转换](../pytorch/weight_conversion.md)。
+训练后导出 HF 权重（`dcp_to_hf`）、完整参数说明，以及个别模型的专用转换器，详见[权重转换](mm_convert.md)。
 
 ### 注意事项
 

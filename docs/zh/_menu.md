@@ -28,5 +28,5 @@
 - [模型性能调优](pytorch/performance_tuning.md)
 - [开发工具]()
   - [性能数据采集](tools.md)
-  - [权重转换](pytorch/weight_conversion.md)
+  - [权重转换](features/mm_convert.md)
 - [FAQ](FAQ.md)

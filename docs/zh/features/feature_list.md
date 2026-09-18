@@ -75,11 +75,6 @@
 
   </tr>
   <tr>
-    <td class="tg-citn">自动并行</td>
-    <td class="tg-i1fi"><a href="automatic_parallelism_mm.md">Automatic Parallelism</a></td>
-
-  </tr>
-  <tr>
     <td class="tg-citn">张量并行</td>
     <td class="tg-i1fi"><a href="https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md">tensor-parallel</a></td>
 
