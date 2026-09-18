@@ -60,7 +60,7 @@ IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 
 
 class DataFileReader:
-    """get the data from different types of files such as csv/json/parquat"""
+    """get the data from different types of files such as csv/json/parquet"""
 
     def __init__(self, data_storage_mode="standard", **kwargs):
         """
@@ -97,8 +97,8 @@ class DataFileReader:
             return json_load(data_path)
         elif data_path.endswith(".jsonl"):
             return json_load(data_path)
-        elif data_path.endswith(".parquat"):
-            data_out = pd.read_parquat(data_path)
+        elif data_path.endswith(".parquet"):
+            data_out = pd.read_parquet(data_path)
             return data_out.to_dict("records")
         elif data_path.endswith(".txt"):
             with open(data_path, 'r') as f:

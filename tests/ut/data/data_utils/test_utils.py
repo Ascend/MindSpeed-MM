@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import mindspeed.megatron_adaptor
 
 from mindspeed_mm.data.data_utils.utils import DataFileReader, TextProcesser
@@ -28,6 +30,19 @@ class TestDataFileReader:
         get_data = DataFileReader(data_storage_mode=data_config["data_storage_mode"])
         cap_list = get_data(data_config["data_path"])
         judge_expression(isinstance(cap_list, list))
+
+    @patch("mindspeed_mm.data.data_utils.utils.pd.read_parquet")
+    def test_get_datasamples_from_parquet(self, mock_read_parquet):
+        records = [{"caption": "sample"}]
+        dataframe = MagicMock()
+        dataframe.to_dict.return_value = records
+        mock_read_parquet.return_value = dataframe
+
+        result = DataFileReader.get_datasamples("data.parquet")
+
+        mock_read_parquet.assert_called_once_with("data.parquet")
+        dataframe.to_dict.assert_called_once_with("records")
+        judge_expression(result == records)
 
 
 class TestTextProcesser:
