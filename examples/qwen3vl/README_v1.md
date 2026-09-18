@@ -11,6 +11,7 @@
 - [环境安装](#环境安装)
   - [环境准备](#1-环境准备)
   - [环境搭建](#2-环境搭建)
+  - [安装配套版本的TriTon-Ascend（可选）](#jump1.3)
 - [权重下载及转换](#权重下载及转换)
   - [权重下载](#1-权重下载)
 - [数据集准备及处理](#数据集准备及处理)
@@ -64,8 +65,27 @@ cd ../MindSpeed-MM
 pip install -e .
 ```
 
----
+<a id="jump1.3"></a>
 
+### 3. 安装配套版本的Triton-Ascend（可选）
+
+- 如果启动脚本是*_A5_mxfp8.sh，为了达到最优性能，建议安装Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
+
+  - 可参考如下安装命令：
+
+```shell
+# 注意：triton-ascend 3.2.0 及以下 Triton-Ascend 和 Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
+pip install triton-ascend==3.2.2 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+```
+
+> [!NOTE]
+> 当前triton-ascend==3.2.2可能会遇到一些兼容问题，若安装triton-ascend==3.2.2问题无法解决，可以尝试退回triton-ascend==3.2.1，经测试3.2.1在python3.12环境下可以跑通完整流程
+
+- 如果想绕过安装Triton-Ascend运行*_A5_mxfp8.sh，可以修改如下配置：
+  - 在`features.chunkloss_plan.chunk_size`配置1024或其他数值，表示计算loss的时候在seq维度切分成大小为`chunk_size`的小块进行计算。
+  - 删除`features.chunkloss_plan.impl_type`和`features.chunkloss_plan.vocab_tile_size`配置。
+
+---
 <a id="jump2"></a>
 
 ## 权重下载及转换
