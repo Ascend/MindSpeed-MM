@@ -112,9 +112,18 @@ features:
     vocab_tile_size: 4096  # 默认 8192 减半 tile 数、slot 显存翻倍
   recompute: true
   recompute_plan:
+    use_reentrant: false
     apply_modules:
       - vision_tower.encoder.blocks.{*}
       - language_model.model.layers.{*}
+    op_replay_scopes:
+      - name: moe_router
+        apply_modules:
+          - language_model.model.layers.{*}.block_sparse_moe.gate # 跳过MoE路由重计算
+        save_rng: false
+        cache_ops:
+          - aten.linear.default
+          - aten.topk.default
   # activation offload 配置（skip_*_recompute 的层号簿记依赖此开关，勿单独关闭）
   enable_activation_offload: true
   activation_offload_plan:
