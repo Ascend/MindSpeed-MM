@@ -34,7 +34,7 @@ from mindspeed.utils import get_actual_seq_len
 from mindspeed_mm.models.common.communications import cal_split_sizes, cal_split_sizes_multi, split_forward_gather_backward
 from mindspeed_mm.utils.utils import get_packed_seq_params, get_packed_seq_len
 from ..cp_utils import get_seq_len, gather_seq_scatter_heads_qkv, gather_heads_scatter_seq, gather_visual_seqs_with_cp
-from ..attention_utils import ALL_ATTENTION_FUNCTIONS, pad_out
+from ..attention_utils import ALL_ATTENTION_FUNCTIONS, get_attn_mask_npu, pad_out
 
 
 class Qwen3VLEmptyModule(nn.Module):
@@ -602,6 +602,7 @@ class Qwen3VLTextAttention(nn.Module):
         self.scaling = self.head_dim**-0.5
         self.attention_dropout = config.attention_dropout
         self.is_causal = True
+        self.skip_flash_attn_recompute = getattr(config, "skip_flash_attn_recompute", False)
 
         self.q_proj = nn.Linear(
             config.hidden_size, config.num_attention_heads * self.head_dim, bias=config.attention_bias
@@ -783,12 +784,47 @@ class Qwen3VLTextAttention(nn.Module):
                 f"Unsupported Attention layout: {layout}, "
                 "Qwen3VLTextAttention only support ['BNSD', 'BSND', 'TND'] now.")
 
-        attn_output = attention_interface(
-            query_states,
-            key_states,
-            value_states,
-            **attention_kwargs,
-        )
+        if (
+            self.config._attn_implementation == "flash_attention_2"
+            and self.skip_flash_attn_recompute
+        ):
+            from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
+            from mindspeed_mm.fsdp.ops.flash_attn.skip_recompute_flash_attn import (
+                skip_recompute_flash_attention,
+            )
+
+            training_context = TrainingContext()
+            training_context.set_training_stage(
+                TrainingStage.BACKWARD if torch.is_grad_enabled() else TrainingStage.FORWARD
+            )
+            training_context.set_layer_index(self.layer_idx)
+            training_context.set_model_depth(self.config.num_hidden_layers)
+
+            head_dim = 2 if layout == "BSND" else 1
+            attn_mask = get_attn_mask_npu(query_states.device) if self.is_causal else attention_mask
+            attn_output = skip_recompute_flash_attention(
+                query_states,
+                key_states,
+                value_states,
+                head_num=query_states.shape[head_dim],
+                layout=layout,
+                pse=None,
+                padding_mask=None,
+                atten_mask=attn_mask,
+                actual_seq_qlen=attention_kwargs.get("actual_seq_qlen", None),
+                actual_seq_kvlen=attention_kwargs.get("actual_seq_kvlen", None),
+                scale=self.scaling,
+                keep_prob=1.0 - dropout,
+                inner_precise=0,
+                sparse_mode=3 if self.is_causal else 0,
+            )
+        else:
+            attn_output = attention_interface(
+                query_states,
+                key_states,
+                value_states,
+                **attention_kwargs,
+            )
 
         if layout == "BNSD":
             attn_output = attn_output.transpose(1, 2)

@@ -139,6 +139,15 @@ class Qwen3VLFSDP2Mixin(FSDP2Mixin):
         llm_activation_offload = getattr(model_cfg.text_decoder, "activation_offload", False)
         setattr(transformer_config.text_config, "activation_offload", llm_activation_offload)
 
+        # skip FlashAttention recompute for the text decoder
+        skip_flash_attn_recompute = getattr(model_cfg.text_decoder, "skip_flash_attn_recompute", False)
+        if skip_flash_attn_recompute and llm_attn_implementation != "flash_attention_2":
+            raise ValueError(
+                "skip_flash_attn_recompute requires text_decoder.attn_implementation="
+                "'flash_attention_2'."
+            )
+        setattr(transformer_config.text_config, "skip_flash_attn_recompute", skip_flash_attn_recompute)
+
         # set router_aux_loss_coef, for moe model
         router_aux_loss_coef = getattr(model_cfg.loss_cfg, "router_aux_loss_coef", 0.0)
         transformer_config.text_config.router_aux_loss_coef = router_aux_loss_coef
