@@ -8,14 +8,14 @@
 
 |产品|是否支持（训练场景）|
 |--|:-:|
-|<term>Ascend 950 系列产品</term>|√|
-|<term>Atlas A3 训练系列产品</term>|√|
-|<term>Atlas A3 推理系列产品</term>|x|
-|<term>Atlas A2 训练系列产品</term>|√|
-|<term>Atlas A2 推理系列产品</term>|x|
-|<term>Atlas 200I/500 A2 推理产品</term>|x|
-|<term>Atlas 推理系列产品</term>|x|
-|<term>Atlas 训练系列产品</term>|x|
+|<term>Ascend 950PR&950DT系列产品</term>|√|
+|<term>Atlas A3训练系列产品</term>|√|
+|<term>Atlas A3推理系列产品</term>|x|
+|<term>Atlas A2训练系列产品</term>|√|
+|<term>Atlas A2推理系列产品</term>|x|
+|<term>Atlas 200I/500 A2推理产品</term>|x|
+|<term>Atlas推理系列产品</term>|x|
+|<term>Atlas训练系列产品</term>|x|
 
 > [!NOTE]
 >
@@ -33,7 +33,7 @@
 >
 > 安装运行程序建议使用非root用户，且建议对安装程序的目录文件做好权限管控：文件夹权限设置为750，文件权限设置为640。可以通过设置umask控制安装后文件的权限，如设置umask为0027。更多安全相关内容请参见《[安全声明](../../../SECURITYNOTE.md)》中各组件关于“文件权限控制”的说明。
 
-下载[固件与驱动](https://hiascend.com/hardware/firmware-drivers/community)，请根据系统和硬件产品型号选择对应版本的社区版本或商用版本的固件与驱动。
+下载[固件与驱动](https://www.hiascend.com/hardware/firmware-drivers)，请根据系统和硬件产品型号选择对应版本的社区版本或商用版本的固件与驱动。
 参考如下命令安装：
 
 ```shell
@@ -56,11 +56,25 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
 1. 拉取镜像
 
-   最新镜像均配套[MindSpeed MM的26.1.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0)，该镜像即将上线，当前可使用MindSpeed MM 26.0.0分支对应镜像，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
+   当前可使用MindSpeed MM 26.1.0分支对应镜像，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
 
-   - <term>Atlas A2 训练系列产品</term>：26.0.0-910b-openeuler24.03-py3.11-aarch64
+   <!-- npu="950" id1 -->
+   - <term>Ascend 950PR&950DT系列产品<</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11
 
-   - <term>Atlas A3 训练系列产品</term>：26.0.0-a3-openeuler24.03-py3.11-aarch64
+   - <term>Ascend 950PR&950DT系列产品<</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
+   <!-- end id1 -->
+
+   <!-- npu="A3" id2 -->
+   - <term>Atlas A3训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
+
+   - <term>Atlas A3训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
+   <!-- end id2 -->
+   
+   <!-- npu="910b" id3 -->
+   - <term>Atlas A2训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11
+
+   - <term>Atlas A2训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu22.04-py3.11
+   <!-- end id3 -->
 
    ```bash
       # 确认是否成功拉取镜像
@@ -82,7 +96,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
       ```bash
       docker run -it --rm \
-          mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
       ```
 
     - 示例二：使用 NPU 设备运行（示例：设备 /dev/davinci1）
@@ -100,7 +114,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
           -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
           -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
           -v /etc/ascend_install.info:/etc/ascend_install.info \
-          mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
       ```
 
     - 示例三：挂载数据目录运行（示例：设备 /dev/davinci1）
@@ -119,7 +133,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
           -v /etc/ascend_install.info:/etc/ascend_install.info \
           -v /path/to/data:/data \
           -v /path/to/weights:/weights \
-          mindspeed-mm:26.0.0-a3-openeuler24.03-py3.11-aarch64 bash
+          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
       ```
 
     具体参数配置说明可查看MindSpeed MM Docker镜像概述的[构建脚本参数说明](../../../docker/OVERVIEW.zh.md#构建脚本参数说明)
@@ -155,7 +169,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
       ```bash
         git clone https://gitcode.com/Ascend/MindSpeed-MM.git
         cd MindSpeed-MM
-        git checkout 26.0.0
+        git checkout master
       ```
 
   2. 执行如下指令一键安装：
@@ -220,14 +234,12 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
   3. 安装PyTorch以及TorchNPU
 
-      请参考《TorchNPU软件安装》中的“[安装PyTorch](https://www.hiascend.com/document/detail/zh/Pytorch/2600/configandinstg/instg/docs/zh/installation_guide/installation_via_binary_package.md)”章节，获取配套版本的PyTorch以及TorchNPU软件包。
-      可参考如下安装命令：
+      根据引导安装配套版本的PyTorch以及TorchNPU，具体请参考《[TorchNPU 快速安装](https://www.hiascend.com/developer/software/ai-frameworks/pytorch/download?versionId=175&ids=89dda9ba9de741349efa03687a487678%2C98%2C107%2C1%2C6%2C177%2C)》。
 
-        ```shell
-        # 安装torch和TorchNPU构建参考 https://gitcode.com/ascend/pytorch/releases
-        pip3 install torch-2.10.0-cp312-cp312-manylinux_2_28_aarch64.whl
-        pip3 install torch_npu-2.10.0.post4-cp312-cp312-manylinux_2_28_aarch64.whl
-        ```
+      > [!NOTE]
+      >
+      > - 更多TorchNPU插件版本请单击[Link](https://gitcode.com/ascend/pytorch/releases)。
+      > - TorchNPU相关文档请参见《[TorchNPU使用导读](https://www.hiascend.com/document/detail/zh/Pytorch/latest/index/index.html)》。
 
   4. 获取MindSpeed MM和Megatron-LM源码。
 
@@ -248,7 +260,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
       git clone https://gitcode.com/Ascend/MindSpeed.git
       # 根据需要切换到特定的分支或commitid
       cd MindSpeed
-      git checkout 26.0.0_core_r0.12.1
+      git checkout master
       # 安装加速库
       pip install -r requirements.txt
       pip install -e .
@@ -261,13 +273,17 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
       pip install -e .
       ```
 
+      > [!NOTE]
+      >
+      > 安装过程中若看到pip's dependency resolver ... dependency conflicts关于transformers版本的提示，属于已知现象，不影响MindSpeed MM的实际安装结果，可通过pip show mindspeed-mm验证。
+
   7. 安装Triton-Ascend（按需）
 
-      根据需要安装配套版本的Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
+      安装配套版本的Triton-Ascend，请参考《[Triton-Ascend安装指南](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)》，获取配套版本的Triton-Ascend安装指令。
 
       可参考如下安装命令：
 
       ```shell
       # 注意：triton-ascend 3.2.0 及以下 Triton-Ascend和Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
-      pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
+      pip install triton-ascend==3.2.2 --extra-index-url=https://mirrors.huaweicloud.com/ascend/repos/pypi
       ```

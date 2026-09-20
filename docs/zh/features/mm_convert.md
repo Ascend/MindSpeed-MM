@@ -50,7 +50,7 @@ subcommands:
 
 ```
 
-继续对子命令`hf_to_mm`命令进行help可以看到具体的参数
+继续对子命令`hf_to_mm`进行help可以看到具体的参数
 
 ```bash
 mm-convert  Qwen2VLConverter hf_to_mm -h

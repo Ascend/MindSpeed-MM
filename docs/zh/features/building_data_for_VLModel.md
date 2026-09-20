@@ -4,7 +4,7 @@
 
 ## 1. 适用范围
 
-本文所述数据构造方式通用于仓库内大多数 VL 模型（如 [Qwen3.6](../../../examples/qwen3_6)、[Qwen3.5](../../../examples/qwen3_5)、[Qwen3VL](../../../examples/qwen3vl)、[Qwen2.5VL](../../../examples/qwen2.5vl)、[GLM4.5V](../../../examples/glm4.5v)、[Kimi-K2.5](../../../examples/kimik2_5)、[Step3-VL](../../../examples/step3_vl) 等）。各模型若有特殊数据要求（如视频、音频等），以其 README 为准。
+本文所述数据构造方式通用于仓库内大多数 VL 模型（如 [Qwen3.6](../../../examples/qwen3_6)、[Qwen3.5](../../../examples/qwen3_5)、[Qwen3VL](../../../examples/qwen3vl)、[GLM4.5V](../../../examples/glm4.5v)、[Kimi-K2.5](../../../examples/kimik2_5)、[Step3-VL](../../../examples/step3_vl) 等）。各模型若有特殊数据要求（如视频、音频等），以其 README 为准。
 
 <a id="real-data"></a>
 
@@ -169,7 +169,7 @@ data:
 
 ## 3. 使用虚构数据进行功能/性能测试
 
-使用真实数据集进行训练时，通常因为样本间序列长度不一，每一步迭代的时间会有所波动，且真实数据通常较大，有一定的下载和使用成本，因此在指定数据分辨率、序列长度的功能和性能测试场景，使用虚构数据可以更快的满足测试效果。
+使用真实数据集进行训练时，通常因为样本间序列长度不一，每一步迭代的时间会有所波动，且真实数据通常较大，有一定的下载和使用成本，因此在指定数据分辨率、序列长度的功能和性能测试场景，使用虚构数据可以更快地满足测试效果。
 
 当前仓库提供了一种构造指定配置图文数据的方法，虚构数据生成脚本使用指令如下：
 
@@ -195,7 +195,7 @@ python mindspeed_mm/fsdp/tools/data_tool/generate_mock_data_for_vlmodel.py \
 data:
   dataset_param:
     basic_parameters:
-      # 该参数指定模型训练的核心语言模块接受的最大序列长度，超出该配置的部分将被截断，建议构造数据是手动计算图文序列长度占比及总长度，尽可能与cutoff_len数值接近，否则会有截断图片占位符无法正常训练的风险
+      # 该参数指定模型训练的核心语言模块接受的最大序列长度，超出该配置的部分将被截断，建议构造数据时，手动计算图文序列长度占比及总长度，尽可能与cutoff_len数值接近，否则会有截断图片占位符无法正常训练的风险
       cutoff_len: 16384
       # 将该字段修改构造数据的保存路径
       dataset_dir: ./data/fake/mocked_vl_data

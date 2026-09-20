@@ -1,5 +1,7 @@
 # 版本说明
 
+## 关键特性
+
 ## 版本配套说明
 
 ### 产品版本信息
@@ -43,13 +45,13 @@
 | MindSpeed MM版本 | MindSpeed Core代码分支名称 | Megatron版本 | PyTorch版本  | TorchNPU版本 | CANN版本 | Triton-Ascend版本 | Python版本     |
 | ---------------- | ------------------ | ------------ | -----------  | ------------- |--------------------- |-----------------| ------------------- |
 | master（在研版本）| master（在研版本）  | core_v0.12.1  | 2.10.0       | 在研版本       | 在研版本  | 在研版本            | Python3.12      |
-| 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.1           | Python3.10      |
+| 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.2           | Python3.10      |
 | 26.0.0           | 26.0.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.0.0        | 9.0.0  | 3.2.1           | Python3.10      |
 
 >[!NOTE]
 >
 >- 用户可根据需要选择MindSpeed MM代码分支下载源码并进行安装。
->- Triton-Ascend版本与CANN版本强绑定，Triton-Ascend的使用应该与CANN版本一一对应，详见[Triton-Ascend兼容性](https://gitcode.com/Ascend/triton-ascend#%E5%85%BC%E5%AE%B9%E6%80%A7)。
+>- Triton-Ascend版本与CANN版本强绑定，Triton-Ascend的使用应该与CANN版本一一对应，详见[Triton-Ascend兼容性](https://triton-ascend.readthedocs.io/zh-cn/latest/release_note.html#id13)。
 
 ## 版本兼容性说明
 
@@ -146,7 +148,7 @@
 |--|--|--|
 |MindSpeed MM|新模型|支持Qwen3.5, Kimi-K2.5|
 |MindSpeed MM|新特性|Qwen3.5、Kimi-K2.5支持激活值异步卸载、chunk loss、chunk mbs|
-|MindSpeed MM|新增硬件支持|支持Ascend 950系列产品|
+|MindSpeed MM|新增硬件支持|支持Ascend 950PR&950DT系列产品|
 
 ### 删除特性
 

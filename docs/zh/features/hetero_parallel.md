@@ -40,7 +40,7 @@ hetero-parallel（异构并行）通过解耦多模态模型的并行方案配�
     GPT_ARGS="
         ...
         --hetero-parallel \
-        --hetero-encoder-mbs-scale {num} \   # 将图像/音频编码器的mbs调整为文本解码器的num倍，提升计算效率g
+        --hetero-encoder-mbs-scale {num} \   # 将图像/音频编码器的mbs调整为文本解码器的num倍，提升计算效率
     "
     ```
 

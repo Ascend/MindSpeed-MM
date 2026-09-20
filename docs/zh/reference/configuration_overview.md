@@ -78,7 +78,7 @@ if hasattr(unwrapped_model, 'fully_shard') and callable(getattr(unwrapped_model,
 `FSDP2Mixin` (mindspeed_mm/models/transformers/base_model.py)
 是MM仓上fsdp2配置解析和策略实现的Mixin类，主要逻辑在 `fully_shared`接口，包含 `_pre_fully_shared` `_fully_shared` `_post_fully_shared`;
 
-- \_pre_fully_shared: 读取fsdp2_config.yaml，并解析为FSDPConfig，conifg
+- \_pre_fully_shared: 读取fsdp2_config.yaml，并解析为FSDPConfig，config
 - 创建device_mash
 - \_fully_shared： 应用fsdp2相关的wrappers
 - \_post_fully_shared：包括init_weight, meta_init等

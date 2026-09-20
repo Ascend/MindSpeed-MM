@@ -192,4 +192,4 @@ offload_to_cpu: False
 为了和`--bf16`的计算行为对齐，我们增加了`--downcast-to-bf16`选项，在权重加载阶段增加权重downcast，以保持关闭`--bf16`时的计算一致性。
 此处fsdp2混精默认保持加载权重的精度不变，推荐使用此默认行为，避免精度损失。
 
-7、当设置`--untie-embeddings-and-output-weights=True`时, 对于原本采用权重绑定设计的模型，该配置会导致权重绑定机制失效。当前框架不支持该场景，需用户在转换权重时手动复制lm_head和embeddings。请注意此时模型结构可能改变，产生变化。
+7、当设置`--untie-embeddings-and-output-weights=True`时, 对于原本采用权重绑定设计的模型，该配置会导致权重绑定机制失效。当前框架不支持该场景，需用户在转换权重时手动复制lm_head和embeddings。请注意此时模型结构可能发生变化。

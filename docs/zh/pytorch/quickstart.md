@@ -19,7 +19,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别�
 
 > [!NOTE]
 >
-> MindSpeed MM支持<term>Ascend 950 系列产品</term>、<term>Atlas A3 训练系列产品</term>和<term>Atlas A2 训练系列产品</term>，且要求单NPU的片上内存为64GB及以上
+> MindSpeed MM支持<term>Ascend 950PR&950DT系列产品</term>、<term>Atlas A3训练系列产品</term>和<term>Atlas A2训练系列产品</term>，且要求单NPU的片上内存为64GB及以上
 >
 > 当前示例脚本中`NPUS_PER_NODE=8`表示需要8个NPU，如果实际情况低于此配置，可能遇到OOM问题。
 
