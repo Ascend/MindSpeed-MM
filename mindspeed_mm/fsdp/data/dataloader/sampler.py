@@ -69,6 +69,14 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
 
     def _iter_one_epoch(self):
         active_total_samples = self.total_samples - self.last_batch_size
+        if active_total_samples <= 0:
+            raise ValueError(
+                f"Total samples ({self.total_samples}) is smaller than the global batch "
+                f"size (micro_batch_size={self.micro_batch_size} x num_replicas="
+                f"{self.num_replicas} = {self.micro_batch_times_data_parallel_size}); "
+                f"the sampler has no full batch to iterate. Increase the dataset size "
+                f"or reduce micro_batch_size/data_parallel_size."
+            )
         self.epoch = self.consumed_samples // active_total_samples
         current_epoch_samples = self.consumed_samples % active_total_samples
 
