@@ -31,7 +31,7 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 
-from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.log import print_rank
 from mindspeed_mm.fsdp.checkpoint.utils import get_checkpoint_name
 
 try:

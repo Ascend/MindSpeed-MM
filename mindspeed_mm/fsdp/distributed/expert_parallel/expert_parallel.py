@@ -8,9 +8,9 @@ import torch
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import Shard, DTensor, Replicate, distribute_tensor, distribute_module
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
+from mindspeed_mm.fsdp.log import print_rank
 
 
 logger = logging.getLogger(__name__)

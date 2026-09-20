@@ -5,8 +5,6 @@ from datetime import datetime
 
 import torch
 
-from mindspeed.fsdp.utils.log import print_rank
-
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import pregather_fsdp_params
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
@@ -27,6 +25,7 @@ from mindspeed_mm.utils.aux_loss import (
     average_global_aux_loss_for_logging,
     reset_global_aux_loss_tracker,
 )
+from mindspeed_mm.fsdp.log import print_rank
 
 logger = logging.getLogger(__name__)
 

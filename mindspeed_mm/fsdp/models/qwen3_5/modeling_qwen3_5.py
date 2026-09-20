@@ -49,7 +49,6 @@ from transformers.utils.import_utils import is_causal_conv1d_available, is_flash
 from transformers.utils.output_capturing import capture_outputs
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5Config, Qwen3_5TextConfig, Qwen3_5VisionConfig
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 
@@ -69,6 +68,7 @@ from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
 from mindspeed_mm.fsdp.models.mtp import MultiTokenPredictionBlock
+from mindspeed_mm.fsdp.log import print_rank
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None

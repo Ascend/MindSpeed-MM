@@ -5,7 +5,7 @@ import torch
 import torch.distributed as dist
 from tqdm import tqdm
 
-from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.log import print_rank
 
 
 class InferEngine:

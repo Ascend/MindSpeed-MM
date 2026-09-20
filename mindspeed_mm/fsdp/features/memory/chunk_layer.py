@@ -4,8 +4,8 @@ from functools import wraps
 
 import torch
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.features.memory.swap_core import SwapCache
+from mindspeed_mm.fsdp.log import print_rank
 
 
 logger = logging.getLogger(__name__)

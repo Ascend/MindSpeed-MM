@@ -10,7 +10,6 @@ import torch.distributed as dist
 from torchdata.stateful_dataloader import StatefulDataLoader
 from torchdata.stateful_dataloader.sampler import StatefulDistributedSampler
 
-from mindspeed.fsdp.utils.log import print_rank, set_log_level
 from mindspeed.fsdp.utils.random import set_seed
 
 from mindspeed_mm.config.config_manager import ConfigManager
@@ -32,6 +31,7 @@ from mindspeed_mm.fsdp.utils.device import (
 )
 from mindspeed_mm.fsdp.utils.register import import_plugin
 from mindspeed_mm.fsdp.utils.utils import to_empty_if_needed
+from mindspeed_mm.fsdp.log import print_rank, init_logger
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class InferenceRunner:
 
         # Set accelerator compatibility and logging level
         set_accelerator_compatible(get_torch_device())
-        set_log_level()
+        init_logger()
         # Set device index for current process
         local_rank = int(os.environ.get("LOCAL_RANK", 0))
         torch.accelerator.set_device_index(local_rank)

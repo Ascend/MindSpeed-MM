@@ -3,12 +3,12 @@ import logging
 import torch
 import torch.nn.functional as F
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.features.memory.chunkloss.chunkloss import chunk_loss, calculate_lm_loss, fixed_cross_entropy
 from mindspeed_mm.fsdp.features.memory.chunkloss.chunkloss_cce_fused import chunk_loss_cce_fused
 from mindspeed_mm.fsdp.utils.constants import AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import split_forward_gather_backward_with_cp
+from mindspeed_mm.fsdp.log import print_rank
 
 
 logger = logging.getLogger(__name__)

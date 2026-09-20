@@ -5,7 +5,6 @@ import time
 import torch
 from torch.distributed.tensor import DTensor, Replicate, Shard
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.utils.device import (
     get_memory_reserved,
@@ -13,6 +12,7 @@ from mindspeed_mm.fsdp.utils.device import (
     get_memory_allocated,
     get_max_memory_allocated,
 )
+from mindspeed_mm.fsdp.log import print_rank
 
 from .constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
 from .device import get_device_type, get_torch_device

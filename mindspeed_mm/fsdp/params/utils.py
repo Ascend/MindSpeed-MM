@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, TypeVar, Union,
 import logging
 from functools import wraps
 
-from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.log import print_rank
 
 logger = logging.getLogger(__name__)
 

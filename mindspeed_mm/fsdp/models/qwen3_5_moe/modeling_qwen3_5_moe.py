@@ -53,7 +53,6 @@ from transformers.utils.import_utils import is_causal_conv1d_available, is_flash
 from transformers.utils.output_capturing import OutputRecorder, capture_outputs
 from transformers.models.qwen3_5_moe.configuration_qwen3_5_moe import Qwen3_5MoeConfig, Qwen3_5MoeTextConfig, Qwen3_5MoeVisionConfig
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from mindspeed_mm.fsdp.utils.constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STEP_TOKEN_NUM
@@ -77,6 +76,7 @@ from mindspeed_mm.utils.aux_loss import load_balancing_loss_func_optimized
 from mindspeed_mm.fsdp.features.memory.grad_offload import clear_offload_grad
 from mindspeed_mm.fsdp.features.memory.aux_loss_grad_offload import offload_wrapper, restore_wrapper
 from mindspeed_mm.fsdp.models.mtp import MultiTokenPredictionBlock
+from mindspeed_mm.fsdp.log import print_rank
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
 _VISUAL_PER_SEQ_LEN = None

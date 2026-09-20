@@ -41,12 +41,12 @@ from transformers.models.qwen2.modeling_qwen2 import Qwen2Model
 from transformers.processing_utils import Unpack
 from transformers.utils import TransformersKwargs, can_return_tuple, logging
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.distributed.expert_parallel.comm import set_ep_rank_seq_lens
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
 from mindspeed_mm.fsdp.utils.register import model_register
+from mindspeed_mm.fsdp.log import print_rank
 
 from .configuration_mimo_v2 import MiMoV2Config
 

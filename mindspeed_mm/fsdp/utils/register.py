@@ -1,7 +1,7 @@
 import importlib
 import pkgutil
 
-from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.log import print_rank
 
 
 def import_package(package_name, print_info=True):

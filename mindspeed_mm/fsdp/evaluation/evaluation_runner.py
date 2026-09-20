@@ -5,13 +5,12 @@ os.environ["USE_TF"] = "FALSE"
 
 import torch.distributed as dist
 
-from mindspeed.fsdp.utils.log import print_rank
-
 from mindspeed_mm.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.evaluation.eval_datasets import eval_dataset_dict
 from mindspeed_mm.fsdp.evaluation.eval_impl import eval_impl_dict
 from mindspeed_mm.fsdp.inference.inference_runner import InferenceRunner
 from mindspeed_mm.fsdp.params.evaluation_args import EvaluationArguments
+from mindspeed_mm.fsdp.log import print_rank
 
 
 class EvaluationRunner:

@@ -3,7 +3,6 @@ import logging
 import torch
 
 from mindspeed.fsdp.utils.str_match import module_name_match
-from mindspeed.fsdp.utils.log import print_rank
 
 from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
@@ -12,6 +11,7 @@ from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.models.modelhub import ModelHub
 from mindspeed_mm.fsdp.utils.device import get_device_type
+from mindspeed_mm.fsdp.log import print_rank
 
 
 logger = logging.getLogger(__name__)

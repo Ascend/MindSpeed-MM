@@ -8,7 +8,6 @@ from datetime import timedelta
 import torch
 
 from mindspeed_mm.fsdp import envs
-from mindspeed.fsdp.utils.log import print_rank, set_log_level
 from mindspeed.fsdp.utils.random import set_seed
 
 from mindspeed_mm.fsdp.utils.device import (
@@ -50,6 +49,7 @@ from mindspeed_mm.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.checkpoint.hf_utils import looks_like_hf_weight_dir
 from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
+from mindspeed_mm.fsdp.log import print_rank, init_logger
 
 
 logger = logging.getLogger(__name__)
@@ -162,7 +162,9 @@ class Trainer:
 
         # Set accelerator compatibility and logging level
         set_accelerator_compatible(get_torch_device())
-        set_log_level()
+
+        init_logger()
+        # set_log_level()
         # Enable before model execution so backward failures include the
         # corresponding forward traceback.
         detect_anomaly = envs.MM_DETECT_ANOMALY

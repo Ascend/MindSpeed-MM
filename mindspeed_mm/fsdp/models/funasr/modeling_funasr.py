@@ -9,9 +9,9 @@ import os
 
 import yaml
 from funasr import AutoModel
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE, get_device_type
 from mindspeed_mm.fsdp.utils.register import model_register
+from mindspeed_mm.fsdp.log import print_rank
 
 logger = logging.getLogger(__name__)
 

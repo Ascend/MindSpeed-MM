@@ -2,7 +2,7 @@ import logging
 
 import torch
 
-from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.log import print_rank
 from .flash_attn.flash_attn import apply_transformers_attention_patch
 from .fully_shard.fully_shard import apply_fully_shard_patch
 

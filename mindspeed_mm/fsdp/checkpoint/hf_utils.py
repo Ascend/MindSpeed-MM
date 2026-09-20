@@ -15,10 +15,10 @@ from torch.distributed.tensor import DTensor, Replicate
 from tqdm import tqdm
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.checkpoint.utils import remove_base_layer_keys
 from mindspeed_mm.fsdp.utils.utils import tensor_to_dtensor_local
+from mindspeed_mm.fsdp.log import print_rank
 
 logger = logging.getLogger(__name__)
 

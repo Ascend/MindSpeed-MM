@@ -6,7 +6,6 @@ from torch.distributed.tensor import Shard
 from torch.distributed.distributed_c10d import ReduceOp
 
 from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import (
@@ -15,6 +14,7 @@ from mindspeed_mm.fsdp.distributed.fully_shard_parallel import (
     find_hook_module,
     get_efsdp_modules,
 )
+from mindspeed_mm.fsdp.log import print_rank
 
 logger = logging.getLogger(__name__)
 

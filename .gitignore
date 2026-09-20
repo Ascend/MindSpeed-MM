@@ -168,3 +168,5 @@ cache_dir/
 /docker/torch_wheels/
 /docker/decord_deps/
 /docker/downloads/
+
+/gitleaks

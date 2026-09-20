@@ -11,7 +11,6 @@ import torch.distributed as dist
 from torch.distributed.tensor import DTensor
 from tqdm import tqdm
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.checkpoint.dcp_utils import (
     extract_metadata,
@@ -28,6 +27,7 @@ from mindspeed_mm.fsdp.checkpoint.hf_utils import (
 )
 from mindspeed_mm.fsdp.utils.device import empty_cache, get_device_type
 from mindspeed_mm.fsdp.utils.utils import tensor_to_dtensor
+from mindspeed_mm.fsdp.log import print_rank
 
 logger = logging.getLogger(__name__)
 

@@ -3,8 +3,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.tasks.evaluation.utils.string_utils import process_answer
+from mindspeed_mm.fsdp.log import print_rank
 
 from .impl_base import BaseEvaluator
 

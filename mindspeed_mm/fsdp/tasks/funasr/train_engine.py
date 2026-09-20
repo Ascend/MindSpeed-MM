@@ -7,8 +7,6 @@ from contextlib import nullcontext
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from mindspeed.fsdp.utils.log import print_rank
-
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import pregather_fsdp_params
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
@@ -16,6 +14,7 @@ from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.utils.utils import get_time, move_to_device
 from mindspeed_mm.fsdp.train.train_engine import TrainEngine
+from mindspeed_mm.fsdp.log import print_rank
 
 logger = logging.getLogger(__name__)
 

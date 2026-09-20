@@ -3,7 +3,7 @@ from functools import wraps
 import logging
 import torch
 
-from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
 
 

@@ -21,7 +21,6 @@ from torch.distributed.checkpoint.state_dict import (
 )
 from torch.distributed.checkpoint.stateful import Stateful
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.utils.device import empty_cache, get_dist_comm_backend, synchronize
 from mindspeed_mm.fsdp.checkpoint.checkpointer import CheckpointerBase
@@ -34,6 +33,7 @@ from mindspeed_mm.fsdp.checkpoint.utils import (
 )
 from mindspeed_mm.fsdp.checkpoint.broadcast_utils import rank0_load_and_broadcast_dcp_weights
 from mindspeed_mm.fsdp.checkpoint.dcp_utils import ProgressLoadPlanner
+from mindspeed_mm.fsdp.log import print_rank
 
 
 logger = logging.getLogger(__name__)

@@ -13,7 +13,6 @@ import torch.distributed as dist
 from transformers import AutoConfig, AutoProcessor
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.checkpoint.broadcast_utils import rank0_load_and_broadcast_hf_weights
 from mindspeed_mm.fsdp.checkpoint.checkpointer import CheckpointerBase
@@ -29,6 +28,7 @@ from mindspeed_mm.fsdp.checkpoint.hf_utils import (
 )
 from mindspeed_mm.fsdp.utils.constants import FILE_MODE
 from mindspeed_mm.fsdp.utils.device import empty_cache, get_device_type, synchronize
+from mindspeed_mm.fsdp.log import print_rank
 
 logger = logging.getLogger(__name__)
 

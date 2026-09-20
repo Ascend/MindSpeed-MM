@@ -4,11 +4,11 @@ from functools import wraps
 import torch
 from torch.autograd.graph import saved_tensors_hooks
 
-from mindspeed.fsdp.utils.log import print_rank
 from mindspeed.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.utils.device import create_stream, create_event, get_current_stream, switch_to_specified_stream
 from mindspeed_mm.fsdp.utils.decorators import Singleton
 from mindspeed_mm.fsdp.train.training_context import TrainingContext
+from mindspeed_mm.fsdp.log import print_rank
 
 
 logger = logging.getLogger(__name__)

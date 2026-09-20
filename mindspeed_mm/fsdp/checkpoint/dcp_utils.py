@@ -19,7 +19,7 @@ from torch.distributed.checkpoint.filesystem import _StoragePrefix, _StorageInfo
 from torch.distributed.checkpoint import FileSystemReader
 from tqdm import tqdm
 
-from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.log import print_rank
 
 
 logger = logging.getLogger(__name__)

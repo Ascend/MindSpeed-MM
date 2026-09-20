@@ -7,7 +7,6 @@ from transformers import AutoConfig, PretrainedConfig, PreTrainedModel
 from accelerate import init_empty_weights
 
 from mindspeed.fsdp.utils.str_match import module_name_match
-from mindspeed.fsdp.utils.log import print_rank
 
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.feature_args import FeatureArguments
@@ -15,6 +14,7 @@ from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.models.base_model import BaseModel
+from mindspeed_mm.fsdp.log import print_rank
 
 
 logger = logging.getLogger(__name__)
