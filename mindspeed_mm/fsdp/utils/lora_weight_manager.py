@@ -59,7 +59,7 @@ class LoraWeightManager:
             model: The PyTorch model with LoRA adapters.
             lora_config: Optional LoRA configuration object (e.g.
                 ``LoraArguments``) carrying ``rank``/``alpha``/``dropout``/
-                ``target_modules``/``init_lora_weights``. When provided, it is
+                ``target_modules``. When provided, it is
                 used to write a PEFT-compatible ``adapter_config.json`` next
                 to the saved weights; otherwise ``adapter_config.json``
                 generation is skipped.
@@ -237,7 +237,6 @@ class LoraWeightManager:
             target_modules=getattr(
                 self.lora_config, "target_modules", ["q_proj", "k_proj", "v_proj"]
             ),
-            init_lora_weights=getattr(self.lora_config, "init_lora_weights", True),
             bias="none",
             task_type="CAUSAL_LM",
             inference_mode=True,

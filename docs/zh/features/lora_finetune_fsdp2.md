@@ -45,7 +45,6 @@ training:
     target_modules: all-linear
     dropout: 0.0
     lora_save_only: false
-    init_lora_weights: true
     pretrained_lora_path: null
 ```
 
@@ -59,7 +58,6 @@ training:
 | `target_modules` | str \| List[str] | `["q_proj", "k_proj", "v_proj"]` | 需要添加 LoRA 的模块名称，或者通配符模式，或特殊关键字 `all-linear`                                                                                                          |
 | `dropout` | float | `0.0` | LoRA 层的 dropout 比例，取值范围 `[0, 1)`                                                                                                                                 |
 | `lora_save_only` | bool | `false` | `true` 时只导出独立 LoRA safetensors 和 adapter 配置文件；`false` 时根据保存类型存储全量模型权重，DCP 格式时保存基础权重和 LoRA 权重，HF 格式时保存基础权重与 LoRA 权重融合后的权重。 |
-| `init_lora_weights` | bool \| str | `True` | 权重初始化方式。`True`；`False`；或选择以下字符串值：`"gaussian"`, `"eva"`, `"olora"`, `"pissa"`, `"pissa_niter_[number of iters]"`, `"corda"`, `"loftq"`, `"orthogonal"` |
 | `pretrained_lora_path` | str | `null` | 预训练 LoRA 权重路径（可选），支持 `.safetensors` 和 `.pt/.bin` 格式                                                                                                              |
 | `disable_peft_moe_conversion` | bool | `true` | 屏蔽 PEFT 对 MoE 模型 `gate_proj`/`up_proj`/`down_proj` 的 `target_modules→target_parameters` 自动重定向，使 LoRA 打在 `shared_expert` 的 `nn.Linear` 而非路由专家的 `nn.Parameter` 上。仅 MoE 模型相关 |
 

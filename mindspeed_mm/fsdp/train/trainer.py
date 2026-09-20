@@ -42,6 +42,7 @@ from mindspeed_mm.fsdp.utils.lora_utils import (
     find_all_linear_target_modules,
     validate_lora_config,
     get_lora_trainable_params,
+    initialize_lora_weights,
     print_lora_config,
 )
 from mindspeed_mm.fsdp.utils.lora_weight_manager import LoraWeightManager
@@ -250,7 +251,7 @@ class Trainer:
                 for _name, sub_model in model.get_sub_models().items():
                     if getattr(sub_model, "_ms_mm_meta_init", False):
                         to_empty_if_needed(sub_model, device=device)
-                if args.training.load is None and not args.training.load_rank0_and_broadcast or args.training.lora.enable:
+                if args.training.load is None and not args.training.load_rank0_and_broadcast:
                     for _name, sub_model in model.get_sub_models().items():
                         if getattr(sub_model, "_ms_mm_meta_init", False) and not getattr(
                             sub_model, "_weights_loaded", False
@@ -258,9 +259,17 @@ class Trainer:
                             init_model_weights(sub_model, seed=args.training.seed)
             else:
                 to_empty_if_needed(model, device=device)
-                if args.training.load is None and not args.training.load_rank0_and_broadcast or args.training.lora.enable:
+                if args.training.load is None and not args.training.load_rank0_and_broadcast:
                     if not getattr(model, "_weights_loaded", False):
                         init_model_weights(model, seed=args.training.seed)
+
+            if args.training.lora.enable:
+                if is_container:
+                    for _name, sub_model in model.get_sub_models().items():
+                        if getattr(sub_model, "_ms_mm_meta_init", False):
+                            initialize_lora_weights(sub_model, seed=args.training.seed)
+                else:
+                    initialize_lora_weights(model, seed=args.training.seed)
 
         if args.training.lora.enable:
             self.lora_weight_manager = LoraWeightManager(model, lora_config=args.training.lora)
@@ -299,7 +308,6 @@ class Trainer:
                 alpha=lora_config.alpha,
                 target_modules=lora_config.target_modules,
                 dropout=lora_config.dropout,
-                init_lora_weights=lora_config.init_lora_weights,
             )
         except ValueError as e:
             raise ValueError(f"Invalid LoRA configuration: {e}") from e
@@ -338,8 +346,6 @@ class Trainer:
             lora_alpha=lora_config.alpha,
             lora_target_modules=matched_modules,
             lora_dropout=lora_config.dropout,
-            init_lora_weights=lora_config.init_lora_weights,
-            pretrained_lora_path=lora_config.pretrained_lora_path,
             disable_peft_moe_conversion=lora_config.disable_peft_moe_conversion,
         )
 
@@ -352,7 +358,6 @@ class Trainer:
             alpha=lora_config.alpha,
             target_modules=matched_modules,
             dropout=lora_config.dropout,
-            init_lora_weights=lora_config.init_lora_weights,
             trainable_params=trainable_params,
             total_params=total_params,
         )

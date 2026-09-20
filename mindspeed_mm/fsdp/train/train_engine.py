@@ -73,11 +73,7 @@ class TrainEngine:
         if args.training.load:
             self.iteration, self.consumed_train_samples = self.load()
 
-        if (
-            args.training.init_model_with_meta_device
-            and args.training.lora.enable
-            and args.training.lora.pretrained_lora_path
-        ):
+        if args.training.lora.enable and args.training.lora.pretrained_lora_path:
             lora_state_dict = load_state_dict(args.training.lora.pretrained_lora_path)
             model_state_dict = model.state_dict()
             for key, value in lora_state_dict.items():

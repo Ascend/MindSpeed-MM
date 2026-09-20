@@ -25,13 +25,13 @@ with FSDP2 distributed training, including:
 
 import fnmatch
 import logging
-import re
 from typing import List, Optional, Set, Tuple, Dict, Any
 
 import torch
 import torch.nn as nn
 
 from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.utils import _precreate_dtensor_rng_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +153,6 @@ def validate_lora_config(
     alpha: int,
     target_modules: List[str],
     dropout: float,
-    init_lora_weights: bool | str,
 ) -> None:
     """Validate LoRA configuration parameters.
 
@@ -162,8 +161,6 @@ def validate_lora_config(
         alpha: LoRA alpha scaling factor.
         target_modules: List of target module patterns.
         dropout: Dropout rate.
-        init_lora_weights: Weight initialization method (True, False, or str).
-
     Raises:
         ValueError: If any configuration parameter is invalid.
     """
@@ -178,23 +175,6 @@ def validate_lora_config(
 
     if not 0.0 <= dropout < 1.0:
         raise ValueError(f"LoRA dropout must be in [0, 1), got {dropout}")
-
-    valid_init_methods = [
-        "gaussian", "eva", "olora", "pissa", "corda", "loftq", "orthogonal"
-    ]
-    pissa_niter_pattern = re.compile(r"^pissa_niter_\d+$")
-    if isinstance(init_lora_weights, str):
-        init_val = init_lora_weights.lower()
-        if init_val not in valid_init_methods and not pissa_niter_pattern.match(init_val):
-            raise ValueError(
-                f"init_lora_weights must be True, False, one of {valid_init_methods}, "
-                f"or 'pissa_niter_[number of iters]' (e.g., 'pissa_niter_5'), "
-                f"got {init_lora_weights}"
-            )
-    elif not isinstance(init_lora_weights, bool):
-        raise ValueError(
-            f"init_lora_weights must be bool or str, got {type(init_lora_weights)}"
-        )
 
 
 def get_lora_trainable_params(model: nn.Module) -> Tuple[int, int, Dict[str, Any]]:
@@ -274,14 +254,12 @@ def add_lora_to_model(
     lora_alpha: int = 16,
     lora_target_modules: Optional[List[str]] = None,
     lora_dropout: float = 0.05,
-    init_lora_weights: bool | str = True,
-    pretrained_lora_path: Optional[str] = None,
     disable_peft_moe_conversion: bool = True,
 ) -> nn.Module:
     """Add LoRA adapters to a PyTorch model.
 
-    This function injects LoRA adapters into the specified target modules,
-    optionally loads pretrained LoRA weights, and ensures proper dtype handling.
+    This function injects LoRA adapters into the specified target modules and
+    ensures proper dtype handling.
 
     Args:
         model: The PyTorch model to add LoRA to.
@@ -289,8 +267,6 @@ def add_lora_to_model(
         lora_alpha: LoRA alpha scaling factor.
         lora_target_modules: List of target module names/patterns.
         lora_dropout: Dropout rate for LoRA layers.
-        init_lora_weights: Weight initialization method (True, False, or str).
-        pretrained_lora_path: Path to pretrained LoRA weights (optional).
         disable_peft_moe_conversion: If True, prevent PEFT from converting
             gate_proj/up_proj/down_proj target_modules into target_parameters
             (which would redirect LoRA from nn.Linear layers to MoE expert
@@ -316,7 +292,6 @@ def add_lora_to_model(
     lora_config = LoraConfig(
         r=lora_rank,
         lora_alpha=lora_alpha,
-        init_lora_weights=init_lora_weights,
         target_modules=lora_target_modules,
         lora_dropout=lora_dropout,
         bias="none",
@@ -337,18 +312,49 @@ def add_lora_to_model(
         if param.requires_grad or "lora" in name:
             param.data = param.data.to(dtype=torch.float32)
 
-    if pretrained_lora_path is not None:
-        state_dict = load_state_dict(pretrained_lora_path)
-        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-        all_keys = [i for i, _ in model.named_parameters()]
-        num_updated_keys = len(all_keys) - len(missing_keys)
-        num_unexpected_keys = len(unexpected_keys)
-        logger.info(
-            f"{num_updated_keys} parameters are loaded from {pretrained_lora_path}. "
-            f"{num_unexpected_keys} parameters are unexpected."
-        )
-
     return model
+
+
+@torch.no_grad()
+def initialize_lora_weights(model: nn.Module, seed: Optional[int] = None) -> None:
+    """Apply PEFT's default initialization after meta parameters materialize.
+
+    LoRA adapters are injected while the model is on the meta device. Their
+    initial values are discarded by ``to_empty_if_needed`` and then replaced
+    by the model's generic initialization. Reset each PEFT LoRA adapter on its
+    real tensor to restore PEFT's default zero-delta initialization.
+    """
+    try:
+        from peft.tuners.lora.layer import LoraLayer
+    except ImportError as e:
+        raise ImportError(
+            "PEFT library is required for LoRA training. "
+            "Please install it with: pip install peft"
+        ) from e
+
+    _precreate_dtensor_rng_tracker(model, seed)
+
+    num_initialized = 0
+    for module in model.modules():
+        if not isinstance(module, LoraLayer):
+            continue
+
+        adapter_names = set()
+        for attr_name in (
+            "lora_A",
+            "lora_B",
+            "lora_embedding_A",
+            "lora_embedding_B",
+        ):
+            adapter_container = getattr(module, attr_name, None)
+            if adapter_container is not None and hasattr(adapter_container, "keys"):
+                adapter_names.update(adapter_container.keys())
+
+        for adapter_name in sorted(adapter_names):
+            module.reset_lora_parameters(adapter_name, True)
+            num_initialized += 1
+
+    logger.info(f"Initialized {num_initialized} LoRA adapters after meta materialization")
 
 
 def load_state_dict(file_path: str, torch_dtype: Optional[torch.dtype] = None) -> Dict[str, torch.Tensor]:
@@ -425,7 +431,6 @@ def print_lora_config(
     alpha: int,
     target_modules: List[str],
     dropout: float,
-    init_lora_weights: bool | str,
     trainable_params: int,
     total_params: int,
 ) -> None:
@@ -436,7 +441,6 @@ def print_lora_config(
         alpha: LoRA alpha.
         target_modules: List of target modules.
         dropout: Dropout rate.
-        init_lora_weights: Initialization method (True, False, or str).
         trainable_params: Number of trainable parameters.
         total_params: Total number of parameters.
     """
@@ -447,7 +451,6 @@ def print_lora_config(
     logger.info(f"  Alpha: {alpha}")
     logger.info(f"  Target modules: {target_modules}")
     logger.info(f"  Dropout: {dropout}")
-    logger.info(f"  Init weights: {init_lora_weights}")
     logger.info(f"  Trainable parameters: {trainable_params:,}")
     logger.info(f"  Total parameters: {total_params:,}")
     if total_params > 0:

@@ -66,7 +66,6 @@ class TestLoraUtils:
             alpha=16,
             target_modules=["q_proj", "k_proj"],
             dropout=0.05,
-            init_lora_weights=True,
         )
 
     def test_validate_lora_config_invalid_rank(self) -> None:
@@ -77,7 +76,6 @@ class TestLoraUtils:
                 alpha=16,
                 target_modules=["q_proj"],
                 dropout=0.05,
-                init_lora_weights=True,
             )
 
     def test_validate_lora_config_invalid_alpha(self) -> None:
@@ -88,7 +86,6 @@ class TestLoraUtils:
                 alpha=0,
                 target_modules=["q_proj"],
                 dropout=0.05,
-                init_lora_weights=True,
             )
 
     def test_validate_lora_config_invalid_dropout(self) -> None:
@@ -99,7 +96,6 @@ class TestLoraUtils:
                 alpha=16,
                 target_modules=["q_proj"],
                 dropout=1.5,
-                init_lora_weights=True,
             )
 
     def test_match_target_modules_exact(self) -> None:
@@ -265,7 +261,6 @@ training:
       - "linear1"
       - "linear2"
     dropout: 0.0
-    init_lora_weights: true
     pretrained_lora_path: null
 
 tools:
@@ -389,37 +384,6 @@ class TestAddLoraToModel:
         )
 
         assert model.lora_alpha == 32
-
-    def test_pretrained_lora_loading(self, tmp_path: pathlib.Path) -> None:
-        from safetensors.torch import save_file
-
-        model = SimpleModel()
-        model.requires_grad_(False)
-        model = add_lora_to_model(
-            model, lora_rank=4, lora_alpha=8,
-            lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
-        )
-
-        lora_state = {}
-        for name, param in model.named_parameters():
-            if "lora" in name and "base_layer" not in name:
-                lora_state[f"base_model.model.{name}"] = param.data.clone()
-
-        pretrained_path = os.path.join(tmp_path, "pretrained_lora.safetensors")
-        save_file(lora_state, pretrained_path)
-
-        model2 = SimpleModel()
-        model2.requires_grad_(False)
-        model2 = add_lora_to_model(
-            model2, lora_rank=4, lora_alpha=8,
-            lora_target_modules=["linear1", "linear2"], lora_dropout=0.0,
-            pretrained_lora_path=pretrained_path,
-        )
-
-        for name, param in model2.named_parameters():
-            if "lora" in name and "base_layer" not in name:
-                assert param.numel() > 0
-
 
 class TestLoraWeightManagerExtended:
     """Extended tests for LoraWeightManager."""
@@ -562,7 +526,6 @@ class TestLoraWeightManagerExtended:
             alpha=32,
             dropout=0.1,
             target_modules=["q_proj", "v_proj"],
-            init_lora_weights="gaussian",
         )
         manager = LoraWeightManager(model, lora_config=lora_cfg)
 
@@ -580,7 +543,6 @@ class TestLoraWeightManagerExtended:
         assert cfg["lora_alpha"] == 32
         assert cfg["lora_dropout"] == 0.1
         assert set(cfg["target_modules"]) == {"q_proj", "v_proj"}
-        assert cfg["init_lora_weights"] == "gaussian"
         assert cfg["bias"] == "none"
         assert cfg["task_type"] == "CAUSAL_LM"
         assert cfg["inference_mode"] is True

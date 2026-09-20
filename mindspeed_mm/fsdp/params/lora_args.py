@@ -18,9 +18,8 @@ This module defines the dataclass for LoRA-specific configuration
 parameters used in FSDP2 distributed training.
 """
 
-import re
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional, Union
+from typing import List, Optional, Union
 
 from mindspeed_mm.config.arguments.base_args import BaseArguments
 
@@ -38,7 +37,6 @@ class LoraArguments(BaseArguments):
         alpha: Scaling factor for LoRA weights.
         target_modules: List of target module names/patterns for LoRA.
         dropout: Dropout rate for LoRA layers.
-        init_lora_weights: Weight initialization method.
         pretrained_lora_path: Path to pretrained LoRA weights (optional).
     """
     enable: bool = field(
@@ -72,16 +70,6 @@ class LoraArguments(BaseArguments):
     dropout: float = field(
         default=0.0,
         metadata={"help": "Dropout rate for LoRA layers."},
-    )
-    init_lora_weights: (
-            bool
-            | Literal[
-                "gaussian", "eva", "olora", "pissa", "pissa_niter_[number of iters]", "corda", "loftq", "orthogonal"]
-    ) = field(
-        default=True,
-        metadata={
-            "help": "How to initialize the weights of the LoRA layers. ",
-        },
     )
     pretrained_lora_path: Optional[str] = field(
         default=None,
@@ -119,20 +107,3 @@ class LoraArguments(BaseArguments):
 
             if not 0.0 <= self.dropout < 1.0:
                 raise ValueError(f"LoRA dropout must be in [0, 1), got {self.dropout}")
-
-            valid_init_methods = [
-                "gaussian", "eva", "olora", "pissa", "corda", "loftq", "orthogonal"
-            ]
-            pissa_niter_pattern = re.compile(r"^pissa_niter_\d+$")
-            if isinstance(self.init_lora_weights, str):
-                init_val = self.init_lora_weights.lower()
-                if init_val not in valid_init_methods and not pissa_niter_pattern.match(init_val):
-                    raise ValueError(
-                        f"init_lora_weights must be True, False, one of {valid_init_methods}, "
-                        f"or 'pissa_niter_[number of iters]' (e.g., 'pissa_niter_5'), "
-                        f"but got {self.init_lora_weights}"
-                    )
-            elif not isinstance(self.init_lora_weights, bool):
-                raise ValueError(
-                    f"init_lora_weights must be bool or str, got {type(self.init_lora_weights)}"
-                )

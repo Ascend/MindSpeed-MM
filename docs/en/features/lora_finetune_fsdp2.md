@@ -51,7 +51,6 @@ training:
       - "model.language_model.layers.{*}.mlp.down_proj"
     dropout: 0.0
     lora_save_only: false
-    init_lora_weights: true
     pretrained_lora_path: null
 ```
 
@@ -65,7 +64,6 @@ training:
 | `target_modules` | List[str] | `["q_proj", "k_proj", "v_proj"]` | Module names or wildcard patterns to which LoRA is added                                                                                                                                            |
 | `dropout` | float | `0.0` | Dropout ratio of the LoRA layer, in the range `[0, 1)`                                                                                                                                 |
 | `lora_save_only` | bool | `false` | When `true`, export only standalone LoRA safetensors and the adapter configuration file. When `false`, save the full model weights according to the save format: DCP saves unmerged base weights and LoRA weights, while HF saves the base weights merged with the LoRA weights. |
-| `init_lora_weights` | bool \| str | `True` | Weight initialization method. `True`; `False`; or one of the following string values: `"gaussian"`, `"eva"`, `"olora"`, `"pissa"`, `"pissa_niter_[number of iters]"`, `"corda"`, `"loftq"`, `"orthogonal"` |
 | `pretrained_lora_path` | str | `null` | Path to pretrained LoRA weights (optional), supporting `.safetensors` and `.pt/.bin` formats                                                                                                              |
 
 ### `target_modules` Configuration
