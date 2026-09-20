@@ -10,7 +10,7 @@ from transformers import AutoConfig
 import torch
 import torch.nn as nn
 
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
     gather_forward_split_backward,

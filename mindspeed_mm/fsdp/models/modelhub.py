@@ -6,7 +6,7 @@ import torch
 from transformers import AutoConfig, PretrainedConfig, PreTrainedModel
 from accelerate import init_empty_weights
 
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.feature_args import FeatureArguments

@@ -2,7 +2,7 @@ import logging
 
 import torch
 
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 
 from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.params.model_args import ModelArguments

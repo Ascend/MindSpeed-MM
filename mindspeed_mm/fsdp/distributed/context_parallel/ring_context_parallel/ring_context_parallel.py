@@ -9,7 +9,11 @@ from einops import rearrange
 import torch
 import torch_npu
 
-from mindspeed.ops.fusion_attention_v2 import npu_fusion_attention, npu_fusion_attention_grad
+try:
+    from mindspeed.ops.fusion_attention_v2 import npu_fusion_attention, npu_fusion_attention_grad
+except ImportError:
+    npu_fusion_attention = torch_npu.npu_fusion_attention
+    npu_fusion_attention_grad = torch_npu.npu_fusion_attention_grad
 
 from .context_parallel_kv_cache import ContextParallelKVCache
 from .utils import RingP2P, tnd_out_update, causal_out_update, general_out_update, forward_update, get_selection_indices_for_tnd_softmax_update

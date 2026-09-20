@@ -7,7 +7,7 @@ from contextlib import nullcontext, ExitStack
 from torch.utils._pytree import tree_flatten, tree_unflatten
 from torch.utils.checkpoint import checkpoint
 from mindspeed_mm.fsdp.log import print_rank
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 
 from .op_replay import build_op_replay_context_fn
 

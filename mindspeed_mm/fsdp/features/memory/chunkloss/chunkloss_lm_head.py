@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributed.tensor import DTensor
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 
 
 logger = logging.getLogger(__name__)

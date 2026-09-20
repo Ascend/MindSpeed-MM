@@ -8,7 +8,7 @@ from datetime import timedelta
 import torch
 
 from mindspeed_mm.fsdp import envs
-from mindspeed.fsdp.utils.random import set_seed
+from mindspeed_mm.fsdp.utils.random import set_seed
 
 from mindspeed_mm.fsdp.utils.device import (
     get_dist_comm_backend,

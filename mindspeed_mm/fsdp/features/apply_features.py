@@ -7,7 +7,7 @@ import transformers
 if version.parse(transformers.__version__) >= version.parse("5.2.0"):
     from transformers.utils.output_capturing import _CAN_RECORD_REGISTRY
 
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from ..params.feature_args import FeatureArguments
 from ..params.parallel_args import ParallelArguments
 from ..features.memory.async_offload import async_offload_modules, get_offload_modules

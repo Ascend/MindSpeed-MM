@@ -8,7 +8,6 @@ import torch_npu
 import torch.distributed as dist
 import numpy as np
 from einops import rearrange
-from mindspeed.ops.npu_ring_attention_update import npu_ring_attention_update
 
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 
@@ -216,6 +215,8 @@ def forward_update(prev_attn_out, prev_softmax_max, prev_softmax_sum,
     - updated_softmax_max (Tensor): The updated maximum value of the softmax distribution.
     - updated_softmax_sum (Tensor): The updated sum of the softmax distribution.
     """
+    from mindspeed.ops.npu_ring_attention_update import npu_ring_attention_update
+
     # Modification: 融合算子的tnd格式需要保证D轴是64的倍数
     if layout == "TND" and cur_attn_out.shape[-1] % 64 == 0 or layout != "TND":
         def accumulate_list(input_list):

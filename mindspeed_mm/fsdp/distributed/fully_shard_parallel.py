@@ -9,10 +9,9 @@ from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard, CPUOffloadPolicy
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from mindspeed.fsdp.utils.str_match import module_name_match
-from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
+from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig, EPPlanConfig
 from mindspeed_mm.fsdp.utils.device import get_torch_device, get_device_type
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments

@@ -1,7 +1,6 @@
 from typing import List
 import torch
 import torch.distributed as dist
-from mindspeed.fsdp.distributed.dist_ops import all_to_all as _all_to_all
 
 EP_RANK_SEQ_LENS = None
 
@@ -231,6 +230,74 @@ def reduce_scatter_tokens_in_ep(input_, ep_group=None):
     return _ReduceScatterTokens.apply(input_, ep_group)
 
 
+def _ep_all_to_all(
+    input_: torch.Tensor,
+    group: dist.ProcessGroup,
+    scatter_dim: int,
+    gather_dim: int,
+    scatter_sizes: List = None,
+    gather_sizes: List = None
+):
+    world_size = torch.distributed.get_world_size(group=group)
+    if world_size == 1:
+        return input_
+
+    inputs = input_.contiguous()
+    if gather_sizes is None:
+        output = torch.empty_like(inputs)  # Equal split (all2all)
+    else:
+        # Unequal split (all2all-v)
+        output = inputs.new_empty(size=[sum(gather_sizes)] + list(inputs.size()[1:]),
+                                    dtype=inputs.dtype, device=inputs.device)
+    torch.distributed.all_to_all_single(output, inputs, output_split_sizes=gather_sizes,
+                                        input_split_sizes=scatter_sizes, group=group)
+    return output
+
+
+class _AllToAll(torch.autograd.Function):
+    """All-to-all communication.
+
+    Args:
+        input_: input matrix
+        process_group: communication group
+        scatter_dim: scatter dimension
+        gather_dim: gather dimension
+    """
+
+    @staticmethod
+    def forward(ctx, input_, process_group, scatter_dim, gather_dim, scatter_sizes, gather_sizes, all_to_all_func):
+        ctx.process_group = process_group
+        ctx.scatter_dim = scatter_dim
+        ctx.gather_dim = gather_dim
+        ctx.scatter_sizes = scatter_sizes
+        ctx.gather_sizes = gather_sizes
+        ctx.all_to_all_func = all_to_all_func
+        output = all_to_all_func(
+            input_, process_group, scatter_dim, gather_dim, scatter_sizes, gather_sizes
+        )
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad_output = ctx.all_to_all_func(
+            grad_output,
+            ctx.process_group,
+            ctx.gather_dim,
+            ctx.scatter_dim,
+            ctx.gather_sizes,
+            ctx.scatter_sizes
+        )
+        return (
+            grad_output,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None
+        )
+
+
 def all_to_all(
     input_: torch.Tensor,
     process_group: dist.ProcessGroup,
@@ -239,4 +306,4 @@ def all_to_all(
     scatter_sizes: List = None,
     gather_sizes: List = None
 ):
-    return _all_to_all(process_group, input_, gather_sizes, scatter_sizes)
+    return _AllToAll.apply(input_, process_group, scatter_dim, gather_dim, scatter_sizes, gather_sizes, _ep_all_to_all)

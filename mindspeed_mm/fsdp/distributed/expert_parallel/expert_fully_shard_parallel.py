@@ -5,9 +5,7 @@ from torch.distributed.fsdp import fully_shard, MixedPrecisionPolicy, CPUOffload
 from torch.distributed.tensor import Shard
 from torch.distributed.distributed_c10d import ReduceOp
 
-from mindspeed.fsdp.parallel_engine_config import EPPlanConfig
-from mindspeed.fsdp.utils.str_match import module_name_match
-from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig
+from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig, EPPlanConfig
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import (
     get_mixprecision_policy,
     get_fsdp_hook_modules,

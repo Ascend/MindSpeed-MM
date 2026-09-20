@@ -78,7 +78,7 @@ from transformers.models.qwen4_exp.configuration_qwen4_exp import (
 
 from torch.distributed.tensor import DTensor
 
-from mindspeed.fsdp.utils.log import print_rank
+from mindspeed_mm.fsdp.log import print_rank
 from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE, get_device_type
 

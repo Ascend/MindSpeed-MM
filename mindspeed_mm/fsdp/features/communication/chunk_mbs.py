@@ -4,7 +4,7 @@ import logging
 import torch
 
 from mindspeed_mm.fsdp.log import print_rank
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 
 
 # Create a logger instance for this module

@@ -30,7 +30,7 @@ from typing import List, Optional, Set, Tuple, Dict, Any
 import torch
 import torch.nn as nn
 
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.utils.utils import _precreate_dtensor_rng_tracker
 
 logger = logging.getLogger(__name__)

@@ -43,7 +43,7 @@ import torch
 from torch.autograd.graph import saved_tensors_hooks
 
 from mindspeed_mm.fsdp.log import print_rank
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 
 from .swap_core import SwapCache
 

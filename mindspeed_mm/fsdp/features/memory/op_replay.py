@@ -35,7 +35,7 @@ import torch.nn as nn
 from torch.utils._python_dispatch import TorchDispatchMode
 from torch.utils._pytree import tree_flatten, tree_unflatten
 
-from mindspeed.fsdp.utils.str_match import module_name_match
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from ...utils.device import IS_NPU_AVAILABLE
 from .swap_core import SwapCache, SwapHandle
 
