@@ -48,6 +48,17 @@ def chunk_loss_cce_fused(
     else:
         h = hidden_states.contiguous()
         labels = shift_labels.contiguous()
+    # SFT-sparse fast path: ignore_index tokens are already masked to 0 loss/grad inside the
+    # kernel, but their logits are still streamed through the vocab-tile matmul. Dropping them
+    # here removes that wasted projection compute; it is numerically exact because CCE only runs
+    # for the scalar-sum reductions and the / alpha normalization in loss_func uses the full
+    # valid-token count regardless. Differentiable boolean indexing scatters grad back to the
+    # valid rows and zeros the dropped ones. Skip when nothing or everything is masked.
+    valid = labels != ignore_index
+    num_valid = int(valid.sum())
+    if 0 < num_valid < labels.numel():
+        h = h[valid]
+        labels = labels[valid]
     if seq_chunk_size and 0 < seq_chunk_size < h.shape[0]:
         loss = None
         for s in range(0, h.shape[0], seq_chunk_size):

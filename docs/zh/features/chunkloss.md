@@ -63,6 +63,26 @@ features:
 
 通过合理配置 `chunk_size`，可在保证训练正确性的同时有效控制显存占用。
 
+## 忽略 token 跳过（SFT 稀疏场景）
+
+在 SFT 等场景下，`shift_labels` 中常有大量 token 被置为 `ignore_index`（prompt 段、padding 等），它们对 loss 与梯度的贡献**恒为 0**，但默认仍会随其余 token 一起被投影到 `lm_head`、白白消耗算力与激活显存。ChunkLoss 会在**进入 `lm_head` 投影之前**把这些 token 丢弃，从而按被 mask 比例节省投影计算与激活显存（mask 越多、收益越大）。两条计算路径均支持：
+
+- ChunkLoss（`chunk_loss`）：拼回完整 `shift_labels`、过滤有效 token 后重新分块再计算；
+- CCE（`chunk_loss_cce_fused`）：在进入 vocab-tile 流式 kernel 前过滤掉 `ignore_index` 行。
+
+**该优化对训练无任何数值影响、无需额外开关**：满足条件时自动生效，其 loss 与梯度和不跳过的稠密路径逐元素等价（仅存在 fp32/bf16 求和顺序级别的浮点噪声）。
+
+**生效条件**（同时满足）：
+
+- 计算方式为 `default` 或 `per_token_loss`——这两种都是「所有有效 token 的 CE 求和 ÷ 一个标量 alpha（全量有效 token 数）」，总 loss 与是否丢弃被 mask 的 token 无关，故可安全丢弃；
+- 序列中**部分**（而非全部、也非零个）token 被 mask；
+- **任意 batch size 均可**——标量-sum 归约与 batch 结构无关，多样本 batch 的有效 token 会被展平成单条稠密序列后重新分块，结果仍与稠密路径逐元素一致。
+
+**回退到稠密路径的情形**（此时行为与未开启该优化完全一致，仅无额外收益）：
+
+- 计算方式为 `per_sample_loss`——它对**每个样本各除以自己的 alpha**（该样本有效 token 数 × batch）后再相加，一个 token 的贡献取决于它属于哪个样本；而丢弃 mask token 需要把整个 batch 展平成一条序列，会丢掉样本边界，无法再对回各自的 alpha，因此不做此优化（对应 `reduction != "sum"` 或 `alpha` 非标量）；
+- 序列中没有任何 token 被 mask，或全部被 mask。
+
 ## 注意事项
 
 ### 已知约束

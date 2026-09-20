@@ -236,6 +236,18 @@ def chunk_loss(hidden_states, head_weight, head_bias, loss_forward, loss_kwargs_
     """
     Compute loss in chunks using the custom autograd function `ChunkLoss`.
 
+    For the scalar-normalized sum reduction (loss_type 'default' / 'per_token_loss'),
+    tokens whose shifted label equals ``ignore_index`` (e.g. SFT prompt tokens) contribute
+    exactly 0 to both loss and gradient. Dropping them *before* the lm_head projection is
+    therefore numerically exact -- the total loss ``(Sum_valid CE) / alpha`` is unchanged and
+    the differentiable boolean-mask indexing scatters gradients back to the valid rows and
+    zeros the rest -- while saving the projection compute and activation memory on the masked
+    tokens (the saving scales with the masked-token ratio). It handles any batch size: the
+    scalar-sum reduction is batch-agnostic, so the valid tokens of a multi-sample batch are
+    flattened into a single dense sequence and re-chunked, still bit-exact against the dense
+    path. The function falls back verbatim to the dense path when those assumptions do not hold
+    (non-sum reduction / non-scalar alpha / nothing or everything masked).
+
     Args:
         hidden_states: Input tensor (e.g., from a transformer) to compute loss on.
         head_weight: Weight matrix of the output classification head.
@@ -247,6 +259,29 @@ def chunk_loss(hidden_states, head_weight, head_bias, loss_forward, loss_kwargs_
     Returns:
         The total accumulated loss as a scalar tensor.
     """
+    kwargs = loss_kwargs_chunks[0]
+    alpha = kwargs.get("alpha")
+
+    # Only the scalar-normalized sum reduction is exact under token filtering.
+    if kwargs.get("reduction") == "sum" and (alpha is None or (torch.is_tensor(alpha) and alpha.ndim == 0)):
+        ignore_index = kwargs.get("ignore_index", -100)
+        # Rebuild the full (batch_size, seq_len) shift labels from the per-chunk split.
+        shift_labels = torch.cat([c["shift_labels"] for c in loss_kwargs_chunks], dim=1)
+        valid = shift_labels.reshape(-1) != ignore_index
+        num_valid = int(valid.sum())
+
+        if 0 < num_valid < valid.numel():
+            hidden_dim = hidden_states.size(-1)
+            # Boolean-mask indexing is differentiable: its backward restores the (zero)
+            # gradient of the dropped rows, so grad_inputs matches the dense path exactly.
+            hidden_states = hidden_states.reshape(-1, hidden_dim)[valid].unsqueeze(0)
+            shift_labels = shift_labels.reshape(-1)[valid].unsqueeze(0)
+            # Re-chunk the now-dense valid tokens; alpha/reduction/ignore_index unchanged.
+            loss_kwargs_chunks = [
+                {**kwargs, "shift_labels": labels}
+                for labels in torch.split(shift_labels, chunk_size, dim=1)
+            ]
+
     return ChunkLoss.apply(
         hidden_states,
         head_weight,
