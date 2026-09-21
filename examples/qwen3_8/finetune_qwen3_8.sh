@@ -28,9 +28,16 @@ DISTRIBUTED_ARGS="
     --master_port $MASTER_PORT
 "
 
+# cd to the repo root regardless of where the script is launched from, so that
+# relative paths (trainer script / yaml / logs / plugin imports) resolve consistently
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+echo "Changing working directory to ${MINDSPEED_ROOT}"
+cd "${MINDSPEED_ROOT}"
+
 logdir=logs/qwen38
-logfile=qwen38_$(date +%Y%m%d)_$(date +%H%M%S)
 mkdir -p $logdir
+logfile=qwen38_$(date +%Y%m%d)_$(date +%H%M%S)
 torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
     examples/qwen3_8/qwen3_8_config.yaml \
     2>&1 | tee ${logdir}/${logfile}.log \

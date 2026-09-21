@@ -28,10 +28,11 @@ MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 config_path="${CONFIG_PATH:-${SCRIPT_DIR}/minimax_h3_fl2va.yaml}"
 
+echo "Changing working directory to ${MINDSPEED_ROOT}"
 cd "${MINDSPEED_ROOT}"
 LOG_DIR="${LOG_DIR:-logs}"
-LOG_FILE="${LOG_DIR}/train_${logfile}.log"
 mkdir -p "${LOG_DIR}"
+LOG_FILE="${LOG_DIR}/train_${logfile}.log"
 torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
     ${config_path} \
     2>&1 | tee "${LOG_FILE}"

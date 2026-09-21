@@ -20,6 +20,13 @@ DISTRIBUTED_ARGS="
     --master_port $MASTER_PORT
 "
 
+# cd to the repo root regardless of where the script is launched from, so that
+# relative paths (trainer script / yaml / logs / plugin imports) resolve consistently
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+echo "Changing working directory to ${MINDSPEED_ROOT}"
+cd "${MINDSPEED_ROOT}"
+
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 config_path=examples/glm5.3_flash/glm5.3_next_config_A3.yaml
 

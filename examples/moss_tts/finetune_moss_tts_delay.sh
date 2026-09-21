@@ -20,6 +20,14 @@ DISTRIBUTED_ARGS="
     --master_addr $MASTER_ADDR \
     --master_port $MASTER_PORT
 "
+
+# cd to the repo root regardless of where the script is launched from, so that
+# relative paths (trainer script / yaml / logs / plugin imports) resolve consistently
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+echo "Changing working directory to ${MINDSPEED_ROOT}"
+cd "${MINDSPEED_ROOT}"
+
 logdir=logs/moss_tts_delay
 mkdir -p $logdir
 logfile=${logdir}/finetune_moss_tts_delay_$(date +%Y%m%d)_$(date +%H%M%S)

@@ -13,7 +13,6 @@ MASTER_ADDR=${MASTER_ADDR:-localhost}
 MASTER_PORT=${MASTER_PORT:-6000}
 NNODES=${NNODES:-1}
 NODE_RANK=${NODE_RANK:-0}
-LOG_DIR=${LOG_DIR:-logs}
 
 DISTRIBUTED_ARGS="
     --nproc_per_node ${NPUS_PER_NODE} \
@@ -23,7 +22,15 @@ DISTRIBUTED_ARGS="
     --master_port ${MASTER_PORT}
 "
 
+# cd to the repo root regardless of where the script is launched from, so that
+# relative paths (trainer script / yaml / logs / plugin imports) resolve consistently
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+echo "Changing working directory to ${MINDSPEED_ROOT}"
+cd "${MINDSPEED_ROOT}"
+
 logfile=$(date +%Y%m%d)_$(date +%H%M%S)
+LOG_DIR=${LOG_DIR:-logs}
 mkdir -p "${LOG_DIR}"
 torchrun ${DISTRIBUTED_ARGS} mindspeed_mm/fsdp/train/trainer.py \
     "${CONFIG_PATH}" \
