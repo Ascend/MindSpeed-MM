@@ -47,7 +47,7 @@ transformers_version=v5.12.0
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)，完成昇腾软件安装。
 
 推荐使用 Python 3.10、PyTorch 2.7.1、torch_npu 2.7.1 和 Transformers 5.12.0。
 
@@ -133,7 +133,7 @@ training:
 
 ## 数据集准备及处理
 
-- 使用真实数据集训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)。
+- 使用真实数据集训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)。
 - 图片和视频分别使用 `<image>` 和 `<video>` 占位符，并与 `images`、`videos` 字段一一对应；相对路径以 `dataset_dir` 为根目录解析。
 
 ## 微调
@@ -184,8 +184,8 @@ parallel:
 【性能优化配置】
 
 - 重计算：通过 `features.recompute` 开启，作用范围由 `features.recompute_plan.apply_modules` 指定。
-- [Chunk Loss](../../docs/zh/features/chunkloss.md)：通过 `features.enable_chunk_loss` 开启，降低长序列 LM Head loss 的显存峰值。
-- [Activation Offload](../../docs/zh/features/async_activation_offload.md)：通过 `features.enable_activation_offload` 开启，将 checkpoint 激活异步卸载到 Host。
+- [Chunk Loss](../../docs/zh/features/optimization/chunkloss.md)：通过 `features.enable_chunk_loss` 开启，降低长序列 LM Head loss 的显存峰值。
+- [Activation Offload](../../docs/zh/features/memory/async_activation_offload.md)：通过 `features.enable_activation_offload` 开启，将 checkpoint 激活异步卸载到 Host。
 - Op Replay：在非重入式重计算中缓存指定算子的前向输出，减少反向阶段的重复计算。
 
 8K 优化配置 `minimax_m3_vl_fsdp2_perf_8card.yaml` 只缓存 `npu.npu_fusion_attention.default`，并设置 `capacity_mb: 256`。不要直接在整个 `self_attn` scope 中加入 `aten.matmul.default`，因为 M3 Sparse Indexer 的 FP32 score 张量随序列长度平方增长，会引入较大的 Host/Device 传输开销。

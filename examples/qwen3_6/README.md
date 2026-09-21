@@ -55,20 +55,20 @@ Latest:  2026.9.16:  为适配 CANN9.1.0 和 torch 2.10.0，将 Triton-Ascend �
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../docs/zh/pytorch/install_guide.md)，完成 CANN 相关配置（驱动、固件及 Toolkit 工具包）。
+请参考[安装指南](../../docs/zh/guides/installation/install_guide.md)，完成 CANN 相关配置（驱动、固件及 Toolkit 工具包）。
 
 <a id="jump1.2"></a>
 
 ### 2. 环境搭建
 
-拉取MindSpeed MM代码仓，并进入代码仓根目录(若需要使用低版本的python，可参考[安装指南](../../docs/zh/pytorch/install_guide.md)的拉取方法)：
+拉取MindSpeed MM代码仓，并进入代码仓根目录(若需要使用低版本的python，可参考[安装指南](../../docs/zh/guides/installation/install_guide.md)的拉取方法)：
 
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
 
-若存在自由指定依赖等手动安装需求，可以参考[安装指南](../../docs/zh/pytorch/install_guide.md)中的手动安装流程（注：Qwen3.6不需要安装该流程中的Megatron-LM库）
+若存在自由指定依赖等手动安装需求，可以参考[安装指南](../../docs/zh/guides/installation/install_guide.md)中的手动安装流程（注：Qwen3.6不需要安装该流程中的Megatron-LM库）
 
 执行如下指令一键安装：
 
@@ -240,8 +240,8 @@ mm-convert Qwen35Converter dcp_to_hf \
 
 ## 数据集准备及处理
 
-- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
-- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/data/building_data_for_VLModel.md#mock-data)。
 
 ### Agentical Trace（OpenAI 格式）数据集
 
@@ -416,14 +416,14 @@ dataset:
 - 重计算
   - 在`features.recompute`配置，`true`表示开启，`false`表示关闭，默认开启。
   - 开启后可以节省显存占用
-- [chunkloss](../../docs/zh/features/chunkloss.md)
+- [chunkloss](../../docs/zh/features/optimization/chunkloss.md)
   - 在`features.enable_chunk_loss`配置，`true`表示开启，`false`表示关闭
   - `features.chunkloss_plan.chunk_size`表示计算loss的时候在seq维度切分成大小为`chunk_size`的小块进行计算。
   - 开启后可以大幅降低loss计算时的显存尖刺，节省整体显存占用
-- [async activation offload](../../docs/zh/features/async_activation_offload.md)
+- [async activation offload](../../docs/zh/features/memory/async_activation_offload.md)
   - 在`features.enable_activation_offload`配置，`true`表示开启，`false`表示关闭
   - 开启后可以异步将重计算入口的激活值offload至host侧，在开启了重计算的场景下可以进一步节省显存。
-- [chunkmbs](../../docs/zh/features/chunkmbs.md)
+- [chunkmbs](../../docs/zh/features/optimization/chunkmbs.md)
   - 在`features.enable_chunk_mbs`配置，`true`表示开启，`false`表示关闭
   - `features.chunkmbs_plan.chunk_mbs`表示切分以后单次计算的`micro_batch_size`
   - 开启该特性时需要同时使能重计算和async activation offload特性，可以增加FSDP2单次unshard对应的计算密度，提高整网吞吐。
@@ -467,7 +467,7 @@ NNODES: 一共几个节点
 
 ### 3. 启动微调
 
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/optimization/vlm_model_loss_calculate_type.md)
 可在`xxx_config.yaml`的`model`参数中配置上述文档中的`loss_type`。
 
 ```shell
@@ -480,7 +480,7 @@ bash examples/qwen3_6/finetune_qwen3_6_35B.sh
 
 将 `training.lora.enable` 设为 `true`，并按需配置其余参数，使用与全量微调相同的启动脚本进行LoRA微调。
 
-更详细的 LoRA 配置与参数说明见 [LoRA 微调特性文档](../../docs/zh/features/lora_finetune_fsdp2.md)。
+更详细的 LoRA 配置与参数说明见 [LoRA 微调特性文档](../../docs/zh/features/training_mode/lora_finetune_fsdp2.md)。
 
 【并行策略调整建议】
 

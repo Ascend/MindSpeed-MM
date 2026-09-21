@@ -52,7 +52,7 @@ url=https://huggingface.co/zai-org/GLM-5.3-Flash-BF16/tree/main
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](../../docs/zh/guides/installation/install_guide.md)，完成昇腾软件安装。
 
 推荐环境版本如下：
 
@@ -164,8 +164,8 @@ pip list | grep fla
 
 ## 数据集准备及处理
 
-- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
-- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/data/building_data_for_VLModel.md#mock-data)。
 
 ## 训练
 
@@ -254,11 +254,11 @@ training:
 - 重计算
   - 在`features.recompute`配置，`true`表示开启，`false`表示关闭。
   - 开启后可以节省显存占用
-- [chunkloss](../../docs/zh/features/chunkloss.md)
+- [chunkloss](../../docs/zh/features/optimization/chunkloss.md)
   - 在`features.enable_chunk_loss`配置，`true`表示开启，`false`表示关闭
   - `features.chunkloss_plan.chunk_size`表示计算loss的时候在seq维度切分成大小为`chunk_size`的小块进行计算。
   - 开启后可以大幅降低loss计算时的显存尖刺，节省整体显存占用
-- [async activation offload](../../docs/zh/features/async_activation_offload.md)
+- [async activation offload](../../docs/zh/features/memory/async_activation_offload.md)
   - 在`features.enable_activation_offload`配置，`true`表示开启，`false`表示关闭
   - 开启后可以异步将重计算入口的激活值offload至host侧，在开启了重计算的场景下可以进一步节省显存。
 

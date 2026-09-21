@@ -53,7 +53,7 @@ git checkout v5.2.0
 - [CANN](https://www.hiascend.com/cann/download?versionId=767&ids=d803%2Ch0501%2Ch0601%2Ch0701)（推荐使用离线安装方式）
 - [TorchNPU](https://www.hiascend.com/developer/software/ai-frameworks/pytorch/download?versionId=174&ids=89dda9ba9de741349efa03687a487678%2C96%2C109%2C1%2C6%2C177%2C)
 
-仍有疑问可以参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
+仍有疑问可以参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)
 
 <a id="jump1.2"></a>
 
@@ -215,8 +215,8 @@ mm-convert Qwen35Converter dcp_to_hf \
 
 ## 数据集准备及处理
 
-- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
-- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/data/building_data_for_VLModel.md#mock-data)。
 
 ## 微调
 
@@ -266,14 +266,14 @@ mm-convert Qwen35Converter dcp_to_hf \
 - 重计算
   - 在`features.recompute`配置，`true`表示开启，`false`表示关闭，默认开启。
   - 开启后可以节省显存占用
-- [chunkloss](../../docs/zh/features/chunkloss.md)
+- [chunkloss](../../docs/zh/features/optimization/chunkloss.md)
   - 在`features.enable_chunk_loss`配置，`true`表示开启，`false`表示关闭
   - `features.chunkloss_plan.chunk_size`表示计算loss的时候在seq维度切分成大小为`chunk_size`的小块进行计算。
   - 开启后可以大幅降低loss计算时的显存尖刺，节省整体显存占用
-- [async activation offload](../../docs/zh/features/async_activation_offload.md)
+- [async activation offload](../../docs/zh/features/memory/async_activation_offload.md)
   - 在`features.enable_activation_offload`配置，`true`表示开启，`false`表示关闭
   - 开启后可以异步将重计算入口的激活值offload至host侧，在开启了重计算的场景下可以进一步节省显存。
-- [chunkmbs](../../docs/zh/features/chunkmbs.md)
+- [chunkmbs](../../docs/zh/features/optimization/chunkmbs.md)
   - 在`features.enable_chunk_mbs`配置，`true`表示开启，`false`表示关闭
   - `features.chunkmbs_plan.chunk_mbs`表示切分以后单次计算的`micro_batch_size`
   - 开启该特性时需要同时使能重计算和async activation offload特性，可以增加FSDP2单次unshard对应的计算密度，提高整网吞吐。
@@ -317,7 +317,7 @@ NNODES: 一共几个节点
 
 ### 3. 启动微调
 
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/optimization/vlm_model_loss_calculate_type.md)
 可在`xxx_config.yaml`的`model`参数中配置上述文档中的`loss_type`。
 
 ```shell

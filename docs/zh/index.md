@@ -12,29 +12,29 @@ MindSpeed-MM是面向大规模分布式训练的昇腾多模态大模型套件�
 :caption: QuickStart:
 :maxdepth: 1
 
-pytorch/install_guide
-快速实践
+guides/installation/install_guide
+introduction/quick_practice
 ```
 
 ```{toctree}
 :caption: 开发指南:
 :maxdepth: 1
 
-introduction
-pytorch/model_migration_dev_guide
-pytorch/new_model_development
+introduction/overview
+guides/development/fsdp2_model_migration_guide_old
+guides/development/new_model_development
 ```
 
 ```{toctree}
 :caption: 特性文档:
 :maxdepth: 1
 
-features/特性总览
-features/fsdp2_principle
+introduction/feature_overview
+features/parallel/fsdp2_principle
 features/parallel/hetero-parallel
 features/parallel/sequence_parallel
-features/async_activation_offload
-features/online_data_balance
+features/memory/async_activation_offload
+features/memory/online_data_balance
 features/parallel/tensor_parallel
 ```
 
@@ -55,13 +55,13 @@ reference/environment_variables
 :caption: 调优指南:
 :maxdepth: 1
 
-pytorch/memory_tuning
-pytorch/performance_tuning
+guides/tuning/memory_tuning
+guides/tuning/performance_tuning
 ```
 
 ```{toctree}
 :caption: FAQ:
 :maxdepth: 1
 
-FAQ
+guides/troubleshooting/FAQ
 ```

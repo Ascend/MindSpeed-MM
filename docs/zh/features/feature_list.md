@@ -38,40 +38,40 @@
   </tr></thead>
 <tbody>
   <tr>
-    <td class="tg-t1fb" rowspan="10">并行特性</td>
+    <td class="tg-t1fb" rowspan="9">并行特性</td>
     <td class="tg-citn">FSDP2</td>
-    <td class="tg-i1fi"><a href="fsdp2.md">FSDP2</a></td>
+    <td class="tg-i1fi"><a href="parallel/fsdp2.md">FSDP2</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn" rowspan="2">PP并行</td>
-    <td class="tg-i1fi"><a href="dynamic_dpcp.md">动态PP / Dynamic DPCP</a></td>
+    <td class="tg-i1fi"><a href="parallel/dynamic_dpcp.md">动态PP / Dynamic DPCP</a></td>
 
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="virtual_pipeline_parallel.md">Virtual Pipeline Parallel</a></td>
+    <td class="tg-i1fi"><a href="parallel/virtual_pipeline_parallel.md">Virtual Pipeline Parallel</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn" rowspan="4">序列并行</td>
-    <td class="tg-i1fi"><a href="unaligned_ulysses_cp.md">Unaligned Ulysses CP</a></td>
+    <td class="tg-i1fi"><a href="parallel/unaligned_ulysses_cp.md">Unaligned Ulysses CP</a></td>
 
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="dit_ring_attention.md">DiT Ring Attention</a></td>
+    <td class="tg-i1fi"><a href="parallel/dit_ring_attention.md">DiT Ring Attention</a></td>
 
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="dit_usp.md">DiT USP</a></td>
+    <td class="tg-i1fi"><a href="parallel/dit_usp.md">DiT USP</a></td>
 
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="unaligned_sequence_parallel.md">Unaligned Sequence Parallel</a></td>
+    <td class="tg-i1fi"><a href="parallel/unaligned_sequence_parallel.md">Unaligned Sequence Parallel</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn">异构并行</td>
-    <td class="tg-i1fi"><a href="hetero_parallel.md">Hetero Parallel</a></td>
+    <td class="tg-i1fi"><a href="parallel/hetero_parallel.md">Hetero Parallel</a></td>
 
   </tr>
   <tr>
@@ -82,90 +82,90 @@
   <tr>
     <td class="tg-t1fb" rowspan="7">显存优化</td>
     <td class="tg-citn">Offload</td>
-    <td class="tg-i1fi"><a href="async_activation_offload.md">Async Activation Offload</a></td>
+    <td class="tg-i1fi"><a href="memory/async_activation_offload.md">Async Activation Offload</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn" rowspan="3">张量交换</td>
-    <td class="tg-i1fi"><a href="swap_core.md">Swap Core（张量交换底座）</a></td>
+    <td class="tg-i1fi"><a href="memory/swap_core.md">Swap Core（张量交换底座）</a></td>
 
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="op_replay.md">Op Replay</a></td>
+    <td class="tg-i1fi"><a href="optimization/op_replay.md">Op Replay</a></td>
 
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="act_stash.md">Act Stash</a></td>
+    <td class="tg-i1fi"><a href="memory/act_stash.md">Act Stash</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn" rowspan="2">负载均衡</td>
-    <td class="tg-0ijx"><a href="online_data_rearrange.md">Online Data Rearrange</a></td>
+    <td class="tg-0ijx"><a href="memory/online_data_rearrange.md">Online Data Rearrange</a></td>
 
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="encoder_dp_balance.md">Encoder DP Balance</a></td>
+    <td class="tg-i1fi"><a href="memory/encoder_dp_balance.md">Encoder DP Balance</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn">Bucket Reordering</td>
-    <td class="tg-i1fi"><a href="bucket_reordering.md">Bucket Reordering</a></td>
+    <td class="tg-i1fi"><a href="memory/bucket_reordering.md">Bucket Reordering</a></td>
 
   </tr>
   <tr>
     <td class="tg-t1fb" rowspan="7">优化特性</td>
     <td class="tg-citn" rowspan="2">损失优化</td>
-    <td class="tg-i1fi"><a href="chunkloss.md">Chunk Loss</a></td>
+    <td class="tg-i1fi"><a href="optimization/chunkloss.md">Chunk Loss</a></td>
 
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="vlm_model_loss_calculate_type.md">VLM Model Loss Calculate Type</a></td>
+    <td class="tg-i1fi"><a href="optimization/vlm_model_loss_calculate_type.md">VLM Model Loss Calculate Type</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn" rowspan="2">性能优化</td>
-    <td class="tg-jajh"><a href="fpdt.md">FPDT</a></td>
+    <td class="tg-jajh"><a href="optimization/fpdt.md">FPDT</a></td>
 
   </tr>
   <tr>
-    <td class="tg-jajh"><a href="grad_norm_overlap.md">Grad Norm Overlap</a></td>
+    <td class="tg-jajh"><a href="optimization/grad_norm_overlap.md">Grad Norm Overlap</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn" rowspan="3">优化器</td>
-    <td class="tg-jajh"><a href="dummy_optimizer.md">Dummy Optimizer</a></td>
+    <td class="tg-jajh"><a href="optimization/dummy_optimizer.md">Dummy Optimizer</a></td>
 
   </tr>
   <tr>
-    <td class="tg-jajh"><a href="parameter_lr_wd_tuning.md">Parameter LR/WD Tuning</a></td>
+    <td class="tg-jajh"><a href="optimization/parameter_lr_wd_tuning.md">Parameter LR/WD Tuning</a></td>
 
   </tr>
   <tr>
-    <td class="tg-jajh"><a href="fsdp2_muon_optimizer.md">FSDP2 Muon Optimizer</a></td>
+    <td class="tg-jajh"><a href="optimization/fsdp2_muon_optimizer.md">FSDP2 Muon Optimizer</a></td>
 
   </tr>
   <tr>
     <td class="tg-whwg" rowspan="5">训练模式</td>
     <td class="tg-citn">预训练</td>
-    <td class="tg-jajh"><a href="pretrain.md">Pretrain</a></td>
+    <td class="tg-jajh"><a href="training_mode/pretrain.md">Pretrain</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn" rowspan="3">高效微调</td>
-    <td class="tg-jajh"><a href="lora_finetune.md">LoRA Finetune</a></td>
+    <td class="tg-jajh"><a href="training_mode/lora_finetune.md">LoRA Finetune</a></td>
 
   </tr>
   <tr>
-    <td class="tg-jajh"><a href="lora_finetune_fsdp2.md">LoRA Finetune with FSDP2</a></td>
+    <td class="tg-jajh"><a href="training_mode/lora_finetune_fsdp2.md">LoRA Finetune with FSDP2</a></td>
 
   </tr>
   <tr>
-    <td class="tg-jajh"><a href="agentic_sft.md">Agentic SFT</a></td>
+    <td class="tg-jajh"><a href="training_mode/agentic_sft.md">Agentic SFT</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn">Layerwise Training</td>
-    <td class="tg-jajh"><a href="layerwise_disaggregated_training.md">Layerwise Disaggregated Training</a></td>
+    <td class="tg-jajh"><a href="training_mode/layerwise_disaggregated_training.md">Layerwise Disaggregated Training</a></td>
 
   </tr>
     <tr>
@@ -177,18 +177,18 @@
   <tr>
     <td class="tg-whwg" rowspan="2">数据处理</td>
     <td class="tg-citn">数据集</td>
-    <td class="tg-jajh"><a href="multimodal_dataset.md">Multimodal Dataset</a></td>
+    <td class="tg-jajh"><a href="data/multimodal_dataset.md">Multimodal Dataset</a></td>
 
   </tr>
   <tr>
     <td class="tg-citn">SeqPack</td>
-    <td class="tg-jajh"><a href="seqpack.md">SeqPack</a></td>
+    <td class="tg-jajh"><a href="data/seqpack.md">SeqPack</a></td>
 
   </tr>
   <tr>
     <td class="tg-whwg" rowspan="2">模型转换</td>
     <td class="tg-citn">模型转换</td>
-    <td class="tg-jajh"><a href="mm_convert.md">MM Convert</a></td>
+    <td class="tg-jajh"><a href="../tools/mm_convert.md">MM Convert</a></td>
 
   </tr>
   <tr>
@@ -205,7 +205,7 @@
   <tr>
     <td class="tg-whwg">评估工具</td>
     <td class="tg-citn">VBench</td>
-    <td class="tg-jajh"><a href="vbench-evaluate.md">VBench Evaluate</a></td>
+    <td class="tg-jajh"><a href="../tools/vbench-evaluate.md">VBench Evaluate</a></td>
 
   </tr>
 </tbody></table>

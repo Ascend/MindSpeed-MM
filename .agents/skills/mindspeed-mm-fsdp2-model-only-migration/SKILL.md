@@ -21,7 +21,7 @@ training.plugin
   -> model(**batch_data, use_cache=False).loss
 ```
 
-迁移前先阅读 `docs/zh/features/fsdp2_developer_migration_guide.md`，理解插件式 FSDP2 的路线、入口、注册、YAML、权重加载和启动方式。
+迁移前先阅读 `docs/zh/guides/development/fsdp2_model_migration_guide.md`，理解插件式 FSDP2 的路线、入口、注册、YAML、权重加载和启动方式。
 
 ## 开始前：创建 Todo
 

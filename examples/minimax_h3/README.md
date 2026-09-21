@@ -14,10 +14,9 @@
   - [配置文件](#配置文件)
   - [启动训练](#启动训练)
   - [正式训练配置](#正式训练配置)
-- [开发与测试](#开发与测试)
-  - [跨后端 BF16 反向精度注意事项](#跨后端-bf16-反向精度注意事项)
 - [环境变量声明](#环境变量声明)
 - [注意事项](#注意事项)
+  - [GPU\NPU BF16 反向精度注意事项](#gpunpu-bf16-反向精度注意事项)
 
 ## 版本说明
 
@@ -47,7 +46,7 @@ Video VAE 和 Audio VAE 的在线训练。训练数据需要先通过 DiffSynth-
 
 ## 环境安装
 
-请先按照 [MindSpeed-MM 安装指南](../../docs/zh/pytorch/install_guide.md) 安装匹配版本的 Ascend Driver、CANN、PyTorch 和 torch-npu。
+请先按照 [MindSpeed-MM 安装指南](../../docs/zh/guides/installation/install_guide.md) 安装匹配版本的 Ascend Driver、CANN、PyTorch 和 torch-npu。
 
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git

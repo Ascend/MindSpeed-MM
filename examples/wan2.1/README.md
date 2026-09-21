@@ -77,7 +77,7 @@ commit_id=f8d4a1e
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)
 
 ### 仓库拉取
 
@@ -92,7 +92,7 @@ cd ../MindSpeed-MM
 
 ### 环境搭建
 
-请参考[安装指南](../../docs/zh/pytorch/install_guide.md)创建Python环境并安装 torch、TorchNPU。
+请参考[安装指南](../../docs/zh/guides/installation/install_guide.md)创建Python环境并安装 torch、TorchNPU。
 
 ```bash
 conda activate test
@@ -317,11 +317,11 @@ bash examples/wan2.1/feature_extract/feature_extraction.sh
 
   - 默认使能方式为Ulysses序列并行。
 
-  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](../../docs/zh/features/dit_ring_attention.md)
+  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](../../docs/zh/features/parallel/dit_ring_attention.md)
 
-  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](../../docs/zh/features/dit_usp.md)
+  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](../../docs/zh/features/parallel/dit_usp.md)
 
-  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](../../docs/zh/features/fpdt.md)
+  - FPDT(Fully Pipelined Distributed Transformer): Ulysses Offload 并行请[参考文档](../../docs/zh/features/optimization/fpdt.md)
 
   - 注：wan2.1使用full attention，对应general，即`--attention-mask-type general`。
 
@@ -461,7 +461,7 @@ mm-convert WanConverter merge_lora_to_base \
 
 ### 环境准备
 
-1. 参考docs/zh/features/vbench-evaluate.md中的环境安装指导完成vbench及依赖三方件的安装
+1. 参考docs/zh/tools/vbench-evaluate.md中的环境安装指导完成vbench及依赖三方件的安装
 2. 将VBench的 [t2v json](https://github.com/Vchitect/VBench/blob/master/vbench/VBench_full_info.json) 下载到MM代码根路径"./vbench/VBench_full_info.json"
 
 ### 生成视频样本

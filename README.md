@@ -57,7 +57,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 # 目录结构
 
-关键目录如下，详细目录介绍参见[目录介绍](docs/zh/dir_structure.md)
+关键目录如下，详细目录介绍参见[目录介绍](docs/zh/introduction/dir_structure.md)
 
 ```bash
 ├─bridge          # mbridge在线权重转换
@@ -222,14 +222,14 @@ MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态，软件版本配套�
 
 ---
 
-MindSpeed MM具体的安装请参考[安装指南](docs/zh/pytorch/install_guide.md)。
-当前qwen3vl、wan2.2模型已支持一键安装，一键安装使用说明详见[一键安装使用说明](docs/zh/pytorch/install_guide.md)。
+MindSpeed MM具体的安装请参考[安装指南](docs/zh/guides/installation/install_guide.md)。
+当前qwen3vl、wan2.2模型已支持一键安装，一键安装使用说明详见[一键安装使用说明](docs/zh/guides/installation/install_guide.md)。
 
 # 快速上手
 
 ---
 
-MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者快速上手预置模型在昇腾NPU上的高效运行。具体的操作请参考[快速上手](./docs/zh/pytorch/quickstart.md)。
+MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者快速上手预置模型在昇腾NPU上的高效运行。具体的操作请参考[快速上手](./docs/zh/guides/practices/quickstart.md)。
 
 # 特性/模型介绍
 
@@ -237,7 +237,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 
 ## 已支持特性概览
 
-|       模型 \ 特性        | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/sequence-parallel.md) | [VPP](docs/zh/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md) | [LoRA](./docs/zh/features/lora_finetune.md) | RL | [FSDP2](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md) |
+|       模型 \ 特性        | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/sequence-parallel.md) | [VPP](docs/zh/features/parallel/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/pipeline-parallel.md) | CP | [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md) | [LoRA](./docs/zh/features/training_mode/lora_finetune.md) | RL | [FSDP2](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/fsdp2.md) |
 |:--------------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:------:|:------:|:------:|:------:|:------:|
 | Magistral-Small-2509 |  |  |  |  |  |  | ✔ | ✔ |  | ✔ |
 |   InternVL3.5-30B    |  |  |  |  |  |  | ✔ |  |  | ✔ |
@@ -284,7 +284,7 @@ MindSpeed MM将以Qwen2.5-VL-3B和Wan2.1-T2V-1.3B模型为例，引导开发者�
 
 ## 配套版本与支持模型
 
-MindSpeed MM 预置了覆盖多模态生成、多模态理解等任务的丰富模型；各模型的参数规模、训练任务、推荐集群与认证状态，详见 **[MindSpeed MM 支持模型列表](docs/zh/pytorch/supported_models.md)**。
+MindSpeed MM 预置了覆盖多模态生成、多模态理解等任务的丰富模型；各模型的参数规模、训练任务、推荐集群与认证状态，详见 **[MindSpeed MM 支持模型列表](docs/zh/introduction/supported_models.md)**。
 
 大语言模型（稠密模型、稀疏模型和状态空间模型）由 MindSpeed-LLM 专项维护，如需进行大语言模型训练，请访问 [MindSpeed-LLM](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/zh/pytorch/models/supported_models.md) 获取详细使用说明。
 
@@ -314,7 +314,7 @@ MindSpeed MM 预置了覆盖多模态生成、多模态理解等任务的丰富�
 
 MindSpeed MM集成了昇腾profiling采集工具，以提供对模型运行情况的分析。该工具能够依照配置采集模型的算子、显存等关键信息，同时支持动静态两种采集方式，协助开发者分析模型瓶颈，并可根据实际场景需求选择使用。
 
-  具体方法见 [README](./docs/zh/tools.md) 的profiling章节
+  具体方法见 [README](./docs/zh/tools/tools.md) 的profiling章节
 
 ## MindStudio Insight性能分析工具
 
@@ -327,19 +327,19 @@ MindStudio Insight提供了包括Timeline视图、通信分析、计算耗时等
 
 MindSpeed MM支持提取视频和文本特征并保存
 
-  具体方法见 [README](./docs/zh/tools.md) 的Sora类模型特征提取章节
+  具体方法见 [README](./docs/zh/tools/tools.md) 的Sora类模型特征提取章节
 
 ## 内存快照提取
 
 MindSpeed MM集成了昇腾内存快照采集工具，以提供对模型运行情况的分析。
 
-  具体方法见 [README](./docs/zh/tools.md) 的内存快照提取章节
+  具体方法见 [README](./docs/zh/tools/tools.md) 的内存快照提取章节
 
 ## Tensorboard使用
 
 MindSpeed MM支持Tensorboard的使用
 
-  具体方法见 [README](./docs/zh/tools.md) 的Tensorboard使用章节
+  具体方法见 [README](./docs/zh/tools/tools.md) 的Tensorboard使用章节
 
 # 版本维护
 
@@ -371,7 +371,7 @@ MindSpeed MM已发布版本维护策略：
 
 ---
 
-相关FAQ请参考链接：[FAQ](./docs/zh/FAQ.md)
+相关FAQ请参考链接：[FAQ](./docs/zh/guides/troubleshooting/FAQ.md)
 
 # 相关资源
 

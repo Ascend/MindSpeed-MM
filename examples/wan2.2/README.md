@@ -71,7 +71,7 @@ url=https://github.com/huggingface/diffusers/tree/v0.35.1
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)
 
 ### 仓库拉取
 
@@ -250,9 +250,9 @@ mm-convert WanConverter mm_to_hf \
 
   - 默认使能方式为Ulysses序列并行。
 
-  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](../../docs/zh/features/dit_ring_attention.md)
+  - DiT-RingAttention：DiT RingAttention序列并行请[参考文档](../../docs/zh/features/parallel/dit_ring_attention.md)
 
-  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](../../docs/zh/features/dit_usp.md)
+  - DiT-USP: DiT USP混合序列并行（Ulysses + RingAttention）请[参考文档](../../docs/zh/features/parallel/dit_usp.md)
 
   - 注：wan2.2使用full attention，对应general，即`--attention-mask-type general`。
 

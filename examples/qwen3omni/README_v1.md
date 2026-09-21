@@ -48,7 +48,7 @@ commit_id=7a833d1
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
@@ -267,7 +267,7 @@ data->dataset_param->basic_parameters->dataset
 
 【chunkloss 配置】
 
-参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/chunkloss.md)
+参考[chunk loss文档](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/optimization/chunkloss.md)
 将`xxx_config_v1.yaml`中`enable_chunk_loss`字段设置为true，chunk_size表示每个子序列的最大长度（即每个 chunk 所包含的 token 数量）
 
 ```yaml

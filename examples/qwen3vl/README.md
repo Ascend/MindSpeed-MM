@@ -46,7 +46,7 @@ commit_id=c0dbe09
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
@@ -104,8 +104,8 @@ mm-convert Qwen3VLConverter hf_to_dcp \
 
 ## 数据集准备及处理
 
-- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
-- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/data/building_data_for_VLModel.md#mock-data)。
 
 ## 微调
 
@@ -222,11 +222,11 @@ gpt_args:
 
 【FSDP2 offload_to_cpu配置】
 在fsdp2_config.yaml配置offload_to_cpu为True, 可以将参数，梯度和优化器状态卸载到CPU内存，进一步降低显存。但同时训练速度相对会变慢，在显存足够的情况下不建议开启。
-功能描述请详见：docs/zh/features/fsdp2.md。
+功能描述请详见：docs/zh/features/parallel/fsdp2.md。
 开启该功能时，同时需要在`qwen3vl_full_sft_xxB.yaml`文件中`gpt_args`配置项里配置`distributed_backend: npu:hccl,cpu:gloo`，以开启双通信后端。
 
 【chunkloss 配置】
-参考[chunk loss文档](../../docs/zh/features/chunkloss.md)
+参考[chunk loss文档](../../docs/zh/features/optimization/chunkloss.md)
 
 【负载均衡损失配置】
 支持自定义moe模型中专家负载均衡的aux_loss的系数，在`qwen3vl_full_sft_xxB.yaml`中的`router_aux_loss_coef`，默认为0.0，即不计算该损失。
@@ -273,7 +273,7 @@ WORLD_SIZE=$(($NPUS_PER_NODE * $NNODES))
 
 【LoRA微调（可选）】
 
-LoRA为框架通用能力，当前已支持30B模型的语言模块LoRA微调，参数介绍请参考[LoRA特性文档](../../docs/zh/features/lora_finetune.md)。
+LoRA为框架通用能力，当前已支持30B模型的语言模块LoRA微调，参数介绍请参考[LoRA特性文档](../../docs/zh/features/training_mode/lora_finetune.md)。
 
 LoRA微调场景下，需要先对原始权重完成以下权重转换
 
@@ -326,7 +326,7 @@ bash examples/qwen3vl/finetune_lora_qwen3vl_30B.sh
 ### 3. 启动微调
 
 以Qwen3VL-xxB为例，启动微调训练任务。
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/optimization/vlm_model_loss_calculate_type.md)
 通过修改`qwen3vl_full_sft_xxB.yaml`文件中的`loss_type`字段可以在不同的loss计算方式中切换。
 
 ```shell
@@ -335,7 +335,7 @@ bash examples/qwen3vl/finetune_qwen3vl_xxB.sh
 
 **优化特性：**
 
-- ChunkLoss：可以参考文档[ChunkLoss](../../docs/zh/features/chunkloss.md)开启该特性优化长序列时的显存占用。
+- ChunkLoss：可以参考文档[ChunkLoss](../../docs/zh/features/optimization/chunkloss.md)开启该特性优化长序列时的显存占用。
 
 ---
 

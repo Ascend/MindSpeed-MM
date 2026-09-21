@@ -45,7 +45,7 @@ commit_id=c0dbe09
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
@@ -129,8 +129,8 @@ mm-convert GenericDCPConverter hf_to_dcp \
 
 ## 数据集准备及处理
 
-- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
-- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/data/building_data_for_VLModel.md#mock-data)。
 
 ## 微调
 
@@ -198,7 +198,7 @@ NNODES: 一共几个节点
 
 ### 3. 启动微调
 
-loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，根据`FSDP2后端`选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/vlm_model_loss_calculate_type.md)，在`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`配置`loss_type`参数，可以设置成default（默认）、per_sample_loss、per_token_loss这3个值。
+loss计算方式差异会对训练效果造成不同的影响，在启动训练任务之前，请查看关于loss计算的文档，根据`FSDP2后端`选择合适的loss计算方式[vlm_model_loss_calculate_type.md](../../docs/zh/features/optimization/vlm_model_loss_calculate_type.md)，在`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`配置`loss_type`参数，可以设置成default（默认）、per_sample_loss、per_token_loss这3个值。
 
 在代码仓根目录（MindSpeed-MM）下执行以下命令启动微调任务：
 

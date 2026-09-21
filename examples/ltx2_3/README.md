@@ -78,7 +78,7 @@ MM 训练阶段从 LTX-2.3 检查点中加载 embedding connector；Gemma 目录
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考 [MindSpeed-MM 安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)，完成昇腾驱动、CANN、PyTorch、`torch_npu` 和 MindSpeed 的安装。建议使用 Python 3.10；`torch`、`torch_npu`、CANN 版本需相互匹配。
+请参考 [MindSpeed-MM 安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)，完成昇腾驱动、CANN、PyTorch、`torch_npu` 和 MindSpeed 的安装。建议使用 Python 3.10；`torch`、`torch_npu`、CANN 版本需相互匹配。
 
 ```bash
 conda activate <your_conda_env>

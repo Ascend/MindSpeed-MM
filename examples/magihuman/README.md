@@ -60,7 +60,7 @@ hf download GAIR/daVinci-MagiHuman \
 
 ### 1. 环境准备
 
-请先按 [安装指导](../../docs/zh/pytorch/install_guide.md) 完成 CANN、PyTorch、torch-npu 和
+请先按 [安装指导](../../docs/zh/guides/installation/install_guide.md) 完成 CANN、PyTorch、torch-npu 和
 MindSpeed MM 的安装，配套版本以该文档为准。
 
 在 MindSpeed MM 仓库根目录安装当前代码：
@@ -241,7 +241,7 @@ bash examples/magihuman/finetune_magihuman_t2av.sh
 
 训练日志能够持续输出 iteration，并且 loss、grad norm 未出现 NaN/Inf，即说明 forward、
 backward 和 optimizer step 已接通。首个 iteration 通常包含初始化和编译开销，耗时可能明显
-高于后续迭代。启动失败或训练卡住时，可查阅 [FAQ](../../docs/zh/FAQ.md)。
+高于后续迭代。启动失败或训练卡住时，可查阅 [FAQ](../../docs/zh/guides/troubleshooting/FAQ.md)。
 
 在 8 卡 Ascend 910B3 上按上述配置训练，输入取 video 3840、audio 126、text 640 token
 （packed 长度 4606），5000 step 稳态 step time 中位数 4634.8 ms，单卡 71.7 TFLOP/s，峰值显存
@@ -259,17 +259,17 @@ RMSNorm 使用 `npu_rms_norm`，fp32 下最大误差约 1e-6。连续半区 gate
 
 | 特性 | 是否支持 | 说明 |
 | --- | --- | --- |
-| [FSDP2](../../docs/zh/features/fsdp2.md) | 是 | 分片粒度 `dit.block.layers.{*}`，`param_dtype: bf16`、`reduce_dtype: fp32` |
+| [FSDP2](../../docs/zh/features/parallel/fsdp2.md) | 是 | 分片粒度 `dit.block.layers.{*}`，`param_dtype: bf16`、`reduce_dtype: fp32` |
 | 全参数微调 | 是 | text-to-audio-video，单流打包序列 |
 | 重计算 | 是 | `features.recompute` 配合 `recompute_plan` |
 | 序列打包 | 是 | dataset 的 `collate_fn` 沿 token 轴拼接，`cu_seqlens` 驱动 varlen attention |
 | NPU 融合算子 | 是 | attention、RoPE、RMSNorm，默认开启 |
 | 权重加载与导出 | 是 | DCP 保存与续训、HF 权重在线加载、导出回上游 HF 格式 |
-| [Ulysses CP](../../docs/zh/features/unaligned_ulysses_cp.md) | 是 | 开启后 DP 同比减小，需用梯度累积补回 global batch |
-| [LoRA 微调](../../docs/zh/features/lora_finetune_fsdp2.md) | 否 | — |
+| [Ulysses CP](../../docs/zh/features/parallel/unaligned_ulysses_cp.md) | 是 | 开启后 DP 同比减小，需用梯度累积补回 global batch |
+| [LoRA 微调](../../docs/zh/features/training_mode/lora_finetune_fsdp2.md) | 否 | — |
 | 张量并行、Ring Attention | 否 | 相关配置项保持为 `1` |
-| [Chunk Loss](../../docs/zh/features/chunkloss.md) | 否 | — |
-| [Async Activation Offload](../../docs/zh/features/async_activation_offload.md) | 是 | 作用于 `dit.block.layers.{*}`；8 卡 100 步开关对照 loss/grad norm 逐位一致，每步卸载约 838 MiB，吞吐下降约 3% |
+| [Chunk Loss](../../docs/zh/features/optimization/chunkloss.md) | 否 | — |
+| [Async Activation Offload](../../docs/zh/features/memory/async_activation_offload.md) | 是 | 作用于 `dit.block.layers.{*}`；8 卡 100 步开关对照 loss/grad norm 逐位一致，每步卸载约 838 MiB，吞吐下降约 3% |
 
 ## 权重布局与转换
 

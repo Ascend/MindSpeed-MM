@@ -42,7 +42,7 @@ url=https://huggingface.co/stepfun-ai/Step3-VL-10B
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](../../docs/zh/guides/installation/install_guide.md)，完成昇腾软件安装。
 
 ### 2. 环境搭建
 
@@ -95,8 +95,8 @@ model-*.safetensors
 
 ## 数据集准备及处理
 
-- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
-- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/data/building_data_for_VLModel.md#mock-data)。
 
 ## 微调
 

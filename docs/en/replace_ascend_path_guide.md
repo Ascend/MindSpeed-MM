@@ -22,7 +22,7 @@ This guide provides the complete steps for batch path replacement using the `rep
 | File Type | Description | Typical Path Example |
 |---------|------|-------------|
 | Shell scripts (`.sh`) | Training/testing startup scripts | `examples/*/pretrain_*.sh`, `scripts/install.sh` |
-| Markdown documents (`.md`) | Installation guides, model usage instructions | `docs/zh/pytorch/install_guide.md`, `docker/OVERVIEW.md` |
+| Markdown documents (`.md`) | Installation guides, model usage instructions | `docs/zh/guides/installation/install_guide.md`, `docker/OVERVIEW.md` |
 | RST documents (`.rst`) | User guides | `UserGuide/quick_start/environment_setup.rst` |
 | Python files (`.py`) | Source code (if path references exist) | Source files of each module |
 | Dockerfile | Docker image build scripts | `docker/Dockerfile` |

@@ -63,7 +63,7 @@ commit_id=74797c9
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/guides/installation/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
@@ -81,8 +81,8 @@ bash scripts/install.sh --msbranch master && pip install tiktoken==0.12.0
 
 ## 数据集准备及处理
 
-- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
-- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/data/building_data_for_VLModel.md#mock-data)。
 
 ## 训练
 
@@ -151,7 +151,7 @@ NODE_RANK: 当前节点序号
 | `enable_preload` | `data->dataloader_param` | 数据预加载开关 | 开启后数据加载与计算重叠，减少训练等待时间 |
 | `enable_activation_offload` | `features` | 激活值卸载到Host侧内存开关 | 开启后降低Device显存占用，`apply_modules`指定需要开启该特性的module |
 | `enable_chunk_mbs` | `features` | 是否开启chunkmbs特性 | 需与`chunkmbs_plan`关联使用，开启后将MicroBatch维度切分为多个微块依次计算，可压缩激活显存峰值并提升训练吞吐 |
-| `chunkmbs_plan` | `features` | chunkmbs切分策略配置 | 仅在`enable_chunk_mbs`启用时生效，包含`chunk_mbs`、`batch_dim`、`chunk_arg_indexs`、`chunk_kwarg_names`等子字段，详细说明请参考[chunkmbs文档](../../docs/zh/features/chunkmbs.md) |
+| `chunkmbs_plan` | `features` | chunkmbs切分策略配置 | 仅在`enable_chunk_mbs`启用时生效，包含`chunk_mbs`、`batch_dim`、`chunk_arg_indexs`、`chunk_kwarg_names`等子字段，详细说明请参考[chunkmbs文档](../../docs/zh/features/optimization/chunkmbs.md) |
 
 <a id="jump3.3"></a>
 

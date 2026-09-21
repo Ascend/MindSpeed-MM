@@ -42,29 +42,29 @@
   <tr>
     <td class="tg-t1fb" rowspan="6">并行特性</td>
     <td class="tg-citn">FSDP2</td>
-    <td class="tg-i1fi"><a href="fsdp2.md">FSDP2</a></td>
+    <td class="tg-i1fi"><a href="parallel/fsdp2.md">FSDP2</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">×</td>
   </tr>
   <tr>
     <td class="tg-citn" rowspan="3">序列并行</td>
-    <td class="tg-i1fi"><a href="unaligned_ulysses_cp.md">Unaligned Ulysses CP</a></td>
+    <td class="tg-i1fi"><a href="parallel/unaligned_ulysses_cp.md">Unaligned Ulysses CP</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">✓</td>
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="dit_ring_attention.md">DiT Ring Attention</a></td>
+    <td class="tg-i1fi"><a href="parallel/dit_ring_attention.md">DiT Ring Attention</a></td>
     <td class="tg-fr9f">×</td>
     <td class="tg-fr9f">✓</td>
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="dit_usp.md">DiT USP</a></td>
+    <td class="tg-i1fi"><a href="parallel/dit_usp.md">DiT USP</a></td>
     <td class="tg-fr9f">×</td>
     <td class="tg-fr9f">✓</td>
   </tr>
   <tr>
     <td class="tg-citn">异构并行</td>
-    <td class="tg-i1fi"><a href="hetero_parallel.md">Hetero Parallel</a></td>
+    <td class="tg-i1fi"><a href="parallel/hetero_parallel.md">Hetero Parallel</a></td>
     <td class="tg-fr9f">×</td>
     <td class="tg-fr9f">✓</td>
   </tr>
@@ -77,43 +77,43 @@
   <tr>
     <td class="tg-t1fb" rowspan="2">显存优化</td>
     <td class="tg-citn">Offload</td>
-    <td class="tg-i1fi"><a href="async_activation_offload.md">Async Activation Offload</a></td>
+    <td class="tg-i1fi"><a href="memory/async_activation_offload.md">Async Activation Offload</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">✓</td>
   </tr>
   <tr>
     <td class="tg-citn">负载均衡</td>
-    <td class="tg-i1fi"><a href="online_data_rearrange.md">Online Data Rearrange</a></td>
+    <td class="tg-i1fi"><a href="memory/online_data_rearrange.md">Online Data Rearrange</a></td>
     <td class="tg-fr9f">×</td>
     <td class="tg-fr9f">✓</td>
   </tr>
   <tr>
     <td class="tg-t1fb" rowspan="2">优化特性</td>
     <td class="tg-citn" rowspan="2">loss优化</td>
-    <td class="tg-i1fi"><a href="chunkloss.md">Chunk Loss</a></td>
+    <td class="tg-i1fi"><a href="optimization/chunkloss.md">Chunk Loss</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">×</td>
   </tr>
   <tr>
-    <td class="tg-i1fi"><a href="vlm_model_loss_calculate_type.md">VLM Model Loss Calculate Type</a></td>
+    <td class="tg-i1fi"><a href="optimization/vlm_model_loss_calculate_type.md">VLM Model Loss Calculate Type</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">✓</td>
   </tr>
   <tr>
     <td class="tg-whwg" rowspan="4">训练模式</td>
     <td class="tg-citn" rowspan="2">高效微调</td>
-    <td class="tg-jajh"><a href="lora_finetune.md">LoRA微调（基于Mcore训练后端）</a></td>
+    <td class="tg-jajh"><a href="training_mode/lora_finetune.md">LoRA微调（基于Mcore训练后端）</a></td>
     <td class="tg-fr9f">×</td>
     <td class="tg-fr9f">✓</td>
   </tr>
   <tr>
-    <td class="tg-jajh"><a href="lora_finetune_fsdp2.md">LoRA微调（基于FSDP后端）</a></td>
+    <td class="tg-jajh"><a href="training_mode/lora_finetune_fsdp2.md">LoRA微调（基于FSDP后端）</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">×</td>
   </tr>
   <tr>
     <td class="tg-citn">数据处理</td>
-    <td class="tg-jajh"><a href="seqpack.md">SeqPack</a></td>
+    <td class="tg-jajh"><a href="data/seqpack.md">SeqPack</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">×</td>
   </tr>

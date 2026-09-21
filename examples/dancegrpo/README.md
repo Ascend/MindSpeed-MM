@@ -39,7 +39,7 @@ commit_id=2149f36f22db601f9dbf70472fea11576f62a0f6
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](../../docs/zh/pytorch/install_guide.md)
+请参考[安装指南](../../docs/zh/guides/installation/install_guide.md)
 
 <a id="jump1.1"></a>
 
@@ -62,7 +62,7 @@ cd ..
 
 ### 2. 环境搭建
 
-请参考[安装指南](../../docs/zh/pytorch/install_guide.md)创建Python环境并安装 torch 和 TorchNPU。
+请参考[安装指南](../../docs/zh/guides/installation/install_guide.md)创建Python环境并安装 torch 和 TorchNPU。
 
 ```bash
 conda activate test

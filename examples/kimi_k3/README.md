@@ -55,7 +55,7 @@ url=https://huggingface.co/moonshotai/Kimi-K3/tree/main
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/pytorch/install_guide.md)，完成昇腾软件安装。
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/master/docs/zh/guides/installation/install_guide.md)，完成昇腾软件安装。
 
 <a id="jump1.2"></a>
 
@@ -206,8 +206,8 @@ pip install -e . --no-build-isolation --no-deps
 
 ## 数据集准备及处理
 
-- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
-- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/building_data_for_VLModel.md#mock-data)。
+- 使用**真实数据集**训练：参考[针对VL模型的数据构造 · 使用真实数据集](../../docs/zh/features/data/building_data_for_VLModel.md#real-data)（下载COCO2017 → 下载LLaVA-Instruct-150K标注 → 运行转换脚本生成`mllm_format_llava_instruct_data.json`）。
+- 使用**虚构数据**做功能/性能测试：参考[针对VL模型的数据构造 · 使用虚构数据](../../docs/zh/features/data/building_data_for_VLModel.md#mock-data)。
 
 ## 训练
 
@@ -278,8 +278,8 @@ NODE_RANK: 当前节点序号
 | `skip_kda_recompute` | `model` | 跳过linear attention层KDA重计算 | 选择性重计算，需同时使能重计算和`enable_activation_offload` |
 | `recompute` | `features` | 重计算开关 | 开启后可以节省显存占用 |
 | `enable_activation_offload` | `features` | 激活值异步卸载到Host侧内存开关 | 开启后降低Device显存占用，`apply_modules`指定需要开启该特性的module |
-| `enable_chunk_loss` | `features` | chunkloss特性开关 | 需与`chunkloss_plan`关联使用，开启后大幅降低loss计算时的显存尖刺，详细说明请参考[chunkloss文档](../../docs/zh/features/chunkloss.md) |
-| `enable_chunk_mbs` | `features` | 是否开启chunkmbs特性 | 需与`chunkmbs_plan`关联使用，开启后将MicroBatch维度切分为多个微块依次计算，可压缩激活显存峰值并提升训练吞吐，详细说明请参考[chunkmbs文档](../../docs/zh/features/chunkmbs.md) |
+| `enable_chunk_loss` | `features` | chunkloss特性开关 | 需与`chunkloss_plan`关联使用，开启后大幅降低loss计算时的显存尖刺，详细说明请参考[chunkloss文档](../../docs/zh/features/optimization/chunkloss.md) |
+| `enable_chunk_mbs` | `features` | 是否开启chunkmbs特性 | 需与`chunkmbs_plan`关联使用，开启后将MicroBatch维度切分为多个微块依次计算，可压缩激活显存峰值并提升训练吞吐，详细说明请参考[chunkmbs文档](../../docs/zh/features/optimization/chunkmbs.md) |
 
 【数据目录配置】
 
@@ -307,14 +307,14 @@ NODE_RANK: 当前节点序号
 - 重计算
   - 在`features.recompute`配置，`true`表示开启，`false`表示关闭。
   - 开启后可以节省显存占用
-- [chunkloss](../../docs/zh/features/chunkloss.md)
+- [chunkloss](../../docs/zh/features/optimization/chunkloss.md)
   - 在`features.enable_chunk_loss`配置，`true`表示开启，`false`表示关闭
   - `features.chunkloss_plan.chunk_size`表示计算loss的时候在seq维度切分成大小为`chunk_size`的小块进行计算。
   - 开启后可以大幅降低loss计算时的显存尖刺，节省整体显存占用
-- [async activation offload](../../docs/zh/features/async_activation_offload.md)
+- [async activation offload](../../docs/zh/features/memory/async_activation_offload.md)
   - 在`features.enable_activation_offload`配置，`true`表示开启，`false`表示关闭
   - 开启后可以异步将重计算入口的激活值offload至host侧，在开启了重计算的场景下可以进一步节省显存。
-- [chunkmbs](../../docs/zh/features/chunkmbs.md)
+- [chunkmbs](../../docs/zh/features/optimization/chunkmbs.md)
   - 在`features.enable_chunk_mbs`配置，`true`表示开启，`false`表示关闭
   - `features.chunkmbs_plan.chunk_mbs`表示切分以后单次计算的`micro_batch_size`
   - 开启该特性时需要同时使能重计算和async activation offload特性，可以增加FSDP2单次unshard对应的计算密度，提高整网吞吐。
