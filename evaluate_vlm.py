@@ -1,7 +1,6 @@
 import os
 os.environ["USE_TF"] = "FALSE"
 import mindspeed.megatron_adaptor
-from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.training import get_args
 from megatron.training.initialize import initialize_megatron
 from mindspeed_mm.configs.config import merge_mm_args
@@ -11,10 +10,6 @@ from mindspeed_mm.patchs.patch_manager import PatchesManager
 from mindspeed_mm.tasks.evaluation.eval_datasets import eval_dataset_dict
 from mindspeed_mm.tasks.evaluation.eval_impl import eval_impl_dict, eval_pipeline_dict
 from mindspeed_mm.tasks.evaluation.eval_prompt import eval_model_prompt_dict
-mindspeed_args = get_mindspeed_args()
-
-if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
-    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def main():

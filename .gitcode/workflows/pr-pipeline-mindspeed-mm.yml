@@ -27,7 +27,7 @@ stages:
         name: CodeCheck_pre_commit
         runs-on: [ self-hosted, x86, cpu=32 ]
         container:
-          image: swr.cn-north-4.myhuaweicloud.com/mindspore/mindspore_python3.11:v0.1
+          image: swr.cn-north-4.myhuaweicloud.com/pytorch_images_x86/pytorchx86:v_03
         steps:
           - name: checkout
             uses: checkout
@@ -99,7 +99,7 @@ stages:
         select: selected_by_default
         runs-on: [ self-hosted, x86, cpu=32 ]
         container:
-          image: swr.cn-north-4.myhuaweicloud.com/mindspore/mindspore_python3.11:v0.1
+          image: swr.cn-north-4.myhuaweicloud.com/pytorch_images_x86/pytorchx86:v_03
         steps:
           - name: Compatibility_Interface
             run: |

@@ -10,7 +10,6 @@ from datasets import Dataset
 import torch
 
 import mindspeed.megatron_adaptor
-from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.core import mpu
 from megatron.core.enums import ModelType
 from megatron.core.num_microbatches_calculator import get_num_microbatches
@@ -27,9 +26,6 @@ from mindspeed_mm.utils.hetero_parallel import change_parallel_state, apply_hete
 from mindspeed_mm.utils.utils import EncoderBalanceComm
 from mindspeed_mm.utils.hetero_parallel import hetero_align_config
 from mindspeed_mm.utils.utils import compute_token_level_loss
-mindspeed_args = get_mindspeed_args()
-if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
-    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def model_provider(pre_process=True, post_process=True, modules=None):

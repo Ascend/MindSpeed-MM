@@ -42,7 +42,6 @@ if version.parse(transformers.__version__).major >= 5:
 spec = importlib.util.spec_from_file_location("config_loader", "mindspeed_mm/configs/read_yaml_config.py")
 spec.loader.exec_module(importlib.util.module_from_spec(spec))
 import mindspeed.megatron_adaptor
-from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.core import mpu
 from megatron.core.enums import ModelType
 from megatron.training import get_args, print_rank_0
@@ -55,10 +54,6 @@ from mindspeed_mm.data.dataloader.dataloader import PrefetchGradAccDataLoader
 from mindspeed_mm.data.dataloader.dynamic_batching_dataloader import DynamicBatchingDataLoader
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.models.transformers_model import TransformersModel
-
-mindspeed_args = get_mindspeed_args()
-if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
-    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def model_provider(*args, **kwargs):

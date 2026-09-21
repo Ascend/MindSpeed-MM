@@ -7,7 +7,6 @@ import torch
 import torch_npu
 
 import mindspeed.megatron_adaptor
-from mindspeed.megatron_adaptor import get_mindspeed_args
 from megatron.core import mpu
 from megatron.core.enums import ModelType
 from megatron.training import get_args, print_rank_0
@@ -28,10 +27,6 @@ from mindspeed_mm.data.data_utils.constants import (
 from mindspeed_mm.data.data_utils.utils import build_iterations
 from mindspeed_mm.models.sora_model import SoRAModel
 import mindspeed_mm.utils.dpcp_utils as dpcp
-mindspeed_args = get_mindspeed_args()
-
-if hasattr(mindspeed_args, "ai_framework") and mindspeed_args.ai_framework == "mindspore" and mindspeed_args.optimization_level >= 0:
-    import mindspeed_mm.mindspore.mindspore_adaptor
 
 
 def model_provider(pre_process=True, post_process=True):
