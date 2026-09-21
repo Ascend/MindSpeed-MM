@@ -490,6 +490,14 @@ class TrainEngine:
                         "at load: optimizer starts from scratch (cold Adam), which "
                         "may cause divergence. Set no_load_optim=true to acknowledge."
                     )
+            if "npu_rng_state" in state["extra_state"]:
+                try:
+                    import torch_npu
+                    torch_npu.npu.set_rng_state(state["extra_state"]["npu_rng_state"])
+                except ImportError:
+                    print_rank(logger.debug, "torch_npu not available, skipping device (NPU) RNG state restore")
+            else:
+                print_rank(logger.warning, "No device (NPU) RNG state found in checkpoint, device RNG not restored")
 
         # Synchronize all processes after loading
         torch.distributed.barrier()
@@ -542,6 +550,11 @@ class TrainEngine:
         state["extra_state"]["saved_optim"] = not args.training.no_save_optim
         if not args.training.no_save_rng:
             state["extra_state"]["torch_rng_state"] = torch.get_rng_state()
+            try:
+                import torch_npu
+                state["extra_state"]["npu_rng_state"] = torch_npu.npu.get_rng_state()
+            except ImportError:
+                print_rank(logger.debug, "torch_npu not available, skipping device (NPU) RNG state save")
         self.save_checkpointer.save(
             args.training.save,
             state=state,
