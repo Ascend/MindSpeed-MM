@@ -242,30 +242,6 @@ class LoraWeightManager:
             inference_mode=True,
         )
 
-    def save_full_model_with_lora(
-        self,
-        save_path: str,
-        iteration: Optional[int] = None,
-    ) -> None:
-        """Save full model including LoRA adapters.
-
-        This method saves the complete model state including both base
-        model weights and LoRA adapters. This is useful for checkpointing
-        during training.
-
-        Args:
-            save_path: Directory path to save the model.
-            iteration: Optional iteration number for checkpoint naming.
-
-        Note:
-            This method should be called through the training engine's
-            save method, which handles optimizer and scheduler state.
-        """
-        print_rank(
-            logger.info,
-            f"Saving full model with LoRA to {save_path}"
-        )
-
     def load_lora_weights(
         self,
         lora_path: str,
