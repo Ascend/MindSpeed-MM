@@ -149,6 +149,16 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
     npu-smi info
    ```
 
+4. 安装MindSpeed MM及其相关依赖，可通过[pyproject.toml](../../../../pyproject.toml)配置第三方依赖清单。
+
+      ```shell
+      pip install -e .
+      ```
+
+      > [!NOTE]
+      >
+      > 安装过程中若看到pip's dependency resolver ... dependency conflicts关于transformers版本的提示，属于已知现象，不影响MindSpeed MM的实际安装结果，可通过pip show mindspeed-mm验证。
+
 ### 方式二：源码安装
 
 安装MindSpeed MM有如下两种方式：
