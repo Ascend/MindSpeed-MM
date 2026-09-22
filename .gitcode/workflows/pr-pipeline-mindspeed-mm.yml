@@ -17,38 +17,24 @@ on:
 env:
   TARGET_BRANCH: ${{ atomgit.base_ref || 'master' }}
   pr_id: ${{ atomgit.event.pull_request.number || atomgit.event.issue.number || '0' }}
+  org_name: "Ascend"
+
+permissions:
+  project: read
+  repository: read
+  id-token: write
+  pr: write
+  note: write
+  action: read
 
 stages:
   stage1:
-    name: CodeCheck
+    name: only_doc
     select: selected_by_default
     jobs:
-      CodeCheck_pre_commit:
-        name: CodeCheck_pre_commit
-        runs-on: [ self-hosted, x86, cpu=32 ]
-        container:
-          image: swr.cn-north-4.myhuaweicloud.com/pytorch_images_x86/pytorchx86:v_03
-        steps:
-          - name: checkout
-            uses: checkout
-            with:
-              ref: refs/merge-requests/${{ env.pr_id }}/merge
-          - name: setup-python310
-            uses: setup-python
-            with:
-              python-version: "3.10.20"
-          - name: install gitleaks
-            run: |
-              cd ${ATOMGIT_WORKSPACE}
-              wget --no-host-directories -c --no-check-certificate https://pytorch-package.obs.cn-north-4.myhuaweicloud.com/pta-codecheck/gitleaks
-              chmod +x gitleaks
-              cd -
-          - name: pre-commit
-            uses: openlibing-pre-commit-action
-
       Detect_file_changes:
         name: Detect_file_changes
-        runs-on: [ self-hosted, x86, cpu=32 ]
+        runs-on: [ self-hosted, default, x86, cpu=16 ]
         container:
           image: swr.cn-north-4.myhuaweicloud.com/pytorch_images_x86/pytorchx86:v_03
         outputs:
@@ -67,7 +53,7 @@ stages:
               base: ${{ atomgit.event.pull_request.base.ref }}
               repo: ${{ atomgit.repository }}
               number: ${{ env.pr_id }}
-              token: ${{ atomgit.ATOMGIT_TOKEN }}
+              token: ${{ secrets.GIT_TOKEN }}
               list-files: json
               predicate-quantifier: every
               filters: |
@@ -94,12 +80,66 @@ stages:
                 echo "need_build_ut=no" >> "$ATOMGIT_OUTPUT"
               fi
 
+      associate_pr_comment:
+        name: associate_pr_comment
+        select: selected_by_default
+        runs-on: [ self-hosted, default, x86, cpu=16 ]
+        steps:
+          - name: associate-pr-comment
+            uses: associate-pr-comment
+          - name: pre_pipeline
+            id: pre_pipeline
+            uses: cann/.gitcode/actions/pre-pipeline@689551d6b29a77d8c2a005b8f1b3883db24820ef
+            with:
+              owner: ${{ env.org_name }}
+              repo: ${{ atomgit.event.repository.name }}
+              pr_number: ${{ atomgit.event.pull_request.number }}
+              token: ${{ secrets.GIT_TOKEN }}
+              apply_label: 'true'
+              run_url: https://gitcode.com/${{ env.org_name }}/${{ atomgit.event.repository.name }}/actions/runs/${{ atomgit.workflow_run_id }}
+
+
+  stage2:
+    name: CodeCheck
+    select: selected_by_default
+    jobs:
+      CodeCheck_pre_commit:
+        name: CodeCheck_pre_commit
+        if : ${{ jobs.Detect_file_changes.outputs.need_build_ut == 'yes' }}
+        runs-on: [ self-hosted, default, x86, cpu=16 ]
+        container:
+          image: swr.cn-north-4.myhuaweicloud.com/atlas-ci/common:latest
+        steps:
+          - name: checkout
+            uses: checkout
+            with:
+              ref: refs/merge-requests/${{ env.pr_id }}/merge
+              allow-unsafe-pr-checkout: true
+          - name: setup-python311
+            run: |
+              PYTHON_BIN=$(which python3.11 || which python3)
+              PYTHON_BIN_DIR=$(dirname "$PYTHON_BIN")
+              ln -sf "$PYTHON_BIN" "$PYTHON_BIN_DIR/python"
+              echo "$PYTHON_BIN_DIR" >> "$ATOMGIT_PATH"
+              python --version
+          - name: install gitleaks
+            run: |
+              cd ${ATOMGIT_WORKSPACE}
+              wget --no-host-directories -c --no-check-certificate https://pytorch-package.obs.cn-north-4.myhuaweicloud.com/pta-codecheck/gitleaks
+              chmod +x gitleaks
+              cd -
+          - name: Run pre-commit
+            uses: openlibing/pre-commit-action@v1.0.0
+            env:
+              SKIP: clang-tidy
+
       Compatibility_Interface:
         name: Compatibility_Interface
+        if : ${{ jobs.Detect_file_changes.outputs.need_build_ut == 'yes' }}
         select: selected_by_default
-        runs-on: [ self-hosted, x86, cpu=32 ]
+        runs-on: [ self-hosted, default, x86, cpu=16 ]
         container:
-          image: swr.cn-north-4.myhuaweicloud.com/pytorch_images_x86/pytorchx86:v_03
+          image: swr.cn-north-4.myhuaweicloud.com/atlas-ci/common:latest
         steps:
           - name: Compatibility_Interface
             run: |
@@ -150,7 +190,31 @@ stages:
               rm -rf ${TOOL_DIR}
               echo "API-Miner Success ..."
 
-  stage2:
+      sca-pr:
+        if : ${{ jobs.Detect_file_changes.outputs.need_build_ut == 'yes' }}
+        runs-on: [ self-hosted, default, x86, cpu=16 ]
+        steps:
+          - name: checkout
+            uses: checkout
+          - name: Run SCA PR scan
+            uses: openlibing/sca-action/sca-pr-action@v1.0.0
+            with:
+              project-name: MindSpeed
+
+      malicious-scan:
+        if : ${{ jobs.Detect_file_changes.outputs.need_build_ut == 'yes' }}
+        runs-on: [ self-hosted, default, x86, cpu=16 ]
+        steps:
+          - name: checkout
+            uses: checkout
+          - name: Run malicious code scan
+            uses: openlibing/malicious-code-scan-action/malicious-code-pr-scan-action@v1.0.0
+            with:
+              repository-name: ${{ atomgit.repository }}
+              pr-id: "${{ atomgit.event.pull_request.number }}"
+              project-name: MindSpeed
+
+  stage3:
     name: Test
     select: selected_by_default
     jobs:
@@ -199,3 +263,18 @@ stages:
               set -e
               echo "start mindspeed-mm st"
               bash ci/mm_ci_trigger.sh "${ATOMGIT_WORKSPACE}" "${{ env.pr_id }}" "${TARGET_BRANCH}" "st"
+
+post:
+  jobs:
+    query_pipeline:
+      steps:
+        - name: query_pipeline
+          id: query_pipeline
+          uses: cann/.gitcode/actions/query-pipeline@689551d6b29a77d8c2a005b8f1b3883db24820ef
+          with:
+            owner: ${{ env.org_name }}
+            repo: ${{ atomgit.event.repository.name }}
+            run_id: ${{ atomgit.workflow_run_id }}
+            token: ${{ secrets.GIT_TOKEN }}
+            pr_number: ${{ atomgit.event.pull_request.number }}
+            apply_label: 'true'
