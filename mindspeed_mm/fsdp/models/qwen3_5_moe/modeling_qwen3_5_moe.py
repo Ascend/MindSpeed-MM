@@ -1279,11 +1279,13 @@ class Qwen3_5MoeExperts(nn.Module):
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
 
         from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward, ep_mc2_forward, ep_allgather_forward
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_chunkmoe import ep_chunkmoe_forward
 
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
             "mc2": ep_mc2_forward,
-            "allgather": ep_allgather_forward
+            "allgather": ep_allgather_forward,
+            "chunkmoe": ep_chunkmoe_forward
         }
 
         if self.enable_ep_balance:
@@ -1293,13 +1295,8 @@ class Qwen3_5MoeExperts(nn.Module):
             if ep_plan.dispatcher in ["mc2", "allgather"]:
                 raise NotImplementedError("EP load balancing strategy currently only supports alltoall dispatch.")
 
-        if ep_plan.dispatcher in ep_dispatcher_dict:
-            dipatcher_func = ep_dispatcher_dict[ep_plan.dispatcher]
-            hidden_states = dipatcher_func(
-                self.num_experts,
-                top_k_weights,
-                top_k_index,
-                hidden_states,
+        def run_dispatcher(hidden_states, routing_weights, router_indices):
+            dispatcher_kwargs = dict(
                 fc1_weight=gate_up_proj,
                 fc2_weight=down_proj,
                 ep_group=ep_group,
@@ -1308,6 +1305,18 @@ class Qwen3_5MoeExperts(nn.Module):
                 seq_mask=kwargs.get("seq_mask", None),
                 skip_moe_pad_tokens=self.skip_moe_pad_tokens,
             )
+            if ep_plan.dispatcher == "chunkmoe":
+                dispatcher_kwargs["ep_plan"] = ep_plan
+            return dipatcher_func(
+                self.num_experts,
+                routing_weights,
+                router_indices,
+                hidden_states,
+                **dispatcher_kwargs,
+            )
+        if ep_plan.dispatcher in ep_dispatcher_dict:
+            dipatcher_func = ep_dispatcher_dict[ep_plan.dispatcher]
+            hidden_states = run_dispatcher(hidden_states, top_k_weights, top_k_index)
         else:
             raise NotImplementedError(f"EP dispatcher {ep_plan.dispatcher} is not implenmented for Qwen3.5 MoE.")
 
@@ -1349,19 +1358,25 @@ class Qwen3_5MoeSparseMoeBlock(nn.Module):
         self.shared_expert = Qwen3_5MoeMLP(config, intermediate_size=config.shared_expert_intermediate_size)
         self.shared_expert_gate = torch.nn.Linear(config.hidden_size, 1, bias=False)
 
-    def forward(self, hidden_states: torch.Tensor, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
+    def _shared_experts_forward(self, hidden_states_reshaped: torch.Tensor):
+        shared_expert_output = self.shared_expert(hidden_states_reshaped)
+        shared_expert_output = F.sigmoid(self.shared_expert_gate(hidden_states_reshaped)) * shared_expert_output
+        return shared_expert_output
+
+    def forward(self, hidden_states: torch.Tensor, residual: torch.Tensor, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
         batch_size, sequence_length, hidden_dim = hidden_states.shape
         hidden_states_reshaped = hidden_states.view(-1, hidden_dim)
-        shared_expert_output = self.shared_expert(hidden_states_reshaped)
+
         _, routing_weights, selected_experts = self.gate(hidden_states_reshaped)
         expert_output = self.experts(hidden_states_reshaped, selected_experts, routing_weights, **kwargs)
 
-        shared_expert_output = F.sigmoid(self.shared_expert_gate(hidden_states_reshaped)) * shared_expert_output
+        shared_expert_output = self._shared_experts_forward(hidden_states_reshaped)
 
         # NOTE: Replaced in-place += with out-of-place addition because the in-place operation
         # breaks the autograd graph during backward pass when enable_ep_balance is enabled.
         expert_output = expert_output + shared_expert_output
         expert_output = expert_output.reshape(batch_size, sequence_length, hidden_dim)
+        expert_output = residual + expert_output
         return expert_output
 
 
@@ -1475,25 +1490,18 @@ class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
             raise RuntimeError("chunk attention did not append its output cache")
         return output, *output_cache
 
-    def _forward_impl(
+    def _attention_forward(
         self,
         hidden_states: torch.Tensor,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
-        attention_mask: torch.Tensor | None = None,
-        position_ids: torch.LongTensor | None = None,
-        past_key_values: Cache | None = None,
-        cache_position: torch.LongTensor | None = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[tuple[torch.Tensor]] = None,
+        cache_position: Optional[torch.LongTensor] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> torch.FloatTensor:
-        bs, seq_len, _ = hidden_states.shape
-        ps = get_parallel_state()
-        if ps.is_ep_enable() and self.layer_idx == 0:
-            set_ep_rank_seq_lens(bs * seq_len, ep_group=ps.get_ep_group(), device=hidden_states.device)
-
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         residual = hidden_states
-
         hidden_states = self.input_layernorm(hidden_states)
-
         # Token Mixer
         if self.layer_type == "linear_attention":
             hidden_states = self.linear_attn(
@@ -1514,17 +1522,41 @@ class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
                 position_embeddings=position_embeddings,
                 **kwargs,
             )
-
         hidden_states = residual + hidden_states
-
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states, **kwargs)
+        return hidden_states, residual
+
+    def _forward_impl(
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        cache_position: torch.LongTensor | None = None,
+        **kwargs: Unpack[FlashAttentionKwargs],
+    ) -> torch.FloatTensor:
+        bs, seq_len, _ = hidden_states.shape
+        ps = get_parallel_state()
+        if ps.is_ep_enable() and self.layer_idx == 0:
+            set_ep_rank_seq_lens(bs * seq_len, ep_group=ps.get_ep_group(), device=hidden_states.device)
+
+        hidden_states, residual = self._attention_forward(
+                hidden_states,
+                position_embeddings,
+                attention_mask,
+                position_ids,
+                past_key_values,
+                cache_position,
+                **kwargs,
+            )
+
+        hidden_states = self.mlp(hidden_states, residual, **kwargs)
         # For the MoE layers, we need to unpack
         if isinstance(hidden_states, tuple):
             hidden_states, _ = hidden_states
-        hidden_states = residual + hidden_states
 
         return hidden_states
 

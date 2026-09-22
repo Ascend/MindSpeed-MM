@@ -46,9 +46,30 @@ class EPPlanConfig(BaseArguments):
     """Configuration for Expert Parallelism (EP) plan for MoE models."""
     apply_modules: List[str] = field(default_factory=list)
     use_npu_fused_ops: bool = True
-    dispatcher: Literal["alltoall", "allgather", "mc2"] = "alltoall"
+    dispatcher: Literal["alltoall", "allgather", "mc2", "chunkmoe"] = "alltoall"
     apply_efsdp_modules: List[str] = field(default_factory=list)
     _gradient_divide_factor: float = None
+
+    moe_chunk_size: int = field(
+        default=0,
+        metadata={"help": "Chunk size for chunked MoE dispatch; 0 means no chunking (the whole token sequence is one chunk)."}
+    )
+    moe_num_chunks: int = field(
+        default=0,
+        metadata={"help": "Fixed number of chunks for chunked MoE dispatch; chunk length is derived as ceil(num_tokens / moe_num_chunks) and tail chunks are padded empty so every EP rank has the same chunk count. 0 means disabled; mutually exclusive with moe_chunk_size."}
+    )
+    chunk_moe_recompute: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable Gradient Checkpointing (Activation Recomputation)."}
+    )
+
+    def model_post_init(self, __context):
+        if self.moe_chunk_size > 0 and self.moe_num_chunks > 0:
+            logger.warning(
+                "moe_chunk_size (%s) and moe_num_chunks (%s) are both set; "
+                "moe_num_chunks takes precedence and moe_chunk_size is ignored.",
+                self.moe_chunk_size, self.moe_num_chunks,
+            )
 
 
 class RecomputePlanConfig(BaseArguments):

@@ -53,7 +53,9 @@ def _build_checkpoint_context_fn(module, context_fn, mxfp8_ctx_fn):
     ctx_list = []
     if context_fn is not None:
         ctx_list.append(context_fn)
-    if mxfp8_ctx_fn is not None:
+    # mxfp8 low-precision recompute only marks module .forward, so it must not
+    # be attached when there is no owning module (method-level entries).
+    if mxfp8_ctx_fn is not None and module is not None:
         def _mxfp8_ctx(mod=module):
             return nullcontext(), mxfp8_ctx_fn(mod)
         ctx_list.append(_mxfp8_ctx)
@@ -71,9 +73,27 @@ def recompute_modules(model, plan, op_cache=None):
     # op_cache is the shared SwapCache from the SwapManager, required when op
     # replay is enabled.
     context_fn = build_op_replay_context_fn(model, plan.op_replay_scopes, plan.use_reentrant, op_cache)
-    modules = get_recompute_modules(model, plan.apply_modules)
+    specs = list(getattr(plan, "apply_modules", None) or [])
+
+    # Dispatch each entry: matches a module in the model tree → wrap .forward;
+    # otherwise treat as module-pattern.method_name (rpartition at last '.').
+    module_entries = []
+    method_entries = []
+    for entry in specs:
+        if any(module_name_match(entry, name) for name, _ in model.named_modules()):
+            module_entries.append(entry)
+        else:
+            method_entries.append(entry)
+
+    modules = get_recompute_modules(model, module_entries) if module_entries else []
+
     if context_fn is not None:
         _check_no_nested_checkpoints(modules)
+        if method_entries:
+            logger.warning(
+                "op replay does not support nested checkpoints: make sure no "
+                "method in apply_modules runs inside another apply_modules "
+                "checkpoint coverage")
 
     mxfp8_mark_fn, _ = _load_mxfp8_recompute_phase()
     for name, module in modules:
@@ -84,7 +104,43 @@ def recompute_modules(model, plan, op_cache=None):
             module.forward, plan.use_reentrant, context_fn,
             plan.flatten_inputs, module
         )
+    if method_entries:
+        logger.warning(
+            "low-precision recompute (mxfp8) does not support method-level "
+            "apply_modules entries; only module .forward is covered. "
+            f"Method entries {method_entries} will use standard recompute without "
+            "low-precision marking.")
+    for pattern in method_entries:
+        _apply_recompute_method(model, pattern, plan, context_fn)
+
     return model
+
+
+def _apply_recompute_method(model, pattern, plan, context_fn=None):
+    """Wrap a method on every module matching the prefix of *pattern*.
+    'model.layers.{*}._attention_forward' → module pattern 'model.layers.{*}',
+    method '_attention_forward'; setattr on each matched instance.
+    """
+    module_pattern, _, method_name = pattern.rpartition('.')
+    if not module_pattern or not method_name:
+        raise ValueError(
+            f'[Recompute] method entry must look like '
+            f"'module.pattern.method_name', got {pattern!r}")
+    matched = False
+    for name, module in model.named_modules():
+        if not module_name_match(module_pattern, name):
+            continue
+        method = getattr(module, method_name, None)
+        if method is None or not callable(method):
+            raise RuntimeError(
+                f'[Recompute] No callable method {method_name!r} on module {name!r}.')
+        print_rank(logger.info, f'Applying recompute to method: {name}.{method_name}')
+        setattr(module, method_name,
+                recompute_wrapper(method, plan.use_reentrant, context_fn,
+                                  plan.flatten_inputs))
+        matched = True
+    if not matched:
+        raise RuntimeError(f'[Recompute] No module named {module_pattern} (from {pattern!r}).')
 
 
 def _check_no_nested_checkpoints(modules):
@@ -164,7 +220,9 @@ def recompute_wrapper(function, use_reentrant, context_fn=None, flatten_inputs=F
 
     def wrapper(*args, **kwargs):
         if has_past_key_values:
-            kwargs['past_key_values'] = None  # transformers kv cache must be set None, or model use_cache=False
+            bound = sig.bind(*args, **kwargs)
+            bound.arguments['past_key_values'] = None
+            args, kwargs = bound.args, bound.kwargs
         ckpt_kwargs = {}
         if not use_reentrant:
             _, mxfp8_ctx_fn = _load_mxfp8_recompute_phase()

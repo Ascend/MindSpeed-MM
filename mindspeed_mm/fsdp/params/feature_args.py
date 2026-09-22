@@ -85,7 +85,14 @@ class OpReplayScopeConfig(BaseArguments):
 
 class RecomputePlanConfig(BaseArguments):
     """Configuration for recompute plan"""
-    apply_modules: List[str] = field(default_factory=list)
+    apply_modules: List[str] = field(
+        default_factory=list,
+        metadata={"help": "Recompute targets, auto-dispatched by format: "
+                          "(1) module name pattern like 'model.layers.{*}' → wrap .forward; "
+                          "(2) 'model.layers.{*}._attention_forward' → if the full pattern "
+                          "matches no module, split at the last '.' and wrap the method on "
+                          "each matched instance."},
+    )
     use_reentrant: bool = False
     op_replay_scopes: List[OpReplayScopeConfig] = field(
         default_factory=list,

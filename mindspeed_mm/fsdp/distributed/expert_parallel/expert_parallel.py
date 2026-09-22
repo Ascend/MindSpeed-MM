@@ -30,7 +30,7 @@ def expert_parallelize_modules(modules: torch.nn.Module, ep_mesh: DeviceMesh, pl
         if hasattr(module, 'ep_forward') and callable(module.ep_forward):
             module.forward = partial(module.ep_forward, ep_group=ep_group, ep_plan=plan)
         else:
-            experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=plan.use_npu_fused_ops, dispatcher=plan.dispatcher)
+            experts_forward_fn = get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=plan.use_npu_fused_ops, dispatcher=plan.dispatcher, plan=plan)
             module.forward = types.MethodType(experts_forward_fn, module)
 
     return modules
@@ -90,8 +90,9 @@ def apply_grad_division_hook(module, ep_size):
             grad_acc.register_hook(get_grad_division_hook(param, ep_size))
 
 
-def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher="alltoall"):
+def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher="alltoall", plan=None):
     from .ep_dispatcher import ep_forward, ep_mc2_forward, ep_allgather_forward
+    from .ep_chunkmoe import ep_chunkmoe_forward
 
     def experts_forward(self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor):
         batch_size = hidden_states.shape[0]
@@ -104,21 +105,30 @@ def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
             "mc2": ep_mc2_forward,
-            "allgather": ep_allgather_forward
+            "allgather": ep_allgather_forward,
+            "chunkmoe": ep_chunkmoe_forward,
         }
 
-        if dispatcher in ep_dispatcher_dict:
-            dipatcher_func = ep_dispatcher_dict[dispatcher]
-            hidden_states = dipatcher_func(
-                self.num_experts,
-                routing_weights,
-                router_indices,
-                hidden_states,
+        def run_dispatcher(hidden_states, routing_weights, router_indices):
+            dispatcher_kwargs = dict(
                 fc1_weight=gate_up_proj,
                 fc2_weight=down_proj,
                 ep_group=ep_group,
                 fused=fused,
             )
+            if dispatcher == "chunkmoe":
+                dispatcher_kwargs["ep_plan"] = plan
+            return dipatcher_func(
+                self.num_experts,
+                routing_weights,
+                router_indices,
+                hidden_states,
+                **dispatcher_kwargs,
+            )
+
+        if dispatcher in ep_dispatcher_dict:
+            dipatcher_func = ep_dispatcher_dict[dispatcher]
+            hidden_states = run_dispatcher(hidden_states, routing_weights, router_indices)
         else:
             raise NotImplementedError(f"ep dispatcher {dispatcher} is not implenmented now.")
 
