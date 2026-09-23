@@ -8,6 +8,7 @@ from .manager import (
     EnvironmentVariable,
     EnvironmentVariableManager,
     Validator,
+    parse_bool,
     parse_exact_true,
     validate_non_negative,
 )
@@ -132,6 +133,15 @@ _register(
     converter=int,
     description="Global rank that writes TensorBoard scalars.",
     validator=validate_non_negative,
+)
+_register(
+    name="GDN_SKIP_TRITON_AUTOTUNE",
+    default=False,
+    converter=parse_bool,
+    description=(
+        "Pin GDN triton kernels to the first autotune config and skip do_bench entirely "
+        "(env-only switch; the GDN kernels never run the autotune benchmark sweep when set)."
+    ),
 )
 
 _manager.validate_registry()

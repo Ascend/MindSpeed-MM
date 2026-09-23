@@ -789,7 +789,9 @@ def causal_conv1d_fwd_impl_old(
 
         NUM_CHKS = triton.cdiv(T, BT) * B
 
-    y = torch.empty_like(x)
+    # varlen: kernel writes only within segments — zero the padding tail (determinism /
+    # grad-path hygiene; see triton/convolution.py bwd dx note).
+    y = torch.zeros_like(x) if cu_seqlens is not None else torch.empty_like(x)
 
     grid = (NUM_CORES,)
 
@@ -857,7 +859,9 @@ def causal_conv1d_fwd_impl(
 
         NUM_CHKS = triton.cdiv(T, BT) * B
 
-    y = torch.empty_like(x)
+    # varlen: kernel writes only within segments — zero the padding tail (determinism /
+    # grad-path hygiene; see triton/convolution.py bwd dx note).
+    y = torch.zeros_like(x) if cu_seqlens is not None else torch.empty_like(x)
 
     grid = (NUM_CORES,)
 
@@ -945,7 +949,10 @@ def causal_conv1d_bwd_impl(
             cu_seqlens=cu_seqlens,
             output_final_state=False,
         )
-    dx = torch.empty_like(x)
+    # varlen: bwd kernel writes dx only within segments — the padding tail would stay
+    # uninitialized garbage and be returned as grad(x) (root cause of the scan-CP pack
+    # grad explosion). Zero-init in varlen.
+    dx = torch.zeros_like(x) if cu_seqlens is not None else torch.empty_like(x)
     dw = weight.new_empty(B * NT, W, D, dtype=torch.float) if weight is not None else None
     db = bias.new_empty(B * NT, *bias.shape, dtype=torch.float) if bias is not None else None
     dr = dy if residual is not None else None

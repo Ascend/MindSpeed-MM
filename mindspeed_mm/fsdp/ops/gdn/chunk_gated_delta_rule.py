@@ -9,6 +9,7 @@ import torch
 from mindspeed_mm.fsdp.utils.import_utils import IS_TRITON_AVAILABLE
 from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
 from mindspeed_mm.fsdp.features.memory.async_offload import OffloadManager, SwapTensor
+from mindspeed_mm.fsdp.ops.gdn.parallel_scan import CpInitStateStore
 from mindspeed_mm.fsdp.utils.device import get_current_stream
 
 if IS_TRITON_AVAILABLE:
@@ -38,6 +39,11 @@ def chunk_gated_delta_rule_fwd(
         output_final_state: bool,
         cu_seqlens: Optional[torch.LongTensor] = None,
         chunk_size: int = 64,
+        cp_group=None,
+        cp_rank: int = 0,
+        cp_size: int = 1,
+        cp_pre_num_ranks=None,
+        cp_is_first_rank=None,
 ):
     g = chunk_local_cumsum(g, chunk_size=chunk_size, cu_seqlens=cu_seqlens, head_first=False)
     # obtain WY representation. u is actually the new v.
@@ -62,6 +68,49 @@ def chunk_gated_delta_rule_fwd(
         g=g,
         cu_seqlens=cu_seqlens,
     )
+
+    # CP pre_process: compute [A_p, B_p] = [M, S_ext] and all_gather + merge for init_state
+    if cp_size > 1:
+        from mindspeed_mm.fsdp.ops.gdn.parallel_scan import compute_a_p_b_p, prefix_scan_compose
+        _B, _T, _H, _K = k.shape
+        _V = u.shape[-1]
+        # The last rank's [A_p, B_p] is never consumed by anyone (no rank j > last reads it),
+        # so computing it is wasted work. Send zeros in the all_gather instead.
+        if cp_rank < cp_size - 1:
+            # compute_a_p_b_p returns FLAT [1,H,K,K]/[1,H,K,V] (varlen) or [B,H,K,K]/[B,H,K,V]
+            # (fixed-length). The flat varlen shape keeps all_gather consistent across ranks
+            # (neat_packing gives each rank a different local segment count -> [N,...] would
+            # mismatch). _hm is [1,H,K,K+V] (varlen) or [_B,H,K,K+V] (fixed).
+            A_p, B_p = compute_a_p_b_p(k, w, u, g, chunk_size=chunk_size, cu_seqlens=cu_seqlens)
+            _hm = torch.cat([A_p, B_p], dim=-1).contiguous()  # [1|B,H,K,K+V]
+        else:
+            _hm = torch.zeros(_B, _H, _K, _K + _V, device=k.device, dtype=torch.float32)
+        # all_gather (no grad — inside Function.forward). Use all_gather_into_tensor (single
+        # contiguous buffer) instead of list+stack — saves cp_size allocations + 1 stack memcpy.
+        # Verified available on NPU/HCCL (ep_dispatcher.py uses the same op).
+        all_hm_stacked = torch.empty((cp_size,) + _hm.shape, dtype=_hm.dtype, device=_hm.device)
+        torch.distributed.all_gather_into_tensor(all_hm_stacked, _hm, group=cp_group)
+        all_A_p = all_hm_stacked[..., :_K]
+        all_B_p = all_hm_stacked[..., _K:]
+        # merge: S = 0; for j < rank: S = M_j @ S + S_ext_j (only compute this rank's state)
+        _merged = prefix_scan_compose(all_A_p, all_B_p, cp_rank,
+                                      pre_num_ranks=cp_pre_num_ranks, is_first_rank=cp_is_first_rank)
+        # Expand the flat merged state [1,H,K,V] into [N_local,H,K,V] at slot [0]: the
+        # cross-rank incoming state seeds ONLY the first segment (the continuation from the
+        # previous rank); all other segments start fresh (init=0). For fixed-length
+        # (cu_seqlens is None) _merged is already [B,H,K,V] with no N dim to expand — pass
+        # through as-is.
+        if cu_seqlens is not None and _merged is not None:
+            _N_local = len(cu_seqlens) - 1
+            if _N_local > 1:
+                _init_full = torch.zeros(_N_local, _H, _K, _V, device=k.device, dtype=_merged.dtype)
+                _init_full[0] = _merged.squeeze(0)
+                initial_state = _init_full
+            else:
+                initial_state = _merged  # N_local==1: [1,H,K,V], slot0==slot-1, no expand needed
+        else:
+            initial_state = _merged
+
     h, v_new, final_state = chunk_gated_delta_rule_fwd_h(
         k=k,
         w=w,
@@ -82,7 +131,7 @@ def chunk_gated_delta_rule_fwd(
         cu_seqlens=cu_seqlens,
         chunk_size=chunk_size,
     )
-    return g, o, A, final_state
+    return g, o, A, final_state, initial_state
 
 
 def chunk_gated_delta_rule_bwd(
@@ -98,6 +147,11 @@ def chunk_gated_delta_rule_bwd(
         dht: torch.Tensor,
         cu_seqlens: Optional[torch.LongTensor] = None,
         chunk_size: int = 64,
+        cp_group=None,
+        cp_rank: int = 0,
+        cp_size: int = 1,
+        cp_post_num_ranks=None,
+        cp_is_last_rank=None,
 ):
     w, u = recompute_w_u_fwd(
         k=k,
@@ -126,12 +180,64 @@ def chunk_gated_delta_rule_bwd(
         cu_seqlens=cu_seqlens,
         chunk_size=chunk_size,
     )
+    # CP backward pre_process: compute [dA_p, dB_p] = [dM, dS_ext] and all_gather + merge_bwd for dht
+    if cp_size > 1:
+        # An external dht (the autograd gradient of the returned final_state, i.e.
+        # output_final_state=True) is NOT yet supported under CP: the cross-rank
+        # merge below replaces dht wholesale, so the external contribution would be
+        # silently dropped and dq/dk/dv/db/dg would all be wrong. The modeling never
+        # combines CP with output_final_state (dht is None there); refuse loudly
+        # instead of computing wrong silently. (PR review, htwang.)
+        if dht is not None:
+            raise NotImplementedError(
+                "chunk_gated_delta_rule backward under CP (cp_size > 1) does not "
+                "support an external dht (output_final_state=True): the cross-rank "
+                "merge overwrites it. Do not combine output_final_state with "
+                "kvallgather scan CP."
+            )
+        from mindspeed_mm.fsdp.ops.gdn.parallel_scan import compute_da_p_db_p, prefix_scan_compose_bwd
+        _B, _T, _H, _K = k.shape
+        _V = do.shape[-1]
+        # The first rank's [dA_p, dB_p] is never consumed (no rank j < first reads it), so
+        # computing it is wasted work. Send zeros in the all_gather instead.
+        if cp_rank > 0:
+            dA_p, dB_p = compute_da_p_db_p(q, k, w, do, dv, g, scale, chunk_size=chunk_size, cu_seqlens=cu_seqlens)
+            _dhm = torch.cat([dA_p, dB_p], dim=-1).contiguous()
+        else:
+            _dhm = torch.zeros(_B, _H, _K, _K + _V, device=k.device, dtype=torch.float32)
+        all_dhm_stacked = torch.empty((cp_size,) + _dhm.shape, dtype=_dhm.dtype, device=_dhm.device)
+        torch.distributed.all_gather_into_tensor(all_dhm_stacked, _dhm, group=cp_group)
+        all_dA_p = all_dhm_stacked[..., :_K]
+        all_dB_p = all_dhm_stacked[..., _K:]
+        # backward merge: dht = 0; for j > rank (descending): dht = dM_j @ dht + dS_ext_j
+        _merged_dht = prefix_scan_compose_bwd(all_dA_p, all_dB_p, cp_rank, cp_size,
+                                       post_num_ranks=cp_post_num_ranks, is_last_rank=cp_is_last_rank)
+        # Mirror of the fwd expand: the flat merged dht [1,H,K,V] lands at slot [-1] (the
+        # spanning/outbound segment whose gradient flows back to the previous rank); all
+        # other segments get zero inbound gradient. For fixed-length (cu_seqlens is None)
+        # _merged_dht is already [B,H,K,V] — pass through.
+        if cu_seqlens is not None and _merged_dht is not None:
+            _N_local = len(cu_seqlens) - 1
+            if _N_local > 1:
+                _dht_full = torch.zeros(_N_local, _H, _K, _V, device=k.device, dtype=_merged_dht.dtype)
+                _dht_full[-1] = _merged_dht.squeeze(0)
+                dht = _dht_full
+            else:
+                dht = _merged_dht
+        else:
+            dht = _merged_dht
+        # Free CP bwd pre_process intermediates — consumed by prefix_scan_compose_bwd above.
+        del all_dhm_stacked, all_dA_p, all_dB_p
+        # dv is the LOCAL dv from chunk_bwd_dv_local. compute_da_p_db_p does NOT modify it
+        # (reads dv_c via reshape view only to form db_t). The cross-rank dv contribution
+        # is embedded in dB_p (dS_ext) → dht, propagated by bwd_dhu.
+
     dh, dh0, dv = chunk_gated_delta_rule_bwd_dhu(
         q=q,
         k=k,
         w=w,
         g=g,
-        h0=initial_state,
+        h0=initial_state if cp_size <= 1 else None,
         dht=dht,
         do=do,
         dv=dv,
@@ -139,6 +245,9 @@ def chunk_gated_delta_rule_bwd(
         cu_seqlens=cu_seqlens,
         chunk_size=chunk_size,
     )
+    # dht consumed by bwd_dhu above; free before per-token gradient kernels.
+    del dht
+
     dq, dk, dw, dg = chunk_bwd_dqkwg(
         q=q,
         k=k,
@@ -153,6 +262,8 @@ def chunk_gated_delta_rule_bwd(
         scale=scale,
         cu_seqlens=cu_seqlens,
     )
+    # h/v_new/w consumed by chunk_bwd_dqkwg above; free the headroom.
+    del h, v_new, w
     dk2, dv, db, dg2 = prepare_wy_repr_bwd(
         k=k,
         v=v,
@@ -171,6 +282,23 @@ def chunk_gated_delta_rule_bwd(
             f"dg current type is {dg.dtype} , should be float32"
         )
     dg = chunk_local_cumsum(dg, chunk_size=chunk_size, reverse=True, cu_seqlens=cu_seqlens, head_first=False)
+    # varlen padding zero-fill: GDN triton kernels write only real-token positions
+    # (chunk_indices + eos-bos masking), leaving torch.empty_like garbage at
+    # [num_real:local_T]. Two consumers read that tail: conv1d backward (its W-1-wide
+    # window past the real-token end overlaps REAL tokens under the SHIFTED cu_seqlens
+    # used in CP mode, _conv1d_cu_seqlens in the modeling files) and the A_log/dt_bias
+    # grads (d(A_log)=Σ dg·g over ALL positions). Zero the returned grads at padding
+    # to break both corruption chains (0×anything=0). Fixed-len (cu_seqlens=None):
+    # kernel writes all positions, block skipped.
+    if cu_seqlens is not None:
+        _nr = cu_seqlens[-1].item()
+        _Tl = q.shape[1]
+        if _nr < _Tl:
+            dq[:, _nr:_Tl].zero_()
+            dk[:, _nr:_Tl].zero_()
+            dv[:, _nr:_Tl].zero_()
+            db[:, _nr:_Tl].zero_()
+            dg[:, _nr:_Tl].zero_()
     return dq, dk, dv, db, dg, dh0
 
 
@@ -193,6 +321,13 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
             use_qk_l2norm_in_kernel: bool = False,
             chunk_size: int = 64,
             skip_recompute: bool = False,
+            cp_group=None,
+            cp_rank: int = 0,
+            cp_size: int = 1,
+            cp_pre_num_ranks=None,
+            cp_is_first_rank=None,
+            cp_post_num_ranks=None,
+            cp_is_last_rank=None,
     ):
         q_rstd, k_rstd = None, None
 
@@ -213,47 +348,56 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
 
             else:
                 layer_items_keys = OffloadManager().get_layer_items_keys(layer_idx)
-
                 swap_tensor_nums = 4 if output_final_state else 3
                 swap_tensors = []
-
                 for swap_key in reversed(layer_items_keys[-swap_tensor_nums:]):
                     swap_tensor = OffloadManager().get(swap_key)
                     swap_tensor.launch_h2d(h2d_stream)
                     get_current_stream().wait_event(swap_tensor.h2d_event)
-
                     swap_tensors.append(swap_tensor.tensor)
                     OffloadManager().clear(swap_key)
-
                 if output_final_state:
                     final_state, A, o, g = swap_tensors
                 else:
                     A, o, g = swap_tensors
                     final_state = None
+            # CP scan: restore the merged initial_state from its dedicated per-layer slot
+            # (see the stash site below for why the backward needs the exact merged value).
+            if cp_size > 1:
+                initial_state = CpInitStateStore().pop_cp_init_state(layer_idx)
+                # None is LEGITIMATE for the stream-first rank (cp_is_first_rank=True:
+                # no ranks precede it, the merged state is zero by definition and fwd
+                # stores it as None). For every OTHER rank None means the stash/pop
+                # pairing broke (chunk_mbs overwrite, inconsistent skip_recompute...):
+                # the fwd_h recompute would silently start from 0 and mis-compute
+                # dq/dk/dw/dg for the first chunks -- refuse loudly instead.
+                if initial_state is None and not cp_is_first_rank:
+                    raise RuntimeError(
+                        f"CpInitStateStore has no stashed initial_state for layer {layer_idx}: "
+                        "CP backward requires the merged state stashed in the forward pass."
+                    )
         else:
-            g, o, A, final_state = chunk_gated_delta_rule_fwd(
-                q=q,
-                k=k,
-                v=v,
-                g=g,
-                beta=beta,
-                scale=scale,
+            g, o, A, final_state, initial_state = chunk_gated_delta_rule_fwd(
+                q=q, k=k, v=v, g=g, beta=beta, scale=scale,
                 initial_state=initial_state,
                 output_final_state=output_final_state,
-                cu_seqlens=cu_seqlens,
-                chunk_size=chunk_size
+                cu_seqlens=cu_seqlens, chunk_size=chunk_size,
+                cp_group=cp_group, cp_rank=cp_rank, cp_size=cp_size,
+                cp_pre_num_ranks=cp_pre_num_ranks,
+                cp_is_first_rank=cp_is_first_rank,
             )
+            # `initial_state` is now the merged (prefix-composed) state computed inside fwd
+            # (None for cp_size<=1). The backward's fwd_h recompute needs this EXACT value —
+            # see the stash site below for the failure mode.
 
         if skip_recompute and training_stage == TrainingStage.FORWARD:
             swap_tensors = [g, o, A]
             if output_final_state:
                 swap_tensors.append(final_state)
-
             for swap_tensor in swap_tensors:
                 key, after_block = OffloadManager().get_cnt(layer_idx)
                 if after_block:
                     OffloadManager().del_npu_tensor("{}_".format(layer_idx - 1))
-
                 if layer_idx == depth - 1:
                     OffloadManager().put_npu_tensor(SwapTensor(swap_tensor, key))
                 else:
@@ -261,36 +405,51 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
                     swap_tensor.launch_d2h(d2h_stream)
                     OffloadManager().put(key, swap_tensor)
 
+            # CP scan: stash the merged initial_state in a DEDICATED per-layer slot (NOT the
+            # npu_item LIFO stack, which is shared with g/o/A/final_state and is order-sensitive
+            # — putting init_state on it would desync the pop order on the last-layer path).
+            # It is ~2MB fp32 [B,H,K,V], kept on NPU — far cheaper than re-running the CP
+            # forward pre_process (incl. the cross-rank all_gather). The backward's fwd_h
+            # recompute needs this EXACT value: without it cp_rank>0 recomputes h from 0 and
+            # dq/dk/dw/dg are wrong for the first ~1-2 chunks. cp_size<=1: no merged state.
+            if cp_size > 1:
+                CpInitStateStore().put_cp_init_state(layer_idx, initial_state)
+
         ctx.save_for_backward(q, q_rstd, k, k_rstd, v, g, beta, A, initial_state, cu_seqlens)
         ctx.scale = scale
         ctx.use_qk_l2norm_in_kernel = use_qk_l2norm_in_kernel
         ctx.chunk_size = chunk_size
+        ctx.cp_group = cp_group
+        ctx.cp_rank = cp_rank
+        ctx.cp_size = cp_size
+        ctx.cp_pre_num_ranks = cp_pre_num_ranks
+        ctx.cp_is_first_rank = cp_is_first_rank
+        ctx.cp_post_num_ranks = cp_post_num_ranks
+        ctx.cp_is_last_rank = cp_is_last_rank
         return o.to(q.dtype), final_state
 
     @staticmethod
     @input_guard
     @autocast_custom_bwd
-    def backward(
-            ctx,
-            do: torch.Tensor,
-            dht: torch.Tensor
-    ):
+    def backward(ctx, do: torch.Tensor, dht: torch.Tensor):
         q, q_rstd, k, k_rstd, v, g, beta, A, initial_state, cu_seqlens = ctx.saved_tensors
+
         dq, dk, dv, db, dg, dh0 = chunk_gated_delta_rule_bwd(
-            q=q,
-            k=k,
-            v=v,
-            g=g,
-            beta=beta,
-            A=A,
-            scale=ctx.scale,
-            initial_state=initial_state,
-            do=do,
-            dht=dht,
-            cu_seqlens=cu_seqlens,
-            chunk_size=ctx.chunk_size,
+            q=q, k=k, v=v, g=g, beta=beta, A=A,
+            scale=ctx.scale, initial_state=initial_state,
+            do=do, dht=dht,
+            cu_seqlens=cu_seqlens, chunk_size=ctx.chunk_size,
+            cp_group=ctx.cp_group, cp_rank=ctx.cp_rank, cp_size=ctx.cp_size,
+            cp_post_num_ranks=ctx.cp_post_num_ranks,
+            cp_is_last_rank=ctx.cp_is_last_rank,
         )
-        return dq.to(q), dk.to(k), dv.to(v), dg.to(g), db.to(beta), None, dh0, None, None, None, None, None
+
+        # 19 inputs: q,k,v,g,beta,scale,initial_state,output_final_state,cu_seqlens,
+        # use_qk_l2norm_in_kernel,chunk_size,skip_recompute,cp_group,cp_rank,cp_size,
+        # cp_pre_num_ranks,cp_is_first_rank,cp_post_num_ranks,cp_is_last_rank
+        return (dq.to(q), dk.to(k), dv.to(v), dg.to(g), db.to(beta),
+                None, dh0, None, None, None, None, None, None, None, None,
+                None, None, None, None)
 
 
 @torch.compiler.disable
@@ -307,7 +466,14 @@ def chunk_gated_delta_rule(
         cu_seqlens: Optional[torch.LongTensor] = None,
         chunk_size: int = 64,
         head_first: bool = False,
-        skip_recompute: bool = False
+        skip_recompute: bool = False,
+        cp_group=None,
+        cp_rank: int = 0,
+        cp_size: int = 1,
+        cp_pre_num_ranks=None,
+        cp_is_first_rank=None,
+        cp_post_num_ranks=None,
+        cp_is_last_rank=None,
 ):
     r"""
     Args:
@@ -426,6 +592,11 @@ def chunk_gated_delta_rule(
         q = l2norm(q, dim=-1, eps=1e-6)
         k = l2norm(k, dim=-1, eps=1e-6)
 
+    if cp_size > 1:
+        # CP scan mode: all_gather + merge happen inside Function.forward/backward (no_grad),
+        # so no autograd graph for all_gather. Gradient correctness via symmetric design.
+        initial_state = None  # CP computes init_state internally
+
     o, final_state = ChunkGatedDeltaRuleFunction.apply(
         q,
         k,
@@ -439,5 +610,12 @@ def chunk_gated_delta_rule(
         False,
         chunk_size,
         skip_recompute,
+        cp_group,
+        cp_rank,
+        cp_size,
+        cp_pre_num_ranks,
+        cp_is_first_rank,
+        cp_post_num_ranks,
+        cp_is_last_rank,
     )
     return o, final_state

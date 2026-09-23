@@ -7,7 +7,7 @@ import torch
 import triton
 import triton.language as tl
 
-from .utils import prepare_chunk_indices
+from .utils import prepare_chunk_indices, pin_autotune_configs
 
 
 @triton.heuristics({
@@ -104,11 +104,11 @@ def chunk_scaled_dot_kkt_fwd_kernel(
     'IS_VARLEN': lambda args: args['cu_seqlens'] is not None
 })
 @triton.autotune(
-    configs=[
+    configs=pin_autotune_configs([
         triton.Config({'BK': BK})
         for BK in [32, 64]
-    ],
-    key=["BC"]
+    ]),
+    key=["BC"],
 )
 @triton.jit(do_not_specialize=['T'])
 def chunk_scaled_dot_kkt_fwd_kernel_intra_sub_inter(
@@ -229,7 +229,7 @@ def chunk_scaled_dot_kkt_fwd_kernel_intra_sub_intra(
                 b_kt = tl.load(p_kt, mask=m_k, other=0).to(tl.float32)
                 b_gk = tl.load(p_gk, mask=m_k, other=0).to(tl.float32)
                 b_A = tl.sum(b_k * b_kt[None, :] * tl.exp(b_g - b_gk[None, :]), 1)
-                # 转化成f32
+                # cast to fp32
                 o_i_tmp = o_i.to(tl.float32)
                 b_A = tl.where(o_i_tmp > j, b_A, 0.)
 

@@ -583,7 +583,9 @@ def causal_conv1d_fwd_impl(
 
         NUM_CHKS = triton.cdiv(T, BT) * B
 
-    y = torch.empty_like(x)
+    # varlen: fwd kernel also writes only within segments — zero the padding tail for
+    # determinism. See the bwd dx note.
+    y = torch.zeros_like(x) if cu_seqlens is not None else torch.empty_like(x)
 
     grid = (NUM_CORES,)
 
@@ -706,7 +708,12 @@ def causal_conv1d_bwd_impl(
             cu_seqlens=cu_seqlens,
             output_final_state=False,
         )
-    dx = torch.empty_like(x)
+    # varlen (pack/CP): the bwd kernel writes dx only WITHIN segments; the pad_to_multiple_of
+    # tail beyond the last segment would stay uninitialized garbage and be returned as
+    # grad(x) -> step-1 grad explosion (root cause of the 2026-08-18 scan-CP pack NaN; see
+    # DEBUG_GRAD_EXPLOSION.md). Zero-init in varlen so padding grads are exactly 0.
+    # Fixed-len (cu_seqlens=None): kernel writes every position, empty_like is fine.
+    dx = torch.zeros_like(x) if cu_seqlens is not None else torch.empty_like(x)
     dw = weight.new_empty(B * NT, W, D, dtype=torch.float) if weight is not None else None
     db = bias.new_empty(B * NT, *bias.shape, dtype=torch.float) if bias is not None else None
     dr = dy if residual is not None else None

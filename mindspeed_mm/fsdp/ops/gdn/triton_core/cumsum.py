@@ -7,16 +7,18 @@ import torch
 import triton
 import triton.language as tl
 
+from ..triton.utils import pin_autotune_configs as _pin
+
 
 @triton.heuristics({
     'HAS_SCALE': lambda args: args['scale'] is not None,
     'IS_VARLEN': lambda args: args['cu_seqlens'] is not None
 })
 @triton.autotune(
-    configs=[
+    configs=_pin([
         triton.Config({}, num_warps=num_warps)
         for num_warps in [1, 2, 4, 8]
-    ],
+    ]),
     key=['B', 'H', 'BT', 'IS_VARLEN', 'REVERSE']
 )
 @triton.jit(do_not_specialize=['T'])

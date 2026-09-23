@@ -7,9 +7,7 @@ import torch
 import triton
 import triton.language as tl
 
-from .utils import prepare_chunk_indices, prepare_chunk_offsets, get_autotune_config, get_npu_properties
-
-CUBE_CORE_NUM = get_npu_properties()['num_aicore']
+from .utils import prepare_chunk_indices, prepare_chunk_offsets, get_autotune_config, pin_autotune_configs
 
 
 @triton.heuristics({
@@ -21,7 +19,7 @@ CUBE_CORE_NUM = get_npu_properties()['num_aicore']
     'IS_VARLEN': lambda args: args['cu_seqlens'] is not None,
 })
 @triton.autotune(
-    configs=get_autotune_config(multibuffer_list=(False,)),
+    configs=pin_autotune_configs(get_autotune_config(multibuffer_list=(False,))),
     key=['H', 'K', 'V', 'BT'],
 )
 @triton.jit(do_not_specialize=['T'])
@@ -258,6 +256,11 @@ def chunk_gated_delta_rule_fwd_h(
         N, NT, chunk_offsets = len(cu_seqlens) - 1, len(chunk_indices), prepare_chunk_offsets(cu_seqlens, BT)
     assert K <= 256, "current kernel does not support head dimension larger than 256."
 
+    # h is fully overwritten by the kernel (every [64, BV] tile is stored, never loaded),
+    # so allocating it in the final [B,H,NT,K,V] layout directly avoids a permute+contiguous
+    # copy of uninitialized garbage. byte-identical shape/stride/dtype/device vs the old
+    # `new_empty(B,NT,H,K,V).permute(0,2,1,3,4).contiguous()`. bwd_dhu (line 544) already
+    # allocates dh this way.
     h = k.new_empty(B, NT, H, K, V).permute(0, 2, 1, 3, 4).contiguous()
     final_state = k.new_empty(N, H, K, V, dtype=torch.float32) if output_final_state else None
 
@@ -303,7 +306,7 @@ def chunk_gated_delta_rule_fwd_h(
 @triton.autotune(
     # The multibuffer variant can issue out-of-range MTE accesses while
     # benchmarking long, stateful TND chunks on Ascend.
-    configs=get_autotune_config(multibuffer_list=(False,)),
+    configs=pin_autotune_configs(get_autotune_config(multibuffer_list=(False,))),
     key=['H', 'K', 'V', 'BT', 'BV', 'USE_G', 'IS_VARLEN'],
 )
 @triton.jit(do_not_specialize=['T'])
@@ -529,7 +532,6 @@ def chunk_gated_delta_rule_bwd_dhu(
     cu_seqlens: torch.LongTensor | None = None,
     chunk_size: int = 64,  # SY: remove this argument and force chunk size 64?
     chunk_indices: torch.LongTensor | None = None,
-    use_exp2: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     B, T, H, K, V = *q.shape, do.shape[-1]
     # N: the actual number of sequences in the batch with either equal or variable lengths

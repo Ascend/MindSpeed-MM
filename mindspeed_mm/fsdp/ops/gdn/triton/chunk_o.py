@@ -129,7 +129,10 @@ def chunk_bwd_kernel_dqkwg(
                 p_dw = tl.make_block_ptr(dw_h, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
                 tl.store(p_dw, -b_dw.to(p_dw.dtype.element_ty), boundary_check=(0, 1))
 
-            tl.debug_barrier()
+            # tl.debug_barrier() removed: the dw store (output buffer) and q/k load (input)
+            # are independent tensors with no RAW hazard, so the compiler can safely overlap
+            # them. The barrier was a debug leftover forcing a full-core sync per (chunk,head)
+            # iteration — NT*H stalls per bwd_dqkwg launch (~1.3-6.4ms/layer at BT=64).
 
             p_q = tl.make_block_ptr(q_h, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
             p_k = tl.make_block_ptr(k_h, (T, K), (H * K, 1), (i_t * BT, i_k * BK), (BT, BK), (1, 0))
@@ -506,7 +509,10 @@ def chunk_bwd_dv_local(
     NT = triton.cdiv(T, BT) if cu_seqlens is None else len(chunk_indices)
 
     g = g.transpose(1, 2).contiguous()
-    dv = torch.empty_like(do)
+    # varlen: kernel writes only real-token chunk positions — zero the padding tail (same
+    # empty_like-family hygiene as conv dx/y and GDN o; the padding garbage is benign for
+    # correctness (first-segment slice + bwd zero-fill) but pollutes non-finite probes).
+    dv = torch.zeros_like(do) if cu_seqlens is not None else torch.empty_like(do)
     grid = (NT, B)
     chunk_bwd_kernel_dv_local[grid](
         q=q,
@@ -550,7 +556,13 @@ def chunk_fwd_o(
     if scale is None:
         scale = k.shape[-1] ** -0.5
 
-    o = torch.empty_like(v)
+    # varlen: kernel writes only real-token chunk positions (cu_seqlens [bos,eos)); the
+    # pad_to_multiple_of tail [num_real:local_T] is left as empty_like uninitialized garbage.
+    # Under active_cp the conv1d runs cu_seqlens=None and reads ALL positions, so padding
+    # garbage propagates -> NaN. Zero-init o in varlen so padding stays 0 (z-gate zeroes the
+    # norm output anyway, so finite garbage is unaffected; NaN garbage is fixed). Fixed-len
+    # (cu_seqlens=None) keeps empty_like — the kernel overwrites every position, no garbage.
+    o = torch.zeros_like(v) if cu_seqlens is not None else torch.empty_like(v)
     if cu_seqlens is None:
         N, chunk_offsets = B, None
     else:

@@ -12,13 +12,15 @@ import logging
 from enum import Enum
 from functools import lru_cache
 from typing import Any, Callable, Optional
-from packaging import version
 
 import torch
 import triton
 import triton.language as tl
 import triton.language.extra.libdevice as tldevice
 import triton.runtime.driver as driver
+from packaging import version
+
+from mindspeed_mm.fsdp import envs
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +93,10 @@ def prepare_lens(cu_seqlens: torch.LongTensor) -> torch.LongTensor:
 
 @tensor_cache(maxsize=3)
 def prepare_chunk_indices(cu_seqlens: torch.LongTensor, chunk_size: int) -> torch.LongTensor:
-    indices = torch.cat([torch.arange(n) for n in triton.cdiv(prepare_lens(cu_seqlens), chunk_size).tolist()])
+    indices_list = [torch.arange(n) for n in triton.cdiv(prepare_lens(cu_seqlens), chunk_size).tolist()]
+    if not indices_list or all(t.numel() == 0 for t in indices_list):
+        return torch.zeros(0, 2, dtype=cu_seqlens.dtype, device=cu_seqlens.device)
+    indices = torch.cat(indices_list)
     return torch.stack([indices.eq(0).cumsum(0) - 1, indices], 1).to(cu_seqlens)
 
 
@@ -289,6 +294,20 @@ def check_shared_mem(arch: str = "none", tensor_idx: int = 0) -> bool:
         return max_shared_memory >= Backend.get_shared_memory(arch)
     except Exception:
         return False
+
+
+def pin_autotune_configs(configs):
+    """With the GDN_SKIP_TRITON_AUTOTUNE env var set, trim the configs LIST ITSELF
+    to a single entry.
+
+    The fork's autotuner (triton 3.2.0) gates on len(self.configs) > 1: a
+    single-entry list takes the else branch and never runs do_bench (zero bench
+    workspace / zero tuning time), whereas prune_configs_by still benchmarks each
+    surviving config (~15 GiB materialized at 1M pack). Without the env var,
+    full-config autotune (best performance)."""
+    if envs.get("GDN_SKIP_TRITON_AUTOTUNE"):
+        return configs[:1]
+    return configs
 
 
 def get_autotune_config(

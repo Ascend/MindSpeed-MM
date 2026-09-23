@@ -7,6 +7,8 @@ import torch
 import triton
 import triton.language as tl
 
+from ..triton.utils import pin_autotune_configs as _pin
+
 
 @triton.heuristics({
     'USE_G': lambda args: args['g'] is not None,
@@ -102,12 +104,12 @@ def chunk_scaled_dot_kkt_fwd_kernel(
     'IS_VARLEN': lambda args: args['cu_seqlens'] is not None
 })
 @triton.autotune(
-    configs=[
+    configs=_pin([
         triton.Config({'BK': BK}, num_warps=num_warps, num_stages=num_stages)
         for BK in [32, 64]
         for num_warps in [1, 2, 4, 8]
         for num_stages in [2, 3, 4]
-    ],
+    ]),
     key=["BC"]
 )
 @triton.jit(do_not_specialize=['T'])
@@ -238,7 +240,7 @@ def chunk_scaled_dot_kkt_fwd_kernel_intra_sub_intra(
                 b_kt = tl.load(p_kt, mask=m_k, other=0).to(tl.float32)
                 b_gk = tl.load(p_gk, mask=m_k, other=0).to(tl.float32)
                 b_A = tl.sum(b_k * b_kt[None, :] * tl.exp(b_g - b_gk[None, :]), 1)
-                # 转化成f32
+                # cast to fp32
                 o_i_tmp = o_i.to(tl.float32)
                 b_A = tl.where(o_i_tmp > j, b_A, 0.)
 
