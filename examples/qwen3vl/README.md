@@ -132,6 +132,8 @@ mm-convert Qwen3VLConverter hf_to_dcp \
 `dataset`配置为./data/video_data_path.json
 注意此时`dataset`需要配置为相对路径
 
+> **注意**：运行时会将`dataset_dir`与标注 JSON 中的媒体文件相对路径（如`./train2017/000000033471.jpg`）拼接，因此`dataset_dir`必须配置为**媒体文件实际所在目录的父目录**（如图片在`train2017/`下，`dataset_dir`应指向`train2017/`的父目录），否则会报`FileNotFoundError`找不到媒体文件。详见[VL模型数据准备](../../docs/zh/features/data/building_data_for_VLModel.md)。
+
 以Qwen3VL-xxB为例，`qwen3vl_full_sft_xxB.yaml`进行以下修改，注意`model_name_or_path`的权重路径为转换前的权重路径,即原始hf权重路径。
 
 **注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。

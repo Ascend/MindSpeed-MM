@@ -12,12 +12,12 @@
 
 ### 2.1. 数据集下载(以coco2017数据集为例)
 
-(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到本地路径，如`./data/COCO2017`。
+(1)用户需要自行下载COCO2017数据集[COCO2017](https://cocodataset.org/#download)，并解压到本地路径，如`./data/coco/COCO2017`。
   > [!NOTE]
   >
   > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
 
-(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至本地，如`./data/`路径下。
+(2)获取图片数据集的描述文件（[LLaVA-Instruct-150K](https://huggingface.co/datasets/liuhaotian/LLaVA-Instruct-150K/tree/main)），下载至本地，如`./data/coco/`路径下。
 
 下载得到的是原始格式数据，采用本地多模态 ShareGPT 风格的字段（示例见 2.3），使用前需参考 2.2 转换为训练实际读取的目标格式。
 
@@ -36,8 +36,8 @@ python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py \
 
 ```text
 ./data/
-└── coco/                                  # COCO数据集父目录（dataset_dir指向这里）
-    ├── COCO2017/                          # COCO 图像数据集（--coco_path 指向这里）
+└── coco/                                  # COCO数据集父目录（存放标注 json）
+    ├── COCO2017/                          # COCO 图像数据集（--coco_path 与 dataset_dir 均指向这里）
     │   ├── train2017/
     │   │   ├── 000000000001.jpg
     │   │   └── ...
@@ -53,8 +53,8 @@ python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py \
 data:
   dataset_param:
     basic_parameters:
-      # 将该字段修改为COCO2017所在路径
-      dataset_dir: ./data/coco
+      # 将该字段修改为COCO2017的路径（即train2017/val2017的父目录）；运行时会将该路径与标注 JSON 中的图片相对路径拼接
+      dataset_dir: ./data/coco/COCO2017
       # 将该字段修改为格式转换后json路径
       dataset: &DATASET_PATH ./data/coco/mllm_format_llava_instruct_data.json
       # 该参数用于限制只读取`max_samples`条数据，可用于快速验证功能，null即为全部数据
@@ -126,7 +126,7 @@ data:
 data:
   dataset_param:
     basic_parameters:
-      dataset_dir: ./data/coco  # 将该字段修改为COCO2017所在路径
+      dataset_dir: ./data/coco/COCO2017  # 将该字段修改为COCO2017的路径（即train2017/val2017的父目录）
       dataset: &DATASET_PATH ./data/coco/mllm_format_llava_instruct_data1.json,./data/coco/mllm_format_llava_instruct_data2.json  # 将该字段修改为格式转换后json路径
 ```
 

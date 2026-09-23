@@ -4,7 +4,7 @@ The current data processing approach is implemented with reference to the [LLaMA
 
 ## 1. Scope of Application
 
-The data construction method described in this document applies to most VL models in the repository, including [Qwen3.6](../../../examples/qwen3_6), [Qwen3.5](../../../examples/qwen3_5), [Qwen3VL](../../../examples/qwen3vl), [Qwen2.5VL](../../../examples/qwen2.5vl), [GLM4.5V](../../../examples/glm4.5v), [Kimi-K2.5](../../../examples/kimik2_5), and [Step3-VL](../../../examples/step3_vl). If a model has special data requirements (such as video, audio, etc.), its README shall prevail.
+The data construction method described in this document applies to most VL models in the repository, including [Qwen3.6](../../../examples/qwen3_6), [Qwen3.5](../../../examples/qwen3_5), [Qwen3VL](../../../examples/qwen3vl), [GLM4.5V](../../../examples/glm4.5v), [Kimi-K2.5](../../../examples/kimik2_5), and [Step3-VL](../../../examples/step3_vl). If a model has special data requirements (such as video, audio, etc.), its README shall prevail.
 
 <a id="real-data"></a>
 
@@ -39,7 +39,7 @@ Before starting training, modify the data configuration in `xxx_config.yaml`:
 data:
   dataset_param:
     basic_parameters:
-      # Change this field to the path where COCO2017 is located
+      # Change this field to the COCO2017 path, i.e. the parent directory of train2017/val2017 that image paths in the annotation JSON are resolved against
       dataset_dir: ./data/COCO2017
       # Modify this field to the JSON path after format conversion.
       dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
@@ -112,7 +112,7 @@ For example, in `xxx_config.yaml`:
 data:
   dataset_param:
     basic_parameters:
-      dataset_dir: ./data/COCO2017  # Modify this field to the path where COCO2017 is located
+      dataset_dir: ./data/COCO2017  # Change this field to the COCO2017 path, i.e. the parent directory of train2017/val2017
       dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data1.json,./data/mllm_format_llava_instruct_data2.json  # Modify this field to the JSON path after format conversion.
 ```
 

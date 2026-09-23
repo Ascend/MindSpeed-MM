@@ -285,10 +285,11 @@ NODE_RANK: 当前节点序号
 
 根据实际情况修改`kimik3_config.yaml`中的数据集路径，包括`model_name_or_path`、`dataset_dir`、`dataset`等字段。
 
-示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/mllm_format_llava_instruct_data.json，此时配置如下：
-`dataset_dir`配置为/home/user/data/;
-`dataset`配置为./data/mllm_format_llava_instruct_data.json
-注意此时`dataset`需要配置为相对路径
+示例：若按本文数据准备章节将图片解压到`/home/user/data/coco/COCO2017/train2017/`，并将转换后的标注文件保存为`/home/user/data/coco/mllm_format_llava_instruct_data.json`，此时配置如下：
+`dataset_dir`配置为`/home/user/data/coco/COCO2017`；
+`dataset`配置为`/home/user/data/coco/mllm_format_llava_instruct_data.json`。
+
+> **注意**：运行时会将`dataset_dir`与标注 JSON 中的图片相对路径（如`./train2017/000000033471.jpg`）拼接，因此`dataset_dir`必须配置为**图片实际所在目录的父目录**（即`train2017/`的父目录），否则会报`FileNotFoundError`找不到图片。详见[VL模型数据准备](../../docs/zh/features/data/building_data_for_VLModel.md)。
 
 【模块冻结配置】
 

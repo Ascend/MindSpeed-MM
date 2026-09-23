@@ -59,9 +59,9 @@ data:
       enable_thinking: false
       train_on_prompt: false
       mask_history: false
-      dataset_dir: /data
+      dataset_dir: /data/coco/COCO2017  # 运行时会将该路径与标注 JSON 中的媒体相对路径拼接（应指向train2017/等的父目录）
       # 性能测试建议按照readme数据准备章节构造vl数据
-      dataset: &DATASET_PATH /data/mllm_format_llava_instruct_data.json
+      dataset: &DATASET_PATH /data/coco/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false
       preprocess_on_fly: true
