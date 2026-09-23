@@ -71,7 +71,9 @@ cd MindSpeed-MM
 执行如下指令一键安装：
 
 ```bash
-bash scripts/install.sh --msbranch master && pip install tiktoken==0.12.0  transformers==4.56.2
+bash scripts/install.sh --msbranch master
+python -m pip install --upgrade --no-deps torch-npu==2.10.0.post6
+python -m pip install tiktoken==0.12.0 transformers==4.56.2
 ```
 
 ### 3. 安装配套版本的Triton-Ascend
@@ -91,9 +93,9 @@ pip install -e . --no-build-isolation --no-deps
 
 ### 4. 安装fla-npu以适配AscendC
 
-Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以及KDA算子（`kimi_delta_attention: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。注意：`kimi_delta_attention: ascendc` 算子当前仅支持ascend910_93, 暂不支持950系列（支持中）。
+Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以及 KDA 算子（`kimi_delta_attention: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。本文固定的 fla-npu commit 支持 A2、A3、A5；构建 wheel 时须按目标芯片选择 SoC：A2 使用 `ascend910b`，A3 使用 `ascend910_93`，A5 使用 `ascend950`。
 
-拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
+拉取flash-linear-attention-npu代码仓，并进入代码仓根目录
 
 ```bash
 git clone https://github.com/flashserve/flash-linear-attention-npu.git
@@ -101,7 +103,21 @@ cd flash-linear-attention-npu
 git checkout 3167fe36bd1
 ```
 
-安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/main/README.md)
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/3167fe36bd1d5b2bc1dc34b3594483383443a507/README.md)
+
+> **说明：** 请确保构建环境已安装 `gawk` 和 `cmake>=3.16`，否则后续环境检查或编译会失败。可参考以下命令安装：
+
+```shell
+# Ubuntu / Debian
+apt-get update
+apt-get install -y gawk
+# openEuler / CentOS / RHEL
+yum install -y gawk
+
+# 避免旧版系统软件源安装到低于 3.16 的 cmake
+python -m pip install "cmake>=3.16"
+cmake --version
+```
 
 推荐使用以下安装命令
 
@@ -109,22 +125,25 @@ git checkout 3167fe36bd1
 # source 实际的cann路径
 source /usr/local/Ascend/cann/set_env.sh
 
-# 编译算子 run 包，--soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
-bash build.sh --soc=ascend910_93 --pkg --vendor_name=fla_npu
-bash build_out/fla-npu-*.run
-cd torch_custom/fla_npu/
-bash build.sh
+python -m pip install -r requirements.txt
+python scripts/check_npu_env.py
 
-# 导入环境变量
-FLA_NPU_PATH=$(python3 -c "import fla_npu, os; print(os.path.dirname(fla_npu.__file__))")
-export ASCEND_CUSTOM_OPP_PATH="${FLA_NPU_PATH}/opp/vendors/fla_npu_transformer:${FLA_NPU_PATH}/opp/vendors/fla_npu_transformer/op_api/lib:${ASCEND_CUSTOM_OPP_PATH}"
+# 按训练设备选择目标 SoC：A2=ascend910b，A3=ascend910_93，A5=ascend950。
+# 以下命令以 A3 为例；A2/A5 请分别替换为 ascend910b/ascend950。
+FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
 
+# build_wheel.py 会输出本次构建 wheel 的准确路径和对应安装命令，复制执行该命令。
+# 必须使用输出中的准确文件名，避免通配符选中 dist/ 中的旧 wheel。
 ```
 
 检验fla_npu是否安装成功
 
 ```bash
-pip list | grep fla_npu
+# import fla_npu 成功表示 wheel 内嵌 OPP 和 op_api 可正常加载；显示 True 表示 Kimi-K3 所需接口齐全。
+python -c "import fla_npu; from fla_npu.ops import ascendc; names = ('chunk_fwd_o', 'chunk_kda_fwd', 'chunk_kda_bwd'); missing = [name for name in names if not hasattr(ascendc, name)]; assert not missing, f'missing fla-npu Kimi-K3 AscendC APIs: {missing}'; print('Kimi-K3 AscendC API check passed.')"
+
+# 显示Packaged wheel API check passed.
+python scripts/check_packaged_wheel_api.py
 ```
 
 ### 5. 安装ops-nn以适配AscendC版本SituGLU
