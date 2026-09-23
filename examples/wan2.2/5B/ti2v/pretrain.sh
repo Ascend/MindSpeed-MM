@@ -74,6 +74,8 @@ GPT_ARGS="
     --optimizer-selection fused_torch_adamw \
     --untie-embeddings-and-output-weights \
     --attention-mask-type general \
+    --manual-gc \
+    --manual-gc-interval=20 \
 "
 
 MM_ARGS="

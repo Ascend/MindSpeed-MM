@@ -57,6 +57,8 @@ gpt_args:
   no_gradient_accumulation_fusion: true
   untie_embeddings_and_output_weights: true
   no_masked_softmax_fusion: true
+  manual_gc: true
+  manual_gc_interval: 20
 
   ## data:
   num_workers: 8
