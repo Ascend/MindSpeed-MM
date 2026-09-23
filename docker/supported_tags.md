@@ -17,8 +17,8 @@ A full list of tags that are supported with MindSpeed MM.
 
 | Tag | Dockerfile | content |
 | --- | --- | --- |
-| `26.0.0-910b-openeuler24.03-py3.11-aarch64` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/docker/Dockerfile) | MindSpeed MM 26.0.0, CANN 9.0.0, TorchNPU 2.7.1.post6, 910B, openEuler 24.03, Python 3.11, aarch64 |
-| `26.0.0-a3-openeuler24.03-py3.11-aarch64` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/docker/Dockerfile) | MindSpeed MM 26.0.0, CANN 9.0.0, TorchNPU 2.7.1.post6, A3, openEuler 24.03, Python 3.11, aarch64 |
+| `26.0.0-910b-openeuler24.03-py3.11-aarch64` | / | MindSpeed MM 26.0.0, CANN 9.0.0, TorchNPU 2.7.1.post6, 910B, openEuler 24.03, Python 3.11, aarch64 |
+| `26.0.0-a3-openeuler24.03-py3.11-aarch64` | / | MindSpeed MM 26.0.0, CANN 9.0.0, TorchNPU 2.7.1.post6, A3, openEuler 24.03, Python 3.11, aarch64 |
 
 ## MindSpeed MM 2025.rc4
 

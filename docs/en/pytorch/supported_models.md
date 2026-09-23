@@ -235,7 +235,7 @@ This table shows the models supported by MindSpeed MM.
       <td> BF16 </td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="../../../examples/diffusers/sdxl">SDXL</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/diffusers/sdxl">SDXL</a></td>
       <td><a href="https://github.com/huggingface/diffusers/tree/5956b68a6927126daffc2c5a6d1a9a189defe288">3.5B</a></td>
       <td> Pre-training </td>
       <td> 1x8</td>
@@ -248,7 +248,7 @@ This table shows the models supported by MindSpeed MM.
       <td> FP16 </td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="../../../examples/diffusers/sd3">SD3.5</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/diffusers/sd3">SD3.5</a></td>
       <td><a href="https://github.com/huggingface/diffusers/tree/5f724735437d91ed05304da478f3b2022fe3f6fb"> 8.1B </a></td>
       <td> Full-parameter fine-tuning </td>
       <td> 1x8 </td>
@@ -261,42 +261,42 @@ This table shows the models supported by MindSpeed MM.
       <td> FP16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/diffusers/flux">Flux</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/diffusers/flux">Flux</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">12B</a></td>
       <td> Full-parameter fine-tuning </td>
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/diffusers/flux2">Flux2-T2I</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/diffusers/flux2">Flux2-T2I</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">32B</a></td>
       <td> Full-parameter fine-tuning </td>
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/diffusers/flux2">Flux2-I2I</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/diffusers/flux2">Flux2-I2I</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">32B</a></td>
       <td> Full-parameter fine-tuning </td>
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/diffusers/flux-kontext">Flux-Kontext</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/diffusers/flux-kontext">Flux-Kontext</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">12B</a></td>
       <td> Full-parameter fine-tuning </td>
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/diffusers/qwen_image">Qwen-Image</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/diffusers/qwen_image">Qwen-Image</a></td>
       <td><a href="https://github.com/huggingface/diffusers/blob/main/examples/dreambooth">27B</a></td>
       <td> LoRA fine-tuning </td>
       <td> 1x8 </td>
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/diffsynth/qwen_image_edit">Qwen-Image-Edit</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/diffsynth/qwen_image_edit">Qwen-Image-Edit</a></td>
       <td><a href="https://github.com/modelscope/Diffsynth-Studio/tree/main/examples/qwen_image">27B</a></td>
       <td> LoRA fine-tuning </td>
       <td> 1x8 </td>
@@ -372,7 +372,7 @@ This table shows the models supported by MindSpeed MM.
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/internvl3.5">InternVL 3.5</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/internvl3.5">InternVL 3.5</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL3_5-30B-A3B-Instruct">30B</a></td>
       <td> Fine-tuning </td>
       <td> 1x8 (A3)  </td>
@@ -398,7 +398,7 @@ This table shows the models supported by MindSpeed MM.
       <td> BF16 </td>
     </tr>
     <tr>
-      <td rowspan="4"><a href="../../../examples/qwen2.5vl">Qwen2.5-VL</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/qwen2.5vl">Qwen2.5-VL</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct">3B</a></td>
       <td> Fine-tuning </td>
       <td> 1x8 </td>
@@ -461,7 +461,7 @@ This table shows the models supported by MindSpeed MM.
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/qwen2.5omni">Qwen2.5-Omni</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/qwen2.5omni">Qwen2.5-Omni</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-Omni-7B">7B</a></td>
       <td> Fine-tuning </td>
       <td> 1x8 </td>
@@ -475,7 +475,7 @@ This table shows the models supported by MindSpeed MM.
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/magistral-2509">Magistral-Small-2509</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/magistral-2509">Magistral-Small-2509</a></td>
       <td><a href="https://huggingface.co/mistralai/Magistral-Small-2509">24B</a></td>
       <td> Fine-tuning </td>
       <td> 1x8 </td>

@@ -55,7 +55,7 @@ hetero-parallel（异构并行）通过解耦多模态模型的并行方案配�
                 "tp":1,
                 "pp":1,
                 "cp":1
-           },
+           }
         },
        "audio_encoder": {
             ...

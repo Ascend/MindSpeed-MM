@@ -55,7 +55,7 @@ For scenarios requiring PP (small MBS, large GAS, and a large number of LLM para
                 "tp":1,
                 "pp":1,
                 "cp":1
-           },
+           }
         },
        "audio_encoder": {
             ...
