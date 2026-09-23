@@ -34,6 +34,7 @@ class ParallelState(metaclass=Singleton):
     tensor_parallel_size: int = 1
     ring_attention_size: int = 1
     ulysses_parallel_size: int = 1
+    kvallgather_parallel_size: int = 1
 
     expert_parallel_size: int = 1
     expert_fully_shard_parallel_size: int = 1
@@ -46,14 +47,25 @@ class ParallelState(metaclass=Singleton):
         if self.device_mesh_map is None:
             self.device_mesh_map = dict()
 
-        # create DP/CP/Ulysses/TP groups
-        dp_shard_size = self.fully_shard_parallel_size // self.ring_attention_size // self.ulysses_parallel_size
+        # create DP/CP/Ulysses/KV-AllGather/TP groups
+        cp_size = self.ring_attention_size * self.ulysses_parallel_size * self.kvallgather_parallel_size
+        if self.fully_shard_parallel_size % cp_size != 0:
+            raise ValueError("fully_shard_parallel_size must be divisible by total CP size.")
+        dp_shard_size = self.fully_shard_parallel_size // cp_size
+        if self.data_parallel_size % dp_shard_size != 0:
+            raise ValueError("data_parallel_size must be divisible by dp_shard_size.")
         dp_replicate_size = self.data_parallel_size // dp_shard_size
-        # Define mesh dimensions and their sizes
-        mesh_dim_names = ("dp_replicate", "dp_shard", "ulysses", "ring", "tp")
+        # Define mesh dimensions and their sizes.
+        # NOTE: kvallgather is placed before ulysses so that the flattened cp group
+        # orders ranks as cp_rank = kvallgather*ulysses*ring + ulysses*ring + ring.
+        # With this ordering the ulysses subgroup gathers a CONTIGUOUS sequence block
+        # (so local Q is contiguous) and the kvallgather all-gather reconstructs the
+        # full K/V in natural sequence order -- both required for correct causal FA.
+        mesh_dim_names = ("dp_replicate", "dp_shard", "kvallgather", "ulysses", "ring", "tp")
         mesh_shape = (
             dp_replicate_size,
             dp_shard_size,
+            self.kvallgather_parallel_size,
             self.ulysses_parallel_size,
             self.ring_attention_size,
             self.tensor_parallel_size,
@@ -63,15 +75,16 @@ class ParallelState(metaclass=Singleton):
         # Flatten mesh dimensions to create hierarchical groups
         # Combine dp_replicate and dp_shard into dp (data parallel) group
         self.device_mesh[("dp_replicate", "dp_shard")]._flatten(mesh_dim_name="dp")
-        # Combine ulysses and ring into cp group
-        self.device_mesh[("ulysses", "ring")]._flatten(mesh_dim_name="cp")
-        # Combine dp_shard, ulysses, ring into dp_shard_cp group
-        self.device_mesh[("dp_shard", "ulysses", "ring")]._flatten(mesh_dim_name="dp_shard_cp")
+        # Combine all context-parallel dimensions into cp group.
+        # kvallgather outermost so kvallgather all-gather yields natural sequence order.
+        self.device_mesh[("kvallgather", "ulysses", "ring")]._flatten(mesh_dim_name="cp")
+        # Combine dp_shard and all context-parallel dimensions into dp_shard_cp group
+        self.device_mesh[("dp_shard", "kvallgather", "ulysses", "ring")]._flatten(mesh_dim_name="dp_shard_cp")
         # Combine all dp and cp dimensions into dp_cp group
-        self.device_mesh[("dp_replicate", "dp_shard", "ulysses", "ring")]._flatten(mesh_dim_name="dp_cp")
+        self.device_mesh[("dp_replicate", "dp_shard", "kvallgather", "ulysses", "ring")]._flatten(mesh_dim_name="dp_cp")
 
         # Register helper functions for all mesh dimensions
-        self.register_funcs(self.device_mesh, ["dp", "cp", "ulysses", "ring", "tp"])
+        self.register_funcs(self.device_mesh, ["dp", "cp", "ulysses", "kvallgather", "ring", "tp"])
 
 
         # create EP_DP/EP groups
@@ -86,7 +99,6 @@ class ParallelState(metaclass=Singleton):
 
         if torch.distributed.get_rank() == 0:
             logger.info(f'Parallel state initialized:\n {self.__str__()}')
-
     def __str__(self):
         info = ''
         for name, _ in self.device_mesh_map.items():
@@ -202,6 +214,7 @@ def init_parallel_state(
     tensor_parallel_size: int = 1,
     ring_attention_size: int = 1,
     ulysses_parallel_size: int = 1,
+    kvallgather_parallel_size: int = 1,
     expert_parallel_size: int = 1,
     expert_fully_shard_parallel_size: int = 1,
     expert_data_parallel_size: int = 1,
@@ -214,6 +227,7 @@ def init_parallel_state(
         tensor_parallel_size=tensor_parallel_size,
         ring_attention_size=ring_attention_size,
         ulysses_parallel_size=ulysses_parallel_size,
+        kvallgather_parallel_size=kvallgather_parallel_size,
         expert_parallel_size=expert_parallel_size,
         expert_fully_shard_parallel_size=expert_fully_shard_parallel_size,
         expert_data_parallel_size=expert_data_parallel_size

@@ -99,7 +99,10 @@ class ParallelArguments(BaseArguments):
 
     ring_attention_size: int = 1 # Size for Ring Attention
     ulysses_parallel_size: int = 1 # Size for Ulysses parallelism
-
+    # Size of the orthogonal CP group used to all-gather K/V after Ulysses.
+    # Total context parallel size is ulysses_parallel_size * kvallgather_parallel_size.
+    # Ring attention is intentionally not combined with kvallgather (mutually exclusive).
+    kvallgather_parallel_size: int = 1
     expert_parallel_size: int = field(
         default=1,
         metadata={"help": "Expert Parallel size for MoE models."}
@@ -140,11 +143,15 @@ class ParallelArguments(BaseArguments):
                 self.tensor_parallel_size
                 * self.ring_attention_size
                 * self.ulysses_parallel_size
+                * self.kvallgather_parallel_size
             )
             != 0
         ):
             raise ValueError(
-                f"World size should be a multiple of tensor_parallel_size: {self.tensor_parallel_size}, ulysses_parallel_size: {self.ulysses_parallel_size}, ring_attention_size: {self.ring_attention_size}."
+                f"World size should be a multiple of tensor_parallel_size: {self.tensor_parallel_size}, "
+                f"ulysses_parallel_size: {self.ulysses_parallel_size}, "
+                f"kvallgather_parallel_size: {self.kvallgather_parallel_size}, "
+                f"ring_attention_size: {self.ring_attention_size}."
             )
         if (
             self.world_size
@@ -162,19 +169,29 @@ class ParallelArguments(BaseArguments):
             self.tensor_parallel_size
             * self.ring_attention_size
             * self.ulysses_parallel_size
+            * self.kvallgather_parallel_size
         )
         if self.data_parallel_size is None:
             self.data_parallel_size = dp_size
 
         if self.data_parallel_size != dp_size:
-            raise ValueError(f"data_parallel_size should be equal to tensor_parallel_size: {self.tensor_parallel_size}, ulysses_parallel_size: {self.ulysses_parallel_size}, ring_attention_size: {self.ring_attention_size}.")
+            raise ValueError(
+                f"data_parallel_size should match world_size / (tp * ulysses * kvallgather * ring): "
+                f"tp={self.tensor_parallel_size}, ulysses={self.ulysses_parallel_size}, "
+                f"kvallgather={self.kvallgather_parallel_size}, ring={self.ring_attention_size}."
+            )
 
-        if self.fully_shard_parallel_size < self.ring_attention_size * self.ulysses_parallel_size:
-            raise ValueError("fully shard parallel size should be greater the ring_attention_size * ulysses_parallel_size.")
+        cp_size = self.ring_attention_size * self.ulysses_parallel_size * self.kvallgather_parallel_size
+        if self.fully_shard_parallel_size < cp_size:
+            raise ValueError("fully_shard_parallel_size should be >= ring_attention_size * ulysses_parallel_size * kvallgather_parallel_size.")
+        if self.fully_shard_parallel_size % cp_size != 0:
+            raise ValueError("fully_shard_parallel_size should be divisible by ring_attention_size * ulysses_parallel_size * kvallgather_parallel_size.")
         if self.tensor_parallel_size != 1:
             raise ValueError("Tensor parallel size not supported yet.")
         if self.ring_attention_size != 1 and not IS_NPU_AVAILABLE:
             raise ValueError("Ring Attention only support on NPU.")
+        if self.kvallgather_parallel_size != 1 and self.ring_attention_size != 1:
+            raise ValueError("KV AllGather does not support Ring Attention; should set ring_attention_size=1.")
 
         # edp=1 → FSDP；edp>1 → HSDP
         if self.world_size % (self.expert_fully_shard_parallel_size * self.expert_parallel_size * self.expert_data_parallel_size) != 0:

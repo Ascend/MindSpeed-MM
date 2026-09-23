@@ -12,7 +12,13 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 from ...distributed.parallel_state import get_parallel_state
 from ...utils.device import IS_NPU_AVAILABLE
 from ...distributed.context_parallel.utils import cal_split_sizes
-from ...distributed.context_parallel.communication import all_to_all
+from ...distributed.context_parallel.communication import (
+    all_to_all,
+    split_forward_gather_backward,
+)
+from ...distributed.context_parallel.kvallgather_context_parallel.kvallgather_context_parallel import (
+    kv_all_gather_attention_qkv,
+)
 from .skip_recompute_flash_attn import skip_recompute_flash_attention
 
 if IS_NPU_AVAILABLE:
@@ -24,6 +30,7 @@ if IS_NPU_AVAILABLE:
 
 
 logger = logging.getLogger(__name__)
+
 _flash_attention_forward = None
 
 
@@ -147,14 +154,14 @@ def do_ring_attention(
     cp_para["megatron_cp_in_bnsd"] = fa_layout.upper() == "BNSD"
 
     if fa_layout.upper() == "SBH" or fa_layout.upper() == "BNSD":
-        # 输入shapes是一维list
+        # input shapes is a 1-D list
         if seq_split_lens is not None:
             seq_split_lens = seq_split_lens.cpu().tolist()
         output = ringattn_context_parallel(
             q, k, v, head_num, cp_para, softmax_scale, attn_mask, dropout_p, shapes=seq_split_lens
         )
     elif not is_causal and fa_layout.upper() == "TND":
-        # 输入shapes是二维tensor
+        # input shapes is a 2-D tensor
         output = ringattn_context_parallel_tnd_general(
             q, k, v, head_num, cp_para, softmax_scale, attn_mask, dropout_p, shapes=seq_split_lens
         )
@@ -166,6 +173,87 @@ def do_ring_attention(
         )
 
     return output
+
+
+def _npu_fa_chunked_varlen_attention(
+    query,
+    key,
+    value,
+    q_head_num,
+    layout,
+    attention_mask,
+    cu_seq_lens_q,
+    scaling,
+    dropout,
+    chunk_tokens,
+    sparse_mode,
+):
+    """Sample-aligned chunked npu_fusion_attention calls for packed varlen
+    (features.fa_varlen_chunk_tokens).
+    Motivation: in gather-full-Q exact mode every rank passes the FULL
+    sequence Q at once (~2GiB at 512K pack); the backward's
+    aclnnFlashAttentionUnpaddingScoreGrad workspace scales with it
+    (~7GiB) and OOMs directly.
+    Approach: packed samples are mutually independent (per-sample causal,
+    cu segments by sample), so split the single full-sequence call into
+    whole-sample-group sub-calls -- each sub-call only needs that
+    group's Q/K/V (no prefix needed: samples are independent!),
+    and the workspace drops linearly with chunk size.
+    Mathematical equivalence: the varlen kernel already processes
+    segments independently; each segment's Q/K/V rows and boundaries
+    are identical to the single call (sparse_mode=3's bottom-right
+    offset = S_k-S_q = 0 in both); torch.split/cat autograd backward
+    is a single contiguous buffer per side, no per-chunk zero-padding sums.
+    """
+    cu = [int(v) for v in cu_seq_lens_q]  # [0, s1, ..., sN(=padded total)]
+    # Greedily close a chunk at sample ends (v > bounds[-1] avoids
+    # empty chunks from duplicate cu values)
+    bounds = [0]
+    for v in cu[1:]:
+        if v > bounds[-1] and v - bounds[-1] >= chunk_tokens:
+            bounds.append(v)
+    if bounds[-1] != cu[-1]:
+        bounds.append(cu[-1])
+    sizes = [bounds[i + 1] - bounds[i] for i in range(len(bounds) - 1)]
+    q_parts = torch.split(query, sizes, dim=0)
+    k_parts = torch.split(key, sizes, dim=0)
+    v_parts = torch.split(value, sizes, dim=0)
+    # Preallocate the full output + per-chunk in-place copy_: NOT
+    # torch.cat(outs) -- at the end cat would hold [all chunk outputs]
+    # + [the concat result] simultaneously (~4 GiB each at 1M pack), one
+    # whole extra output vs the old single call. With
+    # preallocation the peak = full output + one chunk (~1/16), and each
+    # chunk's kernel output is released right after its copy_. copy_ is
+    # pure data movement; for disjoint slices, autograd routes each
+    # slice's gradient back to its chunk correctly (equal to cat).
+    attn_output = torch.empty(
+        query.shape[0], query.shape[1], query.shape[2],
+        dtype=query.dtype, device=query.device,
+    )
+    for i in range(len(sizes)):
+        # Sample ends within this chunk (relative to chunk start);
+        # the last chunk's final segment includes padding
+        seg_ends = [v - bounds[i] for v in cu if bounds[i] < v <= bounds[i + 1]]
+        cu_chunk = [0] + seg_ends
+        attn_output.narrow(0, bounds[i], sizes[i]).copy_(
+            torch_npu.npu_fusion_attention(
+                q_parts[i],
+                k_parts[i],
+                v_parts[i],
+                q_head_num,
+                layout,
+                pse=None,
+                padding_mask=None,
+                atten_mask=attention_mask,
+                actual_seq_qlen=cu_chunk,
+                actual_seq_kvlen=cu_chunk,
+                scale=scaling,
+                keep_prob=1 - dropout,
+                inner_precise=0,
+                sparse_mode=sparse_mode,
+            )[0]
+        )
+    return attn_output
 
 
 def flash_attention_forward(
@@ -436,7 +524,28 @@ def flash_attention_forward(
         return attn_output, None
 
     else:
-        if is_ulysses_enabled and not skip_ulysses:
+        # KV AllGather applies to the (causal) text full-attention layers, whose input
+        # is cp-split.  Vision attention is non-causal and its packed data is split over
+        # the ulysses group only (packed_data_*_with_cp) -- it is replicated across the
+        # kvallgather group and gathered back to full before merging into the text stream,
+        # so it stays on the plain Ulysses path below.
+        is_kvallgather_enabled = ps.is_kvallgather_enable() if dist.is_initialized() else False
+        is_kvag = is_kvallgather_enabled and not skip_ulysses and is_causal
+        # packed varlen under kvag: gather-full-Q exact mode (set by kv_all_gather_attention_qkv)
+        _kvag_varlen = False
+        if is_kvag:
+            (query, key, value, seq_len, q_head_num,
+             kv_group, _kv_split_sizes, _kvag_varlen,
+             cu_seq_lens_q, cu_seq_lens_k) = kv_all_gather_attention_qkv(
+                query, key, value,
+                head_dim_index=head_dim_index,
+                seq_dim_index=seq_dim_index,
+                total_seq_len=total_seq_len,
+                is_causal=is_causal,
+                cu_seq_lens_q=cu_seq_lens_q,
+                cu_seq_lens_k=cu_seq_lens_k,
+            )
+        elif is_ulysses_enabled and not skip_ulysses:
             # ulysses a2a
             query = all_to_all(
                 query,
@@ -484,13 +593,44 @@ def flash_attention_forward(
             if attention_mask is None and is_causal:
                 attention_mask = get_attn_mask(device=query.device)
 
-            # Check if the attention mask is valid
+            # Check if the attention mask is valid.
             if attention_mask is not None and (
                 attention_mask.ndim != 2 or attention_mask.shape[0] != attention_mask.shape[1]
             ):
                 attention_mask = get_attn_mask(device=query.device) if is_causal else None
 
-            if skip_flash_attn_recompute:
+            # features.fa_varlen_chunk_tokens (default 0 = off): per-sub-call token budget for
+            # splitting the packed-varlen full-sequence FA into sample-group sub-calls, bounding
+            # the backward grad workspace (scales with full Q length). See _npu_fa_chunked_varlen_attention.
+            _varlen_chunk_tokens = kwargs.get("fa_varlen_chunk_tokens", 0)
+            _fa_chunk_active = (
+                _kvag_varlen
+                and not skip_flash_attn_recompute
+                and _varlen_chunk_tokens > 0
+                and cu_seq_lens_q is not None
+                # The chunked impl below is written for the 3-D TND layout
+                # (torch.split/narrow on dim=0 = time). Other layouts would split
+                # the batch/head axis instead -- fall back to the single full call.
+                and input_layout == "1TND"
+                # Chunking requires identical q/k segment bounds (the premise that
+                # in-chunk K/V share Q's range). The kvag packed path currently
+                # passes the same cu for q/k; a mismatch means an unexpected call
+                # shape -- fall back to the single full call rather than compute wrong silently.
+                and cu_seq_lens_q == cu_seq_lens_k
+            )
+            if _fa_chunk_active:
+                attn_output = _npu_fa_chunked_varlen_attention(
+                    query, key, value,
+                    q_head_num=q_head_num,
+                    layout=layout,
+                    attention_mask=attention_mask,
+                    cu_seq_lens_q=cu_seq_lens_q,
+                    scaling=scaling,
+                    dropout=dropout,
+                    chunk_tokens=_varlen_chunk_tokens,
+                    sparse_mode=3 if is_causal else 0,
+                )
+            elif skip_flash_attn_recompute:
                 attn_output = skip_recompute_flash_attention(
                     query,
                     key,
@@ -554,12 +694,23 @@ def flash_attention_forward(
                 **kwargs,
             )
 
-        # Ulysses: attention a2a
-        if is_ulysses_enabled and not skip_ulysses:
+        # Ulysses: attention a2a (inverse) -- restore full heads on the local sequence shard.
+        # For KV AllGather local-Q, the output is already the local S/kv shard (Q was
+        # local), so the inverse ulysses a2a alone yields the local S/cp shard.
+        if is_kvag or (is_ulysses_enabled and not skip_ulysses):
             if use_npu_fusion_fa and input_layout in ["1NTD"]:
                 # attn_output layout: TND
                 seq_dim_index = 1
                 head_dim_index = 2
+            if _kvag_varlen:
+                # packed varlen mode: output is the FULL sequence (replicated across the kv
+                # group) — take this rank's Q block back out. Forward split / backward
+                # all_gather (blocks disjoint => concat == sum; grad_scale=None — see above),
+                # feeding Q's split-backward on the gather side.
+                attn_output = split_forward_gather_backward(
+                    attn_output, kv_group, dim=seq_dim_index,
+                    split_sizes=_kv_split_sizes, grad_scale=None,
+                )
             attn_output = all_to_all(
                 attn_output, ps.get_ulysses_group(), scatter_dim=seq_dim_index, gather_dim=head_dim_index
             )

@@ -392,7 +392,14 @@ def _split(
 
     # Get the part corresponding to the current rank
     rank = dist.get_rank(pg)
-    output = tensor_list[rank].contiguous()
+    # clone, not contiguous: with B=1 a chunk sliced along dim (e.g. [1,s,D]) is
+    # "natively contiguous" because size-1 dims are exempt from the contiguity
+    # check, so contiguous() returns a VIEW without copying -- and a view pins the
+    # source tensor's whole storage (at 1M pack a single 1/64 shard view kept the
+    # full ~10 GiB inputs_embeds alive). clone forces an independent storage so the
+    # source is reclaimable as soon as the caller rebinds; the copy cost is one
+    # shard (1/64 ~= 160 MiB). Numerics: pure copy, bitwise identical.
+    output = tensor_list[rank].clone()
 
     return output
 
@@ -426,13 +433,83 @@ def _gather(input_: torch.Tensor,
 
     input_ = input_.contiguous()
 
-    # Prepare the output list with appropriate shapes
     if gather_sizes:
+        sizes = [int(s) for s in gather_sizes]
+        rank = dist.get_rank(pg)
+        my_size = input_.size(dim)
+        # Caller contract: this rank's input length along dim == sizes[rank]
+        # (split/gather sizes are computed from the same metadata on every rank).
+        # A mismatch is a caller bug -- raise explicitly instead of silently
+        # padding out a wrong result (the old impl died in all_gather's shape check).
+        if my_size != sizes[rank]:
+            raise ValueError(
+                f"_gather: local dim={my_size} != sizes[{rank}]={sizes[rank]} "
+                f"(sizes={sizes}); gather_sizes inconsistent with the actual input"
+            )
+        if len(set(sizes)) != 1:
+            # Unequal lengths: torch.distributed.all_gather requires identical
+            # buffer shapes across ranks; the old impl raised RuntimeError here.
+            # Instead: pad to the group max -> symmetric all_gather -> slice to the
+            # true lengths and concat. Pure data movement numerically: padding rows
+            # exist only during communication and are sliced off before the concat,
+            # bitwise identical to "what all_gather would return if it supported
+            # unequal lengths". The equal case always takes the original path below;
+            # this branch only makes previously-crashing configs work (unequal
+            # split_sizes when vision subsequence lengths are not multiples of
+            # ulysses_size; see the vision image-DP partition in the qwen3_5
+            # modeling files).
+            max_size = max(sizes)
+            if max_size == 0:
+                # Whole group empty: all ranks share the same sizes (same
+                # metadata) -> consistently skip the communication
+                return torch.cat(
+                    [input_.narrow(dim, 0, 0) for _ in range(world_size)], dim=dim
+                ).contiguous()
+            pad_shape = list(input_.shape)
+            pad_shape[dim] = max_size
+            padded = torch.zeros(pad_shape, dtype=input_.dtype, device=input_.device)
+            padded.narrow(dim, 0, my_size).copy_(input_)
+            buffers = [
+                torch.empty(pad_shape, dtype=input_.dtype, device=input_.device)
+                for _ in range(world_size)
+            ]
+            torch.distributed.all_gather(buffers, padded, group=pg)
+            return torch.cat(
+                [buffers[i].narrow(dim, 0, sizes[i]) for i in range(world_size)], dim=dim
+            ).contiguous()
+        # Equal lengths: the original path, bitwise identical to the old behavior
+        _equal_sizes = sizes
+    else:
+        _equal_sizes = None
+
+    _d = dim if dim >= 0 else input_.ndim + dim
+    _my_len = input_.size(_d)
+    _total = sum(_equal_sizes) if _equal_sizes else _my_len * world_size
+    if (
+        hasattr(torch.distributed, "all_gather_into_tensor")
+        and (_d == 0 or all(x == 1 for x in input_.shape[:_d]))
+    ):
+        # Single-buffer all_gather + view relayout: the old path kept [world_size
+        # receive buffers] + [the cat result] -- the same data resident twice
+        # (~20 GiB extra at 1M pack, where the full inputs_embeds gradient is
+        # ~10 GiB). all_gather_into_tensor writes every rank's shard directly into
+        # one contiguous output at its rank-segmented position; when all dims before
+        # `dim` are 1 (e.g. [1, s, D] split along dim=1) that segmented layout is
+        # exactly the flat layout of the target [1, K*s, D] -> the reshape is a
+        # zero-copy view. Numerically the same pure data movement, bitwise equal to cat.
+        _lead = list(input_.shape[:_d])
+        _rest = list(input_.shape[_d + 1:])
+        _in_flat = input_.reshape(_my_len, *_rest) if _lead else input_
+        _out = torch.empty([_total] + _rest, dtype=input_.dtype, device=input_.device)
+        torch.distributed.all_gather_into_tensor(_out, _in_flat.contiguous(), group=pg)
+        return _out.reshape(_lead + [_total] + _rest)
+
+    if _equal_sizes:
         tensor_list = []
         tensor_shape_base = input_.size()
         for i in range(world_size):
             tensor_shape = list(tensor_shape_base)
-            tensor_shape[dim] = gather_sizes[i]
+            tensor_shape[dim] = _equal_sizes[i]
             tensor_list.append(torch.empty(tensor_shape, dtype=input_.dtype, device=input_.device))
     else:
         tensor_list = [torch.empty_like(input_, dtype=input_.dtype, device=input_.device) for _ in range(world_size)]
@@ -442,6 +519,80 @@ def _gather(input_: torch.Tensor,
     # concat
     output = torch.cat(tensor_list, dim=dim).contiguous()
     return output
+
+
+class _KVAllGatherForwardReduceScatterBackward(torch.autograd.Function):
+    """All-gather K/V in forward and sum their gradients in backward.
+
+    Each local Q shard attends to every gathered K/V shard.  Consequently the
+    gradient for one local K/V shard is the sum of contributions from every
+    rank in the KV-AllGather group; a plain backward split would be wrong.
+
+    ``grad_scale="down"`` divides the reduce-scattered gradient by ``world_size``.
+    This is required when the gathered tensor is consumed identically on every
+    rank of the group (e.g. linear-attention layers that recompute the full
+    sequence on every rank): the replicated forward makes every rank produce the
+    same gradient, so a raw sum would over-count by ``world_size``.
+    """
+
+    @staticmethod
+    def forward(ctx, input_: torch.Tensor, process_group: dist.ProcessGroup, dim: int, grad_scale: str = None):
+        ctx.process_group = process_group
+        ctx.dim = dim
+        ctx.local_shape = tuple(input_.shape)
+        ctx.world_size = dist.get_world_size(process_group)
+        ctx.grad_scale = grad_scale
+        if ctx.world_size == 1:
+            return input_.contiguous()
+        return _gather(input_, process_group, dim)
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        if ctx.world_size == 1:
+            return grad_output.contiguous(), None, None, None
+
+        # The model pads to total SP size, hence all K/V shards in this group
+        # have an equal sequence length.  This is required by reduce_scatter.
+        if grad_output.size(ctx.dim) % ctx.world_size != 0:
+            raise RuntimeError(
+                "KV AllGather backward requires equal sequence shards; pad the sequence to total SP size."
+            )
+        chunks = [chunk.contiguous() for chunk in torch.chunk(grad_output, ctx.world_size, dim=ctx.dim)]
+        if tuple(chunks[0].shape) != ctx.local_shape:
+            raise RuntimeError(
+                f"KV AllGather gradient shape {tuple(chunks[0].shape)} does not match local K/V shape {ctx.local_shape}."
+            )
+
+        grad_input = torch.empty_like(chunks[0])
+        try:
+            dist.reduce_scatter(grad_input, chunks, op=dist.ReduceOp.SUM, group=ctx.process_group)
+        except RuntimeError:
+            # Some HCCL/PyTorch combinations do not expose list reduce_scatter.
+            # all_reduce + local selection is mathematically identical.
+            reduced = grad_output.contiguous()
+            dist.all_reduce(reduced, op=dist.ReduceOp.SUM, group=ctx.process_group)
+            rank = dist.get_rank(ctx.process_group)
+            grad_input = torch.chunk(reduced, ctx.world_size, dim=ctx.dim)[rank].contiguous()
+
+        if ctx.grad_scale == "down":
+            grad_input = grad_input / ctx.world_size
+        return grad_input, None, None, None
+
+
+def kv_all_gather_forward_reduce_scatter_backward(
+    input_: torch.Tensor,
+    process_group: dist.ProcessGroup,
+    dim: int = 1,
+    grad_scale: str = None,
+) -> torch.Tensor:
+    """Gather K/V along ``dim`` in forward and reduce-scatter their gradients.
+
+    Args:
+        grad_scale: ``"down"`` divides the backward gradient by the group size,
+            needed when the gathered tensor is consumed identically on every
+            rank (replicated forward, e.g. linear-attention layers).
+    """
+    return _KVAllGatherForwardReduceScatterBackward.apply(input_, process_group, dim, grad_scale)
 
 
 class _GatherForwardSplitBackward(torch.autograd.Function):
@@ -724,7 +875,15 @@ def split_forward_gather_backward_with_cp(
             raise ValueError(f"Seq lens should be multiple of 2 * ring_size, but got seq_len: {seq_len}, ring_size: {ps.get_ring_group_size()}")
         input_ = load_balanced_split_forward_gather_backward(input_, ps.get_ring_group(), dim=dim)
         seq_len = input_.shape[dim]
-    if ps.is_ulysses_enable():
+    if ps.is_kvallgather_enable():
+        # USP + KV AllGather: the model forward splits over the FULL cp group
+        # (ulysses x kvallgather), so any CP-aware split (e.g. loss labels) MUST
+        # also split over the cp_group (S -> S/cp per rank), NOT just the ulysses
+        # subgroup (S -> S/ulysses).  Otherwise labels and hidden_states misalign
+        # (S/ulysses labels vs S/cp hidden) and the loss is silently wrong.
+        split_gather_sizes = cal_split_sizes(seq_len, ps.get_cp_group_size())
+        input_ = split_forward_gather_backward(input_, ps.get_cp_group(), dim=dim, split_sizes=split_gather_sizes)
+    elif ps.is_ulysses_enable():
         split_gather_sizes = cal_split_sizes(seq_len, ps.get_ulysses_group_size())
         input_ = split_forward_gather_backward(input_, ps.get_ulysses_group(), dim=dim, split_sizes=split_gather_sizes)
 
@@ -748,7 +907,12 @@ def gather_forward_split_backward_with_cp(
         # Since padding is applied in ring groups, the division yields an integer.
         gather_size = gather_size // ps.get_ring_group_size()
 
-    if ps.is_ulysses_enable():
+    if ps.is_kvallgather_enable():
+        # USP + KV AllGather: gather over the FULL cp group (matches the split
+        # in split_forward_gather_backward_with_cp above).
+        gather_size_list = cal_split_sizes(gather_size, ps.get_cp_group_size())
+        input_ = gather_forward_split_backward(input_, ps.get_cp_group(), dim=dim, gather_sizes=gather_size_list)
+    elif ps.is_ulysses_enable():
         gather_size_list = cal_split_sizes(gather_size, ps.get_ulysses_group_size())
         input_ = gather_forward_split_backward(input_, ps.get_ulysses_group(), dim=dim, gather_sizes=gather_size_list)
     if ps.is_ring_enable():
