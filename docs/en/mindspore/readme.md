@@ -145,7 +145,7 @@ Note:
       <td>In Development</td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/wan2.1">Wan2.1-I2V</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/mindspore/wan2.1">Wan2.1-I2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers"> 1.3B </a></td>
       <td> Pre-training </td>
       <td> 1x8 </td>
@@ -157,7 +157,7 @@ Note:
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/wan2.1">Wan2.1-T2V</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/mindspore/wan2.1">Wan2.1-T2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers"> 1.3B </a></td>
       <td> Pre-training </td>
       <td> 1x8 </td>
@@ -223,7 +223,7 @@ Note:
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/qwen2.5omni">Qwen25Omni</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/mindspore/qwen2.5omni">Qwen25Omni</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-Omni-7B/tree/main">7B</a></td>
       <td> Fine-tuning </td>
       <td> 1x8 </td>
@@ -235,7 +235,7 @@ Note:
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/qwen3vl">Qwen3VL</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.0.0/examples/mindspore/qwen3vl">Qwen3VL</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct/tree/main"> 8B </a></td>
       <td> Fine-tuning </td>
       <td> 1x8 </td>

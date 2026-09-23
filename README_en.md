@@ -257,7 +257,7 @@ Note:
 
 ## Compatible Versions and Supported Models
 
-MindSpeed MM comes with a rich set of preset models covering tasks such as multimodal generation and multimodal understanding. For details on the parameter scale, training tasks, recommended clusters, measured performance, and certification status of each model, see the [MindSpeed MM Supported Models List](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/supported_models.md).
+MindSpeed MM comes with a rich set of preset models covering tasks such as multimodal generation and multimodal understanding. For details on the parameter scale, training tasks, recommended clusters, measured performance, and certification status of each model, see the [MindSpeed MM Supported Models List](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.0.0/README.md#配套版本与支持模型).
 
 Large language models (dense models, sparse models, and state space models) are maintained exclusively by MindSpeed-LLM. If you need to perform LLM training, please visit [MindSpeed-LLM](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/en/pytorch/models/supported_models.md) for detailed usage instructions.
 
