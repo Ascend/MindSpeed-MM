@@ -33,7 +33,7 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
 
 ### 已支持特性概览
 
-|     模型 \ 特性     | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/sequence-parallel.md) | [VPP](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/pipeline-parallel.md) | CP | EP |  [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md) | [LoRA](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/features/lora_finetune.md) |
+|     模型 \ 特性     | [TP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/tensor-parallel.md) | [TP-SP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/sequence-parallel.md) | [VPP](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docs/zh/features/virtual_pipeline_parallel.md) | [PP](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/pipeline-parallel.md) | CP | EP |  [Distributed Optimizer](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/distributed-optimizer.md) | [Recomputation](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/zh/features/recomputation.md) | [LoRA](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docs/zh/features/lora_finetune.md) |
 |:---------------:|:------:|:------:|:------:|:---------------------------------------------------------------------------------------:|:------:|:-------:|:------:|:------:|:------:|
 |  Qwen2.5VL-7B   | ✔ | | | ✔ | | | ✔ | | |
 |  Qwen2.5VL-72B  | ✔ | | | ✔ | | | ✔ | | |
@@ -79,7 +79,7 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td rowspan="3"> 多模态生成 </td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/wan2.1">Wan2.1-I2V</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/mindspore/wan2.1">Wan2.1-I2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers"> 1.3B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -91,7 +91,7 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/wan2.1">Wan2.1-T2V</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/mindspore/wan2.1">Wan2.1-T2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers"> 1.3B </a></td>
       <td> 预训练 </td>
       <td> 1x8 </td>
@@ -157,7 +157,7 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
-      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/qwen2.5omni">Qwen25Omni</a></td>
+      <td rowspan="1"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/mindspore/qwen2.5omni">Qwen25Omni</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-Omni-7B/tree/main">7B</a></td>
       <td> 微调 </td>
       <td> 1x8 </td>
@@ -169,7 +169,7 @@ MindSpeed MM + MindSpore后端的依赖配套如下表，安装步骤参考[基�
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.3.0"> 2.3.0 </a></td>
     </tr>
     <tr>
-      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/master/examples/mindspore/qwen3vl">Qwen3VL</a></td>
+      <td rowspan="2"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/mindspore/qwen3vl">Qwen3VL</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct/tree/main"> 8B </a></td>
       <td> 微调 </td>
       <td> 1x8 </td>

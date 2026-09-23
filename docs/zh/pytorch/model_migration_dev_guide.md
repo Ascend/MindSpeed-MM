@@ -484,4 +484,4 @@ class YourModel(MultiModalModule, FSDP2Mixin, WeightInitMixin):
 
 #### 精度工具使用
 
-在解决模型训练中的精度问题时，可借助 [精度工具 msprobe](https://gitcode.com/Ascend/mstt/tree/master/debug/accuracy_tools/msprobe) 来对不同功能和场景分析和定位。
+在解决模型训练中的精度问题时，可借助 [精度工具 msprobe](https://gitcode.com/Ascend/msprobe) 来对不同功能和场景分析和定位。

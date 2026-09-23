@@ -44,7 +44,7 @@ Qwen Image Edit 是基于 Qwen Image 基础模型扩展的图像编辑功能，�
 
 【模型开发时推荐使用配套的环境版本】
 
-请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/pytorch/install_guide.md)
+请参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docs/zh/pytorch/install_guide.md)
 
 1. 软件与驱动安装
 
