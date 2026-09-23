@@ -26,6 +26,7 @@ from mindspeed_mm.utils.aux_loss import (
     reset_global_aux_loss_tracker,
 )
 from mindspeed_mm.fsdp.log import print_rank
+from mindspeed_mm.fsdp.utils.device import prime_cpu_affinity_binding
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +311,9 @@ class TrainEngine:
             )
 
         self.model.train()
+        # Prime torch_npu's CPU affinity binding before any pinned allocation
+        # (swap arena slabs are first-touched in the first forward).
+        prime_cpu_affinity_binding()
         if args.training.manual_gc_interval > 0:
             gc.disable()
             gc.collect()

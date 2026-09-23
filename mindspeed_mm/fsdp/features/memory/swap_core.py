@@ -5,13 +5,24 @@
   limits (hard capacity + soft limit) + hit/prefetch statistics
 
 Execution model: a single async path. Every copy is issued on the swap
-stream(s) and ordered against the calling stream via events (device-side
-ordering, no host block). There is no synchronous copy path: on a host
+stream(s) and ordered via events anchored at the put-time stream (see
+"Stream anchoring" below; device-side ordering, no host block). There is
+no synchronous copy path: on a host
 without a usable device the cache refuses to construct (fast fail) — swap is
 meaningless without a device. capacity_bytes decides the sync point:
 None (or <0) = no capacity management (pass-through, nothing is evicted);
 0 = every put evicts and the compute stream waits for the swap stream
 (deterministic, no overlap); >0 = normal asynchronous capacity management.
+
+Stream anchoring: put captures the calling stream as `_put_stream` and
+records `_put_event` on it — the contract point where the tensor's content
+becomes final. D2H is ordered after `_put_event` (eviction-time ambient is
+untrustworthy). Release ordering anchors `_put_stream` (the HBM block
+returns to its allocation pool, and the allocator binds freed blocks to the
+allocation stream's pool), never the release-time ambient; consume ordering
+anchors the consume-time calling stream. swap_in lands in the `_put_stream`
+pool with the H2D waiting `_put_stream`, and `_wait_h2d` settles on both
+streams, so a zero-cost REPLICATED eviction needs no wait of its own.
 
 Stream/event handling reuses mindspeed_mm.fsdp.utils.device.
 """
@@ -96,6 +107,17 @@ class SwapHandle:
         self._dual_stream = h2d_stream is not d2h_stream
         self._h2d_event = create_event()
         self._d2h_event = create_event()
+        # Put anchor: the calling stream plus an event recorded on it —
+        # the contract point where the tensor's content becomes final.
+        # _put_event anchors the D2H (eviction fires later under an arbitrary
+        # ambient stream, so swap_out waits this event, not the eviction-time
+        # stream). _put_stream anchors the HBM block's allocator pool: freed
+        # blocks return to the ALLOCATION stream's pool, so every release of
+        # this tensor and every landing allocated for it is ordered on this
+        # stream, never on the release/consume-time ambient alone.
+        self._put_stream = get_current_stream()
+        self._put_event = create_event()
+        self._put_event.record(self._put_stream)
         self._state = SwapState.HBM_ONLY
         self._cpu_buf: Optional[TensorBuffer] = None
         self._d2h_issued = False
@@ -159,9 +181,20 @@ class SwapHandle:
     def _wait_d2h(self) -> MemDelta:
         if self._state != SwapState.D2H_IN_PROGRESS:
             return MemDelta(0, 0)
-        # Device-side ordering: later work on the current stream (including
-        # writes into reused blocks) is ordered after the D2H, no host block.
-        self._d2h_event.wait(get_current_stream())
+        # Two distinct responsibilities, never shared on one ambient wait:
+        # - consume ordering: the calling stream is ordered after the D2H
+        #   read, so later work on it (including a consumer receiving this
+        #   tensor via consume()) sees settled data;
+        # - release ordering: the HBM block returns to its allocation pool
+        #   once the reference drops, and the allocator binds freed blocks to
+        #   the ALLOCATION stream's pool (a later same-pool allocation reuses
+        #   the block host-immediately). Anchor the put stream, never the
+        #   release-time ambient: trim/clear may run under a foreign ambient
+        #   stream (wrong-stream release).
+        cur = get_current_stream()
+        self._d2h_event.wait(cur)
+        if cur != self._put_stream:
+            self._d2h_event.wait(self._put_stream)
         self.tensor = None
         self._state = SwapState.DDR_ONLY
         return MemDelta(hbm=-self._bytes, ddr=0)
@@ -169,7 +202,15 @@ class SwapHandle:
     def _wait_h2d(self) -> MemDelta:
         if self._state != SwapState.H2D_IN_PROGRESS:
             return MemDelta(0, 0)
-        self._h2d_event.wait(get_current_stream())
+        # Dual settle: the calling (consume) stream is ordered after
+        # the H2D write for the consumer; the put stream is ordered too,
+        # because the landing lives in the put stream's pool — a later
+        # zero-cost REPLICATED eviction then drops the tensor with no wait
+        # of its own while pool reuse stays ordered after the H2D write.
+        cur = get_current_stream()
+        self._h2d_event.wait(cur)
+        if cur != self._put_stream:
+            self._h2d_event.wait(self._put_stream)
         # The slab slot keeps its (still valid) image: the handle now holds
         # both copies. Both stay accounted until the tensor is consumed or
         # the HBM side is evicted.
@@ -177,13 +218,20 @@ class SwapHandle:
         return MemDelta(hbm=0, ddr=0)
 
     def wait(self) -> MemDelta:
+        """Settle in-flight copies. Must be called in the FINAL consume
+        stream context: the settle edges land on the calling stream (and the
+        put stream), so settling early on one stream and consuming on another
+        leaves the consumer unordered."""
         return self._wait_d2h() + self._wait_h2d()
 
     def get(self) -> torch.Tensor:
         """Return the tensor wherever it currently lives (device or CPU).
 
         wait() only establishes device-side ordering (the current stream
-        waits on the copy events); it never blocks the host. A DDR_ONLY
+        waits on the copy events); it never blocks the host, and it settles
+        on the CALLING stream — call get()/wait() only in the final consume
+        stream context (settling early on one stream and consuming on another
+        leaves the consumer unordered). A DDR_ONLY
         return value is therefore the CPU `restored` view of the swap slot
         with no host-side guarantee that the D2H copy has physically
         completed — host code reading it directly must synchronize the device
@@ -209,20 +257,25 @@ class SwapHandle:
             # Zero-cost eviction: the slab slot already holds a valid image of
             # this tensor (it is the load source). No D2H needed — the slot is
             # untouched by the H2D (read-only), and the HBM release was already
-            # ordered when the handle entered REPLICATED. Just drop the tensor.
+            # ordered on BOTH the consume stream and the put stream when the
+            # handle entered REPLICATED (dual settle): the block returns
+            # to the put stream's pool with reuse already ordered after the
+            # H2D write. Just drop the tensor.
             self.tensor = None
             self._state = SwapState.DDR_ONLY
             return MemDelta(hbm=-self._bytes, ddr=0)
 
         self._ensure_cpu_buf()
 
-        # Capture the current stream at call time: the tensor may have been
-        # written on another stream after put, and D2H must be ordered after
-        # the latest write. Must capture before switching streams (afterwards
-        # get_current_stream returns the swap stream itself).
-        cur_stream = get_current_stream()
+        # D2H is ordered after the put event (recorded at handle construction,
+        # the contract point where the tensor's content became final), never
+        # after the eviction-time ambient stream: eviction fires from an
+        # unrelated put whose ambient context may fork off the compute stream
+        # before this tensor's last write. Under the no-mutation-after-put
+        # contract no legal write exists past the put event; a violating
+        # in-place write is definitively unordered w.r.t. the D2H and tears.
         with switch_to_specified_stream(self._d2h_stream):
-            self._d2h_stream.wait_stream(cur_stream)
+            self._d2h_stream.wait_event(self._put_event)
             if self._dual_stream and self._h2d_issued:
                 # Dual streams: the same cpu_buf may be read by an in-flight H2D
                 self._d2h_stream.wait_event(self._h2d_event)
@@ -243,15 +296,21 @@ class SwapHandle:
         if self._cpu_buf is None:
             raise RuntimeError(f"Handle {self.id}: no cpu buffer to load from")
 
-        # The landing buffer is allocated on the current (compute) stream so it
-        # comes from the compute pool; the H2D copy itself runs on the swap
-        # stream. A non-contiguous pinned source would make torch_npu H2D go
-        # through host-side materialization, so the transfer is always a 1D
+        # The landing buffer is allocated under the put stream's context so it
+        # comes from the put stream's pool: swap-path device allocations
+        # stay in the main pool instead of fragmenting a consumer-side pool,
+        # and the H2D's wait_stream(_put_stream) below covers the landing
+        # block's past-life readers on that stream. Past-life readers on
+        # other streams are covered transitively: the tenant orders the
+        # allocation stream after its own side-stream reads before dropping
+        # the reference, and the H2D is after the put stream. A
+        # non-contiguous pinned source would make torch_npu H2D go through
+        # host-side materialization, so the transfer is always a 1D
         # contiguous DMA; the original layout is rebuilt via as_strided.
-        landing = self._cpu_buf.prepare_landing()
-        cur_stream = get_current_stream()
+        with switch_to_specified_stream(self._put_stream):
+            landing = self._cpu_buf.prepare_landing()
         with switch_to_specified_stream(self._h2d_stream):
-            self._h2d_stream.wait_stream(cur_stream)
+            self._h2d_stream.wait_stream(self._put_stream)
             if self._dual_stream and self._d2h_issued:
                 self._h2d_stream.wait_event(self._d2h_event)
             self.tensor = self._cpu_buf.load_into(landing, non_blocking=True)

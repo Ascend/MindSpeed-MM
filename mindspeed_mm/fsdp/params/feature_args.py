@@ -19,7 +19,7 @@ class SwapPlanConfig(BaseArguments):
     asynchronous capacity management (default 1024)."""
     capacity_mb: float = field(
         default=1024.0,
-        metadata={"help": "HBM capacity budget (MB) for swapped payloads, shared by all tenants. <0: no capacity management (pass-through, nothing is evicted); =0: every put evicts and the compute stream waits the swap stream (deterministic, no overlap); >0: asynchronous capacity management. Default 1024; tune to the per-step swap volume (a stash aiming to save HBM needs capacity below its evicted volume)."},
+        metadata={"help": "HBM capacity budget (MiB) for swapped payloads, shared by all tenants. <0: no capacity management (pass-through, nothing is evicted); =0: every put evicts and the compute stream waits the swap stream (deterministic, no overlap); >0: asynchronous capacity management. Default 1024; tune to the per-step swap volume (a stash aiming to save HBM needs capacity below its evicted volume)."},
     )
     keep_rate: float = field(
         default=0.0,

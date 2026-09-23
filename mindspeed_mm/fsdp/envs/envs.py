@@ -72,6 +72,31 @@ _register(
     description="Process count on the current node.",
 )
 
+# torch_npu CPU affinity (read-only reflection of the launch environment).
+_register(
+    name="CPU_AFFINITY_CONF",
+    default="",
+    converter=str,
+    description=(
+        "torch_npu CPU-affinity mode (e.g. '1' binds each rank to its "
+        "card-local socket). Applied by torch_npu at the first backward; the "
+        "training engine primes it at startup so early pinned allocations "
+        "(swap arena) also land NUMA-local (see MM_PRIME_CPU_AFFINITY)."
+    ),
+)
+_register(
+    name="MM_PRIME_CPU_AFFINITY",
+    default="auto",
+    converter=str,
+    choices=("auto", "0", "1"),
+    description=(
+        "Control the startup CPU-affinity priming backward independently of "
+        "CPU_AFFINITY_CONF: 'auto' (default) primes only when CPU_AFFINITY_CONF "
+        "is set; '0' never primes (A/B control or troubleshooting); '1' always "
+        "primes, even without CPU_AFFINITY_CONF."
+    ),
+)
+
 # MindSpeed-MM FSDP2 behavior.
 _register(
     name="HF_SAVE_WAIT_MODE",

@@ -167,3 +167,38 @@ def set_allow_hf32(allow_hf32=None) -> None:
         torch.npu.aclnn.allow_hf32 = allow_hf32
     else:
         torch.backends.cudnn.allow_tf32 = allow_hf32
+
+
+def prime_cpu_affinity_binding():
+    """Trigger torch_npu's CPU_AFFINITY_CONF binding before the first forward.
+
+    torch_npu applies the configured CPU affinity (card-local socket) only at
+    the FIRST BACKWARD. Pinned host buffers allocated before that — e.g. swap
+    arena slabs, lazily created and first-touched during the first forward —
+    then keep their unbound NUMA footprint for their whole lifetime (pinned
+    pages cannot migrate), and several ranks' footprints tend to pile onto
+    one node, collapsing concurrent D2H bandwidth (the effect size and even
+    the binding map's correctness are platform-dependent — validate with a
+    concurrent-bandwidth A/B on the target machine). One tiny RNG-free
+    backward at startup moves the binding ahead of any pinned allocation.
+    No model parameters, no optimizer state and no RNG are touched.
+
+    Gated by MM_PRIME_CPU_AFFINITY: 'auto' (default) primes only when
+    CPU_AFFINITY_CONF is set in the launch environment; '0' disables the
+    priming outright (A/B control, troubleshooting); '1' primes even without
+    CPU_AFFINITY_CONF."""
+    from mindspeed_mm.fsdp import envs  # lazy: keep this module leaf-level
+    mode = envs.get("MM_PRIME_CPU_AFFINITY")
+    if mode == "0":
+        return
+    conf = envs.get("CPU_AFFINITY_CONF")
+    if mode == "auto" and (not conf or conf.strip() in ("", "0")):
+        return
+    try:
+        leaf = torch.ones(1, device=get_device_type(), requires_grad=True)
+        (leaf * 2).sum().backward()
+        synchronize()
+    except Exception as exc:
+        logger.warning("prime_cpu_affinity_binding failed (%s); "
+                       "affinity will be applied at the first training "
+                       "backward instead", exc)

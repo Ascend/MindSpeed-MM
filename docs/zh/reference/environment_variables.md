@@ -4,7 +4,9 @@
 
 该文档适用于Mcore、 Mcore-FSDP2后、FSDP2后端。
 
-常用环境变量的描述如下：
+常用环境变量按定义方分为两类：外部环境变量与本仓库自定义环境变量。
+
+## 外部环境变量
 
 <div class="container">
         <table class="mm-table">
@@ -126,6 +128,35 @@
                         <code class="value-desc">1</code>: 同步执行
                     </td>
                 </tr>
+            </tbody>
+        </table>
+    </div>
+
+> **备注：** 更多昇腾相关环境变量请参考 [环境变量列表](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0001.html)
+
+<div style="height: 40px;"></div>
+
+## MindSpeed-MM自定义环境变量
+
+<div class="container">
+        <table class="mm-table">
+            <thead>
+                <tr>
+                    <th>环境变量</th>
+                    <th>描述</th>
+                    <th>取值说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code class="env-var">MM_PRIME_CPU_AFFINITY</code></td>
+                    <td>是否在训练启动时提前触发torch_npu的CPU绑核（FSDP2后端）。torch_npu默认在首个backward才应用CPU_AFFINITY_CONF绑核，提前触发可让此前分配的锁页内存（如swap arena slab）也落在绑定节点上。绑核收益与映射正确性平台相关，详见swap_core文档的NUMA说明</td>
+                    <td>
+                        <code class="value-desc default-value">auto（默认）</code>: 仅当CPU_AFFINITY_CONF已设置时提前触发<br>
+                        <code class="value-desc">0</code>: 不提前触发（A/B对照或排障用）<br>
+                        <code class="value-desc">1</code>: 总是提前触发，即使CPU_AFFINITY_CONF未设置
+                    </td>
+                </tr>
                 <tr>
                     <td><code class="env-var">NPUS_PER_NODE</code></td>
                     <td>配置节点使用的NPU数量</td>
@@ -136,7 +167,3 @@
             </tbody>
         </table>
     </div>
-
-<div style="height: 40px;"></div>
-
-> **备注：** 更多昇腾相关环境变量请参考 [环境变量列表](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0001.html)
