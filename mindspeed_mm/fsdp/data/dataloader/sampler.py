@@ -1,4 +1,5 @@
 from typing import Optional, Dict, Any
+import numpy as np
 import torch
 import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
@@ -17,9 +18,9 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
             group.
         shuffle (bool, optional): If ``True`` (default), sampler will shuffle the
             indices.
-        seed (int, optional): random seed used to shuffle the sampler if
-            :attr:`shuffle=True`. This number should be identical across all
-            processes in the distributed group. Default: ``0``.
+        seed (int, optional): Accepted for compatibility but ignored for shuffling.
+            This sampler uses only the epoch as its random seed. To control the
+            shuffle with a seed, use :class:`SeedRandomBatchSampler`. Default: ``0``.
         drop_last (bool, optional): if ``True``, then the sampler will drop the
             tail of the data to make it evenly divisible across the number of
             replicas. Default: ``True``. (It is not implemented that the drop_last is false.)
@@ -80,6 +81,10 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
         self.epoch = self.consumed_samples // active_total_samples
         current_epoch_samples = self.consumed_samples % active_total_samples
 
+        if self.shuffle:
+            g = torch.Generator()
+            g.manual_seed(self._get_epoch_seed())
+
         # data sharding and random sampling
         if self.data_sharding:
             bucket_size = (self.total_samples // self.micro_batch_times_data_parallel_size) \
@@ -87,8 +92,6 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
             bucket_offset = current_epoch_samples // self.num_replicas
             start_idx = self.rank * bucket_size
             if self.shuffle:
-                g = torch.Generator()
-                g.manual_seed(self.epoch)
                 idx_range_bucket = torch.randperm(bucket_size, generator=g).tolist()
             else:
                 idx_range_bucket = list(range(bucket_size))
@@ -98,8 +101,6 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
                                 * self.micro_batch_size
             full_bucket_offset = current_epoch_samples
             if self.shuffle:
-                g = torch.Generator()
-                g.manual_seed(self.epoch)
                 idx_range_total = \
                     torch.randperm(full_bucket_size, generator=g).tolist()
             else:
@@ -116,6 +117,10 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
                 yield batch
                 batch = []
 
+    def _get_epoch_seed(self) -> int:
+        """Preserve the legacy epoch-only shuffle order."""
+        return self.epoch
+
     def state_dict(self) -> Dict[str, Any]:
         return {self._YIELDED: self.consumed_samples}
 
@@ -125,3 +130,53 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
         if state_dict[self._YIELDED] < 0:
             raise ValueError("Cannot load state_dict with negative yielded value")
         self.next_consumed_samples = state_dict[self._YIELDED]
+
+
+class SeedRandomBatchSampler(BaseRandomBatchSampler):
+    """Batch sampler whose shuffle depends on both seed and epoch.
+
+    Enable in FSDP2 training via data.dataloader_param: dataloader_mode="sampler",
+    sampler_type="SeedRandomBatchSampler", shuffle=True and drop_last=True.
+    The trainer forwards training.seed; use 0 <= training.seed < 2**32 for NumPy
+    worker/global seeding compatibility. Switching from BaseRandomBatchSampler
+    changes the shuffle order, so keep the sampler type unchanged when resuming.
+
+    Inherits batching, sharding, infinite iteration and checkpoint handling from
+    BaseRandomBatchSampler. With shuffle=True, seed must be non-negative and
+    identical across ranks. With shuffle=False, seed is ignored. Resuming requires
+    the same seed and sampling configuration; state_dict stores only the position.
+    """
+
+    def __init__(
+        self,
+        dataset,
+        batch_size: int = 1,
+        num_replicas: Optional[int] = None,
+        rank: Optional[int] = None,
+        shuffle: bool = True,
+        seed: int = 0,
+        drop_last: bool = True,
+        data_sharding: bool = False,
+        infinite: bool = False,
+    ):
+        if shuffle and seed < 0:
+            raise ValueError(
+                f"SeedRandomBatchSampler requires seed >= 0, got {seed}"
+            )
+        super().__init__(
+            dataset, batch_size, num_replicas, rank, shuffle, seed,
+            drop_last, data_sharding, infinite,
+        )
+
+    def _get_epoch_seed(self) -> int:
+        # PyTorch's DistributedSampler uses seed + epoch for shuffling.
+        # Different combinations can therefore produce the same shuffle order:
+        #   epoch=1, seed=1 -> 2
+        #   epoch=2, seed=0 -> 2
+        # SeedSequence mixes both inputs deterministically to avoid this equal-sum pattern.
+        # The CPU RNG uses 32 seed bits, so collisions remain possible after mixing.
+        # Keep the seed identical across ranks so global shuffle partitions agree.
+        return int(
+            np.random.SeedSequence([self.epoch, self.seed])
+            .generate_state(1, dtype=np.uint32)[0]
+        )

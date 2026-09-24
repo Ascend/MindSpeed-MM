@@ -24,7 +24,7 @@ from torch.utils.data import DataLoader
 from torchdata.stateful_dataloader import StatefulDataLoader
 
 from mindspeed_mm.fsdp.data.data_utils.utils import get_seed_worker
-from mindspeed_mm.fsdp.data.dataloader.sampler import BaseRandomBatchSampler
+from mindspeed_mm.fsdp.data.dataloader.sampler import BaseRandomBatchSampler, SeedRandomBatchSampler
 from mindspeed_mm.fsdp.data.dataloader.data_collator import resolve_data_collator
 from mindspeed_mm.fsdp.utils.constants import GLOBAL_STEP_TOKEN_NUM, AVG_PER_STEP_TOKEN_NUM
 from mindspeed_mm.fsdp.utils.device import get_device_type, get_torch_device, create_stream, get_current_stream, switch_to_specified_stream
@@ -111,7 +111,8 @@ def prepare_sampler_dataloader(
     Args:
         dataset (`torch.utils.data.Dataset`): The dataset to be loaded.
         shuffle (bool, optional): Whether to shuffle the dataset. Defaults to False.
-        seed (int, optional): Random worker seed for sampling, defaults to 1024.
+        seed (int, optional): Seed for workers and SeedRandomBatchSampler shuffling.
+            BaseRandomBatchSampler ignores it for shuffling. Defaults to 1024.
         add_sampler: Whether to add ``DistributedDataParallelSampler`` to the dataset. Defaults to True.
         drop_last (bool, optional): Set to True to drop the last incomplete batch, if the dataset size
             is not divisible by the batch size. If False and the size of dataset is not divisible by
@@ -123,7 +124,8 @@ def prepare_sampler_dataloader(
             epoch boundaries so the DataLoader iterator never exhausts. The next epoch's batch
             tasks are then dispatched (via the DataLoader's replenish mechanism) while the last
             batch of the current epoch is still being consumed, which removes the
-            epoch-boundary data stall. Only used by ``BaseRandomBatchSampler``. Defaults to False.
+            epoch-boundary data stall. Used by ``BaseRandomBatchSampler`` and
+            ``SeedRandomBatchSampler``. Defaults to False.
 
     Returns:
         :class:`torch.utils.data.DataLoader`: A DataLoader used for training or testing.
@@ -134,13 +136,18 @@ def prepare_sampler_dataloader(
     if persistent_workers is None:
         persistent_workers = True if num_workers > 0 else False
 
-    if sampler_type == "BaseRandomBatchSampler":
-        batch_sampler = BaseRandomBatchSampler(
+    sampler_classes = {
+        "BaseRandomBatchSampler": BaseRandomBatchSampler,
+        "SeedRandomBatchSampler": SeedRandomBatchSampler,
+    }
+    if sampler_type in sampler_classes:
+        batch_sampler = sampler_classes[sampler_type](
             dataset,
             batch_size=batch_size,
             num_replicas=process_group.size(),
             rank=process_group.rank(),
             shuffle=shuffle,
+            seed=seed,
             drop_last=drop_last,
             data_sharding=data_sharding,
             infinite=infinite_sampler,

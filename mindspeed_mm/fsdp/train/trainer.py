@@ -474,9 +474,12 @@ class Trainer:
                 }
             )
 
-            if val_dataloader_param.get("sampler_type") == "BaseRandomBatchSampler":
+            if val_dataloader_param.get("sampler_type") in (
+                "BaseRandomBatchSampler", "SeedRandomBatchSampler"
+            ):
                 raise ValueError(
-                    "Validation requires drop_last=False, but BaseRandomBatchSampler does not support "
+                    "Validation requires drop_last=False, but BaseRandomBatchSampler and "
+                    "SeedRandomBatchSampler do not support "
                     "drop_last=False yet. Please use a sampler that supports keeping the tail batch for validation."
                 )
 
