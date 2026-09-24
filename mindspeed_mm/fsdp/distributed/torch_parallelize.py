@@ -30,7 +30,16 @@ class ParallelApplier:
         if not self.config.ep_plan.apply_efsdp_modules:
             self.config.ep_plan.apply_efsdp_modules = self.config.ep_plan.apply_modules
         if self.config.ep_plan._gradient_divide_factor is None:
-            self.config.ep_plan._gradient_divide_factor = torch.distributed.get_world_size()
+            # The HSDP all-reduce over the edp replicate dim averages (divides by
+            # edp) on top of the reduce-scatter's 1/factor, so the effective
+            # divisor is factor * edp. For the expert gradient to land on the mean
+            # over the data-parallel group -- the scale the non-EP parameters get
+            # -- the factor must therefore be world_size / edp. With world_size it
+            # is silently 2x too small for every edp > 1, halving the experts'
+            # effective learning rate.
+            self.config.ep_plan._gradient_divide_factor = (
+                torch.distributed.get_world_size() / self.config.expert_data_parallel_size
+            )
         if self.config.expert_parallel_size > 1 and self.config.ep_plan.apply_modules:
             model = expert_parallelize_modules(model, self.parallel_state.get_ep_device_mesh(), self.config.ep_plan)
             model = expert_fully_shard_modules(model, self.parallel_state.get_ehsdp_device_mesh(), self.config.ep_plan, self.config.fsdp_plan)
