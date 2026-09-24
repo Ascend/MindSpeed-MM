@@ -21,6 +21,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Optional, Union, List
+import warnings
 
 import torch
 import torch.nn.functional as F
@@ -43,8 +44,8 @@ from transformers.modeling_outputs import (
 from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
-from transformers.utils import TransformersKwargs, auto_docstring, can_return_tuple, logging, torch_compilable_check
-from transformers.utils.generic import is_flash_attention_requested, maybe_autocast, merge_with_config_defaults
+from transformers.utils import TransformersKwargs, auto_docstring, can_return_tuple, logging
+from transformers.utils.generic import maybe_autocast, merge_with_config_defaults
 from transformers.utils.import_utils import is_causal_conv1d_available, is_flash_linear_attention_available
 from transformers.utils.output_capturing import capture_outputs
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5Config, Qwen3_5TextConfig, Qwen3_5VisionConfig
@@ -59,16 +60,21 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
     split_forward_gather_backward,
     gather_forward_split_backward,
     split_forward_gather_backward_with_cp,
-    gather_forward_split_backward_with_cp,
     packed_data_split_forward_gather_backward_with_cp,
-    packed_data_gather_forward_split_backward_with_cp
+    packed_data_gather_forward_split_backward_with_cp,
 )
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, cal_split_sizes_multi
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import all_to_all
 from mindspeed_mm.fsdp.models.mtp import MultiTokenPredictionBlock
 from mindspeed_mm.fsdp.log import print_rank
+from mindspeed_mm.fsdp.models.qwen3_5.utils import (
+    ChunkedPosEmbedInterp,
+    prepend_conv_cp_tail,
+    cp_split_inputs_and_build_context,
+    vision_image_dp_forward,
+)
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
@@ -357,6 +363,12 @@ def apply_mask_to_padding_states(hidden_states, attention_mask):
     ps = get_parallel_state()
     if attention_mask is not None and attention_mask.shape[1] > 1 and attention_mask.shape[0] > 1:
         dtype = hidden_states.dtype
+        # CP tiling order is ("kvallgather","ulysses","ring"): the full-seq mask must be
+        # split by kvallgather first (take this kv rank's chunk), then by ulysses, so it
+        # matches hidden_states which has already been sequence-parallelized to local seq.
+        if ps.is_kvallgather_enable():
+            split_sizes = cal_split_sizes(attention_mask.shape[1], world_size=ps.get_kvallgather_group_size())
+            attention_mask = torch.split(attention_mask, split_sizes, dim=1)[ps.get_kvallgather_rank()]
         if ps.is_ulysses_enable():
             split_sizes = cal_split_sizes(attention_mask.shape[1], world_size=ps.get_ulysses_group_size())
             attention_mask = torch.split(attention_mask, split_sizes, dim=1)[ps.get_ulysses_rank()]
@@ -624,7 +636,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         elif self.gdn_implementation == IMPL_EAGER:
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
             if self.skip_gdn_recompute:
-                raise NotImplemented(f"gdn_implementation = `eager` not support `skip_gdn_recompute` now.")
+                raise NotImplementedError(f"gdn_implementation = `eager` not support `skip_gdn_recompute` now.")
         else:
             raise ValueError(
                 f"Invalid gdn_implementation='{self.gdn_implementation}'. Must be one of: 'eager', 'triton', 'ascendc'."
@@ -695,6 +707,32 @@ class Qwen3_5GatedDeltaNet(nn.Module):
 
         # Modification: Ulysses SP all-to-all for linear attention heads.
         ps = get_parallel_state()
+        # CP initialization moved OUTSIDE the is_ulysses_enable() block so that
+        # ulysses=1 + kvallgather>1 (scan/pipeline CP) is actually enabled. Previously
+        # kvag_enabled stayed False when ulysses=1, silently falling back to gather
+        # mode (full-sequence all_gather) instead of scan.
+        kvag_enabled = ps.is_kvallgather_enable()  # ulysses a2a + conv1d boundary exchange
+        kv_group = ps.get_kvallgather_group() if kvag_enabled else None
+        kv_size = ps.get_kvallgather_group_size() if kvag_enabled else 1
+        kv_rank = ps.get_kvallgather_rank() if kvag_enabled else 0
+        is_first = (kv_rank == 0)
+        is_last = (kv_rank == kv_size - 1)
+        if kvag_enabled and (
+            self.gdn_implementation != IMPL_TRITON
+            or self.causal_conv1d_implementation != IMPL_TRITON
+            or not IS_NPU_AVAILABLE
+        ):
+            raise ValueError(
+                "kvallgather scan CP requires gdn_implementation='triton' and "
+                "causal_conv1d_implementation='triton' on NPU. gdn: the only "
+                "implementation with cp_group/cp_rank/cp_size scan support. conv: "
+                "the CP tail exchange/_pipe_conv_pad slicing assume the triton "
+                "conv's [B,T,C] layout; ascendc/triton_with_transpose return "
+                "heads-first [B,H,T,D/H] (time on dim=2) and eager is unvalidated "
+                f"under CP. got gdn='{self.gdn_implementation}', "
+                f"conv='{self.causal_conv1d_implementation}'"
+            )
+
         if ps.is_ulysses_enable():
             ulysses_group = ps.get_ulysses_group()
             ulysses_size = ps.get_ulysses_group_size()
@@ -710,21 +748,31 @@ class Qwen3_5GatedDeltaNet(nn.Module):
             local_key_dim = self.head_k_dim * local_num_k_heads
             local_value_dim = self.head_v_dim * local_num_v_heads
 
+            # Under USP + KV AllGather the sequence is split over the total cp group
+            # (ulysses x kvallgather).  Ulysses a2a therefore only gathers across the
+            # ulysses subgroup (total / kv tokens); the remaining sequence is recovered
+            # by a no-sum kv all-gather below.  Linear attention is recurrent, so it
+            # needs the FULL sequence -- gathering it is replicated across the kv group
+            # (no compute savings on GDN), but a no-sum gather/split keeps gradients
+            # correct without any 1/kv scaling.
+            ulysses_gather = get_seq_len("total") // kv_size
+
             # Reshape mixed_qkv to head layout for all-to-all: [B, S_local, D] -> split+reshape to heads
             q_proj, k_proj, v_proj = torch.split(mixed_qkv, [self.key_dim, self.key_dim, self.value_dim], dim=-1)
 
-            # All-to-all: gather full sequence, scatter heads -> [B, S_full, local_dim]
-            q_proj = all_to_all(q_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
-            k_proj = all_to_all(k_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
-            v_proj = all_to_all(v_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
+            # All-to-all: gather ulysses-subgroup sequence, scatter heads -> [B, S/kv, local_dim]
+            q_proj = all_to_all(q_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
+            k_proj = all_to_all(k_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
+            v_proj = all_to_all(v_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
 
             b = b.reshape(batch_size, seq_len, self.num_v_heads)
             a = a.reshape(batch_size, seq_len, self.num_v_heads)
-            b = all_to_all(b, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
-            a = all_to_all(a, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=get_seq_len("total"))
+            b = all_to_all(b, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
+            a = all_to_all(a, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
 
-            # Concat for conv1d: [B, S_full, local_dim]
+            # Concat for conv1d: [B, S/kv, local_dim]
             mixed_qkv = torch.cat((q_proj, k_proj, v_proj), dim=-1)
+
         else:
             local_num_k_heads = self.num_k_heads
             local_num_v_heads = self.num_v_heads
@@ -762,6 +810,20 @@ class Qwen3_5GatedDeltaNet(nn.Module):
             if "cu_seqlens" in kwargs and kwargs.get("cu_seqlens") is not None:
                 cu_seqlens = kwargs.get("cu_seqlens").to(torch.int64)
 
+            if kvag_enabled:
+                # Scan CP: causal conv1d cross-team boundary — tail borrow + B1 zeroing +
+                # cu shift for the conv impls (see prepend_conv_cp_tail). The first W-1
+                # conv outputs are dropped below, after the impl dispatch.
+                mixed_qkv, _pipe_conv_pad, _conv1d_cu_seqlens = prepend_conv_cp_tail(
+                    mixed_qkv, cu_seqlens,
+                    conv_kernel_size=self.conv_kernel_size,
+                    kv_group=kv_group,
+                    is_first=is_first,
+                    is_last=is_last,
+                    pre_num_conv_tokens=kwargs.get("cp_pre_num_conv_tokens"),
+                )
+            else:
+                _pipe_conv_pad, _conv1d_cu_seqlens = 0, cu_seqlens
             if self.causal_conv1d_implementation == IMPL_TRITON:
                 conv_weight = conv_weight.squeeze(1)
                 mixed_qkv, _ = self.causal_conv1d_fn(
@@ -769,7 +831,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                     weight=conv_weight.transpose(-1, -2).contiguous(),
                     bias=self.conv1d.bias,
                     activation=self.activation,
-                    cu_seqlens=cu_seqlens,
+                    cu_seqlens=_conv1d_cu_seqlens,
                 )
             elif self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
                 conv_weight = conv_weight.squeeze(1)
@@ -779,17 +841,17 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                     H=2 * local_num_k_heads + local_num_v_heads,
                     bias=self.conv1d.bias,
                     activation=self.activation,
-                    cu_seqlens=cu_seqlens,
+                    cu_seqlens=_conv1d_cu_seqlens,
                 )
             elif self.causal_conv1d_implementation == IMPL_ASCENDC:
-                mixed_qkv = self.causal_conv1d_fn(
+                mixed_qkv, _ = self.causal_conv1d_fn(
                     x=mixed_qkv,
                     weight=conv_weight.squeeze(1),
                     H=2*local_num_k_heads + local_num_v_heads,
                     bias=self.conv1d.bias,
                     activation=self.activation,
-                    cu_seqlens=cu_seqlens,
-                )[0]
+                    cu_seqlens=_conv1d_cu_seqlens,
+                )
             elif self.causal_conv1d_implementation == IMPL_EAGER and self.causal_conv1d_fn is not None:  # for fla
                 conv_weight = conv_weight.squeeze(1)
                 mixed_qkv = self.causal_conv1d_fn(
@@ -804,6 +866,13 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                 mixed_qkv = mixed_qkv.transpose(1, 2)
                 mixed_qkv = F.silu(F.conv1d(mixed_qkv, weight=conv_weight, bias=self.conv1d.bias, padding=self.conv_kernel_size - 1, groups=local_key_dim * 2 + local_value_dim)[:, :, :mixed_qkv.shape[-1]])
                 mixed_qkv = mixed_qkv.transpose(1, 2)
+
+            # Drop the borrowed tail's conv outputs, keep the local chunk.
+            # _pipe_conv_pad is nonzero ONLY when kvag scan CP prepended a W-1 tail
+            # (see prepend_conv_cp_tail); it is always 0 otherwise (non-CP and
+            # plain-ulysses paths run the conv on the unshifted local tensor).
+            if _pipe_conv_pad:
+                mixed_qkv = mixed_qkv[:, _pipe_conv_pad:, :]
 
         if not use_precomputed_states and self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
             query, key, value = torch.split(
@@ -848,7 +917,23 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                 key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
 
         if not use_precomputed_states:
-            if self.gdn_implementation in [IMPL_TRITON, IMPL_ASCENDC, IMPL_ASCENDC_LEGACY]:
+            if kvag_enabled:
+                _init_state = None
+                _need_final = False
+            else:
+                _init_state = None
+                _need_final = cache_params is not None
+            if kvag_enabled:
+                core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
+                    query, key, value, g=g, beta=beta, cu_seqlens=cu_seqlens,
+                    initial_state=_init_state, output_final_state=_need_final,
+                    use_qk_l2norm_in_kernel=True, skip_recompute=self.skip_gdn_recompute,
+                    cp_group=kv_group, cp_rank=kv_rank, cp_size=kv_size,
+                    cp_pre_num_ranks=kwargs.get("cp_pre_num_ranks"),
+                    cp_is_first_rank=kwargs.get("cp_is_first_rank"),
+                    cp_post_num_ranks=kwargs.get("cp_post_num_ranks"),
+                    cp_is_last_rank=kwargs.get("cp_is_last_rank"))
+            elif self.gdn_implementation in [IMPL_TRITON, IMPL_ASCENDC, IMPL_ASCENDC_LEGACY]:
                 core_attn_out, last_recurrent_state = self.chunk_gated_delta_rule(
                     query,
                     key,
@@ -856,8 +941,8 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                     g=g,
                     beta=beta,
                     cu_seqlens=cu_seqlens,
-                    initial_state=None,
-                    output_final_state=cache_params is not None,
+                    initial_state=_init_state,
+                    output_final_state=_need_final,
                     use_qk_l2norm_in_kernel=True,
                     skip_recompute=self.skip_gdn_recompute
                 )
@@ -868,8 +953,8 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                     value,
                     g=g,
                     beta=beta,
-                    initial_state=None,
-                    output_final_state=cache_params is not None,
+                    initial_state=_init_state,
+                    output_final_state=_need_final,
                     use_qk_l2norm_in_kernel=True,
                 )
 
@@ -940,11 +1025,9 @@ def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
     k_rot, k_pass = k[..., :rotary_dim], k[..., rotary_dim:]
 
     if IS_NPU_AVAILABLE:
-        # NPU optimized: fused rotary mul instead of separate rotate_half + multiply
         q_embed = torch_npu.npu_rotary_mul(q_rot, cos, sin)
         k_embed = torch_npu.npu_rotary_mul(k_rot, cos, sin)
     else:
-        # Apply rotary embeddings on the first half or full tensor
         q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
         k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
 
@@ -1000,6 +1083,9 @@ class Qwen3_5Attention(nn.Module):
         self.config = config
         self.layer_idx = layer_idx
         self.skip_flash_attn_recompute = config.skip_flash_attn_recompute and not is_mtp
+        # features-driven FA kvag-path knobs (stamped by overwrite_transformer_config);
+        # getattr keeps the class usable with a stock HF config
+        self.fa_varlen_chunk_tokens = getattr(config, "fa_varlen_chunk_tokens", 0)
         self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
         self.scaling = self.head_dim**-0.5
@@ -1069,6 +1155,7 @@ class Qwen3_5Attention(nn.Module):
             total_seq_len=total_seq_len,
             seq_split_lens=None,
             skip_flash_attn_recompute=self.skip_flash_attn_recompute,
+            fa_varlen_chunk_tokens=self.fa_varlen_chunk_tokens,
             **kwargs,
         )
 
@@ -1106,7 +1193,6 @@ class Qwen3_5RMSNorm(nn.Module):
 
     def forward(self, x):
         if IS_NPU_AVAILABLE:
-            # NPU optimized: fused rms_norm with pre-added bias (1.0 + weight)
             return torch_npu.npu_rms_norm(x, 1.0 + self.weight, self.eps)[0]
         output = self._norm(x.float())
         # Llama does x.to(float16) * w whilst Qwen3_5 is (x * w).to(float16)
@@ -1285,6 +1371,7 @@ def apply_rotary_pos_emb_vision(
     cos, sin = cos.unsqueeze(-2).float(), sin.unsqueeze(-2).float()
     if IS_NPU_AVAILABLE:
         # NPU optimized: fused rotary mul instead of separate rotate_half + multiply
+        # (torch_npu is imported at module level under IS_NPU_AVAILABLE)
         q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
         k_embed = torch_npu.npu_rotary_mul(k, cos, sin)
     else:
@@ -1532,8 +1619,25 @@ class Qwen3_5VisionModel(Qwen3_5PreTrainedModel):
 
         idx_tensor = torch.tensor(idx_list, dtype=torch.long, device=device)
         weight_tensor = torch.tensor(weight_list, dtype=self.pos_embed.weight.dtype, device=device)
-        pos_embeds = self.pos_embed(idx_tensor).to(device) * weight_tensor[:, :, None]
-        patch_pos_embeds = pos_embeds[0] + pos_embeds[1] + pos_embeds[2] + pos_embeds[3]
+        # Memory-efficient bilinear interpolation via custom autograd Function.
+        # The stock pos_embed(idx_tensor) materializes [4, N, D] at once — ~19 GiB for
+        # 1M packed vision patches (bf16, D=1280). The chunked forward peaks at
+        # ~2 x [chunk, D] ≈ 0.5 GiB, with a hand-written backward that accumulates
+        # grad_weight in corner-major order (all of corner 0, then 1, 2, 3 — matching
+        # the flat [4,N] embedding backward's sequential index_add_ order), so
+        # gradients are BITWISE IDENTICAL to the stock path.
+        # features.vision_pos_embed_chunk (stamped on vision_config at build):
+        # value = chunk size; 0 (default) = the stock full-materialization path.
+        # >0 = chunked interpolation (bitwise-equal forward/backward; the full
+        # [4,N,D] materialization is ~19 GiB at 1M pack -- set e.g. 100000 for
+        # long-sequence packs).
+        _pos_chunk = getattr(self.config, "vision_pos_embed_chunk", 0)
+        if _pos_chunk > 0:
+            patch_pos_embeds = ChunkedPosEmbedInterp.apply(
+                self.pos_embed.weight, idx_tensor, weight_tensor, _pos_chunk)
+        else:
+            pos_embeds = self.pos_embed(idx_tensor).to(device) * weight_tensor[:, :, None]
+            patch_pos_embeds = pos_embeds[0] + pos_embeds[1] + pos_embeds[2] + pos_embeds[3]
 
         patch_pos_embeds = patch_pos_embeds.split([h * w for h, w in zip(grid_hs, grid_ws)])
 
@@ -1706,7 +1810,13 @@ class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
             text_position_ids = position_ids[0]
 
         use_packing = "cu_seqlens" in kwargs and kwargs["cu_seqlens"] is not None
-        if use_packing:
+        ps = get_parallel_state()
+        kvag_enabled = ps.is_kvallgather_enable()
+        if kvag_enabled:
+            # KV AllGather path relies on is_causal (+ K-slice) inside flash attention;
+            # the full causal_mask / ulysses cu_seqlens are not used.
+            causal_mask = None
+        elif use_packing:
             causal_mask = None
             kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids, need_cpu_tensor=False))
         else:
@@ -1720,20 +1830,53 @@ class Qwen3_5TextModel(Qwen3_5PreTrainedModel):
             )
         linear_attn_mask = self._update_linear_attn_mask(attention_mask, cache_position)
         # Modification: For Ulysses, cu_seq_len needs to be calculated before position_ids split
+        if use_packing and not kvag_enabled:
+            # Flatten the collator's 2-D [B, N+1] cu to 1-D: the triton GDN varlen
+            # kernels only take 1-D cu (2-D yields an empty chunk list -> grid=0 crash).
+            kwargs["cu_seqlens"] = kwargs["cu_seqlens"].reshape(-1).to(torch.int64)
         kwargs_fa = kwargs
-        ps = get_parallel_state()
-        if ps.is_ulysses_enable():
+        if ps.is_ulysses_enable() and not kvag_enabled:
             if not use_packing:
                 kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
             else:
                 kwargs_fa = kwargs.copy()
                 kwargs_fa["cu_seq_lens_q"] = kwargs_fa["cu_seq_lens_q"].cpu()
                 kwargs_fa["cu_seq_lens_k"] = kwargs_fa["cu_seq_lens_k"].cpu()
+        elif kvag_enabled and use_packing:
+            # KV-allgather + PACKED: flash-attention layers must run VARLEN (per-sample
+            # causal), not plain causal over the K-slice. The local-Q + is_causal path
+            # treats the whole packed bin as ONE sequence — every sample attends to ALL
+            # previous samples (cross-sample leakage; systematic ~2% loss offset vs the
+            # ulysses16 baseline. See DEBUG_GRAD_EXPLOSION.md). Pass the GLOBAL per-sample
+            # cu (the same boundaries the GDN scan path trusts) — flash_attn.py's kvag
+            # branch then gathers Q to the full sequence and runs the standard varlen path
+            # (numerically identical to the ulysses16 full-sequence path). kwargs_fa only
+            # reaches full_attention layers (layer_type routing below), so GDN's LOCAL
+            # cu_seqlens is unaffected.
+            kwargs_fa = kwargs.copy()
+            # cu_seqlens arrives 2-D [B, N+1] (collator stacks per-sample lists) — flatten
+            # to 1-D: npu_fusion_attention's actual_seq_qlen/kvlen requires a flat
+            # List[int] (a nested list raises a pybind cast error).
+            _global_cu = kwargs["cu_seqlens"].reshape(-1).to(torch.int64).cpu()
+            # Extend the LAST boundary to the PADDED total (inputs_embeds length = Q/KV
+            # tensor length): the varlen kernel (aclnnFlashAttentionVarLenScore) requires
+            # the last actual_seq boundary to cover the tensors. The position_ids-derived
+            # cu used by the non-kvag path has this property naturally (padding positions
+            # don't reset position_ids, so they join the last sample's segment); the
+            # collator cu stops at the real-token count. Padding tokens sit AFTER all
+            # real tokens (causal) so real-token attention is unaffected; loss masks them.
+            _global_cu[-1] = inputs_embeds.shape[1]
+            kwargs_fa["cu_seq_lens_q"] = _global_cu
+            kwargs_fa["cu_seq_lens_k"] = _global_cu
 
         # Modification: sequence parallel patch
         total_seq_len = inputs_embeds.shape[1]
         set_seq_len("total", total_seq_len)
-        if ps.is_ulysses_enable():
+        if ps.is_kvallgather_enable():
+            position_ids, text_position_ids, inputs_embeds = cp_split_inputs_and_build_context(
+                position_ids, text_position_ids, inputs_embeds,
+                total_seq_len, use_packing, self.config, kwargs)
+        elif ps.is_ulysses_enable():
             position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
             text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
             inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
@@ -1920,15 +2063,29 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
         image_grid_thw (`torch.LongTensor` of shape `(num_images, 3)`, *optional*):
             The temporal, height and width of feature shape of each image in LLM.
         """
-        pixel_values = pixel_values.type(self.visual.dtype)
-        vision_output: BaseModelOutputWithPooling = self.visual(
-            pixel_values, grid_thw=image_grid_thw, return_dict=True, **kwargs
-        )
+        # No .type(self.visual.dtype): under meta-init + FSDP, nn.Module.dtype returns
+        # the parameters' STORAGE dtype (fp32), not the runtime compute dtype -- it
+        # used to upcast bf16 pixels to fp32 (pack-1M snapshot trace #902: a 13.70
+        # GiB transient, exactly 2x, which patch_embed immediately cast back to the
+        # conv weight dtype -- pure waste). patch_embed already aligns the input via
+        # hidden_states.to(self.proj.weight.dtype), so the outer cast is redundant:
+        # with it removed, the values entering the conv are bitwise unchanged whether
+        # the conv weight is bf16 or fp32 (bf16->fp32->bf16 is identity for bf16
+        # values; direct pass-through likewise).
+
+        # ---- Vision tower image-level data parallelism ----
+        vision_output = vision_image_dp_forward(self.visual, pixel_values, image_grid_thw, kwargs)
+        if vision_output is None:
+            vision_output = self.visual(
+                pixel_values, grid_thw=image_grid_thw, return_dict=True, **kwargs
+            )
+
+        # Per-image packaging (master parity): pooler_output as a tuple of per-image
+        # embeds; the merge step re-cats it (see _finalize_multimodal_embeds).
         image_embeds = vision_output.pooler_output
         split_sizes = (image_grid_thw.prod(-1) // self.visual.spatial_merge_size**2).tolist()
         image_embeds = torch.split(image_embeds, split_sizes)
         vision_output.pooler_output = image_embeds
-
         return vision_output
 
     def get_placeholder_mask(
@@ -1978,6 +2135,61 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
 
         return special_image_mask, special_video_mask
 
+    def _finalize_multimodal_embeds(
+        self,
+        inputs_embeds: torch.FloatTensor | None,
+        input_ids: torch.LongTensor | None,
+        image_outputs: BaseModelOutputWithPooling | None,
+        video_outputs: BaseModelOutputWithPooling | None,
+    ) -> torch.FloatTensor:
+        """In-frame: embedding lookup + in-place vision/video merge; returns full inputs_embeds.
+
+        The params carry the vision tower outputs hoisted in forward (see the guarded
+        calls there); raw pixel_values is released by train_step before this frame.
+
+        Lifetime contract (MUST be honored, else ~15 GiB is held for the whole step
+        at 1M): the caller must pass this method's return value INLINE as the
+        language_model argument -- never store it in a local. language_model
+        rebinds its parameter to the local shard after the CP split, at which point
+        the full [S, hidden] (~9.6 GiB at 1M) and intermediates like image_embeds
+        (~5.7 GiB) become reclaimable; a caller-frame local would pin them for the
+        entire text forward (the full-sequence embedding would survive into the
+        GDN layer). This method's own frame releases all intermediates on return
+        -- the last short-lived holder on the caller side."""
+
+        if inputs_embeds is None:
+            inputs_embeds = self.get_input_embeddings()(input_ids)
+
+        if image_outputs is not None:
+            image_embeds = image_outputs.pooler_output
+            # get_image_features now returns a flat tensor; keep tuple compat for external callers
+            if isinstance(image_embeds, (tuple, list)):
+                image_embeds = torch.cat(image_embeds, dim=0)
+            image_embeds = image_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
+            image_mask, _ = self.get_placeholder_mask(
+                input_ids, inputs_embeds=inputs_embeds, image_features=image_embeds
+            )
+            # Use nonzero + direct indexing instead of masked_scatter to avoid scanning the full
+            # (batch, seq_len, hidden_dim) tensor. nonzero finds target positions on the compact
+            # (batch, seq_len) mask in O(batch * seq_len), then direct indexing writes only to
+            # those positions — reducing memory bandwidth by a factor of hidden_dim.
+            image_indices_tuple = torch.nonzero(image_mask, as_tuple=True)
+            inputs_embeds[image_indices_tuple] = image_embeds
+
+        if video_outputs is not None:
+            video_embeds = video_outputs.pooler_output
+            if isinstance(video_embeds, (tuple, list)):
+                video_embeds = torch.cat(video_embeds, dim=0)
+            video_embeds = video_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
+            _, video_mask = self.get_placeholder_mask(
+                input_ids, inputs_embeds=inputs_embeds, video_features=video_embeds
+            )
+            # Same optimization as image: nonzero + direct indexing replaces masked_scatter.
+            video_indices_tuple = torch.nonzero(video_mask, as_tuple=True)
+            inputs_embeds[video_indices_tuple] = video_embeds
+
+        return inputs_embeds
+
     def compute_3d_position_ids(
         self,
         input_ids: torch.Tensor | None,
@@ -2000,14 +2212,25 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
             self.rope_deltas = rope_deltas
         # Use pre-calculated rope-deltas to infer correct 3D position ids
         elif self.rope_deltas is not None:
-            batch_size, seq_length, _ = inputs_embeds.shape
+            # inputs_embeds is no longer materialized before this point on the
+            # training/decode path (see _finalize_multimodal_embeds) -- it may be
+            # None here even when input_ids is present. input_ids matches embeds'
+            # first two dims (1:1 in-place placeholder replacement), so length AND
+            # device both follow input_ids; the else sub-branch keeps the pure-
+            # inputs_embeds API fallback (embeds exists there by definition).
+            if input_ids is not None:
+                batch_size, seq_length = input_ids.shape
+                _device = input_ids.device
+            else:
+                batch_size, seq_length, _ = inputs_embeds.shape
+                _device = inputs_embeds.device
             if attention_mask is not None:
                 position_ids = attention_mask.long().cumsum(-1) - 1
                 position_ids = position_ids.masked_fill(attention_mask == 0, 0)
-                position_ids = position_ids.view(1, batch_size, -1).repeat(3, 1, 1).to(inputs_embeds.device)
+                position_ids = position_ids.view(1, batch_size, -1).repeat(3, 1, 1).to(_device)
             else:
                 position_ids = torch.arange(past_key_values_length, past_key_values_length + seq_length)
-                position_ids = position_ids.view(1, 1, -1).expand(3, batch_size, -1).to(inputs_embeds.device)
+                position_ids = position_ids.view(1, 1, -1).expand(3, batch_size, -1).to(_device)
             delta = self.rope_deltas.repeat_interleave(batch_size // self.rope_deltas.shape[0], dim=0)
             position_ids = position_ids + delta.to(device=position_ids.device)
         else:
@@ -2040,41 +2263,25 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
+        # Pre-set None: the inline call to _finalize_multimodal_embeds references
+        # both variables unconditionally; batches without images/videos never enter
+        # the assignment branches above (this once caused UnboundLocalError).
+        image_outputs: BaseModelOutputWithPooling | None = None
+        video_outputs: BaseModelOutputWithPooling | None = None
         if pixel_values is not None:
-            image_outputs: BaseModelOutputWithPooling = self.get_image_features(
+            image_outputs = self.get_image_features(
                 pixel_values, image_grid_thw, return_dict=True
             )
 
         if pixel_values_videos is not None:
-            video_outputs: BaseModelOutputWithPooling = self.get_video_features(
+            video_outputs = self.get_video_features(
                 pixel_values_videos, video_grid_thw, return_dict=True
             )
 
-        if inputs_embeds is None:
-            inputs_embeds = self.get_input_embeddings()(input_ids)
-
-        if pixel_values is not None:
-            image_embeds = image_outputs.pooler_output
-            image_embeds = torch.cat(image_embeds, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
-            image_mask, _ = self.get_placeholder_mask(
-                input_ids, inputs_embeds=inputs_embeds, image_features=image_embeds
-            )
-            # Use nonzero + direct indexing instead of masked_scatter to avoid scanning the full
-            # (batch, seq_len, hidden_dim) tensor. nonzero finds target positions on the compact (batch, seq_len)
-            # mask in O(batch * seq_len), then direct indexing writes only to those positions.
-            image_indices_tuple = torch.nonzero(image_mask, as_tuple=True)
-            inputs_embeds[image_indices_tuple] = image_embeds
-
-        if pixel_values_videos is not None:
-            video_embeds = video_outputs.pooler_output
-            video_embeds = torch.cat(video_embeds, dim=0).to(inputs_embeds.device, inputs_embeds.dtype)
-            _, video_mask = self.get_placeholder_mask(
-                input_ids, inputs_embeds=inputs_embeds, video_features=video_embeds
-            )
-            # Same optimization as image: nonzero + direct indexing replaces masked_scatter.
-            video_indices_tuple = torch.nonzero(video_mask, as_tuple=True)
-            inputs_embeds[video_indices_tuple] = video_embeds
-
+        # position_ids depends only on input_ids/grid (per-token, independent of
+        # embed values), so compute it before materializing the embeds --
+        # inputs_embeds may be None here (compute_3d_position_ids's shape fallback
+        # now uses input_ids.shape; see the comment inside).
         if position_ids is None:
             position_ids = self.compute_3d_position_ids(
                 input_ids=input_ids,
@@ -2085,12 +2292,20 @@ class Qwen3_5Model(Qwen3_5PreTrainedModel):
                 past_key_values=past_key_values,
             )
 
+        # ---- Full inputs_embeds lifetime closure ----
+        # Lookup+merge live in _finalize_multimodal_embeds's frame; the return
+        # value is passed INLINE as the language_model argument (a temporary on
+        # the evaluation stack, never a caller local) -- once language_model
+        # rebinds to the local shard after the CP split, the caller-side reference
+        # is gone and the memory is reclaimable (bitwise unchanged: reference
+        # lifetime management only, the numeric path is verbatim).
         outputs = self.language_model(
             input_ids=None,
             position_ids=position_ids,
             attention_mask=attention_mask,
             past_key_values=past_key_values,
-            inputs_embeds=inputs_embeds,
+            inputs_embeds=self._finalize_multimodal_embeds(
+                inputs_embeds, input_ids, image_outputs, video_outputs),
             cache_position=cache_position,
             **kwargs,
         )
@@ -2268,6 +2483,7 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
         skip_gdn_recompute = getattr(model_args, "skip_gdn_recompute", False)
         transformer_config.text_config.skip_gdn_recompute = skip_gdn_recompute
 
+        # Triton merge kernel for GDN scan CP cross-rank prefix compose.
         # mtp
         mtp_num_layers = getattr(model_args, "mtp_num_layers", 0)
         if mtp_num_layers < 0:
@@ -2277,6 +2493,23 @@ class Qwen3_5ForConditionalGeneration(Qwen3_5PreTrainedModel, GenerationMixin):
         # chunkloss
         transformer_config.text_config.enable_chunk_loss = getattr(feature_args, "enable_chunk_loss", False)
         transformer_config.text_config.enable_dynamic_chunk_loss = getattr(feature_args, "enable_dynamic_chunk_loss", False)
+
+        # FA kvag-path runtime knobs (features): stamped here, read by the
+        # full_attention layers' attention call sites and passed explicitly to
+        # flash_attention_forward (same wiring as skip_flash_attn_recompute).
+        transformer_config.text_config.fa_varlen_chunk_tokens = getattr(feature_args, "fa_varlen_chunk_tokens", 0)
+        transformer_config.vision_config.vision_pos_embed_chunk = getattr(feature_args, "vision_pos_embed_chunk", 0)
+
+        # P2: make the fa_varlen_chunk_tokens x skip_flash_attn_recompute exclusion
+        # explicit -- chunking is silently inactive under the lse-saved backward path.
+        if skip_flash_attn_recompute and getattr(feature_args, "fa_varlen_chunk_tokens", 0) > 0:
+            warnings.warn(
+                "features.fa_varlen_chunk_tokens is silently ignored: "
+                "skip_flash_attn_recompute=True routes FA backward through the "
+                "lse-saved path (npu_fusion_attention_grad), to which the varlen "
+                "chunking does not apply. Enable only one of the two."
+            )
+
         return transformer_config
 
     def get_input_embeddings(self):
