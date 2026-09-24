@@ -276,6 +276,24 @@ class FeatureArguments(BaseArguments):
         metadata={"help": "Whether skip moe pad tokens"}
     )
 
+    vision_pos_embed_chunk: int = field(
+        default=0,
+        metadata={"help": "Vision pos-embed interpolation chunk size (output positions). "
+                          ">0: chunked interpolation (bitwise-equal forward/backward, "
+                          "~19 GiB -> ~0.5 GiB peak at 1M pack) -- set e.g. 100000 for "
+                          "long-sequence packs. 0 (default): stock full-materialization "
+                          "path (OOMs at large N)."},
+    )
+
+    fa_varlen_chunk_tokens: int = field(
+        default=0,
+        metadata={"help": "Chunk size (tokens) for sample-aligned chunked FA calls in the "
+                          "kv-allgather packed-varlen path. 0 disables (single full-sequence "
+                          "call; backward workspace scales with the full gathered Q, "
+                          "~7 GiB at 512K tokens). Chunks break at sample boundaries, "
+                          "samples are independent -> bitwise-equal results."},
+    )
+
     enable_grad_norm_overlap: bool = field(
         default=False,
         metadata={"help": "Whether to overlap per-tensor grad-norm computation with backward "

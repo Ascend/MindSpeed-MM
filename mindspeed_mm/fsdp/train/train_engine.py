@@ -187,6 +187,14 @@ class TrainEngine:
             # forward step
             TrainingContext().set_training_stage(TrainingStage.FORWARD)
             output = self.model(**batch_data, use_cache=False)
+            # Vision pixel data is dead after forward (backward only needs the
+            # tower's saved activations and its input): release the batch-side
+            # reference early instead of keeping the full pixel_values (~3-11 GiB
+            # at 1M pack) alive for the whole step. Under image DP the tower only
+            # keeps a 1/K cloned subset, so the full tensor is reclaimable here.
+            # Pure lifetime management.
+            batch_data.pop("pixel_values", None)
+            batch_data.pop("pixel_values_videos", None)
             loss = output.loss / args.training.gradient_accumulation_steps
             total_loss += loss
 
@@ -212,7 +220,6 @@ class TrainEngine:
             # Backward
             TrainingContext().set_training_stage(TrainingStage.BACKWARD)
             loss.backward()
-
             # Start H2D for the next batch after backward so the device memory is
             # allocated only after the current activations are free.
             if hasattr(train_dataloader_iter, 'trigger_h2d') and callable(getattr(train_dataloader_iter, 'trigger_h2d')):

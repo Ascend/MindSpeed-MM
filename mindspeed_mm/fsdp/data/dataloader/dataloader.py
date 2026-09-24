@@ -241,7 +241,7 @@ class PrefetchGradAccDataLoader:
                     if fetched == 0:
                         break  # No more data
 
-                # 尾端不足时，平均tokens数应该用实际值做除法
+                # When the tail is short, divide by the actual fetched count for the average
                 denom = fetched if fetched > 0 else self.grad_acc_step
                 avg_tokens = total_tokens / denom
                 for batch in buffer:
