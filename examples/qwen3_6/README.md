@@ -378,8 +378,8 @@ dataset:
 
 示例：如果数据及其对应的json都在/home/user/data/目录下，其中json目录为/home/user/data/video_data_path.json，此时配置如下：
 `dataset_dir`配置为/home/user/data/;
-`dataset`配置为./data/video_data_path.json
-注意此时`dataset`需要配置为相对路径
+`dataset`配置为./data/video_data_path.json（基于训练启动时的工作目录解析），也可配置为绝对路径
+注意`dataset`支持绝对路径和相对路径，`dataset_dir`不会自动与`dataset`拼接，它仅用于补全json中图片、视频等媒体文件的相对路径
 **注意`cache_dir`在多机上不要配置同一个挂载目录避免写入同一个文件导致冲突**。
 
 【模块冻结配置】
