@@ -82,7 +82,7 @@ class Trainer:
         # Initialize metrics backends after the distributed environment is ready.
         metrics.reset()
         if args.tools.tensorboard.enable:
-            metrics.add_handler(TensorBoardHandler(args.tools.tensorboard))
+            metrics.add_handler(TensorBoardHandler(args.tools.tensorboard, args.tools.metrics))
         metrics.setup()
 
         self.lora_weight_manager = None

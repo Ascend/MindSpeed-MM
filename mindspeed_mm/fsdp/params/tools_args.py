@@ -4,6 +4,7 @@ from typing import List, Literal, Optional
 import logging
 
 from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp import envs
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,44 @@ class Tensorboard(BaseArguments):
         default=1,
         metadata={"help": "Reserved, not used. TensorBoard write frequency follows training.log_interval."},
     )
+
+
+class Metrics(BaseArguments):
+    """Backend-agnostic switches for which training metrics to collect.
+
+    These control *what* is measured, independent of *where* it is written
+    (TensorBoard today, possibly wandb etc. later). The output backends read
+    these switches; they do not live under any single backend's config.
+    """
+
+    grad_norm_per_layer: bool = field(
+        default=False,
+        metadata={"help": "Record per-layer gradient norm (not zero-cost, disabled by default)."},
+    )
+    token_stats: bool = field(
+        default=False,
+        metadata={"help": "Record per-step token counts (valid/padding/total) and per-rank token distribution (min/max/ave/std)."},
+    )
+    token_stats_per_rank: bool = field(
+        default=False,
+        metadata={"help": "Record per-rank token counts: one curve per rank, the per-step histogram over every rank, the rank x step heatmap and the max/min/avg imbalance scalars. Implies token counting is enabled."},
+    )
+    token_stats_per_rank_list: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "Which ranks to record when token_stats_per_rank is on. None records all ranks; e.g. [1, 2, 3] records only ranks 1/2/3. It narrows the per-rank curves and the heatmap; the per-step histogram always covers every rank."},
+    )
+
+    def model_post_init(self, __context):
+        # WORLD_SIZE is registered with a default of 1, so reading it without
+        # `required=True` stays safe for single-process (non-torchrun) runs.
+        self.world_size = envs.get("WORLD_SIZE")
+        if self.token_stats_per_rank_list is not None:
+            for rank in self.token_stats_per_rank_list:
+                if not 0 <= rank < self.world_size:
+                    raise ValueError(
+                        f"metrics.token_stats_per_rank_list contains invalid rank {rank}, "
+                        f"must be in [0, {self.world_size})."
+                    )
 
 
 class StaticParam(BaseArguments):
@@ -129,3 +168,7 @@ class ToolsArguments(BaseArguments):
     profile: Profiler = field(default_factory=Profiler)
     memory_profile: MemoryProfiler = field(default_factory=MemoryProfiler)
     tensorboard: Tensorboard = field(default_factory=Tensorboard)
+    metrics: Metrics = field(
+        default_factory=Metrics,
+        metadata={"help": "Backend-agnostic switches for which training metrics to collect."},
+    )

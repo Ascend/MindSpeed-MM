@@ -14,6 +14,7 @@ from mindspeed_mm.fsdp.data.data_utils.utils import build_iterations
 from mindspeed_mm.fsdp.optimizer.clip_grad_norm import clip_grad_norm
 from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
+from mindspeed_mm.fsdp.utils.token_counter import TokenCounter
 from mindspeed_mm.fsdp.log.metrics import metrics
 from mindspeed_mm.fsdp.loss.loss_func import build_loss_func
 from mindspeed_mm.fsdp.params.argument import Arguments
@@ -69,6 +70,9 @@ class TrainEngine:
         # Training state tracking
         self.iteration, self.consumed_train_samples = 0, 0
 
+        # Token counter for TensorBoard token statistics (no-op unless enabled).
+        self.token_counter = TokenCounter()
+
         # Load checkpoint if specified
         if args.training.load:
             self.iteration, self.consumed_train_samples = self.load()
@@ -98,6 +102,11 @@ class TrainEngine:
         averaged_losses = averaged_losses / torch.distributed.get_world_size(group=ps.get_dp_group())
 
         return averaged_losses
+
+    def is_log_iteration(self, iteration: int) -> bool:
+
+        interval = self.args.training.log_interval
+        return interval > 0 and iteration % interval == 0
 
     def is_global_router_aux_loss_enabled(self) -> bool:
         loss_cfg = self.args.features.loss_cfg
@@ -169,12 +178,23 @@ class TrainEngine:
         total_aux_loss = None
         all_mtp_loss = None
         ps = get_parallel_state()
+        # Reset the token counter for this step. Counts are only collected on the
+        # steps that will be logged (the same condition the per-layer grad norms
+        # below use), so a non-log step pays nothing at all; the counters are read
+        # once per step in training_log.
+        self.token_counter.reset(
+            (args.tools.metrics.token_stats or args.tools.metrics.token_stats_per_rank)
+            and self.is_log_iteration(self.iteration + 1)
+        )
         if global_aux_loss_enabled:
             reset_global_aux_loss_tracker()
         # Gradient accumulation
         for step in range(args.training.gradient_accumulation_steps):
             # Wait for the preloaded batch to be ready
             batch_data = self.get_batch(train_dataloader_iter)
+
+            # Accumulate token counts for this micro-batch (no-op unless enabled).
+            self.token_counter.update(batch_data)
 
             # setup loss ctx
             self.set_loss_func(batch_data)
@@ -337,11 +357,21 @@ class TrainEngine:
 
             loss_dict = self.train_step(train_dataloader_iter)
 
-            # Clip gradients when clip_grad>0 and get total grad_norm.
+            # Clip gradients when clip_grad>0 and get total grad_norm. Per-layer
+            # gradient norms (not zero-cost, off by default) are computed inside
+            # clip_grad_norm BEFORE clipping, so they are the raw, unclipped
+            # values; they are collected only on log steps (same condition that
+            # triggers training_log, keeping the collective matched on all ranks).
+            per_layer_stats = {}
+            collect_per_layer = (
+                args.tools.metrics.grad_norm_per_layer
+                and self.is_log_iteration(self.iteration + 1)
+            )
             grad_norm = clip_grad_norm(
                 self.model,
                 max_norm=args.training.clip_grad,
                 foreach=args.training.clip_grad_foreach,
+                per_layer_stats=per_layer_stats if collect_per_layer else None,
             )
 
             # Update parameters
@@ -364,7 +394,7 @@ class TrainEngine:
             profiler.step()
 
             # Logging
-            if self.iteration % args.training.log_interval == 0:
+            if self.is_log_iteration(self.iteration):
                 self.training_log(
                     self.iteration,
                     elapsed_time_per_iteration,
@@ -372,6 +402,7 @@ class TrainEngine:
                     self.consumed_train_samples,
                     loss_dict,
                     grad_norm,
+                    per_layer_stats=per_layer_stats if collect_per_layer else None,
                 )
 
             # Report memory after optimizer state has been initialized.
@@ -427,6 +458,7 @@ class TrainEngine:
 
     def training_log(
         self, iteration, elapsed_time_per_iteration, curr_step_lr, consumed_train_samples, loss_dict, grad_norm,
+        per_layer_stats=None,
     ):
         args = self.args
         log_string = f" [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
@@ -456,6 +488,40 @@ class TrainEngine:
         if grad_norm is not None:
             scalars["grad_norm"] = grad_norm
         metrics.record(iteration, scalars, kind="scalar", prefix="train")
+
+        # Per-layer gradient norm distribution across DP replicas (ave), computed
+        # inside clip_grad_norm before clipping. The grad_norm_per_layer switch is
+        # checked inside the handler.
+        if per_layer_stats:
+            per_layer_scalars = {}
+            for group, stats in per_layer_stats.items():
+                per_layer_scalars[f"{group}/ave"] = stats["ave"]
+            metrics.record(iteration, per_layer_scalars, kind="per_layer")
+
+        # Per-step token counts as overall scalars. The `tokens` family reports what
+        # the step processed in total, so the counter sums the per-rank counts over
+        # the DP group (see TokenCounter.step_totals). Reading a counter materialises
+        # it (one device sync), so read each one once and reuse it.
+        valid_tokens = self.token_counter.valid
+        padding_tokens = self.token_counter.padding
+        total_tokens = self.token_counter.total
+        if args.tools.metrics.token_stats:
+            # The handler gates on this switch as well, but step_totals needs a
+            # collective, so it is checked here to keep that off when unrequested.
+            metrics.record(iteration, self.token_counter.step_totals(), kind="scalar", prefix="tokens")
+
+        # The same per-rank payload feeds both records below; the handler owns their
+        # switches and decides what to render from it.
+        per_rank_tokens = {
+            "valid_tokens": valid_tokens,
+            "padding_tokens": padding_tokens,
+            "total_tokens": total_tokens,
+        }
+        # Per-rank distribution (min/max/ave/std across ranks).
+        metrics.record(iteration, per_rank_tokens, kind="per_rank")
+        # Per-rank detail: one curve per rank, the per-step rank histogram and the
+        # rank x step heatmap, all rendered from a single gather.
+        metrics.record(iteration, per_rank_tokens, kind="per_rank_detail")
 
     def load(self):
         """Load checkpoint and restore training state."""

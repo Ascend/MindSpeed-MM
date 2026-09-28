@@ -21,7 +21,10 @@ All four kinds are routed by ``TensorBoardHandler`` today:
   written under the "grad_norm" prefix, gated by ``grad_norm_per_layer``.
 - ``per_rank``: per-rank local values (token counts), gathered to the main rank
   and aggregated into min/max/ave/std curves, gated by ``token_stats``.
-- ``per_rank_detail``: one curve per rank, gated by ``token_stats_per_rank``.
+- ``per_rank_detail``: per-rank renderings, all gated by ``token_stats_per_rank``
+  and produced from a single gather -- one curve per rank, the per-step histogram
+  over every rank, the rank x step heatmap over the listed ranks, and the
+  max/min/avg imbalance scalars over every rank.
 
 Feature switches are read from the config inside the handler, so the training
 loop only calls ``metrics.record(...)`` without knowing which backend consumes
@@ -65,7 +68,7 @@ class TensorBoardHandler(MetricsHandler):
 
     Takes two configs: ``config`` is the TensorBoard *backend* section
     (``args.tools.tensorboard``: enable/dir), and ``metrics_config`` is the
-    backend-agnostic *feature-switch* section (``args.training.metrics``:
+    backend-agnostic *feature-switch* section (``args.tools.metrics``:
     grad_norm_per_layer / token_stats / ...). Keeping them separate lets other
     backends reuse the same feature switches. When ``metrics_config`` is None,
     all feature switches default to off (only train/val scalars are written).
@@ -97,8 +100,10 @@ class TensorBoardHandler(MetricsHandler):
             if self._switch("token_stats"):
                 tb_writer.write_rank_scalars(iteration, metrics, prefix="rank")
         elif kind == KIND_PER_RANK_DETAIL:
+            # One gather feeds three renderings: the per-rank curves, the per-step
+            # histogram (all ranks) and the rank x step heatmap (the listed ranks).
             if self._switch("token_stats_per_rank"):
-                tb_writer.write_per_rank_scalars(
+                tb_writer.write_rank_detail(
                     iteration,
                     metrics,
                     prefix="rank_tokens",
