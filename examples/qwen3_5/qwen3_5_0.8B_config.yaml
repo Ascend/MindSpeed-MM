@@ -1,0 +1,197 @@
+# Qwen3.5-0.8B 微调配置
+#
+# 以 qwen3_5_4B_config.yaml 为基底派生，针对 0.8B 规模与单卡场景调整。
+# 与 4B 配置的差异及理由：
+#   1. 权重路径改为 Qwen35-0.8B。
+#   2. 打开 freeze: ['model.visual']，冻结视觉塔。
+#   3. 显式设置 mtp_num_layers: 0。HF 权重中携带的 mtp.* 键不会被加载，
+#      加载日志提示 "HF checkpoint had 15 key(s) not present in the model" 属正常现象。
+#   4. chunkloss_plan 增加 total_chunk_size: 4096。
+#   5. enable_activation_offload 置为 false：0.8B 单卡显存充裕（峰值约 17.5 GB / 61.27 GiB），
+#      无需把激活在 CPU 与 NPU 之间搬运。实测相对开启时吞吐 +9.1%、每步耗时 -8.3%、
+#      峰值显存 -294 MB，且不改变训练数值。
+#   6. gdn_implementation 使用 triton：纯 triton 实现，无额外依赖。
+#      若已安装 fla_npu（flash-linear-attention-npu），可改为 ascendc 融合算子，
+#      官方对照数据为每步耗时 -10.7%、吞吐 +12.0%。
+#   7. 训练段按 global_batch_size = 8 配置：micro_batch_size 4 × gradient_accumulation_steps 2
+#      （单卡）。并按"直接从 HF 权重开始训练"的方式关闭 optimizer / RNG 的加载与保存。
+#
+# 本配置对应的精度表现（单卡 Ascend 910C，100 iteration，与官方精度日志逐点比对）：
+#   Mean Error 0.0006 ~ 0.0007，Max Error 0.0024 ~ 0.0027，超出 0.02 阈值的点数为 0。
+
+# 并行策略
+parallel:
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules: # 如果要开prefetch的话，请不要随意修改apply_modules的顺序
+      - model.visual
+      - model.visual.blocks.{*}
+      - model.language_model.embed_tokens
+      - model.language_model
+      - model.language_model.layers.{*}
+      - lm_head
+      - mtp
+    param_dtype: bf16
+    reduce_dtype: fp32
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+  ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
+
+### 数据相关配置
+data:
+  dataset_param:
+    dataset_type: huggingface
+    #数据集属性
+    attr:
+      images: images
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+
+    # 数据预处理
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH ./ckpt/hf_path/Qwen35-0.8B # 替换为原始hf权重
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 0
+      video_fps: 2.0
+      video_maxlen: 64
+
+    basic_parameters:
+      cutoff_len: 1024
+      template: qwen3_vl_nothink
+      enable_thinking: false
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: ./data/COCO2017
+      dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
+      cache_dir: ./cache_dir/
+      overwrite_cache: false
+      preprocess_on_fly: true
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+
+  # 数据加载
+  dataloader_param:
+    pin_memory: true
+    shuffle: false # 需与参考基准逐步对齐时置 false，保证样本顺序一致；常规训练可置 true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      model_name: qwen3vl
+      ignore_pad_token_for_loss: true
+    enable_preload: false
+
+# 模型配置
+model:
+  model_id: qwen3_5
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  attn_implementation: flash_attention_2
+  freeze:
+    - model.visual
+  mtp_num_layers: 0
+  # 融合算子配置
+  gdn_implementation: triton # 已装 fla_npu 时可改为 ascendc
+  causal_conv1d_implementation: triton
+  # skip_recompute
+  skip_gdn_recompute: true
+  skip_flash_attn_recompute: true
+
+# 优化特性配置
+features:
+  # loss 配置
+  loss_cfg:
+    loss_type: default   # If you want raw loss in model, loss_type can be set to "raw".
+    router_aux_loss_coef: 0.0
+  # 重计算配置
+  recompute: true
+  recompute_plan:
+      apply_modules:
+        - model.visual.blocks.{*}
+        - model.language_model.layers.{*}
+  # chunkloss配置
+  enable_chunk_loss: true
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 1024
+    total_chunk_size: 4096
+  # activation offload 配置
+  # 0.8B 单卡显存充裕，关闭以省去激活搬运开销（详见文件头说明第 5 条）
+  enable_activation_offload: false
+  activation_offload_plan:
+    apply_modules:
+     - model.visual.blocks.{*}
+     - model.language_model.layers.{*}
+  # chunkmbs配置
+  enable_chunk_mbs: false
+  chunkmbs_plan:
+    apply_modules:
+     - model.language_model.layers.{*}
+    chunk_mbs: 2 # 这个表示的是chunk之后的micro batchsize
+    batch_dim: 0
+    chunk_arg_indexs: [0]
+    chunk_kwarg_names: ["position_embeddings", "position_ids", "rope_deltas", "attention_mask"]
+
+# 训练配置
+training:
+  micro_batch_size: 4
+  gradient_accumulation_steps: 2 # 4 x 2 x 1卡 = global_batch_size 8
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.1
+  weight_decay: 0
+  train_iters: 100 # 示例值，便于逐步与参考日志对齐；正式微调请按需调整
+  clip_grad: 0.0
+  init_model_with_meta_device: true
+  optimizer: adamw
+  adam_fused: true
+  save_interval: 10000
+  no_load_optim: true  # Do not load optimizer state; load by default.
+  no_load_rng: true  # Do not load RNG state; load by default.
+  no_save_optim: true  # Do not save optimizer state; save by default.
+  no_save_rng: true  # Do not save RNG state; save by default.
+  load: ./ckpt/hf_path/Qwen35-0.8B  # 根据load_format替换为hf权重或转换后的dcp权重路径
+  load_format: auto  # 可配置hf或dcp，置为auto时会根据文件格式自动判断，当加载hf权重时需将no_load_optim和no_load_rng置为true
+  save: ./save_path
+  save_format: dcp  # 可配置hf或dcp，当保存为hf权重时需将no_save_optim和no_save_rng置为true
+  use_deter_comp: false
+  plugin:
+    - mindspeed_mm/fsdp/models/qwen3_5
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+
+# 工具配置
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+      enable: false
+      start_step: 1
+      end_step: 2
+      save_path: ./memory_snapshot
+      dump_ranks: [0]
+      stacks: all
+      max_entries: null
+      mem_info: false
