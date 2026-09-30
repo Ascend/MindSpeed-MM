@@ -322,6 +322,12 @@ docker run -it --rm \
     my-mindspeed-app:latest bash
 ```
 
+## Security Risks
+
+Please be aware of the following security risks when running in Docker containers:
+
+- **Running as the root user:** Containers run as the root user by default, which may introduce security risks. It is recommended to create a non-privileged user for running applications in production environments.
+
 ## License
 
 MindSpeed MM is released under the Apache License 2.0. See the [LICENSE](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/LICENSE) file for details.

@@ -322,6 +322,12 @@ docker run -it --rm \
     my-mindspeed-app:latest bash
 ```
 
+## 安全风险
+
+在使用 Docker 容器运行时，需要注意以下安全风险：
+
+- **使用 root 用户运行：** 容器默认以 root 用户身份运行，可能带来安全隐患。建议在生产环境中创建非特权用户来运行应用程序。
+
 ## 许可证
 
 MindSpeed MM 基于 Apache License 2.0 许可证发布。详见 [LICENSE](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/LICENSE) 文件。
