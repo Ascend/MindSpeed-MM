@@ -651,6 +651,10 @@ class DataArguments(BaseArguments):
         default=1000,
         metadata={"help": "The number of examples in one group in pre-processing."},
     )
+    pack_sort_by_image: bool = field(
+        default=False,
+        metadata={"help": "Sort packed bins by image token count in descending order and use block-level shuffle for image-load-balanced sampling."},
+    )
     preprocessing_num_workers: Optional[int] = field(
         default=None,
         metadata={"help": "The number of processes to use for the pre-processing."},
@@ -743,6 +747,18 @@ def greedy_knapsack(numbers: List[int], capacity: int) -> List[List[int]]:
         knapsacks.append(current_knapsack)
 
     return knapsacks
+
+
+def count_image_token_ids(input_ids: List[int], image_token_ids: List[int]) -> int:
+    r"""Count the number of occurrences of the image token id sequence in the input ids."""
+    if not image_token_ids:
+        return 0
+    count = 0
+    m = len(image_token_ids)
+    for i in range(len(input_ids) - m + 1):
+        if input_ids[i:i + m] == image_token_ids:
+            count += 1
+    return count
 
 
 @dataclass
@@ -920,6 +936,19 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
         batch_input_ids, batch_labels, batch_images, batch_videos, batch_audios = [], [], [], [], []
         lengths = []
         length2indexes = defaultdict(list)
+        # Encode the image token once per batch and record each sample's image token count.
+        # Counting only runs when pack_sort_by_image is enabled on the offline preprocess
+        # path, so the switch-off pipeline stays bit-identical to baseline (no extra column).
+        count_image = (
+            self.data_args.pack_sort_by_image
+            and not self.data_args.streaming
+            and not self.data_args.preprocess_on_fly
+        )
+        image_token_ids: List[int] = []
+        image_counts = []
+        if count_image:
+            if self.template.mm_plugin.image_token is not None:
+                image_token_ids = self.tokenizer.encode(self.template.mm_plugin.image_token, add_special_tokens=False)
         for i in range(len(examples["_prompt"])):
             if len(examples["_prompt"][i]) % 2 != 1 or len(examples["_response"][i]) != 1:
                 logger.warning_rank0(
@@ -949,6 +978,8 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
                 labels[0] = IGNORE_INDEX  # mark the last token's label as ignore.
                 lengths.append(length)
                 length2indexes[length].append(valid_num)
+                if count_image:
+                    image_counts.append(count_image_token_ids(input_ids, image_token_ids))
                 batch_input_ids.append(input_ids)
                 batch_labels.append(labels)
                 batch_images.append(examples["_images"][i] or [])
@@ -962,10 +993,13 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
             "input_ids": [], "attention_mask": [], "position_ids": [], "labels": [],
             "images": [], "videos": [], "audios": [], "cu_seqlens": [],
         }
+        if count_image:
+            model_inputs["_image_token_count"] = []
         knapsacks = greedy_knapsack(lengths, self.data_args.cutoff_len)
         for knapsack in knapsacks:
             packed_input_ids, packed_attention_masks, packed_position_ids, packed_labels = [], [], [], []
             packed_images, packed_videos, packed_audios, cu_seqlens = [], [], [], [0]
+            bin_image_count = 0
             for i, length in enumerate(knapsack):
                 index = length2indexes[length].pop()
                 packed_input_ids += batch_input_ids[index]
@@ -975,6 +1009,8 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
                 packed_videos += batch_videos[index]
                 packed_audios += batch_audios[index]
                 cu_seqlens += [cu_seqlens[-1] + length]
+                if count_image:
+                    bin_image_count += image_counts[index]
                 if self.data_args.neat_packing:
                     packed_attention_masks += [i + 1] * len(batch_input_ids[index])  # start from 1
                 else:
@@ -988,6 +1024,8 @@ class PackedSupervisedDatasetProcessor(SupervisedDatasetProcessor):
             model_inputs["videos"].append(packed_videos or None)
             model_inputs["audios"].append(packed_audios or None)
             model_inputs["cu_seqlens"].append(cu_seqlens)
+            if count_image:
+                model_inputs["_image_token_count"].append(bin_image_count)
 
         return model_inputs
 

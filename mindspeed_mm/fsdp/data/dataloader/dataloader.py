@@ -141,6 +141,13 @@ def prepare_sampler_dataloader(
         "SeedRandomBatchSampler": SeedRandomBatchSampler,
     }
     if sampler_type in sampler_classes:
+        # Resolve block-level shuffling from the dataset configuration (next to the
+        # sampler instantiation) instead of having the trainer pass it through:
+        # it is enabled by the dataset's pack_sort_by_image switch on the packed,
+        # non-streaming path. The sampler itself combines it with shuffle.
+        basic_parameters = getattr(dataset_param, "basic_parameters", None)
+        block_shuffle = bool(getattr(basic_parameters, "pack_sort_by_image", False)) \
+            if basic_parameters is not None else False
         batch_sampler = sampler_classes[sampler_type](
             dataset,
             batch_size=batch_size,
@@ -151,6 +158,7 @@ def prepare_sampler_dataloader(
             drop_last=drop_last,
             data_sharding=data_sharding,
             infinite=infinite_sampler,
+            block_shuffle=block_shuffle,
         )
         collate_fn = None
 

@@ -319,6 +319,17 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
                     desc=f"Rank {local_process_index}, running tokenizer on train_dataset",
                     **kwargs,
                 )
+            # Sort bins globally by image token count (descending, stable) so that adjacent
+            # bins taken by the sampler in one micro-step carry similar image loads.
+            # Requires the pack feature enabled (packing) and the pack_sort_by_image switch;
+            # the _image_token_count column is only produced by PackedSupervisedDatasetProcessor
+            # when pack_sort_by_image is on, so this is a defensive guard as well.
+            if data_args.pack_sort_by_image and data_args.packing and not data_args.streaming:
+                if "_image_token_count" in train_dataset.column_names:
+                    counts = train_dataset["_image_token_count"]
+                    order = sorted(range(len(counts)), key=lambda i: -counts[i])  # Python sorted is stable
+                    train_dataset = train_dataset.select(order)
+                    train_dataset = train_dataset.remove_columns(["_image_token_count"])
             if val_dataset:
                 val_dataset = val_dataset.map(
                     preprocess_func,
@@ -328,6 +339,8 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
                     desc=f"Rank {local_process_index}, running tokenizer on val_dataset",
                     **kwargs,
                 )
+                if "_image_token_count" in val_dataset.column_names:
+                    val_dataset = val_dataset.remove_columns(["_image_token_count"])
                 return train_dataset, val_dataset
         if torch.distributed.is_initialized() and torch.distributed.get_rank() == 0:
             print("training example:")

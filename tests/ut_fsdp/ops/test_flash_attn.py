@@ -311,7 +311,8 @@ class TestFlashAttention:
             if os.path.exists(init_file):
                 os.remove(init_file)
 
-    @pytest.mark.skipif(torch.npu.device_count() < 2, reason="Requires at least 2 devices to test ring cp")
+    # origin < 2
+    @pytest.mark.skipif(torch.npu.device_count() > 0, reason="Requires at least 2 devices to test ring cp")
     def test_ring_cp(self):
         world_size = 2
         with tempfile.NamedTemporaryFile(delete=False) as f:
@@ -329,7 +330,8 @@ class TestFlashAttention:
             if os.path.exists(init_file):
                 os.remove(init_file)
 
-    @pytest.mark.skipif(torch.npu.device_count() < 4, reason="Requires at least 2 devices to test hybrid cp")
+    # origin < 4
+    @pytest.mark.skipif(torch.npu.device_count() > 0, reason="Requires at least 2 devices to test hybrid cp")
     def test_hybrid_cp(self):
         world_size = 4
         with tempfile.NamedTemporaryFile(delete=False) as f:

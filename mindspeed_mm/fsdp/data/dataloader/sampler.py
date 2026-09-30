@@ -24,6 +24,12 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
         drop_last (bool, optional): if ``True``, then the sampler will drop the
             tail of the data to make it evenly divisible across the number of
             replicas. Default: ``True``. (It is not implemented that the drop_last is false.)
+        block_shuffle (bool, optional): If ``True`` and :attr:`shuffle=True`,
+            the random permutation is applied at the granularity of "blocks"
+            (block size = ``micro_batch_size * num_replicas``, i.e. the total
+            number of samples consumed by all DP ranks within one micro-step).
+            Blocks are shuffled, while samples inside each block keep their
+            original (sorted) order. Default: ``False``.
     """
 
     def __init__(
@@ -37,6 +43,7 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
         drop_last: bool = True,
         data_sharding: bool = False,
         infinite: bool = False,
+        block_shuffle: bool = False,
     ):
         super().__init__(dataset, num_replicas, rank, shuffle, seed, drop_last)
         self.total_samples = len(dataset)
@@ -45,6 +52,7 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
         self.next_consumed_samples = None
         self.data_sharding = data_sharding
         self.infinite = infinite
+        self.block_shuffle = block_shuffle
         self.epoch = 0
         self.micro_batch_times_data_parallel_size = \
             self.micro_batch_size * self.num_replicas
@@ -101,8 +109,22 @@ class BaseRandomBatchSampler(StatefulDistributedSampler):
                                 * self.micro_batch_size
             full_bucket_offset = current_epoch_samples
             if self.shuffle:
-                idx_range_total = \
-                    torch.randperm(full_bucket_size, generator=g).tolist()
+                if self.block_shuffle:
+                    # Block-level shuffle: permute the block sequence only, keep
+                    # samples inside each block in their original (sorted) order.
+                    # Block size = micro_batch_times_data_parallel_size, i.e. the
+                    # total samples consumed by all DP ranks within one micro-step.
+                    block_size = self.micro_batch_times_data_parallel_size
+                    num_blocks = full_bucket_size // block_size
+                    block_order = torch.randperm(num_blocks, generator=g).tolist()
+                    idx_range_total = [
+                        b * block_size + i
+                        for b in block_order
+                        for i in range(block_size)
+                    ]
+                else:
+                    idx_range_total = \
+                        torch.randperm(full_bucket_size, generator=g).tolist()
             else:
                 idx_range_total = list(range(full_bucket_size))
             idx_range_active = idx_range_total[full_bucket_offset:]
@@ -158,6 +180,7 @@ class SeedRandomBatchSampler(BaseRandomBatchSampler):
         drop_last: bool = True,
         data_sharding: bool = False,
         infinite: bool = False,
+        block_shuffle: bool = False,
     ):
         if shuffle and seed < 0:
             raise ValueError(
@@ -165,7 +188,7 @@ class SeedRandomBatchSampler(BaseRandomBatchSampler):
             )
         super().__init__(
             dataset, batch_size, num_replicas, rank, shuffle, seed,
-            drop_last, data_sharding, infinite,
+            drop_last, data_sharding, infinite, block_shuffle,
         )
 
     def _get_epoch_seed(self) -> int:
