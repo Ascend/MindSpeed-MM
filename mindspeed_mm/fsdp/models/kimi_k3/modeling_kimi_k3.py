@@ -464,11 +464,6 @@ class Rope2DPosEmbRepeated(nn.Module):
     3. During the forward pass, pass the `freqs_cis` tensor to each attention layer, and call `apply` just before each attention operation.
         The rope is shared across all attention layers and all heads.
 
-    Refs:
-    - RoFormer: https://arxiv.org/abs/2104.09864
-    - VisionLLaMA: https://arxiv.org/abs/2403.00522
-    - https://github.com/Meituan-AutoML/VisionLLaMA/blob/main/dit/models.py
-
     Args:
         dim (int): usually the multi-head attention dimension, should be divisible by 4 (TODO: relax this constraint if needed)
         max_height (int): the maximum height of the 2D grid

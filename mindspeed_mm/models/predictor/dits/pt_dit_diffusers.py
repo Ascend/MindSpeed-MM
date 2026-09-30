@@ -446,8 +446,6 @@ class AdaLayerNormSingle(nn.Module):
     r"""
     Norm layer adaptive layer norm single (adaLN-single).
 
-    As proposed in PixArt-Alpha (see: https://arxiv.org/abs/2310.00426; Section 2.3).
-
     Parameters:
         embedding_dim (`int`): The size of each embedding vector.
         use_additional_conditions (`bool`): To use additional conditions for normalization or not.
