@@ -48,8 +48,7 @@ class HunyuanImage3Config(PretrainedConfig):
             `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
             `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
             converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
-            by meanpooling all the original heads within that group. For more details checkout [this
-            paper](https://arxiv.org/pdf/2305.13245.pdf). If it is not specified, will default to
+            by meanpooling all the original heads within that group. If it is not specified, will default to
             `num_attention_heads`.
         hidden_act (`str` or `function`, *optional*, defaults to `"silu"`):
             The non-linear activation function (function or string) in the decoder.
@@ -81,9 +80,7 @@ class HunyuanImage3Config(PretrainedConfig):
             Dictionary containing the scaling configuration for the RoPE embeddings. Currently supports two scaling
             strategies: linear and dynamic. Their scaling factor must be a float greater than 1. The expected format is
             `{"type": strategy name, "factor": scaling factor}`. When using this flag, don't update
-            `max_position_embeddings` to the expected new maximum. See the following thread for more information on how
-            these scaling strategies behave:
-            https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/. This is an
+            `max_position_embeddings` to the expected new maximum. This is an
             experimental feature, subject to breaking API changes in future versions.
         attention_bias (`bool`, defaults to `False`, *optional*, defaults to `False`):
             Whether to use a bias in the query, key, value and output projection layers during self-attention.
