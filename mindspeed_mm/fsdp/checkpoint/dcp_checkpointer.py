@@ -157,6 +157,7 @@ class DistributedCheckpointer(CheckpointerBase):
     dcp_save_future: Optional[Any] = None
     # Dedicated process group for async saves (created on first use)
     _async_process_group: Optional[Any] = None
+    _sync_process_group: Optional[Any] = None
 
     @classmethod
     def save(
@@ -305,6 +306,8 @@ class DistributedCheckpointer(CheckpointerBase):
                 storage_reader=storage_reader,
             )
         else:
+            if process_group is None and dist.is_initialized():
+                process_group = cls._get_sync_process_group()
             dcp.load(
                 state_dict=load_state,
                 storage_reader=storage_reader,
@@ -347,9 +350,11 @@ class DistributedCheckpointer(CheckpointerBase):
                 process_group=cls._async_process_group,
             )
         else:
+            process_group = cls._get_sync_process_group() if dist.is_initialized() else None
             dcp.save(
                 state_dict=save_state,
                 storage_writer=storage_writer,
+                process_group=process_group,
             )
             if dist.is_initialized():
                 dist.barrier()
@@ -366,6 +371,21 @@ class DistributedCheckpointer(CheckpointerBase):
             f.write(str(iteration))
 
     # Private helper methods
+    @classmethod
+    def _get_sync_process_group(cls):
+        """Use CPU collectives for DCP metadata planning on HCCL systems."""
+        if cls._sync_process_group is None:
+            default_group = dist.distributed_c10d._get_default_group()
+            bound_device_id = default_group.bound_device_id
+            try:
+                # torch_npu rejects a CPU device_id, while PyTorch otherwise
+                # inherits the default NPU binding into this CPU-only group.
+                default_group.bound_device_id = None
+                cls._sync_process_group = dist.new_group(backend="cpu:gloo")
+            finally:
+                default_group.bound_device_id = bound_device_id
+        return cls._sync_process_group
+
     @classmethod
     def _create_checkpoint_dir(cls, checkpoint_dir: str) -> None:
         """Create checkpoint directory."""
