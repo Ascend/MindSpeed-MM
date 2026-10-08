@@ -832,9 +832,8 @@ class Glm5NextTextLinearAttention(nn.Module):
                     mixed_qkv.transpose(1, 2), self.layer_idx, conv_kernel_size=self.conv_kernel_size
                 ).transpose(1, 2)
 
-            cu_seqlens = None
-            if kwargs.get("cu_seq_lens_q") is not None:
-                cu_seqlens = kwargs["cu_seq_lens_q"].to(torch.int64)
+            cu_seqlens = kwargs.get("cu_seqlens")
+            cu_seqlens = cu_seqlens.to(dtype=torch.int64) if cu_seqlens is not None else None
 
             if self.causal_conv1d_implementation == IMPL_TRITON:
 
