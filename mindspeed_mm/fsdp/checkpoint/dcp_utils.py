@@ -344,6 +344,14 @@ class ProgressLoadPlanner(DefaultLoadPlanner):
         self._progress = None
         self._completed = 0
 
+    def create_local_plan(self):
+        plan = super().create_local_plan()
+        if self.allow_partial_load:
+            missing_keys = sorted(set(self.state_dict) - set(self.metadata.state_dict_metadata))
+            if missing_keys:
+                print_rank(logger.warning, f"Missing keys in checkpoint: {missing_keys}")
+        return plan
+
     def finish_plan(self, plan):
         plan = super().finish_plan(plan)
         if not dist.is_initialized() or dist.get_rank() == 0:
