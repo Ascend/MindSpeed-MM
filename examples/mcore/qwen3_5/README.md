@@ -35,6 +35,8 @@ commit_id=fc91372
 
 2026.07.15: 首次支持Qwen3_5 35B Mcore后端
 
+2026.08.20: 支持Qwen3_5 27B（dense）Mcore后端
+
 ---
 <a id="jump1"></a>
 
@@ -96,7 +98,7 @@ source /usr/local/Ascend/cann/set_env.sh
 
 # 编译算子 run 包，--soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
 bash build.sh --soc=ascend910b --pkg --vendor_name=fla_npu
-bash build_out/fla-npu_*.run
+bash build_out/*.run
 cd torch_custom/fla_npu/
 bash build.sh
 ```
@@ -186,7 +188,7 @@ gpt_args:
 
 【MoE配置】
 
-根据实际需求配置`xxx_config.yaml`中moe相关配置，主要涉及`gpt_args`和`model`两个部分的参数设置
+Qwen3.5-35B（MoE）需根据实际需求配置`xxx_config.yaml`中moe相关配置，主要涉及`gpt_args`和`model`两个部分的参数设置（Qwen3.5-27B为dense模型，`text_decoder.model_id`配置为`qwen3_5`，无需以下MoE配置）
 
 ```yaml
 gpt_args:
@@ -260,6 +262,8 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 ```
+
+27B（dense）模型对应配置`examples/mcore/qwen3_5/finetune_qwen3_5_27B.sh`，参数修改方式相同。
 
 【多机运行配置】
 如需拉起多机训练，修改启动脚本下 MASTER_ADDR、NODE_ADDR、NNODES以及NODE_RANK变量

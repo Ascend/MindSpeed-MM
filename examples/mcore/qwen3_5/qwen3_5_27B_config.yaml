@@ -1,0 +1,201 @@
+MM_TOOL_PATH: ./mindspeed_mm/tools/tools.json
+
+### GPT args
+gpt_args:
+  ## parallel: （TP/PP/CP/)
+  context_parallel_size: 1
+  context_parallel_algo: ulysses_cp_algo
+  tensor_model_parallel_size: &TP 4
+  sequence_parallel: true
+  pipeline_model_parallel_size: &PP 1
+
+  ## training:
+  clip_grad: 1.0
+  micro_batch_size: 1
+  global_batch_size: 16  # 4机32卡配置: global_batch_size=micro_batch_size*grad_acc_step*dp=micro_batch_size*grad_acc_step*(world_size/TP/PP)=1*2*8
+  optimizer_selection: "fused_torch_adamw"
+  lr: 1.0e-5
+  weight_decay: 0.0
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  lr_decay_style: cosine
+  lr_warmup_fraction: 0.1
+  train_iters: 2000
+  ckpt_format: torch
+  no_load_optim: true  # 不加载优化器状态，若需加载请移除
+  no_load_rng: true  # 不加载随机数状态，若需加载请移除
+  no_save_optim: true  # 不保存优化器状态，若需保存请移除
+  no_save_rng: true  # 不保存随机数状态，若需保存请移除
+  seed: 42
+  bf16: true
+
+  use_distributed_optimizer: true
+  overlap_grad_reduce: true
+
+  ## save_and_logging:
+  log_interval: 1
+  save_interval: 10000
+  eval_interval: 10000
+  eval_iters: 5000
+  save: save_dir
+  log_tps: true
+
+  ## model:
+  load: ckpt/Qwen3.5-27B
+  normalization: RMSNorm
+  use_fused_rmsnorm: true
+  swiglu: true
+  use_fused_swiglu: true
+  use_flash_attn: true
+  vocab_size: 152064
+  seq_length: 24576
+  kv_channels: 256  # 27B Gated Attention: 24 heads x 256 != hidden 5120, explicit kv_channels to skip divisibility check
+  make_vocab_size_divisible_by: 1
+  tokenizer_type: NullTokenizer
+  untie_embeddings_and_output_weights: true
+  no_masked_softmax_fusion: true
+
+  ## data:
+  num_workers: 8
+
+
+### 模型相关配置
+model:
+  freeze_vision_model: true
+  freeze_vision_projection: true
+  freeze_language_model: false
+
+  image_encoder:
+    vision_encoder:
+      num_layers: 27
+      hidden_size: 1152
+      in_channels: 3
+      ffn_hidden_size: 4304
+      num_attention_heads: 16
+      num_position_embeddings: 2304
+      out_hidden_size: 5120
+      patch_size: 16
+      spatial_merge_size: 2
+      temporal_patch_size: 2
+      add_bias_linear: true
+      add_qkv_bias: true
+      add_bias_conv: true
+      hidden_dropout: 0.0
+      attention_dropout: 0.0
+      gated_linear_unit: false
+      bias_dropout_fusion: true
+  text_decoder:
+    model_id: qwen3_5
+    # parallel
+    tensor_model_parallel_size: *TP
+    pipeline_model_parallel_size: *PP
+    sequence_parallel: true
+
+    causal_conv1d_implementation: torch
+    gdn_implementation: AscendC
+
+    image_token_id: 248056
+    video_token_id: 248057
+    vision_start_token_id: 248053
+    vision_end_token_id: 248054
+    eos_token_id: 248044
+    bos_token_id: 248045
+
+    num_layers: 64
+    linear_attention_freq: 4
+    num_attention_heads: 24
+    hidden_size: 5120
+    # Gated DeltaNet (GDN) config
+    linear_conv_kernel_dim: 4
+    linear_key_head_dim: 128
+    linear_num_key_heads: 16
+    linear_num_value_heads: 48
+    linear_value_head_dim: 128
+    # Dense MLP config (SwiGLU: linear_fc1 = fused [gate; up], linear_fc2 = down)
+    ffn_hidden_size: 17408
+    # Common LLM config
+    share_embeddings_and_output_weights: false
+    normalization: RMSNorm
+    gated_linear_unit: true
+    add_bias_linear: false
+    add_qkv_bias: false
+    qk_layernorm: true
+    kv_channels: 256
+    num_query_groups: 4
+    hidden_dropout: 0.0
+    attention_dropout: 0.0
+    attention_softmax_in_fp32: true
+    rotary_base: 10000000.0
+    rotary_percent: 0.25
+    seq_length: 24576
+    bf16: true
+
+    # VL-specidic config
+    position_embedding_type: mrope
+    mrope_section: [11, 11, 10]
+    apply_rotary_pos_emb_in_fp32: false
+    max_position_embeddings: 32768
+    vocab_size: 248320
+    recompute_num_layers: 64
+    recompute_granularity: full
+    recompute_method: block
+  patch:
+      clip_grad_async: true
+      bridge_patch: true
+
+
+### 数据相关配置
+data:
+  dataset_param:
+    dataset_type: huggingface
+    #数据集属性
+    attr:
+      system: null
+      images: images
+      videos: null
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+      observation_tag: null
+      function_tag: null
+      system_tag: null
+
+    # 数据预处理
+    preprocess_parameters:
+      model_name_or_path: ckpt/Qwen3.5-27B
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 0
+      video_fps: 2.0
+      video_maxlen: 64
+
+    basic_parameters:
+      template: qwen3_vl_nothink
+      enable_thinking: false
+      train_on_prompt: false
+      mask_history: false
+      tool_format: null
+      dataset_dir: datasets/mocked_vl_data
+      dataset: datasets/mocked_vl_data/mock_data_pic_num_10_textlen_16384.json
+      cache_dir: ./data/cache_dir
+      overwrite_cache: false
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+
+  # 数据加载
+  dataloader_param:
+    pin_memory: true
+    shuffle: false
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      model_name: qwen3vl
+      ignore_pad_token_for_loss: true

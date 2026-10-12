@@ -198,7 +198,8 @@ def get_qwen3_5_text_block_spec(
            with MoE, or standard attention with dense MLP).
            - Attention pattern: derived from `config.linear_attention_freq` or
              `config.experimental_attention_variant`.
-           - MLP pattern: derived from `config.moe_layer_freq`.
+            - MLP pattern: derived from `config.num_moe_experts`
+              (MoE when set, dense SwiGLU MLP otherwise).
 
         2. Per-Layer Spec Construction: Iterates through layers, constructing transformer
            layer specs based on attention and MLP patterns.
@@ -225,13 +226,18 @@ def get_qwen3_5_text_block_spec(
             if (layer_number + 1) % config.linear_attention_freq == 0
             else get_gated_delta_net_module_spec(config)
         )
-        mlp = get_moe_module_spec(
-            use_te=config.use_te,
-            num_experts=config.num_moe_experts,
-            moe_grouped_gemm=config.moe_grouped_gemm,
-            moe_shared_expert_gate=config.moe_shared_expert_gate,
-            tp_size=config.tensor_model_parallel_size
-        )
+        if config.num_moe_experts is not None:
+            mlp = get_moe_module_spec(
+                use_te=config.use_te,
+                num_experts=config.num_moe_experts,
+                moe_grouped_gemm=config.moe_grouped_gemm,
+                moe_shared_expert_gate=config.moe_shared_expert_gate,
+                tp_size=config.tensor_model_parallel_size
+            )
+        else:
+            # Dense SwiGLU MLP (e.g. Qwen3.5-27B): linear_fc1 holds the fused
+            # [gate; up] projections and linear_fc2 the down projection.
+            mlp = get_mlp_module_spec(use_te=config.use_te)
 
         layer_specs.append(
             ModuleSpec(

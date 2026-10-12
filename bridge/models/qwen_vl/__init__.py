@@ -6,7 +6,7 @@ __all__ = [
 from bridge.models.qwen_vl.qwen25_vl_bridge import Qwen25VLBridge
 from bridge.models.qwen_vl.qwen3_vl_bridge import Qwen3VLMoEBridge, Qwen3VLBridge
 try:
-    from bridge.models.qwen_vl.qwen3_5_bridge import Qwen3_5MoEBridge
+    from bridge.models.qwen_vl.qwen3_5_bridge import Qwen3_5Bridge, Qwen3_5MoEBridge
 except ImportError as exc:
     exc_name = getattr(exc, "name", "") or ""
     exc_msg = str(exc)
@@ -23,4 +23,5 @@ except ImportError as exc:
     ):
         raise
 
+    Qwen3_5Bridge = None
     Qwen3_5MoEBridge = None

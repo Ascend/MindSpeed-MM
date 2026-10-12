@@ -81,20 +81,22 @@ class MindSpeedArgsRequired:
 
 
 @dataclass
-class Qwen3_5MoEModelConfig(TransformerConfig, MindSpeedArgsRequired):
+class Qwen3_5ModelConfig(TransformerConfig, MindSpeedArgsRequired):
     """
-    TransformerConfig for Qwen 3.5 VL (Vision-Language) Models.
+    TransformerConfig for dense Qwen 3.5 VL (Vision-Language) Models.
 
     Qwen 3.5 combines a hybrid GDN (Gated DeltaNet) + Gated Attention language model
-    architecture (like Qwen3-Next) with a vision encoder (similar to Qwen3-VL) and
-    Mixture of Experts (MoE) with shared experts.
+    architecture (like Qwen3-Next) with a vision encoder (similar to Qwen3-VL) and a
+    dense SwiGLU MLP per decoder layer (e.g. Qwen3.5-27B).
 
-    Key Architecture Details (397B-A17B):
-    - 60 layers: 15 groups × (3 GDN-MoE + 1 Attention-MoE)
-    - Hidden dim: 4096, Token Embedding: 248320
-    - GDN: 16 QK heads, 64 V heads, head_dim=128
-    - Gated Attention: 32 Q heads, 2 KV heads, head_dim=256
-    - MoE: 512 experts, 10 routed + 1 shared, expert dim=1024
+    Key Architecture Details (27B):
+    - 64 layers: 16 groups × (3 GDN + 1 Attention)
+    - Hidden dim: 5120, Token Embedding: 248320
+    - GDN: 16 QK heads, 48 V heads, head_dim=128
+    - Gated Attention: 24 Q heads, 4 KV heads, head_dim=256
+    - Dense MLP: SwiGLU with intermediate size 17408 (ffn_hidden_size follows the HF
+      intermediate_size convention; Megatron doubles the linear_fc1 output width
+      internally when gated_linear_unit is set)
     - mRoPE with sections [11, 11, 10], rope_theta=10,000,000
     - partial_rotary_factor=0.25
 
@@ -117,23 +119,7 @@ class Qwen3_5MoEModelConfig(TransformerConfig, MindSpeedArgsRequired):
     linear_key_head_dim: int = 128
     linear_value_head_dim: int = 128
     linear_num_key_heads: int = 16
-    linear_num_value_heads: int = 64  # 64 V heads for GDN in 397B model
-
-    # =========================================================================
-    # MoE parameters
-    # =========================================================================
-    num_moe_experts: int = 512
-    moe_ffn_hidden_size: int = 1024
-    moe_router_topk: int = 10  # 10 routed experts per token
-    moe_shared_expert_gate: bool = True
-    moe_router_load_balancing_type: str = "aux_loss"
-    moe_router_pre_softmax: bool = False
-    moe_grouped_gemm: bool = False
-    moe_token_dispatcher_type: str = "alltoall"
-    moe_permute_fusion: bool = True
-    moe_aux_loss_coeff: float = 1e-3
-    use_fused_moe_token_permute_and_unpermute: bool = False
-    moe_router_force_load_balancing: bool = False
+    linear_num_value_heads: int = 48  # 48 V heads for GDN in 27B model
 
     # =========================================================================
     # GDN implementation choice (PyTorch vs. custom Triton/AscendC kernels)
@@ -229,6 +215,48 @@ class Qwen3_5MoEModelConfig(TransformerConfig, MindSpeedArgsRequired):
 
 
 @dataclass
+class Qwen3_5MoEModelConfig(Qwen3_5ModelConfig):
+    """
+    TransformerConfig for Qwen 3.5 VL MoE Models.
+
+    Same hybrid GDN + Gated Attention architecture and vision encoder as the dense
+    variant, but each decoder layer uses Mixture of Experts (MoE) with shared experts.
+
+    Key Architecture Details (397B-A17B):
+    - 60 layers: 15 groups × (3 GDN-MoE + 1 Attention-MoE)
+    - Hidden dim: 4096, Token Embedding: 248320
+    - GDN: 16 QK heads, 64 V heads, head_dim=128
+    - Gated Attention: 32 Q heads, 2 KV heads, head_dim=256
+    - MoE: 512 experts, 10 routed + 1 shared, expert dim=1024
+    - mRoPE with sections [11, 11, 10], rope_theta=10,000,000
+    - partial_rotary_factor=0.25
+
+    Note: num_query_groups corresponds to num_key_value_heads in HF config (for
+    standard Gated Attention layers). GDN layers have separate head counts.
+    """
+
+    # =========================================================================
+    # MoE parameters
+    # =========================================================================
+    num_moe_experts: int = 512
+    moe_ffn_hidden_size: int = 1024
+    moe_router_topk: int = 10  # 10 routed experts per token
+    moe_shared_expert_gate: bool = True
+    moe_router_load_balancing_type: str = "aux_loss"
+    moe_router_pre_softmax: bool = False
+    moe_grouped_gemm: bool = False
+    moe_token_dispatcher_type: str = "alltoall"
+    moe_permute_fusion: bool = True
+    moe_aux_loss_coeff: float = 1e-3
+    moe_router_force_load_balancing: bool = False
+
+    # =========================================================================
+    # Dense-MLP defaults overridden for MoE layers
+    # =========================================================================
+    linear_num_value_heads: int = 64  # 64 V heads for GDN in 397B model
+
+
+@dataclass
 class Qwen3_5VisionConfig(TransformerConfig, MindSpeedArgsRequired):
     use_te: bool = False
     pipeline_dtype: torch.dtype = torch.bfloat16
@@ -281,8 +309,15 @@ def get_qwen3_5_vision_config(config: Dict):
 def get_qwen3_5_llm_config(config: Dict):
     model_id = config.pop("model_id")
 
-    if model_id == "qwen3_5_moe":
+    if model_id == "qwen3_5":
+        print_rank_0(f"language config: {config}")
+        llm_config = Qwen3_5ModelConfig(**config)
+    elif model_id == "qwen3_5_moe":
         print_rank_0(f"language config: {config}")
         llm_config = Qwen3_5MoEModelConfig(**config)
+    else:
+        raise ValueError(
+            f"Unsupported model_id '{model_id}' for Qwen3.5, expected 'qwen3_5' (dense) or 'qwen3_5_moe'."
+        )
 
     return llm_config
