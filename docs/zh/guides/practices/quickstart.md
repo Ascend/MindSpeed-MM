@@ -567,6 +567,6 @@ mm-convert WanConverter mm_to_hf \
 
 ## 参考
 
-多模态理解模型更多细节请参考《[Qwen2_5_VL 使用指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/examples/qwen2.5vl/README.md)》。
+多模态理解模型更多细节请参考《[Qwen2_5_VL 使用指南](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/qwen2.5vl/README.md)》。
 
 多模态生成模型更多细节请参考《[Wan2.2 使用指南](../../../../examples/wan2.2/README.md)》。

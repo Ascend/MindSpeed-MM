@@ -50,13 +50,13 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 > [!NOTE]
 >
 > - 使用镜像前，请先确认机器型号。最新镜像仅支持aarch64架构，可通过uname -a命令确认当前环境是否符合要求。
-> - 配套镜像已预装配套的CANN 9.1.0软件及TorchNPU 26.1.0插件，您可根据需要选用。
+> - 配套镜像已预装配套的CANN 9.2.0软件及TorchNPU 26.2.0插件，您可根据需要选用。
 > - 若您当前环境与提供的镜像不兼容，请选择[方式二：源码安装](#方式二源码安装)。
 > - master分支后续会更新新的镜像，如果需要自定义构建镜像，请参见[镜像概述](../../../../docker/OVERVIEW.zh.md)。
 
 1. 拉取镜像
 
-   当前可使用MindSpeed MM 26.1.0分支对应镜像，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
+      最新镜像均配套[MindSpeed MM的26.2.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.2.0)，该镜像即将上线，当前可使用MindSpeed MM 26.1.0分支对应镜像，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
 
    <!-- npu="950" id1 -->
    - <term>Ascend 950PR&950DT系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11

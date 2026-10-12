@@ -14,7 +14,7 @@ With the number of devices unchanged, create more pipeline stages, trading incre
 
 ![virtual_pipeline](../../../sources/images/virtual_pipeline_parallel/virtual_pipeline.png)
 
-For more details, see [the paper](https://people.eecs.berkeley.edu/~matei/papers/2021/sc_megatron_lm.pdf).
+For more details, see [the paper](https://dl.acm.org/doi/10.1145/3458817.3476209).
 
 For easy understanding, here is an example: The Qwen2vl-7B model has 32 vision module layers and 28 language module layers. Set tensor parallelism size to 1, pipeline parallelism size to 4, and virtual pipeline parallelism size to 3. The model will be divided into `4 * 3 = 12` stages. The number of layers in each stage can be customized, supporting non-uniform partitioning.
 
