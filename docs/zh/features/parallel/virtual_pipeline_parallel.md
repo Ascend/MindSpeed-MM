@@ -14,7 +14,7 @@ Pipedream流水线并行切分粒度过大，运行过程中仍然有许多空�
 
 ![alt text](../../../../sources/images/virtual_pipeline_parallel/virtual_pipeline.png)
 
-[原文链接](https://people.eecs.berkeley.edu/~matei/papers/2021/sc_megatron_lm.pdf)
+[原文链接](https://dl.acm.org/doi/10.1145/3458817.3476209)
 
 为了方便理解，举一个例子：Qwen2vl-7B的视觉模块层数是32，语言模块层数是28。设置张量并行大小为1，流水线并行大小为4，虚拟流水线并行大小为3。模型会被分为 4 * 3 = 12 个阶段，其中每个阶段的层数可自定义，支持非均匀切分。
 

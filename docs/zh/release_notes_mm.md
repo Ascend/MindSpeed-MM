@@ -2,6 +2,8 @@
 
 ## 关键特性
 
+MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
+
 ## 版本配套说明
 
 ### 产品版本信息
@@ -13,17 +15,17 @@
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%"><p>产品版本</p>
 </th>
-<td class="cellrowborder" valign="top" width="73.75%" ><p>26.1.0</p>
+<td class="cellrowborder" valign="top" width="73.75%" ><p>26.2.0</p>
 </td>
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%"><p>版本类型</p>
 </th>
-<td class="cellrowborder" valign="top" width="73.75%" ><p>正式版本</p>
+<td class="cellrowborder" valign="top" width="73.75%" ><p>release版本</p>
 </td>
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%" id="mcps1.1.3.4.1"><p>发布时间</p>
 </th>
-<td class="cellrowborder" valign="top" width="73.75%" headers="mcps1.1.3.4.1 "><p>2026年7月</p>
+<td class="cellrowborder" valign="top" width="73.75%" headers="mcps1.1.3.4.1 "><p>2026年9月</p>
 </td>
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%"><p>维护周期</p>
@@ -44,7 +46,7 @@
 
 | MindSpeed MM版本 | MindSpeed Core代码分支名称 | Megatron版本 | PyTorch版本  | TorchNPU版本 | CANN版本 | Triton-Ascend版本 | Python版本     |
 | ---------------- | ------------------ | ------------ | -----------  | ------------- |--------------------- |-----------------| ------------------- |
-| master（在研版本）| master（在研版本）  | core_v0.12.1  | 2.10.0       | 在研版本       | 在研版本  | 在研版本            | Python3.12      |
+| 26.2.0 | 26.2.0_core_r0.12.1  | core_v0.12.1  | 2.10.0       | 26.2.0       | 9.2.0  | 3.2.2            | Python3.12      |
 | 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.2           | Python3.10      |
 | 26.0.0           | 26.0.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.0.0        | 9.0.0  | 3.2.1           | Python3.10      |
 
@@ -71,29 +73,40 @@
 <thead>
   <tr>
     <th rowspan="2">MindSpeed MM</th>
-    <th colspan="4">TorchNPU版本</th>
+    <th colspan="5">TorchNPU版本</th>
   </tr>
   <tr>
     <th>7.2.0</th>
     <th>7.3.0</th>
     <th>26.0.0</th>
-    <th>26.1.0</th>
+    <th>26.1.X</th>
+    <th>26.2.X</th>
   </tr>
 </thead>
 <tbody>
-  <tr>
-    <td>26.1.0</td>
-    <td>/</td>
-    <td>Y</td>
-    <td>Y</td>
-    <td>Y</td>
-  </tr>
   <tr>
     <td>26.0.0</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
-    <td>/</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+  <tr>
+    <td>26.1.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+    <tr>
+    <td>26.2.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
   </tr>
 </tbody>
 </table>
@@ -109,29 +122,40 @@
 </colgroup>
 <thead>
   <tr>
-    <th rowspan="2">MindSpeed MM</th>
-    <th colspan="4">CANN版本</th>
+    <th rowspan="3">MindSpeed MM</th>
+    <th colspan="5">CANN版本</th>
   </tr>
   <tr>
     <th>8.3.RC1</th>
     <th>8.5.0</th>
     <th>9.0.0</th>
-    <th>9.1.0</th>
+    <th>9.1.X</th>
+    <th>9.2.X</th>
   </tr></thead>
 <tbody>
-  <tr>
-    <td>26.1.0</td>
-    <td>/</td>
-    <td>Y</td>
-    <td>Y</td>
-    <td>Y</td>
-  </tr>
   <tr>
     <td>26.0.0</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
-    <td>/</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+    <tr>
+    <td>26.1.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+    <tr>
+    <td>26.2.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
   </tr>
 </tbody>
 </table>
@@ -146,9 +170,7 @@
 
 |组件|描述|目的|
 |--|--|--|
-|MindSpeed MM|新模型|支持Qwen3.5, Kimi-K2.5|
-|MindSpeed MM|新特性|Qwen3.5、Kimi-K2.5支持激活值异步卸载、chunk loss、chunk mbs|
-|MindSpeed MM|新增硬件支持|支持Ascend 950PR&950DT系列产品|
+|MindSpeed MM|新模型|支持Kimi-K3，GLM5.3 NEXT，MiniMax M3|
 
 ### 删除特性
 
@@ -196,10 +218,16 @@
 
 |防病毒软件名称|防病毒软件版本|病毒库版本|扫描时间|扫描结果|
 |---|---|---|---|---|
-|QiAnXin|8.0.5.5260|2026-07-05 08:00:00.0|2026-07-06|无病毒，无恶意|
-|Kaspersky|12.0.0.6672|2026-07-06 10:03:00|2026-07-06|无病毒，无恶意|
-|Bitdefender|7.5.1.200224|7.101158|2026-07-06|无病毒，无恶意|
+|QiAnXin|8.0.5.5260|2026-09-27 08:00:00.0|2026-09-28|无病毒，无恶意|
+|Kaspersky|12.0.0.6672|2026-09-28 10:09:00|2026-09-28|无病毒，无恶意|
+|Bitdefender|7.5.1.200224|7.101487|2026-09-28|无病毒，无恶意|
 
 ### 漏洞修补列表
 
 无
+
+## 修订记录
+
+|文档版本|发布日期|修改说明|
+|--|--|--|
+|01|2026-10-15|第一次正式发布|
