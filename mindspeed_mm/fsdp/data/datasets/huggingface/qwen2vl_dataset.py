@@ -20,6 +20,9 @@ from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import (
     PackedSupervisedDatasetProcessor,
     PairwiseDatasetProcessor,
     PretrainDatasetProcessor,
+    MultimodalPretrainDatasetProcessor,
+    PackedMultimodalPretrainDatasetProcessor,
+    has_media_columns,
 )
 from mindspeed_mm.fsdp.data.data_utils.func_utils.log import get_logger
 from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
@@ -257,7 +260,19 @@ def get_qwen2vl_dataset(basic_param, preprocess_param, dataset_param, **kwargs):
         elif data_args.stage == "pretrain":
             # Will automatically enable sequences packing in pre-training.
             data_args.packing = data_args.packing if data_args.packing is not None else True
-            dataset_processor_cls = PretrainDatasetProcessor
+            if not has_media_columns(dataset_attr):
+                # Text-only datasets keep the legacy concatenate-and-split behavior.
+                dataset_processor_cls = PretrainDatasetProcessor
+            elif data_args.packing:
+                if data_args.preprocess_on_fly:
+                    raise ValueError(
+                        "Multimodal pre-training packing requires preprocess_on_fly=false. "
+                        "Packing needs a batched offline map so complete encoded documents "
+                        "can be grouped before the dataloader requests individual rows."
+                    )
+                dataset_processor_cls = PackedMultimodalPretrainDatasetProcessor
+            else:
+                dataset_processor_cls = MultimodalPretrainDatasetProcessor
         elif data_args.stage == "sft":
             if data_args.packing:
                 data_args.cutoff_len -= 1

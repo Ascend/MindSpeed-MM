@@ -62,6 +62,11 @@ class TokenizerModule(TypedDict):
     processor: Optional["ProcessorMixin"]
 
 
+def has_media_columns(dataset_attr: "DatasetAttr") -> bool:
+    r"""Return whether the dataset declares any image, video or audio column."""
+    return any(getattr(dataset_attr, name, None) for name in ("images", "videos", "audios"))
+
+
 @dataclass
 class DatasetConverter:
     dataset_attr: "DatasetAttr"
@@ -135,6 +140,58 @@ class AlpacaDatasetConverter(DatasetConverter):
 
 @dataclass
 class SharegptDatasetConverter(DatasetConverter):
+    def _convert_pretrain_example(
+            self,
+            example: Dict[str, Any],
+            messages: List[Dict[str, Any]],
+            system: str,
+            tag_mapping: Dict[str, str],
+    ) -> Dict[str, Any]:
+        r"""Convert one ShareGPT example into a pre-training document.
+
+        Keeps all messages in order (system first) in ``_prompt`` without a chat
+        template. Media placeholders are expanded later by the pretrain processor.
+        Example: {"from": "human", "value": "<image> hi"} -> {"role": "user", "content": "<image> hi"}
+        """
+        aligned_messages = []
+        if system:
+            aligned_messages.append(
+                {"role": Role.SYSTEM.value, "content": system.strip()}
+            )
+
+        for turn_idx, message in enumerate(messages):
+            role_tag = message.get(self.dataset_attr.role_tag)
+            role = tag_mapping.get(role_tag)
+            if role is None:
+                logger.warning_rank0(
+                    f"Skipping pre-training sample: invalid role tag at turn {turn_idx} "
+                    f"(got {role_tag!r})."
+                )
+                aligned_messages = []
+                break
+
+            aligned_messages.append(
+                {
+                    "role": role,
+                    "content": (message.get(self.dataset_attr.content_tag) or "").strip(),
+                }
+            )
+
+        return {
+            "_prompt": aligned_messages,
+            "_response": [],
+            "_system": system,
+            "_images": self._find_media_files(
+                example[self.dataset_attr.images]
+            ) if self.dataset_attr.images else None,
+            "_videos": self._find_media_files(
+                example[self.dataset_attr.videos]
+            ) if self.dataset_attr.videos else None,
+            "_audios": self._find_media_files(
+                example[self.dataset_attr.audios]
+            ) if self.dataset_attr.audios else None,
+        }
+
     def __call__(self, example: Dict[str, Any]) -> Dict[str, Any]:
         tag_mapping = {
             self.dataset_attr.user_tag: Role.USER.value,
@@ -156,6 +213,9 @@ class SharegptDatasetConverter(DatasetConverter):
             messages = messages[1:]
         else:
             system = example[self.dataset_attr.system] if self.dataset_attr.system else ""
+
+        if self.data_args.stage == "pretrain" and has_media_columns(self.dataset_attr):
+            return self._convert_pretrain_example(example, messages, system, tag_mapping)
 
         aligned_messages = []
         broken_data = False
@@ -894,6 +954,12 @@ class SupervisedDatasetProcessor(DatasetProcessor):
 
 @dataclass
 class PretrainDatasetProcessor(DatasetProcessor):
+    r"""Text-only pre-training processor.
+
+    With packing, documents are concatenated and split into ``cutoff_len`` blocks.
+    Without packing, each document is truncated to ``cutoff_len``.
+    """
+
     def preprocess_dataset(self, examples: dict[str, list[Any]]) -> dict[str, list[Any]]:
         # build grouped texts with format `X1 X2 X3 ...` if packing is enabled
         eos_token = "<|end_of_text|>" if self.data_args.template == "llama3" else self.tokenizer.eos_token
@@ -925,6 +991,202 @@ class PretrainDatasetProcessor(DatasetProcessor):
     def print_data_example(self, example: dict[str, list[int]]) -> None:
         print("input_ids:\n{}".format(example["input_ids"]))
         print("inputs:\n{}".format(self.tokenizer.decode(example["input_ids"], skip_special_tokens=False)))
+
+
+@dataclass
+class MultimodalPretrainDatasetProcessor(DatasetProcessor):
+    def _validate_no_reserved_media_tokens(self, messages: List[Dict[str, str]]) -> None:
+        r"""Reject raw text that already contains the plugin's media tokens.
+
+        The plugin expands each media placeholder (e.g. ``<image>``) into its media
+        tokens, whose count must match the extracted media features. A literal
+        media token written in the raw text would break that alignment, so such a
+        document is rejected here and dropped by ``_prepare_model_inputs``. This is
+        checked only for pre-training; SFT data is not affected.
+        """
+        plugin = self.template.mm_plugin
+        reserved_tokens = [
+            token
+            for token in (
+                getattr(plugin, "vision_bos_token", None),
+                getattr(plugin, "vision_eos_token", None),
+                getattr(plugin, "image_token", None),
+                getattr(plugin, "video_token", None),
+                getattr(plugin, "audio_token", None),
+            )
+            if token
+        ]
+        for message_index, message in enumerate(messages):
+            unexpected_tokens = [token for token in reserved_tokens if token in message["content"]]
+            if unexpected_tokens:
+                raise ValueError(
+                    f"Raw message {message_index} contains reserved media tokens {unexpected_tokens}; "
+                    "use the media placeholders (e.g. <image>) with matching media inputs instead."
+                )
+
+    def _encode_data_example(
+            self,
+            messages: List[Dict[str, str]],
+            images: List["ImageInput"],
+            videos: List["VideoInput"],
+            audios: List["AudioInput"],
+    ) -> Tuple[List[int], List[int]]:
+        r"""Encode one complete PT document before packing.
+
+        Multimodal placeholders must be expanded while the document still owns
+        its media list. Packing token streams first would lose the mapping
+        between image/video placeholders and their processor outputs.
+        """
+        self._validate_no_reserved_media_tokens(messages)
+        messages = self.template.mm_plugin.process_messages(
+            messages, images, videos, audios, self.processor
+        )
+        eos_token = "<|end_of_text|>" if self.data_args.template == "llama3" else self.tokenizer.eos_token
+        text = "\n".join(message["content"] for message in messages)
+        if eos_token:
+            text += eos_token
+
+        input_ids = self.tokenizer.encode(text, add_special_tokens=False)
+        labels = input_ids.copy()
+        input_ids, labels = self.template.mm_plugin.process_token_ids(
+            input_ids, labels, images, videos, audios, self.tokenizer, self.processor
+        )
+
+        if getattr(self.tokenizer, "add_bos_token", False):
+            input_ids = [self.tokenizer.bos_token_id] + input_ids
+            labels = [self.tokenizer.bos_token_id] + labels
+
+        return input_ids, labels
+
+    def _prepare_model_inputs(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+        r"""Build complete multimodal PT samples before optional packing.
+
+        Unlike the legacy text-only implementation, documents are never split.
+        Each document is multimodally encoded while it still owns its media list.
+        """
+        batch_input_ids, batch_labels = [], []
+        batch_images, batch_videos, batch_audios = [], [], []
+
+        for i in range(len(examples["_prompt"])):
+            messages = (examples["_prompt"][i] or []) + (examples["_response"][i] or [])
+            if not messages:
+                logger.warning_rank0("Dropped empty pre-training example.")
+                continue
+
+            images = examples["_images"][i] or []
+            videos = examples["_videos"][i] or []
+            audios = examples["_audios"][i] or []
+            try:
+                input_ids, labels = self._encode_data_example(messages, images, videos, audios)
+            except (IndexError, OSError, TypeError, ValueError) as error:
+                logger.warning_rank0(f"Dropped invalid pre-training example: {error}")
+                continue
+
+            length = len(input_ids)
+            if len(labels) != length:
+                logger.warning_rank0(
+                    f"Dropped invalid pre-training example: input length {length} "
+                    f"does not match label length {len(labels)}."
+                )
+                continue
+            if length == 0:
+                logger.warning_rank0("Dropped empty tokenized pre-training example.")
+                continue
+            if length > self.data_args.cutoff_len:
+                logger.warning_rank0(
+                    f"Dropped lengthy pre-training example with length {length} "
+                    f"> {self.data_args.cutoff_len}; multimodal documents are not split."
+                )
+                continue
+
+            batch_input_ids.append(input_ids)
+            batch_labels.append(labels)
+            batch_images.append(images)
+            batch_videos.append(videos)
+            batch_audios.append(audios)
+
+        return {
+            "input_ids": batch_input_ids,
+            "labels": batch_labels,
+            "images": batch_images,
+            "videos": batch_videos,
+            "audios": batch_audios,
+        }
+
+    def preprocess_dataset(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+        model_inputs = self._prepare_model_inputs(examples)
+        model_inputs["attention_mask"] = [[1] * len(input_ids) for input_ids in model_inputs["input_ids"]]
+        model_inputs["images"] = [images or None for images in model_inputs["images"]]
+        model_inputs["videos"] = [videos or None for videos in model_inputs["videos"]]
+        model_inputs["audios"] = [audios or None for audios in model_inputs["audios"]]
+        return model_inputs
+
+    def print_data_example(self, example: dict[str, list[int]]) -> None:
+        print("input_ids:\n{}".format(example["input_ids"]))
+        print("inputs:\n{}".format(self.tokenizer.decode(example["input_ids"], skip_special_tokens=False)))
+        print("labels:\n{}".format(example.get("labels")))
+
+
+@dataclass
+class PackedMultimodalPretrainDatasetProcessor(MultimodalPretrainDatasetProcessor):
+    def preprocess_dataset(self, examples: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+        r"""Pack complete multimodal PT samples while preserving document boundaries."""
+        unpacked_inputs = self._prepare_model_inputs(examples)
+        batch_input_ids = unpacked_inputs["input_ids"]
+        batch_labels = unpacked_inputs["labels"]
+        batch_images = unpacked_inputs["images"]
+        batch_videos = unpacked_inputs["videos"]
+        batch_audios = unpacked_inputs["audios"]
+
+        lengths = []
+        length2indexes = defaultdict(list)
+        for index, input_ids in enumerate(batch_input_ids):
+            length = len(input_ids)
+            lengths.append(length)
+            length2indexes[length].append(index)
+
+        model_inputs: Dict[str, List[Any]] = {
+            "input_ids": [], "attention_mask": [], "position_ids": [], "labels": [],
+            "images": [], "videos": [], "audios": [], "cu_seqlens": [],
+        }
+        for knapsack in greedy_knapsack(lengths, self.data_args.cutoff_len):
+            packed_input_ids, packed_attention_mask = [], []
+            packed_position_ids, packed_labels = [], []
+            packed_images, packed_videos, packed_audios = [], [], []
+            cu_seqlens = [0]
+
+            for length in knapsack:
+                index = length2indexes[length].pop()
+                document_labels = batch_labels[index].copy()
+                # After the causal-label shift, this masks the prediction that
+                # would otherwise cross into this packed document.
+                document_labels[0] = IGNORE_INDEX
+                packed_input_ids += batch_input_ids[index]
+                packed_labels += document_labels
+                packed_position_ids += list(range(length))
+                packed_images += batch_images[index]
+                packed_videos += batch_videos[index]
+                packed_audios += batch_audios[index]
+                cu_seqlens.append(cu_seqlens[-1] + length)
+                # cu_seqlens is the authoritative document-boundary contract.
+                # Keep this mask binary so Qwen3.5 linear-attention layers do not
+                # mistake document ids for padding-mask values.
+                packed_attention_mask += [1] * length
+
+            model_inputs["input_ids"].append(packed_input_ids)
+            model_inputs["attention_mask"].append(packed_attention_mask)
+            model_inputs["position_ids"].append(packed_position_ids)
+            model_inputs["labels"].append(packed_labels)
+            model_inputs["images"].append(packed_images or None)
+            model_inputs["videos"].append(packed_videos or None)
+            model_inputs["audios"].append(packed_audios or None)
+            model_inputs["cu_seqlens"].append(cu_seqlens)
+
+        return model_inputs
+
+    def print_data_example(self, example: dict[str, list[int]]) -> None:
+        super().print_data_example(example)
+        print("cu_seqlens:\n{}".format(example["cu_seqlens"]))
 
 
 @dataclass

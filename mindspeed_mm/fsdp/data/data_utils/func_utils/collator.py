@@ -186,7 +186,31 @@ class MultiModalDataCollatorForSeq2Seq(DataCollatorForSeq2Seq):
             for i, feature in enumerate(features):
                 feature["token_type_ids"] = token_type_ids[i]
 
+        packed_cu_seqlens = None
+        has_packed_cu_seqlens = ["cu_seqlens" in feature for feature in features]
+        if any(has_packed_cu_seqlens):
+            if not all(has_packed_cu_seqlens):
+                raise ValueError("Packed and unpacked samples cannot be mixed in one batch.")
+            if self.tokenizer.padding_side != "right":
+                raise ValueError("Multimodal packing requires right padding.")
+            packed_cu_seqlens = list(features[0].pop("cu_seqlens"))
+
         features: dict[str, torch.Tensor] = super().__call__(features)
+
+        if packed_cu_seqlens is not None:
+            padded_seq_len = features["input_ids"].shape[1]
+            if packed_cu_seqlens[-1] > padded_seq_len:
+                raise ValueError(
+                    f"Packed cu_seqlens ends at {packed_cu_seqlens[-1]}, "
+                    f"but the collated sequence length is only {padded_seq_len}."
+                )
+            # Treat right-padding as part of the final packed sequence for varlen
+            # kernels. Its labels and attention mask remain ignored, while the
+            # cumulative length now matches the physical input tensor length.
+            packed_cu_seqlens[-1] = padded_seq_len
+            features["cu_seqlens"] = torch.as_tensor(
+                packed_cu_seqlens, dtype=torch.int32
+            ).unsqueeze(0)
 
         packed_postion_ids = None
         if "position_ids" in features:

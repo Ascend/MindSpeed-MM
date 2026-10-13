@@ -514,6 +514,46 @@ class Qwen2VLPlugin(BasePlugin):
         return mm_inputs
 
     @override
+    def process_token_ids(
+            self,
+            input_ids: List[int],
+            labels: Optional[List[int]],
+            images: List["ImageInput"],
+            videos: List["VideoInput"],
+            audios: List["AudioInput"],
+            tokenizer: "PreTrainedTokenizer",
+            processor: Optional["MMProcessor"],
+    ) -> Tuple[List[int], Optional[List[int]]]:
+        input_ids, labels = super().process_token_ids(
+            input_ids, labels, images, videos, audios, tokenizer, processor
+        )
+        if labels is None or not input_ids:
+            # SFT calls this with empty lists to fetch a prefix; nothing to mask there.
+            return input_ids, labels
+        if len(input_ids) != len(labels):
+            raise ValueError(
+                f"Input length {len(input_ids)} does not match label length {len(labels)}."
+            )
+
+        # The expanded media placeholders are replaced by visual/audio embeddings
+        # in the model, so the language model is not trained to predict them.
+        # Boundary tokens such as <|vision_start|> keep their labels.
+        unk_token_id = getattr(tokenizer, "unk_token_id", None)
+        media_token_ids = set()
+        for token in (self.image_token, self.video_token, self.audio_token):
+            if token is None:
+                continue
+            token_id = tokenizer.convert_tokens_to_ids(token)
+            if token_id is not None and token_id != unk_token_id:
+                media_token_ids.add(token_id)
+
+        masked_labels = [
+            IGNORE_INDEX if token_id in media_token_ids else label_id
+            for token_id, label_id in zip(input_ids, labels)
+        ]
+        return input_ids, masked_labels
+
+    @override
     def process_messages(
             self,
             messages: List[Dict[str, str]],
