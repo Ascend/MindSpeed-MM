@@ -12,7 +12,7 @@
 
 ## MindSpeed MM
 
-MindSpeed MM: An Atlas multimodal large model suite for large-scale distributed training, supporting mainstream multimodal large model training in the industry. It aims to provide an end-to-end multimodal training solution for Huawei [Atlas chips](https://www.hiAscend.com/), including features such as pre-built mainstream models, data engineering, distributed training and acceleration, pre-training, fine-tuning, post-training, and online inference tasks.
+MindSpeed MM: An Atlas multimodal large model suite for large-scale distributed training, supporting mainstream multimodal large model training in the industry. It aims to provide an end-to-end multimodal training solution for Huawei [Atlas chips](https://www.hiascend.com/en/), including features such as pre-built mainstream models, data engineering, distributed training and acceleration, pre-training, fine-tuning, post-training, and online inference tasks.
 
 The MindSpeed MM image is based on both Ubuntu 22.04 and openEuler 24.03 operating systems, supporting x86_64 and aarch64 (ARM64) CPU architectures. The image comes with the following pre-installed software:
 
@@ -22,7 +22,7 @@ The MindSpeed MM image is based on both Ubuntu 22.04 and openEuler 24.03 operati
 
 Due to differences in dependencies between models, only the above basic dependencies are pre-installed in the image. After pulling the image and starting a container, users need to manually install the additional dependencies required by the target model in the base environment according to the target model's README file.
 
-Image download: Please visit [Quay.io](https://quay.io/repository/ascend/mindspeed-mm?tab=tags) to get the corresponding `docker pull` command.
+Image download: Please visit [AscendHub](https://www.hiascend.com/en/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e) to get the corresponding `docker pull` command.
 The current image supports two operating systems, `openEuler 24.03` and `ubuntu22.04`, and provides both `x86_64` and `aarch64` (ARM64) CPU architectures (x86 and aarch64 combined).
 
 ## Image Tag Key Field Description
@@ -76,7 +76,7 @@ Dockerfile naming:
 
 ### Latest Version v26.1.0
 
-Below are all image tags of the current latest version v26.1.0 (`cann9.1.0` + `torch_npu2.7.1.post8`). The latest tags are images combining x86 and aarch64, built using the [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile). You can obtain the corresponding `docker pull` command from [Quay.io](https://quay.io/repository/ascend/mindspeed-mm?tab=tags).
+Below are all image tags of the current latest version v26.1.0 (`cann9.1.0` + `torch_npu2.7.1.post8`). The latest tags are images combining x86 and aarch64, built using the [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile). You can obtain the corresponding `docker pull` command from [AscendHub](https://www.hiascend.com/en/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e).
 
 | Tag | Dockerfile | Description |
 | --- | --- | --- |
@@ -136,7 +136,7 @@ The `docker/build.sh` script uses the version number specified by the `-v` param
 
 #### Installing the Driver
 
-A compatible Atlas NPU driver must be installed on the host matching the CANN version inside the container. Please visit the [CANN Version Compatibility Website](https://www.hiascend.com/developer/download/compatibility) to understand the correspondence between driver and CANN versions.
+A compatible Atlas NPU driver must be installed on the host matching the CANN version inside the container. Please visit the [CANN Version Compatibility Website](https://www.hiascend.com/en/developer/download/compatibility) to understand the correspondence between driver and CANN versions.
 
 ### Running the Image
 
@@ -336,7 +336,7 @@ When running containers with these images, be aware of the following security ri
 
 MindSpeed MM is released under the Apache License 2.0. See the [LICENSE](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/LICENSE) file for details.
 
-This image is built on top of the CANN base image. For license information about the CANN software series contained in these images, please refer to the [CANN Software License](https://www.hiascend.com/legal/cannua-download?isNewCon=true).
+This image is built on top of the CANN base image. For license information about the CANN software series contained in these images, please refer to the [CANN Software License](https://www.hiascend.com/en/legal/cannua-download?isNewCon=true).
 
 Like all Docker images, these images may also contain other software under other licenses (such as Bash from the base distribution, and any direct or indirect dependencies of the included main software).
 
