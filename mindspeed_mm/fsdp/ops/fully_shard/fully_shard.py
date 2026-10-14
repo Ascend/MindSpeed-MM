@@ -858,7 +858,8 @@ def param_group_post_backward_pt29(self, *unused: Any):
         )
         if all_reduce_input is not None:
             if self.device.type != "cpu":
-                raise AssertionError("all_reduce_event cannot be None.")
+                if all_reduce_event is None:
+                    raise AssertionError("all_reduce_event cannot be None.")
             self._all_reduce_state = AllReduceState(
                 all_reduce_input, all_reduce_event
             )
