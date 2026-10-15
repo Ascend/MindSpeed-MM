@@ -54,7 +54,7 @@ MindStudio Insight是昇腾提供的性能分析工具，支持对Profiling采�
 
 1. **计算vs通信vs空闲占比**：首先看整体时间中计算、通信和Free的比例。Free占比高通常意味着Host bound或调度问题，此时可在MindStudio Insight工具timeline中打开**下发曲线**（Flow Events）：曲线陡峭或出现明显空隙的时间段，往往就是Host来不及下发、NPU空等的位置，对照这些位置即可定位下发瓶颈并做针对性优化（参见[调度下发优化](#调度下发优化)）；通信占比高需要检查通算掩盖情况。
 2. **快慢卡排查**：对比各卡的耗时分布，如果存在某张卡通信或下发明显慢于其他卡，需排查是否为下发bound、负载不均衡或硬件问题。
-3. **算子级拆解**：将计算时间按算子类型（Cube/Vector/AI_CPU）分解，识别占比最高的算子类型。Cube算子（MatMul/FA等）MFU低说明计算密度不足，Vector算子占比过高说明存在可融合空间，出现AI_CPU算子则意味着该算子回退到CPU执行、通常较慢，应设法消除或替换为NPU算子。
+3. **算子级拆解**：将计算时间按算子类型（Cube/Vector/AI CPU）分解，识别占比最高的算子类型。Cube算子（MatMul/FA等）MFU低说明计算密度不足，Vector算子占比过高说明存在可融合空间，出现AI CPU算子则意味着该算子回退到CPU执行、通常较慢，应设法消除或替换为NPU算子。
 4. **子模块MFU分析**：对模型子模块（Attention、MLP等）分别计算MFU，精确定位计算瓶颈。
 
 #### 通信耗时分析
@@ -80,7 +80,7 @@ MFU（Model FLOPs Utilization，模型算力利用率）是指训练过程中实
 3. **计算子模块MFU**：`子模块MFU = 子模块FLOPs / (子模块耗时 × 理论算力)`。
 4. **对比定位瓶颈**：对比各子模块的MFU值，识别利用率低的模块。
 
-实践中，不同子模块的MFU高低往往有其结构性原因：Attention层以稠密矩阵乘（如FlashAttention）为主，MFU通常较高；MoE experts层因包含permute/unpermute等非计算操作，MFU通常较低。解读分解结果时，关键是区分“结构性偏低”（如MoE routing本身就含大量非计算开销，难以改变）与“可优化的偏低”（如可融合的Vector算子、冗余的Cast、低效访存等）。后者才是优化对象。优化的目的是用合适的手段消除这些浪费、提升真实性能，而不是去抬高MFU这个数字本身。
+实践中，不同子模块的MFU高低往往有其结构性原因：Attention层以稠密矩阵乘（如Flash Attention）为主，MFU通常较高；MoE experts层因包含permute/unpermute等非计算操作，MFU通常较低。解读分解结果时，关键是区分“结构性偏低”（如MoE routing本身就含大量非计算开销，难以改变）与“可优化的偏低”（如可融合的Vector算子、冗余的Cast、低效访存等）。后者才是优化对象。优化的目的是用合适的手段消除这些浪费、提升真实性能，而不是去抬高MFU这个数字本身。
 
 ## 性能调优方法
 
@@ -108,7 +108,7 @@ MindSpeed-MM提供了多种性能调优特性，可根据实际场景选择合�
 
 #### CPU绑核
 
-TorchNPU提供了`CPU_AFFINITY_CONF`环境变量，用于控制CPU端任务绑核，减少上下文切换和跨NUMA访问延迟：`0`或未设置表示不启用；`1`表示开启粗粒度绑核；`2`表示开启细粒度绑核。开启绑核后，还可选地为指定NPU卡自定义绑核区间，例如`export CPU_AFFINITY_CONF=1,npu0:192-215,npu1:216-239,npu2:0-23,npu3:24-47`。详见[环境变量参考](https://www.hiascend.com/document/detail/zh/Pytorch/730/comref/EnvVariables/docs/zh/environment_variable_reference/CPU_AFFINITY_CONF.md)。
+TorchNPU提供了`CPU_AFFINITY_CONF`环境变量，用于控制CPU端任务绑核，减少上下文切换和跨NUMA延迟：`0`或未设置表示不启用；`1`表示开启粗粒度绑核；`2`表示开启细粒度绑核。开启绑核后，还可选地为指定NPU卡自定义绑核区间，例如`export CPU_AFFINITY_CONF=1,npu0:192-215,npu1:216-239,npu2:0-23,npu3:24-47`。详见[环境变量参考](https://www.hiascend.com/document/detail/zh/Pytorch/730/comref/EnvVariables/docs/zh/environment_variable_reference/CPU_AFFINITY_CONF.md)。
 
 #### 调度下发优化
 
