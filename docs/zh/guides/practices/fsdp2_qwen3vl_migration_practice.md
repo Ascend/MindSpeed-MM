@@ -248,7 +248,7 @@ training:
 
 权重加载方式是大模型迁移中的一个关键决策：**为什么用 meta init + DCP 权重？** 大模型常规加载的初始化峰值内存很高，`init_model_with_meta_device` 用于降低它——先在 meta 设备上仅构建模型结构、不分配实际内存，再由 DCP（分布式检查点格式）按分片直接加载到各卡，每张卡只读自己那一份（以 Qwen3-VL-30B 为例，bf16 权重约 60GB，借此可避免多卡重复占用主机内存）。
 
-meta init 需配合 DCP 格式权重使用，因此训练前要先把 HF 权重转换为 DCP（DCP 为分片检查点格式，转换一次可重复使用）。转换命令（在仓库根目录执行，假设 HF 权重已下载到 `ckpt/Qwen3-VL-30B-A3B-Instruct`）：
+meta init 需配合 DCP 格式权重使用，因此训练前要先把 HF 权重转换为 DCP（DCP 为分布式检查点格式，转换一次可重复使用）。转换命令（在仓库根目录执行，假设 HF 权重已下载到 `ckpt/Qwen3-VL-30B-A3B-Instruct`）：
 
 ```bash
 mm-convert GenericDCPConverter hf_to_dcp \
