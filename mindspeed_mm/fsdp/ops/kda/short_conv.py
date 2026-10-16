@@ -126,6 +126,7 @@ class ShortConvolution(nn.Conv1d):
         cu_seqlens: torch.LongTensor | None = None,
         chunk_indices: torch.LongTensor | None = None,
         weight: torch.Tensor | None = None,
+        output_layout: str | None = None,
         **kwargs,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         """
@@ -149,9 +150,13 @@ class ShortConvolution(nn.Conv1d):
             weight (`Optional[torch.Tensor]`):
                 Optional weight override of shape `[D_local, 1, W]` (e.g. a head-sharded
                 slice under Ulysses context parallel). Default: `None` (use `self.weight`).
+            output_layout (Optional[str]):
+                `None` (default): return `[B, T, D]`; `'BNSD'` (AscendC only):
+                return the op's native head-major output `[B, H, T, d]`, so an
+                AscendC KDA consumer can use it without a layout round-trip.
 
         Returns:
-            Tensor of shape `[B, T, D]`.
+            Tensor of shape `[B, T, D]`, or `[B, H, T, d]` when `output_layout='BNSD'`.
         """
         B, T, *_ = x.shape
         N = B if cu_seqlens is None else len(cu_seqlens) - 1
@@ -173,6 +178,17 @@ class ShortConvolution(nn.Conv1d):
 
         if weight is None:
             weight = self.weight
+
+        if output_layout is not None and output_layout != 'BNSD':
+            raise ValueError(
+                f"Unsupported output_layout: '{output_layout}'. "
+                "Expected 'BNSD' or None."
+            )
+        if output_layout == 'BNSD' and self.implementation != 'ascendc':
+            raise ValueError(
+                f"output_layout='BNSD' requires implementation='ascendc', "
+                f"got '{self.implementation}'."
+            )
 
         if self.implementation == 'ascendc':
             # Import here to avoid circular dependency and to keep torch_npu/fla_npu
@@ -200,7 +216,11 @@ class ShortConvolution(nn.Conv1d):
                 cu_seqlens=cu_seqlens,
                 output_final_state=output_final_state,
             )
-            # The AscendC op returns the head layout [B, H, T, d]; convert back to [B, T, D]
+            if output_layout == 'BNSD':
+                # The op already returns the BNSD layout [B, H, T, d]; keep it so an
+                # AscendC KDA consumer skips the round-trip through [B, T, D].
+                return y, final_state
+            # The AscendC op returns the BNSD layout [B, H, T, d]; convert back to [B, T, D]
             y = y.transpose(1, 2).reshape(B, T, -1)
             return y, final_state
 

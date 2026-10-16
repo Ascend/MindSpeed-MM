@@ -5,6 +5,9 @@ importable as a MindSpeed-MM plugin. It registers the custom config/model
 classes and adds the small amount of training glue needed by the FSDP2 trainer.
 """
 
+import logging
+import os
+
 from transformers import AutoConfig
 
 import torch
@@ -20,6 +23,16 @@ from mindspeed_mm.fsdp.utils.register import model_register
 from mindspeed_mm.fsdp.models.base_model import WeightInitMixin
 from .configuration_kimi_k3 import KimiK3Config, KimiLinearConfig
 from .modeling_kimi_k3 import KimiK3ForConditionalGeneration as _KimiK3ForConditionalGeneration
+
+logger = logging.getLogger(__name__)
+
+# Debug/test-only model size overrides via environment variables.
+# Unset variables keep the values from the loaded checkpoint config.
+_ENV_CONFIG_OVERRIDES = (
+    ("NUM_HIDDEN_LAYERS", "num_hidden_layers"),
+    ("NUM_EXPERTS", "num_experts"),
+    ("NUM_EXPERTS_PER_TOKEN", "num_experts_per_token"),
+)
 
 for _model_type, _config_cls in (
     ("kimi_linear", KimiLinearConfig),
@@ -47,6 +60,14 @@ class KimiK3ForConditionalGeneration(WeightInitMixin, _KimiK3ForConditionalGener
         Disables KV cache and propagates the selected attention implementation
         and MoE execution switches to ``text_config``.
         """
+        # Optional size overrides for debugging/performance testing; unset env
+        # vars leave the checkpoint config untouched.
+        for env_name, attr in _ENV_CONFIG_OVERRIDES:
+            env_value = os.getenv(env_name)
+            if env_value is not None:
+                setattr(transformer_config.text_config, attr, int(env_value))
+                logger.info(f"Overriding text_config.{attr} = {int(env_value)} (from env {env_name})")
+
         transformer_config.use_cache = False
         if getattr(transformer_config, "text_config", None) is not None:
             transformer_config.text_config.use_cache = False

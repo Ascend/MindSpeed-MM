@@ -621,6 +621,16 @@ class KimiDeltaAttention(nn.Module):
         self.v_proj = nn.Linear(self.hidden_size, projection_size, bias=False)
 
         self.causal_conv1d_implementation = getattr(config, "causal_conv1d_implementation", "triton")
+        self.kda_implementation = getattr(config, "kda_implementation", "triton")
+        # When both the short conv and the chunk KDA kernel run on AscendC, the conv
+        # output [B, H, T, d] already matches the kernel's input layout, so the
+        # round-trip through [B, T, D] between them is skipped.
+        self.head_major_qkv = (
+            self.causal_conv1d_implementation == "ascendc"
+            and self.kda_implementation == "ascendc"
+            and "Ascend950" in torch_npu.npu.get_device_name()
+        )
+
         self.q_conv1d = ShortConvolution(
             hidden_size=projection_k_size,
             kernel_size=self.conv_size,
@@ -779,11 +789,19 @@ class KimiDeltaAttention(nn.Module):
                 v_proj_states = index_first_axis(
                     rearrange(v_proj_states, "b s ... -> (b s) ..."), indices).unsqueeze(0)
         # Modification end
+        # The AscendC short conv only produces BNSD output on the chunked
+        # training/prefill path; the decode step path keeps the [B, T, D] layout.
+        # The non-NPU fla ShortConvolution has no `output_layout` parameter,
+        # so only pass it when the BNSD fast path is actually requested.
+        qkv_layout = "BNSD" if self.head_major_qkv else "BSND"
+        layout_kwargs = {"output_layout": "BNSD"} if self.head_major_qkv else {}
+
         q, conv_state_q = self.q_conv1d(
             x=q_proj_states,
             cache=conv_state_q,
             output_final_state=use_cache,
             cu_seqlens=cu_seqlens,
+            **layout_kwargs,
             **q_conv_kwargs,
         )
         k, conv_state_k = self.k_conv1d(
@@ -791,6 +809,7 @@ class KimiDeltaAttention(nn.Module):
             cache=conv_state_k,
             output_final_state=use_cache,
             cu_seqlens=cu_seqlens,
+            **layout_kwargs,
             **k_conv_kwargs,
         )
         v, conv_state_v = self.v_conv1d(
@@ -798,6 +817,7 @@ class KimiDeltaAttention(nn.Module):
             cache=conv_state_v,
             output_final_state=use_cache,
             cu_seqlens=cu_seqlens,
+            **layout_kwargs,
             **v_conv_kwargs,
         )
         g = self.f_b_proj(self.f_a_proj(hidden_states))
@@ -815,9 +835,10 @@ class KimiDeltaAttention(nn.Module):
         g = rearrange(g, '... (h d) -> ... h d', d=self.head_dim)
         beta = beta.float()
 
-        q, k = map(lambda x: rearrange(
-            x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
-        v = rearrange(v, '... (h d) -> ... h d', d=self.head_dim)
+        if not self.head_major_qkv:
+            q, k = map(lambda x: rearrange(
+                x, '... (h d) -> ... h d', d=self.head_k_dim), (q, k))
+            v = rearrange(v, '... (h d) -> ... h d', d=self.head_dim)
 
         # Modification start: slice per-head decay params to the local V-heads under LASP.
         if is_ulysses_enabled:
@@ -832,7 +853,7 @@ class KimiDeltaAttention(nn.Module):
         # Modification end
 
         if mode == 'chunk':
-            kda_implementation = getattr(self.config, "kda_implementation", "triton")
+            kda_implementation = self.kda_implementation
             if kda_implementation == "triton":
                 # kda triton实现
                 from mindspeed_mm.fsdp.ops.kda.triton_ascend.chunk import chunk_kda
@@ -857,7 +878,10 @@ class KimiDeltaAttention(nn.Module):
                 )
             elif kda_implementation == "ascendc":
                 # kda ascendc 实现
-                from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_ascendc_kimi import chunk_kda_ascendc
+                if "Ascend950" in torch_npu.npu.get_device_name():
+                    from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_ascendc_kimi_fused import chunk_kda_ascendc
+                else:
+                    from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_ascendc_kimi import chunk_kda_ascendc
                 o, recurrent_state = chunk_kda_ascendc(
                     q=q,
                     k=k,
@@ -874,8 +898,9 @@ class KimiDeltaAttention(nn.Module):
                     use_beta_sigmoid_in_kernel=True,
                     safe_gate=self.gate_lower_bound is not None,
                     lower_bound=self.gate_lower_bound,
-                    transpose_state_layout=True,
+                    transpose_state_layout=False,
                     cu_seqlens=cu_seqlens,
+                    qkv_layout=qkv_layout,
                 )
             elif kda_implementation == "eager":
                 # 小算子版本

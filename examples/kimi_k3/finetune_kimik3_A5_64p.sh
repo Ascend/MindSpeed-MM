@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+
+export NON_MEGATRON=true
+export HCCL_CONNECT_TIMEOUT=1200
+export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+export MULTI_STREAM_MEMORY_REUSE=2
+export TASK_QUEUE_ENABLE=1
+export CPU_AFFINITY_CONF=1,npu0:192-239,npu1:240-287,npu2:0-47,npu3:48-95,npu4:96-147,npu5:147-192,npu6:288-333,npu7:334-383
+# 性能测试开启强路由制负载均衡
+export MM_FORCE_EP_BALANCE=1
+
+# 注：此配置需要修改checkpoint文件中的config.json文件以调整模型大小
+# 仅需要调整参数 num_experts=28 即可，调整后模型参数约由2.8T -> 141B，用于64p性能测试
+
+NPROC_PER_NODE=8
+MASTER_ADDR=localhost
+MASTER_PORT=6000
+NNODES=1
+NODE_RANK=0
+WORLD_SIZE=$(($NPROC_PER_NODE*$NNODES))
+
+DISTRIBUTED_ARGS="
+    --nproc_per_node ${NPROC_PER_NODE} \
+    --nnodes ${NNODES} \
+    --node_rank ${NODE_RANK} \
+    --master_addr ${MASTER_ADDR} \
+    --master_port ${MASTER_PORT}
+"
+
+# cd to the repo root regardless of where the script is launched from, so that
+# relative paths (trainer script / yaml / logs / plugin imports) resolve consistently
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+echo "Changing working directory to ${MINDSPEED_ROOT}"
+cd "${MINDSPEED_ROOT}"
+
+logfile=$(date +%Y%m%d)_$(date +%H%M%S)
+mkdir -p logs
+torchrun ${DISTRIBUTED_ARGS} mindspeed_mm/fsdp/train/trainer.py \
+    examples/kimi_k3/kimik3_config_A5_64p.yaml \
+    2>&1 | tee "logs/train_${logfile}.log"
+STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
+GBS=`grep "global batch size" logs/train_${logfile}.log | awk -F 'global batch size:' '{print$2}' | awk -F '|' '{print$1}' | head -n 1 | awk '{print $1}'`
+SAMPLES_PER_SECOND=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
+echo "Elapsed Time Per iteration (ms): $STEP_TIME" | tee -a logs/train_${logfile}.log
+echo "Average Samples per Second: $SAMPLES_PER_SECOND" | tee -a logs/train_${logfile}.log

@@ -100,7 +100,9 @@ Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以�
 ```bash
 git clone https://github.com/flashserve/flash-linear-attention-npu.git
 cd flash-linear-attention-npu
-git checkout 3167fe36bd1
+
+# A5 系列使用 commit id：90176b44321e, A3&A2 使用 commit id：e22e0bf
+git checkout ｛相应commit id｝
 ```
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/3167fe36bd1d5b2bc1dc34b3594483383443a507/README.md)
