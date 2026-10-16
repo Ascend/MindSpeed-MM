@@ -8,6 +8,7 @@ import torch
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME
 
 from checkpoint.vlm_model.converters.moe_expert import (
+    get_config_type_from_class_name,
     merge_moe_expert_weights,
     split_moe_expert_weights,
     save_sharded_state_dict,
@@ -97,6 +98,44 @@ def test_split_moe_expert_weights():
     assert expert_1_gate_proj.shape == (2, 3)
     assert expert_1_up_proj.shape == (2, 3)
     assert expert_1_down_proj.shape == (2, 3)
+
+
+def test_glm4v_merge_keeps_expert_weights_3d_and_round_trips():
+    torch.manual_seed(0)
+    original = {
+        f"layer.0.experts.{expert}.gate_proj.weight": torch.randn(2, 3)
+        for expert in range(2)
+    }
+    for expert in range(2):
+        original[f"layer.0.experts.{expert}.up_proj.weight"] = torch.randn(2, 3)
+        original[f"layer.0.experts.{expert}.down_proj.weight"] = torch.randn(3, 2)
+    state_dict = {name: tensor.clone() for name, tensor in original.items()}
+    args = (1, 2, 0, ConfigType.GLM4V, "layer.{layer}.experts.{expert}")
+
+    merge_moe_expert_weights(state_dict, *args)
+
+    assert state_dict["layer.0.experts.gate_up_proj"].shape == (2, 3, 4)
+    assert state_dict["layer.0.experts.down_proj"].shape == (2, 2, 3)
+
+    split_moe_expert_weights(state_dict, *args)
+
+    assert state_dict.keys() == original.keys()
+    for name, expected in original.items():
+        torch.testing.assert_close(state_dict[name], expected)
+
+
+def test_glm4v_3d_layout_requires_explicit_environment_flag(tmp_path):
+    class Glm4vMoeConfig:
+        pass
+
+    with patch(
+        "checkpoint.vlm_model.converters.moe_expert.AutoConfig.from_pretrained",
+        return_value=Glm4vMoeConfig(),
+    ):
+        with patch.dict("os.environ", {}, clear=True):
+            assert get_config_type_from_class_name(tmp_path) == ConfigType.DEFAULT
+        with patch.dict("os.environ", {"GLM4V_DCP_3D": "1"}, clear=True):
+            assert get_config_type_from_class_name(tmp_path) == ConfigType.GLM4V
 
 
 def test_save_sharded_state_dict(setup_test_files):

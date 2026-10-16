@@ -1,0 +1,146 @@
+# 并行策略
+parallel:
+  fully_shard_parallel_size: auto
+  fsdp_plan:
+    apply_modules:
+      - model.visual
+      - model.visual.blocks.{*}
+      - model.language_model
+      - model.language_model.embed_tokens
+      - model.language_model.layers.{*}
+      - lm_head
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+    param_dtype: bf16
+    reduce_dtype: fp32
+  ring_attention_size: 1
+  ulysses_parallel_size: 1
+  expert_parallel_size: 16
+  ep_plan:
+    apply_modules:
+      - model.language_model.layers.{*}.mlp.experts
+    dispatcher: alltoall
+
+# 数据相关配置
+data:
+  dataset_param:
+    dataset_type: huggingface
+    attr:
+      images: images
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH ./ckpt/hf_path/GLM-4.5V
+      trust_remote_code: true
+      use_fast_tokenizer: true
+      split_special_tokens: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 0
+      video_fps: 2.0
+      video_maxlen: 64
+    basic_parameters:
+      cutoff_len: 1024
+      template: glm4v_moe
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: ./data
+      dataset: &DATASET_PATH ./data/mllm_format_llava_instruct_data.json
+      cache_dir: ./data/cache_dir
+      overwrite_cache: false
+      preprocessing_batch_size: 1000
+      preprocessing_num_workers: 16
+      max_samples: null
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      collator_id: qwen3vl
+      ignore_pad_token_for_loss: true
+    enable_preload: true
+
+# 模型配置
+model:
+  model_id: glm4v_moe
+  model_name_or_path: &MM_MODEL_LOAD_PATH ./ckpt/mm_path/GLM-4.5V
+  trust_remote_code: true
+  attn_implementation: flash_attention_2
+  use_grouped_expert_matmul: true
+
+# 优化特性配置
+features:
+  loss_cfg:
+    loss_type: default
+    router_aux_loss_coef: 0.0
+  enable_chunk_loss: true
+  enable_dynamic_chunk_loss: false
+  chunkloss_plan:
+    apply_module: lm_head
+    chunk_size: 1024
+    total_chunk_size: 4096
+  recompute: true
+  recompute_plan:
+    apply_modules:
+      - model.visual.blocks.{*}
+      - model.language_model.layers.{*}
+  enable_activation_offload: false
+  activation_offload_plan:
+    apply_modules:
+      - model.visual.blocks.{*}
+      - model.language_model.layers.{*}
+  enable_ep_balance: false
+  ep_balance_plan:
+    max_dup_experts_num: 2
+
+# 训练配置
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 1234
+  lr: 1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.1
+  weight_decay: 0
+  train_iters: 10000
+  clip_grad: 0.0
+  init_model_with_meta_device: true
+  load: *MM_MODEL_LOAD_PATH
+  load_format: dcp
+  load_strict: true
+  no_load_optim: true
+  no_load_rng: true
+  optimizer: adamw
+  adam_fused: true
+  save: ./save_dir
+  save_interval: 10000
+  use_deter_comp: false
+  load_rank0_and_broadcast: false
+  plugin:
+    - mindspeed_mm/fsdp/models/glm4_5v
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+
+# 工具配置
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+  memory_profile:
+    enable: false

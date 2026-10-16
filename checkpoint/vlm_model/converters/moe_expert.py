@@ -13,6 +13,7 @@ mm-convert moe_expert --style split --hf_dir "merged_weight" --save_dir "splited
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, Literal
 from enum import Enum
@@ -37,6 +38,7 @@ class ConfigType(Enum):
     DEFAULT = 0
     QWEN3_OMNI = 1
     QWEN3_5 = 2
+    GLM4V = 3
 
 
 def get_config_type_from_class_name(save_dir: Path) -> ConfigType:
@@ -48,6 +50,8 @@ def get_config_type_from_class_name(save_dir: Path) -> ConfigType:
     class_name = config.__class__.__name__
     if class_name == "Qwen3OmniMoeConfig":
         return ConfigType.QWEN3_OMNI
+    elif class_name == "Glm4vMoeConfig" and os.getenv("GLM4V_DCP_3D") == "1":
+        return ConfigType.GLM4V
     else:
         return ConfigType.DEFAULT
 
