@@ -55,7 +55,16 @@ class BaseArguments(BaseModel):
 
         # Set default values for all registered fields
         for name, field_info in self._dynamic_fields_info.items():
-            if not hasattr(self, name):  # If not set in initialization data
+            nested_type = field_info.value_type
+            if isinstance(nested_type, type) and issubclass(nested_type, BaseArguments):
+                value = getattr(self, name, field_info.default)
+                if value is None and name not in data:
+                    value = nested_type()
+                elif isinstance(value, dict):
+                    value = nested_type(**value)
+                self._validate_type(value, nested_type, name)
+                setattr(self, name, value)
+            elif not hasattr(self, name):  # If not set in initialization data
                 setattr(self, name, field_info.default)
 
     @classmethod
@@ -79,6 +88,31 @@ class BaseArguments(BaseModel):
             AttributeError: Raised when field already exists
             TypeError: Raised when default value doesn't match value_type
         """
+        if '.' in name:
+            prefix, rest = name.split('.', 1)
+            field = cls.model_fields.get(prefix)
+            dynamic_field = cls._dynamic_fields_info.get(prefix)
+            if field is not None:
+                nested_type = field.annotation
+            elif dynamic_field is not None:
+                nested_type = dynamic_field.value_type
+            elif hasattr(cls, prefix):
+                raise TypeError(f"Cannot register '{name}': '{prefix}' is not a BaseArguments subclass")
+            else:
+                nested_type = type(
+                    f"{cls.__name__}{''.join(part.capitalize() for part in prefix.split('_'))}",
+                    (BaseArguments,), {},
+                )
+                nested_type.register_field(rest, value_type, default, description, required)
+                cls._dynamic_fields_info[prefix] = FieldInfo(
+                    value_type=nested_type, description=f"Nested config: {prefix}",
+                )
+                return
+            if not isinstance(nested_type, type) or not issubclass(nested_type, BaseArguments):
+                raise TypeError(f"Cannot register '{name}': '{prefix}' is not a BaseArguments subclass")
+            nested_type.register_field(rest, value_type, default, description, required)
+            return
+
         # Check if field already exists
         if hasattr(cls, name) and name not in cls.__fields__:
             raise AttributeError(f"Field '{name}' already exists, cannot register again")
@@ -122,9 +156,20 @@ class BaseArguments(BaseModel):
         result = self.model_dump()
 
         # 2. Add dynamically registered fields
+        def _serialize(value):
+            if isinstance(value, BaseArguments):
+                return value.to_dict()
+            if isinstance(value, dict):
+                return {key: _serialize(item) for key, item in value.items()}
+            if isinstance(value, list):
+                return [_serialize(item) for item in value]
+            if isinstance(value, tuple):
+                return tuple(_serialize(item) for item in value)
+            return value
+
         for field_name in self._dynamic_fields_info.keys():
             value = getattr(self, field_name)
-            result[field_name] = value
+            result[field_name] = _serialize(value)
 
         return result
 
@@ -218,6 +263,9 @@ class BaseArguments(BaseModel):
             # Perform type validation when field type is specified
             if expected_type is not None and value is not None:
                 self._validate_type(value, expected_type, name)
+                if (isinstance(expected_type, type) and issubclass(expected_type, BaseArguments)
+                        and isinstance(value, dict)):
+                    value = expected_type(**value)
 
         # Call parent class
         super().__setattr__(name, value)
@@ -260,6 +308,11 @@ class BaseArguments(BaseModel):
         # 2. Handle None
         if value is None:
             raise TypeError(f"Field '{field_name}': cannot be None")
+
+        if isinstance(expected_type, type) and issubclass(expected_type, BaseArguments):
+            if not isinstance(value, (dict, expected_type)):
+                raise TypeError(f"Field '{field_name}': must be a dictionary or {expected_type.__name__}")
+            return
 
         # 3. Basic type checking
         if expected_type is int:

@@ -4,7 +4,7 @@ from typing import List, Literal, Optional
 
 from pydantic import model_validator
 
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 
 class SwapPlanConfig(BaseArguments):

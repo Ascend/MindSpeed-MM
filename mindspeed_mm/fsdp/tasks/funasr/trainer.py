@@ -11,7 +11,7 @@ from mindspeed_mm.fsdp.tools.memory_profiler import memory_profiler
 from mindspeed_mm.fsdp.tools.profiler import profiler
 from mindspeed_mm.fsdp.train.trainer import Trainer
 from mindspeed_mm.fsdp.tasks.funasr.train_engine import FunasrTrainEngine
-from mindspeed_mm.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 

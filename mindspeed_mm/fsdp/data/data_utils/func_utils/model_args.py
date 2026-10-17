@@ -18,7 +18,7 @@
 from dataclasses import dataclass, field, asdict
 from typing import Optional, Dict, Any
 
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 
 class ProcessorArguments(BaseArguments):

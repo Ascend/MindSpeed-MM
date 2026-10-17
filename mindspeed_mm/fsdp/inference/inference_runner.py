@@ -11,7 +11,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 from torchdata.stateful_dataloader.sampler import StatefulDistributedSampler
 
 from mindspeed_mm.fsdp.utils.random import set_seed
-from mindspeed_mm.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import DistributedCheckpointer
 from mindspeed_mm.fsdp.checkpoint.hf_checkpointer import HuggingFaceCheckpointer
 from mindspeed_mm.fsdp.checkpoint.hf_utils import looks_like_hf_weight_dir

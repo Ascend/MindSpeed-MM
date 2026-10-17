@@ -50,7 +50,7 @@ def to_str(self) -> str
 **使用示例：**
 
 ```python
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from typing import List, Optional
 
 class ModelConfig(BaseArguments):
@@ -141,7 +141,7 @@ def print_summary(self)
 **基础使用：**
 
 ```python
-from mindspeed_mm.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.params.argument import Arguments
 
 # 方式1：最简单使用（自动读取命令行和YAML）
@@ -177,6 +177,8 @@ nested_custom:
   field2: "text"
 ```
 
+YAML 扩展和自动注册默认开启，新增的嵌套配置可直接通过属性访问，例如 `config.nested_custom.field1`，无需手动注册字段。
+
 **命令行参数覆盖：**
 
 ```bash
@@ -193,8 +195,8 @@ torchrun $DISTRIBUTED_ARGS trainer.py config.yaml use_amp=true
 **代码中扩展配置：**
 
 ```python
-from mindspeed_mm.config.config_manager import ConfigManager
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from typing import List
 
 # 定义自定义配置类

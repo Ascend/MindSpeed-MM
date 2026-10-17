@@ -5,7 +5,7 @@ import torch
 
 from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 logger = logging.getLogger(__name__)
 

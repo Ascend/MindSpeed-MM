@@ -5,7 +5,7 @@ import logging
 
 from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.params.lora_args import LoraArguments
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 logger = logging.getLogger(__name__)
 

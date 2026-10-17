@@ -39,7 +39,7 @@ MindSpeed-MM supports two main training backend paths. Agents should identify th
 | Backend | Primary Entries | Description |
 | --- | --- | --- |
 | MindSpeed Core / Megatron | `mindspeed_mm/training.py`, `mindspeed_mm/pretrain_*.py`, `examples/*/*.sh` | Megatron-style flow using model/data/forward providers and hybrid parallelism. |
-| FSDP2 | `mindspeed_mm/fsdp/train/trainer.py`, `mindspeed_mm/config/config_manager.py`, `mindspeed_mm/fsdp/utils/register.py` | YAML-driven flow using plugin registration, `ModelHub`, FSDP2 data builders, and parallel plans. |
+| FSDP2 | `mindspeed_mm/fsdp/train/trainer.py`, `mindspeed_mm/fsdp/config/config_manager.py`, `mindspeed_mm/fsdp/utils/register.py` | YAML-driven flow using plugin registration, `ModelHub`, FSDP2 data builders, and parallel plans. |
 
 See `knowledge/architecture.md` for the agent-facing architecture overview.
 

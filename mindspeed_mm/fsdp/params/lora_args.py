@@ -21,7 +21,7 @@ parameters used in FSDP2 distributed training.
 from dataclasses import dataclass, field
 from typing import List, Optional, Union
 
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 
 class LoraArguments(BaseArguments):

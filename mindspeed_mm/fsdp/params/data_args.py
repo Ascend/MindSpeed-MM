@@ -5,7 +5,7 @@ import logging
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DatasetAttr
 from mindspeed_mm.fsdp.data.data_utils.func_utils.convert import DataArguments as BasicDataAruments
 from mindspeed_mm.fsdp.data.data_utils.func_utils.model_args import ProcessorArguments
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import List, Literal, Optional
 import logging
 
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from mindspeed_mm.fsdp import envs
 
 

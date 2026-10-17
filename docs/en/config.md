@@ -50,7 +50,7 @@ def to_str(self) -> str
 **Usage Example**:
 
 ```python
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from typing import List, Optional
 
 class ModelConfig(BaseArguments):
@@ -141,7 +141,7 @@ The basic usage is illustrated in the following diagram.
 **Basic Usage**:
 
 ```python
-from mindspeed_mm.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.params.argument import Arguments
 
 # Method 1: Simplest usage (automatically reads command line and YAML)
@@ -177,6 +177,8 @@ nested_custom:
   field2: "text"
 ```
 
+YAML extensions and automatic registration are enabled by default. New nested fields support attribute access, such as `config.nested_custom.field1`, without manual field registration.
+
 **Command-line Argument Override**:
 
 ```bash
@@ -193,8 +195,8 @@ torchrun $DISTRIBUTED_ARGS trainer.py config.yaml use_amp=true
 **In-Code Extended Configuration**:
 
 ```python
-from mindspeed_mm.config.config_manager import ConfigManager
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from typing import List
 
 # Define a Custom Configuration Class

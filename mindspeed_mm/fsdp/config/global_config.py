@@ -1,7 +1,7 @@
 import os
 from typing import Optional
-from mindspeed_mm.config.arguments.base_args import BaseArguments
-from mindspeed_mm.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
 
 
 class _GlobalConfig:

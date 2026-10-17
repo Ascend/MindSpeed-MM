@@ -1,7 +1,7 @@
 from dataclasses import field
 from typing import Optional
 
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from mindspeed_mm.fsdp.params.inference_args import InferenceArguments
 
 

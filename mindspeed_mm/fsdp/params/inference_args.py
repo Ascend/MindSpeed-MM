@@ -1,7 +1,7 @@
 from dataclasses import field
 from typing import Any, Dict, List, Literal, Optional
 
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from mindspeed_mm.fsdp.params.feature_args import FeatureArguments
 from mindspeed_mm.fsdp.params.model_args import ModelArguments
 from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments

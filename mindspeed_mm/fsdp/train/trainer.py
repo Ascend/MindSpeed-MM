@@ -45,7 +45,7 @@ from mindspeed_mm.fsdp.utils.lora_utils import (
     print_lora_config,
 )
 from mindspeed_mm.fsdp.utils.lora_weight_manager import LoraWeightManager
-from mindspeed_mm.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.checkpoint.hf_utils import looks_like_hf_weight_dir
 from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
 from mindspeed_mm.fsdp.utils.dtype import get_dtype

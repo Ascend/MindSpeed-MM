@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, Tuple, Literal, List, Di
 import torch
 from transformers import PreTrainedTokenizer, ProcessorMixin, AutoProcessor, AutoConfig, AutoTokenizer, PretrainedConfig
 from mindspeed_mm.fsdp import envs
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 from .log import get_logger
 from .model_args import ProcessorArguments

@@ -15,7 +15,7 @@ from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.params.parallel_args import ParallelArguments
 from mindspeed_mm.fsdp.params.tools_args import ToolsArguments
 from mindspeed_mm.fsdp.params.utils import instantiate_dataclass
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 
 def _is_packed_pretrain_dataset(dataset_param):

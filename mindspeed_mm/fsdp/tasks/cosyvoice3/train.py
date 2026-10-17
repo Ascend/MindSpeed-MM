@@ -6,7 +6,7 @@ from mindspeed_mm.fsdp.data import build_mm_dataset
 from mindspeed_mm.fsdp.params.argument import Arguments, parse_args
 from mindspeed_mm.fsdp.train.trainer import Trainer
 from mindspeed_mm.fsdp.utils.device import get_device_type
-from mindspeed_mm.config.config_manager import ConfigManager
+from mindspeed_mm.fsdp.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.log import print_rank
 
 

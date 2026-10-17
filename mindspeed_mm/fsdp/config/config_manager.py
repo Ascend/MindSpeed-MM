@@ -5,9 +5,9 @@ from typing import Dict, Any, Optional, List, Type
 from pathlib import Path
 import yaml
 
-from mindspeed_mm.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from mindspeed_mm.fsdp.params.argument import Arguments
-from mindspeed_mm.config.exception import ConfigValidationError
+from mindspeed_mm.fsdp.config.exception import ConfigValidationError
 
 
 class ConfigManager:
