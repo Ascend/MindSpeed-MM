@@ -78,14 +78,14 @@ MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
   <tr>
     <th>7.2.0</th>
     <th>7.3.0</th>
-    <th>26.0.0</th>
+    <th>26.0.X</th>
     <th>26.1.X</th>
     <th>26.2.X</th>
   </tr>
 </thead>
 <tbody>
   <tr>
-    <td>26.0.0</td>
+    <td>26.0.X</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
@@ -93,7 +93,7 @@ MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
     <td>Y</td>
   </tr>
   <tr>
-    <td>26.1.0</td>
+    <td>26.1.X</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
@@ -101,7 +101,7 @@ MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
     <td>Y</td>
   </tr>
     <tr>
-    <td>26.2.0</td>
+    <td>26.2.X</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
@@ -126,15 +126,15 @@ MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
     <th colspan="5">CANN版本</th>
   </tr>
   <tr>
-    <th>8.3.RC1</th>
+    <th>8.3.RCX</th>
     <th>8.5.0</th>
-    <th>9.0.0</th>
+    <th>9.0.X</th>
     <th>9.1.X</th>
     <th>9.2.X</th>
   </tr></thead>
 <tbody>
   <tr>
-    <td>26.0.0</td>
+    <td>26.0.X</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
@@ -142,7 +142,7 @@ MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
     <td>Y</td>
   </tr>
     <tr>
-    <td>26.1.0</td>
+    <td>26.1.X</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
@@ -150,7 +150,7 @@ MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
     <td>Y</td>
   </tr>
     <tr>
-    <td>26.2.0</td>
+    <td>26.2.X</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
