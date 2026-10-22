@@ -102,11 +102,25 @@ pip install triton-ascend==3.2.2 --extra-index-url=https://triton-ascend.osinfra
 
 ### 4. 安装fla-npu以适配AscendC
 
+方式一：官网下载编好的whl文件进行安装
+
+打开[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/releases)，选择适用于你当前环境的whl包进行安装，推荐使用以下命令：
+
+```shell
+# source 实际的cann路径
+source /usr/local/Ascend/cann/set_env.sh
+# cd到存放whl包的路径下执行安装
+python -m pip install --force-reinstall --no-deps ./flash_linear_attention_npu*.whl
+```
+
+方式二：手动编包并安装
+
 拉取flash-linear-attention-npu代码仓，并进入代码仓根目录
 
 ```bash
-git clone https://github.com/flashserve/flash-linear-attention-npu -b v26.6.0
+git clone https://github.com/flashserve/flash-linear-attention-npu
 cd flash-linear-attention-npu
+git checkout v26.9.1
 ```
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/v26.6.0/README.md)
@@ -129,24 +143,20 @@ yum install gawk cmake
 source /usr/local/Ascend/cann/set_env.sh
 
 python -m pip install -r requirements.txt
-python scripts/check_npu_env.py --build-only
+python scripts/check_npu_env.py # 无 NPU 的纯构建环境可加 --build-only
 
-# --soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
-FLA_NPU_SOC=ascend910_93 python -m pip wheel --no-build-isolation --no-deps . -w dist
-python -m pip install --force-reinstall --no-deps dist/flash_linear_attention_npu-*.whl
+# --soc 需指定为当前机器芯片类型 {A2: ascend910b, A3: ascend910_93, A5:ascend950}
+FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
+python -m pip install --force-reinstall --no-cache-dir --no-deps dist/flash_linear_attention_npu*.whl
 ```
 
 检验fla_npu是否安装成功
 
 ```bash
-# 显示True
-python -c "import fla_npu; import torch; print(hasattr(torch.ops.npu, 'npu_chunk_fwd_o'))"
-
-# 显示Packaged wheel API check passed.
-python scripts/check_packaged_wheel_api.py
-
-# 显示flash-linear-attention-npu 26.6.0
 pip list | grep fla
+python -c "import fla_npu; print('ok')"
+python -c "from fla_npu.ops import ascendc; print(hasattr(ascendc, 'chunk_fwd_o'))"
+python scripts/check_packaged_wheel_api.py
 ```
 
 ---

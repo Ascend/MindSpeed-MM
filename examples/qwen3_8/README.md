@@ -22,6 +22,7 @@
   - [准备工作](#1-准备工作)
   - [配置参数](#2-配置参数)
   - [启动微调](#3-启动微调)
+  - [LoRA 微调](#4-lora-微调)
 - [环境变量声明](#环境变量声明)
 - [注意事项](#注意事项)
 
@@ -29,9 +30,18 @@
 
 ### 参考实现
 
+Qwen3.8-2.4T和Qwen3.8-27B：
+
 ```shell
 url=https://github.com/huggingface/transformers.git
 git checkout v5.2.0
+```
+
+qwen3.8-flash-next：
+
+```shell
+url=https://github.com/huggingface/transformers.git
+git checkout v5.19.0
 ```
 
 ### 变更记录
@@ -48,81 +58,117 @@ git checkout v5.2.0
 ### 1. 环境准备
 
 【推荐使用配套环境版本】
-> Python版本推荐3.10或3.11，建议使用CANN9.1.0，torch_npu2.7.1.post8版本，详细安装步骤可查看：
 
-- [CANN](https://www.hiascend.com/cann/download?versionId=767&ids=d803%2Ch0501%2Ch0601%2Ch0701)（推荐使用离线安装方式）
-- [TorchNPU](https://www.hiascend.com/developer/software/ai-frameworks/pytorch/download?versionId=174&ids=89dda9ba9de741349efa03687a487678%2C96%2C109%2C1%2C6%2C177%2C)
+- [CANN](https://www.hiascend.com/cann/download?versionId=810&ids=d803%2Ch0501%2Ch0601%2Ch0703&currentTab=0)（推荐使用离线安装方式）
+- [TorchNPU](https://www.hiascend.com/developer/software/ai-frameworks/pytorch/download?versionId=174&ids=89dda9ba9de741349efa03687a487678%2C96%2C109%2C1%2C6%2C177%2C)或[Release外发版本](https://gitcode.com/Ascend/pytorch/releases)
 
-仍有疑问可以参考[安装指南](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docs/zh/guides/installation/install_guide.md)
+仍有疑问可以参考[安装指南](../../docs/zh/guides/installation/install_guide.md)，完成 CANN 相关配置（驱动、固件及 Toolkit 工具包）。
 
 <a id="jump1.2"></a>
 
 ### 2. 环境搭建
 
-拉取MindSpeed MM代码仓，并进入代码仓根目录：
+拉取MindSpeed MM代码仓，并进入代码仓根目录(若需要使用低版本的python，可参考[安装指南](../../docs/zh/guides/installation/install_guide.md)的拉取方法)：
 
 ```bash
 git clone https://gitcode.com/Ascend/MindSpeed-MM.git
 cd MindSpeed-MM
 ```
 
+若存在自由指定依赖等手动安装需求，可以参考[安装指南](../../docs/zh/guides/installation/install_guide.md)中的手动安装流程（注：Qwen3.8不需要安装该流程中的Megatron-LM库）
+
 执行如下指令一键安装：
 
 ```bash
+# Qwen3.8-2.4T和Qwen3.8-27B：
 bash scripts/install.sh --msbranch master && pip install transformers==5.2.0
+
+# Qwen3.8-Flash-Next：
+bash scripts/install.sh --msbranch master && pip install transformers==5.19.0
 ```
+
+以上指令会默认安装v2.10.0版本 torch 以及 torch_npu 库，如需指定版本可参考如下示例：
+
+```bash
+bash scripts/install.sh --msbranch master --torchversion 2.10.0 && pip install transformers==5.19.0
+```
+
+请参考[版本配套说明](../../docs/zh/release_notes_mm.md)和[Triton-Ascend3.2.2适配版本](https://github.com/triton-lang/triton-ascend/releases)选择适配的 pytorch/torch_npu 版本
+
+> [!NOTE]
+> 当前一键安装脚本torch_npu版本与torch为严格对应（无post后缀），建议按照链接中的适配版本自行安装带后缀的torch版本，否则可能无法通过后续环境检测脚本
 
 ### 3. 安装配套版本的Triton-Ascend
 
-可直接使用如下安装命令：
+安装配套版本的Triton-Ascend，请参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节，获取配套版本的Triton-Ascend安装指令。
+
+可参考如下安装命令：
 
 ```shell
-pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
-# 注意：triton-ascend 3.2.0 及以下 triton-ascend 和 triton 不能同时存在。需要先卸载社区 triton，再安装 triton-ascend。
+# 注意：triton-ascend 3.2.0 及以下 Triton-Ascend 和 Triton 不能同时存在。需要先卸载社区 Triton，再安装 Triton-Ascend。
+pip install triton-ascend==3.2.2 --extra-index-url=https://triton-ascend.osinfra.cn/pypi/simple
 ```
 
-若需了解更多可参考《Triton-Ascend》中的"[通过pip安装Triton-Ascend](https://triton-ascend.readthedocs.io/zh-cn/latest/installation_guide.html#piptriton-ascend)"章节。
+> [!NOTE]
+> 当前triton-ascend==3.2.2可能会遇到一些兼容问题，若安装triton-ascend==3.2.2问题无法解决，可以尝试退回triton-ascend==3.2.1，经测试3.2.1在python3.12环境下可以跑通完整流程
 
 ### 4. 安装fla-npu以适配AscendC
 
-拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
+方式一：官网下载编好的whl文件进行安装
 
-```bash
-git clone https://github.com/flashserve/flash-linear-attention-npu -b v26.6.0
-cd flash-linear-attention-npu
+打开[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/releases)，选择适用于你当前环境的whl包进行安装，推荐使用以下命令：
+
+```shell
+# source 实际的cann路径
+source /usr/local/Ascend/cann/set_env.sh
+# cd到存放whl包的路径下执行安装
+python -m pip install --force-reinstall --no-deps ./flash_linear_attention_npu*.whl
 ```
 
-安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
+方式二：手动编包并安装
 
-> **说明：** 请确保操作系统已安装 `gawk`，否则后续安装会失败，参考以下命令安装：
+拉取flash-linear-attention-npu代码仓，并进入代码仓根目录
+
+```bash
+git clone https://github.com/flashserve/flash-linear-attention-npu
+cd flash-linear-attention-npu
+git checkout v26.9.1
+```
+
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/v26.6.0/README.md)
+
+> **说明：** 请确保操作系统已安装 `gawk`和`cmake`，否则后续安装会失败。可参考以下命令安装：
 
 ```shell
 # Ubuntu / Debian
 apt-get update
-apt-get install gawk
+apt-get install gawk cmake
 # openEuler / CentOS / RHEL
 yum update
-yum install gawk
+yum install gawk cmake
 ```
 
-fla-npu推荐使用以下安装命令
+推荐使用以下安装命令
 
 ```shell
-# source 所安装cann包路径下的set_env.sh
-source /user/Ascend/CANN_9.1.0/ascend-toolkit/set_env.sh
+# source 实际的cann路径
+source /usr/local/Ascend/cann/set_env.sh
 
-# 编译算子 run 包，--soc 需指定为当前机器芯片类型 {A2:ascend910b/A3:ascend910_93/A5:ascend950}
-# 以A3机型为例
-bash build.sh --soc=ascend910_93 --pkg --vendor_name=fla_npu
-bash build_out/fla-npu-*.run #运行完成后会生成命令：export LD_LIBRARY_PATH=xxx:${LD_LIBRARY_PATH}，将该命令添加到shell训练脚本中
-cd torch_custom/fla_npu/
-bash build.sh
+python -m pip install -r requirements.txt
+python scripts/check_npu_env.py # 无 NPU 的纯构建环境可加 --build-only
+
+# --soc 需指定为当前机器芯片类型 {A2: ascend910b, A3: ascend910_93, A5:ascend950}
+FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
+python -m pip install --force-reinstall --no-cache-dir --no-deps dist/flash_linear_attention_npu*.whl
 ```
 
 检验fla_npu是否安装成功
 
 ```bash
-pip list | grep fla_npu
+pip list | grep fla
+python -c "import fla_npu; print('ok')"
+python -c "from fla_npu.ops import ascendc; print(hasattr(ascendc, 'chunk_fwd_o'))"
+python scripts/check_packaged_wheel_api.py
 ```
 
 ---
@@ -141,37 +187,29 @@ pip list | grep fla_npu
 >
 > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
 
-- 模型地址: [Qwen3.8系列模型](https://www.modelscope.cn/collections/Qwen/Qwen38)；
+模型地址:
 
- 将下载的模型权重保存到本地的`ckpt/hf_path/xxxxxxx`目录下。(*表示对应的尺寸)
+- [Qwen3.8-*B](https://huggingface.co/collections/Qwen/qwen38)
+- [Qwen3.8-Flash-Next](https://huggingface.co/collections/Qwen/qwen38-flash-next)
+
+ 将下载的模型权重保存到本地的`ckpt/hf_path/Qwen3.8-*B`目录下。(*表示对应的尺寸)
 
 <a id="jump2.2"></a>
 
 ### 2. 权重加载
 
-当前支持huggingface权重或dcp权重加载，在`xxx_config.yaml`中`training->load_format`字段中配置加载权重的类型，支持`hf`, `dcp`和`auto`，设置为`auto`时会根据权重文件格式自行判断权重类型。
+当前支持huggingface权重或dcp权重加载，在`xxx_config.yaml`中`training.load_format`字段中配置加载权重的类型，支持`hf`(即`huggingface`), `dcp`(即`distributed checkpoint`)和`auto`，设置为`auto`时会根据权重文件格式自行判断权重类型。
 
-如果需要加载dcp权重，请先根据模型配置完成以下hf权重到dcp权重的转换：
+配置示例：
 
 ```bash
-mm-convert Qwen35Converter hf_to_dcp \
---hf_dir ckpt/hf_path/xxxxxxx \
---dcp_dir ckpt/dcp_path/xxxxxxx \
---num_workers 0
-
-# 其中：
-# hf_dir: huggingface权重目录
-# dcp_dir: 转换后DCP格式的权重保存目录
-# num_workers: 并行工作线程数，0表示串行执行，若存储IO性能允许，可适当调大并发数以提升转换效率，推荐设置为4
-
-# 转换后的目录结构为：
-# ———— xxxxxxx
-#   |—— release
-#   |—— latest_checkpointed_iteration.txt
+training:
+  load: /home/weights/Qwen3.8-Flash-Next
+  load_format: hf
+  init_model_with_meta_device: true
 ```
 
-并在`xxx_config.yaml`中将`init_model_with_meta_device`参数配置为`True`，同时将`load`参数修改为转换后的dcp权重路径（写到`release`文件夹的上一级目录）。
-注意：如果MoE模型不支持mtp，可在执行`mm-convert`权重转换前将`ckpt/hf_path/xxxxxxx/config.json`中的`mtp_num_hidden_layers`设置为0，以跳过mtp专家权重合并，缩短转换时间，如397B模型可以缩短约5分钟。
+注意：当加载hf权重时需要将no_load_optim和no_load_rng设置为true。
 
 <a id="jump2.3"></a>
 
@@ -249,7 +287,7 @@ mm-convert Qwen35Converter dcp_to_hf \
 根据实际情况配置`xxx_config.yaml`的`training`参数，包括保存路径以及保存间隔`save`、`save_interval`
 根据实际情况配置`xxx_config.yaml`中的`init_from_hf_path`参数，该参数表示初始权重的加载路径。
 
-【Ulysses-CP并行配置】
+【ulysses-cp并行配置】
 
 根据实际情况配置`xxx_config.yaml`中的`ulysses_parallel_size`以调整ulysses-cp的并行度。（`ulysses_parallel_size`为1时不开启ulysses-cp）
 
@@ -260,6 +298,10 @@ mm-convert Qwen35Converter dcp_to_hf \
 根据实际的需求配置`xxx_config.yaml`中的`expert_parallel_size`（注意仅对MoE模型生效）
 
 根据`expert_parallel_size`可以自行选择更合适的`ep_plan.dispatcher`，推荐`expert_parallel_size`小于`topk`时，`dispatcher`选择`allgather`，`expert_parallel_size`大于`topk`时选择`alltoall`。
+
+【MoE aux loss配置】
+
+针对MoE模型，如果训练的过程中需要在交叉熵损失的基础上增加`router_aux_loss`使得训练过程中的专家负载分配区域平衡的话，可以配置`xxx_config.yaml`中的`features.loss_cfg.router_aux_loss_coef`字段，该字段表示负载均衡损失的系数。
 
 【性能优化配置】
 
@@ -286,14 +328,48 @@ mm-convert Qwen35Converter dcp_to_hf \
   - gdn_implementation和causal_conv1d_implementation分别支持`eager`，`triton`和`ascendc`配置，使用`ascendc`性能最佳，需要安装fla_npu库
   - 当gdn_implementation配置为`ascendc`时，causal_conv1d_implementation只支持和`triton`和`ascendc`，防止算子之间的布局不匹配
 
+【纯文本 SFT】
+
+当使用纯文本数据对 Qwen3.8 进行 SFT 时，可通过 `text_only` collator 避免假模态注入和无效的视觉塔计算。
+
+在 `xxx_config.yaml` 中配置：
+
+```yaml
+data:
+  dataloader_param:
+    collate_param:
+      collator_id: text_only
+      ignore_pad_token_for_loss: true
+
+model:
+  freeze:
+    - model.visual
+
+features:
+  recompute_plan:
+    apply_modules:
+      - model.language_model.layers.{*}
+  activation_offload_plan:
+    apply_modules:
+      - model.language_model.layers.{*}
+```
+
+注意事项：
+
+- 输入数据必须为纯文本，不得携带非空的 `images`、`videos` 或 `audios`；
+- 视觉塔必须冻结（`model.freeze: [model.visual]`）；
+- 视觉模块继续保留在 `fsdp_plan.apply_modules` 中，维持分片和 checkpoint 拓扑；
+- 从 recompute/offload 中移除视觉模块，仅保留语言模型层；
+- 需要训练视觉塔或使用多模态数据时，将 `collator_id` 切回 `qwen3vl`；
+
 【单机运行配置】
-以qwen3_8模型为例：
+
 配置`examples/qwen3_8/finetune_qwen3_8.sh`参数如下
 
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-NPUS_PER_NODE=16
+NPUS_PER_NODE=8
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1
@@ -321,8 +397,20 @@ loss计算方式差异会对训练效果造成不同的影响，在启动训练�
 可在`xxx_config.yaml`的`model`参数中配置上述文档中的`loss_type`。
 
 ```shell
-bash examples/qwen3_8/finetune_qwen3_8.sh
+bash examples/qwen3_8/finetune_qwen3_8_xxB.sh
 ```
+
+<a id="jump4.4"></a>
+
+### 4. LoRA 微调
+
+将 `training.lora.enable` 设为 `true`，并按需配置其余参数，使用与全量微调相同的启动脚本进行LoRA微调。
+
+更详细的 LoRA 配置与参数说明见 [LoRA 微调特性文档](../../docs/zh/features/training_mode/lora_finetune_fsdp2.md)。
+
+【并行策略调整建议】
+
+开启 LoRA 后，基础模型参数全部冻结，仅 LoRA 适配器参数参与训练，可训练参数量相比全量微调大幅下降，梯度与优化器状态的显存占用也随之显著降低。因此，建议结合可训练参数的实际体量重新评估 `parallel` 模块中的并行切分策略，而不必沿用全量微调的配置。例如，yaml配置文件中的 `fully_shard_parallel_size` 不必保持为 `auto`（即在全部设备上切分参数），可结合显存情况显式指定较小的切分度，以减少参数切分引入的通信开销；对于 MoE 类模型，LoRA 微调时可以根据实际情况将 `EP` 开至很低甚至无需开启。
 
 <a id="jump10"></a>
 
