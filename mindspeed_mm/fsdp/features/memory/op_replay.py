@@ -5,9 +5,15 @@ inside a checkpoint boundary, replay zones (scopes) mark sub-regions:
 - forward: OpReplayCachingMode (a TorchDispatchMode) intercepts whitelisted
   aten ops in the active scope and hands their outputs to the shared SwapCache
   (async HBM<->DDR swap, owned by the SwapManager), recording an op ->
-  output-handle route in the checkpoint's session;
+  output-handle route in the checkpoint's session. Each scope may hand its
+  outputs in with a static payload quantizer (quantizer), which shrinks the
+  cached payload at the cost of precision;
 - recompute: OpReplayReplayingMode replays a hit op via the route (skipping
   computation); any miss falls back to recomputing that op.
+
+pop() of a handle that was put with a quantizer returns a freshly
+dequantized tensor, not the object that went into put; a handle put without a
+quantizer (the default) returns that very object.
 
 It only activates via a non-reentrant checkpoint's context_fn, so the wiring
 entry point is build_op_replay_context_fn, called by the recompute feature.
@@ -37,6 +43,7 @@ from torch.utils._pytree import tree_flatten, tree_unflatten
 
 from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from ...utils.device import IS_NPU_AVAILABLE
+from .quantizer import QUANTIZERS
 from .swap_core import SwapCache, SwapHandle
 
 
@@ -165,14 +172,29 @@ class OpReplayScope:
                "cache everything" mode (it would swap out cheap-to-recompute
                and view/metadata ops whose payloads are pure waste).
     save_rng:  record/replay post-op RNG snapshots for this scope's cached ops
+    quantizer: payload quantizer for this scope's cached outputs, handed to
+               the swap cache on every put (None = store raw bytes). A
+               registered name (QUANTIZERS) resolves to its instance once,
+               here; an instance is used as-is. Static per scope: no data- or
+               size-dependent selection, every cached leaf of the scope goes
+               in with the same quantizer.
     """
 
-    def __init__(self, cache_ops=None, save_rng=True, name=None):
+    def __init__(self, cache_ops=None, save_rng=True, name=None, quantizer=None):
         if cache_ops is None:
             cache_ops = _default_cache_ops()
+        if isinstance(quantizer, str):
+            # A registered name resolves here, once; an unknown name is a
+            # config error, raised at scope construction — not at first put.
+            if quantizer not in QUANTIZERS:
+                raise ValueError(
+                    f"unknown payload quantizer {quantizer!r} "
+                    f"(registered: {sorted(QUANTIZERS)})")
+            quantizer = QUANTIZERS[quantizer]
         self.cache_ops = cache_ops
         self.save_rng = save_rng
         self.name = name
+        self.quantizer = quantizer
 
     @classmethod
     def from_config(cls, cfg) -> "OpReplayScope":
@@ -185,10 +207,13 @@ class OpReplayScope:
             cache_ops=_parse_op_list(getattr(cfg, "cache_ops", None)),
             save_rng=getattr(cfg, "save_rng", True),
             name=getattr(cfg, "name", None),
+            quantizer=getattr(cfg, "quantizer", None),
         )
 
     def __repr__(self):
-        return f"OpReplayScope(name={self.name!r}, save_rng={self.save_rng})"
+        quantizer = self.quantizer.name if self.quantizer is not None else None
+        return (f"OpReplayScope(name={self.name!r}, save_rng={self.save_rng}, "
+                f"quantizer={quantizer!r})")
 
 
 class OpReplaySession:
@@ -237,7 +262,14 @@ class _OpReplayMode(TorchDispatchMode):
 
 class OpReplayCachingMode(_OpReplayMode):
     """Forward mode: run whitelisted ops and swap their outputs out, recording
-    op -> route in this checkpoint's session."""
+    op -> route in this checkpoint's session.
+
+    Outputs are handed to the shared swap cache with the scope's static payload
+    quantizer (scope.quantizer): the cache stores the QUANTIZED payload, so a
+    quantized scope replays a dequantized (lossy) tensor instead of the exact
+    forward output. Every cached leaf of the scope gets the same quantizer —
+    never a per-tensor choice by size or data.
+    """
 
     def __torch_dispatch__(self, func, types, args=(), kwargs=None):
         kwargs = kwargs or {}
@@ -254,14 +286,17 @@ class OpReplayCachingMode(_OpReplayMode):
         for leaf in leaves:
             if isinstance(leaf, torch.Tensor):
                 handle = self.session.op_cache.put(
-                    _maybe_detach(leaf, any_ret_has_alias_info))
+                    _maybe_detach(leaf, any_ret_has_alias_info),
+                    quantizer=scope.quantizer)
                 info_leaves.append(_HandleInfo(handle))
                 has_tensor = True
             else:
                 info_leaves.append(leaf)
 
         if has_tensor:
-            # put consumes no RNG, so this is still the op's post-op state.
+            # put consumes no RNG (nor does the payload quantizer it runs: a
+            # quantizer must be RNG-free by contract), so this is still the op's
+            # post-op state.
             post_rng_snap = _get_rng_snapshot() if scope.save_rng else None
             self.session.token_routes[func].append((info_leaves, spec, post_rng_snap))
         return out
@@ -289,6 +324,9 @@ class OpReplayReplayingMode(_OpReplayMode):
         handles = [info.handle for info in info_leaves if isinstance(info, _HandleInfo)]
         tensors: dict = {}
         for handle in handles:
+            # pop dequantizes a quantized handle: what stands in for the op's
+            # forward output is a freshly dequantized tensor there, and the
+            # object put stored when the handle carries no quantizer.
             tensor = self.session.op_cache.pop(handle)
             if tensor is None:
                 # Off the regular path: eviction never removes a handle from
@@ -323,6 +361,9 @@ class OpReplayReplayingMode(_OpReplayMode):
     def __exit__(self, *args):
         ret = super().__exit__(*args)
         # Release routes this checkpoint did not consume (e.g. early stop).
+        # A quantized payload is dequantized here even though nobody reads it:
+        # the cleanup path only reclaims the handle (small known waste, see
+        # SwapCache.pop).
         for func, routes in self.session.token_routes.items():
             for info_leaves, spec, post_rng_snap in routes:
                 for info in info_leaves:
@@ -428,6 +469,7 @@ def build_op_replay_context_fn(model: nn.Module, scope_configs,
             "(swap_plan); none was provided")
 
     scopes = [OpReplayScope.from_config(cfg) for cfg in scope_configs]
+
     controller = OpReplayController(scopes, op_cache)
 
     for cfg, scope in zip(scope_configs, scopes):

@@ -64,6 +64,9 @@ flowchart TB
 - **换出的张量禁止原地改写（无运行时兜底）**：进入缓存的张量在被取回前禁止in-place改写；违反时不报错、静默产生错误数值（训练场景下即错误梯度），缓存层不做版本检测。确需改写请先 `clone()`。
 - **put在分配流上下文调用**：张量的全部写入须有序于put；此前在旁流上的写入由租户先用事件接力进put所在流（跨流定序纪律属多流编程自身要求，底座不兜底）。
 - **pop/consume在消费流上下文调用**：取回落点固定在put流池分配，底座在取回完成时把排序同时落到消费流与put流（settle双落）；租户随后释放引用前，须保证分配流已有序于自己的全部旁流读（wait-before-drop）。
+- **可选载荷量化（payload quantizer）**：`put(tensor, quantizer=<quantizer实例>)`，默认不传即不量化（与不带该参数逐位相同）。量化是租户侧/put前处理、反量化是pop后处理（都在调用方流上、`no_grad` 下），底座只搬"载荷"字节：`handle.quantizer`/`handle.meta` 随句柄存取、底座不解读（`clear()` 时一并释放），容量与统计（`_bytes` / `hbm_bytes` / `ddr_bytes` / `peak_*`）**一律按载荷字节计**（量化后即量化载荷的字节数）。已注册的quantizer见 `mindspeed_mm/fsdp/features/memory/quantizer.py` 的 `QUANTIZERS`（配置层按注册名引用，解析发生在scope构造期，底座本身无注册表）；quantizer须确定性且不消耗RNG（op replay依赖post-op RNG快照对齐）。
+- **量化句柄：`pop` 返回反量化后的新张量**：`pop(handle)` 对量化句柄在消费流上反量化，返回**原dtype/原shape的新张量**（put进去的对象不返回）；未带quantizer的句柄语义不变（仍返回同一对象，直到它经历过DDR往返）。`get()` 是窥视/调试接口，返回的是**载荷**（量化后即int8张量）而非原张量，勿当结果使用。清理性的 `pop`（如 op replay early stop 释放未消费路由）同样会做一次无人读的反量化——已知小浪费，后续可能由独立的 `release(handle)` 收口。
+- **量化与验收口径互斥**：有损载荷与逐位比对不能共存——开量化的scope/租户只能用**容差口径**验收（loss/grad norm在约定容差内一致），逐位口径仅适用于不配置quantizer。
 
 ## 使用场景
 
@@ -140,7 +143,7 @@ flowchart LR
 ### 已知约束
 
 - **已验证范围**：qwen3_5 4B（FSDP2后端，Op Replay与Act Stash租户）e2e训练，截至2026-08。
-- **精度验证建议**：新配置（新租户、新scope、新白名单）上线前，用确定性模式做逐位对照——`training.use_deter_comp: true` + 固定种子 + 关数据shuffle，同配置开/关特性各跑若干步，逐iter loss与grad norm逐位一致才放行（见 [确定性计算](../other/deterministic_computing.md)）。先确认基线本身逐位可复现：个别算子kernel非确定时，逐位差异并非本特性引入；`examples/qwen3_5/finetune_qwen3_5_4B.sh` 已验证逐位可复现。
+- **精度验证建议**：新配置（新租户、新scope、新白名单）上线前，用确定性模式做逐位对照——`training.use_deter_comp: true` + 固定种子 + 关数据shuffle，同配置开/关特性各跑若干步，逐iter loss与grad norm逐位一致才放行（见 [确定性计算](../other/deterministic_computing.md)）。先确认基线本身逐位可复现：个别算子kernel非确定时，逐位差异并非本特性引入；`examples/qwen3_5/finetune_qwen3_5_4B.sh` 已验证逐位可复现。**开载荷量化的scope不适用逐位口径**（有损载荷），改用容差口径，见[使用约定](#使用约定)。
 - **多流场景**：① 跨流生产的张量须先汇流（事件同步到计算流）再被put——这是多流编程自身的纪律，与底座无关；② D2H拷出的排序锚定在 **put时刻**调用流上录制的事件：驱逐即使后来被无关上下文间接触发，拷出也只与put前的写入保序，驱逐侧无需额外关注；③ pop侧落点在 **put时刻捕获的流**（put流）上下文分配、H2D与put流保序，取回完成的排序同时落消费流与put流（settle双落）；释放定序锚put流（释放块回分配流池，与释放时ambient无关），旁流读者的安全性经租户wait-before-drop向put流传递。两点多流限定预期：跨租户驱逐时释放定序会把一道设备侧wait插进**被驱逐租户**的流（有界反压边，单流接线无感）；预取H2D等待put流全量队尾，put流≠消费流时预取起跑可能偏晚。反向多流调度场景（pop/consume与put不在同一流）不在当前已验证范围内。此类问题表现为偶发错值、不报错；排查时用 `capacity_mb: 0` 确定性驱逐档做二分定位——错值消失即指向异步序问题。
 - **传输带宽与NUMA布局强平台相关**：容量定标规则中的"单份传输耗时"必须按目标机器实测，不可跨平台沿用历史数据。上线前建议用 `tests/ut_fsdp/features/memory/` 下的带宽/双工/并发探针实测：单链路solo带宽、D2H与H2D并发时两方向的相互影响、目标并发规模下的聚合带宽与per-rank有效带宽；定标容量与传输耗时一律取**并发期实测值**而非solo值。
 - **CPU绑核收益平台相关，映射正确性须先按机器验证**：绑核映射（`CPU_AFFINITY_CONF`）与实际卡-NUMA拓扑不符时（错节点绑定）反而有害；`MM_PRIME_CPU_AFFINITY`的priming只把绑核生效时刻提前到首个backward之前（让早期锁页分配如swap arena落在绑定节点），不修正映射本身。是否启用绑核与priming，建议先在目标机器上做绑核A/B的并发带宽对照实测再决定。

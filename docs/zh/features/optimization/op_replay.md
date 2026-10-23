@@ -83,6 +83,7 @@ features:
 | `op_replay_scopes[i].apply_modules` | List[str] | [] | 标定scope区域的模块。**必须落在 `recompute_plan.apply_modules` 覆盖范围内**——dispatch模式只在checkpoint内部激活，scope落在覆盖外时永不回放（不报错，只是不生效）。 |
 | `op_replay_scopes[i].save_rng` | bool | true | 是否记录/回放该scope内缓存算子执行后的RNG快照。作用域内含随机算子（如dropout、randn_like等）时保持重计算RNG流与forward逐算子对齐，保证梯度一致；scope内无随机算子时可关闭。 |
 | `op_replay_scopes[i].cache_ops` | List[str] / null | None | 缓存算子白名单，元素为 `torch.ops` 全限定名（如 `aten.mm.default`、`npu.npu_fusion_attention.default`）。`None` 回落到内置默认白名单：matmul族（`aten.mm.default` / `aten.addmm.default` / `aten.bmm.default` / `aten.linear.default`）与 `aten._scaled_dot_product_flash_attention.default`；**显式空列表 = 不缓存任何算子**。缓存始终白名单门控，不存在"全缓存"模式。 |
+| `op_replay_scopes[i].quantizer` | str / null | None | 该scope缓存输出交给Swap Cache时使用的载荷量化器（**静态**按scope配置，不按尺寸/数据逐张量选择）：`None` = 不量化（默认，与不加该字段的行为逐位相同），其余取值为 `mindspeed_mm/fsdp/features/memory/quantizer.py` 的 `QUANTIZERS` 注册名（如 `int8_pertoken`）；未注册名在**配置解析期即报错**（fail-fast，不等接线或首次put）。只影响缓存载荷的精度，不影响收哪些算子（那由 `cache_ops` 决定）。**精度边界：forward与loss逐位不变**——被替换的只是backward期重算本该产出的那个张量（`pop`返回反量化后的新张量，是该张量的有损近似，不再是put进去的对象）；因此开量化的scope只能用容差口径验收，逐位口径仅对不配置 `quantizer` 成立。 |
 
 ### 自定义算子纳管
 

@@ -84,11 +84,19 @@ class SwapHandle:
     _id_counter = itertools.count()  # process-wide monotonic id, for logging/debugging only
 
     def __init__(self, tensor, h2d_stream=None, d2h_stream=None, *,
-                 cpu_arena: SlabArena):
+                 cpu_arena: SlabArena, quantizer=None, meta=None):
         self.tensor: Optional[torch.Tensor] = tensor
         self.id = next(SwapHandle._id_counter)
         self._cpu_arena = cpu_arena
         self._bytes = cpu_arena.payload_bytes(tensor)
+        # Payload quantizer that produced `tensor` (via SwapCache.put's
+        # quantize call — quantized, or passed through unchanged with
+        # meta=None) and its opaque descriptor. The foundation never
+        # interprets either: it moves the payload it was handed, so all
+        # accounting below counts the payload's bytes. Both are dropped in
+        # clear() (releasing whatever the meta holds, e.g. scales).
+        self.quantizer = quantizer
+        self.meta = meta
         # H2D/D2H share one stream by default: on a half-duplex host link,
         # concurrent streams compete for bandwidth while a single stream
         # serializes both directions and eliminates cross-stream races.
@@ -320,6 +328,10 @@ class SwapHandle:
         return MemDelta(hbm=self._bytes, ddr=0)
 
     def clear(self) -> MemDelta:
+        # The handle goes out of service here: drop the payload descriptor and
+        # with it whatever the meta references (e.g. quant scale tensors).
+        # pop() snapshots quantizer/meta before calling consume() -> clear().
+        self.quantizer = self.meta = None
         delta = self.wait()
         if self._state == SwapState.HBM_ONLY:
             # HBM_ONLY means never offloaded, so no buffer was ever registered
@@ -389,6 +401,9 @@ class SwapCache:
     deliberately keep their physical memory across clear(); call
     release_empty_slabs() explicitly to return it to the torch host cache
     (not directly to the OS).
+
+    Payload quantizers are handed in per put (see put()); the cache stores and
+    loads payload bytes and never learns how they were produced.
     """
 
     def __init__(self, capacity_bytes=None, soft_limit_bytes=0,
@@ -554,13 +569,30 @@ class SwapCache:
             if self._d2h_in_flight:
                 self._wait_oldest_d2h()
 
-    def put(self, tensor: torch.Tensor) -> SwapHandle:
+    def put(self, tensor: torch.Tensor, quantizer=None) -> SwapHandle:
         # Returns the handle (the sole pop token) with
         # hbm_bytes <= capacity_bytes guaranteed; the soft limit decides how
         # early proactive eviction starts.
+        #
+        # quantizer: a PayloadQuantizer instance (duck-typed by contract, see
+        # the quantizer module — the core never imports an implementation);
+        # None (default) stores raw bytes — bit-for-bit today's behavior.
+        # Quantizing is put-side preprocessing on this (the put) stream, under
+        # no_grad; the payload it returns is all the cache ever sees: byte
+        # accounting, D2H, prefetch budget and REPLICATED work on the payload
+        # unchanged. The handle is built after quantizing, so the put event
+        # that anchors the D2H already covers the quantized payload.
+        meta = None
+        if quantizer is not None:
+            # The quantizer passes an unsupported tensor through unchanged
+            # (meta=None) — whether a payload was quantized is the
+            # quantizer's own business.
+            with torch.no_grad():
+                tensor, meta = quantizer.quantize(tensor)
         handle = SwapHandle(tensor, h2d_stream=self._h2d_stream,
                             d2h_stream=self._d2h_stream,
-                            cpu_arena=self._cpu_arena)
+                            cpu_arena=self._cpu_arena, quantizer=quantizer,
+                            meta=meta)
         self.handles[handle] = None
         self._put_order.append(handle)
         self._handle_to_put_idx[handle] = len(self._put_order) - 1
@@ -570,6 +602,19 @@ class SwapCache:
         return handle
 
     def pop(self, handle: SwapHandle) -> Optional[torch.Tensor]:
+        """Pop the handle's tensor and hand it to the consumer.
+
+        A handle that was put with a payload quantizer is dequantized here, on
+        the CALLING (consume) stream under no_grad, into a NEW tensor in the
+        consumer's pool: a quantized handle does not return the object that
+        went into put. A handle put without a quantizer still returns that
+        exact object.
+
+        A cleanup pop of a route nobody consumes (e.g. the replay mode's
+        early-stop path) therefore pays one dequantization whose result is
+        dropped — a small known waste; a dedicated release(handle) is the
+        follow-up candidate for such paths.
+        """
         if handle not in self.handles:
             return None
         del self.handles[handle]
@@ -577,6 +622,8 @@ class SwapCache:
             self._iter_stats['hbm_hit'] += 1
         else:
             self._iter_stats['ddr_load'] += 1
+        # Snapshot before consume(): consume() -> clear() drops both fields.
+        quantizer, meta = handle.quantizer, handle.meta
         tensor, delta = handle.consume()
         self._apply(delta)
         self._d2h_in_flight.pop(handle, None)  # consume may have waited out an in-flight D2H
@@ -593,6 +640,12 @@ class SwapCache:
         # foundation cannot infer training-step boundaries from its own state,
         # so the upper layer delimits iterations via end_iteration()/clear().
 
+        if quantizer is not None and tensor is not None:
+            # Dequantizing on the consume stream, after the handle released the
+            # payload: the extra tensor lives in the consumer's pool, never in
+            # the cache's accounting (the quantizer layer is outside the cache).
+            with torch.no_grad():
+                return quantizer.dequantize(tensor, meta)
         return tensor
 
     def _prefetch_chain(self) -> None:

@@ -5,6 +5,7 @@ from typing import List, Literal, Optional
 from pydantic import model_validator
 
 from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
+from mindspeed_mm.fsdp.features.memory.quantizer import QUANTIZERS
 
 
 class SwapPlanConfig(BaseArguments):
@@ -81,6 +82,24 @@ class OpReplayScopeConfig(BaseArguments):
                           "['aten.mm.default', 'aten.linear.default']). None falls back to the "
                           "built-in default whitelist."},
     )
+    quantizer: Optional[str] = field(
+        default=None,
+        metadata={"help": "Payload quantizer applied statically per scope when handing "
+                          "cached op outputs to the swap cache; None = no quantization (default, "
+                          "bit-exact today's behavior). Registered names live in "
+                          "mindspeed_mm/fsdp/features/memory/quantizer.py (e.g. 'int8_pertoken'); "
+                          "an unregistered name is a config error, rejected at config parse. "
+                          "Only the precision of the cached payload changes — which ops are "
+                          "cached is decided by cache_ops alone."},
+    )
+
+    @model_validator(mode='after')
+    def _check_quantizer(self):
+        if self.quantizer is not None and self.quantizer not in QUANTIZERS:
+            raise ValueError(
+                f"op_replay scope {self.name!r}: unknown payload quantizer "
+                f"{self.quantizer!r} (registered: {sorted(QUANTIZERS)})")
+        return self
 
 
 class RecomputePlanConfig(BaseArguments):
