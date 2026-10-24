@@ -35,11 +35,12 @@ MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 echo "Changing working directory to ${MINDSPEED_ROOT}"
 cd "${MINDSPEED_ROOT}"
 
+config_path=examples/qwen3_8/qwen3_8_flash_next_config.yaml
 logdir=logs/qwen38
-mkdir -p $logdir
 logfile=qwen38_flash_next_$(date +%Y%m%d)_$(date +%H%M%S)
-torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
-    examples/qwen3_8/qwen3_8_flash_next_config.yaml \
+mkdir -p $logdir
+
+torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py  $config_path \
     2>&1 | tee ${logdir}/${logfile}.log
 
 STEP_TIME=`grep "elapsed time per iteration" ${logdir}/${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 10 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`

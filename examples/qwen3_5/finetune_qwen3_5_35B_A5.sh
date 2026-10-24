@@ -34,15 +34,16 @@ MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 echo "Changing working directory to ${MINDSPEED_ROOT}"
 cd "${MINDSPEED_ROOT}"
 
-logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 config_path=examples/qwen3_5/qwen3_5_35B_config_A5.yaml
-mkdir -p logs
-torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
-    ${config_path} \
-    2>&1 | tee logs/train_${logfile}.log
+logdir=logs/qwen3_5
+logfile=qwen3_5_35B_A5_$(date +%Y%m%d_%H%M%S)
+mkdir -p $logdir
 
-STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
-GBS=`grep "global batch size" logs/train_${logfile}.log | awk -F 'global batch size:' '{print$2}' | awk -F '|' '{print$1}' | head -n 1 | awk '{print $1}'`
+torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py  $config_path \
+    2>&1 | tee ${logdir}/${logfile}.log
+
+STEP_TIME=`grep "elapsed time per iteration" ${logdir}/${logfile}.log | awk -F 'elapsed time per iteration [(]ms[)]:' '{print$2}' | awk -F '|' '{print$1}' | head -n 200 | tail -n 10 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
+GBS=`grep "global batch size" ${logdir}/${logfile}.log | awk -F 'global batch size:' '{print$2}' | awk -F '|' '{print$1}' | head -n 1 | awk '{print $1}'`
 SAMPLES_PER_SECOND=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
-echo "Elapsed Time Per iteration (ms): $STEP_TIME" | tee -a logs/train_${logfile}.log
-echo "Average Samples per Second: $SAMPLES_PER_SECOND" | tee -a logs/train_${logfile}.log
+echo "Elapsed Time Per iteration (ms): $STEP_TIME" | tee -a ${logdir}/${logfile}.log
+echo "Average Samples per Second: $SAMPLES_PER_SECOND" | tee -a ${logdir}/${logfile}.log

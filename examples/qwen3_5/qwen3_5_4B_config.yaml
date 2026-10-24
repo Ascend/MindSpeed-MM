@@ -42,7 +42,7 @@ data:
       video_maxlen: 64
 
     basic_parameters:
-      cutoff_len: 1024
+      cutoff_len: 16384
       template: qwen3_vl_nothink
       enable_thinking: false
       train_on_prompt: false
@@ -67,7 +67,8 @@ data:
     collate_param:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
-    enable_preload: false
+    enable_preload: true
+    infinite_sampler: true
 
 # 模型配置
 model:
@@ -75,11 +76,12 @@ model:
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   attn_implementation: flash_attention_2
+  # 冻结部分模块
   # freeze:
   #   - model.visual
   # 融合算子配置
   gdn_implementation: ascendc
-  causal_conv1d_implementation: triton
+  causal_conv1d_implementation: ascendc
   # skip_recompute
   skip_gdn_recompute: true
   skip_flash_attn_recompute: true
@@ -119,7 +121,7 @@ features:
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  micro_batch_size: 2
   gradient_accumulation_steps: 1
   seed: 42
   lr: 1.0e-5
