@@ -49,7 +49,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
 > [!NOTE]
 >
-> - 使用镜像前，请先确认机器型号。最新镜像仅支持aarch64架构，可通过uname -a命令确认当前环境是否符合要求。
+> - 使用镜像前，请先确认机器型号。可通过uname -a命令确认当前环境是否符合要求。
 > - 配套镜像已预装配套的CANN 9.2.0软件及TorchNPU 26.2.0插件，您可根据需要选用。
 > - 若您当前环境与提供的镜像不兼容，请选择[方式二：源码安装](#方式二源码安装)。
 > - 26.2.0分支后续会更新新的镜像，如果需要自定义构建镜像，请参见[镜像概述](../../../../docker/OVERVIEW.zh.md)。
@@ -192,12 +192,12 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
         |参数名称|说明|是否必选|取值范围|
         |--|--|--|:-:|
-        |-t, --torchversion|表示当前使用的torch版本|否|2.7.1或2.10.0|
+        |-t, --torchversion|表示当前使用的torch版本|否|2.10.0|
         |-m, --msid|表示当前基于源码安装的MindSpeed加速库的commit id|是|MindSpeed最新release版本commit id|
         |-y, --yes|确认所有软件重新安装|否|-|
         |-n, --no|自动跳过第三方依赖库安装|否|-|
-        |-mt, --megatron|安装Megatron-LM|否|默认安装版本Megatron-LM 0.12.0|
-        |-ic, --install-cann |安装CANN|否|默认安装版本CANN 9.1.0|
+        |-mt, --megatron|安装Megatron-LM|否|默认安装版本Megatron-LM 0.12.1|
+        |-ic, --install-cann |安装CANN|否|默认安装版本CANN 9.2.0|
         |-h, --help|显示安装帮助|否|-|
 
   3. 如已安装了PyTorch或TorchNPU，请按以下步骤操作；未安装可跳过本步骤：

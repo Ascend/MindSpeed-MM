@@ -556,7 +556,7 @@ bash examples/wan2.2/A14B/t2v/pretrain_high.sh
 
 ```shell
 mm-convert WanConverter mm_to_hf \
---cfg.source_path <path for your saved weight/> \
+--cfg.source_path "path for your saved weight/" \
 --cfg.target_path ./converted_weights/Wan2.2-T2V-A14B-Diffusers/transformer/ \
 --cfg.hf_dir weights/Wan2.2-T2V-A14B-Diffusers/transformer/
 ```

@@ -87,7 +87,7 @@ Qwen3-VL模型采用Pytorch原生FSDP2（Fully Sharded Data Parallel 2）框架,
 
     执行如下数据转换脚本：
 
-    ```python
+    ```shell
     # 该脚本对 Qwen2-VL / Qwen3-VL 通用，可直接运行
     python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py
     ```

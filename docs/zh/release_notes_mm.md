@@ -2,7 +2,7 @@
 
 ## 关键特性
 
-MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
+MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT，MiniMax M3模型。
 
 ## 版本配套说明
 
@@ -20,12 +20,12 @@ MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%"><p>版本类型</p>
 </th>
-<td class="cellrowborder" valign="top" width="73.75%" ><p>release版本</p>
+<td class="cellrowborder" valign="top" width="73.75%" ><p>Release版本</p>
 </td>
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%" id="mcps1.1.3.4.1"><p>发布时间</p>
 </th>
-<td class="cellrowborder" valign="top" width="73.75%" headers="mcps1.1.3.4.1 "><p>2026年9月</p>
+<td class="cellrowborder" valign="top" width="73.75%" headers="mcps1.1.3.4.1 "><p>2026年10月</p>
 </td>
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%"><p>维护周期</p>
@@ -122,7 +122,7 @@ MindSpeed MM新增支持Kimi-K3，GLM5.3 NEXT,MiniMax M3模型。
 </colgroup>
 <thead>
   <tr>
-    <th rowspan="3">MindSpeed MM</th>
+    <th rowspan="2">MindSpeed MM</th>
     <th colspan="5">CANN版本</th>
   </tr>
   <tr>
