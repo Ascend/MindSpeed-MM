@@ -41,30 +41,44 @@ PR合入前都须通过全量CI门禁用例测试。
 
 > **说明**：UT用例看护功能指标，确保代码能够正常运行。
 
-| Module | Features | Scripts |
-| :------- | :--------- | :-------- |
-| **Loss** | Chunk Loss | [test_chunkloss.py](ut/loss/test_chunkloss.py) |
-| **Tools** | Profiler性能分析工具 | [test_profiler.py](ut/tools/test_profiler.py) |
-| **Data** | 数据工具函数 | [test_utils.py](ut/data/data_utils/test_utils.py) |
-| | 多模态数据处理插件 | [test_mm_plugin.py](ut/data/data_utils/func_utils/test_mm_plugin.py) |
-| **Models - Vision** | Vision RoPE索引计算 (Qwen2VL) | [test_qwen2vl_get_rope_index.py](ut/models/vision/test_qwen2vl_get_rope_index.py) |
-| | Vision RoPE索引计算 (Qwen2.5VL) | [test_qwen2_5vl_get_rope_index.py](ut/models/vision/test_qwen2_5vl_get_rope_index.py) |
-| | Vision RoPE索引计算 (Qwen2.5Omni) | [test_qwen2_5_omni_get_rope_index.py](ut/models/vision/test_qwen2_5_omni_get_rope_index.py) |
-| | Vision RoPE Processor (Qwen2VL) | [test_qwen2vl_rope_processor.py](ut/models/vision/vision_encoders/test_qwen2vl_rope_processor.py) |
-| **Models - Text Encoder** | 文本编码器处理 | [test_text_encoder_processor.py](ut/models/text_encoder/test_text_encoder_processor.py) |
-| | Tokenizer处理 | [test_tokenzier_processor.py](ut/models/text_encoder/test_tokenzier_processor.py) |
-| **Models - Audio Encoder** | 音频编码器处理 | [test_audio_encoder_processor.py](ut/models/audio_encoder/test_audio_encoder_processor.py) |
-| **Models - AE** | AutoEncoder处理 | [test_ae_processor.py](ut/models/ae/test_ae_processor.py) |
-| **Models - Diffusion** | Wan Flow Match Scheduler | [test_wan_flow_match_scheduler.py](ut/models/diffusion/test_wan_flow_match_scheduler.py) |
-| **Models - Common** | 激活函数 | [test_activations.py](ut/models/common/test_activations.py) |
-| | 非对齐分割 | [test_unaligned_split.py](ut/models/common/test_unaligned_split.py) |
-| | 位置编码 | [test_pos_embeddings.py](ut/models/common/embeddings/test_pos_embeddings.py) |
-| | CogVideoX位置编码 | [test_cogvideox_pos_emb.py](ut/models/common/embeddings/test_cogvideox_pos_emb.py) |
-| **Tasks** | Sora GRPO Trainer | [test_sora_grpo_trainer.py](ut/tasks/dancegrpo/test_sora_grpo_trainer.py) |
-| | Flux GRPO Trainer | [test_flux_grpo_trainer.py](ut/tasks/dancegrpo/test_flux_grpo_trainer.py) |
-| **Checkpoint** | 权重转换 | [test_weight_convert.py](ut/test_weight_convert.py) |
-| | Encoder Balance Comm | [test_encoder_balance_comm.py](ut/test_encoder_balance_comm.py) |
-| | MoE Expert Weight Convert | [test_moe_expert_weight_convert.py](ut/test_moe_expert_weight_convert.py) |
+| 测试目录 | 说明 |
+| ------ | ------ |
+| [ut](ut/) | 依赖Megatron，测试与Megatron相关的代码实现。 |
+| [ut_fsdp](ut_fsdp/) | 基于原生PyTorch FSDP的单元测试，不依赖Megatron。 |
+
+---
+
+### 2.3 UT 执行方式
+
+执行UT需要可用的NPU、`torch_npu`和`triton-ascend`。
+
+#### 2.3.1 安装环境与依赖
+
+请先按照[安装指南](../docs/zh/guides/installation/install_guide.md#手动安装)完成Python环境、NPU驱动与固件、CANN、PyTorch、TorchNPU、MindSpeed及MindSpeed MM的安装，并加载CANN环境变量。运行`tests/ut`还需按指南安装Megatron-LM；单独运行`tests/ut_fsdp`无需安装Megatron-LM。版本配套及安装命令以安装指南和其中链接的配套说明为准；当前分支的Python、PyTorch要求见[项目依赖](../pyproject.toml)，UT使用`triton-ascend==3.2.2`，请按安装指南中的Triton-Ascend安装步骤配置。
+
+完成上述安装后，在仓库根目录补充安装测试依赖：
+
+```bash
+python -m pip install -e '.[test]'
+```
+
+`.[test]`包含`pytest`、`pytest-mock`和`transformers[sentencepiece]`。若CANN安装路径与`ci/run_ci.sh`中的`/usr/local/Ascend/ascend-toolkit/set_env.sh`不一致，请按实际路径修改脚本中的`source`路径。
+
+#### 2.3.2 执行UT
+
+环境准备完成后，在仓库根目录执行：
+
+```bash
+bash ci/run_ci.sh --type=ut --skip_build=1
+```
+
+`--type=ut`依次执行`pytest -x tests/ut`和`pytest -x tests/ut_fsdp`，前者通过后执行后者；`--skip_build=1`（默认值）跳过依赖安装和项目构建。
+
+如需由脚本安装项目测试依赖、构建项目并在检测到NPU时安装`triton-ascend==3.2.2`，可先执行`bash ci/run_ci.sh --type=ut --skip_build=0`。该模式完成安装和构建后即退出，**不会执行UT**，仍需再执行上面的`--skip_build=1`命令；NPU驱动、CANN和TorchNPU须提前安装。
+
+本地调试也可直接执行`pytest -x tests/ut`、`pytest -x tests/ut_fsdp`，或指定单个文件，例如`pytest tests/ut/models/common/test_activations.py -v`。
+
+UT包含Triton算子用例，首次运行会触发编译，整体耗时可达1小时以上。部分用例依赖云端预生成Tensor等数据，无法在本地跑通，需提交PR后通过流水线验证。
 
 ---
 

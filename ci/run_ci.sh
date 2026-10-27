@@ -28,7 +28,7 @@ else
     pip install --upgrade build
     python -m build
     if command -v npu-smi &> /dev/null && npu-smi info &> /dev/null; then
-        pip install triton-ascend==3.2.0
+        pip install triton-ascend==3.2.2
     fi
     if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
         pip install flash-linear-attention
