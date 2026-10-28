@@ -94,8 +94,8 @@ model:
   causal_conv1d_implementation: ascendc
   # situ_glu融合算子实现: ascendc (ops-nn融合算子) / triton (triton-ascend-kernels融合算子) / eager (torch算子实现)
   situ_glu_implementation: ascendc
-  # attn_res融合算子实现: ascendc (ops-transformer融合算子) / eager (torch算子实现)
-  attn_res_implementation: ascendc
+  # attn_res融合算子实现: ascendc (ops-transformer融合算子) / triton (triton融合算子) / eager (torch算子实现)
+  attn_res_implementation: triton
   # 选择性重计算：attention 相关融合算子（ViT/MLA 的 FA、KDA）不参与重算，
   skip_flash_attn_recompute: true
   skip_kda_recompute: true

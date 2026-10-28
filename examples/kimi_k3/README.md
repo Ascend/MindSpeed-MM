@@ -181,7 +181,7 @@ export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_nn/op_api/lib/:${LD_LIB
 
 Kimi-K3 采用 attn_res（attention residual）机制替代传统 Transformer 的固定残差连接：模型每 `attn_res_block_size` 层将当前 hidden states 追加到 `block_residual` 残差历史中；在每层的注意力与 MLP 计算前（以及模型输出位置），将残差历史与当前前缀和拼接，经 RMSNorm 归一化后，用可学习的投影权重对每个历史块打分，再经 softmax 加权融合得到该位置的残差输入，实现跨层残差路径的软选择。
 
-`attn_res_implementation: ascendc` 时，上述"归一化 + 打分 + 加权融合"计算使用 ops-transformer 仓的 AscendC 融合算子完成，需安装 ops-transformer；`eager` 为 torch 小算子实现，可用于功能对齐验证。
+`attn_res_implementation: ascendc` 时，上述"归一化 + 打分 + 加权融合"计算使用 ops-transformer 仓的 AscendC 融合算子完成，需安装 ops-transformer；`triton` 为仓内 Triton 融合算子（依赖 Triton-Ascend，无需安装 ops-transformer）；`eager` 为 torch 小算子实现，可用于功能对齐验证。
 
 安装步骤如下：
 
@@ -294,7 +294,7 @@ NODE_RANK: 当前节点序号
 | `kda_implementation` | `model` | KDA算子实现选择 | `triton`: triton-ascend-kernels融合算子（默认），需安装Triton-Ascend及配套算子库<br>`ascendc`: AscendC融合算子（仅NPU）<br>`eager`: 仓内小算子实现，可用于功能对齐验证 |
 | `causal_conv1d_implementation` | `model` | KDA短卷积算子实现选择 | `triton`: triton实现（默认）<br>`ascendc`: fla_npu AscendC融合算子（仅NPU），需安装fla-npu，参考[安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc) |
 | `situ_glu_implementation` | `model` | SituGLU算子实现选择 | `ascendc`: ops-nn AscendC融合算子（默认，仅NPU），需安装ops-nn，参考[安装ops-nn以适配AscendC版本SituGLU](#5-安装ops-nn以适配ascendc版本situglu)<br>`triton`: 仓内Triton融合算子（依赖Triton-Ascend）<br>`eager`: torch小算子实现，可用于功能对齐验证 |
-| `attn_res_implementation` | `model` | attn_res算子实现选择 | `ascendc`: ops-transformer AscendC融合算子（默认，仅NPU），需安装ops-transformer，参考[安装ops-transformer以适配AscendC版本attn_res](#6-安装ops-transformer以适配ascendc版本attn_res)<br>`eager`: torch小算子实现，可用于功能对齐验证 |
+| `attn_res_implementation` | `model` | attn_res算子实现选择 | `ascendc`: ops-transformer AscendC融合算子（默认，仅NPU），需安装ops-transformer，参考[安装ops-transformer以适配AscendC版本attn_res](#6-安装ops-transformer以适配ascendc版本attn_res)<br>`triton`: 仓内Triton融合算子（依赖Triton-Ascend）<br>`eager`: torch小算子实现，可用于功能对齐验证 |
 | `skip_flash_attn_recompute` | `model` | 跳过full attention层flash attention重计算 | 选择性重计算，需同时使能重计算和`enable_activation_offload` |
 | `skip_kda_recompute` | `model` | 跳过linear attention层KDA重计算 | 选择性重计算，需同时使能重计算和`enable_activation_offload` |
 | `recompute` | `features` | 重计算开关 | 开启后可以节省显存占用 |

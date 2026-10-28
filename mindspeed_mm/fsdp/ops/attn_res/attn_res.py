@@ -54,8 +54,18 @@ def apply_attn_res(
     elif attn_res_implementation == "ascendc":
         import cann_ops_transformer
         return cann_ops_transformer.block_attention_residuals(prefix_sum, block_residual, proj.weight, norm.weight)
+    elif attn_res_implementation == "triton":
+        # triton 版 attn_res 目前仅在 Ascend950 上完成适配与验证, 其他芯片不支持
+        device_name = torch_npu.npu.get_device_name()
+        if "Ascend950" not in device_name:
+            raise RuntimeError(
+                f"attn_res_implementation 'triton' is only supported on Ascend950, "
+                f"got device: {device_name}. Use 'ascendc' or 'eager' instead."
+            )
+        from mindspeed_mm.fsdp.ops.attn_res.attn_res_triton import attn_res_triton
+        return attn_res_triton(prefix_sum, block_residual, proj, norm)
     else:
         raise ValueError(
             f"Unsupported attn_res_implementation: {attn_res_implementation}. "
-            "Expected 'eager' or 'ascendc'."
+            "Expected 'eager', 'triton' or 'ascendc'."
         )

@@ -131,14 +131,14 @@ class KimiK3ForConditionalGeneration(WeightInitMixin, _KimiK3ForConditionalGener
                 "Expected 'eager', 'triton' or 'ascendc'."
             )
 
-        # attn_res kernel selection: 'ascendc' (fused CANN op from cann_ops_transformer)
-        # or 'eager' (torch small-op).
+        # attn_res kernel selection: 'ascendc' (fused CANN op from cann_ops_transformer),
+        # 'triton' (fused triton-ascend kernel) or 'eager' (torch small-op).
         attn_res_implementation = getattr(model_args, "attn_res_implementation", "ascendc")
         transformer_config.text_config.attn_res_implementation = attn_res_implementation
-        if attn_res_implementation not in ("ascendc", "eager"):
+        if attn_res_implementation not in ("ascendc", "triton", "eager"):
             raise ValueError(
                 f"Unsupported attn_res_implementation: {attn_res_implementation}. "
-                "Expected 'eager' or 'ascendc'."
+                "Expected 'eager', 'triton' or 'ascendc'."
             )
 
         return transformer_config
