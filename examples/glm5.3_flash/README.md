@@ -41,6 +41,8 @@ url=https://huggingface.co/zai-org/GLM-5.3-Flash-BF16/tree/main
 
 2026.08.27: 首次支持GLM-5.3-Flash模型
 
+2026.10.20: KDA Triton算子库切换为triton-ascend-kernels官方仓master分支
+
 ---
 <a id="jump1"></a>
 
@@ -96,30 +98,12 @@ GLM-5.3-Flash的KDA（Kimi Delta Attention）等线性注意力融合算子基�
 pip install triton-ascend==3.2.2 --extra-index-url=https://mirrors.huaweicloud.com/ascend/repos/pypi
 ```
 
-KDA 算子实现依赖`triton-ascend-kernels`算子库（`modeling_glm5_next.py` 中的 `chunk_kda` 来自该包），安装步骤如下：
-
-atlas A2&A3训练产品安装步骤
+KDA 算子实现依赖 `triton-ascend-kernels` 算子库（`modeling_glm5_next.py` 中的 `chunk_kda` 来自该包）。安装步骤如下：
 
 ```shell
 # 拉取 triton-ascend-kernels 代码仓
-git clone https://gitcode.com/fengrui886/triton-ascend-kernels
+git clone https://gitcode.com/Ascend/triton-ascend-kernels.git
 cd triton-ascend-kernels
-git checkout kda_a3
-
-# 安装
-pip install -e . --no-build-isolation --no-deps
-cd ..
-```
-
-950系列产品安装步骤
-
-```shell
-# 拉取 triton-ascend-kernels 代码仓
-git clone https://gitcode.com/shenzhaofeng/triton-ascend-kernels.git
-cd triton-ascend-kernels
-
-# 拉取配套分支
-git checkout kda_a5
 
 # 安装
 pip install -e . --no-build-isolation --no-deps
