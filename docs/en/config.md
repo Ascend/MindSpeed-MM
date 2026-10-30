@@ -38,13 +38,13 @@ A Pydantic-based configuration base class providing type validation and dynamic 
 ```python
 @classmethod
 def register_field(cls, name: str, value_type: Optional[Type] = None,  default: Any = None, description: str = "", required: bool = False)
-# Register Dynamic Fields
+# Register dynamic fields
 
 def to_dict(self) -> Dict[str, Any]
-# Convert to Dictionary
+# Convert to a dictionary
 
 def to_str(self) -> str
-# Format as a String
+# Format as a string
 ```
 
 **Usage Example**:
@@ -54,26 +54,26 @@ from mindspeed_mm.config.arguments.base_args import BaseArguments
 from typing import List, Optional
 
 class ModelConfig(BaseArguments):
-    """Model Configuration"""
+    """Model configuration"""
     model_name: str = "gpt2"
     hidden_size: int = 768
     num_layers: int = 12
-
+    
 class MyArguments(BaseArguments):
-    """Custom Configuration"""
-    # Static Fields
+    """Custom configuration"""
+    # Static fields
     learning_rate: float = 1e-4
     batch_size: int = 32
-
-    # Nested Configuration
+    
+    # Nested configuration
     model_config: ModelConfig = ModelConfig()
 
-# Register Dynamic Fields
+# Register dynamic fields
 MyArguments.register_field(
     name="new_field",
     value_type=str,
     default="default_value",
-    description="New Field Description",
+    description="Description of the new field",
     required=False
 )
 ```
@@ -123,13 +123,13 @@ def get_defined_fields(self) -> List[str]
 
 def register_dynamic_field(self, name: str, value_type: Optional[Type] = None,
                           default: Any = None, description: str = "", required: bool = False)
-# Register a dynamic field (supports nested fields)
+# Register dynamic fields (nested fields supported)
 
 def save_config(self, file_path: str, include_dynamic: bool = True, include_yaml: bool = True)
-# Save configuration to file
+# Save the configuration to a file
 
 def print_summary(self)
-# Display the complete status of the configuration system in a structured way, including statically defined fields, dynamically registered fields, configuration sources, etc.
+# Display the complete state of the configuration system in a structured way, including statically defined fields, dynamically registered fields, configuration sources, and other information.
 ```
 
 ## How to Use
@@ -144,18 +144,18 @@ The basic usage is illustrated in the following diagram.
 from mindspeed_mm.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.params.argument import Arguments
 
-# Method 1: Simplest usage (automatically reads command line and YAML)
+# Method 1: simplest usage (automatically reads the command line and YAML)
 config_manager = ConfigManager()
 config = config_manager.load_and_parse()
 
-# Method 2: Specify a configuration file
+# Method 2: specify a configuration file
 config_manager = ConfigManager(
     config_file_path="config.yaml",
     additional_args={"learning_rate": 1e-4}
 )
 config = config_manager.load_and_parse()
 
-# Use Configuration
+# Use the configuration
 print(config.learning_rate)
 print(config.model.model_name)
 ```
@@ -170,7 +170,7 @@ model:
 data:
   xxx
 
-# Dynamic extension fields (requires allow_register_yaml_fields to be enabled)
+# Dynamically extended field (allow_register_yaml_fields must be enabled)
 custom_field: "custom_value"
 nested_custom:
   field1: 123
@@ -183,10 +183,10 @@ nested_custom:
 # Basic format: key=value
 torchrun $DISTRIBUTED_ARGS trainer.py config.yaml learning_rate=0.001 batch_size=32
 
-# Nested field support
+# Nested fields are supported
 torchrun $DISTRIBUTED_ARGS trainer.py config.yaml model.model_name=gpt2 data.dataset.path=/path/to/data
 
-# Boolean value support
+# Boolean values are supported
 torchrun $DISTRIBUTED_ARGS trainer.py config.yaml use_amp=true
 ```
 
@@ -197,7 +197,7 @@ from mindspeed_mm.config.config_manager import ConfigManager
 from mindspeed_mm.config.arguments.base_args import BaseArguments
 from typing import List
 
-# Define a Custom Configuration Class
+# Define a custom configuration class
 class CustomArguments(BaseArguments):
     """Custom configuration"""
     custom_field: str = "default"
@@ -210,23 +210,7 @@ config_manager = ConfigManager(
     allow_register_yaml_fields=True
 )
 
-# Register a Dynamic Field
-config_manager.register_dynamic_field(
-    name="dynamic_field",
-    value_type=int,
-    default=100,
-    description="Dynamic Field Example"
-)
-
-# Register Nested Dynamic Fields
-config_manager.register_dynamic_field(
-    name="data.custom.nested_field",
-    value_type=str,
-    default="nested_default",
-    description="Nested Dynamic Fields"
-)
-
-# Pass Configuration from Code
+# Configuration can be passed in from code at creation time
 config_manager = ConfigManager(
     additional_args={
         "learning_rate": 2e-4,
@@ -235,6 +219,22 @@ config_manager = ConfigManager(
         }
     }
 )
+
+# Register dynamic fields
+config_manager.register_dynamic_field(
+    name="dynamic_field",
+    value_type=int,
+    default=100,
+    description="Dynamic field example"
+)
+
+# Register a nested dynamic field
+config_manager.register_dynamic_field(
+    name="data.custom.nested_field",
+    value_type=str,
+    default="nested_default",
+    description="Nested dynamic field"
+)
 ```
 
 ## MindSpeed MM Main Configuration Items
@@ -242,7 +242,7 @@ config_manager = ConfigManager(
 The main configuration items consist of the following modules:
 
 - `parallel`: Defines the core parallelism capabilities for distributed training, including FSDP2 full sharding, expert parallelism, sequence parallelism, and more. You can configure the sharding plan, recomputation strategy, and specific parameters for each parallelism dimension here.
-- `data` (data configuration): Used to configure datasets and data loading processes. The framework has a built-in generic dataloader mechanism and supports flexible integration of user-defined datasets by specifying a `dataset_type` (e.g., huggingface). This section covers data preprocessing, sampling strategies, dataloader parameters, and more.
+- `data` (data configuration): Used to configure datasets and data loading processes. The framework has a built-in generic dataloader mechanism and supports flexible integration of user-defined datasets by specifying a `dataset_type` (e.g., Hugging Face). This section covers data preprocessing, sampling strategies, dataloader parameters, and more.
 - `model` (model configuration): Defines parameters related to model structure, loading, and optimization. This includes specifying the model ID, Hugging Face model path, attention implementation method, modules to freeze, loss function configuration, and whether to enable specific optimizations (such as chunked loss, Triton operators, etc.).
 - `training` (training configuration): Covers the hyperparameters and execution settings for the training process. Examples include learning rate and scheduling strategy, batch size, optimizer selection, number of training steps, gradient clipping, and checkpoint save/load paths.
 - `tools` (tool configuration): Provides a series of auxiliary tools and performance analysis options. It mainly includes features like `profile` (performance profiling) and `memory_profile` (memory snapshot), which are used to identify performance bottlenecks and memory usage during the training process.

@@ -231,8 +231,8 @@ CP=1
     "pp": 1, # 当前只支持pp为1
     "cp": 1
   },
-  "audio_decoder": {
-    "audio_decoder":{
+  "audio_encoder": {
+    "audio_encoder":{
       ...,
       "pipeline_num_layers": [32],
       ...
@@ -240,7 +240,7 @@ CP=1
     "tp": 1,
     "pp": 1, # 当前只支持pp为1
     "cp": 1
-  }
+  },
   "text_decoder": {
     ...,
     "pipeline_num_layers": [11, 17],

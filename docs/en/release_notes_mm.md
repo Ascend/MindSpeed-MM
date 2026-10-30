@@ -1,36 +1,39 @@
 # Release Notes
 
+## Key Features
+
+MindSpeed MM adds support for the Kimi-K3, GLM5.3 NEXT, and MiniMax M3 models.
+
 ## Version Compatibility Notes
 
 ### Product Version Information
 
-<table>
-  <tbody>
-    <tr>
-      <th class="firstcol" valign="top" width="26.25%"><p>Product Name</p></th>
-      <td class="cellrowborder" valign="top" width="73.75%"><p>MindSpeed</p></td>
-    </tr>
-    <tr>
-      <th class="firstcol" valign="top" width="26.25%"><p>Product Version</p></th>
-      <td class="cellrowborder" valign="top" width="73.75%"><p>26.1.0</p></td>
-    </tr>
-    <tr>
-      <th class="firstcol" valign="top" width="26.25%"><p>Version Type</p></th>
-      <td class="cellrowborder" valign="top" width="73.75%"><p>Official Release</p></td>
-    </tr>
-    <tr>
-      <th class="firstcol" valign="top" width="26.25%"><p>Component Name</p></th>
-      <td class="cellrowborder" valign="top" width="73.75%"><p>MindSpeed MM</p></td>
-    </tr>
-    <tr>
-      <th class="firstcol" valign="top" width="26.25%"><p>Release Date</p></th>
-      <td class="cellrowborder" valign="top" width="73.75%"><p>July, 2026</p></td>
-    </tr>
-    <tr>
-      <th class="firstcol" valign="top" width="26.25%"><p>Maintenance Period</p></th>
-      <td class="cellrowborder" valign="top" width="73.75%"><p>6 months</p></td>
-    </tr>
-  </tbody>
+<table><tbody><tr><th class="firstcol" valign="top" width="26.25%"><p>Product Name</p>
+</th>
+<td class="cellrowborder" valign="top" width="73.75%"><p><span>MindSpeed MM</span></p>
+</td>
+</tr>
+<tr><th class="firstcol" valign="top" width="26.25%"><p>Product Version</p>
+</th>
+<td class="cellrowborder" valign="top" width="73.75%" ><p>26.2.0</p>
+</td>
+</tr>
+<tr><th class="firstcol" valign="top" width="26.25%"><p>Version Type</p>
+</th>
+<td class="cellrowborder" valign="top" width="73.75%" ><p>Release</p>
+</td>
+</tr>
+<tr><th class="firstcol" valign="top" width="26.25%" id="mcps1.1.3.4.1"><p>Release Date</p>
+</th>
+<td class="cellrowborder" valign="top" width="73.75%" headers="mcps1.1.3.4.1 "><p>September, 2026</p>
+</td>
+</tr>
+<tr><th class="firstcol" valign="top" width="26.25%"><p>Maintenance Period</p>
+</th>
+<td class="cellrowborder" valign="top" width="73.75%"><p>6 months</p>
+</td>
+</tr>
+</tbody>
 </table>
 
 > [!NOTE]
@@ -39,11 +42,12 @@
 
 ### Related Product Version Compatibility
 
-**Table 1**  MindSpeed MM compatibility table
+**Table 1** MindSpeed MM compatibility table
 
 | MindSpeed MM Version | MindSpeed Core Code Branch | Megatron Version | PyTorch Version | TorchNPU Version | CANN Version | Triton-Ascend Version | Python Version |
 | ---------------- | ------------------ | ------------ | -----------  | ------------- |--------------------- |-----------------| ------------------- |
-| 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.1           | Python3.10      |
+| 26.2.0 | 26.2.0_core_r0.12.1  | core_v0.12.1  | 2.10.0       | 26.2.0       | 9.2.0  | 3.2.2            | Python3.12      |
+| 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.2           | Python3.10      |
 | 26.0.0           | 26.0.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.0.0        | 9.0.0  | 3.2.1           | Python3.10      |
 
 >[!NOTE]
@@ -57,7 +61,7 @@
 >
 > In the tables in this section, "/" indicates incompatibility, and "Y" indicates compatibility.
 
-**Table 2**  MindSpeed MM and TorchNPU version compatibility
+**Table 2** MindSpeed MM and TorchNPU version compatibility
 
 <table style="table-layout: fixed; width: 531px"><colgroup>
 <col style="width: 156px">
@@ -69,34 +73,45 @@
 <thead>
   <tr>
     <th rowspan="2">MindSpeed MM</th>
-    <th colspan="4">TorchNPU</th>
+    <th colspan="5">TorchNPU</th>
   </tr>
   <tr>
     <th>7.2.0</th>
     <th>7.3.0</th>
     <th>26.0.0</th>
-    <th>26.1.0</th>
+    <th>26.1.X</th>
+    <th>26.2.X</th>
   </tr>
 </thead>
 <tbody>
-  <tr>
-    <td>26.1.0</td>
-    <td>/</td>
-    <td>Y</td>
-    <td>Y</td>
-    <td>Y</td>
-  </tr>
   <tr>
     <td>26.0.0</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
-    <td>/</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+  <tr>
+    <td>26.1.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+    <tr>
+    <td>26.2.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
   </tr>
 </tbody>
 </table>
 
-**Table 3**  MindSpeed MM and CANN version compatibility
+**Table 3** MindSpeed MM and CANN version compatibility
 
 <table style="table-layout: fixed; width: 547px"><colgroup>
 <col style="width: 162px">
@@ -107,29 +122,40 @@
 </colgroup>
 <thead>
   <tr>
-    <th rowspan="2">MindSpeed MM</th>
-    <th colspan="4">CANN</th>
+    <th rowspan="3">MindSpeed MM</th>
+    <th colspan="5">CANN</th>
   </tr>
   <tr>
-    <th>8.3.RCX</th>
-    <th>8.5.X</th>
-    <th>9.0.X</th>
+    <th>8.3.RC1</th>
+    <th>8.5.0</th>
+    <th>9.0.0</th>
     <th>9.1.X</th>
+    <th>9.2.X</th>
   </tr></thead>
 <tbody>
-  <tr>
-    <td>26.1.0</td>
-    <td>/</td>
-    <td>Y</td>
-    <td>Y</td>
-    <td>Y</td>
-  </tr>
   <tr>
     <td>26.0.0</td>
     <td>Y</td>
     <td>Y</td>
     <td>Y</td>
-    <td>/</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+    <tr>
+    <td>26.1.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+  </tr>
+    <tr>
+    <td>26.2.0</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
+    <td>Y</td>
   </tr>
 </tbody>
 </table>
@@ -144,9 +170,7 @@ None
 
 |Component|Description|Purpose|
 |--|--|--|
-|MindSpeed MM|New model|Supports Qwen3.5 and Kimi-K2.5|
-|MindSpeed MM|New feature|Qwen3.5 and Kimi-K2.5 support asynchronous activation offloading, ChunkLoss, and ChunkMBS|
-|MindSpeed MM|New hardware support|Supports Ascend 950 products|
+|MindSpeed MM|New model|Supports Kimi-K3, GLM5.3 NEXT, and MiniMax M3|
 
 ### Removed Features
 
@@ -184,9 +208,9 @@ None
 
 |Document Name|Introduction|Release Notes|
 |--|--|--|
-|*[MindSpeed MM Software Installation](../en/pytorch/install_guide.md)*|Guides users to complete the installation of MindSpeed MM based on PyTorch on NPUs. It covers hardware and operating system compatibility, driver firmware and CANN base software installation, as well as the complete installation process under the PyTorch framework, helping users quickly set up a multimodal model training environment.|-|
-|*[MindSpeed MM Quick Start (Based on Megatron Training Backend)](../en/pytorch/quickstart.md)*|Using Wan2.1 and Qwen2.5-VL as examples, guides developers to complete fine-tuning tasks based on the Megatron training backend, helping users quickly get started with multimodal model training.|-|
-|*[MindSpeed MM Quick Start (Based on FSDP2 Training Backend)](../en/pytorch/quickstart_fsdp2.md)*|Using Qwen3-VL-30B as an example, guides developers to complete fine-tuning tasks based on the FSDP2 training backend, helping users quickly get started with multimodal model training.|-|
+|[MindSpeed MM Installation Guide](guides/installation/install_guide.md)|Guides users to install MindSpeed MM based on PyTorch on NPUs. It covers hardware and operating system compatibility, driver, firmware, and CANN base software installation, as well as the complete installation process under the PyTorch framework, helping users quickly set up a multimodal model training environment.|-|
+|[MindSpeed MM Quick Start (Based on Megatron Training Backend)](guides/practices/quickstart.md)|Using Wan2.1 and Qwen2.5-VL as examples, guides developers to complete fine-tuning tasks based on the Megatron training backend, helping users quickly get started with multimodal model training.|-|
+|[MindSpeed MM Quick Start (Based on FSDP2 Training Backend)](guides/practices/quickstart_fsdp2.md)|Using Qwen3-VL-30B as an example, guides developers to complete fine-tuning tasks based on the FSDP2 training backend, helping users quickly get started with multimodal model training.|-|
 
 ## Virus Scan and Vulnerability Patching List
 
@@ -194,10 +218,16 @@ None
 
 |Antivirus Software Name|Antivirus Software Version|Virus Database Version|Scan Time|Scan Result|
 |---|---|---|---|---|
-|QiAnXin|8.0.5.5260|2026-07-05 08:00:00.0|2026-07-06|Virus-free and Malware-free|
-|Kaspersky|12.0.0.6672|2026-07-06 10:03:00|2026-07-06|Virus-free and Malware-free|
-|Bitdefender|7.5.1.200224|7.101158|2026-07-06|Virus-free and Malware-free|
+|QiAnXin|8.0.5.5260|2026-09-27 08:00:00.0|2026-09-28|Virus-free and malware-free|
+|Kaspersky|12.0.0.6672|2026-09-28 10:09:00|2026-09-28|Virus-free and malware-free|
+|Bitdefender|7.5.1.200224|7.101487|2026-09-28|Virus-free and malware-free|
 
 ### Vulnerability Patch List
 
 None
+
+## Revision History
+
+|Document Version|Release Date|Change Description|
+|--|--|--|
+|01|2026-10-15|First official release|
