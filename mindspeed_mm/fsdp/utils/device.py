@@ -1,4 +1,5 @@
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
+from functools import lru_cache
 import sys
 import types
 import logging
@@ -93,6 +94,15 @@ def get_torch_device() -> Any:
 def get_device_name() -> str:
     """Get real device name, e.g. A100, H100"""
     return get_torch_device().get_device_name()
+
+
+@lru_cache
+def is_arch35() -> bool:
+    try:
+        device_name = get_device_name()
+    except Exception:
+        return False
+    return "Ascend910_95" in device_name or "Ascend950" in device_name
 
 
 def synchronize() -> None:

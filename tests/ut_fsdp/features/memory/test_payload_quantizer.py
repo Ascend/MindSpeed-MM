@@ -1,4 +1,4 @@
-"""Payload quantizer UTs: int8 per-token quantize/dequantize on the swap cache.
+"""Payload quantizer UTs: int8 per-token and fp8 block-wise swap payloads.
 
 Covers the quantizer contract (roundtrip fidelity, bitwise-correct N-dim
 reshape bookkeeping through the quantize/dequantize facade, identity fallback,
@@ -11,6 +11,7 @@ The dequant kernels themselves (dispatch tiers, geometry, arch profiles) are
 tested in tests/ut_fsdp/ops/test_int8_dequant.py.
 """
 import logging
+import sys
 
 import pytest
 import torch
@@ -20,12 +21,13 @@ from mindspeed_mm.fsdp.features.memory import op_replay as opr
 from mindspeed_mm.fsdp.features.memory import swap_core as swap_core_mod
 from mindspeed_mm.fsdp.features.memory.quantizer import (
     QUANTIZERS,
+    Fp8BlockwiseQuantizer,
     Int8PerTokenQuantizer,
 )
 from mindspeed_mm.fsdp.features.memory.slab_arena import SlabArena
 from mindspeed_mm.fsdp.features.memory.swap_core import SwapCache, SwapState
 from mindspeed_mm.fsdp.params.feature_args import OpReplayScopeConfig
-from mindspeed_mm.fsdp.utils.device import get_device_type
+from mindspeed_mm.fsdp.utils.device import get_device_type, is_arch35
 
 
 pytestmark = pytest.mark.skipif(
@@ -374,6 +376,16 @@ class TestOpReplayWiring:
             OpReplayScopeConfig(name='q', apply_modules=['0'],
                                 quantizer='int4_imaginary')
 
+    def test_config_rejects_invalid_fp8_block_size(self):
+        with pytest.raises(ValidationError):
+            OpReplayScopeConfig(name='q8', apply_modules=['0'],
+                                quantizer=FP8_MODE, fp8_block_size=96)
+
+    def test_config_rejects_fp8_block_size_for_int8(self):
+        with pytest.raises(ValidationError, match='fp8_block_size'):
+            OpReplayScopeConfig(name='q', apply_modules=['0'],
+                                quantizer=MODE, fp8_block_size=64)
+
     def _run_mm_through_caching_mode(self, scope, op_cache):
         session = opr.OpReplaySession(_FakeController(scope, op_cache))
         a = torch.randn(4, 8, dtype=torch.bfloat16)
@@ -392,3 +404,143 @@ class TestOpReplayWiring:
         plain = opr.OpReplayScope(cache_ops=opr._parse_op_list(['aten.mm.default']),
                                   name='plain')
         assert self._run_mm_through_caching_mode(plain, _PutSpyCache()) == [None]
+
+
+FP8_MODE = Fp8BlockwiseQuantizer.name
+FP8 = QUANTIZERS[FP8_MODE]
+
+
+def _fp8_dequant_reference(payload, meta):
+    rows, cols = int(meta.reduced_shape[0]), int(meta.reduced_shape[-1])
+    q = payload.reshape(rows, cols // meta.block_size, meta.block_size).float()
+    return (q * meta.scale.unsqueeze(-1)).to(meta.orig_dtype).reshape(meta.orig_shape)
+
+
+@pytest.mark.skipif(not is_arch35(), reason="fp8 block-wise quantization is only tested on A5/950")
+class TestFp8BlockwiseRoundtrip:
+    """fp8-e4m3 1x128 block-wise payload: quantize at put, dequantize at pop"""
+
+    def test_2d_roundtrip_shape_dtype_and_accuracy(self):
+        device = _get_device()
+        cache = _make_cache(capacity_bytes=0)
+        x = torch.randn(256, 512, dtype=torch.bfloat16, device=device)
+
+        handle = cache.put(x, quantizer=FP8)
+        assert handle.bytes() == x.numel()
+        out = cache.pop(handle)
+
+        assert out is not x
+        assert out.dtype == x.dtype and out.shape == x.shape
+        assert out.stride() == x.stride()
+        assert _mean_rel_err(out, x) < 0.08
+
+    def test_quantize_layout_scales_and_payload_dtype(self):
+        device = _get_device()
+        x = torch.randn(64, 1024, dtype=torch.bfloat16, device=device)
+
+        payload, meta = FP8.quantize(x)
+
+        assert payload.dtype is torch.float8_e4m3fn
+        assert payload.shape == x.shape
+        assert meta.scale.dtype is torch.float32
+        assert meta.scale.shape == (64, 1024 // 128)
+        amax = x.float().reshape(64, -1, 128).abs().amax(dim=-1)
+        torch.testing.assert_close(meta.scale, amax / 448)
+
+    @pytest.mark.parametrize('block_size', [64, 128, 192, 256])
+    def test_configurable_block_size(self, block_size):
+        device = _get_device()
+        quantizer = Fp8BlockwiseQuantizer(block_size=block_size)
+        x = torch.randn(8, block_size * 3, dtype=torch.bfloat16, device=device)
+
+        payload, meta = quantizer.quantize(x)
+        out = quantizer.dequantize(payload, meta)
+
+        assert meta.block_size == block_size
+        assert meta.scale.shape == (8, 3)
+        amax = x.float().reshape(8, -1, block_size).abs().amax(dim=-1)
+        torch.testing.assert_close(meta.scale, amax / 448)
+        _assert_bitwise_equal(out, _fp8_dequant_reference(payload, meta))
+
+    def test_invalid_block_size_is_rejected(self):
+        with pytest.raises(ValueError, match='fp8 block size'):
+            Fp8BlockwiseQuantizer(block_size=96)
+
+    def test_1d_roundtrip_uses_2d_shim(self):
+        device = _get_device()
+        cache = _make_cache(capacity_bytes=0)
+        x = torch.randn(4096, dtype=torch.bfloat16, device=device)
+
+        handle = cache.put(x, quantizer=FP8)
+        out = cache.pop(handle)
+
+        assert handle.bytes() == x.numel()
+        assert out.dtype == x.dtype and out.shape == x.shape
+        assert _mean_rel_err(out, x) < 0.08
+
+    def test_fp16_roundtrip(self):
+        device = _get_device()
+        cache = _make_cache(capacity_bytes=0)
+        x = torch.randn(64, 128, dtype=torch.float16, device=device)
+
+        out = cache.pop(cache.put(x, quantizer=FP8))
+
+        assert out.dtype == x.dtype and out.shape == x.shape
+        assert _mean_rel_err(out, x) < 0.08
+
+    def test_bitwise_matches_reference_across_dims_and_dtypes(self):
+        device = _get_device()
+        quantizer = Fp8BlockwiseQuantizer()
+        for dtype in (torch.bfloat16, torch.float16):
+            for shape in ((4096,), (64, 128), (4, 16, 256), (2, 3, 4, 128), (1, 1024)):
+                x = torch.randn(*shape, dtype=dtype, device=device)
+                payload, meta = quantizer.quantize(x)
+
+                got = quantizer.dequantize(payload, meta)
+
+                _assert_bitwise_equal(got, _fp8_dequant_reference(payload, meta))
+                assert got.shape == x.shape and got.dtype == dtype
+
+    def test_128_scales_use_per_row_dequantization(self):
+        device = _get_device()
+        x = torch.randn(64, 256, dtype=torch.bfloat16, device=device)
+        payload, meta = FP8.quantize(x)
+        assert meta.scale.numel() == 128
+
+        out = FP8.dequantize(payload, meta)
+
+        _assert_bitwise_equal(out, _fp8_dequant_reference(payload, meta))
+
+    def test_last_dim_not_multiple_of_128_passes_through(self):
+        device = _get_device()
+        cache = _make_cache(capacity_bytes=None)
+        x = torch.randn(64, 100, dtype=torch.bfloat16, device=device)
+
+        handle = cache.put(x, quantizer=FP8)
+
+        assert handle.quantizer is FP8 and handle.meta is None
+        assert cache.pop(handle) is x
+
+    def test_scalar_passes_through(self):
+        device = _get_device()
+        cache = _make_cache(capacity_bytes=None)
+        x = torch.randn((), dtype=torch.bfloat16, device=device)
+
+        handle = cache.put(x, quantizer=FP8)
+
+        assert handle.quantizer is FP8 and handle.meta is None
+        assert cache.pop(handle) is x
+
+    def test_scope_resolves_fp8_quantizer_from_config(self):
+        cfg = OpReplayScopeConfig(name='q8', apply_modules=['0'], quantizer=FP8_MODE)
+        assert opr.OpReplayScope.from_config(cfg).quantizer is FP8
+
+    def test_scope_uses_configured_fp8_block_size(self):
+        cfg = OpReplayScopeConfig(name='q8', apply_modules=['0'],
+                                  quantizer=FP8_MODE, fp8_block_size=192)
+
+        scope = opr.OpReplayScope.from_config(cfg)
+
+        assert scope.quantizer is not FP8
+        assert isinstance(scope.quantizer, Fp8BlockwiseQuantizer)
+        assert scope.quantizer.block_size == 192

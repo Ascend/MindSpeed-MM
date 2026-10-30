@@ -43,7 +43,7 @@ from torch.utils._pytree import tree_flatten, tree_unflatten
 
 from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from ...utils.device import IS_NPU_AVAILABLE
-from .quantizer import QUANTIZERS
+from .quantizer import QUANTIZERS, Fp8BlockwiseQuantizer
 from .swap_core import SwapCache, SwapHandle
 
 
@@ -203,11 +203,17 @@ class OpReplayScope:
         Whitelist fallback chain: scope.cache_ops -> built-in default whitelist
         (the fallback lives in the constructor, so both entry paths agree).
         """
+        quantizer = getattr(cfg, "quantizer", None)
+        if quantizer == Fp8BlockwiseQuantizer.name:
+            block_size = getattr(
+                cfg, "fp8_block_size", Fp8BlockwiseQuantizer.DEFAULT_BLOCK_SIZE)
+            if block_size != Fp8BlockwiseQuantizer.DEFAULT_BLOCK_SIZE:
+                quantizer = Fp8BlockwiseQuantizer(block_size=block_size)
         return cls(
             cache_ops=_parse_op_list(getattr(cfg, "cache_ops", None)),
             save_rng=getattr(cfg, "save_rng", True),
             name=getattr(cfg, "name", None),
-            quantizer=getattr(cfg, "quantizer", None),
+            quantizer=quantizer,
         )
 
     def __repr__(self):

@@ -65,7 +65,7 @@ flowchart TB
 - **put在分配流上下文调用**：张量的全部写入须有序于put；此前在旁流上的写入由租户先用事件接力进put所在流（跨流定序纪律属多流编程自身要求，底座不兜底）。
 - **pop/consume在消费流上下文调用**：取回落点固定在put流池分配，底座在取回完成时把排序同时落到消费流与put流（settle双落）；租户随后释放引用前，须保证分配流已有序于自己的全部旁流读（wait-before-drop）。
 - **可选载荷量化（payload quantizer）**：`put(tensor, quantizer=<quantizer实例>)`，默认不传即不量化（与不带该参数逐位相同）。量化是租户侧/put前处理、反量化是pop后处理（都在调用方流上、`no_grad` 下），底座只搬"载荷"字节：`handle.quantizer`/`handle.meta` 随句柄存取、底座不解读（`clear()` 时一并释放），容量与统计（`_bytes` / `hbm_bytes` / `ddr_bytes` / `peak_*`）**一律按载荷字节计**（量化后即量化载荷的字节数）。已注册的quantizer见 `mindspeed_mm/fsdp/features/memory/quantizer.py` 的 `QUANTIZERS`（配置层按注册名引用，解析发生在scope构造期，底座本身无注册表）；quantizer须确定性且不消耗RNG（op replay依赖post-op RNG快照对齐）。
-- **量化句柄：`pop` 返回反量化后的新张量**：`pop(handle)` 对量化句柄在消费流上反量化，返回**原dtype/原shape的新张量**（put进去的对象不返回）；未带quantizer的句柄语义不变（仍返回同一对象，直到它经历过DDR往返）。`get()` 是窥视/调试接口，返回的是**载荷**（量化后即int8张量）而非原张量，勿当结果使用。清理性的 `pop`（如 op replay early stop 释放未消费路由）同样会做一次无人读的反量化——已知小浪费，后续可能由独立的 `release(handle)` 收口。
+- **量化句柄：`pop` 返回反量化后的新张量**：`pop(handle)` 对量化句柄在消费流上反量化，返回**原dtype/原shape的新张量**（put进去的对象不返回）；未带quantizer的句柄语义不变（仍返回同一对象，直到它经历过DDR往返）。`get()` 是窥视/调试接口，返回的是**载荷**（量化后即int8或fp8张量）而非原张量，勿当结果使用。清理性的 `pop`（如 op replay early stop 释放未消费路由）同样会做一次无人读的反量化——已知小浪费，后续可能由独立的 `release(handle)` 收口。
 - **量化与验收口径互斥**：有损载荷与逐位比对不能共存——开量化的scope/租户只能用**容差口径**验收（loss/grad norm在约定容差内一致），逐位口径仅适用于不配置quantizer。
 
 ## 使用场景

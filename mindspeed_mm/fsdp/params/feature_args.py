@@ -6,6 +6,7 @@ from pydantic import model_validator
 
 from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 from mindspeed_mm.fsdp.features.memory.quantizer import QUANTIZERS
+from mindspeed_mm.fsdp.utils.device import is_arch35
 
 
 class SwapPlanConfig(BaseArguments):
@@ -87,10 +88,16 @@ class OpReplayScopeConfig(BaseArguments):
         metadata={"help": "Payload quantizer applied statically per scope when handing "
                           "cached op outputs to the swap cache; None = no quantization (default, "
                           "bit-exact today's behavior). Registered names live in "
-                          "mindspeed_mm/fsdp/features/memory/quantizer.py (e.g. 'int8_pertoken'); "
+                          "mindspeed_mm/fsdp/features/memory/quantizer.py (e.g. 'int8_pertoken', "
+                          "'fp8_blockwise' for fp8-e4m3 block-wise quantization); "
                           "an unregistered name is a config error, rejected at config parse. "
                           "Only the precision of the cached payload changes — which ops are "
                           "cached is decided by cache_ops alone."},
+    )
+    fp8_block_size: Literal[64, 128, 192, 256] = field(
+        default=128,
+        metadata={"help": "Column block size for 'fp8_blockwise' on A5/950; row block size "
+                          "remains 1. Supported values: 64, 128 (default), 192, 256."},
     )
 
     @model_validator(mode='after')
@@ -99,6 +106,13 @@ class OpReplayScopeConfig(BaseArguments):
             raise ValueError(
                 f"op_replay scope {self.name!r}: unknown payload quantizer "
                 f"{self.quantizer!r} (registered: {sorted(QUANTIZERS)})")
+        if self.quantizer == 'fp8_blockwise' and not is_arch35():
+            raise ValueError(
+                f"op_replay scope {self.name!r}: 'fp8_blockwise' is only supported on A5/950")
+        if self.quantizer != 'fp8_blockwise' and self.fp8_block_size != 128:
+            raise ValueError(
+                f"op_replay scope {self.name!r}: 'fp8_block_size' requires "
+                "quantizer='fp8_blockwise'")
         return self
 
 

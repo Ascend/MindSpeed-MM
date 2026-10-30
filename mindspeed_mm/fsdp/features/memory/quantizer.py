@@ -34,9 +34,13 @@ Quantizer contract:
 Registering a new quantizer: add one instance to QUANTIZERS under its name;
 tenants then hand the instance to SwapCache.put(..., quantizer=...) (config
 files reference it by name, resolved at scope construction). Nothing else in
-the swap path needs to change. (Extension point: an e4m3/fp8 quantizer would
-need a hand-written quantize kernel — this stack has no native fp8 cast —
-intentionally not implemented.)
+the swap path needs to change.
+
+Two modes are registered: int8 per-token and fp8-e4m3 block-wise (1xN per
+token, DeepSeek-style dynamic scaling with N=64/128/192/256). Both use AscendC fused ops:
+npu_dynamic_quant / npu_dynamic_block_quant at put, npu_anti_quant at pop
+(the int8 mode additionally has Triton/torch dequant fallbacks — see
+ops/int8_dequant.py; the fp8 block-wise mode is AscendC-only).
 
 This module is the tenant-facing layer: the contract, the meta record, the
 registry. The hardware-facing dequant implementation (native op probe, Triton
@@ -172,9 +176,114 @@ class Int8PerTokenQuantizer:
         return out.reshape(meta.orig_shape)
 
 
+@dataclass(frozen=True)
+class Fp8BlockwiseMeta:
+    """Opaque fp8-e4m3 block-wise payload descriptor.
+
+    orig_dtype/orig_shape: the tensor put into the cache.
+    reduced_shape: the >=2D shape the fused op worked on, including the
+      [1, numel] shim for a 1D input.
+    block_size: number of columns in each 1xN token block.
+    scale: fp32 per-block scales of shape (reduced_shape[0], cols // block_size).
+    """
+
+    orig_dtype: torch.dtype
+    orig_shape: torch.Size
+    reduced_shape: torch.Size
+    block_size: int
+    scale: torch.Tensor
+
+
+class Fp8BlockwiseQuantizer:
+    """fp8-e4m3 block-wise dynamic quantization via AscendC fused ops.
+
+    quantize: torch.ops.npu.npu_dynamic_block_quant(x2d,
+    dst_type=torch.float8_e4m3fn, row_block_size=1,
+    col_block_size=block_size) -> (e4m3 payload, fp32 scale), with a dynamic
+    scale of amax / 448 for each block. A5/950 supports block sizes 64, 128,
+    192 and 256; the default is 128.
+    dequantize: torch.ops.npu.npu_anti_quant over the [rows*groups, block_size]
+    view with scales reshaped to [rows*groups, 1], explicitly selecting per-row
+    dequantization. There is no Triton path.
+
+    The last dimension must be a multiple of block_size; other tensors pass
+    through unchanged like the int8 mode. 1D inputs take the [1, numel] shim.
+
+    Net effect on the cache: payload 1 B/element plus 4 B per block of scales,
+    vs 50% for int8 per-token.
+    """
+
+    name = "fp8_blockwise"
+    DEFAULT_BLOCK_SIZE = 128
+    SUPPORTED_BLOCK_SIZES = (64, 128, 192, 256)
+
+    def __init__(self, block_size=DEFAULT_BLOCK_SIZE):
+        if block_size not in self.SUPPORTED_BLOCK_SIZES:
+            raise ValueError(
+                f"fp8 block size must be one of {self.SUPPORTED_BLOCK_SIZES}, "
+                f"got {block_size}")
+        self.block_size = block_size
+        self._skip_warned = set()
+
+    def _reject_reason(self, t: torch.Tensor) -> Optional[str]:
+        if t.dtype not in (torch.bfloat16, torch.float16):
+            return f"dtype={t.dtype}"
+        if not t.is_contiguous():
+            return "non-contiguous"
+        if t.numel() == 0:
+            return "empty tensor"
+        if t.device.type != 'npu':
+            return f"device={t.device.type}"
+        if t.dim() == 0:
+            return "scalar tensor"
+        if t.shape[-1] % self.block_size != 0:
+            return f"last dim {t.shape[-1]} is not a multiple of {self.block_size}"
+        return None
+
+    def quantize(self, t: torch.Tensor) -> Tuple[torch.Tensor, Optional[object]]:
+        reason = self._reject_reason(t)
+        if reason is not None:
+            if reason not in self._skip_warned:
+                self._skip_warned.add(reason)
+                print_rank(
+                    logger.warning,
+                    f"payload quantizer {self.name!r} does not support this "
+                    f"tensor ({reason}, shape={tuple(t.shape)}); passing it "
+                    f"through unchanged. Further skips of this reason are "
+                    f"not warned again.",
+                    ranks=0)
+            return t, None
+        x2d = t.reshape(-1, t.shape[-1]) if t.dim() >= 2 else t.reshape(1, -1)
+        q, scale = torch.ops.npu.npu_dynamic_block_quant(
+            x2d, dst_type=torch.float8_e4m3fn,
+            row_block_size=1, col_block_size=self.block_size)
+        payload = q.reshape(t.shape)
+        meta = Fp8BlockwiseMeta(
+            orig_dtype=t.dtype,
+            orig_shape=t.shape,
+            reduced_shape=x2d.shape,
+            block_size=self.block_size,
+            scale=scale,
+        )
+        return payload, meta
+
+    def dequantize(self, payload: torch.Tensor,
+                   meta: Optional[Fp8BlockwiseMeta]) -> torch.Tensor:
+        if meta is None:
+            return payload
+        rows, cols = int(meta.reduced_shape[0]), int(meta.reduced_shape[-1])
+        groups = cols // meta.block_size
+        q2d = payload.reshape(rows * groups, meta.block_size)
+        scale = meta.scale.reshape(-1, 1)
+        out = torch.ops.npu.npu_anti_quant(
+            q2d, scale, dst_dtype=meta.orig_dtype)
+        return out.reshape(meta.orig_shape)
+
+
 # Name -> quantizer instance. Config layers reference a quantizer by name and
 # resolve it here (OpReplayScope construction); the swap core itself never
 # imports this module.
 QUANTIZERS = {
     Int8PerTokenQuantizer.name: Int8PerTokenQuantizer(),
+    Fp8BlockwiseQuantizer.name: Fp8BlockwiseQuantizer(),
 }
