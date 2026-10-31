@@ -29,8 +29,10 @@ MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 echo "Changing working directory to ${MINDSPEED_ROOT}"
 cd "${MINDSPEED_ROOT}"
 
-logfile=$(date +%Y%m%d)_$(date +%H%M%S)
-mkdir -p logs
-torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py \
-    examples/qwen3vl/qwen3vl_30B_config_v1_A5_mxfp8.yaml \
-    2>&1 | tee logs/train_${logfile}.log
+config_path=examples/qwen3vl/qwen3vl_30B_config_v1_A5_mxfp8.yaml
+logdir=logs/qwen3vl
+logfile=qwen3vl_30B_v1_A5_mxfp8_$(date +%Y%m%d_%H%M%S)
+mkdir -p $logdir
+
+torchrun $DISTRIBUTED_ARGS mindspeed_mm/fsdp/train/trainer.py  $config_path \
+    2>&1 | tee ${logdir}/${logfile}.log

@@ -40,25 +40,27 @@ MINDSPEED_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 echo "Changing working directory to ${MINDSPEED_ROOT}"
 cd "${MINDSPEED_ROOT}"
 
-logfile=$(date +%Y%m%d)_$(date +%H%M%S)
 config_path=examples/qwen3vl/qwen3vl_full_sft_30B.yaml
-mkdir -p logs
-torchrun $DISTRIBUTED_ARGS pretrain_transformers.py ${config_path} \
+logdir=logs/qwen3vl
+logfile=qwen3vl_30B_$(date +%Y%m%d_%H%M%S)
+mkdir -p $logdir
+
+torchrun $DISTRIBUTED_ARGS pretrain_transformers.py  $config_path \
     --distributed-backend nccl \
-    2>&1 | tee logs/train_${logfile}.log
+    2>&1 | tee ${logdir}/${logfile}.log
 
 # Print performance evaluation metrics: STEP_TIME，SAMPLES_PER_SECOND， TOKENS_PER_SECOND
-chmod 440 logs/train_${logfile}.log
-SAVE_PATH=$(grep "saving checkpoint at iteration" logs/train_${logfile}.log | tail -n 1 | awk '{for(i=1;i<=NF;i++){if($i=="to"){print $(i+1);break}}}')
+chmod 440 ${logdir}/${logfile}.log
+SAVE_PATH=$(grep "saving checkpoint at iteration" ${logdir}/${logfile}.log | tail -n 1 | awk '{for(i=1;i<=NF;i++){if($i=="to"){print $(i+1);break}}}')
 [ -d "$SAVE_PATH" ] && (find "$SAVE_PATH" -type d -exec chmod 750 {} \; && find "$SAVE_PATH" -type f -exec chmod 640 {} \; && echo "Success: Modified permissions for $SAVE_PATH") || echo "Warning: Invalid save path: $SAVE_PATH"
-STEP_TIME=`grep "elapsed time per iteration" logs/train_${logfile}.log | awk -F ':' '{print$5}' | awk -F '|' '{print$1}' | head -n 150 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
-GBS=`grep "consumed samples:" logs/train_${logfile}.log | tail -n 1 | awk -F '|' '{split($1, a, "iteration"); split(a[2], b, "/"); iter=b[1]+0; split($2, c, ":"); samp=c[2]+0; if(iter!=0) printf("%.2f", samp/iter); else print "N/A"}'`
+STEP_TIME=`grep "elapsed time per iteration" ${logdir}/${logfile}.log | awk -F ':' '{print$5}' | awk -F '|' '{print$1}' | head -n 150 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
+GBS=`grep "consumed samples:" ${logdir}/${logfile}.log | tail -n 1 | awk -F '|' '{split($1, a, "iteration"); split(a[2], b, "/"); iter=b[1]+0; split($2, c, ":"); samp=c[2]+0; if(iter!=0) printf("%.2f", samp/iter); else print "N/A"}'`
 SAMPLES_PER_SECOND=`awk 'BEGIN{printf "%.3f\n", '${GBS}'*1000/'${STEP_TIME}'}'`
 echo "Elapsed Time Per iteration: $STEP_TIME"
 echo "Average Samples per Second: $SAMPLES_PER_SECOND"
-LOG_TOKENS_PER_SECOND=`grep "tokens per sample" logs/train_${logfile}.log`
+LOG_TOKENS_PER_SECOND=`grep "tokens per sample" ${logdir}/${logfile}.log`
 if [ "$LOG_TOKENS_PER_SECOND" ]; then
-    AVERAGE_TOKENS=`grep "tokens per sample" logs/train_${logfile}.log | awk -F 'tokens per sample:' '{print$2}' | awk -F '|' '{print$1}' | head -n 150 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
+    AVERAGE_TOKENS=`grep "tokens per sample" ${logdir}/${logfile}.log | awk -F 'tokens per sample:' '{print$2}' | awk -F '|' '{print$1}' | head -n 150 | tail -n 100 | awk '{sum+=$1} END {if (NR != 0) printf("%.1f",sum/NR)}'`
     TOKENS_PER_SECOND=`awk 'BEGIN{printf "%.3f\n", '${SAMPLES_PER_SECOND}'*'${AVERAGE_TOKENS}'}'`
     echo "Consumed Tokens per Second: $TOKENS_PER_SECOND"
 fi
