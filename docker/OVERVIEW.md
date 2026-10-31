@@ -116,7 +116,7 @@ docker/
 
 ### Script Usage Mechanism
 
-The `docker/build.sh` script uses the version number specified by the `-v` parameter (default: 26.1.0) as the branch for git cloning MindSpeed-MM during the build process.
+The `docker/build.sh` script uses the version number specified by the `-v` parameter (default: 26.2.0) as the branch for git cloning MindSpeed-MM during the build process.
 
 ## 1. Image Usage Guide
 
@@ -205,7 +205,7 @@ The build script `build.sh` supports multiple parameter configurations. The CANN
 | ------ | ------ | ------------ |
 | `--base-image` | **Required.** Full base image name. CANN version, NPU type (910b/a3/950), OS, and Python version are auto-detected from the image tag | None (required) |
 | `--python-version` | Python version of the conda base environment (e.g. 3.11/3.10/3.12). Selects the matching Miniconda installer, which finally determines the conda base environment's Python version | Auto-detected from the base image tag |
-| `-v, --version` | MindSpeed MM version identifier, also used as the Git branch name | 26.1.0 |
+| `-v, --version` | MindSpeed MM version identifier, also used as the Git branch name | 26.2.0 |
 | `--tag` | Custom image tag (overrides the default tag; CI appends `-ci`) | Auto-generated |
 | `-n, --no-cache` | Build without cache | None |
 | `--torch-version` | PyTorch version (online installation) | 2.7.1 |
@@ -231,7 +231,7 @@ bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0
 bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1.post4
 
 # Build with specified version
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -v 26.1.0
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -v 26.2.0
 
 # Build the CI image (on top of the dev image; tag appends -ci)
 bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --build-ci
@@ -269,7 +269,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12"
 TORCH_VERSION="2.7.1"
 TORCH_NPU_VERSION="2.7.1.post8"
-MINDSPEED_MM_VERSION="26.1.0"
+MINDSPEED_MM_VERSION="26.2.0"
 PYTHON_VERSION="3.11"
 
 # Execute build
@@ -286,7 +286,7 @@ bash "${SCRIPT_DIR}/build.sh" \
 
 1. **Automatic recognition**: The script automatically recognizes the CANN version (9.1.0), NPU type (910b), and operating system (openeuler24.03) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
 2. **Specify Python version**: `--python-version` is used to specify the Python version for running the model.
-3. **Automatic tag generation**: Automatically generates image tags conforming to the naming rules based on recognition results (e.g. `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`).
+3. **Automatic tag generation**: Automatically generates image tags conforming to the naming rules based on recognition results (e.g. `v26.2.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`).
 4. **Automatic download**: If the Miniconda installer or decord dependencies are not available locally, the script will automatically download them
 5. **Failure cleanup**: The `--cleanup-on-fail` parameter ensures cleanup of dangling resources if the build fails
 
@@ -295,7 +295,7 @@ bash "${SCRIPT_DIR}/build.sh" \
 Create a custom Dockerfile based on this image:
 
 ```dockerfile
-FROM mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
+FROM mindspeed-mm:v26.2.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
 
 RUN pip install your-package==1.0.0
 

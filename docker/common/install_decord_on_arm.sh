@@ -29,18 +29,7 @@ for file in "${REQUIRED_FILES[@]}"; do
 done
 echo "All required files found."
 
-echo ">>> Installing build tools..."
-# Detect OS and use appropriate package manager
-if [ -f /etc/redhat-release ] || grep -q "openEuler" /etc/os-release; then
-    # CentOS/RHEL/openEuler
-    yum install -y autoconf automake bzip2 bzip2-devel freetype-devel gcc gcc-c++ git libtool make mercurial pkgconfig zlib-devel unzip
-elif grep -q "Ubuntu" /etc/os-release; then
-    # Ubuntu
-    apt-get update && apt-get install -y autoconf automake bzip2 libbz2-dev libfreetype-dev gcc g++ git libtool make mercurial pkg-config zlib1g-dev unzip
-else
-    echo "ERROR: Unsupported OS"
-    exit 1
-fi
+# Build dependencies are provisioned by common/install_dependencies.sh.
 
 echo ">>> Installing cmake ${CMAKE_VERSION}..."
 cd /tmp

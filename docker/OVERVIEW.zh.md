@@ -70,7 +70,7 @@ MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，
 Dockerfile 命名：
 
 - `Dockerfile`：统一的 dev 镜像构建文件，通过构建参数支持所有 NPU 类型（910b/a3/950）和操作系统版本
-- `Dockerfile.ci`：CI 镜像构建文件，在 dev 镜像基础上叠加多版本 conda 环境（通过 `--build-ci` 使用）
+- `Dockerfile.ci`：CI 镜像构建文件，直接基于 CANN 镜像构建多版本 conda 环境（仅 910B + openEuler + aarch64）（通过 `--build-ci` 使用）
 
 ## 支持的 Tags 及 Dockerfile 链接
 
@@ -98,7 +98,7 @@ Docker 项目目录遵循清晰的分层结构，便于维护和扩展：
 ```text
 docker/
 ├── Dockerfile                 # 统一 dev 镜像 Dockerfile，支持多 NPU 类型和操作系统
-├── Dockerfile.ci              # CI 镜像 Dockerfile（基于 dev 镜像叠加）
+├── Dockerfile.ci              # CI 镜像 Dockerfile（直接基于 CANN 镜像构建）
 ├── build.sh                   # 镜像构建脚本，支持多种参数配置
 ├── OVERVIEW.md                # 英文版说明文档
 ├── OVERVIEW.zh.md             # 中文版说明文档
@@ -110,13 +110,13 @@ docker/
 ### 目录说明
 
 1. **Dockerfile**：统一的 dev 镜像构建文件，通过构建参数支持所有 NPU 类型和操作系统版本
-2. **Dockerfile.ci**：CI 镜像构建文件，在 dev 镜像基础上叠加多版本 conda 环境（`--build-ci` 使用）
+2. **Dockerfile.ci**：CI 镜像构建文件，直接基于 CANN 镜像构建多版本 conda 环境（仅 910B + openEuler + aarch64）（`--build-ci` 使用）
 3. **build.sh**：镜像构建脚本，提供灵活的参数配置和自动识别功能
 4. **scripts/**：按脚本功能进行目录组织（如 `ci/` 存放 CI 构建相关脚本）
 
 ### 脚本使用机制
 
-`docker/build.sh` 脚本在构建过程中根据 `-v` 参数指定的版本号（默认为 26.1.0）作为 git clone MindSpeed-MM 的分支。
+`docker/build.sh` 脚本在构建过程中根据 `-v` 参数指定的版本号（默认为 26.2.0）作为 git clone MindSpeed-MM 的分支。
 
 ## 1. 镜像使用指导
 
@@ -204,13 +204,13 @@ docker run \
 | 参数 | 说明 | 默认值 |
 | ------ | ------ | ------------ |
 | `--base-image` | **必选。** 完整基础镜像名称，CANN 版本、NPU 类型（910b/a3/950）、操作系统和 Python 版本均从镜像 tag 自动识别 | 无（必需） |
-| `--python-version` | conda base 环境的 Python 版本（如 3.11/3.10/3.12）。用于选择对应的 Miniconda 安装器，最终决定 conda base 环境的 Python 版本 | 从 base 镜像 tag 自动识别 |
-| `-v, --version` | MindSpeed MM 版本标识，同时作为 Git 分支名称 | 26.1.0 |
+| `--python-version` | conda base 环境的 Python 版本（如 3.12）。用于选择对应的 Miniconda 安装器，最终决定 conda base 环境的 Python 版本 | 从 base 镜像 tag 自动识别 |
+| `-v, --version` | MindSpeed MM 版本标识，同时作为 Git 分支名称 | 26.2.0 |
 | `--tag` | 自定义镜像 tag（覆盖默认 tag；CI 构建自动追加 `-ci`） | 自动生成 |
 | `-n, --no-cache` | 构建时不使用缓存 | 无 |
-| `--torch-version` | PyTorch 版本（在线安装） | 2.7.1 |
-| `--torch-npu-version` | TorchNPU 版本（在线安装） | 2.7.1.post8 |
-| `--build-ci` | 在 dev 镜像基础上构建 CI 镜像（多版本 conda 环境），输出 tag 追加 `-ci` | 无 |
+| `--torch-version` | PyTorch 版本（在线安装） | 2.10.0 |
+| `--torch-npu-version` | TorchNPU 版本（在线安装） | 2.10.0.post7 |
+| `--build-ci` | 直接基于 CANN 镜像构建 CI 镜像（仅 910B + openEuler + aarch64，多版本 conda 环境），输出 tag 追加 `-ci` | 无 |
 | `--cleanup-on-fail` | 构建失败时清理悬空镜像/容器 | 无 |
 
 ### 基础构建示例
@@ -219,22 +219,22 @@ docker run \
 cd docker
 
 # 构建 A3 + openEuler 镜像
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12
 
 # 构建 910B + Ubuntu 镜像
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-ubuntu22.04-py3.11
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-ubuntu22.04-py3.12
 
 # 构建 950 + openEuler 镜像，并指定 conda base 环境为 Python 3.12
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-950-openeuler24.03-py3.12 --python-version 3.12
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-950-openeuler24.03-py3.12 --python-version 3.12
 
 # 指定 PyTorch 版本构建
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1.post4
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12 --torch-version 2.10.0 --torch-npu-version 2.10.0.post7
 
 # 指定版本构建
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -v 26.1.0
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12 -v 26.2.0
 
-# 构建 CI 镜像（在 dev 镜像基础上，tag 追加 -ci）
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --build-ci
+# 构建 CI 镜像（在 910B + openEuler + aarch64 主机上执行，tag 追加 -ci）
+bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12 --build-ci
 ```
 
 ### 自动下载功能说明
@@ -251,10 +251,10 @@ bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0
 
 构建脚本会自动从基础镜像 tag 中识别关键信息（`--base-image` 参数为必选）：
 
-1. **CANN 版本识别**：从镜像 tag 中提取 CANN 版本号（如 `9.0.0`）
+1. **CANN 版本识别**：从镜像 tag 中提取 CANN 版本号（如 `9.2.0`）
 2. **NPU 类型识别**：从镜像 tag 中识别 NPU 类型（如 `a3`）
 3. **操作系统识别**：从镜像 tag 中识别 `openeuler24.03` 或 `ubuntu22.04`
-4. **Python 版本识别**：从镜像 tag 中的 `py<x.y>` 字段提取 Python 版本（如 `3.11`）
+4. **Python 版本识别**：从镜像 tag 中的 `py<x.y>` 字段提取 Python 版本（如 `3.12`）
 5. **自动生成镜像 tag**：基于识别到的信息自动生成符合命名规则的镜像 tag
 
 ### 最佳实践示例
@@ -266,11 +266,11 @@ bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 自定义配置
-BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12"
-TORCH_VERSION="2.7.1"
-TORCH_NPU_VERSION="2.7.1.post8"
-MINDSPEED_MM_VERSION="26.1.0"
-PYTHON_VERSION="3.11"
+BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12"
+TORCH_VERSION="2.10.0"
+TORCH_NPU_VERSION="2.10.0.post7"
+MINDSPEED_MM_VERSION="26.2.0"
+PYTHON_VERSION="3.12"
 
 # 执行构建
 bash "${SCRIPT_DIR}/build.sh" \
@@ -284,9 +284,9 @@ bash "${SCRIPT_DIR}/build.sh" \
 
 **关键特性说明：**
 
-1. **自动识别**：脚本会自动从 `BASE_IMAGE` 中识别 CANN 版本（9.1.0）、NPU 类型（910b）和操作系统（openeuler24.03）。如果`BASE_IMAGE`在系统中不存在，会自动拉取。
+1. **自动识别**：脚本会自动从 `BASE_IMAGE` 中识别 CANN 版本（9.2.0）、NPU 类型（910b）和操作系统（openeuler24.03）。如果`BASE_IMAGE`在系统中不存在，会自动拉取。
 2. **指定 Python 版本**：`--python-version` 用于指定模型运行 Python 版本。
-3. **自动生成 tag**：基于识别结果自动生成符合命名规则的镜像 tag（如 `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`）。
+3. **自动生成 tag**：基于识别结果自动生成符合命名规则的镜像 tag（如 `v26.2.0-cann9.2.0-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12-aarch64`）。
 4. **自动下载**：如果本地没有 Miniconda 安装器或 decord 依赖，脚本会自动下载
 5. **失败清理**：`--cleanup-on-fail` 参数确保构建失败时清理悬空资源
 
@@ -295,7 +295,7 @@ bash "${SCRIPT_DIR}/build.sh" \
 基于此镜像创建自定义 Dockerfile：
 
 ```dockerfile
-FROM mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
+FROM mindspeed-mm:v26.2.0-cann9.2.0-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12-aarch64
 
 RUN pip install your-package==1.0.0
 

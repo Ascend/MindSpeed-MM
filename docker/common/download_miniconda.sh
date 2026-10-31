@@ -3,7 +3,7 @@ set -e
 
 OUTPUT_DIR="${1:-.}"
 REQUESTED_ARCH="${2:-}"
-PYTHON_VERSION="${3:-3.11}"
+PYTHON_VERSION="${3:-3.12}"
 
 if [ -n "$REQUESTED_ARCH" ]; then
     ARCH="$REQUESTED_ARCH"
@@ -11,7 +11,7 @@ else
     ARCH=$(uname -m)
 fi
 
-# Map "3.11" -> "311" to select the matching Miniconda variant, which in turn
+# Map "3.12" -> "312" to select the matching Miniconda variant, which in turn
 # determines the Python version of the conda base environment.
 PY_STR="${PYTHON_VERSION//./}"
 
@@ -93,7 +93,6 @@ echo "=========================================="
 echo ""
 echo "Next steps:"
 echo "  1. Verify the file: bash ${MINICONDA_FILE} --help"
-echo "  2. Use it to build Docker image:"
-echo "     bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11"
+echo "  2. Continue with the Docker image build"
 # Last line: the resulting installer file name (consumed by build.sh).
 echo "${MINICONDA_FILE}"

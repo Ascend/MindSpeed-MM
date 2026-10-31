@@ -32,7 +32,7 @@ TRITON_ASCEND_INDEX = "https://triton-ascend.osinfra.cn/pypi/simple"
 DECORD_SRC = "/opt/decord_src"
 PRIVATE_CANN_ROOT = "/workspace/cann"
 CANN_INSTALLERS_DIR = "/tmp/cann_installers"
-CANN_VERSION = os.environ.get("CANN_VERSION", "9.1.0")
+CANN_VERSION = os.environ.get("CANN_VERSION", "9.2.0")
 CANN_DOWNLOAD_BASE = (
     "https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/"
     f"CANN/CANN%20{CANN_VERSION}"

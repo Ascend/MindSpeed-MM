@@ -36,12 +36,11 @@
 
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
-| `NPU_TYPE` | `a3` | NPU 型号：`910b` 或 `a3` |
-| `OS` | `openeuler24.03` | 操作系统：`openeuler24.03` 或 `ubuntu22.04` |
-| `BASE_IMAGE_VERSION` | `9.0.0` | CANN 基础镜像版本 |
-| `TORCH_VERSION` | `2.7.1` | PyTorch 版本（在线安装） |
-| `TORCH_NPU_VERSION` | `2.7.1.post8` | torch_npu 版本（在线安装） |
-| `MINDSPEED_MM_BRANCH` | `26.1.0` | MindSpeed-MM 分支 |
+| `BASE_IMAGE` | `swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12` | 完整 CANN 基础镜像名称 |
+| `PYTHON_VERSION` | `3.12` | conda base 环境的 Python 版本 |
+| `TORCH_VERSION` | `2.10.0` | PyTorch 版本（在线安装） |
+| `TORCH_NPU_VERSION` | `2.10.0.post7` | torch_npu 版本（在线安装） |
+| `MINDSPEED_MM_BRANCH` | `26.2.0` | MindSpeed-MM 分支 |
 
 ## NPU 设备配置
 
@@ -58,7 +57,7 @@
 ## 常见问题排查
 
 - **Miniconda 下载超时（自建模式）**
-  手动下载 [Miniconda3-py311_26.1.1-1-Linux-${ARCH}.sh](https://repo.anaconda.com/miniconda/) 放到 `docker/downloads/` 目录后重新构建
+  手动下载 [Miniconda3-py312_26.1.1-1-Linux-${ARCH}.sh](https://repo.anaconda.com/miniconda/) 放到 `docker/downloads/` 目录后重新构建
 
 - **decord 依赖下载失败（仅 ARM 架构需要 & 自建模式）**
   decord 编译依赖较多且常因网络问题下载失败，可用浏览器手动下载后放入 `docker/decord_deps/` 目录，再重新执行 **Reopen in Container**。下载链接参考 [docker/common/download_decord_deps.sh](../docker/common/download_decord_deps.sh)。

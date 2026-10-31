@@ -79,8 +79,6 @@ for i in $(seq 1 $MAX_RETRIES); do
     sleep 5
 done
 
-apt-get install -y ca-certificates
-
 apt-get clean
 
 echo "=========================================="

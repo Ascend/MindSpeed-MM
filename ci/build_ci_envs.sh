@@ -4,10 +4,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/../docker"
 
 # These are default settings. Feel free to tweak them based on your actual situation.
-BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12"
+BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12"
 TORCH_VERSION="2.10.0"
-TORCH_NPU_VERSION="2.10.0.post4"
-MINDSPEED_MM_VERSION="26.1.0"
+TORCH_NPU_VERSION="2.10.0.post7"
+MINDSPEED_MM_VERSION="26.2.0"
 PYTHON_VERSION="3.12"
 
 bash "build.sh" \

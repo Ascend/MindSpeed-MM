@@ -26,7 +26,7 @@ cleanup_dangling() {
 
 # Dockerfile naming: Dockerfile (dev image), Dockerfile.ci (CI image)
 # Dev image tag:  {version}-cann{cann}-torch_npu{torch_npu}-{chip}-{os}-py{python}-{arch}
-# CI image tag:   {dev_tag}-ci  (built on top of the dev image)
+# CI image tag:   {dev_tag}-ci  (built directly from the CANN base image)
 #
 # CANN version, NPU type (910b/a3/950), OS and architecture are auto-detected
 # from the base image tag. The Python version defaults to the Python detected
@@ -46,36 +46,36 @@ Usage: $0 [OPTIONS]
 Build MindSpeed MM Docker Image
 
 Required:
-    --base-image IMAGE       Full base image name (e.g. swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.11)
+    --base-image IMAGE       Full base image name (e.g. swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12)
                              CANN version, NPU type (910b/a3/950), OS and architecture are auto-detected from the image tag.
 
 Optional:
-    --python-version VER     Python version for the conda base environment (e.g. 3.11, 3.10, 3.12).
+    --python-version VER     Python version for the conda base environment (e.g. 3.12).
                              Selects the matching Miniconda installer. Defaults to the Python version
                              detected from the base image tag.
     --tag TAG                Custom image tag (default: auto-generated from build info; CI appends '-ci')
-    -v, --version VERSION    MindSpeed MM version (default: 26.1.0; branch used to clone the repo)
-    --torch-version VER      PyTorch version (default: 2.7.1, online install)
-    --torch-npu-version VER  torch-npu version (default: 2.7.1.post8, online install)
+    -v, --version VERSION    MindSpeed MM version (default: 26.2.0; branch used to clone the repo)
+    --torch-version VER      PyTorch version (default: 2.10.0, online install)
+    --torch-npu-version VER  torch-npu version (default: 2.10.0.post7, online install)
     -n, --no-cache           Build without cache
-    --build-ci               Build CI image on top of the dev image (multi-version conda environments)
+    --build-ci               Build standalone CI image from the CANN base (multi-version conda environments)
     --cleanup-on-fail        Clean up dangling images/containers if build fails
     -h, --help               Show help
 
 Examples:
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-a3-openeuler24.03-py3.11
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1.post8
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-950-openeuler24.03-py3.12 --python-version 3.12
-    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.11 --build-ci
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12 --torch-version 2.10.0 --torch-npu-version 2.10.0.post7
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-950-openeuler24.03-py3.12 --python-version 3.12
+    bash $0 --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12 --build-ci
 EOF
 }
 
 IMAGE_TAG=""
 NO_CACHE=""
-TORCH_VERSION="2.7.1"
-TORCH_NPU_VERSION="2.7.1.post8"
+TORCH_VERSION="2.10.0"
+TORCH_NPU_VERSION="2.10.0.post7"
 BASE_IMAGE=""
-MINDSPEED_MM_VERSION="26.1.0"
+MINDSPEED_MM_VERSION="26.2.0"
 CLEANUP_ON_FAIL=false
 BUILD_CI=false
 PYTHON_VERSION=""
@@ -135,7 +135,7 @@ parse_base_image_tag() {
         detected_cann="${tag_lower%%-*}"
     fi
 
-    # Python version: match 'py<x.y>' field in the tag (e.g. py3.11 -> 3.11)
+    # Python version: match 'py<x.y>' field in the tag (e.g. py3.12 -> 3.12)
     local detected_python=""
     if [[ "$tag_lower" =~ py([0-9]+\.[0-9]+) ]]; then
         detected_python="${BASH_REMATCH[1]}"
@@ -199,7 +199,7 @@ CANN_VERSION="$DETECTED_CANN_VERSION"
 # Resolve Python version: user-specified takes precedence, else auto-detected.
 if [ -z "$PYTHON_VERSION" ]; then
     if [ -z "$DETECTED_PYTHON_VERSION" ]; then
-        echo "Error: Failed to detect Python version from base image tag (expected 'py<x.y>', e.g. py3.11)."
+        echo "Error: Failed to detect Python version from base image tag (expected 'py<x.y>', e.g. py3.12)."
         echo "       Use --python-version to specify it explicitly."
         exit 1
     fi
@@ -234,13 +234,11 @@ esac
 
 # CPU architecture: used for Miniconda/decord selection and the image tag.
 DOWNLOAD_ARCH=$(uname -m)
-if [ "$DOWNLOAD_ARCH" = "aarch64" ]; then
-    IS_ARM=true
-    ARCH_NAME="aarch64"
-else
-    IS_ARM=false
-    ARCH_NAME="x86_64"
-fi
+case "$DOWNLOAD_ARCH" in
+    aarch64) IS_ARM=true; ARCH_NAME="aarch64" ;;
+    x86_64) IS_ARM=false; ARCH_NAME="x86_64" ;;
+    *) echo "Error: Unsupported CPU architecture: $DOWNLOAD_ARCH"; exit 1 ;;
+esac
 # aarch64 builds decord from source in the decord-builder stage.
 DECORD_BUILD=$([ "$IS_ARM" = true ] && echo "true" || echo "false")
 

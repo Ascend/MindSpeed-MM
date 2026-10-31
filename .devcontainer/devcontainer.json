@@ -9,14 +9,15 @@
   //   "options": ["--network=host"],
   //   "args": {
   //     // PyTorch / torch_npu 版本（在线安装）
-  //     "TORCH_VERSION": "2.7.1",
-  //     "TORCH_NPU_VERSION": "2.7.1.post8",
+  //     "TORCH_VERSION": "2.10.0",
+  //     "TORCH_NPU_VERSION": "2.10.0.post7",
+  //     "PYTHON_VERSION": "3.12",
   //     // MindSpeed-MM 分支（dev 镜像会克隆该分支；工作区挂载会覆盖克隆内容）
-  //     "MINDSPEED_MM_BRANCH": "26.1.0",
+  //     "MINDSPEED_MM_BRANCH": "26.2.0",
   //     // 构建开发镜像（非 CI 多版本镜像）
   //     "BUILD_CI": "false",
   //     // CANN 基础镜像版本
-  //     "BASE_IMAGE": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11",
+  //     "BASE_IMAGE": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12",
   //     // 以下参数对应 prepare-context.sh 暂存到上下文中的文件/目录名
   //     "MINICONDA_SH": "miniconda.sh",
   //     "DECORD_SCRIPT": "install_decord_on_arm.sh",

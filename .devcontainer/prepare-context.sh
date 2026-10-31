@@ -34,13 +34,13 @@ echo "=========================================="
 cd "${DOCKER_DIR}"
 
 # 1. 下载并暂存 Miniconda 安装器（统一命名为 miniconda.sh，便于构建参数固定）
-MINICONDA_FILE="Miniconda3-py311_26.1.1-1-Linux-${ARCH}.sh"
+MINICONDA_FILE="Miniconda3-py312_26.1.1-1-Linux-${ARCH}.sh"
 if [ ! -f "miniconda.sh" ]; then
     if [ -f "downloads/${MINICONDA_FILE}" ]; then
         echo ">>> 复用已下载的 Miniconda: downloads/${MINICONDA_FILE}"
     else
         echo ">>> 下载 Miniconda (${ARCH})..."
-        bash "${COMMON_DIR}/download_miniconda.sh" "${DOCKER_DIR}/downloads" "${ARCH}"
+        bash "${COMMON_DIR}/download_miniconda.sh" "${DOCKER_DIR}/downloads" "${ARCH}" "3.12"
     fi
     cp "downloads/${MINICONDA_FILE}" "miniconda.sh"
 else

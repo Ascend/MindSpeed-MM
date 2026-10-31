@@ -11,7 +11,7 @@
 # final stage contains only CI runtime content.
 # ============================================
 
-ARG BASE_IMAGE=swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12
+ARG BASE_IMAGE=swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12
 FROM ${BASE_IMAGE} AS ci-builder
 
 USER root
@@ -20,7 +20,7 @@ ARG MINICONDA_SH
 ARG DECORD_SCRIPT
 ARG DECORD_DEPS_DIR=decord_deps
 ARG DECORD_BUILD=true
-ARG CANN_VERSION=9.1.0
+ARG CANN_VERSION=9.2.0
 
 RUN ARCH="$(uname -m)" && \
     . /etc/os-release && \
@@ -28,13 +28,12 @@ RUN ARCH="$(uname -m)" && \
     test "${ARCH}" = "aarch64" && \
     echo "${ID_LOWER}" | grep -q "openeuler"
 
+COPY common/install_dependencies.sh /tmp/install_dependencies.sh
 COPY configure_repo.sh /tmp/configure_repo.sh
 RUN chmod +x /tmp/configure_repo.sh && \
     bash /tmp/configure_repo.sh && \
     rm -f /tmp/configure_repo.sh && \
-    yum install -y git wget curl gawk && \
-    yum clean all && \
-    rm -rf /var/cache/yum
+    bash /tmp/install_dependencies.sh runtime
 
 COPY ${MINICONDA_SH} /tmp/miniconda.sh
 RUN bash /tmp/miniconda.sh -b -p /opt/conda && \
@@ -51,6 +50,9 @@ ENV PATH=/opt/conda/bin:$PATH
 ENV CONDA_AUTO_UPDATE_CONDA=false
 ENV CANN_VERSION=${CANN_VERSION}
 
+# Shared compiler / FFmpeg / Python build dependencies, after Miniconda setup.
+RUN bash /tmp/install_dependencies.sh build
+
 # Build Decord once, retain its source for per-Python bindings, and collect only
 # runtime shared objects for the final stage.
 COPY ${DECORD_SCRIPT} /tmp/install_decord.sh
@@ -66,10 +68,6 @@ RUN test "${DECORD_BUILD}" = "true" && \
 
 # Build every configured Conda environment. Environments with a structured
 # "fla" entry also receive a private CANN installation and an FLA wheel.
-RUN yum install -y patch && \
-    yum clean all && \
-    rm -rf /var/cache/yum
-
 COPY scripts/ci/ /tmp/ci_scripts/
 RUN python /tmp/ci_scripts/build_ci_envs.py && \
     rm -rf /tmp/ci_scripts /root/.cache/pip /opt/conda/pkgs/*
@@ -94,13 +92,12 @@ FROM ${BASE_IMAGE} AS final
 
 USER root
 
+COPY common/install_dependencies.sh /tmp/install_dependencies.sh
 COPY configure_repo.sh /tmp/configure_repo.sh
 RUN chmod +x /tmp/configure_repo.sh && \
     bash /tmp/configure_repo.sh && \
     rm -f /tmp/configure_repo.sh && \
-    yum install -y git iproute wget curl gawk ffmpeg && \
-    yum clean all && \
-    rm -rf /var/cache/yum
+    bash /tmp/install_dependencies.sh runtime
 
 COPY --from=ci-builder /opt/conda/ /opt/conda/
 COPY --from=ci-builder /workspace/cann/ /workspace/cann/
