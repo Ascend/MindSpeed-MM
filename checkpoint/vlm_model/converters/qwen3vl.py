@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import torch
-from transformers import AutoConfig, AutoProcessor
+from transformers import AutoConfig, AutoProcessor, GenerationConfig
 
 from checkpoint.common.converter import Converter
 from checkpoint.common.permissions import set_directory_permissions
@@ -173,9 +173,13 @@ class Qwen3VLConverter(Converter):
         save_path = Path(save_merged_hf_dir)
         config.save_pretrained(save_path)
         processor.save_pretrained(save_path)
+        try:
+            GenerationConfig.from_pretrained(str(base_hf_dir)).save_pretrained(save_path)
+        except (OSError, ValueError):
+            pass
 
         save_hf_weights(
-            save_dir=save_merged_hf_dir,
+            save_path=save_path,
             model_assets_dir=str(base_hf_dir),
             state_dict=merge_state_dict,
             prefix="",
