@@ -310,7 +310,16 @@ def compute_per_layer_grad_norm(model) -> dict:
     # Expert part: reduced like ep_fsdp2_clip_grad_norm (same experts first, then
     # across experts). Sums of squares are additive, so the vectors simply add.
     if ep_param_ids:
-        ep_sq = torch.stack([_local_pth_sum(ep_by_layer.get(g, ()), 2.0) for g in groups])
+        # EP sharding: a layer group whose local shard has no grad at all (e.g.
+        # its experts live on other ranks) must contribute 0.0 instead of being
+        # handed to _local_pth_sum, which requires at least one local grad.
+        _zero = torch.tensor(0.0, device=torch.device(get_device_type()), dtype=torch.float32)
+        ep_sq = torch.stack([
+            _local_pth_sum(ep_by_layer[g], 2.0)
+            if any(p.grad is not None for p in ep_by_layer.get(g, ()))
+            else _zero
+            for g in groups
+        ])
         for _, group in ep_groups:
             if group is not None:
                 dist.all_reduce(ep_sq, op=dist.ReduceOp.SUM, group=group)
