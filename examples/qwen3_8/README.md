@@ -231,6 +231,8 @@ MindSpeed MM保存权重类型支持huggingface格式和dcp格式，在`xxx_conf
 #   |—— release
 #   |—— latest_checkpointed_iteration.txt
 
+# 转换前需设置该环境变量
+export NON_MEGATRON=true
 mm-convert Qwen35Converter dcp_to_hf \
 --save_hf_dir ckpt/save_hf_path/Qwen3.8-xxB-hf-save \
 --dcp_dir ./save_path/iter_000xx \
