@@ -54,7 +54,7 @@ data:
       video_maxlen: 64
 
     basic_parameters:
-      cutoff_len: 1024
+      cutoff_len: 16384
       template: qwen3_vl_nothink
       enable_thinking: false
       train_on_prompt: false
@@ -66,7 +66,7 @@ data:
       overwrite_cache: false
       preprocessing_batch_size: 1000
       preprocessing_num_workers: 16
-      max_samples: 10000
+      max_samples: null
 
   # 数据加载
   dataloader_param:
@@ -80,6 +80,7 @@ data:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
     enable_preload: false
+    infinite_sampler: true
 
 # 模型配置
 model:
@@ -100,17 +101,29 @@ features:
     apply_modules:
       - model.visual.blocks.{*}
       - model.language_model.layers.{*}
-  enable_chunk_loss: false
+    use_reentrant: false
+    op_replay_scopes:
+      - name: layer_attn
+        apply_modules:
+          - model.language_model.layers.{*}.self_attn
+        cache_ops:
+          - npu.npu_fusion_attention.default
+  swap_plan:
+    capacity_mb: 2048
+  enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
-    chunk_size: 1024
+    chunk_size: null
+    impl_type: cce
+    vocab_tile_size: 4096
+  enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
       - model.language_model.layers.{*}
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  micro_batch_size: 4
   gradient_accumulation_steps: 1
   seed: 42
   lr: 1.0e-5
