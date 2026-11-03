@@ -90,5 +90,11 @@ def test_owner_cost_charges_per_call_overhead():
 
 
 @pytest.mark.parametrize("rows,heads", [(4, 0), (4, 8), (6, 4), (0, 2)])
-def test_invalid_head_layout_is_rejected_before_shard_access(rows, heads):
+def test_invalid_head_layout_is_rejected_before_shard_access(monkeypatch, rows, heads):
+    from mindspeed_mm.optimizer.muon import distributed
+
     assert not _row_shards_preserve_heads(rows, heads, 3)
+    monkeypatch.setattr(distributed, "_single_shard_layout", lambda _: (0, 0, None))
+    tensor = torch.empty(rows, 4)
+    with pytest.raises(ValueError):
+        distributed._per_head_dtensor_update(tensor, tensor, {"muon_num_heads": heads})
