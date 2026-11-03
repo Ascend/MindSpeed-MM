@@ -21,7 +21,7 @@ jobs:
   JOB_test_nightly:
     name: test_nightly_mindspeed_mm
     select: selected_by_default
-    runs-on: [ self-hosted, arch=x64, k8s=public ]
+    runs-on: [ self-hosted, arch=x86, k8s=public ]
     outputs:
       testcase-obs-url: ${{ steps.run-nightly-smoke.outputs.testcase-obs-url }}
       env-log-file: ${{ steps.run-nightly-smoke.outputs.env-log-file }}
