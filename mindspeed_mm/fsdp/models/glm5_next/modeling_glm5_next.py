@@ -1910,6 +1910,9 @@ class Glm5NextTextModel(Glm5NextPreTrainedModel):
             position_ids = torch.arange(inputs_embeds.shape[1], device=inputs_embeds.device) + past_seen
             position_ids = position_ids.unsqueeze(0)
 
+        if kwargs.get("cu_seqlens") is not None:
+            kwargs["cu_seqlens"] = kwargs["cu_seqlens"].reshape(-1).to(torch.int64)
+
         if not isinstance(causal_mask_mapping := attention_mask, dict):
             attention_mask = create_recurrent_attention_mask(
                 config=self.config,
