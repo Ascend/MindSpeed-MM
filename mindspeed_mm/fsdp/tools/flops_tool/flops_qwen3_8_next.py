@@ -64,7 +64,7 @@ class Qwen38NextFlopsCounter:
     @staticmethod
     def _get_layer_counts(config):
         num_qsa_layers = sum(
-            layer_type == "full_attention"
+            layer_type == "indexed_attention"
             for layer_type in config.layer_types
         )
         num_gdn_layers = sum(
@@ -493,7 +493,8 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    flopcounter = Qwen38NextFlopsCounter(config=AutoConfig.from_pretrained(args.hf_path))
+    config = AutoConfig.from_pretrained(args.hf_path)
+    flopcounter = Qwen38NextFlopsCounter(config=config)
     flops = flopcounter.estimate_flops(
         batch_seqlens=args.llm_seqlens, images_seqlens=args.vit_seqlens, step_time=args.step_time
     )

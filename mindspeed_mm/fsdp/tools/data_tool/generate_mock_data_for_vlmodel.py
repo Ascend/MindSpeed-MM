@@ -32,7 +32,9 @@ if __name__ == '__main__':
     num_pics = args.num_pics
     text_length = args.text_length
     num_samples = args.num_samples
-    json_path = os.path.join(path_root, f"mock_data_pic_num_{num_pics}_textlen_{text_length}_num_samples_{num_samples}.json")
+    pic_width = args.pic_width
+    pic_height = args.pic_height
+    json_path = os.path.join(path_root, f"mock_data_pic_num_{num_pics}_{pic_width}x{pic_height}_textlen_{text_length}_num_samples_{num_samples}.json")
 
     # Generate a random RGB image
     width, height = args.pic_width, args.pic_height

@@ -84,7 +84,7 @@ cd MindSpeed-MM
 bash scripts/install.sh --msbranch master && pip install transformers==5.2.0
 
 # Qwen3.8-Flash-Next：
-bash scripts/install.sh --msbranch master && pip install transformers==5.19.0
+bash scripts/install.sh --msbranch master && pip install transformers==5.19.0  && pip uninstall torchaudio -y
 ```
 
 以上指令会默认安装v2.10.0版本 torch 以及 torch_npu 库，如需指定版本可参考如下示例：

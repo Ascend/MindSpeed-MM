@@ -20,8 +20,11 @@
 
 import itertools
 import math
+import os
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any, Optional, Union, List
 
 import torch
 import torch.nn.functional as F
@@ -38,7 +41,6 @@ from transformers.integrations import (
     use_kernel_func_from_hub_with_fallback,
     use_kernelized_func,
 )
-from transformers.integrations.accelerate import force_accelerate_hooks
 from transformers.masking_utils import create_causal_mask, create_recurrent_attention_mask
 from transformers.modeling_layers import GradientCheckpointingLayer
 from transformers.modeling_outputs import (
@@ -71,7 +73,6 @@ from transformers.vision_utils import (
     get_vision_interpolation_indices_and_weights,
     get_vision_position_ids,
 )
-from transformers import AutoModel
 from transformers.models.qwen4_exp.configuration_qwen4_exp import (
     Qwen4ExpConfig,
     Qwen4ExpTextConfig,
@@ -82,7 +83,17 @@ from torch.distributed.tensor import DTensor
 
 from mindspeed_mm.fsdp.log import print_rank
 from mindspeed_mm.fsdp.utils.register import model_register
-from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE, get_device_type
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+    all_to_all,
+    gather_forward_split_backward,
+    packed_data_gather_forward_split_backward_with_cp,
+    split_forward_gather_backward,
+    split_forward_gather_backward_with_cp,
+    packed_data_split_forward_gather_backward_with_cp,
+)
+from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
+from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 
 if IS_NPU_AVAILABLE:
     import torch_npu
@@ -94,8 +105,63 @@ IMPL_TRITON = "triton"
 IMPL_TRITON_WITH_TRANSPOSE = "triton_with_transpose"
 IMPL_ASCENDC = "ascendc"
 IMPL_ASCENDC_LEGACY = "ascendc_legacy"
+IMPL_FLASH_ATTENTION_2 = "flash_attention_2"
 IMPL_FOR_CAUSAL_CONV = (IMPL_EAGER, IMPL_TRITON, IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC)
 IMPL_FOR_GDN = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC, IMPL_ASCENDC_LEGACY)
+IMPL_FOR_QSA = (IMPL_EAGER, IMPL_ASCENDC, IMPL_FLASH_ATTENTION_2)
+IMPL_FOR_QSA_INDEXER = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC)
+
+_TOTAL_SEQ_LEN = None
+_VISUAL_SEQ_LEN = None
+_VISUAL_PER_SEQ_LEN = None
+
+def get_seq_len(seq_type: str = None) -> int:
+    if seq_type == "total":
+        global _TOTAL_SEQ_LEN
+        return _TOTAL_SEQ_LEN
+    elif seq_type == "visual":
+        global _VISUAL_SEQ_LEN
+        return _VISUAL_SEQ_LEN
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        return _VISUAL_PER_SEQ_LEN
+    else:
+        raise ValueError(
+            f"Invalid sequence type: '{seq_type}'. Expected 'total' or 'visual'."
+        )
+
+
+def set_seq_len(seq_type: str = None, seq_len: Optional[Union[int, List[int]]] = None) -> None:
+    if seq_type == "total":
+        global _TOTAL_SEQ_LEN
+        _TOTAL_SEQ_LEN = seq_len
+    elif seq_type == "visual":
+        global _VISUAL_SEQ_LEN
+        _VISUAL_SEQ_LEN = seq_len
+    elif seq_type == "per_visual":
+        global _VISUAL_PER_SEQ_LEN
+        _VISUAL_PER_SEQ_LEN = seq_len
+    else:
+        raise ValueError(
+            f"Invalid sequence type: '{seq_type}'. Expected 'total' or 'visual'."
+        )
+
+
+def _validate_cp_topology(ps) -> None:
+    """Reject CP layouts whose masks and recurrent states are not implemented."""
+    if ps.is_ring_enable() or ps.is_kvallgather_enable():
+        raise NotImplementedError(
+            "Qwen4Exp Ulysses CP currently supports only ulysses_parallel_size > 1 "
+            "with ring_attention_size=1 and kvallgather_parallel_size=1"
+        )
+
+
+def _ulysses_local_slice(x: torch.Tensor, ps, total_size: int, dim: int) -> torch.Tensor:
+    """Select this rank's contiguous Ulysses shard from a full sequence tensor."""
+    sizes = cal_split_sizes(total_size, ps.get_ulysses_group_size())
+    rank = ps.get_ulysses_rank()
+    offset = sum(sizes[:rank])
+    return x.narrow(dim, offset, sizes[rank]).contiguous()
 
 
 class Qwen4ExpTextRotaryEmbedding(nn.Module):
@@ -171,6 +237,7 @@ class Qwen4ExpTextRMSNorm(nn.Module):
         self.eps = eps
         self.weight = nn.Parameter(torch.zeros(dim))
         self.group_size = group_size
+        self._norm_ones = None
         if group_size is not None and dim % group_size != 0:
             raise ValueError(f"hidden_size ({dim}) must be divisible by group_size ({group_size}).")
 
@@ -181,13 +248,20 @@ class Qwen4ExpTextRMSNorm(nn.Module):
         return out.flatten(-2) if self.group_size is not None else out
 
     def forward(self, x):
-        if IS_NPU_AVAILABLE:
-            output = torch_npu.npu_rms_norm(x, 1.0 + self.weight, self.eps)[0]
-        else:
+        if not IS_NPU_AVAILABLE:
             output = self._norm(x.float())
-            # Llama does x.to(float16) * w whilst Qwen4ExpText is (x * w).to(float16)
-            # See https://github.com/huggingface/transformers/pull/29402
             output = output * (1.0 + self.weight.float())
+            return output.type_as(x)
+        z = x.float()
+        if self.group_size is not None:
+            z = z.reshape(*z.shape[:-1], -1, self.group_size)
+            if self._norm_ones is None or self._norm_ones.device != z.device:
+                self._norm_ones = torch.ones(self.group_size, dtype=torch.float32, device=z.device)
+            # A [H] gamma normalizes H only; [C,H] would reduce both axes.
+            output = torch_npu.npu_rms_norm(z, self._norm_ones, self.eps)[0]
+            output = output.flatten(-2) * (1.0 + self.weight.float())
+        else:
+            output = torch_npu.npu_rms_norm(z, 1.0 + self.weight.float(), self.eps)[0]
         return output.type_as(x)
 
     def extra_repr(self):
@@ -593,6 +667,35 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
             )
         self.recurrent_gated_delta_rule = torch_recurrent_gated_delta_rule
 
+    def _get_local_conv1d_weight(self, ulysses_rank: int, local_key_dim: int, local_value_dim: int) -> torch.Tensor:
+        """Select depthwise convolution channels after the Ulysses head exchange."""
+        full = self.conv1d.weight
+        if full.shape[0] != self.conv_dim:
+            raise ValueError(
+                f"conv1d weight dim ({full.shape[0]}) must match conv_dim ({self.conv_dim})"
+            )
+        key_offset = ulysses_rank * local_key_dim
+        value_offset = ulysses_rank * local_value_dim
+        q_weight = full[key_offset:key_offset + local_key_dim]
+        k_weight = full[self.key_dim + key_offset:self.key_dim + key_offset + local_key_dim]
+        v_weight = full[2 * self.key_dim + value_offset:2 * self.key_dim + value_offset + local_value_dim]
+        return torch.cat((q_weight, k_weight, v_weight), dim=0)
+
+    def _get_local_conv1d_bias(self, ulysses_rank: int, local_key_dim: int, local_value_dim: int):
+        if self.conv1d.bias is None:
+            return None
+        full = self.conv1d.bias
+        key_offset = ulysses_rank * local_key_dim
+        value_offset = ulysses_rank * local_value_dim
+        return torch.cat(
+            (
+                full[key_offset:key_offset + local_key_dim],
+                full[self.key_dim + key_offset:self.key_dim + key_offset + local_key_dim],
+                full[2 * self.key_dim + value_offset:2 * self.key_dim + value_offset + local_value_dim],
+            ),
+            dim=0,
+        )
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -604,6 +707,10 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
 
         # Set up dimensions for reshapes later
         batch_size, seq_len, _ = hidden_states.shape
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
+        if ps.is_ulysses_enable() and cache_params is not None:
+            raise NotImplementedError("Qwen4Exp GDN Ulysses CP currently supports training prefill only")
         use_precomputed_states = cache_params is not None and cache_params.has_previous_state(
             self.layer_idx, state_idx=0
         )
@@ -615,6 +722,41 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
 
         b = self.in_proj_b(hidden_states)
         a = self.in_proj_a(hidden_states)
+
+        if ps.is_ulysses_enable():
+            ulysses_group = ps.get_ulysses_group()
+            ulysses_size = ps.get_ulysses_group_size()
+            ulysses_rank = ps.get_ulysses_rank()
+            if self.num_k_heads % ulysses_size != 0 or self.num_v_heads % ulysses_size != 0:
+                raise ValueError(
+                    f"Ulysses size ({ulysses_size}) must divide GDN key heads ({self.num_k_heads}) "
+                    f"and value heads ({self.num_v_heads})"
+                )
+            total_seq_len = get_seq_len("total")
+            if total_seq_len is None:
+                raise RuntimeError("set_seq_len('total', ...) must run before Qwen4Exp GDN")
+            local_num_k_heads = self.num_k_heads // ulysses_size
+            local_num_v_heads = self.num_v_heads // ulysses_size
+            local_key_dim = self.head_k_dim * local_num_k_heads
+            local_value_dim = self.head_v_dim * local_num_v_heads
+            conv_weight = self._get_local_conv1d_weight(ulysses_rank, local_key_dim, local_value_dim)
+            conv_bias = self._get_local_conv1d_bias(ulysses_rank, local_key_dim, local_value_dim)
+            q_proj, k_proj, v_proj = torch.split(
+                mixed_qkv, [self.key_dim, self.key_dim, self.value_dim], dim=-1
+            )
+            q_proj = all_to_all(q_proj, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            k_proj = all_to_all(k_proj, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            v_proj = all_to_all(v_proj, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            b = all_to_all(b, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            a = all_to_all(a, ulysses_group, scatter_dim=2, gather_dim=1, gather_size=total_seq_len)
+            mixed_qkv = torch.cat((q_proj, k_proj, v_proj), dim=-1)
+        else:
+            local_num_k_heads = self.num_k_heads
+            local_num_v_heads = self.num_v_heads
+            local_key_dim = self.key_dim
+            local_value_dim = self.value_dim
+            conv_weight = self.conv1d.weight
+            conv_bias = self.conv1d.bias
 
         cu_seqlens = None
         if kwargs.get("cu_seq_lens_q") is not None:
@@ -642,26 +784,26 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
             if self.causal_conv1d_implementation == IMPL_TRITON:
                 mixed_qkv, _ = self.causal_conv1d_fn(
                     x=mixed_qkv,
-                    weight=self.conv1d.weight.squeeze(1).transpose(-1, -2).contiguous(),
-                    bias=self.conv1d.bias,
+                    weight=conv_weight.squeeze(1).transpose(-1, -2).contiguous(),
+                    bias=conv_bias,
                     activation=self.activation,
                     cu_seqlens=cu_seqlens,
                 )
             elif self.causal_conv1d_implementation == IMPL_TRITON_WITH_TRANSPOSE:
                 mixed_qkv, _ = self.causal_conv1d_fn(
                     x=mixed_qkv,
-                    weight=self.conv1d.weight.squeeze(1),
-                    H=2 * self.num_k_heads + self.num_v_heads,
-                    bias=self.conv1d.bias,
+                    weight=conv_weight.squeeze(1),
+                    H=2 * local_num_k_heads + local_num_v_heads,
+                    bias=conv_bias,
                     activation=self.activation,
                     cu_seqlens=cu_seqlens,
                 )
             elif self.causal_conv1d_implementation == IMPL_ASCENDC:
                 mixed_qkv = self.causal_conv1d_fn(
                     x=mixed_qkv,
-                    weight=self.conv1d.weight.squeeze(1),
-                    H=2 * self.num_k_heads + self.num_v_heads,
-                    bias=self.conv1d.bias,
+                    weight=conv_weight.squeeze(1),
+                    H=2 * local_num_k_heads + local_num_v_heads,
+                    bias=conv_bias,
                     activation=self.activation,
                     cu_seqlens=cu_seqlens,
                 )[0]
@@ -669,8 +811,8 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
                 mixed_qkv = mixed_qkv.transpose(1, 2)
                 mixed_qkv = causal_conv1d_fn(
                     mixed_qkv,
-                    self.conv1d.weight.squeeze(1),
-                    self.conv1d.bias,
+                    conv_weight.squeeze(1),
+                    conv_bias,
                     activation=self.activation,
                 ).transpose(1, 2)
             if cache_params is not None:
@@ -680,16 +822,16 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
             # NPU kernels return a [b, H, s*d] layout, split per head
             query, key, value = torch.split(
                 mixed_qkv,
-                [self.num_k_heads, self.num_k_heads, self.num_v_heads],
+                [local_num_k_heads, local_num_k_heads, local_num_v_heads],
                 dim=1,
             )
         else:
             query, key, value = torch.split(
                 mixed_qkv,
                 [
-                    self.key_dim,
-                    self.key_dim,
-                    self.value_dim,
+                    local_key_dim,
+                    local_key_dim,
+                    local_value_dim,
                 ],
                 dim=-1,
             )
@@ -700,8 +842,17 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
 
         beta = b.sigmoid()
         # If the model is loaded in fp16, without the .float() here, A might be -inf
-        g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
-        if self.num_v_heads // self.num_k_heads > 1:
+        if ps.is_ulysses_enable():
+            value_head_offset = ulysses_rank * local_num_v_heads
+            value_head_slice = slice(value_head_offset, value_head_offset + local_num_v_heads)
+            g = -self.A_log[value_head_slice].float().exp() * F.softplus(a.float() + self.dt_bias[value_head_slice])
+        else:
+            g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
+        # The AscendC chunk kernel accepts grouped Q/K heads directly.
+        use_grouped_qk = self.gdn_implementation == IMPL_ASCENDC and not (
+            use_precomputed_states and seq_len == 1
+        )
+        if self.num_v_heads // self.num_k_heads > 1 and not use_grouped_qk:
             if self.causal_conv1d_implementation in (IMPL_TRITON_WITH_TRANSPOSE, IMPL_ASCENDC):
                 query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
                 key = key.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=1)
@@ -749,6 +900,14 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
         # Update cache
         if cache_params is not None:
             cache_params.update_recurrent_state(last_recurrent_state, self.layer_idx)
+
+        if ps.is_ulysses_enable():
+            core_attn_out = all_to_all(
+                core_attn_out,
+                ps.get_ulysses_group(),
+                scatter_dim=1,
+                gather_dim=2,
+            )
 
         # reshape input data into 2D tensor
         core_attn_out = core_attn_out.reshape(-1, self.head_v_dim)
@@ -831,6 +990,7 @@ class Qwen4ExpTextQSAIndexer(nn.Module):
         )
         self.q_layernorm = Qwen4ExpTextRMSNorm(self.index_head_dim, eps=config.rms_norm_eps)
         self.k_layernorm = Qwen4ExpTextRMSNorm(self.index_head_dim, eps=config.rms_norm_eps)
+        self.qsa_indexer_implementation = getattr(config, "qsa_indexer_implementation", IMPL_EAGER)
 
     def forward(
         self,
@@ -838,7 +998,16 @@ class Qwen4ExpTextQSAIndexer(nn.Module):
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
         attention_mask: torch.Tensor,
         past_key_values: Cache | None,
+        return_block_ids: bool = False,
     ) -> torch.Tensor:
+
+        if self.qsa_indexer_implementation == IMPL_ASCENDC:
+            from mindspeed_mm.fsdp.ops.qsa.ascendc.qsa_indexer import qwen4_exp_qsa_indexer_forward_lightning
+            return qwen4_exp_qsa_indexer_forward_lightning(
+                self, hidden_states, position_embeddings, attention_mask, past_key_values,
+                return_block_ids=return_block_ids,
+            )
+
         batch_size, seq_length, _ = hidden_states.shape
         hidden_shape = (batch_size, seq_length, -1, self.index_head_dim)
         # The cos/sin here are the full positions for the keys, so we need to slice to get only the current positions for the queries
@@ -861,9 +1030,11 @@ class Qwen4ExpTextQSAIndexer(nn.Module):
         # Note that the mask is never None here as we only allow eager and sdpa, and we do not allow sdpa's mask skip
         # It's always 4D with either bool (sdpa) or float (eager) and already gives us the valid indices
         visible_token_indices = attention_mask if attention_mask.dtype == torch.bool else attention_mask == 0
+        if return_block_ids:
+            visible_token_indices = visible_token_indices.expand(batch_size, -1, -1, -1)
 
         selected_token_indices = torch.full(
-            (batch_size, seq_length, self.token_budget + self.compress_ratio - 1),
+            (batch_size, seq_length, self.block_topk + 1 if return_block_ids else self.token_budget + self.compress_ratio - 1),
             -1,
             dtype=torch.int32,
             device=hidden_states.device,
@@ -898,12 +1069,23 @@ class Qwen4ExpTextQSAIndexer(nn.Module):
 
                     selected_block_indices = scores.topk(min(self.block_topk, num_complete_blocks), dim=0).indices
                     # Remap the indices of the blocks to the indices of individual tokens
-                    selected_tokens = block_token_indices.index_select(0, selected_block_indices).flatten()
+                    if not return_block_ids:
+                        selected_tokens = block_token_indices.index_select(0, selected_block_indices).flatten()
                 else:
                     selected_tokens = torch.tensor([], device=hidden_states.device)
+                    selected_block_indices = torch.empty(0, dtype=torch.long, device=hidden_states.device)
                 tail = local_visible_indices[num_complete_blocks * self.compress_ratio :]
+                if return_block_ids:
+                    blocks = selected_block_indices.to(torch.int32)
+                    if tail.numel():
+                        blocks = torch.cat((blocks, blocks.new_tensor([num_complete_blocks])))
+                    selected_token_indices[batch_idx, query_idx, :blocks.numel()] = blocks
+                    continue
                 selected_tokens = torch.cat([selected_tokens, tail]).to(torch.int32)
                 selected_token_indices[batch_idx, query_idx, : selected_tokens.numel()] = selected_tokens
+
+        if return_block_ids:
+            return selected_token_indices
 
         # Create the additive mask to be added to the main causal mask
         kv_length = attention_mask.shape[-1]
@@ -959,6 +1141,56 @@ def eager_attention_forward(
     return attn_output, attn_weights
 
 
+def qsa_flash_attention_forward(
+    module, query, key, value, attention_mask, dropout=0.0, scaling=None, **kwargs,
+):
+    """BNSD -> BSND using CANN FA/FA-grad with an uncompressed QSA mask.
+
+    Unlike the shared FlashAttention wrapper, this path never substitutes a
+    causal template for the per-sample QSA mask. Boolean input means allowed;
+    additive input uses zero for allowed and nonzero for masked positions.
+    """
+    if query.device.type != "npu":
+        raise NotImplementedError("QSA flash_attention_2 currently requires NPU")
+
+    ps = get_parallel_state()
+    _validate_cp_topology(ps)
+
+    if attention_mask is None or attention_mask.ndim != 4:
+        raise ValueError("QSA flash_attention_2 requires the full [B,1,Sq,Skv] attention mask")
+    b, h, sq, _ = query.shape
+    if key.shape[1] != h:
+        if h % key.shape[1] != 0:
+            raise ValueError(
+                f"QSA key/value heads ({key.shape[1]}) must divide query heads ({h})"
+            )
+        repeats = h // key.shape[1]
+        key = key.repeat_interleave(repeats, dim=1)
+        value = value.repeat_interleave(repeats, dim=1)
+    if (attention_mask.shape[0] not in (1, b) or attention_mask.shape[1] not in (1, h)
+            or attention_mask.shape[2:] != (sq, key.shape[2])):
+        raise ValueError("QSA attention mask must match Q/K sequence lengths and batch/heads")
+
+    # CANN uses True for masked positions, the inverse of the QSA boolean mask.
+    blocked = ~attention_mask if attention_mask.dtype == torch.bool else attention_mask != 0
+    blocked = blocked.contiguous()
+    query, key, value = (x.contiguous() for x in (query, key, value))
+    skip_recompute = module.training and getattr(module.config, "skip_flash_attn_recompute", False)
+    if skip_recompute and dropout:
+        raise NotImplementedError("QSA skip_flash_attn_recompute requires attention_dropout=0")
+    # inner_precise=2 handles fully masked query rows introduced by padding.
+    op_kwargs = dict(
+        atten_mask=blocked, scale=scaling if scaling is not None else query.shape[-1] ** -0.5,
+        keep_prob=1.0 - dropout, sparse_mode=0, inner_precise=2,
+    )
+    if skip_recompute:
+        from mindspeed_mm.fsdp.ops.flash_attn.skip_recompute_flash_attn import skip_recompute_flash_attention
+        output = skip_recompute_flash_attention(query, key, value, h, "BNSD", **op_kwargs)
+    else:
+        output = torch_npu.npu_fusion_attention(query, key, value, h, "BNSD", **op_kwargs)[0]
+    return output.transpose(1, 2).contiguous(), None
+
+
 class Qwen4ExpTextAttention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
@@ -986,6 +1218,11 @@ class Qwen4ExpTextAttention(nn.Module):
         self.q_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.k_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.indexer = Qwen4ExpTextQSAIndexer(config, layer_idx)
+        self.qsa_implementation = getattr(config, "qsa_implementation", IMPL_EAGER)
+        if self.qsa_implementation not in IMPL_FOR_QSA:
+            raise ValueError(
+                f"Invalid qsa_implementation='{self.qsa_implementation}'; expected {IMPL_FOR_QSA}"
+            )
 
     def forward(
         self,
@@ -995,15 +1232,47 @@ class Qwen4ExpTextAttention(nn.Module):
         past_key_values: Cache | None = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
-        selected_token_mask = self.indexer(hidden_states, position_embeddings, attention_mask, past_key_values)
-        # Combine both masks (they are never None, and are always 4D with either bool for sdpa, or float for eager)
-        if attention_mask.is_floating_point():
-            attention_mask = attention_mask + selected_token_mask
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
+        if ps.is_ulysses_enable() and self.qsa_implementation not in (IMPL_FLASH_ATTENTION_2, IMPL_ASCENDC):
+            raise NotImplementedError(
+                "Qwen4Exp Ulysses CP requires qsa_implementation='flash_attention_2' or 'ascendc'"
+            )
+        if ps.is_ulysses_enable() and past_key_values is not None:
+            raise NotImplementedError("Qwen4Exp QSA Ulysses CP currently supports training prefill only")
+
+        use_generic_sparse = self.qsa_implementation == IMPL_ASCENDC
+        local_seq_len = hidden_states.shape[1]
+        total_seq_len = get_seq_len("total") if ps.is_ulysses_enable() else local_seq_len
+        if ps.is_ulysses_enable():
+            if total_seq_len is None:
+                raise RuntimeError("set_seq_len('total', ...) must run before Qwen4Exp QSA")
+            gather_sizes = cal_split_sizes(total_seq_len, ps.get_ulysses_group_size())
+            full_hidden_states = gather_forward_split_backward(
+                hidden_states,
+                ps.get_ulysses_group(),
+                dim=1,
+                gather_sizes=gather_sizes,
+            )
         else:
+            full_hidden_states = hidden_states
+        if use_generic_sparse:
+            if past_key_values is not None:
+                raise NotImplementedError("AscendC QSA currently supports prefill without KV cache only")
+            from mindspeed_mm.fsdp.ops.qsa.ascendc.generic_sparse_attention import generic_sparse_attention
+            selected_blocks = self.indexer(
+                full_hidden_states, position_embeddings, attention_mask, past_key_values, return_block_ids=True
+            )
+        else:
+            selected_token_mask = self.indexer(
+                full_hidden_states, position_embeddings, attention_mask, past_key_values
+            )
+        # Combine the causal/padding mask with the indexer's selected tokens.
+        if not use_generic_sparse and attention_mask.is_floating_point():
+            attention_mask = attention_mask + selected_token_mask
+        elif not use_generic_sparse:
             attention_mask = attention_mask & selected_token_mask
 
-        # The cos/sin are the full positions here due to the indexer, so we need to slice to get current positions
-        position_embeddings = (x[:, -hidden_states.shape[1] :, :] for x in position_embeddings)
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self.head_dim)
 
@@ -1016,30 +1285,122 @@ class Qwen4ExpTextAttention(nn.Module):
         key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
         value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
 
-        cos, sin = position_embeddings
+        # When Ulysses is wider than the native KV head count, repeat GQA heads
+        # before A2A so every rank receives the same number of KV heads.  For the
+        # usual U <= num_key_value_heads case, AscendC retains native GQA while
+        # qsa_flash_attention_forward repeats the post-A2A KV heads instead.
+        if ps.is_ulysses_enable():
+            ulysses_size = ps.get_ulysses_group_size()
+            if self.config.num_attention_heads % ulysses_size != 0:
+                raise ValueError(
+                    f"QSA query heads ({self.config.num_attention_heads}) must be divisible by "
+                    f"ulysses size ({ulysses_size})"
+                )
+            if ulysses_size > self.config.num_key_value_heads:
+                key_states = repeat_kv(key_states, self.num_key_value_groups)
+                value_states = repeat_kv(value_states, self.num_key_value_groups)
+            elif self.config.num_key_value_heads % ulysses_size != 0:
+                raise ValueError(
+                    f"QSA KV heads ({self.config.num_key_value_heads}) must be divisible by "
+                    f"ulysses size ({ulysses_size}) when Ulysses does not pre-repeat GQA heads"
+                )
+
+        if ps.is_ulysses_enable():
+            local_position_embeddings = tuple(
+                _ulysses_local_slice(x, ps, total_seq_len, dim=1) for x in position_embeddings
+            )
+        else:
+            # The indexer uses all cached positions, while Q/K only contain
+            # the tokens in the current call during non-CP decoding.
+            local_position_embeddings = tuple(x[:, -local_seq_len:, :] for x in position_embeddings)
+        cos, sin = local_position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
-        if past_key_values is not None:
-            key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx)
+        if ps.is_ulysses_enable():
+            ulysses_group = ps.get_ulysses_group()
+            query_states = all_to_all(
+                query_states,
+                ulysses_group,
+                scatter_dim=1,
+                gather_dim=2,
+                gather_size=total_seq_len,
+            )
+            key_states = all_to_all(
+                key_states,
+                ulysses_group,
+                scatter_dim=1,
+                gather_dim=2,
+                gather_size=total_seq_len,
+            )
+            value_states = all_to_all(
+                value_states,
+                ulysses_group,
+                scatter_dim=1,
+                gather_dim=2,
+                gather_size=total_seq_len,
+            )
+            gate = all_to_all(
+                gate,
+                ulysses_group,
+                scatter_dim=2,
+                gather_dim=1,
+                gather_size=total_seq_len,
+            )
 
-        attention_interface: Callable = ALL_ATTENTION_FUNCTIONS.get_interface(
-            self.config._attn_implementation, eager_attention_forward
-        )
+        if use_generic_sparse:
+            attn_output = generic_sparse_attention(
+                query_states, key_states, value_states, selected_blocks,
+                block_size=self.indexer.compress_ratio, scale=self.scaling,
+                dropout=self.attention_dropout if self.training else 0.0,
+            )
+            # AscendC returns [B, S_group, Hq_local * D]. Keep the full
+            # sequence until the common gate and reverse Ulysses exchange.
+            attn_weights = None
+        else:
+            if past_key_values is not None:
+                key_states, value_states = past_key_values.update(key_states, value_states, self.layer_idx)
 
-        attn_output, attn_weights = attention_interface(
-            self,
-            query_states,
-            key_states,
-            value_states,
-            attention_mask,
-            dropout=0.0 if not self.training else self.attention_dropout,
-            scaling=self.scaling,
-            **kwargs,
-        )
+            # Select QSA independently of the vision/global attention backend.
+            if self.qsa_implementation == IMPL_FLASH_ATTENTION_2:
+                attention_interface = qsa_flash_attention_forward
+            else:
+                attention_interface = eager_attention_forward
+                if attention_mask.dtype == torch.bool:
+                    attention_mask = torch.where(attention_mask, 0.0, torch.finfo(query_states.dtype).min).to(
+                        query_states.dtype
+                    )
+
+            attn_output, attn_weights = attention_interface(
+                self,
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                dropout=0.0 if not self.training else self.attention_dropout,
+                scaling=self.scaling,
+                **kwargs,
+            )
+
+        # After Ulysses A2A both tensors are full-sequence/local-head. Apply the
+        # per-head gate before the reverse exchange, while their sequence/head
+        # layouts still match.
+        if ps.is_ulysses_enable():
+            attn_output = attn_output.reshape(attn_output.shape[0], attn_output.shape[1], -1)
+            attn_output = attn_output * torch.sigmoid(gate)
+            attn_output = attn_output.view(
+                attn_output.shape[0], attn_output.shape[1], -1, self.head_dim
+            )
+            attn_output = all_to_all(
+                attn_output,
+                ps.get_ulysses_group(),
+                scatter_dim=1,
+                gather_dim=2,
+            )
+        else:
+            attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+            attn_output = attn_output * torch.sigmoid(gate)
 
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
-        attn_output = attn_output * torch.sigmoid(gate)
-
         attn_output = self.o_proj(attn_output)
         return attn_output, attn_weights
 
@@ -1076,27 +1437,31 @@ class Qwen4ExpTextExperts(nn.Module):
         if self.use_grouped_expert_matmul and IS_NPU_AVAILABLE:
             print_rank(logger.info, "Qwen4ExpTextExperts use NPU fused ops")
 
-        # EP load balancing (hot-expert duplication), mirroring Qwen3_5MoeExperts. The planner
+        # EP load balancing (hot-expert duplication), the planner
         # is weight-layout agnostic (it works on expert IDs), so it is safe to build here even
         # though ep_forward feeds the dispatcher transposed [E, in, out] views of the stored
         # [E, out, in] weights.
-        from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
-
-        parallel_state = get_parallel_state()
-        self.enable_ep_balance = getattr(config, "enable_ep_balance", False) and parallel_state.is_ep_enable()
+        ps = get_parallel_state()
+        self.enable_ep_balance = getattr(config, "enable_ep_balance", False) and ps.is_ep_enable()
         if self.enable_ep_balance:
             from mindspeed_mm.fsdp.distributed.expert_parallel.ep_balance.ep_balance_strategy import EPBalanceStrategy
-
             self.ep_balance_strategy = EPBalanceStrategy(
-                ep_group=parallel_state.get_ep_group(),
-                num_experts=self.num_experts,
-                max_dup_experts_num=getattr(config, "max_dup_experts_num", 2),
+                ep_group = ps.get_ep_group(),
+                num_experts = self.num_experts,
+                max_dup_experts_num = getattr(config, "max_dup_experts_num", 2),
             )
-
             def hook_fn(*args, **kwargs):
                 self.ep_balance_strategy.planner.pop_plan_cache()
-
             self.register_full_backward_hook(hook_fn)
+        self.skip_moe_pad_tokens = config.skip_moe_pad_tokens
+
+    def extra_repr(self) -> str:
+        return (
+            f"(gate_up_proj): Parameter(num_experts={self.num_experts}, "
+            f"hidden_dim={self.hidden_dim}, intermediate_dim={2 * self.intermediate_dim})\n"
+            f"(down_proj): Parameter(num_experts={self.num_experts}, "
+            f"intermediate_dim={self.intermediate_dim}, hidden_dim={self.hidden_dim})"
+        )
 
     def forward(
         self,
@@ -1152,16 +1517,15 @@ class Qwen4ExpTextExperts(nn.Module):
         ep_plan,
         **kwargs,
     ) -> torch.Tensor:
-        """Expert-parallel entry injected by ``expert_parallelize_modules`` (mirrors
-        ``Qwen3_5MoeExperts.ep_forward``): tokens are dispatched to the expert owners by the plan's
-        dispatcher instead of the expert weights being gathered.
+        """Expert-parallel entry injected by ``expert_parallelize_modules``: tokens are dispatched to
+        the expert owners by the plan's dispatcher instead of the expert weights being gathered.
 
         Layout note: this module stores weights nn.Linear-style ``[E, out, in]`` while the EP
-        dispatchers (``ep_dispatcher.ep_forward`` -> grouped matmul) expect ``[E, in, out]``
+        dispatchers expect ``[E, in, out]``
         ``fc1_weight``/``fc2_weight``; pass transposed views so produced grads flow back onto the
         stored layout. ``expert_parallel_size`` for this model must divide ``num_experts`` (checked
         in ``dispatch_preprocess``). EP load balancing (``enable_ep_balance``, YAML
-        ``features.enable_ep_balance``) is wired here via ``EPBalanceStrategy``; the gradient
+        ``features.enable_ep_balance``) is supported with ``alltoall`` via ``EPBalanceStrategy``; the gradient
         accumulation hooks must be registered on the SAME transposed views handed to the
         dispatcher, because their ``add_dup_experts_grad`` reshape assumes the dispatcher-side
         ``[E, in, out]`` layout.
@@ -1171,29 +1535,51 @@ class Qwen4ExpTextExperts(nn.Module):
         fc1_weight = gate_up_proj.transpose(1, 2)
         fc2_weight = down_proj.transpose(1, 2)
 
-        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import ep_forward
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import (
+            ep_allgather_forward,
+            ep_forward,
+            ep_mc2_forward,
+        )
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_chunkmoe import ep_chunkmoe_forward
 
-        if ep_plan.dispatcher != "alltoall":
+        ep_dispatcher_dict = {
+            "alltoall": ep_forward,
+            "mc2": ep_mc2_forward,
+            "allgather": ep_allgather_forward,
+            "chunkmoe": ep_chunkmoe_forward,
+        }
+        if ep_plan.dispatcher not in ep_dispatcher_dict:
             raise NotImplementedError(
-                f"ep_plan.dispatcher='{ep_plan.dispatcher}' is not supported by Qwen4ExpTextExperts; use 'alltoall'."
+                f"ep_plan.dispatcher='{ep_plan.dispatcher}' is not supported by Qwen4ExpTextExperts."
             )
 
         if self.enable_ep_balance:
+            if ep_plan.dispatcher != "alltoall":
+                raise NotImplementedError("EP load balancing strategy currently only supports alltoall dispatch.")
             self.ep_balance_strategy.executor.register_backward_dup_experts_grad_acc_hook(fc1_weight, name="fc1")
             self.ep_balance_strategy.executor.register_backward_dup_experts_grad_acc_hook(fc2_weight, name="fc2")
 
-        hidden_states = ep_forward(
-            self.num_experts,
-            top_k_weights,
-            top_k_index,
-            hidden_states,
+        if ep_plan.dispatcher == "chunkmoe" and self.skip_moe_pad_tokens:
+            raise NotImplementedError("chunkmoe dispatch does not support skip_moe_pad_tokens yet.")
+
+        dispatcher_kwargs = dict(
             fc1_weight=fc1_weight,
             fc2_weight=fc2_weight,
             ep_group=ep_group,
             fused=ep_plan.use_npu_fused_ops,
             ep_balance_strategy=self.ep_balance_strategy if self.enable_ep_balance else None,
             seq_mask=kwargs.get("seq_mask", None),
-            skip_moe_pad_tokens=False,
+            skip_moe_pad_tokens=self.skip_moe_pad_tokens,
+        )
+        if ep_plan.dispatcher == "chunkmoe":
+            dispatcher_kwargs["ep_plan"] = ep_plan
+
+        hidden_states = ep_dispatcher_dict[ep_plan.dispatcher](
+            self.num_experts,
+            top_k_weights,
+            top_k_index,
+            hidden_states,
+            **dispatcher_kwargs,
         )
         return hidden_states
 
@@ -1244,6 +1630,9 @@ class Qwen4ExpTextSparseMoeBlock(nn.Module):
 class Qwen4ExpTextGatedResidual(nn.Module):
     def __init__(self, config: Qwen4ExpTextConfig, use_combine: bool = True):
         super().__init__()
+        self.qhc_implementation = getattr(config, "qhc_implementation", IMPL_EAGER)
+        if self.qhc_implementation not in (IMPL_EAGER, IMPL_ASCENDC):
+            raise ValueError("qhc_implementation must be 'eager' or 'ascendc'.")
         self.hc_count = config.hc_count
         self.hidden_size = config.hidden_size
         hc_hidden_size = self.hc_count * self.hidden_size
@@ -1259,6 +1648,24 @@ class Qwen4ExpTextGatedResidual(nn.Module):
             raise ValueError(
                 f"Expected {self.hc_count * self.hidden_size} hyper-connection features, got {hyper_input.shape[-1]}."
             )
+        if self.qhc_implementation == IMPL_ASCENDC:
+            from mindspeed_mm.fsdp.ops.hc.text_gated_residual_ascendc import text_gated_residual_autograd
+
+            output = text_gated_residual_autograd(
+                hyper_input,
+                self.input_mix_weight_down.weight,
+                self.input_mix_weight_up.weight,
+                w_gate=self.block_inject_weight.weight if self.block_inject_weight is not None else None,
+                # The kernel applies 1 + gamma internally and requires FP32 gamma.
+                gamma=self.hc_norm.weight.float(),
+                channels=self.hc_count,
+                eps=self.hc_norm.eps,
+            )
+            if self.block_inject_weight is None:
+                return output
+            mixed_input, injection_weights = output
+            return mixed_input, hyper_input, injection_weights
+
         hyper_input_normed = self.hc_norm(hyper_input)
         input_mix_weight = F.silu(self.input_mix_weight_down(hyper_input_normed) / self.hc_count)
         input_mix_weight = torch.sigmoid(self.input_mix_weight_up(input_mix_weight))
@@ -1328,7 +1735,13 @@ class Qwen4ExpTextNGramEmbedding(nn.Module):
         self.ngram_heads = (self.ngram_size - 1) * self.heads_per_ngram
         self.ple_layer_index = ple_layer_index
         self.unigram_vocab_size = config.vocab_size
-        self.ngram_vocab_size_base = config.ngram_vocab_size_base
+        ngram_vocab_size_base_override = os.environ.get("NGRAM_VOCAB_SIZE_BASE", "").strip()
+        if ngram_vocab_size_base_override:
+            self.ngram_vocab_size_base = int(ngram_vocab_size_base_override)
+            if self.ngram_vocab_size_base <= 0:
+                raise ValueError("NGRAM_VOCAB_SIZE_BASE must be a positive integer.")
+        else:
+            self.ngram_vocab_size_base = config.ngram_vocab_size_base
         head_dim_per_ngram = embedding_dim // self.ngram_heads
         self.seed = config.seed
         # CODEPATH: @ArthurZucker fix flagging for no reason here
@@ -1369,7 +1782,9 @@ class Qwen4ExpTextNGramEmbedding(nn.Module):
         valid = (position_in_segment >= shift) & (source_positions.unsqueeze(0) >= 0)
         return torch.where(valid, shifted, token_ids.new_full((), self.eos_token_id))
 
-    def forward(self, input_ids: torch.Tensor, past_key_values: Cache | None) -> torch.Tensor:
+    def _compute_ngram_ids(self, input_ids: torch.Tensor, past_key_values: Cache | None) -> torch.Tensor:
+        """compute ngram ids [batch, seq_len, ngram_heads] from input_ids [batch, seq_len] and past_key_values
+        """
         input_ids = input_ids.long()
         # This is a trick to store the previous N=self.context_len `input_ids` - indeed the manipulations are identical to storing
         # a past conv_state, so we can use an additional conv_states inside the Cache for it
@@ -1413,12 +1828,80 @@ class Qwen4ExpTextNGramEmbedding(nn.Module):
             blocks.append(ngram_ids + head_offsets.view(1, 1, -1))
 
         ngram_ids = torch.cat(blocks, dim=-1)[:, -input_ids.shape[1] :]
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
+        if ps.is_ulysses_enable():
+            if past_key_values is not None:
+                raise NotImplementedError("Qwen4Exp PLE Ulysses CP currently supports training prefill only")
+            # Hash the full token history first: local input_ids would replace
+            # the previous rank's context with EOS at every shard boundary.
+            ngram_ids = _ulysses_local_slice(ngram_ids, ps, input_ids.shape[1], dim=1)
+        return ngram_ids
+
+    def forward(self, input_ids: torch.Tensor, past_key_values: Cache | None) -> torch.Tensor:
+        ngram_ids = self._compute_ngram_ids(input_ids, past_key_values)
         # We need explicit device placement here, as the embedding may be skipped from device_map completely (we just need to be
         # careful in the case of offloading to disk)
         execution_device = (
             self.ngram_embedding.weight.device if self.ngram_embedding.weight.device.type != "meta" else None
         )
         return self.ngram_embedding(ngram_ids.to(execution_device)).to(ngram_ids.device).flatten(-2)
+
+    def vp_forward(
+        self,
+        input_ids: torch.Tensor,
+        past_key_values: Cache | None,
+        vocab_group=None,
+        vocab_plan=None,
+    ) -> torch.Tensor:
+        """Vocab-parallel lookup injected by `vocab_parallelize_modules` (see `vocab_plan`).
+
+        The model either leaves this as the module's ``forward``, or calls the same function ahead of
+        the consuming layer (see VocabPlanConfig.prefetch). Because only `input_ids` decides which
+        rows are needed, the earlier call lets recomputation reuse its result instead of looking the
+        rows up again.
+        """
+        return self.vp_resolve(self.vp_prepare(input_ids, past_key_values, vocab_group, vocab_plan))
+
+    def vp_prepare(self, input_ids: torch.Tensor, past_key_values: Cache | None, vocab_group=None,
+                   vocab_plan=None):
+        """Ids plus the first half of the lookup: route them, fetch the rows, start the copy.
+
+        Called ahead of the decoder layers, so the host-to-device copy can run under the layers in
+        between; the layer finishes it through :meth:`vp_finish` (see VocabPlanConfig.prefetch_split).
+        """
+        from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_dispatcher import get_vocab_split_dispatcher
+
+        if vocab_plan is None:
+            raise RuntimeError("vp_prepare requires vocab_plan; it is injected by vocab_parallelize_modules.")
+        ngram_ids = self._compute_ngram_ids(input_ids, past_key_values)
+        prepare, _ = get_vocab_split_dispatcher(vocab_plan.dispatcher)
+        return prepare(self.ngram_embedding, ngram_ids, vocab_group, vocab_plan)
+
+    def vp_finish(self, pending) -> torch.Tensor:
+        """Second half of a split lookup: cast, embedding all-to-all, unpermute, flatten."""
+        from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_dispatcher import get_vocab_split_dispatcher
+
+        _, finish = get_vocab_split_dispatcher(pending.dispatcher)
+        return finish(self.ngram_embedding, pending).flatten(-2)
+
+    def vp_resolve(self, prefetched):
+        """Complete a prefetched lookup: a ready tensor when it was not split, or the pending one."""
+        from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_dispatcher import PendingLookup
+
+        if isinstance(prefetched, PendingLookup):
+            # Hold the record (and the rows it carries) past the forward: the recomputation pass reads
+            # it again from inside the backward, while the model's own dictionary is gone by then.
+            self._vp_pending = prefetched
+            return self.vp_finish(prefetched)
+        return prefetched
+
+    @staticmethod
+    def vp_batch_size(prefetched) -> int:
+        """Batch size a prefetched lookup was computed for (both shapes carry it)."""
+        from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_dispatcher import PendingLookup
+
+        return prefetched.batch_size if isinstance(prefetched, PendingLookup) else prefetched.shape[0]
 
 
 class Qwen4ExpTextPLELayer(nn.Module):
@@ -1455,6 +1938,17 @@ class Qwen4ExpTextPLELayer(nn.Module):
         )
 
     def _short_conv(self, hidden_states: torch.Tensor, past_key_values: Cache | None) -> torch.Tensor:
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
+        if ps.is_ulysses_enable():
+            if past_key_values is not None:
+                raise NotImplementedError("Qwen4Exp PLE Ulysses CP currently supports training prefill only")
+            # Exchange channels for complete sequences so the dilated causal
+            # convolution retains its left context across sequence shards.
+            hidden_states = all_to_all(
+                hidden_states, ps.get_ulysses_group(), scatter_dim=2, gather_dim=1,
+                gather_size=get_seq_len("total"),
+            )
         seq_len = hidden_states.shape[1]
         hidden_states = hidden_states.transpose(1, 2)
 
@@ -1468,9 +1962,20 @@ class Qwen4ExpTextPLELayer(nn.Module):
         hidden_states = hidden_states[..., -(self.short_conv_state_len + seq_len) :]
 
         # We cannot use the usual functions/kernels here for the short conv as the conv1d has dilation
-        hidden_states = F.silu(self.conv1d(hidden_states))
+        if ps.is_ulysses_enable():
+            weight = _ulysses_local_slice(self.conv1d.weight, ps, self.conv1d.out_channels, dim=0)
+            hidden_states = F.silu(F.conv1d(
+                hidden_states, weight, dilation=self.conv1d.dilation, groups=weight.shape[0],
+            ))
+        else:
+            hidden_states = F.silu(self.conv1d(hidden_states))
 
         hidden_states = hidden_states.transpose(1, 2)
+        if ps.is_ulysses_enable():
+            hidden_states = all_to_all(
+                hidden_states, ps.get_ulysses_group(), scatter_dim=1, gather_dim=2,
+                gather_size=self.conv1d.out_channels,
+            )
         return hidden_states
 
     def forward(
@@ -1479,8 +1984,29 @@ class Qwen4ExpTextPLELayer(nn.Module):
         input_ids: torch.Tensor,
         past_key_values: Cache | None,
         conv_mask: torch.Tensor | None = None,
+        prefetched: object | None = None,
     ) -> torch.Tensor:
-        embeddings = self.ple_embedding(input_ids, past_key_values)
+        # A prefetched tensor holds the whole batch; a chunked micro-batch (chunk_mbs) would need its
+        # own slice, so look this chunk's rows up instead of using the wrong ones. Such a mismatch means
+        # the whole-batch prefetch can never be consumed, so drop the prefetch of this table: the model
+        # only calls it while `_vp_prefetch` is set, and one lookup of the whole batch per step would
+        # otherwise be computed and thrown away for every chunk above.
+        # `prefetched` is either a ready tensor (unsplit prefetch) or a pending lookup whose copy is
+        # still in flight; `vp_batch_size` and `vp_resolve` handle both, and the first thing resolve
+        # does for the pending case is wait for that copy.
+        if prefetched is not None and self.ple_embedding.vp_batch_size(prefetched) == input_ids.shape[0]:
+            embeddings = self.ple_embedding.vp_resolve(prefetched)
+        else:
+            if prefetched is not None:
+                self.ple_embedding._vp_prefetch = None
+                print_rank(
+                    logger.info,
+                    f"[Vocabulary Parallel] prefetch off for layers.{self.layer_idx}.ple.ple_embedding: "
+                    f"the layer receives a batch of {input_ids.shape[0]} while the prefetch computed "
+                    f"{self.ple_embedding.vp_batch_size(prefetched)} rows (chunk_mbs slices the batch in "
+                    f"between), so the lookup stays inside the layer from now on",
+                )
+            embeddings = self.ple_embedding(input_ids, past_key_values)
         key_normed = self.norm_key(self.key_proj(embeddings)).unflatten(-1, (self.hc_count, self.hidden_size))
         value = self.value_proj(embeddings)
         query_normed = self.norm_query(hidden_states).unflatten(-1, (self.hc_count, self.hidden_size))
@@ -1519,11 +2045,12 @@ class Qwen4ExpTextDecoderLayer(GradientCheckpointingLayer):
         conv_mask: torch.Tensor | None = None,
         past_key_values: Cache | None = None,
         ple_input_ids: torch.LongTensor | None = None,
+        ple_prefetched: torch.Tensor | None = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> torch.FloatTensor:
         if self.ple is not None:
             hidden_states = hidden_states + self.ple(
-                hidden_states, ple_input_ids, past_key_values, conv_mask=conv_mask
+                hidden_states, ple_input_ids, past_key_values, conv_mask=conv_mask, prefetched=ple_prefetched
             )
 
         hidden_states, hyper_input, injection_weights = self.attn_hyper_connection(hidden_states)
@@ -1558,7 +2085,7 @@ class Qwen4ExpPreTrainedModel(PreTrainedModel):
     supports_gradient_checkpointing = True
     _no_split_modules = None  # will be set on text and vision separately
     _skip_keys_device_placement = ["past_key_values"]
-    _supports_flash_attn = False  # flash-mla kernels need a bit more work in the way we enable them!
+    _supports_flash_attn = True
     _supports_sdpa = True
     _keys_to_ignore_on_load_unexpected = [r"^mtp.*"]
     _can_record_outputs = None  # will be set on text and vision separately
@@ -1663,6 +2190,21 @@ class Qwen4ExpTextModel(Qwen4ExpPreTrainedModel):
             # If we do not have input_ids but have ple, we need to revert the embeddings to find back the ids
             ple_input_ids = input_ids if input_ids is not None else self.reverse_embedding(inputs_embeds)
 
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
+        if ps.is_cp_enable() and (use_cache or past_key_values is not None):
+            raise NotImplementedError("Qwen4Exp Ulysses CP currently supports training prefill only")
+        if ps.is_cp_enable() and getattr(self.config, "qsa_implementation", IMPL_EAGER) not in (
+            IMPL_FLASH_ATTENTION_2, IMPL_ASCENDC,
+        ):
+            raise NotImplementedError(
+                "Qwen4Exp Ulysses CP requires qsa_implementation='flash_attention_2' or 'ascendc'"
+            )
+
+        if getattr(self.config, "qsa_implementation", IMPL_EAGER) == IMPL_ASCENDC:
+            if use_cache or past_key_values is not None:
+                raise NotImplementedError("AscendC QSA requires use_cache=False and no past_key_values")
+
         if use_cache and past_key_values is None:
             past_key_values = DynamicCache(config=self.config)
 
@@ -1683,6 +2225,12 @@ class Qwen4ExpTextModel(Qwen4ExpPreTrainedModel):
         else:
             text_position_ids = None
 
+        if getattr(self.config, "qsa_implementation", IMPL_EAGER) == IMPL_ASCENDC:
+            from mindspeed_mm.fsdp.ops.qsa.ascendc.generic_sparse_attention import validate_prefill_mask
+            validate_prefill_mask(
+                attention_mask, text_position_ids, inputs_embeds.shape[0], inputs_embeds.shape[1]
+            )
+
         # We need the full position_ids in the indexer, not just the current ones, so bind them to the cache if any (as they
         # are 3D, it's otherwise not easy to compute them back from only current positions)
         if past_key_values is not None:
@@ -1702,10 +2250,20 @@ class Qwen4ExpTextModel(Qwen4ExpPreTrainedModel):
                 # we may have to recreate it in each layer if it gets skipped
                 "allow_is_causal_skip": False,
             }
+            # All QSA implementations need an additive mask independently of
+            # the vision/global attention backend.
+            mask_config = copy.copy(self.config)
+            mask_config._attn_implementation = IMPL_EAGER
+            mask_kwargs["config"] = mask_config
             causal_mask_mapping = {
                 "indexed_attention": create_causal_mask(**mask_kwargs),
                 "linear_attention": create_recurrent_attention_mask(**mask_kwargs),
             }
+
+            if IS_NPU_AVAILABLE and causal_mask_mapping["indexed_attention"] is None:
+                S = inputs_embeds.shape[1]
+                mask = torch.tril(torch.ones(S, S, dtype=torch.bool, device=inputs_embeds.device))
+                causal_mask_mapping["indexed_attention"] = mask[None, None, :, :]   # -> [1, 1, S, S]
 
         conv_mask = causal_mask_mapping.get("linear_attention")
         # CODEPATH: @ArthurZucker fix flagging for no reason here
@@ -1714,9 +2272,29 @@ class Qwen4ExpTextModel(Qwen4ExpPreTrainedModel):
             eos_token_id = eos_token_id[0] if isinstance(eos_token_id, list) else eos_token_id
             ple_input_ids = torch.where(conv_mask.bool(), ple_input_ids, eos_token_id)
 
+        total_seq_len = inputs_embeds.shape[1]
+        set_seq_len("total", total_seq_len)
+        # Masks, position embeddings, and QSA indexer inputs are built from the
+        # complete sequence. Only tensors consumed by local decoder computation
+        # are sharded after these full-sequence artifacts are ready.
         hidden_states = inputs_embeds
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
+        if ps.is_cp_enable():
+            hidden_states = split_forward_gather_backward_with_cp(hidden_states, dim=1)
+            if conv_mask is not None:
+                conv_mask = split_forward_gather_backward_with_cp(conv_mask, dim=1)
         hidden_states = hidden_states.repeat(1, 1, self.config.hc_count)
+
+        # The n-gram ids depend only on `ple_input_ids`, so each PLE layer's rows are looked up here,
+        # once and ahead of the layer that consumes them: recomputation reuses the result instead of
+        # looking the rows up a second time. Empty when the prefetch is off, in which case each layer
+        # does its own lookup (see VocabPlanConfig.prefetch).
+        ple_prefetched = {}
+        if ple_input_ids is not None:
+            for layer_idx, decoder_layer in enumerate(self.layers[: self.config.num_hidden_layers]):
+                ple = getattr(decoder_layer, "ple", None)
+                if ple is not None and getattr(ple.ple_embedding, "_vp_prefetch", None) is not None:
+                    ple_prefetched[layer_idx] = ple.ple_embedding._vp_prefetch(ple_input_ids, past_key_values)
 
         for layer_idx, decoder_layer in enumerate(self.layers[: self.config.num_hidden_layers]):
             hidden_states = decoder_layer(
@@ -1726,6 +2304,7 @@ class Qwen4ExpTextModel(Qwen4ExpPreTrainedModel):
                 conv_mask=conv_mask,
                 past_key_values=past_key_values,
                 ple_input_ids=ple_input_ids,
+                ple_prefetched=ple_prefetched.get(layer_idx),
                 **kwargs,
             )
 
@@ -1820,6 +2399,19 @@ def load_balancing_loss_func(
             router_prob_sum = router_prob_sum + (routing_weights.float() * flat_mask.unsqueeze(-1)).sum(dim=0)
             total_rows = total_rows + flat_mask.sum()
 
+    ps = get_parallel_state()
+    _validate_cp_topology(ps)
+    if ps.is_cp_enable():
+        # Balance against the whole CP batch, including uneven shards/padding.
+        # Only the probability sums need autograd. Its all-reduce backward sums
+        # the replicated auxiliary objective, matching FSDP's gradient average.
+        from torch.distributed.nn.functional import all_reduce
+        torch.distributed.all_reduce(tokens_per_expert_sum, group=ps.get_cp_group())
+        total_rows = torch.as_tensor(total_rows, device=compute_device, dtype=torch.float32)
+        torch.distributed.all_reduce(total_rows, group=ps.get_cp_group())
+        router_prob_sum = all_reduce(router_prob_sum, group=ps.get_cp_group())
+        total_rows = total_rows.clamp_min(1)
+
     tokens_per_expert = tokens_per_expert_sum / total_rows
     router_prob_per_expert = router_prob_sum / total_rows
 
@@ -1898,6 +2490,8 @@ class Qwen4ExpForCausalLM(Qwen4ExpPreTrainedModel, GenerationMixin):
         )
 
         hidden_states = outputs.last_hidden_state
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
         logits = self.lm_head(hidden_states[:, slice_indices, :])
@@ -1905,14 +2499,19 @@ class Qwen4ExpForCausalLM(Qwen4ExpPreTrainedModel, GenerationMixin):
         loss = None
         if labels is not None:
             loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
+            if ps.is_cp_enable():
+                loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0).sum()
 
         aux_loss = None
         if output_router_logits:
+            router_attention_mask = attention_mask
+            if ps.is_cp_enable() and router_attention_mask is not None and router_attention_mask.ndim == 2:
+                router_attention_mask = split_forward_gather_backward_with_cp(router_attention_mask, dim=1)
             aux_loss = load_balancing_loss_func(
                 outputs.router_logits,
                 self.num_experts,
                 self.num_experts_per_tok,
-                attention_mask,
+                router_attention_mask,
             )
             if labels is not None:
                 loss += self.router_aux_loss_coef * aux_loss.to(loss.device)  # make sure to reside in the same device
@@ -2036,7 +2635,43 @@ class Qwen4ExpVisionPatchMerger(nn.Module):
         self.linear_fc2 = nn.Linear(self.hidden_size, config.out_hidden_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.norm(x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x).view(-1, self.hidden_size)
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
+        if ps.is_ulysses_enable():
+            # Ulysses splits packed visual tokens before the vision blocks. Restore
+            # the packed order before spatial merging so a rank boundary can never
+            # split one spatial_merge_unit group. Split the merged rows again so the
+            # projection remains local on every rank.
+            if self.use_postshuffle_norm:
+                x = packed_data_gather_forward_split_backward_with_cp(
+                    x, dim=0, seq_lens=get_seq_len("per_visual")
+                )
+                x = x.view(-1, self.hidden_size)
+                split_sizes = cal_split_sizes(x.shape[0], ps.get_ulysses_group_size())
+                x = split_forward_gather_backward(
+                    x,
+                    ps.get_ulysses_group(),
+                    dim=0,
+                    grad_scale="down",
+                    split_sizes=split_sizes,
+                )
+                x = self.norm(x)
+            else:
+                x = self.norm(x)
+                x = packed_data_gather_forward_split_backward_with_cp(
+                    x, dim=0, seq_lens=get_seq_len("per_visual")
+                )
+                x = x.view(-1, self.hidden_size)
+                split_sizes = cal_split_sizes(x.shape[0], ps.get_ulysses_group_size())
+                x = split_forward_gather_backward(
+                    x,
+                    ps.get_ulysses_group(),
+                    dim=0,
+                    grad_scale="down",
+                    split_sizes=split_sizes,
+                )
+        else:
+            x = self.norm(x.view(-1, self.hidden_size) if self.use_postshuffle_norm else x).view(-1, self.hidden_size)
         x = self.linear_fc2(self.act_fn(self.linear_fc1(x)))
         return x
 
@@ -2048,8 +2683,14 @@ def apply_rotary_pos_emb_vision(
     orig_k_dtype = k.dtype
     q, k = q.float(), k.float()
     cos, sin = cos.unsqueeze(-2).float(), sin.unsqueeze(-2).float()
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
+    if IS_NPU_AVAILABLE:
+        import torch_npu
+        # NPU optimized: fused rotary mul instead of separate rotate_half + multiply
+        q_embed = torch_npu.npu_rotary_mul(q, cos, sin)
+        k_embed = torch_npu.npu_rotary_mul(k, cos, sin)
+    else:
+        q_embed = (q * cos) + (rotate_half(q) * sin)
+        k_embed = (k * cos) + (rotate_half(k) * sin)
     q_embed = q_embed.to(orig_q_dtype)
     k_embed = k_embed.to(orig_k_dtype)
     return q_embed, k_embed
@@ -2084,15 +2725,41 @@ class Qwen4ExpVisionAttention(nn.Module):
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb_vision(query_states, key_states, cos, sin)
 
-        query_states = query_states.transpose(0, 1).unsqueeze(0)
-        key_states = key_states.transpose(0, 1).unsqueeze(0)
-        value_states = value_states.transpose(0, 1).unsqueeze(0)
-
         attention_interface: Callable = ALL_ATTENTION_FUNCTIONS.get_interface(
             self.config._attn_implementation, eager_attention_forward
         )
 
-        if is_flash_attention_requested(self.config):
+        # Modification: pass total_visual_seqlen
+        if self.config._attn_implementation == "flash_attention_2" and IS_NPU_AVAILABLE:
+            query_states = query_states.unsqueeze(0)
+            key_states = key_states.unsqueeze(0)
+            value_states = value_states.unsqueeze(0)
+
+            # Flash Attention 2: Use cu_seqlens for variable length attention
+            max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
+            attn_output, _ = attention_interface(
+                self,
+                query_states,
+                key_states,
+                value_states,
+                attention_mask=None,
+                scaling=self.scaling,
+                dropout=0.0 if not self.training else self.attention_dropout,
+                cu_seq_lens_q=cu_seqlens,
+                cu_seq_lens_k=cu_seqlens,
+                max_length_q=max_seqlen,
+                max_length_k=max_seqlen,
+                is_causal=False,
+                total_seq_len=get_seq_len("visual"),
+                input_layout="1TND",
+                skip_flash_attn_recompute=self.config.skip_flash_attn_recompute,
+                **kwargs,
+            )
+
+        elif is_flash_attention_requested(self.config):
+            query_states = query_states.transpose(0, 1).unsqueeze(0)
+            key_states = key_states.transpose(0, 1).unsqueeze(0)
+            value_states = value_states.transpose(0, 1).unsqueeze(0)
             # Flash Attention: Use cu_seqlens for variable length attention
             max_seqlen = get_max_seqlen(cu_seqlens, self.config, kwargs={"max_seqlen": max_seqlen})
             attn_output, _ = attention_interface(
@@ -2111,6 +2778,10 @@ class Qwen4ExpVisionAttention(nn.Module):
                 **kwargs,
             )
         else:
+            query_states = query_states.transpose(0, 1).unsqueeze(0)
+            key_states = key_states.transpose(0, 1).unsqueeze(0)
+            value_states = value_states.transpose(0, 1).unsqueeze(0)
+
             # Other implementations: Process each chunk separately
             lengths = cu_seqlens[1:] - cu_seqlens[:-1]
             splits = [
@@ -2229,6 +2900,10 @@ class Qwen4ExpVisionModel(Qwen4ExpPreTrainedModel):
         )
         position_ids = get_vision_position_ids(grid_thw, self.spatial_merge_size, kwargs=kwargs)
         cu_seqlens, max_seqlen = get_vision_attention_seqlens(grid_thw, self.config, kwargs=kwargs)
+        # The helper already includes the leading zero. Keep these boundaries
+        # on CPU for SDPA's tolist() calls during NPU recompute/offload.
+        if IS_NPU_AVAILABLE and not is_flash_attention_requested(self.config):
+            cu_seqlens = cu_seqlens.cpu()
 
         hidden_states = self.patch_embed(hidden_states)
         pos_embeds = (self.pos_embed(interp_indices) * interp_weights[:, :, None]).sum(1)
@@ -2236,7 +2911,24 @@ class Qwen4ExpVisionModel(Qwen4ExpPreTrainedModel):
         position_embeddings = self.rotary_pos_emb(hidden_states, position_ids)
 
         seq_len, _ = hidden_states.size()
+        set_seq_len("visual", seq_len)
+        sequence_lengths = torch.repeat_interleave(
+            grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]
+        ).cpu()
+        set_seq_len("per_visual", sequence_lengths)
         hidden_states = hidden_states.reshape(seq_len, -1)
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
+        if ps.is_cp_enable():
+            position_embeddings = tuple(
+                packed_data_split_forward_gather_backward_with_cp(
+                    emb, dim=0, seq_lens=sequence_lengths
+                )
+                for emb in position_embeddings
+            )
+            hidden_states = packed_data_split_forward_gather_backward_with_cp(
+                hidden_states, dim=0, seq_lens=sequence_lengths
+            )
 
         for blk in self.blocks:
             hidden_states = blk(
@@ -2248,7 +2940,17 @@ class Qwen4ExpVisionModel(Qwen4ExpPreTrainedModel):
             )
 
         merged_hidden_states = self.merger(hidden_states)
-
+        set_seq_len("visual", seq_len // self.spatial_merge_unit)
+        if ps.is_ulysses_enable():
+            gather_sizes = cal_split_sizes(get_seq_len("visual"), ps.get_ulysses_group_size())
+            merged_hidden_states = gather_forward_split_backward(
+                merged_hidden_states,
+                ps.get_ulysses_group(),
+                dim=0,
+                grad_scale="up",
+                gather_sizes=gather_sizes,
+            )
+        set_seq_len("visual", seq_len)
         return BaseModelOutputWithPooling(
             last_hidden_state=hidden_states,
             pooler_output=merged_hidden_states,
@@ -2468,21 +3170,27 @@ class Qwen4ExpModel(Qwen4ExpPreTrainedModel):
             special_image_mask = input_ids == self.config.image_token_id
             special_video_mask = input_ids == self.config.video_token_id
 
-        n_image_tokens = special_image_mask.sum()
-        special_image_mask = special_image_mask.unsqueeze(-1).to(inputs_embeds.device)
+        # Keep mask at compact shape (batch, seq_len) instead of expanding to (batch, seq_len, hidden_dim).
+        # The compact mask avoids allocating a huge boolean tensor and enables efficient nonzero + direct indexing
+        # in forward(), replacing the expensive masked_scatter which scans the full (batch, seq_len, hidden_dim) space.
         if image_features is not None:
-            torch_compilable_check(
-                n_image_tokens * inputs_embeds.shape[-1] == image_features.numel(),
-                f"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}",
-            )
+            n_image_tokens = special_image_mask.sum()
+            if n_image_tokens != image_features.shape[0]:
+                raise ValueError(
+                    f"Image features and image tokens do not match, tokens: {n_image_tokens}, features: {image_features.shape[0]}"
+                )
+        else:
+            special_image_mask = None
 
-        n_video_tokens = special_video_mask.sum()
-        special_video_mask = special_video_mask.unsqueeze(-1).to(inputs_embeds.device)
         if video_features is not None:
-            torch_compilable_check(
-                n_video_tokens * inputs_embeds.shape[-1] == video_features.numel(),
-                f"Video features and video tokens do not match, tokens: {n_video_tokens}, features: {video_features.shape[0]}",
-            )
+            n_video_tokens = special_video_mask.sum()
+            if n_video_tokens != video_features.shape[0]:
+                raise ValueError(
+                    f"Video features and video tokens do not match, tokens: {n_video_tokens}, features: {video_features.shape[0]}"
+                )
+        else:
+            special_video_mask = None
+
         return special_image_mask, special_video_mask
 
     def compute_3d_position_ids(
@@ -2588,7 +3296,8 @@ class Qwen4ExpModel(Qwen4ExpPreTrainedModel):
             image_mask, _ = self.get_placeholder_mask(
                 input_ids, inputs_embeds=inputs_embeds, image_features=image_embeds
             )
-            inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
+            image_indices_tuple = torch.nonzero(image_mask, as_tuple=True)
+            inputs_embeds[image_indices_tuple] = image_embeds
 
         if mm_encoder_outputs.get("video") is not None:
             video_embeds = torch.cat(mm_encoder_outputs["video"].pooler_output, dim=0).to(
@@ -2597,7 +3306,8 @@ class Qwen4ExpModel(Qwen4ExpPreTrainedModel):
             _, video_mask = self.get_placeholder_mask(
                 input_ids, inputs_embeds=inputs_embeds, video_features=video_embeds
             )
-            inputs_embeds = inputs_embeds.masked_scatter(video_mask, video_embeds)
+            video_indices_tuple = torch.nonzero(video_mask, as_tuple=True)
+            inputs_embeds[video_indices_tuple] = video_embeds
 
         if position_ids is None:
             position_ids = self.compute_3d_position_ids(
@@ -2659,6 +3369,12 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
 
     @staticmethod
     def overwrite_transformer_config(transformer_config, model_args, feature_args):
+        # QHC implementation; eager preserves the original checkpoint parameter layout.
+        qhc_implementation = getattr(model_args, "qhc_implementation", IMPL_EAGER).lower().strip()
+        if qhc_implementation not in (IMPL_EAGER, IMPL_ASCENDC):
+            raise ValueError("qhc_implementation must be 'eager' or 'ascendc'.")
+        transformer_config.text_config.qhc_implementation = qhc_implementation
+
         # gdn implementation
         gdn_implementation = getattr(model_args, "gdn_implementation", IMPL_EAGER).lower().strip()
         if gdn_implementation not in IMPL_FOR_GDN:
@@ -2666,6 +3382,7 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
                 f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: {IMPL_FOR_GDN}."
             )
         transformer_config.text_config.gdn_implementation = gdn_implementation
+
         # causal conv1d implementation
         causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()
         if causal_conv1d_implementation not in IMPL_FOR_CAUSAL_CONV:
@@ -2680,6 +3397,21 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
                 f"causal_conv1d='{causal_conv1d_implementation}'. "
                 f"gdn can be 'ascendc' only if causal_conv1d is not 'eager'."
             )
+
+        # qsa indexer implementation
+        qsa_indexer_implementation = getattr(model_args, "qsa_indexer_implementation", IMPL_EAGER).lower().strip()
+        if qsa_indexer_implementation not in IMPL_FOR_QSA_INDEXER:
+            raise ValueError(f"Invalid qsa_indexer_implementation='{qsa_indexer_implementation}'; expected {IMPL_FOR_QSA_INDEXER}")
+        qsa_implementation = getattr(model_args, "qsa_implementation", IMPL_EAGER).lower().strip()
+        if qsa_implementation not in IMPL_FOR_QSA:
+            raise ValueError(
+                f"Invalid qsa_implementation='{qsa_implementation}'; expected {IMPL_FOR_QSA}; "
+                "select the indexer with qsa_indexer_implementation"
+            )
+        if qsa_implementation == IMPL_ASCENDC and qsa_indexer_implementation == IMPL_TRITON:
+            raise NotImplementedError("Triton indexer does not expose block IDs; use ascendc or eager for AscendC QSA")
+        transformer_config.text_config.qsa_indexer_implementation = qsa_indexer_implementation
+        transformer_config.text_config.qsa_implementation = qsa_implementation
 
         # skip flash attn recompute
         skip_flash_attn_recompute = getattr(model_args, "skip_flash_attn_recompute", False)
@@ -2839,6 +3571,8 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
         )
 
         hidden_states = outputs[0]
+        ps = get_parallel_state()
+        _validate_cp_topology(ps)
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
@@ -2854,13 +3588,19 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
                     logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size, **kwargs
                 )
 
+        if loss is not None and ps.is_cp_enable():
+            loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0).sum()
+
         aux_loss = None
         if output_router_logits:
+            router_attention_mask = attention_mask
+            if ps.is_cp_enable() and router_attention_mask is not None and router_attention_mask.ndim == 2:
+                router_attention_mask = split_forward_gather_backward_with_cp(router_attention_mask, dim=1)
             aux_loss = load_balancing_loss_func(
                 outputs.router_logits,
                 self.config.text_config.num_experts,
                 self.config.text_config.num_experts_per_tok,
-                attention_mask,
+                router_attention_mask,
             )
             if labels is not None:
                 loss += self.config.text_config.router_aux_loss_coef * aux_loss.to(

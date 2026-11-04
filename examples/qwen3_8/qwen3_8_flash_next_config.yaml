@@ -4,7 +4,6 @@ parallel:
   fsdp_plan:
     apply_modules: # 如果要开prefetch的话，请不要随意修改apply_modules的顺序
       - model.visual
-      - model.visual.blocks.{*}
       - model.language_model.embed_tokens
       - model.language_model
       - model.language_model.layers.{*}
@@ -18,11 +17,13 @@ parallel:
     num_to_forward_prefetch: 1
     num_to_backward_prefetch: 1
   ulysses_parallel_size: 1 # 开启 ulysses-cp 时, 请将 model 的 attn_implementation 设置为 flash_attention_2
-  expert_parallel_size: 1
+  expert_parallel_size: 8
   ep_plan:
     apply_modules:
       - model.language_model.layers.{*}.mlp.experts
-    dispatcher: alltoall
+    dispatcher: chunkmoe
+    moe_num_chunks: 2
+    use_npu_fused_ops: true
 
 ### 数据相关配置
 data:
@@ -50,7 +51,7 @@ data:
       video_maxlen: 64
 
     basic_parameters: &TRAIN_BASIC_PARAMETERS
-      cutoff_len: 4096
+      cutoff_len: 8192
       template: qwen3_vl_nothink
       enable_thinking: false
       train_on_prompt: false
@@ -59,10 +60,10 @@ data:
       dataset: &DATASET_PATH /home/data/datasets/coco/mllm_format_llava_instruct_data.json
       cache_dir: ./cache_dir/
       overwrite_cache: false
-      preprocess_on_fly: false
+      preprocess_on_fly: true
       preprocessing_batch_size: 1000
       preprocessing_num_workers: 8
-      max_samples: 10000
+      max_samples: null
 
   # 数据加载
   dataloader_param:
@@ -75,22 +76,26 @@ data:
     collate_param:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
-    enable_preload: false
+    enable_preload: true
+    infinite_sampler: true
 
 # 模型配置
 model:
   model_id: qwen4_exp
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
-  attn_implementation: sdpa
+  attn_implementation: flash_attention_2
   # 冻结部分模块
-  # freeze:
-  #   - model.visual
+  freeze:
+    - model.visual
   # 融合算子配置
-  gdn_implementation: triton
-  causal_conv1d_implementation: triton
+  gdn_implementation: ascendc
+  causal_conv1d_implementation: ascendc
+  qsa_indexer_implementation: ascendc # eager | ascendc | triton
+  qsa_implementation: flash_attention_2 # eager | ascendc | flash_attention_2
   use_grouped_expert_matmul: true
-  skip_gdn_recompute: false
+  skip_gdn_recompute: true
+  skip_flash_attn_recompute: true
 
 # 优化特性配置
 features:
@@ -108,7 +113,9 @@ features:
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
-    chunk_size: 512
+    chunk_size: null
+    impl_type: cce
+    vocab_tile_size: 4096
   # activation offload 配置
   enable_activation_offload: true
   activation_offload_plan:
@@ -132,7 +139,8 @@ features:
 
 # 训练配置
 training:
-  micro_batch_size: 1
+  manual_gc_interval: 20
+  micro_batch_size: 4
   gradient_accumulation_steps: 1
   seed: 42
   lr: 1.0e-5
