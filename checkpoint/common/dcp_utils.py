@@ -328,7 +328,7 @@ def extract_metadata(
 def append_state_dict_to_dcp(
     dcp_dir: Path,
     state_dict: STATE_DICT_TYPE,
-    part_idx: int = 100,
+    part_idx: Optional[int] = None,
 ):
     """
     Append additional state_dict entries to an existing DCP checkpoint.
@@ -340,14 +340,27 @@ def append_state_dict_to_dcp(
     Args:
         dcp_dir (Path): Path to the DCP checkpoint directory (containing 'release' subdir).
         state_dict (STATE_DICT_TYPE): New state dict entries to append.
-        part_idx (int): Storage prefix index for the new shard, to avoid filename
-                        collisions with existing shards.
+        part_idx (Optional[int]): Storage prefix index for the new shard. When not
+                        given, it is derived from the existing shard files so the
+                        new shard never collides with them (e.g., a checkpoint with
+                        101+ shards already contains "__100_0.distcp", which a
+                        hard-coded default would silently overwrite).
     """
     import pickle
+    import re
+
     from torch.distributed.checkpoint import FileSystemWriter, FileSystemReader
     from checkpoint.common.permissions import set_directory_permissions
 
     save_path = Path(dcp_dir) / "release"
+
+    if part_idx is None:
+        existing_parts = [
+            int(match.group(1))
+            for shard in save_path.glob("__*.distcp")
+            if (match := re.match(r"__(\d+)_", shard.name))
+        ]
+        part_idx = max(existing_parts, default=-1) + 1
 
     storage_reader = FileSystemReader(save_path)
     existing_metadata = load_metadata(storage_reader)
