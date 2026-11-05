@@ -61,6 +61,7 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import generate_ulysses_cu_seqlen_params
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.ops.attn_res.attn_res import apply_attn_res
+from mindspeed_mm.fsdp.ops.flash_attn.flash_attn import _require_right_padding
 
 if IS_NPU_AVAILABLE:
     import torch_npu
@@ -430,6 +431,9 @@ def eager_attention_forward(
     scores = torch.einsum("bhqd,bhkd->bhqk", query, key) * scaling
     if attention_mask is not None:
         scores = scores + attention_mask[:, :, :, : key.shape[-2]]
+    publish_qk_metrics = getattr(module, "_publish_qk_clip_max_logits", None)
+    if module.training and getattr(module, "_qk_clip_enabled", False) and publish_qk_metrics is not None:
+        publish_qk_metrics(scores.detach().amax(dim=(0, 2, 3)).float())
 
     probs = F.softmax(scores, dim=-1, dtype=torch.float32).to(query.dtype)
     probs = F.dropout(probs, p=dropout, training=module.training)
@@ -507,6 +511,29 @@ class KimiMLAAttention(nn.Module):
             self.g_proj = nn.Linear(self.hidden_size, projection_size, bias=False)
 
         self.rotary_emb = None
+        self._qk_clip_enabled = False
+        self._qk_clip_max_logits = None
+
+    def _publish_qk_clip_max_logits(self, per_head_max: torch.Tensor) -> None:
+        """Accumulate detached maximum logits for each attention head."""
+        if not self.training:
+            return
+        if per_head_max.ndim != 1 or per_head_max.numel() != self.num_heads:
+            raise ValueError(
+                f"QK-Clip metrics must be a [num_heads]={self.num_heads} vector, "
+                f"got shape {tuple(per_head_max.shape)}"
+            )
+        current = per_head_max.detach().float()
+        if self._qk_clip_max_logits is None:
+            self._qk_clip_max_logits = current
+        else:
+            self._qk_clip_max_logits = torch.maximum(self._qk_clip_max_logits, current)
+
+    def consume_qk_clip_max_logits(self):
+        """Return the accumulated metrics and clear them."""
+        metrics = self._qk_clip_max_logits
+        self._qk_clip_max_logits = None
+        return metrics
 
     def forward(
         self,
@@ -1462,6 +1489,11 @@ class KimiLinearModel(KimiPreTrainedModel):
 
         if position_ids is None:
             position_ids = cache_position.unsqueeze(0)
+
+        # Checked once per forward, not per layer: the check syncs with the device.
+        if (self.training and attention_mask is not None and attention_mask.ndim == 2
+                and any(getattr(layer.self_attn, "_qk_clip_enabled", False) for layer in self.layers)):
+            _require_right_padding(attention_mask)
 
         causal_mask = create_causal_mask(
             config=self.config,

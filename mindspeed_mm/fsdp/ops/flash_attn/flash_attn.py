@@ -1,4 +1,4 @@
-from typing import Optional, Union, List, Tuple
+from typing import Callable, Optional, Union, List, Tuple
 import logging
 
 from einops import rearrange
@@ -35,6 +35,133 @@ _flash_attention_forward = None
 
 
 ATTN_MASK_NPU_CACHE = {}
+
+
+def _per_head_softmax_max(
+    softmax_max: torch.Tensor, valid_tokens: Optional[int] = None,
+    query_mask: Optional[torch.Tensor] = None,
+    cu_seq_lens: Optional[List[int]] = None,
+) -> torch.Tensor:
+    """Reduce the NPU attention kernel's row maxima to one FP32 value per head.
+
+    ``softmax_max`` is ``[B, N, S, 8]``, or ``[T, N, 8]`` for packed sequences;
+    the kernel stores each row's maximum logit 8 times in the last dimension.
+    TND statistics are stored head-first within each sequence despite their
+    tensor shape, so sequence bounds are needed before masking query rows.
+    ``valid_tokens`` drops the padding rows at the end of a packed layout.
+    ``query_mask`` is ``[B, S]`` (``True`` for real tokens) and drops padded
+    query rows anywhere in either layout.
+    """
+    if softmax_max.ndim not in (3, 4):
+        raise ValueError(
+            f"expected 3-D (TND) or 4-D softmax_max, got shape {tuple(softmax_max.shape)}"
+        )
+    if softmax_max.ndim == 3:
+        tokens, heads, repeats = softmax_max.shape
+        if query_mask is not None and query_mask.numel() != tokens:
+            raise ValueError("QK-Clip padding mask does not match the packed query rows")
+        bounds = [0] + [int(end) for end in (cu_seq_lens or [tokens]) if end > 0]
+        maxima = []
+        for start, end in zip(bounds, bounds[1:]):
+            valid_end = end if valid_tokens is None else min(end, valid_tokens)
+            if valid_end <= start:
+                continue
+            # The raw buffer concatenates [heads, sequence length, 8] segments.
+            segment = softmax_max[start:end].reshape(1, heads, end - start, repeats)
+            segment = segment[:, :, :valid_end - start]
+            mask = None if query_mask is None else query_mask.reshape(-1)[start:valid_end].unsqueeze(0)
+            maxima.append(_per_head_softmax_max(segment, query_mask=mask))
+        if not maxima:
+            return softmax_max.new_full((heads,), -torch.inf, dtype=torch.float32)
+        return torch.stack(maxima).amax(dim=0)
+    if query_mask is not None:
+        if query_mask.shape == (softmax_max.size(0), softmax_max.size(2)):
+            keep = query_mask[:, None, :, None]
+        else:
+            raise ValueError(
+                f"QK-Clip padding mask {tuple(query_mask.shape)} does not match the "
+                f"local query rows of softmax_max {tuple(softmax_max.shape)}"
+            )
+        softmax_max = softmax_max.masked_fill(~keep.to(softmax_max.device), -torch.inf)
+    reduction_dims = tuple(d for d in range(softmax_max.ndim) if d != 1)
+    return softmax_max.detach().amax(dim=reduction_dims).float()
+
+
+def _padding_mask(attention_mask: Optional[torch.Tensor], batch_size: int) -> Optional[torch.Tensor]:
+    """Return ``attention_mask`` if it is a ``[batch, seq]`` padding mask.
+
+    Only QK-Clip uses the result. Its only model, Kimi, passes padding masks
+    and never square kernel masks, so batch == seq is still a padding mask.
+    """
+    if attention_mask is not None and attention_mask.ndim == 2 and attention_mask.shape[0] == batch_size:
+        return attention_mask
+    return None
+
+
+def _require_right_padding(padding_mask: torch.Tensor) -> None:
+    """QK-Clip drops padded query rows; the NPU call omits the key-padding mask.
+
+    With right padding, causal attention keeps real queries away from padded
+    keys; left or internal padding would put them into real queries' maxima.
+    """
+    valid = padding_mask >= 1
+    if (valid[:, 1:] & ~valid[:, :-1]).any():
+        raise ValueError("QK-Clip requires right padding; left or internal padding is unsupported")
+
+
+def _place_qk_clip_heads_in_full_width(per_head_max: torch.Tensor) -> torch.Tensor:
+    """Place a contiguous Ulysses head shard in a full-width vector.
+
+    Unowned heads are negative infinity for the later maximum reduction.
+    """
+    ps = get_parallel_state()
+    ulysses_size = ps.get_ulysses_group_size()
+    if ulysses_size <= 1:
+        return per_head_max
+    local_heads = per_head_max.numel()
+    full = per_head_max.new_full((local_heads * ulysses_size,), float("-inf"))
+    start = ps.get_ulysses_rank() * local_heads
+    full[start:start + local_heads] = per_head_max
+    return full
+
+
+def _make_qk_clip_metric_sink(
+    module: torch.nn.Module,
+    valid_tokens: Optional[int] = None,
+    gather_ulysses: bool = False,
+    padding_mask: Optional[torch.Tensor] = None,
+    cu_seq_lens_q: Optional[List[int]] = None,
+) -> Optional[Callable[[torch.Tensor], None]]:
+    """Build a callback that publishes full-width per-head maximum logits.
+
+    ``padding_mask`` is the ``[B, S]`` mask (0 at padding) that the kernel
+    does not receive; padded query rows still produce row maxima.
+    """
+    if not getattr(module, "_qk_clip_enabled", False) or not module.training:
+        return None
+    publish = getattr(module, "_publish_qk_clip_max_logits", None)
+    if not callable(publish):
+        return None
+    query_mask = None if padding_mask is None else padding_mask >= 1
+
+    def metric_sink(softmax_max: torch.Tensor, token_offset: int = 0) -> None:
+        # Chunked packed calls pass the first query row of each chunk.
+        mask = query_mask
+        if mask is not None and softmax_max.ndim == 3:
+            mask = mask.reshape(-1)[token_offset:token_offset + softmax_max.size(0)]
+        valid = None if valid_tokens is None else max(0, valid_tokens - token_offset)
+        bounds = None
+        if softmax_max.ndim == 3 and cu_seq_lens_q is not None:
+            bounds = [0] + [end - token_offset for end in cu_seq_lens_q
+                            if token_offset < end <= token_offset + softmax_max.size(0)]
+        per_head_max = _per_head_softmax_max(
+            softmax_max, valid_tokens=valid, query_mask=mask, cu_seq_lens=bounds,
+        )
+        if gather_ulysses:
+            per_head_max = _place_qk_clip_heads_in_full_width(per_head_max)
+        publish(per_head_max)
+
+    return metric_sink
 
 
 def get_attn_mask(device, seq_len=2048):
@@ -135,6 +262,7 @@ def do_ring_attention(
     attn_mask=None,
     dropout_p=0.0,
     seq_split_lens: Optional[list[int] | torch.Tensor] = None,
+    metric_sink: Optional[Callable[[torch.Tensor], None]] = None,
 ):
     ps = get_parallel_state()
     cp_group = ps.get_ring_group()
@@ -152,6 +280,7 @@ def do_ring_attention(
     cp_para["cp_global_ranks"] = cp_global_ranks
     cp_para["cp_group_for_send_recv_overlap"] = None
     cp_para["megatron_cp_in_bnsd"] = fa_layout.upper() == "BNSD"
+    cp_para["metric_sink"] = metric_sink
 
     if fa_layout.upper() == "SBH" or fa_layout.upper() == "BNSD":
         # input shapes is a 1-D list
@@ -187,6 +316,7 @@ def _npu_fa_chunked_varlen_attention(
     dropout,
     chunk_tokens,
     sparse_mode,
+    metric_sink=None,
 ):
     """Sample-aligned chunked npu_fusion_attention calls for packed varlen
     (features.fa_varlen_chunk_tokens).
@@ -235,24 +365,27 @@ def _npu_fa_chunked_varlen_attention(
         # the last chunk's final segment includes padding
         seg_ends = [v - bounds[i] for v in cu if bounds[i] < v <= bounds[i + 1]]
         cu_chunk = [0] + seg_ends
-        attn_output.narrow(0, bounds[i], sizes[i]).copy_(
-            torch_npu.npu_fusion_attention(
-                q_parts[i],
-                k_parts[i],
-                v_parts[i],
-                q_head_num,
-                layout,
-                pse=None,
-                padding_mask=None,
-                atten_mask=attention_mask,
-                actual_seq_qlen=cu_chunk,
-                actual_seq_kvlen=cu_chunk,
-                scale=scaling,
-                keep_prob=1 - dropout,
-                inner_precise=0,
-                sparse_mode=sparse_mode,
-            )[0]
-        )
+        chunk_outputs = torch_npu.npu_fusion_attention(
+            q_parts[i],
+            k_parts[i],
+            v_parts[i],
+            q_head_num,
+            layout,
+            pse=None,
+            padding_mask=None,
+            atten_mask=attention_mask,
+            actual_seq_qlen=cu_chunk,
+            actual_seq_kvlen=cu_chunk,
+            scale=scaling,
+            keep_prob=1 - dropout,
+            inner_precise=0,
+            sparse_mode=sparse_mode,
+        )[:2]
+        if metric_sink is not None:
+            # QK-Clip keeps the running per-head maximum across chunks.
+            metric_sink(chunk_outputs[1], token_offset=bounds[i])
+        attn_output.narrow(0, bounds[i], sizes[i]).copy_(chunk_outputs[0])
+        del chunk_outputs
     return attn_output
 
 
@@ -393,6 +526,9 @@ def flash_attention_forward(
     if is_ring_enabled:
         if not IS_NPU_AVAILABLE:
             raise ValueError(f"Ring Attention now only support in NPU.")
+        # The ring metric sink cannot drop padded query rows.
+        if getattr(module, "_qk_clip_enabled", False) and module.training and _padding_mask(attention_mask, query.shape[0]) is not None:
+            raise NotImplementedError("QK-Clip does not support padded batches with ring attention")
 
         if skip_flash_attn_recompute:
             raise ValueError(f"Not support skip_flash_attn_recompute for ring attention.")
@@ -497,6 +633,11 @@ def flash_attention_forward(
         if ring_fa_layout == "TND" and ring_cal_layout == "BNSD":
             raise NotImplementedError(f"Ring attention calculated in bnsd not support packing data")
 
+        qk_clip_valid_tokens = None
+        if (ring_fa_layout == "TND" and seq_split_lens is not None
+                and getattr(module, "_qk_clip_enabled", False) and module.training):
+            qk_clip_valid_tokens = int(seq_split_lens[ps.get_ring_rank()].sum())
+
         # ring attention calculate
         attn_output = do_ring_attention(
             query,
@@ -509,6 +650,9 @@ def flash_attention_forward(
             attn_mask=attention_mask,
             dropout_p=dropout,
             seq_split_lens=seq_split_lens,
+            metric_sink=_make_qk_clip_metric_sink(
+                module, valid_tokens=qk_clip_valid_tokens, gather_ulysses=is_ulysses_enabled
+            ),
         )  # Output in sbh or tnd layout
 
         # Convert back to original layout: BSND or 1TND
@@ -590,6 +734,18 @@ def flash_attention_forward(
                 key = key.squeeze(0)
                 value = value.squeeze(0)
 
+            # The kernel never applies a [batch, seq] mask as padding, so
+            # QK-Clip uses it to drop padded query rows. With a KV
+            # cache it also covers earlier keys; the queries are its last columns.
+            # Local-Q KV-all-gather cannot map the full padding mask.
+            padding_mask = _padding_mask(attention_mask, 1 if layout == "TND" else query.shape[0])
+            if (padding_mask is not None and is_kvag and not _kvag_varlen
+                    and padding_mask.size(1) != seq_len
+                    and getattr(module, "_qk_clip_enabled", False) and module.training):
+                raise NotImplementedError("QK-Clip does not support padded local-query KV-all-gather attention")
+            if padding_mask is not None and not is_kvag:
+                padding_mask = padding_mask[:, -seq_len:]
+
             if attention_mask is None and is_causal:
                 attention_mask = get_attn_mask(device=query.device)
 
@@ -598,6 +754,23 @@ def flash_attention_forward(
                 attention_mask.ndim != 2 or attention_mask.shape[0] != attention_mask.shape[1]
             ):
                 attention_mask = get_attn_mask(device=query.device) if is_causal else None
+
+            # QK-Clip: record the maximum attention logit of each head, excluding
+            # padded query rows. Packed TND inputs also exclude rows after the last sequence.
+            # This runs after kv_all_gather_attention_qkv, so cu_seq_lens_q
+            # already holds the bounds of the query this rank attends with. Both
+            # the KV all-gather path and the Ulysses path split heads across the
+            # Ulysses group, so local heads are placed in a full-width vector.
+            qk_clip_valid_tokens = None
+            if layout == "TND" and cu_seq_lens_q:
+                qk_clip_valid_tokens = int(cu_seq_lens_q[-1])
+            metric_sink = _make_qk_clip_metric_sink(
+                module,
+                valid_tokens=qk_clip_valid_tokens,
+                gather_ulysses=is_kvag or (is_ulysses_enabled and not skip_ulysses),
+                padding_mask=padding_mask,
+                cu_seq_lens_q=cu_seq_lens_q if layout == "TND" else None,
+            )
 
             # features.fa_varlen_chunk_tokens (default 0 = off): per-sub-call token budget for
             # splitting the packed-varlen full-sequence FA into sample-group sub-calls, bounding
@@ -629,6 +802,7 @@ def flash_attention_forward(
                     dropout=dropout,
                     chunk_tokens=_varlen_chunk_tokens,
                     sparse_mode=3 if is_causal else 0,
+                    metric_sink=metric_sink,
                 )
             elif skip_flash_attn_recompute:
                 attn_output = skip_recompute_flash_attention(
@@ -646,9 +820,10 @@ def flash_attention_forward(
                     keep_prob=1 - dropout,
                     inner_precise=0,
                     sparse_mode=3 if is_causal else 0,
+                    metric_sink=metric_sink,
                 )
             else:
-                attn_output = torch_npu.npu_fusion_attention(
+                attn_output, softmax_max = torch_npu.npu_fusion_attention(
                     query,
                     key,
                     value,
@@ -663,7 +838,10 @@ def flash_attention_forward(
                     keep_prob=1 - dropout,
                     inner_precise=0,
                     sparse_mode=3 if is_causal else 0,
-                )[0]
+                )[:2]
+                if metric_sink is not None:
+                    metric_sink(softmax_max)
+                del softmax_max
 
             if input_layout in ["1TND", "1NTD"]:
                 attn_output = attn_output.unsqueeze(0)

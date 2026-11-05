@@ -27,7 +27,8 @@ class SkipRecomputeFlashAttention(torch.autograd.Function):
         scale,
         keep_prob,
         inner_precise,
-        sparse_mode
+        sparse_mode,
+        metric_sink=None,
     ):
         layer_idx, depth = TrainingContext().get_layer_index(), TrainingContext().get_model_depth()
 
@@ -35,7 +36,7 @@ class SkipRecomputeFlashAttention(torch.autograd.Function):
         if TrainingContext().get_training_stage() == TrainingStage.FORWARD:
             # --- Scenario 1: Forward Pass ---
             # Perform the actual Flash Attention computation on the NPU
-            attn_output, softmax_max, softmax_sum, *_ = torch_npu.npu_fusion_attention(
+            attn_output, softmax_max, softmax_sum = torch_npu.npu_fusion_attention(
                 q,
                 k,
                 v,
@@ -50,7 +51,9 @@ class SkipRecomputeFlashAttention(torch.autograd.Function):
                 keep_prob=keep_prob,
                 inner_precise=inner_precise,
                 sparse_mode=sparse_mode,
-            )
+            )[:3]
+            if metric_sink is not None:
+                metric_sink(softmax_max)
 
             # Offload the intermediate results (attn_output, softmax_max, softmax_sum) to CPU memory.
             # This allows us to skip recomputing Flash Attention during the backward pass.
@@ -132,7 +135,7 @@ class SkipRecomputeFlashAttention(torch.autograd.Function):
         inner_precise = ctx.inner_precise
         sparse_mode = ctx.sparse_mode
 
-        grad_q, grad_k, grad_v, *_ = torch_npu.npu_fusion_attention_grad(
+        grad_q, grad_k, grad_v = torch_npu.npu_fusion_attention_grad(
             q, k, v,
             grad_output,
             head_num,
@@ -149,14 +152,15 @@ class SkipRecomputeFlashAttention(torch.autograd.Function):
             keep_prob=keep_prob,
             inner_precise=inner_precise,
             sparse_mode=sparse_mode
-        )
+        )[:3]
 
         return (
             grad_q, grad_k, grad_v,  # Gradients for q, k, v
             None, None, None,        # head_num, layout, pse (replace with grad_pse if pse requires gradients)
             None, None,              # padding_mask, atten_mask
             None, None,              # actual_seq_qlen, actual_seq_kvlen
-            None, None, None, None   # scale, keep_prob, inner_precise, sparse_mode
+            None, None, None, None,  # scale, keep_prob, inner_precise, sparse_mode
+            None                     # metric_sink
         )
 
 
@@ -172,10 +176,11 @@ def skip_recompute_flash_attention(
     actual_seq_kvlen=None,
     keep_prob=1.0,
     inner_precise=0,
-    sparse_mode=0
+    sparse_mode=0,
+    metric_sink=None,
 ):
     attn_output = SkipRecomputeFlashAttention.apply(
-        q, k, v, head_num, layout, pse, padding_mask, atten_mask, actual_seq_qlen, actual_seq_kvlen, scale, keep_prob, inner_precise, sparse_mode
+        q, k, v, head_num, layout, pse, padding_mask, atten_mask, actual_seq_qlen, actual_seq_kvlen, scale, keep_prob, inner_precise, sparse_mode, metric_sink
     )
 
     return attn_output

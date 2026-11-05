@@ -1043,6 +1043,9 @@ class AttentionWithCp(torch.autograd.Function):
         attn_mask = attn_mask if isinstance(attn_mask, list) else [attn_mask]
 
         attn_out, softmax_max, softmax_sum, cp_config.rng_states = cp_config.global_attn_outs
+        metric_sink = cp_para.get("metric_sink")
+        if metric_sink is not None:
+            metric_sink(softmax_max)
         if cp_config.causal and not cp_config.is_eod_reset:
             k_stack, v_stack, q = cache_manager.get_cache_causal_regular(cur_kv, q)
         else:
@@ -1420,6 +1423,9 @@ class AttentionWithCpTNDGeneral(torch.autograd.Function):
         attn_mask = attn_mask if isinstance(attn_mask, list) else [attn_mask]
         # Extract final attention outputs
         attn_out, softmax_max, softmax_sum, cp_config.rng_states = cp_config.global_attn_outs
+        metric_sink = cp_para.get("metric_sink")
+        if metric_sink is not None:
+            metric_sink(softmax_max)
 
         k_stack, v_stack = cache_manager.get_cache(cur_kv)
 
