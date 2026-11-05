@@ -7,7 +7,7 @@ export HCCL_CONNECT_TIMEOUT=1200
 export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 export MULTI_STREAM_MEMORY_REUSE=2
 export TASK_QUEUE_ENABLE=1
-export CPU_AFFINITY_CONF=1,npu0:192-239,npu1:240-287,npu2:0-47,npu3:48-95,npu4:96-147,npu5:147-192,npu6:288-333,npu7:334-383
+export CPU_AFFINITY_CONF=1,npu_affine:1
 # 性能测试开启强路由制负载均衡
 export MM_FORCE_EP_BALANCE=1
 
