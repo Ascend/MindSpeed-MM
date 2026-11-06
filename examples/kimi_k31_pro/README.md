@@ -423,6 +423,8 @@ bash examples/kimi_k31_pro/finetune_kimik31_pro.sh
 bash examples/kimi_k31_pro/kimik31_pro_lora_128p.sh
 ```
 
+以上实验可通过master分支的commit 2b174b4f5400ccefa17c7e191a82c1a101f3d354进行复现
+
 <a id="jump4"></a>
 
 ## 环境变量声明
