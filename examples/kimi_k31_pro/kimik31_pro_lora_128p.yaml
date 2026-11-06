@@ -1,0 +1,188 @@
+parallel:
+  fully_shard_parallel_size: 128
+  fsdp_plan:
+    apply_modules:
+      - vision_tower
+      - mm_projector
+      - language_model.model
+      - language_model.model.embed_tokens
+      - language_model.model.layers.{*}
+      - language_model.model.layers.{*}.block_sparse_moe.experts
+      - language_model.lm_head
+    hook_modules:
+      - language_model.model.layers.{*}
+    num_to_forward_prefetch: 1
+    num_to_backward_prefetch: 1
+    param_dtype: bf16
+    reduce_dtype: fp32
+  ulysses_parallel_size: 1
+  expert_parallel_size: 64
+  ep_plan:
+    apply_modules:
+      - language_model.model.layers.{*}.block_sparse_moe.experts
+    dispatcher: alltoall
+    use_npu_fused_ops: true
+
+data:
+  dataset_param:
+    dataset_type: huggingface
+    attr:
+      images: images
+      messages: messages
+      role_tag: role
+      content_tag: content
+      user_tag: user
+      assistant_tag: assistant
+    preprocess_parameters:
+      model_name_or_path: &HF_MODEL_LOAD_PATH mindspeed_mm/fsdp/models/kimi_k31_pro
+      trust_remote_code: true
+      use_fast_tokenizer: false
+      split_special_tokens: false
+      image_max_pixels: 262144
+      image_min_pixels: 1024
+      video_max_pixels: 16384
+      video_min_pixels: 0
+      video_fps: 2.0
+      video_maxlen: 64
+    basic_parameters:
+      cutoff_len: 2048
+      template: kimi_k3
+      enable_thinking: false
+      train_on_prompt: false
+      mask_history: false
+      dataset_dir: /datasets/FORGE
+      dataset: /datasets/FORGE/train.jsonl
+      cache_dir: /home/FORGE/cache_dir
+      overwrite_cache: false
+      preprocess_on_fly: true
+      preprocessing_batch_size: 1
+      preprocessing_num_workers: 1
+      max_samples: 25984
+  dataloader_param:
+    pin_memory: true
+    shuffle: true
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: BaseRandomBatchSampler
+    num_workers: 8
+    collate_param:
+      collator_id: qwen3vl
+      ignore_pad_token_for_loss: true
+    enable_preload: true
+
+model:
+  model_id: kimi_k31_pro
+  model_name_or_path: *HF_MODEL_LOAD_PATH
+  trust_remote_code: true
+  use_grouped_expert_matmul: true
+  kda_implementation: ascendc
+  dsa_implementation: ascendc
+  causal_conv1d_implementation: ascendc
+  situ_glu_implementation: triton
+  attn_res_implementation: triton
+  skip_flash_attn_recompute: false
+  skip_kda_recompute: false
+
+features:
+  loss_cfg:
+    loss_type: default
+  enable_chunk_loss: false
+  recompute: true
+  recompute_plan:
+    use_reentrant: false
+    apply_modules:
+      - vision_tower.encoder.blocks.{*}
+      - language_model.model.layers.{*}
+  enable_activation_offload: true
+  activation_offload_plan:
+    apply_modules:
+      - vision_tower.encoder.blocks.{*}
+      - language_model.model.layers.{*}
+  enable_chunk_mbs: false
+  chunkmbs_plan:
+    apply_modules:
+      - language_model.model.layers.{*}
+    chunk_mbs: 1 # 这个表示的是chunk之后的micro batchsize
+    batch_dim: 0
+    chunk_arg_indexs: [0]
+    chunk_kwarg_names: ["attention_mask", "cache_position", "block_residual"]
+  # ep balance
+  enable_ep_balance: false
+  ep_balance_plan:
+    max_dup_experts_num: 2
+
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  seed: 42
+  lr: 1.0e-5
+  lr_decay_style: cosine
+  lr_warmup_ratio: 0.05
+  weight_decay: 0
+  train_iters: 2000
+  clip_grad: 0.0
+  init_model_with_meta_device: true
+  optimizer: adamw
+  adam_fused: true
+  use_deter_comp: false
+  no_save_optim: true
+  no_save_rng: true
+  save_interval: 200
+  save: ./save_path
+  save_format: dcp  # 可配置hf或dcp，当保存为hf权重时需将no_save_optim和no_save_rng置为true
+  load_rank0_and_broadcast: false
+  no_load_optim: true  # Do not load optimizer state; load by default.
+  no_load_rng: true  # Do not load RNG state; load by default.
+  load: ./load_path/Kimi-K3.1-full-fsdp128-ep64  # 根据load_format替换为hf权重或转换后的dcp权重路径
+  load_format: dcp
+
+  lora:
+    enable: true
+    rank: 8
+    alpha: 16
+    target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - q_a_proj
+      - q_b_proj
+      - kv_a_proj_with_mqa
+      - kv_b_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    dropout: 0.0
+    lora_save_only: true
+    pretrained_lora_path: null
+    disable_peft_moe_conversion: true
+  plugin:
+    - mindspeed_mm/fsdp/models/kimi_k31_pro
+    - mindspeed_mm/fsdp/data/datasets/huggingface
+
+# 工具配置
+tools:
+  profile:
+    enable: false
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_stack: false
+      with_memory: false
+      record_shapes: false
+      with_cpu: true
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      data_simplification: false
+      aic_metrics_type: PipeUtilization
+  memory_profile:
+    enable: false
+    start_step: 1
+    end_step: 2
+    save_path: ./memory_snapshot
+    dump_ranks: [0]
+    stacks: all
+    max_entries: null
+    mem_info: false

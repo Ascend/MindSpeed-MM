@@ -17,12 +17,17 @@
     - [4. 安装fla-npu以适配AscendC](#4-安装fla-npu以适配ascendc)
     - [5. 安装ops-transformer以适配AscendC版本DSA](#5-安装ops-transformer以适配ascendc版本dsa)
     - [6. 安装MindSpeed-Ops以支持Triton版本causal conv1d](#6-安装mindspeed-ops以支持triton版本causal-conv1d)
+  - [权重下载及转换](#权重下载及转换)
+    - [1. 权重下载](#1-权重下载)
+    - [2. 反量化为 BF16 格式](#2-反量化为-bf16-格式)
+    - [3. 转换为 DCP 格式](#3-转换为-dcp-格式)
   - [数据集准备及处理](#数据集准备及处理)
   - [训练](#训练)
     - [1. 准备工作](#1-准备工作)
     - [2. 配置参数](#2-配置参数)
     - [3. 受限场景支持](#3-受限场景支持)
     - [4. 启动训练](#4-启动训练)
+    - [5. 分布式 LoRA 微调](#5-分布式-lora-微调)
   - [环境变量声明](#环境变量声明)
   - [注意事项](#注意事项)
 
@@ -194,6 +199,57 @@ python -m pip install -e . --no-build-isolation --no-deps
 
 ---
 
+<a id="jump25"></a>
+
+## 权重下载及转换
+
+<a id="jump25.1"></a>
+
+### 1. 权重下载
+
+从 Hugging Face 下载 Kimi K3.1 Pro 开源模型权重：https://huggingface.co/moonshotai/Kimi-K3.1-Pro/tree/main
+
+> [!NOTE]
+>
+> 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+
+<a id="jump25.2"></a>
+
+### 2. 反量化为 BF16 格式
+
+Kimi-K3.1-Pro 开源权重为 MXFP4 量化格式，训练前需反量化为 BF16：
+
+```shell
+MXFP4_MODEL_PATH=/mnt/weight/moonshotai/Kimi-K3.1-Pro
+BF16_MODEL_PATH=/mnt/weight/moonshotai/Kimi-K3.1-Pro-bf16
+
+python examples/kimi_k31_pro/convert_kimi_k31_mxfp4_to_bf16_mp.py \
+    --source ${MXFP4_MODEL_PATH} \
+    --output ${BF16_MODEL_PATH} \
+    --workers 8 \
+    --overwrite
+```
+
+<a id="jump25.3"></a>
+
+### 3. 转换为 DCP 格式
+
+完成 BF16 权重转换后，进一步将反量化后的 Safetensors 权重转换为适配 FSDP2 分布式训练的 DCP（Distributed Checkpoint）格式，完成模型权重加载格式适配，为多机多卡训练提供支持：
+
+```shell
+python checkpoint/vlm_model/converters/kimi_k31.py \
+    --src-dir /mnt/weight/moonshotai/Kimi-K3.1-Pro-bf16 \
+    --dst-dir /mnt/weight/moonshotai/Kimi-K3.1-Pro-bf16-fsdp128-ep64 \
+    --fsdp-shards 128 \
+    --ep-size 64 \
+    --workers 8 \
+    --read-threads 4
+```
+
+转换完成后，在训练配置中将`training.load`配置为转换后的 DCP 权重目录，`training.load_format`配置为`dcp`。
+
+---
+
 <a id="jump2"></a>
 
 ## 数据集准备及处理
@@ -350,6 +406,20 @@ WORLD_SIZE=$(($NPROC_PER_NODE*$NNODES))
 
 ```shell
 bash examples/kimi_k31_pro/finetune_kimik31_pro.sh
+```
+
+<a id="jump3.5"></a>
+
+### 5. 分布式 LoRA 微调
+
+基于16机、128卡昇腾950超节点集群开展Kimi-K3.1-Pro LoRA微调，采用FSDP2+EP混合并行策略，实现超大规模模型的分布式部署与高效训练。
+
+(1) 在`kimik31_pro_lora_128p.yaml`配置文件中完成模型权重、训练数据集、LoRA参数及分布式并行策略等配置（LoRA参数见`training.lora`字段，分布式并行策略见`parallel`字段）；
+
+(2) 启动分布式LoRA微调：
+
+```shell
+bash examples/kimi_k31_pro/kimik31_pro_lora_128p.sh
 ```
 
 <a id="jump4"></a>
