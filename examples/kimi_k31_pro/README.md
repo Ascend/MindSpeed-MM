@@ -33,7 +33,7 @@
 
 ## 版本说明
 
-> 当前版本已完成减层、减专家场景的训练验证，使用前请先阅读[受限场景支持](#3-受限场景支持)章节。
+> 当前版本已完成减层、减专家场景的训练验证和完整参数的LoRA微调训练验证，使用前请先阅读[受限场景支持](#3-受限场景支持)章节。
 > 更多能力正在支持，敬请期待！
 
 Kimi-K3.1-Pro 复用 Kimi-K3 的视觉模块、KDA、MoE 和 FSDP2 训练链路，主要结构差异是 full-attention 层由 MLA 改为带 Lightning Indexer 的 DSA（Gated Sparse MLA）。模型插件位于 `mindspeed_mm/fsdp/models/kimi_k31_pro`，注册名为 `kimi_k31_pro`。
@@ -395,6 +395,7 @@ WORLD_SIZE=$(($NPROC_PER_NODE*$NNODES))
 - **减层减专家训练**：当前版本仅进行了至多8机验证，验证规格减少模型尺寸为28专家，尚未进行全层训练验证。
 - **DSA长序列路径**：测试序列长度需大于`index_topk`，才能覆盖实际的稀疏Top-K路径。K3.1默认`index_topk=2048`。
 - Top-K选择是离散操作，当前Indexer参数不从语言模型损失接收梯度，将会尽快支持。
+- **完整参数LoRA微调**：当前版本进行了128卡Atlas 950 SuperPoD验证.
 
 <a id="jump3.4"></a>
 
@@ -412,7 +413,7 @@ bash examples/kimi_k31_pro/finetune_kimik31_pro.sh
 
 ### 5. 分布式 LoRA 微调
 
-基于16机、128卡昇腾950超节点集群开展Kimi-K3.1-Pro LoRA微调，采用FSDP2+EP混合并行策略，实现超大规模模型的分布式部署与高效训练。
+基于128卡Atlas 950 SuperPoD开展Kimi-K3.1-Pro LoRA微调，采用FSDP2+EP混合并行策略，实现超大规模模型的分布式部署与高效训练。
 
 (1) 在`kimik31_pro_lora_128p.yaml`配置文件中完成模型权重、训练数据集、LoRA参数及分布式并行策略等配置（LoRA参数见`training.lora`字段，分布式并行策略见`parallel`字段）；
 

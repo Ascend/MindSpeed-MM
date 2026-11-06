@@ -47,6 +47,7 @@ test = [
     "pytest",
     "transformers[sentencepiece]",
     "pytest-mock",
+    "protobuf>=7.36.1"
 ]
 
 evaluate = [
