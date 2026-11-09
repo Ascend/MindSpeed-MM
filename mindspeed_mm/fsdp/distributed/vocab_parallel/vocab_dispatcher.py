@@ -174,83 +174,21 @@ VOCAB_SPLIT_DISPATCHERS: Dict[str, Tuple[Callable, Callable]] = {
 
 
 
+def vp_lookup(module, input_ids, past_key_values, vp_group, vp_plan) -> torch.Tensor:
+    """Look this layer's rows up now.
+
+    The model normally prefetches ahead and hands the rows in as an input (see
+    ``vocab_parallel.vp_prefetch``); this is the path used when it does not, e.g. for a layer outside
+    the prefetch scope or with prefetching disabled.
+    """
+    ngram_ids = module._compute_ngram_ids(input_ids, past_key_values)
+    prepare, finish = get_vocab_split_dispatcher(vp_plan.dispatcher)
+    pending = prepare(module.ngram_embedding, ngram_ids, vp_group, vp_plan)
+    return finish(module.ngram_embedding, pending).flatten(-2)
+
+
 def get_vocab_split_dispatcher(name: str) -> Tuple[Callable, Callable]:
     pair = VOCAB_SPLIT_DISPATCHERS.get(name)
     if pair is None:
         raise ValueError(f"vocab dispatcher {name} has no split form; disable prefetch_split.")
     return pair
-
-
-# How many prefetched batches one module keeps. chunk_mbs can hold a couple of micro-batches in
-# flight at once; anything older than these entries is a left-over of a previous step.
-MAX_PREFETCH_ENTRIES = 4
-
-
-def _prefetch_key(input_ids) -> tuple:
-    """Identity of the batch a prefetch belongs to: its own micro-batch when chunk_mbs slices one."""
-    return input_ids.data_ptr(), tuple(input_ids.shape)
-
-
-def _prefetch_stash(module) -> dict:
-    stash = getattr(module, "_vp_prefetched", None)
-    if stash is None:
-        stash = module._vp_prefetched = {}
-    return stash
-
-
-def _complete_prefetch(module, prefetched) -> torch.Tensor:
-    """Turn a prefetch into the layer's rows: complete a pending lookup, or pass a ready tensor on."""
-    if isinstance(prefetched, PendingLookup):
-        _, finish = get_vocab_split_dispatcher(prefetched.dispatcher)
-        return finish(module.ngram_embedding, prefetched).flatten(-2)
-    return prefetched
-
-
-def vp_lookup(module, input_ids, past_key_values, vp_group, vp_plan) -> torch.Tensor:
-    """Complete a lookup for ``module``: consume the prefetch of this batch, or fetch the rows now.
-
-    The stash is keyed by the batch tensor, so a batch sliced by ``chunk_mbs`` consumes its own
-    prefetch instead of a whole-batch one. After the lookup the next PLE layer is prefetched for the
-    same batch (``_vp_prefetch_next``), which keeps the fetches a layer ahead when the forward runs as
-    micro-batches and nobody prefetched them from the top.
-    """
-    stash = _prefetch_stash(module)
-    prefetched = stash.pop(_prefetch_key(input_ids), None)
-    if prefetched is not None:
-        result = _complete_prefetch(module, prefetched)
-    else:
-        ngram_ids = module._compute_ngram_ids(input_ids, past_key_values)
-        prepare, finish = get_vocab_split_dispatcher(vp_plan.dispatcher)
-        pending = prepare(module.ngram_embedding, ngram_ids, vp_group, vp_plan)
-        result = finish(module.ngram_embedding, pending).flatten(-2)
-
-    next_prefetch = getattr(module, "_vp_prefetch_next", None)
-    if next_prefetch is not None:
-        next_prefetch(input_ids, past_key_values)
-    return result
-
-
-def vp_prefetch(module, input_ids, past_key_values, vp_group, vp_plan) -> None:
-    """Look the rows of ``module`` up ahead of the layer that consumes them, one entry per batch.
-
-    ``chunk_mbs`` slices the batch inside the model forward, so several batches are in flight at once
-    and each keeps its own entry; a layer consumes the entry of the batch it is given.
-    """
-    if not vp_plan.prefetch:
-        return None
-    stash = _prefetch_stash(module)
-    key = _prefetch_key(input_ids)
-    if key in stash:
-        return None
-    if len(stash) >= MAX_PREFETCH_ENTRIES:
-        stash.pop(next(iter(stash)))
-    ngram_ids = module._compute_ngram_ids(input_ids, past_key_values)
-    prepare, finish = get_vocab_split_dispatcher(vp_plan.dispatcher)
-    if vp_plan.prefetch_split:
-        # Issue the fetch here and finish it in the layer, so the copy has the layers in between to
-        # run under (see VocabPlanConfig.prefetch_split).
-        stash[key] = prepare(module.ngram_embedding, ngram_ids, vp_group, vp_plan)
-        return None
-    pending = prepare(module.ngram_embedding, ngram_ids, vp_group, vp_plan)
-    stash[key] = finish(module.ngram_embedding, pending).flatten(-2)
-    return None

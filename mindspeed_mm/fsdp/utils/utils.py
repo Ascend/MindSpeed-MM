@@ -21,6 +21,25 @@ from .device import get_device_type, get_torch_device
 logger = logging.getLogger(__name__)
 
 
+def _get_no_placement_patterns(model) -> list:
+    """read patterns from model to declare host-resident parameters."""
+    return list(getattr(model, "_no_placement_params", None) or [])
+
+
+def is_host_resident_param(model, name: str) -> bool:
+    """Whether parameter ``name`` is declared host-resident by ``model._no_placement_params``."""
+    return any(name.endswith(pattern) for pattern in _get_no_placement_patterns(model))
+
+
+def get_host_resident_params(model, recurse: bool = True) -> list:
+    """``(name, parameter)`` of every parameter declared host-resident by the model."""
+    return [
+        (name, param)
+        for name, param in model.named_parameters(recurse=recurse)
+        if is_host_resident_param(model, name)
+    ]
+
+
 def to_empty_if_needed(
     model,
     device: torch.device | str | int | None,

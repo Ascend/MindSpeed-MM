@@ -72,6 +72,64 @@ class EPPlanConfig(BaseArguments):
             )
 
 
+class VocabPlanConfig(BaseArguments):
+    """Configuration for Vocabulary Parallelism (VP) plan for Ngram embedding tables."""
+    apply_modules: List[str] = field(default_factory=list)
+    dispatcher: Literal["alltoall"] = field(
+        default="alltoall",
+        metadata={"help": "Routing backend of the lookup. Only the all-to-all dispatcher exists today; "
+                          "the field stays so a plan keeps naming it explicitly."}
+    )
+    prefetch: bool = field(
+        default=True,
+        metadata={"help": "Look the table rows up before the layer that consumes them: the n-gram ids "
+                          "depend only on input_ids, so the lookup is not repeated by recomputation "
+                          "and can overlap with the preceding layers."}
+    )
+    prefetch_split: bool = field(
+        default=False,
+        metadata={"help": "Split that prefetch in two: route the ids and start the cpu-to-device copy "
+                          "before the decoder layers, then cast and send the rows back inside the layer "
+                          "that consumes them. The copy then runs under the layers in between, at the "
+                          "cost of one extra embedding all-to-all in the recomputation pass."}
+    )
+    host_by_cpu: bool = field(
+        default=True,
+        metadata={"help": "True keeps the n-gram table in host (cpu) memory and ships the touched rows "
+                          "per lookup: row-sparse gradient, a cpu-side sparse optimizer, dedup and "
+                          "prefetch. False keeps the table on the accelerator, sharded over the "
+                          "vocabulary group: dense gradient, the model's own optimizer, and none of the "
+                          "cpu-side machinery. The two are numerically equivalent."}
+    )
+    dedup: bool = field(
+        default=True,
+        metadata={"help": "Collapse repeated n-gram ids before routing and expand them after the rows "
+                          "come back, so both all-to-alls, the cpu fetch and the step-end merge carry "
+                          "distinct rows only. The forward output is unchanged. Costs one unique() over "
+                          "the lookup ids, which pays off whenever a step repeats an id; turn it off "
+                          "for a corpus where almost every id is distinct."}
+    )
+    async_offload: bool = field(
+        default=True,
+        metadata={"help": "Move the row transfers between cpu and accelerator onto a side stream so "
+                          "they overlap the compute stream. Covers the backward row-gradient copy and, "
+                          "with prefetch_split, the forward copy. Off makes every transfer block."}
+    )
+
+    def model_post_init(self, __context):
+        # Three renames landed together, and the base class accepts unknown keys, so a stale plan would
+        # otherwise be ignored and silently take the cpu path.
+        legacy = {
+            "device": "host_by_cpu (true: table on cpu, false: table on the accelerator)",
+            "async_transfer": "async_offload",
+            "device_sort": "environment variable MM_VP_DEVICE_SORT",
+            "device_merge": "environment variable MM_VP_DEVICE_MERGE",
+        }
+        stale = [f"{key} -> {hint}" for key, hint in legacy.items() if key in (self.model_extra or {})]
+        if stale:
+            raise ValueError("[Vocabulary Parallel] stale vocab_plan keys: " + "; ".join(stale))
+
+
 class RecomputePlanConfig(BaseArguments):
     """Configuration for recompute plan."""
     apply_modules: List[str] = field(default_factory=list)

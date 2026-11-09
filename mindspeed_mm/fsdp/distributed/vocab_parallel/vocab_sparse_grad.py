@@ -216,28 +216,24 @@ class VocabRowGrad:
         return self._coalesce(rows_parts, values_parts)
 
 
-def _named_modules(model):
-    """``named_modules()`` of a real model; nothing for a stand-in (a unit-test stub, for instance)."""
-    named_modules = getattr(model, "named_modules", None)
-    return named_modules() if callable(named_modules) else ()
-
-
 def get_vocab_embeddings(model) -> list:
-    """``(name, module)`` of every host-resident embedding: the ones whose gradient lands in a row ledger."""
-    return [
-        (name, module)
-        for name, module in _named_modules(model)
-        if getattr(module, "_vp_row_grad", None) is not None
-    ]
+    """``(name, module)`` of every host-resident embedding: the ones whose gradient lands in a row ledger.
+
+    ``vocab_parallelize_modules`` caches the takeover on the model; that cache is the only source, so the
+    per-step callers do not walk the module tree. Without vocabulary parallelism the cache is absent and
+    the list is empty, which is what the VP-off paths (optimizer, clipping, checkpoint keys) read.
+    """
+    cache = getattr(model, "_vocab_embeddings", None)
+    return [] if cache is None else cache["host"]
 
 
 def get_device_vocab_embeddings(model) -> list:
-    """``(name, module)`` of every embedding on the accelerator, updated by the model optimizer directly."""
-    return [
-        (name, module)
-        for name, module in _named_modules(model)
-        if getattr(module, "_vp_dense_embedding", False)
-    ]
+    """``(name, module)`` of every embedding on the accelerator, updated by the model optimizer directly.
+
+    Reads the cache ``vocab_parallelize_modules`` leaves behind, like ``get_vocab_embeddings``.
+    """
+    cache = getattr(model, "_vocab_embeddings", None)
+    return [] if cache is None else cache["device"]
 
 
 class _HostRowLookup(torch.autograd.Function):
