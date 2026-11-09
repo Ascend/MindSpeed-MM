@@ -437,8 +437,10 @@ class TrainEngine:
         metrics.close()
         # Final save after training completes
         if args.training.save:
-            dataloader_state = getattr(train_dataloader_iter, "last_consumed_state", None)
-            self.save(self.iteration, self.consumed_train_samples, dataloader_state)
+            # Skip if the final iteration was already saved at an interval boundary
+            if not (args.training.save_interval > 0 and self.iteration % args.training.save_interval == 0):
+                dataloader_state = getattr(train_dataloader_iter, "last_consumed_state", None)
+                self.save(self.iteration, self.consumed_train_samples, dataloader_state)
 
     def _run_validation(self, iteration):
         print_rank(logger.info, f"Running validation at iteration {iteration}...")
