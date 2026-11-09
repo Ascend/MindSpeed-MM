@@ -35,12 +35,12 @@ MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，
 
 | 字段 | 必选 | 说明 | 示例值 |
 | ------ | ------ | ------ | -------- |
-| 版本号 | 是 | MindSpeed MM 版本标识(v表示version，数字代表分支) | v26.0.0, v26.1.0 |
-| CANN版本 | 是 | `cann` + 版本号 | cann9.1.0 |
-| TorchNPU版本 | 是 | `torch_npu` + 版本号 | torch_npu2.7.1.post8 |
+| 版本号 | 是 | MindSpeed MM 版本标识（`v`表示version，数字代表分支） | v26.2.0 |
+| CANN版本 | 是 | `cann` + 版本号 | cann9.2.1 |
+| TorchNPU版本 | 是 | `torch_npu` + 版本号 | torch_npu2.10.0.post7 |
 | 适用产品信息 | 是 | NPU 芯片类型（小写） | 910b, a3, 950 |
 | 操作系统 | 是 | 操作系统 | openeuler24.03, ubuntu22.04 |
-| Python版本 | 是 | `py` + 版本号 | py3.11 |
+| Python版本 | 是 | `py` + 版本号 | py3.12 |
 
 > 镜像仓库中的 Tag 为 x86 与 aarch64 二合一的多架构镜像，**不包含** `x86_64`/`aarch64` 架构后缀。仅当通过 Dockerfile 在本地构建时，才会生成带架构后缀（`-x86_64` / `-aarch64`）的 Tag。
 
@@ -48,23 +48,23 @@ MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，
 
 | Tag | 版本号 | CANN | TorchNPU | NPU | 操作系统 | Python |
 | ----- | ----- | ----- | ----- | ----- | --------- | -------- |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11` | v26.1.0 | 9.1.0 | 2.7.1.post8 | A3 | openEuler 24.03 | 3.11 |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11` | v26.1.0 | 9.1.0 | 2.7.1.post8 | 910B | openEuler 24.03 | 3.11 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | v26.2.0 | 9.2.1 | 2.10.0.post7 | A3 | openEuler 24.03 | 3.12 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | v26.2.0 | 9.2.1 | 2.10.0.post7 | 910B | openEuler 24.03 | 3.12 |
 
 ### Tag 含义说明
 
-以 `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11` 为例：
+以 `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` 为例：
 
 | 字段 | 值 | 含义 |
 | ------ | ------ | ------ |
-| 版本号 | `v26.1.0` | MindSpeed MM Git tag（分支名：26.1.0） |
-| CANN版本 | `cann9.1.0` | 基于 CANN 9.1.0 |
-| TorchNPU版本 | `torch_npu2.7.1.post8` | TorchNPU 2.7.1.post8 |
+| 版本号 | `v26.2.0` | MindSpeed MM 版本标识（构建使用 Git 分支 `26.2.0`） |
+| CANN版本 | `cann9.2.1` | 基于 CANN 9.2.1 |
+| TorchNPU版本 | `torch_npu2.10.0.post7` | TorchNPU 2.10.0.post7 |
 | 适用产品信息 | `a3` | 适用于昇腾 A3 服务器 |
 | 操作系统 | `openeuler24.03` | 基于 openEuler 24.03 |
-| Python版本 | `py3.11` | Python 3.11 |
+| Python版本 | `py3.12` | Python 3.12 |
 
-> 通过 Dockerfile 本地构建后，会生成带架构后缀的 Tag，如 `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11-aarch64`（aarch64）与 `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11-x86_64`（x86_64）。
+> 通过 Dockerfile 本地构建后，会生成带架构后缀的 Tag，如 `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12-aarch64`（aarch64）与 `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12-x86_64`（x86_64）。
 > CANN 版本、NPU 类型（910b/a3/950）、操作系统和 Python 版本默认来源于构建时基础镜像的 tag；Python 版本可通过 `--python-version` 覆盖。TorchNPU 版本来源于 `--torch-npu-version` 参数。
 
 Dockerfile 命名：
@@ -74,20 +74,20 @@ Dockerfile 命名：
 
 ## 支持的 Tags 及 Dockerfile 链接
 
-### 最新版本 v26.1.0
+### 最新版本 v26.2.0
 
-如下是当前最新版本 v26.1.0 的所有镜像 Tag（`cann9.1.0` + `torch_npu2.7.1.post8`）。最新 Tag 为 x86 与 aarch64 二合一的镜像，使用 [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) 构建完成，可通过 ascendhub 获取对应的 `docker pull` 命令（[mindspeed-mm 镜像中心](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)）。
+下表列出 v26.2.0 的六个镜像 Tag，均使用 CANN 9.2.1、TorchNPU 2.10.0.post7 和 Python 3.12。每个 Tag 同时支持 x86_64 和 aarch64。可通过 ascendhub 获取对应的 `docker pull` 命令（[mindspeed-mm 镜像中心](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)）。
 
 | Tag | Dockerfile | 说明 |
 | --- | --- | --- |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 910B + openEuler 24.03，x86_64/aarch64 二合一 |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 910B + Ubuntu 22.04，x86_64/aarch64 二合一 |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | A3 + openEuler 24.03，x86_64/aarch64 二合一 |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | A3 + Ubuntu 22.04，x86_64/aarch64 二合一 |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 950 + openEuler 24.03，x86_64/aarch64 二合一 |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 950 + Ubuntu 22.04，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 910B + openEuler 24.03，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 910B + Ubuntu 22.04，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | A3 + openEuler 24.03，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | A3 + Ubuntu 22.04，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 950 + openEuler 24.03，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 950 + Ubuntu 22.04，x86_64/aarch64 二合一 |
 
-> 上表中的最新 Tag 为多架构镜像（x86 与 aarch64 二合一）。该 Dockerfile 实际构建完成后会生成带架构后缀的 Tag，例如 `-aarch64` / `-x86_64` 后缀（如 `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`）。历史版本所有 Tag 请参考 [Supported Tags](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/supported_tags.md)。
+> 上表中的最新 Tag 为多架构镜像（x86 与 aarch64 二合一）。该 Dockerfile 实际构建完成后会生成带架构后缀的 Tag，例如 `-aarch64` / `-x86_64` 后缀（如 `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12-aarch64`）。历史版本所有 Tag 请参考 [Supported Tags](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/supported_tags.md)。
 
 ## 项目目录结构规范
 
@@ -102,7 +102,7 @@ docker/
 ├── build.sh                   # 镜像构建脚本，支持多种参数配置
 ├── OVERVIEW.md                # 英文版说明文档
 ├── OVERVIEW.zh.md             # 中文版说明文档
-├── supported_tags.md          # 历史 Tag 列表
+├── supported_tags.md          # 支持的 Tag 列表
 └── scripts/                   # 脚本目录
     └── ci/                    # CI 构建脚本与版本配置
 ```
@@ -129,7 +129,7 @@ docker/
     # 基本运行
     docker run -it --rm \
         -e LD_LIBRARY_PATH="/usr/local/npu/driver/lib64/driver:/usr/local/npu/driver/lib64/common:$LD_LIBRARY_PATH" \
-        mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+        mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12 bash
     ```
 
 ### 前置要求（可选）
@@ -139,6 +139,8 @@ docker/
 主机上必须安装与容器内 CANN 版本兼容的昇腾 NPU 驱动。请访问 [CANN 版本配套网站](https://www.hiascend.com/developer/download/compatibility) 了解驱动与 CANN 版本的对应关系。
 
 ### 运行镜像
+
+以下运行示例使用镜像短名称。请按镜像中心的拉取命令，将示例中的镜像名称替换为实际拉取的完整镜像名称。
 
 ```bash
 
@@ -158,12 +160,12 @@ docker run -it \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
     -v /path/to/data:/data \
     -v /path/to/weights:/weights \
-    mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+    mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12 bash
 ```
 
-### 在 950 系列 aarch64 架构产品上运行 CANN 容器
+### 在 950 系列 aarch64 架构产品上运行 MindSpeed MM 容器
 
-在 950 系列 aarch64 架构产品上，可通过以下命令运行 CANN 容器：
+在 950 系列 aarch64 架构产品上，可通过以下命令运行 MindSpeed MM 容器：
 
 ```bash
 
@@ -179,7 +181,7 @@ docker run \
     -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
     -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
-    -it mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+    -it mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-openeuler24.03-py3.12 bash
 ```
 
 ### 内置环境
@@ -215,26 +217,28 @@ docker run \
 
 ### 基础构建示例
 
+以下示例使用 [Ascend CANN 9.2.1 基础镜像](https://github.com/Ascend/cann-container-image/blob/main/OVERVIEW.md#latest-cann-921)。
+
 ```bash
 cd docker
 
 # 构建 A3 + openEuler 镜像
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12
 
 # 构建 910B + Ubuntu 镜像
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-ubuntu22.04-py3.12
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-910b-ubuntu22.04-py3.12
 
 # 构建 950 + openEuler 镜像，并指定 conda base 环境为 Python 3.12
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-950-openeuler24.03-py3.12 --python-version 3.12
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-950-openeuler24.03-py3.12 --python-version 3.12
 
 # 指定 PyTorch 版本构建
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12 --torch-version 2.10.0 --torch-npu-version 2.10.0.post7
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12 --torch-version 2.10.0 --torch-npu-version 2.10.0.post7
 
 # 指定版本构建
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-a3-openeuler24.03-py3.12 -v 26.2.0
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12 -v 26.2.0
 
 # 构建 CI 镜像（在 910B + openEuler + aarch64 主机上执行，tag 追加 -ci）
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12 --build-ci
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-910b-openeuler24.03-py3.12 --build-ci
 ```
 
 ### 自动下载功能说明
@@ -251,7 +255,7 @@ bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0
 
 构建脚本会自动从基础镜像 tag 中识别关键信息（`--base-image` 参数为必选）：
 
-1. **CANN 版本识别**：从镜像 tag 中提取 CANN 版本号（如 `9.2.0`）
+1. **CANN 版本识别**：从镜像 tag 中提取 CANN 版本号（如 `9.2.1`）
 2. **NPU 类型识别**：从镜像 tag 中识别 NPU 类型（如 `a3`）
 3. **操作系统识别**：从镜像 tag 中识别 `openeuler24.03` 或 `ubuntu22.04`
 4. **Python 版本识别**：从镜像 tag 中的 `py<x.y>` 字段提取 Python 版本（如 `3.12`）
@@ -266,7 +270,7 @@ bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 自定义配置
-BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-910b-openeuler24.03-py3.12"
+BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.1-910b-openeuler24.03-py3.12"
 TORCH_VERSION="2.10.0"
 TORCH_NPU_VERSION="2.10.0.post7"
 MINDSPEED_MM_VERSION="26.2.0"
@@ -284,18 +288,18 @@ bash "${SCRIPT_DIR}/build.sh" \
 
 **关键特性说明：**
 
-1. **自动识别**：脚本会自动从 `BASE_IMAGE` 中识别 CANN 版本（9.2.0）、NPU 类型（910b）和操作系统（openeuler24.03）。如果`BASE_IMAGE`在系统中不存在，会自动拉取。
+1. **自动识别**：脚本会自动从 `BASE_IMAGE` 中识别 CANN 版本（9.2.1）、NPU 类型（910b）和操作系统（openeuler24.03）。如果`BASE_IMAGE`在系统中不存在，会自动拉取。
 2. **指定 Python 版本**：`--python-version` 用于指定模型运行 Python 版本。
-3. **自动生成 tag**：基于识别结果自动生成符合命名规则的镜像 tag（如 `v26.2.0-cann9.2.0-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12-aarch64`）。
+3. **自动生成 tag**：基于识别结果自动生成符合命名规则的镜像 tag（如 `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12-aarch64`）。
 4. **自动下载**：如果本地没有 Miniconda 安装器或 decord 依赖，脚本会自动下载
 5. **失败清理**：`--cleanup-on-fail` 参数确保构建失败时清理悬空资源
 
 ### 二次开发
 
-基于此镜像创建自定义 Dockerfile：
+基于此镜像创建自定义 Dockerfile。若使用从镜像中心拉取的镜像，请将 `FROM` 后的镜像名称替换为实际拉取的完整镜像名称：
 
 ```dockerfile
-FROM mindspeed-mm:v26.2.0-cann9.2.0-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12-aarch64
+FROM mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12
 
 RUN pip install your-package==1.0.0
 

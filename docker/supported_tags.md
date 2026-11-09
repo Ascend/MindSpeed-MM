@@ -2,6 +2,17 @@
 
 A full list of tags that are supported with MindSpeed MM.
 
+## MindSpeed MM 26.2.0
+
+| Tag | Dockerfile | content |
+| --- | --- | --- |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | MindSpeed MM 26.2.0, CANN 9.2.1, TorchNPU 2.10.0.post7, 910B, openEuler 24.03, Python 3.12, x86_64/aarch64 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | MindSpeed MM 26.2.0, CANN 9.2.1, TorchNPU 2.10.0.post7, 910B, Ubuntu 22.04, Python 3.12, x86_64/aarch64 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | MindSpeed MM 26.2.0, CANN 9.2.1, TorchNPU 2.10.0.post7, A3, openEuler 24.03, Python 3.12, x86_64/aarch64 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | MindSpeed MM 26.2.0, CANN 9.2.1, TorchNPU 2.10.0.post7, A3, Ubuntu 22.04, Python 3.12, x86_64/aarch64 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | MindSpeed MM 26.2.0, CANN 9.2.1, TorchNPU 2.10.0.post7, 950, openEuler 24.03, Python 3.12, x86_64/aarch64 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | MindSpeed MM 26.2.0, CANN 9.2.1, TorchNPU 2.10.0.post7, 950, Ubuntu 22.04, Python 3.12, x86_64/aarch64 |
+
 ## MindSpeed MM 26.1.0
 
 | Tag | Dockerfile | content |

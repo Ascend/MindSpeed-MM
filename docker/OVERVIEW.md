@@ -35,12 +35,12 @@ All fields are mandatory, the field order cannot be changed, and all separators 
 
 | Field | Mandatory | Description | Example Values |
 | ------ | ------ | ------ | -------- |
-| version | Yes | MindSpeed MM version identifier (v indicates version; the number represents the branch) | v26.0.0, v26.1.0 |
-| CANN version | Yes | `cann` + version number | cann9.1.0 |
-| TorchNPU version | Yes | `torch_npu` + version number | torch_npu2.7.1.post8 |
+| version | Yes | MindSpeed MM version identifier (v indicates version; the number represents the branch) | v26.0.0, v26.2.0 |
+| CANN version | Yes | `cann` + version number | cann9.2.1 |
+| TorchNPU version | Yes | `torch_npu` + version number | torch_npu2.10.0.post7 |
 | product info | Yes | NPU chip type (lowercase) | 910b, a3, 950 |
 | OS | Yes | Operating system | openeuler24.03, ubuntu22.04 |
-| Python version | Yes | `py` + version number | py3.11 |
+| Python version | Yes | `py` + version number | py3.12 |
 
 > The tags in the image repository are multi-architecture images combining x86 and aarch64, and **do not** include the `x86_64`/`aarch64` architecture suffix. Only when building locally via the Dockerfile will tags with the architecture suffix (`-x86_64` / `-aarch64`) be generated.
 
@@ -48,23 +48,23 @@ All fields are mandatory, the field order cannot be changed, and all separators 
 
 | Tag | version | CANN | TorchNPU | NPU | OS | Python |
 | ----- | ----- | ----- | ----- | ----- | --------- | -------- |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11` | v26.1.0 | 9.1.0 | 2.7.1.post8 | A3 | openEuler 24.03 | 3.11 |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11` | v26.1.0 | 9.1.0 | 2.7.1.post8 | 910B | openEuler 24.03 | 3.11 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | v26.2.0 | 9.2.1 | 2.10.0.post7 | A3 | openEuler 24.03 | 3.12 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | v26.2.0 | 9.2.1 | 2.10.0.post7 | 910B | openEuler 24.03 | 3.12 |
 
 ### Tag Meaning Explanation
 
-Taking `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11` as an example:
+Taking `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` as an example:
 
 | Field | Value | Meaning |
 | ------ | ------ | ------ |
-| version | `v26.1.0` | MindSpeed MM Git tag (branch: 26.1.0) |
-| CANN version | `cann9.1.0` | Based on CANN 9.1.0 |
-| TorchNPU version | `torch_npu2.7.1.post8` | TorchNPU 2.7.1.post8 |
+| version | `v26.2.0` | MindSpeed MM Git tag (branch: 26.2.0) |
+| CANN version | `cann9.2.1` | Based on CANN 9.2.1 |
+| TorchNPU version | `torch_npu2.10.0.post7` | TorchNPU 2.10.0.post7 |
 | product info | `a3` | For Atlas A3 servers |
 | OS | `openeuler24.03` | Based on openEuler 24.03 |
-| Python version | `py3.11` | Python 3.11 |
+| Python version | `py3.12` | Python 3.12 |
 
-> Building locally via the Dockerfile generates tags with the architecture suffix, such as `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11-aarch64` (aarch64) and `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11-x86_64` (x86_64).
+> Building locally via the Dockerfile generates tags with the architecture suffix, such as `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12-aarch64` (aarch64) and `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12-x86_64` (x86_64).
 > The CANN version, NPU type (910b/a3/950), OS, and Python version are derived from the base image tag by default; the Python version can be overridden with `--python-version`. The TorchNPU version comes from the `--torch-npu-version` parameter.
 
 Dockerfile naming:
@@ -74,20 +74,20 @@ Dockerfile naming:
 
 ## Supported Tags and Dockerfile Links
 
-### Latest Version v26.1.0
+### Latest Version v26.2.0
 
-Below are all image tags of the current latest version v26.1.0 (`cann9.1.0` + `torch_npu2.7.1.post8`). The latest tags are images combining x86 and aarch64, built using the [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile). You can obtain the corresponding `docker pull` command from [AscendHub](https://www.hiascend.com/en/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e).
+Below are all image tags of the current latest version v26.2.0 (`cann9.2.1` + `torch_npu2.10.0.post7`). The latest tags are images combining x86 and aarch64, built using the [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile). You can obtain the corresponding `docker pull` command from [AscendHub](https://www.hiascend.com/en/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e).
 
 | Tag | Dockerfile | Description |
 | --- | --- | --- |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 910B + openEuler 24.03, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 910B + Ubuntu 22.04, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | A3 + openEuler 24.03, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | A3 + Ubuntu 22.04, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 950 + openEuler 24.03, x86_64/aarch64 combined |
-| `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.1.0/docker/Dockerfile) | 950 + Ubuntu 22.04, x86_64/aarch64 combined |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 910B + openEuler 24.03, x86_64/aarch64 combined |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 910B + Ubuntu 22.04, x86_64/aarch64 combined |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | A3 + openEuler 24.03, x86_64/aarch64 combined |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | A3 + Ubuntu 22.04, x86_64/aarch64 combined |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 950 + openEuler 24.03, x86_64/aarch64 combined |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 950 + Ubuntu 22.04, x86_64/aarch64 combined |
 
-> The latest tags in the table above are multi-architecture images (x86 and aarch64 combined). Once actually built, this Dockerfile generates tags with the architecture suffix, such as `-aarch64` / `-x86_64` (e.g. `v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`). For all tags of historical versions, please refer to [Supported Tags](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/supported_tags.md).
+> The latest tags in the table above are multi-architecture images (x86 and aarch64 combined). Once actually built, this Dockerfile generates tags with the architecture suffix, such as `-aarch64` / `-x86_64` (e.g. `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12-aarch64`). For all tags of historical versions, please refer to [Supported Tags](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/supported_tags.md).
 
 ## Project Directory Structure Specification
 
@@ -129,7 +129,7 @@ The `docker/build.sh` script uses the version number specified by the `-v` param
     # Basic run
     docker run -it --rm \
         -e LD_LIBRARY_PATH="/usr/local/npu/driver/lib64/driver:/usr/local/npu/driver/lib64/common:$LD_LIBRARY_PATH" \
-        mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+        mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12 bash
     ```
 
 ### Prerequisites (Optional)
@@ -158,12 +158,12 @@ docker run -it \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
     -v /path/to/data:/data \
     -v /path/to/weights:/weights \
-    mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+    mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12 bash
 ```
 
-### Running the CANN Container on 950 Series aarch64 Architecture Products
+### Running the MindSpeed MM Container on 950 Series aarch64 Architecture Products
 
-On 950 series aarch64 architecture products, the CANN container can be run with the following command:
+On 950 series aarch64 architecture products, the MindSpeed MM container can be run with the following command:
 
 ```bash
 
@@ -179,7 +179,7 @@ docker run \
     -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
     -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
     -v /etc/ascend_install.info:/etc/ascend_install.info \
-    -it mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+    -it mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-openeuler24.03-py3.12 bash
 ```
 
 ### Built-in Environments
@@ -208,8 +208,8 @@ The build script `build.sh` supports multiple parameter configurations. The CANN
 | `-v, --version` | MindSpeed MM version identifier, also used as the Git branch name | 26.2.0 |
 | `--tag` | Custom image tag (overrides the default tag; CI appends `-ci`) | Auto-generated |
 | `-n, --no-cache` | Build without cache | None |
-| `--torch-version` | PyTorch version (online installation) | 2.7.1 |
-| `--torch-npu-version` | TorchNPU version (online installation) | 2.7.1.post8 |
+| `--torch-version` | PyTorch version (online installation) | 2.10.0 |
+| `--torch-npu-version` | TorchNPU version (online installation) | 2.10.0.post7 |
 | `--build-ci` | Build CI image on top of the dev image (multi-version conda environments); output tag appends `-ci` | None |
 | `--cleanup-on-fail` | Clean up dangling images/containers on build failure | None |
 
@@ -219,22 +219,22 @@ The build script `build.sh` supports multiple parameter configurations. The CANN
 cd docker
 
 # Build A3 + openEuler image
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12
 
 # Build 910B + Ubuntu image
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-ubuntu22.04-py3.11
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-910b-ubuntu22.04-py3.12
 
 # Build 950 + openEuler image with Python 3.12 as the conda base environment
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-950-openeuler24.03-py3.12 --python-version 3.12
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-950-openeuler24.03-py3.12 --python-version 3.12
 
 # Build with specified PyTorch version
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --torch-version 2.7.1 --torch-npu-version 2.7.1.post4
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12 --torch-version 2.10.0 --torch-npu-version 2.10.0.post7
 
 # Build with specified version
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 -v 26.2.0
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12 -v 26.2.0
 
 # Build the CI image (on top of the dev image; tag appends -ci)
-bash build.sh --base-image swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-a3-openeuler24.03-py3.11 --build-ci
+bash build.sh --base-image quay.io/ascend/cann:9.2.1-910b-openeuler24.03-py3.12 --build-ci
 ```
 
 ### Automatic Download Function Description
@@ -251,10 +251,10 @@ The build script supports automatic download of the following resources. Please 
 
 The build script automatically recognizes key information from the base image tag (the `--base-image` parameter is required):
 
-1. **CANN version recognition**: Extracts the CANN version number (e.g., `9.0.0`) from the image tag
+1. **CANN version recognition**: Extracts the CANN version number (e.g., `9.2.1`) from the image tag
 2. **NPU type recognition**: Recognizes the NPU type (e.g., `a3`) from the image tag
 3. **Operating system recognition**: Recognizes `openeuler24.03` or `ubuntu22.04` from the image tag
-4. **Python version recognition**: Extracts the Python version (e.g., `3.11`) from the `py<x.y>` field in the image tag
+4. **Python version recognition**: Extracts the Python version (e.g., `3.12`) from the `py<x.y>` field in the image tag
 5. **Automatic image tag generation**: Automatically generates image tags conforming to naming rules based on recognized information
 
 ### Best Practice Example
@@ -266,11 +266,11 @@ The following example shows how to build a MindSpeed MM image using a custom bas
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Custom configuration
-BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-910b-openeuler24.03-py3.12"
-TORCH_VERSION="2.7.1"
-TORCH_NPU_VERSION="2.7.1.post8"
+BASE_IMAGE="swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.1-910b-openeuler24.03-py3.12"
+TORCH_VERSION="2.10.0"
+TORCH_NPU_VERSION="2.10.0.post7"
 MINDSPEED_MM_VERSION="26.2.0"
-PYTHON_VERSION="3.11"
+PYTHON_VERSION="3.12"
 
 # Execute build
 bash "${SCRIPT_DIR}/build.sh" \
@@ -284,9 +284,9 @@ bash "${SCRIPT_DIR}/build.sh" \
 
 **Key Feature Description:**
 
-1. **Automatic recognition**: The script automatically recognizes the CANN version (9.1.0), NPU type (910b), and operating system (openeuler24.03) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
+1. **Automatic recognition**: The script automatically recognizes the CANN version (9.2.1), NPU type (910b), and operating system (openeuler24.03) from `BASE_IMAGE`. If `BASE_IMAGE` doesn't exist in the system, it will be automatically pulled.
 2. **Specify Python version**: `--python-version` is used to specify the Python version for running the model.
-3. **Automatic tag generation**: Automatically generates image tags conforming to the naming rules based on recognition results (e.g. `v26.2.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11-aarch64`).
+3. **Automatic tag generation**: Automatically generates image tags conforming to the naming rules based on recognition results (e.g. `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12-aarch64`).
 4. **Automatic download**: If the Miniconda installer or decord dependencies are not available locally, the script will automatically download them
 5. **Failure cleanup**: The `--cleanup-on-fail` parameter ensures cleanup of dangling resources if the build fails
 
@@ -295,7 +295,7 @@ bash "${SCRIPT_DIR}/build.sh" \
 Create a custom Dockerfile based on this image:
 
 ```dockerfile
-FROM mindspeed-mm:v26.2.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
+FROM mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12
 
 RUN pip install your-package==1.0.0
 
