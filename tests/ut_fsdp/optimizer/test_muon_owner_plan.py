@@ -8,6 +8,7 @@ import torch.multiprocessing as mp
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.tensor import distribute_tensor, Shard
 
+from mindspeed_mm.optimizer.muon import Muon
 from mindspeed_mm.optimizer.muon.owner_plan import collect_owner_batches
 
 
@@ -69,3 +70,72 @@ def _distributed_checks(rank, rendezvous):
 
 def test_owner_collection_and_rank_agreement(tmp_path):
     mp.spawn(_distributed_checks, args=((tmp_path / "owner_plan").as_uri(),), nprocs=3)
+
+
+def _optimizer_integration_checks(rank, rendezvous):
+    torch.set_num_threads(1)
+    dist.init_process_group("gloo", init_method=rendezvous, rank=rank, world_size=3,
+                            timeout=timedelta(seconds=60))
+    try:
+        mesh = DeviceMesh("cpu", [0, 1, 2])
+        for mode, shape, count_key in (("per_head", (4, 8), "muon_num_heads"),
+                                       ("per_expert", (2, 4, 8), "muon_num_experts")):
+            layout_mesh = DeviceMesh("cpu", [0, 1, 2], mesh_dim_names=("ep",)) if mode == "per_expert" else mesh
+            parameter = torch.nn.Parameter(distribute_tensor(torch.ones(shape), layout_mesh, [Shard(0)]))
+            parameter.grad = torch.ones_like(parameter)
+            optimizer = Muon([dict(params=[parameter], use_muon=True, muon_mode=mode, **{count_key: 2})], ns_steps=2)
+            optimizer.step()
+            assert torch.isfinite(parameter.to_local()).all()
+            if rank == 2:
+                assert parameter.to_local().numel() == 0
+
+        full_grad = torch.randn(32, 129, generator=torch.Generator().manual_seed(12))
+        local = torch.nn.Parameter(torch.ones_like(full_grad))
+        sharded = torch.nn.Parameter(distribute_tensor(local.detach().clone(), mesh, [Shard(0)]))
+        options = dict(lr=.01, weight_decay=.1, momentum=.75, nesterov=False)
+        reference = Muon([dict(params=[local], use_muon=True)], **options)
+        optimizer = Muon([dict(params=[sharded], use_muon=True, param_names=["dense.weight"])], **options)
+        for _ in range(2):
+            local.grad = full_grad.clone()
+            sharded.grad = distribute_tensor(full_grad, mesh, [Shard(0)])
+            reference.step()
+            optimizer.step()
+            torch.testing.assert_close(sharded.full_tensor(), local, rtol=1e-5, atol=1e-6)
+            torch.testing.assert_close(optimizer.state[sharded]["momentum_buffer"].full_tensor(),
+                                       reference.state[local]["momentum_buffer"])
+
+        params = [torch.nn.Parameter(distribute_tensor(torch.ones(4, 16), mesh, [Shard(0)]))
+                  for _ in range(2)]
+        candidate = Muon([dict(params=params, use_muon=True, param_names=["a", "b"])])
+        candidate.step()
+        assert not candidate.state  # No gradients means no parameter or momentum update.
+        for parameter in params:
+            torch.testing.assert_close(parameter.full_tensor(), torch.ones(4, 16))
+
+        # A cached plan must still reject later disagreements before changing state.
+        for mismatch in ("gradient", "names", "steps", "coefficients"):
+            group = candidate.param_groups[0]
+            group.update(param_names=["a", "b"], ns_steps=5, ns_coefficients="polar_express")
+            for parameter in params:
+                parameter.grad = torch.ones_like(parameter)
+            candidate._collect_owner_matrices()
+            if rank == 0:
+                if mismatch == "gradient":
+                    params[0].grad = None
+                elif mismatch == "names":
+                    group["param_names"][0] = "changed"
+                elif mismatch == "steps":
+                    group["ns_steps"] = 10
+                else:
+                    group["ns_coefficients"] = "keller"
+            with pytest.raises(RuntimeError, match="manifest differs"):
+                candidate.step()
+            assert not candidate.state
+            for parameter in params:
+                torch.testing.assert_close(parameter.full_tensor(), torch.ones(4, 16))
+    finally:
+        dist.destroy_process_group()
+
+
+def test_sharded_optimizer_updates_and_rank_agreement(tmp_path):
+    mp.spawn(_optimizer_integration_checks, args=((tmp_path / "optimizer").as_uri(),), nprocs=3)

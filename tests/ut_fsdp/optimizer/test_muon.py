@@ -22,7 +22,8 @@ class TestZeroPowerViaNewtonSchulz5:
             result = zeropower_via_newtonschulz5(matrix, steps=2)
 
             judge_expression(result.shape == matrix.shape)
-            judge_expression(result.dtype == matrix.dtype)
+            # Standard Newton-Schulz returns its BF16 compute dtype.
+            judge_expression(result.dtype == torch.bfloat16)
 
     def test_rejects_non_2d_input(self):
         with pytest.raises(ValueError, match="expects a 2-D tensor"):

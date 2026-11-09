@@ -1,4 +1,5 @@
-"""QK-Clip scales per-head weights and agrees across CPU/Gloo ranks."""
+"""QK-Clip scales only out-of-bound heads and agrees across CPU/Gloo ranks."""
+import copy
 from datetime import timedelta
 
 import pytest
@@ -8,7 +9,8 @@ import torch.multiprocessing as mp
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.tensor import DTensor, Replicate, Shard, distribute_tensor
 
-from mindspeed_mm.optimizer.muon.qk_clip import qk_clip_, qk_clip_mla_, _apply_qk_clip_groups, _prepare_qk_clip_groups
+from mindspeed_mm.optimizer.muon import Muon, qk_clip_, qk_clip_mla_
+from mindspeed_mm.optimizer.muon.qk_clip import _apply_qk_clip_groups, _QK_CLIP_RUNTIME_KEYS
 
 
 def _group(query, key, metrics, num_heads, process_groups=()):
@@ -107,28 +109,115 @@ def test_distributed_qk_clip_agreement_and_failures(tmp_path):
     mp.spawn(_distributed_checks, args=((tmp_path / "qk").as_uri(),), nprocs=4)
 
 
+def test_runtime_groups_are_not_checkpointed():
+    query = torch.nn.Parameter(torch.ones(4, 3))
+    key = torch.nn.Parameter(torch.ones(4, 3))
+    group = _group(query, key, torch.ones(2), 2)
+    group["qk_clip_metric_provider"] = lambda: torch.ones(2)
+    optimizer = Muon([group])
+    saved = copy.deepcopy(optimizer.state_dict())
+    assert not set(_QK_CLIP_RUNTIME_KEYS).intersection(saved["param_groups"][0])
+    optimizer.load_state_dict(saved)
+    assert optimizer.param_groups[0]["qk_clip_metric_provider"] is group["qk_clip_metric_provider"]
+    assert optimizer.param_groups[0]["qk_clip_params"][0] is query
+
+
+class _TinyAttention(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.q_proj = torch.nn.Linear(3, 4, bias=False)
+        self.k_proj = torch.nn.Linear(3, 4, bias=False)
+        self.norm = torch.nn.LayerNorm(3)
+
+
+def _qk_clip_muon(model, provider):
+    """Per-head Muon for Q and K with QK-Clip on Q, and AdamW for the norm."""
+    query, key = model.q_proj.weight, model.k_proj.weight
+    per_head = dict(use_muon=True, muon_mode="per_head", muon_num_heads=2)
+    return Muon([
+        dict(params=[query], **per_head, qk_clip_params=(query, key),
+             qk_clip_metric_provider=provider, qk_clip_threshold=1e-3, qk_clip_alpha=.5),
+        dict(params=[key], **per_head),
+        dict(params=list(model.norm.parameters()), use_muon=False),
+    ], lr=.01)
+
+
+def test_distributed_checkpoint_round_trip_into_fresh_optimizer():
+    """DCP creates state with a zero-lr step(closure=None) before save and load."""
+    from torch.distributed.checkpoint.state_dict import (
+        get_optimizer_state_dict,
+        set_optimizer_state_dict,
+    )
+
+    torch.manual_seed(0)
+    model = _TinyAttention()
+    fresh_metrics = {"value": None}
+
+    def provider():
+        value, fresh_metrics["value"] = fresh_metrics["value"], None
+        return value
+
+    optimizer = _qk_clip_muon(model, provider)
+    before = copy.deepcopy(model.state_dict())
+    # The initialization step sees no fresh QK-Clip metrics and must not change weights.
+    get_optimizer_state_dict(model, optimizer)
+    for name, value in model.state_dict().items():
+        torch.testing.assert_close(value, before[name], rtol=0, atol=0)
+
+    for parameter in model.parameters():
+        parameter.grad = torch.randn_like(parameter)
+    fresh_metrics["value"] = torch.tensor([10., 0.])
+    optimizer.step()
+    saved = copy.deepcopy(get_optimizer_state_dict(model, optimizer))
+
+    restored_model = copy.deepcopy(model)
+    restored = _qk_clip_muon(restored_model, provider)
+    set_optimizer_state_dict(restored_model, restored, saved)
+    for name, value in restored_model.state_dict().items():
+        torch.testing.assert_close(value, model.state_dict()[name], rtol=0, atol=0)
+    for source, target in zip(model.parameters(), restored_model.parameters()):
+        assert optimizer.state[source].keys() == restored.state[target].keys()
+        for key, value in optimizer.state[source].items():
+            torch.testing.assert_close(restored.state[target][key], value)
+    assert restored.param_groups[0]["qk_clip_metric_provider"] is provider
+
+
+def test_adamw_initializes_moments_with_unrelated_state():
+    parameter = torch.nn.Parameter(torch.ones(2, 3))
+    reference = torch.nn.Parameter(parameter.detach().clone())
+    optimizer = Muon([dict(params=[parameter], use_muon=False)], lr=.01, weight_decay=.1, adamw_eps=1e-3)
+    adamw = torch.optim.AdamW([reference], lr=.01, weight_decay=.1, betas=(.95, .95), eps=1e-3)
+    optimizer.state[parameter]["momentum_buffer"] = torch.full_like(parameter, 7.)
+    for _ in range(2):
+        # Small gradients make the epsilon placement affect the update.
+        parameter.grad = torch.full_like(parameter, 2e-6)
+        reference.grad = parameter.grad.clone()
+        optimizer.step()
+        adamw.step()
+        torch.testing.assert_close(parameter, reference)
+
 
 @pytest.mark.parametrize("name,value", [("qk_clip_alpha", 2.), ("qk_clip_threshold", -1.)])
-def test_invalid_controls_keep_consumed_metrics_for_retry(name, value):
-    query = torch.nn.Parameter(torch.ones(4, 3))
-    key = torch.nn.Parameter(torch.ones_like(query))
-    metrics = [torch.full((2,), 20.)]
+def test_invalid_controls_fail_before_any_optimizer_update(name, value):
+    model = _TinyAttention()
+    metrics = [torch.tensor([10., 12.])]
     calls = []
 
     def provider():
         calls.append(1)
         return metrics.pop() if metrics else None
 
-    group = _group(query, key, None, 2)
-    group["qk_clip_metric_provider"] = provider
-    original = group[name]
-    group[name] = value
+    optimizer = _qk_clip_muon(model, provider)
+    original = optimizer.param_groups[0][name]
+    optimizer.param_groups[0][name] = value
+    for parameter in model.parameters():
+        parameter.grad = torch.ones_like(parameter)
+    before = copy.deepcopy(model.state_dict())
     with pytest.raises(ValueError):
-        _prepare_qk_clip_groups([group])
-    torch.testing.assert_close(query, torch.ones_like(query))
-    torch.testing.assert_close(key, torch.ones_like(key))
-    group[name] = original
-    _apply_qk_clip_groups([group])
+        optimizer.step()
+    torch.testing.assert_close(model.state_dict(), before, rtol=0, atol=0)
+    assert not optimizer.state
+    optimizer.param_groups[0][name] = original
+    optimizer.step()
     assert len(calls) == 1
-    torch.testing.assert_close(query, torch.full_like(query, .5))
-    torch.testing.assert_close(key, torch.full_like(key, .5))
+    assert optimizer.state
