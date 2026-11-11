@@ -14,6 +14,7 @@
   - [配置文件](#配置文件)
   - [启动训练](#启动训练)
   - [正式训练配置](#正式训练配置)
+  - [LoRA 微调](#lora-微调)
 - [环境变量声明](#环境变量声明)
 - [注意事项](#注意事项)
   - [GPU\NPU BF16 反向精度注意事项](#gpunpu-bf16-反向精度注意事项)
@@ -43,6 +44,11 @@ Video VAE 和 Audio VAE 的在线训练。训练数据需要先通过 DiffSynth-
 | T2VA | prompt | `FL2VA/transformer` | `minimax_h3_t2va.yaml` | `finetune_minimax_h3_t2va.sh` |
 | FL2VA | prompt、首帧、尾帧 | `FL2VA/transformer` | `minimax_h3_fl2va.yaml` | `finetune_minimax_h3_fl2va.sh` |
 | Ref2VA | prompt、图像/视频/音频 reference | `Ref2VA/transformer` | `minimax_h3_ref2va.yaml` | `finetune_minimax_h3_ref2va.sh` |
+
+LoRA 微调复用与全参微调相同的模型插件、预计算缓存数据链路和 FSDP2 后端，
+仅将 DiT 中 `attn.qkv_proj`、`attn.out_proj`、`mlp.fc1`、`mlp.fc2` 替换为 PEFT
+LoRA 层并冻结其余参数。LoRA 不提供独立的示例配置和启动脚本，配置与启动方式见
+[LoRA 微调](#lora-微调)。
 
 ## 环境安装
 
@@ -173,6 +179,16 @@ data/minimax_h3/t2va_cache/
     └── 1.pth
 ```
 
+> **缓存格式兼容性**：DiffSynth-Studio v2.1.0 的缓存直接存储 `update_mask`、
+> `cond_rows` 等字段；v2.1.5 起缓存只保留 packed 序列结构（`img_pos` /
+> `audio_pos` / `text_pos` / `cu_seqlens` / `seq_len` / `token_tags` /
+> `img_position_ids`）。两种格式的缓存均受支持：v2.1.5 缓存缺失的字段会在
+> 数据集加载时按 DiffSynth `model_fn` 的同等逻辑推导补齐——`update_mask`
+> 在条件行（reference/keyframe，即 `img_pos` 前 `cond_rows` 行）置 False、
+> 其余视频行置 True，与训练时条件行被排除出 loss 的语义一致；同时校验
+> 视频/音频行数与 latent 几何信息（`latent_t*h*w`、`audio_channel*audio_t`）
+> 一致，不一致时加载即报错。
+
 ## 微调
 
 ### 配置文件
@@ -251,6 +267,62 @@ training:
 
 `dit_num_layers` 应与训练目标一致。完整 MiniMax-H3 transformer 包含 50 个 DiT block；
 减层仅用于资源受限的开发验证。
+
+### LoRA 微调
+
+将 `training.lora.enable` 设为 `true`，并按需配置其余参数，使用与全参微调相同的启动脚本
+进行 LoRA 微调。
+
+更详细的 LoRA 配置与参数说明见
+[LoRA 微调特性文档](../../docs/zh/features/training_mode/lora_finetune_fsdp2.md)。
+
+以 FL2VA 为例：复制全参配置 `minimax_h3_fl2va.yaml`，在 `training` 下添加 `lora` 配置块，
+并按需调整 `lr` 和 `save`：
+
+```yaml
+training:
+  lr: 1.0e-4
+  save: ./outputs/minimax_h3/lora_fl2va/checkpoints
+  lora:
+    enable: true
+    lora_save_only: true         # 只导出 adapter，不导出全量模型
+    rank: 32
+    alpha: 32                    # alpha = rank 时缩放系数为 1
+    target_modules:              # 被替换为 LoRA 层的子模块
+      - attn.qkv_proj
+      - attn.out_proj
+      - mlp.fc1
+      - mlp.fc2
+    dropout: 0.0
+    pretrained_lora_path: null   # 从已有 LoRA adapter 续训时填写
+```
+
+启动方式与全参微调一致，通过 `CONFIG_PATH` 指向复制出的配置：
+
+```bash
+cp examples/minimax_h3/minimax_h3_fl2va.yaml my_minimax_h3_fl2va_lora.yaml
+# 编辑 my_minimax_h3_fl2va_lora.yaml，在 training 下添加 lora 配置块
+CONFIG_PATH=my_minimax_h3_fl2va_lora.yaml \
+LOG_DIR=logs/minimax_h3_lora_fl2va \
+bash examples/minimax_h3/finetune_minimax_h3_fl2va.sh
+```
+
+T2VA / Ref2VA LoRA 分别改用 `finetune_minimax_h3_t2va.sh` /
+`finetune_minimax_h3_ref2va.sh`。`NNODES`、`NODE_RANK`、`MASTER_ADDR`、
+`MASTER_PORT` 等环境变量与全参微调一致，见[环境变量声明](#环境变量声明)。
+
+说明：
+
+- LoRA 注入发生在 FSDP2 分片之前，`target_modules` 指定的子模块（含 token refiner
+  中的同名子模块）被 PEFT 替换为 LoRA 层；base 权重冻结并保持 `param_dtype`（bf16），
+  LoRA 参数以 FP32 作为 master weight 参与 optimizer 更新。
+
+- `lora_save_only: true` 时按 `save_interval` 将 adapter 保存为
+  `<save>/lora_adapter.safetensors`（含 iteration 时为
+  `iter_<N>/lora_adapter_iteration_<N>.safetensors`），并写入 PEFT 风格的
+  `adapter_config.json`。
+
+- 继续训练已有 LoRA 时，将 `pretrained_lora_path` 指向 safetensors 文件。
 
 ## 环境变量声明
 

@@ -12,7 +12,6 @@ _PACKED_TENSOR_KEYS = (
     "img_pos",
     "audio_pos",
     "text_pos",
-    "update_mask",
     "token_tags",
     "cu_seqlens",
 )
@@ -65,7 +64,6 @@ class MiniMaxH3PrecomputedDataset(Dataset):
             "packed_img_position_ids_bits": packed["img_position_ids"]
             .contiguous()
             .view(torch.int64),
-            "packed_cond_rows": int(packed.get("cond_rows", 0)),
         }
         if "keyframe_cond_anchor" in shared:
             output["keyframe_cond_anchor"] = shared["keyframe_cond_anchor"]
@@ -87,10 +85,122 @@ class MiniMaxH3PrecomputedDataset(Dataset):
         for key in _PACKED_TENSOR_KEYS:
             output[f"packed_{key}"] = packed[key]
         for key in _PACKED_INT_KEYS:
-            output[f"packed_{key}"] = int(packed[key])
-        if "ref_audio_rows" in packed:
-            output["packed_ref_audio_rows"] = int(packed["ref_audio_rows"])
+            if key in packed:
+                output[f"packed_{key}"] = int(packed[key])
+        self._fill_packed_fields(output, shared, packed)
         return output
+
+    @staticmethod
+    def _fill_packed_fields(output, shared, packed):
+        """Fill packed fields, deriving ones missing from newer DiffSynth caches.
+
+        DiffSynth-Studio v2.1.0 caches store ``update_mask``, ``cond_rows`` and
+        the packed metadata ints directly. Since the pipeline refactor
+        (v2.1.5+), caches only carry ``img_pos``/``audio_pos``/``text_pos``/
+        ``cu_seqlens``/``seq_len``/``token_tags``/``img_position_ids`` and the
+        fields below are re-derived at train time exactly like DiffSynth's
+        ``model_fn`` does. Both cache formats therefore end up with the same
+        batch contract.
+
+        Raises:
+            ValueError: if the cached/derived values violate the packed
+                geometry that ``model_fn`` relies on (latent shapes or
+                ``update_mask`` length), so layout mismatches fail at load
+                time instead of as reshape errors at the first training step.
+        """
+        video_latents = shared["input_latents"]
+        audio_latents = shared["audio_input_latents"]
+        # patchify_video consumes [B, C, T, H, W]; pack_audio consumes
+        # [audio_channel, latent_dim, T] (no batch dim).
+        if video_latents.dim() != 5:
+            raise ValueError(
+                f"input_latents must be [B, C, T, H, W], got "
+                f"{tuple(video_latents.shape)}."
+            )
+        if audio_latents.dim() != 3:
+            raise ValueError(
+                f"audio_input_latents must be [audio_channel, latent_dim, T], "
+                f"got {tuple(audio_latents.shape)}."
+            )
+
+        cond_rows = packed.get("cond_rows")
+        if cond_rows is None:
+            # ref2va anchors take precedence over fl2va keyframes, same as the
+            # DiffSynth model_fn cond anchor selection.
+            cond_anchor = output.get("ref_visual_anchor")
+            if cond_anchor is None:
+                cond_anchor = output.get("keyframe_cond_anchor")
+            cond_rows = 0 if cond_anchor is None else cond_anchor.shape[0]
+
+        ref_audio_rows = packed.get("ref_audio_rows")
+        if ref_audio_rows is None:
+            ref_audio_anchor = output.get("ref_audio_anchor")
+            ref_audio_rows = 0 if ref_audio_anchor is None else ref_audio_anchor.shape[0]
+
+        img_pos = packed["img_pos"]
+        update_mask = packed.get("update_mask")
+        if update_mask is None:
+            # Every video row updates except the condition (reference /
+            # keyframe) rows at the front of img_pos, which model_fn masks out
+            # and excludes from the loss. Audio condition rows are handled by
+            # model_fn slicing only; audio logits are gated by
+            # update_audio_mask (None during training), not by update_mask.
+            update_mask = torch.ones(img_pos.shape[0], dtype=torch.bool)
+            if cond_rows:
+                update_mask[:cond_rows] = False
+        elif update_mask.shape[0] != img_pos.shape[0]:
+            raise ValueError(
+                f"update_mask length {update_mask.shape[0]} does not match "
+                f"the number of img rows ({img_pos.shape[0]})."
+            )
+
+        latent_t = int(packed.get("latent_t", video_latents.shape[2]))
+        latent_h_patched = int(
+            packed.get("latent_h_patched", video_latents.shape[3] // 2)
+        )
+        latent_w_patched = int(
+            packed.get("latent_w_patched", video_latents.shape[4] // 2)
+        )
+        audio_channel = int(packed.get("audio_channel", audio_latents.shape[0]))
+        audio_t = int(packed.get("audio_t", audio_latents.shape[2]))
+
+        # These row counts are what unpatchify_video / unpack_audio reshape
+        # against; validate them here so mismatched layouts fail with a clear
+        # message instead of a confusing reshape error at the first step.
+        video_rows = latent_t * latent_h_patched * latent_w_patched
+        if video_rows != img_pos.shape[0] - cond_rows:
+            raise ValueError(
+                f"latent_t*latent_h_patched*latent_w_patched ({video_rows}) "
+                f"does not match the number of video rows "
+                f"({img_pos.shape[0]} - cond_rows {cond_rows})."
+            )
+        audio_rows = audio_channel * audio_t
+        if audio_rows != packed["audio_pos"].shape[0] - ref_audio_rows:
+            raise ValueError(
+                f"audio_channel*audio_t ({audio_rows}) does not match the "
+                f"number of audio rows ({packed['audio_pos'].shape[0]} - "
+                f"ref_audio_rows {ref_audio_rows})."
+            )
+
+        fields = {
+            "packed_update_mask": update_mask,
+            "packed_cond_rows": int(cond_rows),
+            "packed_ref_audio_rows": int(ref_audio_rows),
+            # DiffSynth builders store cu_seqlens as [0, used, seq_len], so the
+            # last entry is the padded seq_len; only fills when the cache
+            # omits seq_len (setdefault keeps an explicit value authoritative).
+            "packed_seq_len": int(packed.get("seq_len", packed["cu_seqlens"][-1])),
+            "packed_text_len": int(
+                packed.get("text_len", packed["text_pos"].shape[0])
+            ),
+            "packed_audio_channel": audio_channel,
+            "packed_audio_t": audio_t,
+            "packed_latent_t": latent_t,
+            "packed_latent_h_patched": latent_h_patched,
+            "packed_latent_w_patched": latent_w_patched,
+        }
+        for key, value in fields.items():
+            output.setdefault(key, value)
 
     @staticmethod
     def collate_fn(features):
