@@ -272,13 +272,21 @@ class Qwen4ExpTextRMSNorm(nn.Module):
 # NOTE: the FLA package does not re-cast to `input_dtype` in its implementation, maybe we should do the same
 @use_kernel_forward_from_hub("RMSNormGated")
 class Qwen4ExpTextRMSNormGated(nn.Module):
-    def __init__(self, hidden_size: int, eps: float = 1e-6, activation: str = "silu") -> None:
+    def __init__(self, hidden_size: int, eps: float = 1e-6, activation: str = "silu",
+                 implementation: str = IMPL_EAGER) -> None:
         super().__init__()
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.variance_epsilon = eps
         self.activation = activation
+        self.implementation = implementation
 
     def forward(self, hidden_states: torch.Tensor, gate: torch.Tensor) -> torch.Tensor:
+        if self.implementation == IMPL_TRITON:
+            from mindspeed_mm.fsdp.ops.rmsnorm_gated.rmsnorm_gated_triton import rmsnorm_gated
+
+            return rmsnorm_gated(
+                hidden_states, gate, self.weight, self.variance_epsilon, self.activation
+            )
         input_dtype = hidden_states.dtype
         if IS_NPU_AVAILABLE:
             hidden_states = torch_npu.npu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
@@ -594,7 +602,9 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
         A = torch.empty(self.num_v_heads).uniform_(0.01, 16)
         self.A_log = nn.Parameter(torch.log(A))
         self.norm = Qwen4ExpTextRMSNormGated(
-            self.head_v_dim, eps=self.layer_norm_epsilon, activation=config.output_gate_type or config.hidden_act
+            self.head_v_dim, eps=self.layer_norm_epsilon,
+            activation=config.output_gate_type or config.hidden_act,
+            implementation=config.rmsnormgated_implementation,
         )
         self.out_proj = nn.Linear(self.value_dim, self.hidden_size, bias=False)
 
@@ -605,9 +615,9 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
         self.in_proj_b = nn.Linear(self.hidden_size, self.num_v_heads, bias=False)
         self.in_proj_a = nn.Linear(self.hidden_size, self.num_v_heads, bias=False)
 
-        self.causal_conv1d_implementation = getattr(config, "causal_conv1d_implementation", IMPL_EAGER)
-        self.gdn_implementation = getattr(config, "gdn_implementation", IMPL_EAGER)
-        self.skip_gdn_recompute = getattr(config, "skip_gdn_recompute", False)
+        self.causal_conv1d_implementation = config.causal_conv1d_implementation
+        self.gdn_implementation = config.gdn_implementation
+        self.skip_gdn_recompute = config.skip_gdn_recompute
 
         if self.gdn_implementation == IMPL_ASCENDC and self.causal_conv1d_implementation == IMPL_TRITON and IS_NPU_AVAILABLE:
             self.causal_conv1d_implementation = IMPL_TRITON_WITH_TRANSPOSE
@@ -662,12 +672,6 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
                 )
         elif self.gdn_implementation == IMPL_EAGER:
             self.chunk_gated_delta_rule = torch_chunk_gated_delta_rule
-            if self.skip_gdn_recompute:
-                raise NotImplementedError("gdn_implementation='eager' does not support skip_gdn_recompute now.")
-        else:
-            raise ValueError(
-                f"Invalid gdn_implementation='{self.gdn_implementation}'. Must be one of: {IMPL_FOR_GDN}."
-            )
         self.recurrent_gated_delta_rule = torch_recurrent_gated_delta_rule
 
     def _get_local_conv1d_weight(self, ulysses_rank: int, local_key_dim: int, local_value_dim: int) -> torch.Tensor:
@@ -993,7 +997,8 @@ class Qwen4ExpTextQSAIndexer(nn.Module):
         )
         self.q_layernorm = Qwen4ExpTextRMSNorm(self.index_head_dim, eps=config.rms_norm_eps)
         self.k_layernorm = Qwen4ExpTextRMSNorm(self.index_head_dim, eps=config.rms_norm_eps)
-        self.qsa_indexer_implementation = getattr(config, "qsa_indexer_implementation", IMPL_EAGER)
+        self.qsa_indexer_implementation = config.qsa_indexer_implementation
+        self.qsa_id2mask_implementation = config.qsa_id2mask_implementation
 
     def forward(
         self,
@@ -1221,11 +1226,7 @@ class Qwen4ExpTextAttention(nn.Module):
         self.q_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.k_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.indexer = Qwen4ExpTextQSAIndexer(config, layer_idx)
-        self.qsa_implementation = getattr(config, "qsa_implementation", IMPL_EAGER)
-        if self.qsa_implementation not in IMPL_FOR_QSA:
-            raise ValueError(
-                f"Invalid qsa_implementation='{self.qsa_implementation}'; expected {IMPL_FOR_QSA}"
-            )
+        self.qsa_implementation = config.qsa_implementation
 
     def forward(
         self,
@@ -1633,9 +1634,7 @@ class Qwen4ExpTextSparseMoeBlock(nn.Module):
 class Qwen4ExpTextGatedResidual(nn.Module):
     def __init__(self, config: Qwen4ExpTextConfig, use_combine: bool = True):
         super().__init__()
-        self.qhc_implementation = getattr(config, "qhc_implementation", IMPL_EAGER)
-        if self.qhc_implementation not in (IMPL_EAGER, IMPL_ASCENDC):
-            raise ValueError("qhc_implementation must be 'eager' or 'ascendc'.")
+        self.qhc_implementation = config.qhc_implementation
         self.hc_count = config.hc_count
         self.hidden_size = config.hidden_size
         hc_hidden_size = self.hc_count * self.hidden_size
@@ -1652,9 +1651,9 @@ class Qwen4ExpTextGatedResidual(nn.Module):
                 f"Expected {self.hc_count * self.hidden_size} hyper-connection features, got {hyper_input.shape[-1]}."
             )
         if self.qhc_implementation == IMPL_ASCENDC:
-            from mindspeed_mm.fsdp.ops.hc.text_gated_residual_ascendc import text_gated_residual_autograd
+            from mindspeed_mm.fsdp.ops.qhc.qhc_ascendc import qhc_ascendc
 
-            output = text_gated_residual_autograd(
+            output = qhc_ascendc(
                 hyper_input,
                 self.input_mix_weight_down.weight,
                 self.input_mix_weight_up.weight,
@@ -1668,6 +1667,25 @@ class Qwen4ExpTextGatedResidual(nn.Module):
                 return output
             mixed_input, injection_weights = output
             return mixed_input, hyper_input, injection_weights
+
+        elif self.qhc_implementation == IMPL_TRITON:
+            from mindspeed_mm.fsdp.ops.qhc.qhc_triton import qhc_triton
+            result = qhc_triton(
+                hyper_input,
+                self.hc_norm.weight,
+                self.input_mix_weight_down.weight,
+                self.input_mix_weight_up.weight,
+                self.block_inject_weight.weight
+                if self.block_inject_weight is not None
+                else None,
+                self.hc_count,
+                self.hidden_size,
+                self.hc_norm.eps,
+            )
+            if self.block_inject_weight is None:
+                return result
+            mixed, injection = result
+            return mixed, hyper_input, injection
 
         hyper_input_normed = self.hc_norm(hyper_input)
         input_mix_weight = F.silu(self.input_mix_weight_down(hyper_input_normed) / self.hc_count)
@@ -2197,14 +2215,14 @@ class Qwen4ExpTextModel(Qwen4ExpPreTrainedModel):
         _validate_cp_topology(ps)
         if ps.is_cp_enable() and (use_cache or past_key_values is not None):
             raise NotImplementedError("Qwen4Exp Ulysses CP currently supports training prefill only")
-        if ps.is_cp_enable() and getattr(self.config, "qsa_implementation", IMPL_EAGER) not in (
+        if ps.is_cp_enable() and self.config.qsa_implementation not in (
             IMPL_FLASH_ATTENTION_2, IMPL_ASCENDC,
         ):
             raise NotImplementedError(
                 "Qwen4Exp Ulysses CP requires qsa_implementation='flash_attention_2' or 'ascendc'"
             )
 
-        if getattr(self.config, "qsa_implementation", IMPL_EAGER) == IMPL_ASCENDC:
+        if self.config.qsa_implementation == IMPL_ASCENDC:
             if use_cache or past_key_values is not None:
                 raise NotImplementedError("AscendC QSA requires use_cache=False and no past_key_values")
 
@@ -2228,7 +2246,7 @@ class Qwen4ExpTextModel(Qwen4ExpPreTrainedModel):
         else:
             text_position_ids = None
 
-        if getattr(self.config, "qsa_implementation", IMPL_EAGER) == IMPL_ASCENDC:
+        if self.config.qsa_implementation == IMPL_ASCENDC:
             from mindspeed_mm.fsdp.ops.qsa.ascendc.generic_sparse_attention import validate_prefill_mask
             validate_prefill_mask(
                 attention_mask, text_position_ids, inputs_embeds.shape[0], inputs_embeds.shape[1]
@@ -3374,9 +3392,15 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
     def overwrite_transformer_config(transformer_config, model_args, feature_args):
         # QHC implementation; eager preserves the original checkpoint parameter layout.
         qhc_implementation = getattr(model_args, "qhc_implementation", IMPL_EAGER).lower().strip()
-        if qhc_implementation not in (IMPL_EAGER, IMPL_ASCENDC):
-            raise ValueError("qhc_implementation must be 'eager' or 'ascendc'.")
+        if qhc_implementation not in (IMPL_EAGER, IMPL_ASCENDC, IMPL_TRITON):
+            raise ValueError("qhc_implementation must be eager, ascendc, or triton.")
         transformer_config.text_config.qhc_implementation = qhc_implementation
+
+        # Gated RMSNorm implementation
+        rmsnormgated_implementation = getattr(model_args, "rmsnormgated_implementation", IMPL_EAGER).lower().strip()
+        if rmsnormgated_implementation not in (IMPL_EAGER, IMPL_TRITON):
+            raise ValueError("rmsnormgated_implementation must be eager or triton")
+        transformer_config.text_config.rmsnormgated_implementation = rmsnormgated_implementation
 
         # gdn implementation
         gdn_implementation = getattr(model_args, "gdn_implementation", IMPL_EAGER).lower().strip()
@@ -3407,10 +3431,12 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
                 f"gdn can be 'ascendc' only if causal_conv1d is not 'eager'."
             )
 
-        # qsa indexer implementation
+        # QSA indexer implementation
         qsa_indexer_implementation = getattr(model_args, "qsa_indexer_implementation", IMPL_EAGER).lower().strip()
         if qsa_indexer_implementation not in IMPL_FOR_QSA_INDEXER:
             raise ValueError(f"Invalid qsa_indexer_implementation='{qsa_indexer_implementation}'; expected {IMPL_FOR_QSA_INDEXER}")
+
+        # QSA implementation
         qsa_implementation = getattr(model_args, "qsa_implementation", IMPL_EAGER).lower().strip()
         if qsa_implementation not in IMPL_FOR_QSA:
             raise ValueError(
@@ -3420,6 +3446,14 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
         if qsa_implementation == IMPL_ASCENDC and qsa_indexer_implementation == IMPL_TRITON:
             raise NotImplementedError("Triton indexer does not expose block IDs; use ascendc or eager for AscendC QSA")
         transformer_config.text_config.qsa_indexer_implementation = qsa_indexer_implementation
+
+        # QSA ID2Mask implementation
+        qsa_id2mask_implementation = getattr(model_args, "qsa_id2mask_implementation", IMPL_EAGER).lower().strip()
+        if qsa_id2mask_implementation not in (IMPL_EAGER, IMPL_TRITON):
+            raise ValueError("qsa_id2mask_implementation must be eager or triton")
+        if qsa_id2mask_implementation == IMPL_TRITON and qsa_indexer_implementation != IMPL_ASCENDC:
+            raise ValueError("Triton id2mask requires qsa_indexer_implementation=ascendc")
+        transformer_config.text_config.qsa_id2mask_implementation = qsa_id2mask_implementation
         transformer_config.text_config.qsa_implementation = qsa_implementation
 
         # skip flash attn recompute
@@ -3433,7 +3467,10 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
         transformer_config.vision_config.skip_flash_attn_recompute = skip_flash_attn_recompute
 
         # skip gdn recompute
-        transformer_config.text_config.skip_gdn_recompute = getattr(model_args, "skip_gdn_recompute", False)
+        skip_gdn_recompute = getattr(model_args, "skip_gdn_recompute", False)
+        if skip_gdn_recompute and gdn_implementation == IMPL_EAGER:
+            raise NotImplementedError("gdn_implementation='eager' does not support skip_gdn_recompute now.")
+        transformer_config.text_config.skip_gdn_recompute = skip_gdn_recompute
 
         # grouped expert matmul (NPU fused MoE)
         transformer_config.text_config.use_grouped_expert_matmul = getattr(

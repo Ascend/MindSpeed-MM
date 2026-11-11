@@ -26,6 +26,8 @@ if IS_NPU_AVAILABLE:
     from cann_ops_transformer.ops import lightning_indexer, lightning_indexer_metadata
 
 
+IMPL_TRITON = "triton"
+
 _LIGHTNING_OPS = None
 _METADATA_CACHE: dict[tuple, tuple[torch.Tensor, torch.Tensor]] = {}
 _WEIGHT_CACHE: dict[tuple, torch.Tensor] = {}
@@ -184,6 +186,7 @@ def qsa_lightning_selected_token_mask(
     return_token_ids: bool = False,
     return_block_ids: bool = False,
     fallback_to_triton: bool = True,
+    id2mask_implementation: str,
 ) -> torch.Tensor:
     """Run QSA routing with LightningIndexerV2 and preserve Qwen tail semantics.
 
@@ -257,6 +260,12 @@ def qsa_lightning_selected_token_mask(
             return_value=0,
         )
         selected_blocks = selected_blocks.squeeze(2)
+        if id2mask_implementation == IMPL_TRITON and not (return_token_ids or return_block_ids):
+            from mindspeed_mm.fsdp.ops.qsa_id2mask.qsa_id2mask_triton import qsa_id_to_mask
+            return qsa_id_to_mask(
+                selected_blocks, query_length=query_length, kv_length=kv_length,
+                token_budget=token_budget, compress_ratio=compress_ratio, dtype=attention_mask.dtype,
+            )
         positions = torch.arange(
             dense_prefix_rows + query_position_offset,
             query_length + query_position_offset,
@@ -277,6 +286,13 @@ def qsa_lightning_selected_token_mask(
             dim=-1,
         )
     else:
+        if id2mask_implementation == IMPL_TRITON and not (return_token_ids or return_block_ids):
+            from mindspeed_mm.fsdp.ops.qsa_id2mask.qsa_id2mask_triton import qsa_id_to_mask
+            return qsa_id_to_mask(
+                torch.empty((batch, 0, block_topk), dtype=torch.int32, device=index_queries.device),
+                query_length=query_length, kv_length=kv_length, token_budget=token_budget,
+                compress_ratio=compress_ratio, dtype=attention_mask.dtype,
+            )
         selected_blocks = torch.empty(
             (batch, 0, block_topk + 1),
             dtype=torch.int32,
@@ -397,6 +413,7 @@ def qwen4_exp_qsa_indexer_forward_lightning(
         token_budget=self.token_budget,
         compress_ratio=self.compress_ratio,
         return_block_ids=return_block_ids,
+        id2mask_implementation=self.qsa_id2mask_implementation,
     )
     if return_block_ids:
         from mindspeed_mm.fsdp.ops.qsa.ascendc.generic_sparse_attention import complete_block_ids
