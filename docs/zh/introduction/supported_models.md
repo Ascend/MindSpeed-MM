@@ -51,7 +51,7 @@
       <td> BF16 </td>
     </tr>
     <tr>
-      <td rowspan="4"><a href="../../../examples/wan2.1">Wan2.1-T2V</a></td>
+      <td rowspan="4"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.2.0/examples/wan2.1">Wan2.1-T2V（26.2.0）</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers">1.3B</a></td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -76,7 +76,7 @@
       <td> BF16 </td>
     </tr>
     <tr>
-      <td rowspan="3"><a href="../../../examples/wan2.1">Wan2.1-I2V</a></td>
+      <td rowspan="3"><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.2.0/examples/wan2.1">Wan2.1-I2V（26.2.0）</a></td>
       <td>1.3B</td>
       <td> 预训练 </td>
       <td> 1x8</td>
@@ -95,7 +95,7 @@
       <td> BF16 </td>
     </tr>
     <tr>
-      <td><a href="../../../examples/self_forcing">Self-Forcing</a></td>
+      <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.2.0/examples/self_forcing">Self-Forcing（26.2.0）</a></td>
       <td><a href="https://huggingface.co/gdhe17/Self-Forcing">1.3B</a></td>
       <td> DMD蒸馏 </td>
       <td> 1x8</td>

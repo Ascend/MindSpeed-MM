@@ -1,1 +1,0 @@
-examples/wan2.1/flf2v_input_first_frame.png, examples/wan2.1/flf2v_input_last_frame.png

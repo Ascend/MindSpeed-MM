@@ -30,8 +30,7 @@ PR合入前都须通过全量CI门禁用例测试。
 
 | Module | Features | Scripts |
 | :------- | :--------- | :-------- |
-| **Pretrain** | Wan2.1 T2V, FSDP2 | [pretrain_wan2.1_t2v.sh](st/shell_scripts/pretrain_wan2.1_t2v.sh) |
-| | Wan2.2 I2V, FSDP2 | [pretrain_wan2.2_i2v.sh](st/shell_scripts/pretrain_wan2.2_i2v.sh) |
+| **Pretrain** | Wan2.2 I2V, FSDP2 | [pretrain_wan2.2_i2v.sh](st/shell_scripts/pretrain_wan2.2_i2v.sh) |
 | **Finetune** | Qwen3Omni, FSDP2 | [finetune_qwen3omni.sh](st/shell_scripts/finetune_qwen3omni.sh) |
 | | Qwen3VL 30B, FSDP2 | [finetune_qwen3vl_30B.sh](st/shell_scripts/finetune_qwen3vl_30B.sh) |
 | | Kimi-K2.5, FSDP2 | [finetune_kimik2_5.sh](st/shell_scripts/finetune_kimik2_5.sh) |

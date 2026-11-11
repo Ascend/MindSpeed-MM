@@ -4,7 +4,7 @@
 
 ## 1. 适用范围
 
-本文所述数据构造方式通用于仓库内大多数 VL 模型（如 [Qwen3.6](../../../../examples/qwen3_6)、[Qwen3.5](../../../../examples/qwen3_5)、[Qwen3VL](../../../../examples/qwen3vl)、[GLM4.5V](../../../../examples/glm4.5v)、[Kimi-K2.5](../../../../examples/kimik2_5)、[Step3-VL](../../../../examples/step3_vl) 等）。各模型若有特殊数据要求（如视频、音频等），以其 README 为准。
+本文所述数据构造方式通用于仓库内大多数 VL 模型（如 [Qwen3.6](../../../../examples/qwen3_6)、[Qwen3.5](../../../../examples/qwen3_5)、[Qwen3VL](../../../../examples/qwen3vl)、[GLM4.5V](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.2.0/examples/glm4.5v)、[Kimi-K2.5](../../../../examples/kimik2_5)、[Step3-VL](../../../../examples/step3_vl) 等）。各模型若有特殊数据要求（如视频、音频等），以其 README 为准。
 
 <a id="real-data"></a>
 

@@ -4,7 +4,7 @@ The current data processing approach is implemented with reference to the [LLaMA
 
 ## 1. Scope of Application
 
-The data construction method described in this document applies to most VL models in the repository, such as [Qwen3.6](../../../../examples/qwen3_6), [Qwen3.5](../../../../examples/qwen3_5), [Qwen3-VL](../../../../examples/qwen3vl), [GLM4.5V](../../../../examples/glm4.5v), [Kimi-K2.5](../../../../examples/kimik2_5), and [Step3-VL](../../../../examples/step3_vl). If a model has special data requirements (such as video or audio), its README shall prevail.
+The data construction method described in this document applies to most VL models in the repository, such as [Qwen3.6](../../../../examples/qwen3_6), [Qwen3.5](../../../../examples/qwen3_5), [Qwen3-VL](../../../../examples/qwen3vl), [GLM4.5V](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.2.0/examples/glm4.5v), [Kimi-K2.5](../../../../examples/kimik2_5), and [Step3-VL](../../../../examples/step3_vl). If a model has special data requirements (such as video or audio), its README shall prevail.
 
 <a id="real-data"></a>
 

@@ -10,7 +10,6 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import yaml
 from transformers.models.glm4v_moe.configuration_glm4v_moe import (
     Glm4vMoeConfig,
     Glm4vMoeTextConfig,
@@ -22,8 +21,6 @@ from transformers.models.glm4v_moe import modeling_glm4v_moe as hf_modeling
 
 REPO_ROOT = Path(__file__).parents[4]
 MODEL_PATH = REPO_ROOT / "mindspeed_mm/fsdp/models/glm4_5v/modeling_glm4_5v.py"
-LAUNCHER_PATH = REPO_ROOT / "examples/glm4.5v/finetune_glm4_5v_106B_v1.sh"
-CONFIG_PATH = REPO_ROOT / "examples/glm4.5v/glm4_5v_106B_config_v1.yaml"
 
 
 class _ModelRegister:
@@ -545,32 +542,6 @@ def test_ep_balance_configuration_and_dispatch():
     }
 
 
-def test_feature_plan_covers_visual_and_text_towers():
-    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
-    features = config["features"]
-
-    assert config["data"]["dataloader_param"]["collate_param"]["collator_id"] == "qwen3vl"
-    assert config["model"]["attn_implementation"] == "flash_attention_2"
-    assert config["parallel"]["ring_attention_size"] == 1
-    assert config["parallel"]["ulysses_parallel_size"] == 1
-    assert features["enable_chunk_loss"] is True
-    assert features["enable_dynamic_chunk_loss"] is False
-    assert features["chunkloss_plan"]["total_chunk_size"] == 4096
-    assert features["recompute"] is True
-    assert features["recompute_plan"]["apply_modules"] == [
-        "model.visual.blocks.{*}",
-        "model.language_model.layers.{*}",
-    ]
-    assert features["enable_activation_offload"] is False
-    assert features["activation_offload_plan"]["apply_modules"] == [
-        "model.visual.blocks.{*}",
-        "model.language_model.layers.{*}",
-    ]
-    assert features["enable_ep_balance"] is False
-    assert config["training"]["save"] == "./save_dir"
-    assert config["training"]["save_interval"] == 10000
-
-
 def test_feature_plan_module_paths_exist_on_model():
     modeling = _load_modeling_module()
     config = _tiny_config()
@@ -698,14 +669,3 @@ def test_npu_patch_requires_explicit_registration():
         npu_patch.apply_glm4v_npu_patch()
         assert hf_modeling.apply_rotary_pos_emb_vision is npu_patch.apply_rotary_pos_emb_vision
         assert hf_modeling.apply_multimodal_rotary_pos_emb is npu_patch.apply_multimodal_rotary_pos_emb
-
-
-def test_multinode_launcher_requires_external_rendezvous_settings():
-    launcher = LAUNCHER_PATH.read_text(encoding="utf-8")
-
-    assert 'MASTER_ADDR=${MASTER_ADDR:?' in launcher
-    assert 'NODE_RANK=${NODE_RANK:?' in launcher
-    assert 'NNODES=${NNODES:-8}' in launcher
-    source = 'source /usr/local/Ascend/ascend-toolkit/set_env.sh || exit $?'
-    assert source in launcher
-    assert launcher.index(source) < launcher.index('set -euo pipefail')

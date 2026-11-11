@@ -1,1 +1,0 @@
-/data/wan2.1/dataset,/data/wan2.1/data.json

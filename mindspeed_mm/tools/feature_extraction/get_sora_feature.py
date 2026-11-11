@@ -235,6 +235,8 @@ class FeatureExtractor:
         # Add i2v additional latents if present
         if latents_dict:
             for key, value in latents_dict.items():
+                if value is None:
+                    continue
                 item = value[sample_idx]
                 # Move tensors to CPU, leave other types as-is
                 data_to_save[key] = item.cpu() if isinstance(item, torch.Tensor) else item

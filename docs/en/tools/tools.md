@@ -133,14 +133,14 @@ The tools in the [feature_extraction](../../../mindspeed_mm/tools/feature_extrac
     --save_path             # Feature data storage path
     ```
 
-2. Before use, modify the dataset and configuration file (VAE, T5) paths of the corresponding model in the [feature_extraction.sh](../../../examples/wan2.1/feature_extract/feature_extraction.sh) file as needed.
+2. Before use, modify the dataset and configuration file (VAE, T5) paths of the corresponding model in the [feature_extraction.sh](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/examples/wan2.1/feature_extract/feature_extraction.sh) file as needed.
 
     ```bash
     --MM_DATA       # Data configuration file path (.json)
     --MM_MODEL      # Model configuration file path (.json)
     ```
 
-3. After configuration, call [feature_extraction.sh](../../../examples/wan2.1/feature_extract/feature_extraction.sh) to extract data features.
+3. After configuration, call [feature_extraction.sh](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/examples/wan2.1/feature_extract/feature_extraction.sh) to extract data features.
 
 ### Memory Snapshot Extraction
 

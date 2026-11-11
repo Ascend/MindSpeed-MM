@@ -14,7 +14,7 @@ FPDT在原生Ulysses切分sequence逻辑的基础上，将切分后的sequence�
 
 ## 使用方法
 
-使用场景：视频分辨率/帧数设置得很大时，训练过程中CP切分下单卡显存不足（OOM），需要开启FPDT。当前仅wan2.1的1.3B T2V示例（`WanDiT`）提供配置。
+使用场景：视频分辨率/帧数设置得很大时，训练过程中CP切分下单卡显存不足（OOM），需要开启FPDT。
 
 使能方式：开启CP > 1，在启动脚本pretrain_model.json的 `predictor` 段中修改如下JSON配置键（前提：`context_parallel_algo` 需配置为 `ulysses_cp_algo` 或 `hybrid_cp_algo`，且attention类型为self-attention）：
 
@@ -33,10 +33,6 @@ FPDT在原生Ulysses切分sequence逻辑的基础上，将切分后的sequence�
 | `FPDT` | bool | `false` | 使能键 |
 | `FPDT_chunk_number` | int | `None` | chunk数量，需确保per_gpu_seq_len可被其整除；开启FPDT时必填，缺省（`None`）会在FPDTFlashAttention初始化时报错 |
 | `FPDT_with_offload` | bool | `false` | 是否开启offload特性 |
-
-### 示例脚本
-
-**示例脚本**：`examples/wan2.1/1.3b/t2v/pretrain.sh`（特性配置键见 `examples/wan2.1/1.3b/t2v/pretrain_model.json` 的 `predictor` 段；示例中 `FPDT` 默认 `false`，需置为 `true`）。
 
 ## 注意事项
 
