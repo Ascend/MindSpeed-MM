@@ -8,9 +8,24 @@ FSDP2 + MCORE
 
 在训练多模态理解模型时，`lm_head` 的输出维度（即词表大小 `vocab_size`）通常远大于模型的隐空间维度 `hidden_size`。传统损失计算方式需要在中间显式构造一个形状为 `[bs, seq, vocab_size]` 的logits张量，这会带来显著的显存峰值，且词表越大或序列越长，该峰值越明显。此外，在动态shape场景下，这一操作还容易引发大块内存碎片，进一步加剧显存管理的负担。
 
+### 现有方案局限（legacy）
+
+`impl_type=legacy`（默认）通过"序列维分块 + 在forward内手动计算梯度"来降低显存：每个chunk仍会物化一份形状为`[chunk, vocab_size]`的logits，且其计算与梯度反传依赖`ChunkLoss`、`calculate_lm_loss`、`fixed_cross_entropy`三层调用栈，反向需要回放chunk内的计算图。当词表极大（如Qwen3.5的248320）或序列很长时，单块logits仍占不小显存，多层调用也带来额外开销。
+
 ## 解决方案
 
-通过对序列维度进行分块（chunking），将loss计算拆分为多个长度为`sub_seq`的子段依次进行。在完成每个子段的前向计算后，立即执行对应的反向传播，从而避免同时保留整个序列的logits。这样一来，任意时刻最多只需缓存长度为 `sub_seq` 的logits，显著降低了显存峰值。
+### 序列维分块（legacy）
+
+通过对序列维度进行分块（chunking），将loss计算拆分为多个长度为`sub_seq`的子段依次进行。在完成每个子段的前向计算后，立即执行对应的反向传播，从而避免同时保留整个序列的logits。这样一来，任意时刻最多只需缓存长度为`sub_seq`的logits，显著降低了显存峰值。
+
+### CCE融合算子（impl_type: cce）
+
+`impl_type=cce`采用Cut Cross-Entropy思路，在**词表维度**进行tile流式分块并配合在线softmax，前向过程从不物化完整的`[N, V]` logits（仅保留用于反向重算所需的激活值），从而在降低显存峰值的同时减少多层调用开销。
+
+- **两层分块**：外层按序列长度切成`seq_chunk_size`段（可选，由`chunk_size`复用，`None`表示单段不切分）；内层将词表切成大小为`vocab_tile_size`的tile逐一处理。
+- **双stream流水**：Cube流执行`hidden @ head`的矩阵乘，Vector流执行tile级在线softmax与累加，配合滑动窗口（NSLOT轮转）重叠计算，提升硬件利用率。
+- **反向重算**：基于前向缓存激活值重算所需梯度，无需额外保存完整logits。
+- **更轻的实现**：直接替换`ChunkLoss` + `calculate_lm_loss` + `fixed_cross_entropy`三层调用栈为融合算子`chunk_loss_cce_fused`，并可在无Triton环境下正常运行。
 
 ## 使用方法
 
@@ -35,10 +50,33 @@ features:
 | `enable_chunk_loss` | bool | `false` | 开启静态分块ChunkLoss，按固定块大小切分；块大小由 `chunkloss_plan.chunk_size` 指定。 |
 | `enable_dynamic_chunk_loss` | bool | `false` | 开启动态分块ChunkLoss，按总量自适应分块；总量由 `chunkloss_plan.total_chunk_size` 指定。 |
 | `chunkloss_plan.apply_module` | str | `lm_head` | 应用ChunkLoss的模块（要求该模块为 `nn.Linear`，否则报错）。 |
-| `chunkloss_plan.chunk_size` | int | `1024` | 静态分块时每块的大小（token数），仅 `enable_chunk_loss` 生效。 |
+| `chunkloss_plan.chunk_size` | int | `1024` | 静态分块时每块的大小（token数），仅`enable_chunk_loss`生效。`impl_type=legacy`时`None`自动按`1024`生效；`impl_type=cce`时该字段复用为外层序列切分大小（`seq_chunk_size`），`None`或`0`表示单段不切分。 |
 | `chunkloss_plan.total_chunk_size` | int | `4096` | 动态分块时单次计算的总token上限，仅 `enable_dynamic_chunk_loss` 生效，每块大小按批大小自动推导。 |
+| `chunkloss_plan.impl_type` | str | `legacy` | 可实现选型：`legacy`（默认）或`cce`。设为`cce`时`vocab_tile_size`生效。 |
+| `chunkloss_plan.vocab_tile_size` | int | `4096` | CCE的词表tile大小（仅`impl_type=cce`生效）。 |
 
 可参考 `examples/qwen3_5/qwen3_5_4B_config.yaml`。
+
+启用CCE融合算子时，在`chunkloss_plan`中设置`impl_type: cce`：
+
+```yaml
+features:
+  enable_chunk_loss: true
+  chunkloss_plan:
+    apply_module: lm_head
+    impl_type: cce
+    vocab_tile_size: 4096
+    chunk_size: 1024
+```
+
+`impl_type=cce`相关的参数说明：
+
+- `enable_chunk_loss`：CCE依赖该总开关必须为`true`，否则配置会校验报错（见`chunkloss_plan`归一化逻辑）。
+- `impl_type`：实现的选型，`legacy`（默认）或`cce`。设为`cce`后`vocab_tile_size`生效。
+- `vocab_tile_size`：CCE的词表tile大小，默认`4096`（仅`impl_type=cce`生效）。推荐`4096`平衡tile数与单tile内核开销，或用`8192`减半tile数以降低宿主侧事件开销（代价是slot显存翻倍）。
+- `chunk_size`：在`impl_type=cce`下复用为外层序列切分大小（`seq_chunk_size`），`None`或`0`表示单段不切分（仅`enable_chunk_loss`时生效）。
+
+CCE不额外引入独立启动脚本，直接在标准启动脚本所加载的config中开启即可，参考`examples/qwen3_5/finetune_qwen3_5_35B.sh`。
 
 ### 基于Megatron的FSDP2（过渡态，将退出）
 
@@ -88,3 +126,13 @@ features:
 ### 已知约束
 
 - `enable_chunk_loss` 与 `enable_dynamic_chunk_loss` 请勿混用：框架不做冲突校验，若同时开启，模型侧按静态分块使能，而loss计算的分块大小由动态分块参数推导，二者行为不一致。
+
+### 使用效果
+
+在多模态理解模型中，通过合理设置`chunk_size`可显著降低显存峰值并保持相同的loss曲线；启用`impl_type=cce`后收益更明显：
+
+- **显存峰值**：大词表长序列场景下，CCE相比基于Triton的分块路线约省63%显存。
+- **单步耗时**：大词表场景下，CCE相比基于Triton的分块路线约快12%。
+- **数值精度**：单元测试7/7通过，`loss_rel < 1e-4`、`grad_hidden`相对误差`< 1e-3`、`grad_weight`相对误差`< 5e-2`，与baseline保持一致。
+
+CCE目前仅支持默认与per token两种loss粒度，`per_sample_loss`暂不支持（将报`NotImplementedError`）。
