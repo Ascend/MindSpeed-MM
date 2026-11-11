@@ -1,61 +1,77 @@
 # 性能调优
 
-性能优化是训练的重要环节，合理的性能调优可以显著提升模型训练效率，降低资源消耗。本文档介绍了MindSpeed-MM在性能调优方面的最佳实践和方法。首先，我们介绍性能数据采集的方法，然后介绍性能分析的流程，最后介绍常用的性能调优方法。
+性能优化是训练的重要环节，合理的性能调优可以显著提升模型训练效率，降低资源消耗。本文介绍MindSpeed-MM性能数据的采集、分析流程和常用调优方法。具体模型支持的特性及配置，以模型样例和对应特性文档为准。
 
-性能在本文中，指机器（GPU、NPU或其他平台）在指定模型和输入数据的背景下，完成一次端到端训练所需要花费的时间，考虑到不同模型的训练数据量和训练轮次（epoch）差异，此处定义的性能是在完成一个batch训练所需花费的时间。而这里的端到端，我们通常是指完成一个人工智能模型单步训练的过程，也就是说，本文所讨论的性能的衡量和性能的优化，都是站在模型角度上。
+本文从模型角度衡量性能，关注指定模型和输入数据下完成一次端到端训练step所需的时间。一个step通常对应一次优化器更新，可能包含多个梯度累积的micro-batch。多模态样本的文本长度、图像分辨率和视频帧数等会影响工作量，比较时需要保持输入和训练配置一致。
 
-对于一个batch而言，时间主要由以下部分构成：
+一个训练step的时间涉及以下部分：
 
-单batch总时间 = 数据加载时间 + 模型前反向时间 + 优化器时间 + 模型后处理时间 + 通信时间 + 调度时间
+- **数据加载**：从存储设备读取图片、视频和文本等数据，在CPU上进行预处理（如编解码），并将数据送至设备。
+- **模型前向和反向**：前向计算和反向传播求导。
+- **优化器**：更新模型参数。
+- **模型后处理**：优化器更新后的数据处理或必要的同步，具体取决于模型。
+- **通信**：单节点内设备之间以及多节点之间的数据通信。与计算重叠的通信可能被掩盖，分析时重点关注未被掩盖的部分。
+- **调度下发**：Host执行指令并向设备下发算子任务的过程。
 
-各组成成分介绍如下：
+这些环节可能并行或重叠，各项累计耗时不能直接相加得到step时间；应沿时间线寻找影响step结束的等待和工作。
 
-- 数据加载时间：模型在加载自身所需要的数据（如图片、视频和文本等）的时间，包括将数据从硬件存储设备读取到CPU（Central Processing Unit）中、CPU中数据的预处理（编解码等操作）、CPU数据放到device上的时间。
-- 模型前向和反向时间：深度学习模型的前向过程和反向过程的时间，即Forward和Backward过程，包含前向的数据计算和反向的数据微分求导的时间。
-- 优化器时间：模型参数更新时间。
-- 模型后处理时间：优化器更新后的时间，包括数据的后处理或者一些必要的同步操作，通常取决于模型特有操作。
-- 通信时间：单节点内卡之间和多节点间节点之间的通信时间。由于PyTorch的特殊机制，在通信和计算可以并行的情况下，表示未被计算掩盖的通信时间。
-- 调度时间：模型从CPU的指令到调用NPU侧的核（Kernel）所需要的时间。
+下图概括本文的调优流程：先采集数据，再分析瓶颈并选择调优方法；实施后验证精度、显存和性能，必要时重新采集数据分析。
 
-## 性能数据采集
+```mermaid
+flowchart LR
+    A[采集性能数据] --> B[性能分析]
+    B --> C[选择调优方法]
+    C --> D[验证调优效果]
+    D -->|需要进一步调优| A
+```
 
-MindSpeed-MM提供了Profiling采集工具，支持静态采集和动态采集两种模式，用于采集模型训练过程中的性能数据。两个训练后端的配置入口不同：
+## 采集性能数据
 
-- **FSDP2后端**：在训练YAML的`tools`段配置，`tools.profile`用于性能数据采集（`enable`、`profile_type`、`ranks`等字段），`tools.memory_profile`用于显存快照采集（`enable`、`start_step`、`end_step`、`save_path`等字段），可参考各FSDP2模型样例YAML（如`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`）中的`tools`段。
-- **MCORE（Megatron）后端**：通过`mindspeed_mm/tools/tools.json`配置采集开关与参数，详细使用方法请参考[Profiling采集工具](../../tools/tools.md#profiling采集工具)；
+两个后端的采集入口不同：
 
-采集profiling时，建议同时记录以下关键上下文信息，便于后续分析：
+- **FSDP2**：在训练YAML的`tools.profile`中配置静态采集。可参考`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`。
+- **MCORE（Megatron）**：在`mindspeed_mm/tools/tools.json`中配置静态或动态采集，详见[Profiling采集工具](../../tools/tools.md#profiling采集工具)。
 
-- 模型名称、参数量、分布式策略（TP/PP/DP/EP/SP设置）
-- 训练配置（batch size、序列长度、梯度累积步数）
-- NPU型号、集群规模、CANN/TorchNPU插件版本号
-- 是否开启重计算、激活值卸载等特性
+FSDP2静态采集示例，合并到YAML中已有的`tools`段：
+
+```yaml
+tools:
+  profile:
+    enable: true
+    profile_type: static
+    ranks: [0]
+    static_param:
+      level: level1
+      with_cpu: true
+      with_stack: false
+      record_shapes: false
+      with_memory: false
+      save_path: ./profiling
+      start_step: 10
+      end_step: 11
+      analyse_flag: true
+```
+
+示例采集预热后的一个step：活动步数为`end_step - start_step`，训练需运行足够长。选择稳定区间，避开初始化、checkpoint等操作。排查跨卡等待时选择相关rank；`ranks: [-1]`表示全部rank，但采集开销和数据量也会增加。需要调用栈或形状信息时再开启相应选项。
+
+`with_memory`采集算子内存信息；`tools.memory_profile`则生成分配历史快照，使用方法见[显存调优](memory_tuning.md)。FSDP2若关闭在线解析，可运行`python mindspeed_mm/fsdp/tools/profiler.py --profiler-path ./profiling`；多机分析前应汇总各机器的采集结果。
 
 ## 性能分析流程
 
 ### 性能分析工具
 
-采集到性能数据后，可通过[MindStudio Insight](https://www.hiascend.com/document/detail/zh/mindstudio/2600/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/overview.md)对性能数据进行可视化分析，定位性能瓶颈。
+采集到性能数据后，可通过[MindStudio Insight](https://www.hiascend.com/document/detail/zh/mindstudio/2600/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/overview.md)分析算子、通信、显存和流水线等数据，定位性能瓶颈。
 
-MindStudio Insight是昇腾提供的性能分析工具，支持对Profiling采集的数据进行多维度分析，包括：
-
-- 算子耗时分析：识别耗时较长的算子，定位计算瓶颈
-- 通信耗时分析：分析通信与计算的时间占比，优化通信策略
-- 内存分析：查看显存使用情况，识别显存瓶颈
-- 流水线分析：分析流水线并行的空泡比例
-
-#### 多卡Timeline对齐
-
-多卡采集时各卡timeline各自记录，多机场景下因各机器时钟不一致，可能导致各卡timeline相对位置不对齐，影响跨卡分析（如快慢卡、通信等待）的判断；这属于采集数据在分析时的展示问题，不影响实际训练。MindStudio Insight对单卡、集群、多模型场景已实现timeline相对位置自动对齐；若多机场景仍不准，可使用其单卡或泳道维度的时间校准功能（在时间线界面设置偏移量，将对应卡/泳道左右平移），手动对齐各卡时间基准，详见[MindStudio Insight系统调优指南](https://www.hiascend.com/document/detail/zh/mindstudio/2600/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/system_tuning.md)中“时间线（Timeline） - 支持单卡和泳道时间对齐”小节。
+多机场景下，各机器时钟可能存在偏差，影响跨卡时间线的相对位置。分析前应检查时间线对齐情况，必要时使用单卡或泳道时间校准功能，详见[MindStudio Insight系统调优指南](https://www.hiascend.com/document/detail/zh/mindstudio/2600/GUI_baseddevelopmenttool/MindStudioInsight/docs/zh/user_guide/system_tuning.md)。
 
 ### 性能拆解分析方法
 
 拿到profiling数据后，建议按照以下维度进行系统拆解：
 
-1. **计算vs通信vs空闲占比**：首先看整体时间中计算、通信和Free的比例。Free占比高通常意味着Host bound或调度问题，此时可在MindStudio Insight工具timeline中打开**下发曲线**（Flow Events）：曲线陡峭或出现明显空隙的时间段，往往就是Host来不及下发、NPU空等的位置，对照这些位置即可定位下发瓶颈并做针对性优化（参见[调度下发优化](#调度下发优化)）；通信占比高需要检查通算掩盖情况。
-2. **快慢卡排查**：对比各卡的耗时分布，如果存在某张卡通信或下发明显慢于其他卡，需排查是否为下发bound、负载不均衡或硬件问题。
-3. **算子级拆解**：将计算时间按算子类型（Cube/Vector/AI CPU）分解，识别占比最高的算子类型。Cube算子（MatMul/FA等）MFU低说明计算密度不足，Vector算子占比过高说明存在可融合空间，出现AI CPU算子则意味着该算子回退到CPU执行、通常较慢，应设法消除或替换为NPU算子。
-4. **子模块MFU分析**：对模型子模块（Attention、MLP等）分别计算MFU，精确定位计算瓶颈。
+- **计算vs通信vs空闲占比**：首先看整体时间中计算、通信和Free的比例。Free占比高通常意味着Host bound或调度问题，此时可在MindStudio Insight工具timeline中打开**下发曲线**（Flow Events）：曲线陡峭或出现明显空隙的时间段，往往就是Host来不及下发、NPU空等的位置，对照这些位置即可定位下发瓶颈并做针对性优化（参见[调度下发优化](#调度下发优化)）；通信占比高需要检查通算掩盖情况。
+- **快慢卡排查**：对比各卡的耗时分布，如果存在某张卡通信或下发明显慢于其他卡，需排查是否为下发bound、负载不均衡或硬件问题。
+- **算子级拆解**：将计算时间按算子类型（Cube/Vector/AI CPU）分解，识别占比最高的算子类型。Cube算子（MatMul/FA等）MFU低说明计算密度不足，Vector算子占比过高说明存在可融合空间，出现AI CPU算子则意味着该算子回退到CPU执行、通常较慢，应设法消除或替换为NPU算子。
+- **子模块MFU分析**：对模型子模块（Attention、MLP等）分别计算MFU，精确定位计算瓶颈。
 
 #### 通信耗时分析
 
@@ -75,10 +91,10 @@ MFU（Model FLOPs Utilization，模型算力利用率）是指训练过程中实
 
 分析步骤如下：
 
-1. **计算理论FLOPs**：根据模型结构和输入shape，分别计算各模块的理论FLOPs。
-2. **获取实际耗时**：从profiling数据中提取各模块在前向、反向各阶段的真实耗时。
-3. **计算子模块MFU**：`子模块MFU = 子模块FLOPs / (子模块耗时 × 理论算力)`。
-4. **对比定位瓶颈**：对比各子模块的MFU值，识别利用率低的模块。
+- **计算理论FLOPs**：根据模型结构和输入shape，分别计算各模块的理论FLOPs。
+- **获取实际耗时**：从profiling数据中提取各模块在前向、反向各阶段的真实耗时。
+- **计算子模块MFU**：`子模块MFU = 子模块FLOPs / (子模块耗时 × 理论算力)`。
+- **对比定位瓶颈**：对比各子模块的MFU值，识别利用率低的模块。
 
 实践中，不同子模块的MFU高低往往有其结构性原因：Attention层以稠密矩阵乘（如Flash Attention）为主，MFU通常较高；MoE experts层因包含permute/unpermute等非计算操作，MFU通常较低。解读分解结果时，关键是区分“结构性偏低”（如MoE routing本身就含大量非计算开销，难以改变）与“可优化的偏低”（如可融合的Vector算子、冗余的Cast、低效访存等）。后者才是优化对象。优化的目的是用合适的手段消除这些浪费、提升真实性能，而不是去抬高MFU这个数字本身。
 
@@ -90,17 +106,9 @@ MindSpeed-MM提供了多种性能调优特性，可根据实际场景选择合�
 
 以下为FSDP2与MCORE均支持的框架特性：
 
-#### 异步激活值卸载
+#### 显存优化
 
-将激活值卸载至Host侧，利用异步机制使拷贝被计算掩盖，降低峰值显存，详见[异步激活值卸载](../../features/memory/async_activation_offload.md)
-
-#### ChunkLoss
-
-对序列维度分块计算loss，避免同时保留整个序列的logits，降低显存峰值，详见[ChunkLoss](../../features/optimization/chunkloss.md)
-
-#### 重计算
-
-在反向传播时重新计算前向的部分中间结果，以计算时间换取显存空间。适用于显存紧张、需要增大MBS或序列长度的场景。
+重计算以额外计算换显存；[异步激活值卸载](../../features/memory/async_activation_offload.md)将激活值卸载至Host；[ChunkLoss](../../features/optimization/chunkloss.md)分块计算loss。适用模型、配置和代价见各特性文档。
 
 #### 融合算子
 
@@ -127,35 +135,28 @@ Python的垃圾回收（GC）机制可能导致训练性能抖动。当观察到
 
 ### FSDP2后端特性
 
-以下方法仅适用于FSDP2插件式后端（入口为`mindspeed_mm/fsdp/train/trainer.py`）。
+以下方法适用于FSDP2插件式后端，具体配置和适用模型以[FSDP2迁移指南](../development/fsdp2_model_migration_guide.md)及模型样例为准。
 
-#### 显存优化
+#### 显存与Host内存优化
 
-显存是训练吞吐的关键约束，释放显存可以增大数据规模（MBS或序列长度），从而实现更好的通算掩盖。以下方法均可用于降低显存峰值。
+- **重计算**：在`features`段中通过`recompute`和`recompute_plan.apply_modules`选择重计算模块，以额外计算换取显存空间。
+- **Swap Core**：[Swap Core](../../features/memory/swap_core.md)统一管理张量换入换出使用的设备显存、Host锁页内存和预取策略；仅配置`swap_plan`不会启用卸载，需配合Act Stash或Op Replay等特性使用。
+- **Act Stash**：[Act Stash](../../features/memory/act_stash.md)使用Swap Core卸载前向保存的激活值，反向时按需取回：设置`enable_activation_offload: true`、`activation_offload_plan.impl: stash`并指定`apply_modules`。它与原有异步激活值卸载的`legacy`实现二选一；需结合显存峰值、Host内存和拷贝开销评估。
+- **Op Replay**：在重计算范围内缓存指定算子的输出，反向重计算时取回输出以跳过对应算子的重算。需开启重计算、设置`recompute_plan.use_reentrant: false`并配置`op_replay_scopes`，作用域须被重计算模块覆盖；与Act Stash同开时共享Swap Core容量。适用场景和约束见[Op Replay](../../features/optimization/op_replay.md)。
+- **CCE Loss**：FSDP2的[ChunkLoss](../../features/optimization/chunkloss.md)支持CCE实现，按词表分块计算交叉熵，降低完整logits带来的显存开销。通过`features.enable_chunk_loss: true`和`chunkloss_plan.impl_type: cce`启用，可用`vocab_tile_size`调整词表块大小。当前支持`default`和`per_token_loss`，不支持带bias的输出层或动态ChunkLoss；应结合模型配置与精度验证使用。
+- **ChunkMBS**：在参数聚合开销较大且显存限制batch大小时，可以按batch维度切块，在一次参数聚合后完成多个微块的计算。使用时需同时开启重计算和异步激活值卸载，ChunkMBS的`apply_modules`需被两者覆盖；配置方式和约束见[ChunkMBS](../../features/optimization/chunkmbs.md)。
+- **Meta Device初始化**：设置`training.init_model_with_meta_device: true`，先在meta device上构建模型结构，减少初始化阶段的Host内存占用。具体适用情况见模型样例。
 
-- **ChunkMBS**：结合重计算与异步激活卸载，对Batch维度进行细粒度切分（Chunk），使得一次参数Unshard后可以完成多个micro-chunk的前反向计算，减少通信次数、提升通算掩盖效果。在Qwen3.5 35B模型上实测整网收益约5%。详见[ChunkMBS](../../features/optimization/chunkmbs.md)。使用ChunkMBS需同时开启重计算和异步激活值卸载，且`apply_modules`需被前两者覆盖。
-- **async_activation_offload（异步激活值卸载）**：FSDP2通过`enable_activation_offload`开启，原理与详情见[异步激活值卸载](../../features/memory/async_activation_offload.md)。
+#### 通信与计算优化
 
-#### Host内存优化
-
-- **Meta Device初始化**：不开启时多rank会占用大量Host内存；开启后先在meta device上构建空结构，各rank只初始化自己那份分片，节省host内存。使用方式：在YAML配置中设置`init_model_with_meta_device: true`。
-
-#### 通信与计算重叠
-
-- **序列并行**：Ulysses上下文并行，通过训练YAML的`parallel.ulysses_parallel_size`配置，原理见[Unaligned Ulysses CP](../../features/parallel/unaligned_ulysses_cp.md)
-- **Prefetch配置**：通过提前发起参数AllGather实现通信与计算重叠，由`num_to_forward_prefetch`（前向预取层数，默认0）和`num_to_backward_prefetch`（反向预取层数，默认1）控制（均定义于`mindspeed_mm/fsdp/params/parallel_args.py`）。两点需注意：
-  - 开启EP（Expert Parallelism）场景下，前向预取的AllGather可能与EP域的All2All抢占带宽，应检查预取层数是否合理。
-  - 预取顺序由`fsdp_plan.apply_modules`的配置顺序决定，**必须与模型前向执行顺序一致**，否则会预取错层、掩盖失效。
-- **reshard_after_forward配置**：控制FSDP2前向计算完成后是否重新分片参数。`true`（默认，ZeRO3模式）：前向完成后立即释放聚拢的参数，节省显存，但反向需要再次AllGather；`false`（ZeRO2模式）：前向完成后保留参数，反向可省一次AllGather通信，显存会相应上涨（增量因模型尺寸、所选模块与卡数而异）。在ViT模块通信量较小且显存充裕的场景下，可将ViT部分设置为`reshard_after_forward: false`以减少反向通信开销。相关参数定义位于`mindspeed_mm/fsdp/params/parallel_args.py`。
-
-#### 其他优化
-
-- **重计算（recompute）**：通过`recompute`参数开启、`recompute_plan.apply_modules`指定重计算的模块（使用模块路径匹配，支持精确路径、通配符和正则表达式，可精确到实例级别）。详见[FSDP2迁移指南](../development/fsdp2_model_migration_guide.md)。
-- **fully_shard切分粒度优化**：默认情况下FSDP2对每个Block单独做fully_shard，产生多次小参数通信。对于参数量较大的子模块（如MoE experts），可以通过`parallel.fsdp_plan.apply_modules`指定其单独切分，减少通信算子调用次数。详见[FSDP2迁移指南](../development/fsdp2_model_migration_guide.md)。
-- **Cast优化**：模型中可能存在不必要的精度转换（Cast）操作，主要涉及：(1) RMSNorm内部已使用fp32高精度实现，外部无需额外转fp32；(2) MoE routing（Unpermute）TorchNPU插件已修复相关bug，输入已支持output为bf16、routing_weight为fp32的组合，无需额外Cast。在Qwen3.5 MoE模型上，消融RMSNorm + Unpermute处的Cast约有5%性能收益；消融RMSNorm + Unpermute + RMSNormGated处的Cast约有10%性能收益。收益视模型结构而定，修改前应验证精度对齐。
+- **预取（Prefetch）**：提前发起参数AllGather，尝试用计算掩盖通信。`parallel.fsdp_plan.num_to_forward_prefetch`和`num_to_backward_prefetch`分别控制前向、反向显式预取层数，默认均为`0`。自动预取根据`apply_modules`的顺序推导，配置应符合模型前向执行顺序；模型也可以自定义预取。建议结合日志和时间线检查实际顺序，并关注预取带来的显存开销。开启专家并行（EP）时，还需检查AllGather与All2All是否争用带宽。
+- **前向后重新分片**：`parallel.fsdp_plan.reshard_after_forward`默认为`true`，前向后重新分片参数，节省显存，但反向需要再次聚合；设为`false`可减少反向聚合，代价是显存占用增加。该通用配置应用于计划管理的模块，调整时应同时比较通信耗时和峰值显存。
+- **分片粒度**：通过`parallel.fsdp_plan.apply_modules`指定分片模块。更细的粒度可能增加通信调用次数，更粗的粒度可能增加峰值显存或影响通算掩盖；应结合模型结构和时间线选择。
+- **Ulysses上下文并行**：通过`parallel.ulysses_parallel_size`切分序列计算，可降低单卡序列计算和显存压力，同时引入通信开销。具体配置与约束见[Unaligned Ulysses CP](../../features/parallel/unaligned_ulysses_cp.md)。
+- **Cast优化**：检查模型中频繁出现的精度转换，结合模型实现和TorchNPU版本确认算子支持的输入、输出与累积精度，再判断是否可以消除冗余Cast。修改后应验证精度和训练结果，收益因模型而异。
 
 ### MCORE（Megatron）后端特性
 
-- **异构并行**：支持不同维度的并行策略组合，详见[异构并行](../../features/parallel/hetero_parallel.md)
-- **序列并行**：通过切分序列维度降低单卡计算量，支持Ulysses、RingAttention、USP等算法，详见[DiT USP](../../features/parallel/dit_usp.md)和[DiT Ring Attention](../../features/parallel/dit_ring_attention.md)
-- **融合算子与通信隐藏**：rms_norm/swiglu/flash attention等融合算子与Megatron权重更新通信隐藏，详见[迁移调优指南](../development/model-migration.md#性能调优)
+- **异构并行**：组合不同维度的并行策略，详见[异构并行](../../features/parallel/hetero_parallel.md)。
+- **序列并行**：根据模型和序列长度选择Ulysses、RingAttention或USP等算法，详见[DiT USP](../../features/parallel/dit_usp.md)和[DiT Ring Attention](../../features/parallel/dit_ring_attention.md)。
+- **融合算子与通信隐藏**：可结合模型配置使用RMSNorm、SwiGLU、Flash Attention等融合算子及权重更新通信隐藏，详见[迁移调优指南](../development/model-migration.md#性能调优)。
