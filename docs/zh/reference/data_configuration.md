@@ -67,7 +67,7 @@ data:
       ignore_pad_token_for_loss: true
 ```
 
-方式二：在单独的json文件中进行配置，以[examples/qwen3vl/data_30.json](https://gitcode.com/cxiaolong/MindSpeed-MM_ulysses/blob/master/examples/qwen3vl/data_30B.json)为例：
+方式二：在单独的json文件中进行配置，以[examples/qwen3vl/data_30B.json](https://gitcode.com/Ascend/MindSpeed-MM/blob/2.3.0/examples/qwen3vl/data_30B.json)为例：
 
 ```json
 {

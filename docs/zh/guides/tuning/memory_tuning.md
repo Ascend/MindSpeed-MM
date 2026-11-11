@@ -339,7 +339,7 @@ for cache in caches:
         cache[k] = cache[k].to("cpu")
 for i in range(len(caches)):
     for k in caches[i]:
-        caches[i] = caches[i].to("npu")
+        caches[i][k] = caches[i][k].to("npu")
     run_your_code(**caches[i])
 ```
 

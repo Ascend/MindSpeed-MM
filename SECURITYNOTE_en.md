@@ -29,7 +29,7 @@ For security and least-privilege considerations, it is not recommended to use ad
 | Configuration file directory                        |    750 (rwxr-x---)                |
 | Log file (recording completed or archived)      |    440 (r--r-----)                |
 | Log file (being recorded)                 |    640 (rw-r-----)                |
-| Log file record                        |    750 (rwxr-x---)                |
+| Log file directory                        |    750 (rwxr-x---)                |
 | Debug file                          |    640 (rw-r-----)                |
 | Debug file directory                      |    750 (rwxr-x---)                 |
 | Temporary file directory                       |     750 (rwxr-x---)                |
@@ -81,7 +81,7 @@ For security and least-privilege considerations, it is not recommended to use ad
 
 ## Public API Declaration
 
-MindSpeed MM has not yet released a wheel package and has no formal public APIs. All functions are invoked through shell scripts. The 19 entry scripts are:
+MindSpeed MM has not yet released a wheel package and has no formal public APIs. All functions are invoked through shell scripts. The entry scripts are:
 
 - [evaluate_gen](./evaluate_gen.py)
 - [evaluate_vlm](./evaluate_vlm.py)
