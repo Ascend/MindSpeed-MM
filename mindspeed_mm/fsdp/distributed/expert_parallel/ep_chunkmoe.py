@@ -16,6 +16,7 @@ from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 
 # Enable forced expert balance for debugging purposes only.
 FORCE_EP_BALANCE = envs.MM_FORCE_EP_BALANCE
+_COUNTS_HOST_CACHE = None
 EP_BINCOUNT_DISPATCH = envs.MM_EP_BINCOUNT_DISPATCH
 
 
@@ -126,7 +127,6 @@ def batched_pre_dispatch_metadata(
     ], dim=0)
     if ep_group is None or ep_size <= 1:
         global_counts = counts.view(num_chunks, 1, num_global_experts)
-        counts_host = global_counts.tolist()
     else:
         gathered = torch.zeros(
             ep_size, num_chunks, num_global_experts,
@@ -135,6 +135,12 @@ def batched_pre_dispatch_metadata(
 
         dist.all_gather_into_tensor(gathered.view(-1), counts.view(-1), group=ep_group)
         global_counts = gathered.permute(1, 0, 2).contiguous()  # [num_chunks, ep_size, num_experts]
+    if FORCE_EP_BALANCE:
+        global _COUNTS_HOST_CACHE
+        if _COUNTS_HOST_CACHE is None:
+            _COUNTS_HOST_CACHE = global_counts.tolist()
+        counts_host = _COUNTS_HOST_CACHE
+    else:
         counts_host = global_counts.tolist()
     start_idx = ep_rank * num_local_experts
     end_idx = (ep_rank + 1) * num_local_experts
@@ -186,7 +192,16 @@ def post_dispatch_pre_combine(
                 f"Number of experts ({num_global_experts}) must be divisible by expert parallel size ({ep_size})."
             )
         _expert_ids_per_ep_rank = torch.arange(num_global_experts, dtype=torch.int32, device=hidden_states.device) % num_local_experts
-        global_input_tokens_local_experts_indices = torch.repeat_interleave(_expert_ids_per_ep_rank, num_global_tokens_per_local_expert.ravel())
+        if FORCE_EP_BALANCE:
+            global_input_tokens_local_experts_indices = torch.repeat_interleave(
+                _expert_ids_per_ep_rank,
+                num_global_tokens_per_local_expert.ravel(),
+                output_size=hidden_states.shape[0],
+            )
+        else:
+            global_input_tokens_local_experts_indices = torch.repeat_interleave(
+                _expert_ids_per_ep_rank, num_global_tokens_per_local_expert.ravel()
+            )
         hidden_states, post_dispatch_unpermute_indices = permute(hidden_states, global_input_tokens_local_experts_indices, fused=fused)
         intermediate_hidden_states = grouped_matmul(
             hidden_states, fc1_weight, num_global_sum_tokens_per_local_expert, fused=fused,

@@ -21,6 +21,7 @@ from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingSt
 # Set environment variable export MM_FORCE_EP_BALANCE=1 to activate.
 # MUST BE DISABLED during formal training.
 FORCE_EP_BALANCE = envs.MM_FORCE_EP_BALANCE
+_SPLIT_SIZES_CACHE = None
 # `torch.bincount` is used for counting expert assignments in EP. This is slower than `torch.histc` but more stable.
 # `torch.histc` is not a deterministic operation and `torch.bincount` is deterministic.
 # Set environment variable export MM_EP_BINCOUNT_DISPATCH=1 to activate.
@@ -233,8 +234,19 @@ def dispatch_preprocess(
     start_idx, end_idx = ep_rank * num_local_experts, (ep_rank + 1) * num_local_experts
     num_global_tokens_per_local_expert = num_global_tokens_per_expert[:, start_idx:end_idx].contiguous()
 
-    input_splits = num_local_tokens_per_expert.reshape(ep_size, num_local_experts).sum(dim=1).tolist()
-    output_splits = num_global_tokens_per_local_expert.sum(dim=1).tolist()
+    if FORCE_EP_BALANCE:
+        input_splits = num_local_tokens_per_expert.reshape(ep_size, num_local_experts).sum(dim=1)
+        output_splits = num_global_tokens_per_local_expert.sum(dim=1)
+        global _SPLIT_SIZES_CACHE
+        if _SPLIT_SIZES_CACHE is None:
+            input_splits = input_splits.tolist()
+            output_splits = output_splits.tolist()
+            _SPLIT_SIZES_CACHE = (input_splits, output_splits)
+        else:
+            input_splits, output_splits = _SPLIT_SIZES_CACHE
+    else:
+        input_splits = num_local_tokens_per_expert.reshape(ep_size, num_local_experts).sum(dim=1).tolist()
+        output_splits = num_global_tokens_per_local_expert.sum(dim=1).tolist()
 
     num_global_sum_tokens_per_local_expert = num_global_tokens_per_local_expert.sum(dim=0)
     return input_splits, output_splits, num_global_tokens_per_local_expert, num_global_sum_tokens_per_local_expert
@@ -310,7 +322,16 @@ def alltoall_dispatch(
     )
 
     _expert_ids_per_ep_rank = torch.arange(num_global_experts, dtype=torch.int32, device=hidden_states.device) % num_local_experts
-    global_input_tokens_local_experts_indices = torch.repeat_interleave(_expert_ids_per_ep_rank, num_global_tokens_per_local_expert.ravel())
+    if FORCE_EP_BALANCE:
+        global_input_tokens_local_experts_indices = torch.repeat_interleave(
+            _expert_ids_per_ep_rank,
+            num_global_tokens_per_local_expert.ravel(),
+            output_size=hidden_states.shape[0],
+        )
+    else:
+        global_input_tokens_local_experts_indices = torch.repeat_interleave(
+            _expert_ids_per_ep_rank, num_global_tokens_per_local_expert.ravel()
+        )
     hidden_states, post_dispatch_unpermute_indices = permute(hidden_states, global_input_tokens_local_experts_indices, fused=fused)
 
     return hidden_states, unpermute_indices, post_dispatch_unpermute_indices
