@@ -174,7 +174,7 @@ def get_xxmodel_vit_layer_spec(config=None, is_vit=True, *args, **kwargs) -> Mod
 ## 使用案例及效果
 
 - **模型**：Qwen2.5VL-7B
-- **硬件环境**：910B2（8×Ascend A2 64GB NPU）
+- **硬件环境**：Atlas A2训练系列产品（8×64GB NPU）
 - **显存优化效果​**：
   : - TP=1（基线）：单卡显存占用 50.26 GB​
     - TP=2：单卡显存占用降至 34.20 GB，显存节省16.06 GB，约32%

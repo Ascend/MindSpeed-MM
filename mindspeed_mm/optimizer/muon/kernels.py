@@ -2,7 +2,7 @@
 """Select CATLASS or PyTorch kernels for the Newton-Schulz matrix products.
 
 On Ascend NPUs with ``torch_catlass`` installed, the symmetric products use
-CATLASS SYRK kernels for Ascend 950. For other devices or shapes where CATLASS
+CATLASS SYRK kernels for Ascend 950PR and 950DT series products. For other devices or shapes where CATLASS
 is slower, standard ``torch.matmul`` is used instead.
 """
 

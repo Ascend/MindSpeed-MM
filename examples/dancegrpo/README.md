@@ -191,9 +191,9 @@ bash examples/dancegrpo/posttrain_flux_dancegrpo.sh
 
 训练完成后，会在logs目录中生成运行日志文件，生成训练reward记录文件。
 
-#### Atlas 950 服务器性能测试脚本
+#### Ascend 950PR&950DT系列产品性能测试脚本
 
-如需在 Atlas 950 服务器上进行纯性能测试，可使用 [posttrain_flux_dancegrpo_A5.sh](./posttrain_flux_dancegrpo_A5.sh) 脚本。该脚本默认通过 `--no-save_images` 关闭采样图片的落盘，以减少 I/O 开销、专注于性能评估：
+如需在 Ascend 950PR&950DT系列产品上进行纯性能测试，可使用 [posttrain_flux_dancegrpo_A5.sh](./posttrain_flux_dancegrpo_A5.sh) 脚本。该脚本默认通过 `--no-save_images` 关闭采样图片的落盘，以减少 I/O 开销、专注于性能评估：
 
 ```bash
 bash examples/dancegrpo/posttrain_flux_dancegrpo_A5.sh

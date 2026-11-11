@@ -118,5 +118,5 @@ training:
 - ⚠️ 使用前请确保已安装 FSDPTurbo（`pip install -e FSDPTurbo`），否则在 converter 实例化时会报 `ModuleNotFoundError`。
 - ⚠️ `quant_recipe` 设为 `w8a16`，`converters` 中必须配置 `quantize.linear.w8a16`，两者缺一不可。
 - ⚠️ W8A16 为 fake-quant 训练路径，不修改 FSDP 低精度 all-gather 通信路径，因此 `enable_fsdp_low_precision_all_gather` / `fsdp_low_precision_all_gather_mode` 对其无效，无需配置。
-- ⚠️ 低精度训练相关功能仅支持在 950 系列机器上运行，910B/C 等机器不支持。
+- ⚠️ 低精度训练相关功能仅支持在 Ascend 950PR&950DT系列产品上运行，Atlas A2训练系列产品和Atlas A3训练系列产品等不支持。
 - ⚠️ 低精度训练过程中可能引起精度损失，造成模型性能下降，非框架本身问题，建议谨慎使用。

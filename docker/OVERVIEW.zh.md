@@ -48,8 +48,8 @@ MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，
 
 | Tag | 版本号 | CANN | TorchNPU | NPU | 操作系统 | Python |
 | ----- | ----- | ----- | ----- | ----- | --------- | -------- |
-| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | v26.2.0 | 9.2.1 | 2.10.0.post7 | A3 | openEuler 24.03 | 3.12 |
-| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | v26.2.0 | 9.2.1 | 2.10.0.post7 | 910B | openEuler 24.03 | 3.12 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | v26.2.0 | 9.2.1 | 2.10.0.post7 | Atlas A3训练系列产品 | openEuler 24.03 | 3.12 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | v26.2.0 | 9.2.1 | 2.10.0.post7 | Atlas A2训练系列产品 | openEuler 24.03 | 3.12 |
 
 ### Tag 含义说明
 
@@ -60,7 +60,7 @@ MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，
 | 版本号 | `v26.2.0` | MindSpeed MM 版本标识（构建使用 Git 分支 `26.2.0`） |
 | CANN版本 | `cann9.2.1` | 基于 CANN 9.2.1 |
 | TorchNPU版本 | `torch_npu2.10.0.post7` | TorchNPU 2.10.0.post7 |
-| 适用产品信息 | `a3` | 适用于昇腾 A3 服务器 |
+| 适用产品信息 | `a3` | 适用于Atlas A3训练系列产品 |
 | 操作系统 | `openeuler24.03` | 基于 openEuler 24.03 |
 | Python版本 | `py3.12` | Python 3.12 |
 
@@ -70,7 +70,7 @@ MindSpeed MM 镜像基于 Ubuntu 22.04 和 openEuler 24.03 两种操作系统，
 Dockerfile 命名：
 
 - `Dockerfile`：统一的 dev 镜像构建文件，通过构建参数支持所有 NPU 类型（910b/a3/950）和操作系统版本
-- `Dockerfile.ci`：CI 镜像构建文件，直接基于 CANN 镜像构建多版本 conda 环境（仅 910B + openEuler + aarch64）（通过 `--build-ci` 使用）
+- `Dockerfile.ci`：CI 镜像构建文件，直接基于 CANN 镜像构建多版本 conda 环境（仅 Atlas A2训练系列产品 + openEuler + aarch64）（通过 `--build-ci` 使用）
 
 ## 支持的 Tags 及 Dockerfile 链接
 
@@ -80,12 +80,12 @@ Dockerfile 命名：
 
 | Tag | Dockerfile | 说明 |
 | --- | --- | --- |
-| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 910B + openEuler 24.03，x86_64/aarch64 二合一 |
-| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 910B + Ubuntu 22.04，x86_64/aarch64 二合一 |
-| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | A3 + openEuler 24.03，x86_64/aarch64 二合一 |
-| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | A3 + Ubuntu 22.04，x86_64/aarch64 二合一 |
-| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 950 + openEuler 24.03，x86_64/aarch64 二合一 |
-| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | 950 + Ubuntu 22.04，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | Atlas A2训练系列产品 + openEuler 24.03，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | Atlas A2训练系列产品 + Ubuntu 22.04，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | Atlas A3训练系列产品 + openEuler 24.03，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | Atlas A3训练系列产品 + Ubuntu 22.04，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-openeuler24.03-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | Ascend 950PR&950DT系列产品 + openEuler 24.03，x86_64/aarch64 二合一 |
+| `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-ubuntu22.04-py3.12` | [Dockerfile](https://gitcode.com/Ascend/MindSpeed-MM/blob/26.2.0/docker/Dockerfile) | Ascend 950PR&950DT系列产品 + Ubuntu 22.04，x86_64/aarch64 二合一 |
 
 > 上表中的最新 Tag 为多架构镜像（x86 与 aarch64 二合一）。该 Dockerfile 实际构建完成后会生成带架构后缀的 Tag，例如 `-aarch64` / `-x86_64` 后缀（如 `v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12-aarch64`）。历史版本所有 Tag 请参考 [Supported Tags](https://gitcode.com/Ascend/MindSpeed-MM/blob/master/docker/supported_tags.md)。
 
@@ -110,7 +110,7 @@ docker/
 ### 目录说明
 
 1. **Dockerfile**：统一的 dev 镜像构建文件，通过构建参数支持所有 NPU 类型和操作系统版本
-2. **Dockerfile.ci**：CI 镜像构建文件，直接基于 CANN 镜像构建多版本 conda 环境（仅 910B + openEuler + aarch64）（`--build-ci` 使用）
+2. **Dockerfile.ci**：CI 镜像构建文件，直接基于 CANN 镜像构建多版本 conda 环境（仅 Atlas A2训练系列产品 + openEuler + aarch64）（`--build-ci` 使用）
 3. **build.sh**：镜像构建脚本，提供灵活的参数配置和自动识别功能
 4. **scripts/**：按脚本功能进行目录组织（如 `ci/` 存放 CI 构建相关脚本）
 
@@ -163,9 +163,9 @@ docker run -it \
     mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12 bash
 ```
 
-### 在 950 系列 aarch64 架构产品上运行 MindSpeed MM 容器
+### 在 Ascend 950PR&950DT系列产品 aarch64 架构上运行 MindSpeed MM 容器
 
-在 950 系列 aarch64 架构产品上，可通过以下命令运行 MindSpeed MM 容器：
+在 Ascend 950PR&950DT系列产品 aarch64 架构上，可通过以下命令运行 MindSpeed MM 容器：
 
 ```bash
 
@@ -212,7 +212,7 @@ docker run \
 | `-n, --no-cache` | 构建时不使用缓存 | 无 |
 | `--torch-version` | PyTorch 版本（在线安装） | 2.10.0 |
 | `--torch-npu-version` | TorchNPU 版本（在线安装） | 2.10.0.post7 |
-| `--build-ci` | 直接基于 CANN 镜像构建 CI 镜像（仅 910B + openEuler + aarch64，多版本 conda 环境），输出 tag 追加 `-ci` | 无 |
+| `--build-ci` | 直接基于 CANN 镜像构建 CI 镜像（仅 Atlas A2训练系列产品 + openEuler + aarch64，多版本 conda 环境），输出 tag 追加 `-ci` | 无 |
 | `--cleanup-on-fail` | 构建失败时清理悬空镜像/容器 | 无 |
 
 ### 基础构建示例
@@ -222,13 +222,13 @@ docker run \
 ```bash
 cd docker
 
-# 构建 A3 + openEuler 镜像
+# 构建 Atlas A3训练系列产品 + openEuler 镜像
 bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12
 
-# 构建 910B + Ubuntu 镜像
+# 构建 Atlas A2训练系列产品 + Ubuntu 镜像
 bash build.sh --base-image quay.io/ascend/cann:9.2.1-910b-ubuntu22.04-py3.12
 
-# 构建 950 + openEuler 镜像，并指定 conda base 环境为 Python 3.12
+# 构建 Ascend 950PR&950DT系列产品 + openEuler 镜像，并指定 conda base 环境为 Python 3.12
 bash build.sh --base-image quay.io/ascend/cann:9.2.1-950-openeuler24.03-py3.12 --python-version 3.12
 
 # 指定 PyTorch 版本构建
@@ -237,7 +237,7 @@ bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12 --
 # 指定版本构建
 bash build.sh --base-image quay.io/ascend/cann:9.2.1-a3-openeuler24.03-py3.12 -v 26.2.0
 
-# 构建 CI 镜像（在 910B + openEuler + aarch64 主机上执行，tag 追加 -ci）
+# 构建 CI 镜像（在 Atlas A2训练系列产品 + openEuler + aarch64 主机上执行，tag 追加 -ci）
 bash build.sh --base-image quay.io/ascend/cann:9.2.1-910b-openeuler24.03-py3.12 --build-ci
 ```
 

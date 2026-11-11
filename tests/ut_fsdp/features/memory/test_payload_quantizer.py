@@ -416,7 +416,7 @@ def _fp8_dequant_reference(payload, meta):
     return (q * meta.scale.unsqueeze(-1)).to(meta.orig_dtype).reshape(meta.orig_shape)
 
 
-@pytest.mark.skipif(not is_arch35(), reason="fp8 block-wise quantization is only tested on A5/950")
+@pytest.mark.skipif(not is_arch35(), reason="fp8 block-wise quantization is only tested on Ascend 950PR and 950DT series products")
 class TestFp8BlockwiseRoundtrip:
     """fp8-e4m3 1x128 block-wise payload: quantize at put, dequantize at pop"""
 

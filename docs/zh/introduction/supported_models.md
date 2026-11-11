@@ -27,27 +27,27 @@
       <td rowspan="2"><a href="../../../examples/wan2.2">Wan2.2-T2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">5B</a></td>
       <td> 预训练 </td>
-      <td> 1x4 (A3) </td>
+      <td> 1x4 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers">A14B</a></td>
       <td> 预训练 </td>
-      <td> 1x8 (A3) </td>
+      <td> 1x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
       <tr>
       <td rowspan="1"><a href="../../../examples/wan2.2">Wan2.2-TI2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">5B</a></td>
       <td> 预训练 </td>
-      <td> 1x4 (A3) </td>
+      <td> 1x4 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
       <td rowspan="1"><a href="../../../examples/wan2.2">Wan2.2-I2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers">A14B</a></td>
       <td> 预训练 </td>
-      <td> 1x8 (A3) </td>
+      <td> 1x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
@@ -184,7 +184,7 @@
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/internvl3.5">InternVL 3.5</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL3_5-30B-A3B-Instruct">30B</a></td>
       <td> 微调 </td>
-      <td> 1x8 (A3)  </td>
+      <td> 1x8 (Atlas A3训练系列产品)  </td>
       <td> BF16 </td>
     </tr>
     <tr>
@@ -209,7 +209,7 @@
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct">72B</a></td>
       <td> 微调 </td>
-      <td> 4x8 (A3) </td>
+      <td> 4x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
@@ -222,32 +222,32 @@
     <tr>
       <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 30B </a></td>
       <td> 微调 </td>
-      <td> 1x8 (A3) </td>
+      <td> 1x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/collections/Qwen/qwen3-vl-68d2a7c1b8a8afce4ebd2dbe"> 235B </a></td>
       <td> 微调 </td>
-      <td> 16x8 (A3) </td>
+      <td> 16x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
       <td rowspan="3"><a href="../../../examples/qwen3_5">Qwen3.5</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen3.5-27B">27B</a></td>
       <td> 微调 </td>
-      <td> 1x8 (A3) </td>
+      <td> 1x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen3.5-35B-A3B">35B</a></td>
       <td> 微调 </td>
-      <td> 1x8 (A3) </td>
+      <td> 1x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
       <td><a href="https://huggingface.co/Qwen/Qwen3.5-397B-A17B">397B</a></td>
       <td> 微调 </td>
-      <td> 16x8 (A3) </td>
+      <td> 16x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>
@@ -261,7 +261,7 @@
       <td><a href="../../../examples/qwen3omni">Qwen3-Omni</a></td>
       <td><a href="https://huggingface.co/Qwen/Qwen3-Omni-30B-A3B-Instruct">30B</a></td>
       <td> 微调 </td>
-      <td> 2x4 (A3) </td>
+      <td> 2x4 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>

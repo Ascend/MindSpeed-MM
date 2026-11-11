@@ -96,8 +96,8 @@ class OpReplayScopeConfig(BaseArguments):
     )
     fp8_block_size: Literal[64, 128, 192, 256] = field(
         default=128,
-        metadata={"help": "Column block size for 'fp8_blockwise' on A5/950; row block size "
-                          "remains 1. Supported values: 64, 128 (default), 192, 256."},
+        metadata={"help": "Column block size for 'fp8_blockwise' on Ascend 950PR and 950DT "
+                          "series products; row block size remains 1. Supported values: 64, 128 (default), 192, 256."},
     )
 
     @model_validator(mode='after')
@@ -108,7 +108,8 @@ class OpReplayScopeConfig(BaseArguments):
                 f"{self.quantizer!r} (registered: {sorted(QUANTIZERS)})")
         if self.quantizer == 'fp8_blockwise' and not is_arch35():
             raise ValueError(
-                f"op_replay scope {self.name!r}: 'fp8_blockwise' is only supported on A5/950")
+                f"op_replay scope {self.name!r}: 'fp8_blockwise' is only supported on "
+                "Ascend 950PR and 950DT series products")
         if self.quantizer != 'fp8_blockwise' and self.fp8_block_size != 128:
             raise ValueError(
                 f"op_replay scope {self.name!r}: 'fp8_block_size' requires "

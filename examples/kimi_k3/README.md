@@ -93,7 +93,7 @@ pip install -e . --no-build-isolation --no-deps
 
 ### 4. 安装fla-npu以适配AscendC
 
-Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以及 KDA 算子（`kimi_delta_attention: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。本文固定的 fla-npu commit 支持 A2、A3、A5；构建 wheel 时须按目标芯片选择 SoC：A2 使用 `ascend910b`，A3 使用 `ascend910_93`，A5 使用 `ascend950`。
+Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以及 KDA 算子（`kimi_delta_attention: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。本文固定的 fla-npu commit 支持Atlas A2训练系列产品、Atlas A3训练系列产品、Ascend 950PR&950DT系列产品；构建 wheel 时须按目标芯片选择 SoC：Atlas A2训练系列产品使用 `ascend910b`，Atlas A3训练系列产品使用 `ascend910_93`，Ascend 950PR&950DT系列产品使用 `ascend950`。
 
 拉取flash-linear-attention-npu代码仓，并进入代码仓根目录
 
@@ -101,7 +101,7 @@ Kimi-K3 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以�
 git clone https://github.com/flashserve/flash-linear-attention-npu.git
 cd flash-linear-attention-npu
 
-# A5 系列使用 commit id：90176b44321e, A3&A2 使用 commit id：e22e0bf
+# Ascend 950PR&950DT系列产品使用 commit id：90176b44321e，Atlas A3训练系列产品和Atlas A2训练系列产品使用 commit id：e22e0bf
 git checkout ｛相应commit id｝
 ```
 
@@ -130,8 +130,8 @@ source /usr/local/Ascend/cann/set_env.sh
 python -m pip install -r requirements.txt
 python scripts/check_npu_env.py
 
-# 按训练设备选择目标 SoC：A2=ascend910b，A3=ascend910_93，A5=ascend950。
-# 以下命令以 A3 为例；A2/A5 请分别替换为 ascend910b/ascend950。
+# 按训练设备选择目标 SoC：Atlas A2训练系列产品=ascend910b，Atlas A3训练系列产品=ascend910_93，Ascend 950PR&950DT系列产品=ascend950。
+# 以下命令以Atlas A3训练系列产品为例；Atlas A2训练系列产品/Ascend 950PR&950DT系列产品请分别替换为 ascend910b/ascend950。
 FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
 
 # build_wheel.py 会输出本次构建 wheel 的准确路径和对应安装命令，复制执行该命令。
@@ -162,7 +162,7 @@ git clone https://gitcode.com/cann/ops-nn.git && cd ops-nn
 git checkout b7af75e68cc07
 # 根据芯片类型进行编译
 source /usr/local/Ascend/cann/set_env.sh
-bash build.sh --pkg --soc=${soc_version} --ops=situ_glu,situ_glu_grad -j16
+bash build.sh --pkg --soc="${soc_series}" --ops=situ_glu,situ_glu_grad -j16
 # 安装算子包
 ./build_out/*.run
 bash build.sh --torch_extension
@@ -171,11 +171,11 @@ pip install build_out/*.whl
 export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_nn/op_api/lib/:${LD_LIBRARY_PATH}
 ```
 
-产品名对应的`${soc_version}`取值如下，请按实际场景传参：
+产品名对应的`${soc_series}`取值如下，请按实际场景传参：
 
-- Atlas A2 训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
-- Atlas A3 训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
-- 950系列产品：取值为ascend950
+- Atlas A2训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
+- Atlas A3训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
+- Ascend 950PR&950DT系列产品：取值为Ascend950
 
 ### 6. 安装ops-transformer以适配AscendC版本attn_res
 
@@ -193,7 +193,7 @@ git checkout a041b05638
 
 # 根据芯片类型进行编译
 source /usr/local/Ascend/cann/set_env.sh
-bash build.sh --pkg --soc=${soc_version} --ops=block_attention_residuals,block_attention_residuals_grad -j16
+bash build.sh --pkg --soc="${soc_series}" --ops=block_attention_residuals,block_attention_residuals_grad -j16
 bash build/cann-ops-transformer-custom_linux-aarch64.run
 # 编译安装torch 依赖
 bash build.sh --torch_extension
@@ -202,11 +202,11 @@ pip install torch_extension/dist/*.whl --force-reinstall --no-deps
 export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_transformer/op_api/lib/:${LD_LIBRARY_PATH}
 ```
 
-产品名对应的`${soc_version}`取值如下，请按实际场景传参：
+产品名对应的`${soc_series}`取值如下，请按实际场景传参：
 
-- Atlas A2 训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
-- Atlas A3 训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
-- 950系列产品：取值为ascend950
+- Atlas A2训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
+- Atlas A3训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
+- Ascend 950PR&950DT系列产品：取值为Ascend950
 
 ### 7. 安装MindSpeed-Ops以支持Triton版本causal conv1d
 
@@ -383,7 +383,7 @@ NNODES: 一共几个节点
 - **减层训练**：基于减层、减专家模型配置进行训练验证；
   - 调整层数：修改模型配置路径 `mindspeed_mm/fsdp/models/kimi_k3` 下 `config.json` 中的 `num_hidden_layers` 字段；
   - 调整专家个数：修改 `config.json` 中的 `num_experts` 字段，注意需与 `kimik3_config.yaml` 中的 `expert_parallel_size` 配套调整（专家个数需能被EP并行度整除）；
-  - 参考配置: 当前单台昇腾950节点，可以配置`num_hidden_layers=8`、`num_experts=64`, 此模型配置下单机8卡最大可支持16k序列训练。`examples/kimi_k3/kimik3_config_A5.yaml` 是此场景下的单台950节点训练的推荐配置，可用于性能测试。
+  - 参考配置: 当前单台Ascend 950PR&950DT系列产品节点，可以配置`num_hidden_layers=8`、`num_experts=64`, 此模型配置下单机8卡最大可支持16k序列训练。`examples/kimi_k3/kimik3_config_A5.yaml` 是此场景下的单台Ascend 950PR&950DT系列产品节点训练的推荐配置，可用于性能测试。
 
 - **CP 长序列训练**：支持 ulysses-cp 长序列训练，配置 `kimik3_config.yaml` 中 `parallel->ulysses_parallel_size` 调整并行度（值为1时不开启）。
 

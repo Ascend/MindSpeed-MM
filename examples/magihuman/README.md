@@ -243,7 +243,7 @@ bash examples/magihuman/finetune_magihuman_t2av.sh
 backward 和 optimizer step 已接通。首个 iteration 通常包含初始化和编译开销，耗时可能明显
 高于后续迭代。启动失败或训练卡住时，可查阅 [FAQ](../../docs/zh/guides/troubleshooting/FAQ.md)。
 
-在 8 卡 Ascend 910B3 上按上述配置训练，输入取 video 3840、audio 126、text 640 token
+在 8 卡 Atlas A2训练系列产品上按上述配置训练，输入取 video 3840、audio 126、text 640 token
 （packed 长度 4606），5000 step 稳态 step time 中位数 4634.8 ms，单卡 71.7 TFLOP/s，峰值显存
 51384 MiB/卡。MFU 按单卡峰值 280 TFLOPS 计算为 25.6%，可用
 `mindspeed_mm/fsdp/tools/flops_tool/flops_magihuman.py` 按实际硬件复算。

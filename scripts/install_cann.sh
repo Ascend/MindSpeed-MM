@@ -33,7 +33,7 @@ detect_os() {
 # 操作系统安装函数定义
 # 函数命名格式: install_cann_{NPU_TYPE}_{ARCH}_{OS_TYPE}
 
-# a2 NPU安装函数
+# Atlas A2训练系列产品 NPU安装函数
 install_cann_a2_x86_apt() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
@@ -86,7 +86,7 @@ install_cann_a2_arm_yum() {
     bash ./Ascend-cann-910b-ops_9.1.0_linux-aarch64.run --install
 }
 
-# a3 NPU安装函数
+# Atlas A3训练系列产品 NPU安装函数
 install_cann_a3_x86_apt() {
     groupadd HwHiAiUser
     useradd -g HwHiAiUser -d /home/HwHiAiUser -m HwHiAiUser -s /bin/bash
@@ -233,15 +233,15 @@ main() {
     case "$npu_device_id_lower" in
         d802)
             NPU_TYPE="a2"
-            echo "NPU Type: Ascend A2 (d802)"
+            echo "NPU Type: Atlas A2训练系列产品 (d802)"
             ;;
         d803)
             NPU_TYPE="a3"
-            echo "NPU Type: Ascend A3 (d803)"
+            echo "NPU Type: Atlas A3训练系列产品 (d803)"
             ;;
         *)
             echo "Error: Unsupported NPU device ID: $npu_device_id"
-            echo "Supported device IDs: d802 (Ascend Atlas A2), d803 (Ascend Atlas A3)"
+            echo "Supported device IDs: d802 (Atlas A2训练系列产品), d803 (Atlas A3训练系列产品)"
             echo "Your device ID: $npu_device_id"
             return 1
             ;;

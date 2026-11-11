@@ -99,7 +99,7 @@ KDA 短卷积在 `causal_conv1d_implementation: triton` 时还需安装 MindSpee
 
 ### 4. 安装fla-npu以适配AscendC
 
-Kimi-K3.1-Pro 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以及 KDA 算子（`kda_implementation: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。构建 wheel 时须按目标芯片选择 SoC：A2 使用 `ascend910b`，A3 使用 `ascend910_93`，昇腾950系列使用 `ascend950`。
+Kimi-K3.1-Pro 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`）以及 KDA 算子（`kda_implementation: ascendc`）基于 fla-npu 的 AscendC 融合算子实现，需要安装 fla-npu。构建 wheel 时须按目标芯片选择 SoC：Atlas A2训练系列产品使用 `ascend910b`，Atlas A3训练系列产品使用 `ascend910_93`，Ascend 950PR&950DT系列产品使用 `ascend950`。
 
 拉取flash-linear-attention-npu代码仓，并进入代码仓根目录：
 
@@ -107,8 +107,8 @@ Kimi-K3.1-Pro 的 KDA 短卷积算子（`causal_conv1d_implementation: ascendc`�
 git clone https://github.com/flashserve/flash-linear-attention-npu.git
 cd flash-linear-attention-npu
 
-# 昇腾950系列使用 commit id：90176b44321e，A3&A2 使用 commit id：e22e0bf
-export FLA_NPU_COMMIT=e22e0bf  # A3/A2；昇腾950系列改为 90176b44321e
+# Ascend 950PR&950DT系列产品使用 commit id：90176b44321e，Atlas A3训练系列产品和Atlas A2训练系列产品使用 commit id：e22e0bf
+export FLA_NPU_COMMIT=e22e0bf  # Atlas A3训练系列产品/Atlas A2训练系列产品；Ascend 950PR&950DT系列产品改为 90176b44321e
 git checkout ${FLA_NPU_COMMIT}
 git rev-parse HEAD
 ```
@@ -135,7 +135,7 @@ source /usr/local/Ascend/cann/set_env.sh
 python -m pip install -r requirements.txt
 python scripts/check_npu_env.py
 
-# 按训练设备选择目标SoC，以下命令以昇腾950系列为例
+# 按训练设备选择目标SoC，以下命令以Ascend 950PR&950DT系列产品为例
 FLA_NPU_SOC=ascend950 python scripts/build_wheel.py
 ```
 
@@ -167,7 +167,7 @@ cd ops-transformer
 
 # 根据芯片类型进行编译
 source /usr/local/Ascend/cann/set_env.sh
-bash build.sh --pkg --soc=${soc_version} \
+bash build.sh --pkg --soc="${soc_series}" \
   --ops=lightning_indexer,sparse_flash_attention,sparse_flash_attention_grad -j16
 bash build/cann-ops-transformer-custom_linux-aarch64.run
 
@@ -179,11 +179,11 @@ python -m pip install torch_extension/dist/*.whl --force-reinstall --no-deps
 export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_transformer/op_api/lib:${LD_LIBRARY_PATH}
 ```
 
-产品名对应的`${soc_version}`取值如下，请按实际场景传参：
+产品名对应的`${soc_series}`取值如下，请按实际场景传参：
 
-- Atlas A2 训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
-- Atlas A3 训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
-- 950系列产品：取值为ascend950
+- Atlas A2训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
+- Atlas A3训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
+- Ascend 950PR&950DT系列产品：取值为Ascend950
 
 实际安装包名称和动态库路径以构建输出为准。
 
@@ -367,9 +367,9 @@ NODE_RANK: 当前节点序号
 - **chunkmbs**：在`features.enable_chunk_mbs`配置，可将MicroBatch切分为多个微块依次计算，详见[chunkmbs文档](../../docs/zh/features/optimization/chunkmbs.md)。
 - **选择性重计算**：可通过Swap Core和Op Replay实现。Op Replay在前向时将`recompute_plan.op_replay_scopes`指定范围内的白名单算子输出换出，重计算时直接取回并跳过重算；Swap Core提供HBM与DDR之间的异步换入换出及显存预算管理。使用时需开启`features.recompute`，设置`recompute_plan.use_reentrant: false`，并通过`apply_modules`和`cache_ops`配置作用模块与算子白名单。详见[Swap Core](../../docs/zh/features/memory/swap_core.md)和[Op Replay](../../docs/zh/features/optimization/op_replay.md)文档。
 
-【单机运行配置（昇腾950系列产品）】
+【单机运行配置（Ascend 950PR&950DT系列产品）】
 
-在昇腾950系列产品上配置`examples/kimi_k31_pro/finetune_kimik31_pro.sh`参数如下：
+在Ascend 950PR&950DT系列产品上配置`examples/kimi_k31_pro/finetune_kimik31_pro.sh`参数如下：
 
 ```shell
 # 根据实际情况修改ascend-toolkit路径

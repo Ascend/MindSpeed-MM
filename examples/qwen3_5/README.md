@@ -145,7 +145,7 @@ source /usr/local/Ascend/cann/set_env.sh
 python -m pip install -r requirements.txt
 python scripts/check_npu_env.py # 无 NPU 的纯构建环境可加 --build-only
 
-# --soc 需指定为当前机器芯片类型 {A2: ascend910b, A3: ascend910_93, A5:ascend950}
+# --soc 需指定为当前机器芯片类型 {Atlas A2训练系列产品: ascend910b, Atlas A3训练系列产品: ascend910_93, Ascend 950PR&950DT系列产品: ascend950}
 FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
 python -m pip install --force-reinstall --no-cache-dir --no-deps dist/flash_linear_attention_npu*.whl
 ```

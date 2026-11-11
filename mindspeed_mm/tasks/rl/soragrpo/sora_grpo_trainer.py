@@ -70,7 +70,7 @@ class SoraGRPOTrainer(ABC):
         if world_size <= 8:
             os.environ['HCCL_DETERMINISTIC'] = 'true'
         elif world_size >= 16:
-            # 950服务器不需要设置 HCCL_OP_EXPANSION_MODE=AIV
+            # Ascend 950PR&950DT系列产品不需要设置 HCCL_OP_EXPANSION_MODE=AIV
             if not check_npu_version(min_version=NPUVersion.A5):
                 os.environ['HCCL_OP_EXPANSION_MODE'] = 'AIV'
 

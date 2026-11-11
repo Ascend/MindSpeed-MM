@@ -201,7 +201,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 
-MindSpeed MM支持Atlas 800T A2等昇腾训练硬件形态，软件版本配套表如下：
+MindSpeed MM支持Atlas A2训练系列产品等昇腾训练硬件形态，软件版本配套表如下：
 
 | MindSpeed MM版本 | MindSpeed版本      | Megatron版本 | PyTorch版本  | TorchNPU版本 | CANN版本 | Python版本            |
 | ---------------- | ------------------ | ------------ | ------------ | ------------- | -------- | --------------------- |

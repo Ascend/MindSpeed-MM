@@ -10,7 +10,7 @@ export CPU_AFFINITY_CONF=1
 NPUS_PER_NODE=16
 MASTER_ADDR=localhost
 MASTER_PORT=6000
-NNODES=32  # Kimi-K2.5模型需要32机A3运行，可参考readme介绍配置多机训练
+NNODES=32  # Kimi-K2.5模型需要32机Atlas A3训练系列产品运行，可参考readme介绍配置多机训练
 NODE_RANK=0
 WORLD_SIZE=$(($NPUS_PER_NODE*$NNODES))
 

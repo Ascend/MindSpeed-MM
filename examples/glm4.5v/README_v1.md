@@ -274,7 +274,7 @@ NON_MEGATRON=true GLM4V_DCP_3D=1 mm-convert ExpertMergeDcpConverter dcp_to_hf \
 
 ## 跨后端对拍
 
-2026-10-11 在 8 张 Ascend 910B3 上完成 2000 步验证：文本和视觉各保留 4 层，保留 128 个 routed experts 和 top-k 8，EP=1、CP=1、FSDP=8，使用固定的 2048 条真实 LLaVA/COCO 图文样本。该配置不是完整 106B 模型，也不替代 EP>1 的验证。
+2026-10-11 在 8 卡 Atlas A2训练系列产品上完成 2000 步验证：文本和视觉各保留 4 层，保留 128 个 routed experts 和 top-k 8，EP=1、CP=1、FSDP=8，使用固定的 2048 条真实 LLaVA/COCO 图文样本。该配置不是完整 106B 模型，也不替代 EP>1 的验证。
 
 | 指标 | 结果 |
 | --- | --- |

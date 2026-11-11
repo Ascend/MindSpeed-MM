@@ -129,7 +129,7 @@ git checkout 2062460754c8
 python -m pip install -r requirements.txt
 # 检查编译环境满足要求, 如果不满足需解决
 python scripts/check_npu_env.py
-# FLA_NPU_SOC对应A2/A3/A5分别填ascend910b/ascend910_93/ascend950
+# FLA_NPU_SOC对应Atlas A2训练系列产品/Atlas A3训练系列产品/Ascend 950PR&950DT系列产品分别填ascend910b/ascend910_93/ascend950
 FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
 # 编译成功后安装
 ./build_out/*.run

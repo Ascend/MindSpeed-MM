@@ -200,7 +200,7 @@ class Fp8BlockwiseQuantizer:
     quantize: torch.ops.npu.npu_dynamic_block_quant(x2d,
     dst_type=torch.float8_e4m3fn, row_block_size=1,
     col_block_size=block_size) -> (e4m3 payload, fp32 scale), with a dynamic
-    scale of amax / 448 for each block. A5/950 supports block sizes 64, 128,
+    scale of amax / 448 for each block. Ascend 950PR and 950DT series products support block sizes 64, 128,
     192 and 256; the default is 128.
     dequantize: torch.ops.npu.npu_anti_quant over the [rows*groups, block_size]
     view with scales reshaped to [rows*groups, 1], explicitly selecting per-row

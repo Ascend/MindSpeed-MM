@@ -18,7 +18,7 @@ gpt_args:
   ## training:
   clip_grad: 0.0
   micro_batch_size: 1
-  global_batch_size: 256  #默认16机A3配置，16*16 global_batch_sizes=micro_batch_size*grad_acc_step*dp=micro_batch_size*grad_acc_step*(world_size/cp)
+  global_batch_size: 256  #默认16机Atlas A3训练系列产品配置，16*16 global_batch_sizes=micro_batch_size*grad_acc_step*dp=micro_batch_size*grad_acc_step*(world_size/cp)
   optimizer_selection: fused_torch_adamw
   lr: 1.0e-5
   weight_decay: 0.0
