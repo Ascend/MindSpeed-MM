@@ -46,6 +46,8 @@ class TestFlashAttention:
 
         # B S N D, cu_seq_lens, is_causal
         TEST_CASES = [
+            (32, 32, 8, 128, None, True),  # Square [B, S] padding mask (issue #783).
+            (32, 32, 8, 128, None, False),  # Explicit uncompressed [S, S] attention mask.
             (1, 4096, 32, 128, None, True),
             (1, 4096, 32, 128, [0, 1024, 2048, 4096], True),
             (1, 4096, 32, 128, None, False),
@@ -64,6 +66,8 @@ class TestFlashAttention:
             attention_mask = (
                 torch.triu(torch.ones([2048, 2048], device=device), diagonal=1).bool() if is_causal else None
             )
+            if not is_causal and batch_size == seq_len:
+                attention_mask = torch.triu(torch.ones([seq_len, seq_len], device=device), diagonal=1).bool()
             target_output = torch_npu.npu_fusion_attention(
                 q.squeeze(0) if is_packing else q,
                 k.squeeze(0) if is_packing else k,
@@ -105,8 +109,15 @@ class TestFlashAttention:
                 "total_seq_len": seq_len,
             }
 
+            input_attention_mask = None
+            if batch_size == seq_len:
+                input_attention_mask = (
+                    torch.ones((batch_size, seq_len), device=device, dtype=torch.bool)
+                    if is_causal else attention_mask
+                )
+
             output = self._test_flash_attention_forward(
-                module=module, q=q, k=k, v=v, attn_mask=None, common_kwargs=common_kwargs
+                module=module, q=q, k=k, v=v, attn_mask=input_attention_mask, common_kwargs=common_kwargs
             )
 
             judge_expression(torch.allclose(target_output, output, rtol=1e-4, atol=1e-5))
@@ -118,7 +129,7 @@ class TestFlashAttention:
 
             common_kwargs["input_layout"] = "1NTD" if is_packing else "BNSD"
             output = self._test_flash_attention_forward(
-                module=module, q=q, k=k, v=v, attn_mask=None, common_kwargs=common_kwargs
+                module=module, q=q, k=k, v=v, attn_mask=input_attention_mask, common_kwargs=common_kwargs
             )
 
             judge_expression(torch.allclose(target_output, output, rtol=1e-4, atol=1e-5))

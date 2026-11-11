@@ -124,7 +124,7 @@ def _make_reduced_config() -> Path:
 
 def _generate_mock_data(text_length: int) -> Path:
     """幂等生成 mock 数据, 返回 json 路径。"""
-    mock_file = f"mock_data_pic_num_1_textlen_{text_length}.json"
+    mock_file = f"mock_data_pic_num_1_1024x1024_textlen_{text_length}_num_samples_512.json"
     mock_path = MOCK_DIR / mock_file
     if mock_path.exists():
         return mock_path

@@ -35,6 +35,7 @@ _flash_attention_forward = None
 
 
 ATTN_MASK_NPU_CACHE = {}
+ATTN_MASK_SHAPE = (2048, 2048)
 
 
 def _per_head_softmax_max(
@@ -746,14 +747,14 @@ def flash_attention_forward(
             if padding_mask is not None and not is_kvag:
                 padding_mask = padding_mask[:, -seq_len:]
 
-            if attention_mask is None and is_causal:
-                attention_mask = get_attn_mask(device=query.device)
-
-            # Check if the attention mask is valid.
-            if attention_mask is not None and (
+            # Only causal attention uses the fixed-size compressed mask.
+            if is_causal:
+                if attention_mask is None or tuple(attention_mask.shape) != ATTN_MASK_SHAPE:
+                    attention_mask = get_attn_mask(device=query.device)
+            elif attention_mask is not None and (
                 attention_mask.ndim != 2 or attention_mask.shape[0] != attention_mask.shape[1]
             ):
-                attention_mask = get_attn_mask(device=query.device) if is_causal else None
+                attention_mask = None
 
             # QK-Clip: record the maximum attention logit of each head, excluding
             # padded query rows. Packed TND inputs also exclude rows after the last sequence.
