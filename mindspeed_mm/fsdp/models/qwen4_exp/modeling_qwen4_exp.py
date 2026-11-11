@@ -24,6 +24,7 @@ import os
 import copy
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Optional, Union, List
 
 import torch
@@ -641,7 +642,9 @@ class Qwen4ExpTextGatedDeltaNet(nn.Module):
             if IS_NPU_AVAILABLE:
                 from mindspeed_mm.fsdp.ops.gdn.flash_gated_delta_rule import flash_gated_delta_rule
                 print_rank(logger.info, "Qwen4ExpTextGatedDeltaNet (without transpose) use NPU AscendC fused ops")
-                self.chunk_gated_delta_rule = flash_gated_delta_rule
+                self.chunk_gated_delta_rule = partial(
+                    flash_gated_delta_rule, using_l2norm_in_gdn=config.using_l2norm_in_gdn
+                )
             else:
                 raise ValueError(
                     "gdn_implementation='ascendc' requires NPU, but NPU is not available. "
@@ -3382,6 +3385,12 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
                 f"Invalid gdn_implementation='{gdn_implementation}'. Must be one of: {IMPL_FOR_GDN}."
             )
         transformer_config.text_config.gdn_implementation = gdn_implementation
+
+        # Fuse Q/K L2Norm into AscendC GDN forward and backward only when requested.
+        using_l2norm_in_gdn = getattr(model_args, "using_l2norm_in_gdn", False)
+        if not isinstance(using_l2norm_in_gdn, bool):
+            raise ValueError("using_l2norm_in_gdn must be a boolean")
+        transformer_config.text_config.using_l2norm_in_gdn = using_l2norm_in_gdn
 
         # causal conv1d implementation
         causal_conv1d_implementation = getattr(model_args, "causal_conv1d_implementation", IMPL_EAGER).lower().strip()

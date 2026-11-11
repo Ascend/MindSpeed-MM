@@ -177,11 +177,20 @@ def flash_chunk_gated_delta_rule_fwd(
     chunk_indices_list: Optional[Dict[str, Optional[list[int]]]] = None,
     chunk_size: int = 64,
     use_composite_core: bool = True,
+    use_qk_l2norm_in_kernel: bool = False,
+    using_l2norm_in_gdn: bool = False,
 ):
+    # The composite kernel returns normalized Q/K and reciprocal norms for backward.
+    # Keep normalization outside GDN unless fusion is explicitly enabled.
+    q_rstd, k_rstd = None, None
+    fused_qk_l2norm = use_qk_l2norm_in_kernel and using_l2norm_in_gdn and use_composite_core
+    if use_qk_l2norm_in_kernel and not fused_qk_l2norm:
+        q, q_rstd = l2norm_fwd(q)
+        k, k_rstd = l2norm_fwd(k)
     cu_list = cu_seqlens_list
     chunk_list = _chunk_list(chunk_indices_list, chunk_size)
     if use_composite_core:
-        o, final_state, g, A, _, _, _, _, _, _ = ascendc_chunk_gated_delta_rule_fwd(
+        o, final_state, g, A, _, _, q_hat, k_hat, fused_q_rstd, fused_k_rstd = ascendc_chunk_gated_delta_rule_fwd(
             q,
             k,
             v,
@@ -195,10 +204,16 @@ def flash_chunk_gated_delta_rule_fwd(
             scale=scale,
             disable_recompute=True,
             return_intermediate_states=False,
+            use_qk_l2norm_in_kernel=fused_qk_l2norm,
         )
+        if fused_qk_l2norm:
+            if any(x is None for x in (q_hat, k_hat, fused_q_rstd, fused_k_rstd)):
+                raise RuntimeError("Fused GDN forward must return normalized Q/K and rstd.")
+            q, k = q_hat, k_hat
+            q_rstd, k_rstd = fused_q_rstd, fused_k_rstd
         if not output_final_state:
             final_state = None
-        return g, o, A, final_state
+        return g, o, A, final_state, q, k, q_rstd, k_rstd
 
     g = chunk_local_cumsum_auto(
         g=g,
@@ -268,7 +283,7 @@ def flash_chunk_gated_delta_rule_fwd(
     if not output_final_state:
         final_state = None
     o = o.transpose(1, 2).contiguous()
-    return g.transpose(1, 2).contiguous(), o, A, final_state
+    return g.transpose(1, 2).contiguous(), o, A, final_state, q, k, q_rstd, k_rstd
 
 
 def flash_chunk_gated_delta_rule_bwd(
@@ -288,8 +303,11 @@ def flash_chunk_gated_delta_rule_bwd(
     chunk_indices_list: Optional[Dict[str, Optional[list[int]]]] = None,
     chunk_size: int = 64,
     use_composite_core: bool = False,
+    use_qk_l2norm_in_kernel: bool = False,
+    q_rstd: Optional[torch.Tensor] = None,
+    k_rstd: Optional[torch.Tensor] = None,
 ):
-    if use_composite_core and is_arch35():
+    if use_composite_core:
         dq, dk, dv, d_beta, dg, dh0, _, _ = ascendc_chunk_gated_delta_rule_bwd(
             q,
             k,
@@ -304,6 +322,9 @@ def flash_chunk_gated_delta_rule_bwd(
             chunk_indices=_chunk_list(chunk_indices_list, chunk_size),
             initial_state=initial_state,
             dht=dht,
+            use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
+            q_rstd=q_rstd if use_qk_l2norm_in_kernel else None,
+            k_rstd=k_rstd if use_qk_l2norm_in_kernel else None,
             use_exp2=False,
             use_gate_in_kernel=False,
             state_v_first=False,
@@ -460,13 +481,11 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
         chunk_size: int = 64,
         skip_recompute: bool = False,
         use_composite_core: bool = True,
+        using_l2norm_in_gdn: bool = False,
     ):
 
-        if use_qk_l2norm_in_kernel:
-            q, q_rstd = l2norm_fwd(q)
-            k, k_rstd = l2norm_fwd(k)
-        else:
-            q_rstd, k_rstd = None, None
+        fused_qk_l2norm = use_qk_l2norm_in_kernel and using_l2norm_in_gdn and use_composite_core
+        q_rstd, k_rstd = None, None
 
         training_stage = TrainingContext().get_training_stage()
         layer_idx, depth = TrainingContext().get_layer_index(), TrainingContext().get_model_depth()
@@ -474,35 +493,35 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
         d2h_stream = OffloadManager().swap_stream
 
         if skip_recompute and training_stage == TrainingStage.BACKWARD:
+            # Replay the exact normalized inputs produced by the original fused forward.
+            swap_tensor_nums = 4 if output_final_state else 3
+            if fused_qk_l2norm:
+                swap_tensor_nums += 4
             if layer_idx == depth - 1:
-                if output_final_state:
-                    final_state = OffloadManager().pop_npu_tensor().tensor
-                else:
-                    final_state = None
-                A = OffloadManager().pop_npu_tensor().tensor
-                o = OffloadManager().pop_npu_tensor().tensor
-                g = OffloadManager().pop_npu_tensor().tensor
+                swap_tensors = [
+                    OffloadManager().pop_npu_tensor().tensor for _ in range(swap_tensor_nums)
+                ]
             else:
                 layer_items_keys = OffloadManager().get_layer_items_keys(layer_idx)
-
-                swap_tensor_nums = 4 if output_final_state else 3
                 swap_tensors = []
-
                 for swap_key in reversed(layer_items_keys[-swap_tensor_nums:]):
                     swap_tensor = OffloadManager().get(swap_key)
                     swap_tensor.launch_h2d(h2d_stream)
                     get_current_stream().wait_event(swap_tensor.h2d_event)
-
                     swap_tensors.append(swap_tensor.tensor)
                     OffloadManager().clear(swap_key)
 
-                if output_final_state:
-                    final_state, A, o, g = swap_tensors
-                else:
-                    A, o, g = swap_tensors
-                    final_state = None
+            # Both cache paths pop in reverse insertion order.
+            swap_tensors.reverse()
+            g, o, A = swap_tensors[:3]
+            final_state = swap_tensors[3] if output_final_state else None
+            if fused_qk_l2norm:
+                q, k, q_rstd, k_rstd = swap_tensors[-4:]
+            elif use_qk_l2norm_in_kernel:
+                q, q_rstd = l2norm_fwd(q)
+                k, k_rstd = l2norm_fwd(k)
         else:
-            g, o, A, final_state = flash_chunk_gated_delta_rule_fwd(
+            g, o, A, final_state, q, k, q_rstd, k_rstd = flash_chunk_gated_delta_rule_fwd(
                 q=q,
                 k=k,
                 v=v,
@@ -517,12 +536,16 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
                 chunk_indices_list=chunk_indices_list,
                 chunk_size=chunk_size,
                 use_composite_core=use_composite_core,
+                use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
+                using_l2norm_in_gdn=using_l2norm_in_gdn,
             )
 
         if skip_recompute and training_stage == TrainingStage.FORWARD:
             swap_tensors = [g, o, A]
             if output_final_state:
                 swap_tensors.append(final_state)
+            if fused_qk_l2norm:
+                swap_tensors.extend([q, k, q_rstd, k_rstd])
 
             for swap_tensor in swap_tensors:
                 key, after_block = OffloadManager().get_cnt(layer_idx)
@@ -543,6 +566,7 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
         ctx.cu_seqlens = cu_seqlens
         ctx.scale = scale
         ctx.use_qk_l2norm_in_kernel = use_qk_l2norm_in_kernel
+        ctx.fused_qk_l2norm = fused_qk_l2norm
         ctx.chunk_size = chunk_size
         ctx.cu_seqlens_list = cu_seqlens_list
         ctx.chunk_indices = chunk_indices
@@ -572,8 +596,11 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
             chunk_indices_list=ctx.chunk_indices_list,
             chunk_size=ctx.chunk_size,
             use_composite_core=ctx.use_composite_core,
+            use_qk_l2norm_in_kernel=ctx.fused_qk_l2norm,
+            q_rstd=ctx.q_rstd,
+            k_rstd=ctx.k_rstd,
         )
-        if ctx.use_qk_l2norm_in_kernel:
+        if ctx.use_qk_l2norm_in_kernel and not ctx.fused_qk_l2norm:
             dq = l2norm_bwd(q, ctx.q_rstd, dq)
             dk = l2norm_bwd(k, ctx.k_rstd, dk)
         return (
@@ -584,6 +611,7 @@ class ChunkGatedDeltaRuleFunction(torch.autograd.Function):
             db.to(beta),
             None,
             dh0,
+            None,
             None,
             None,
             None,
@@ -615,19 +643,23 @@ def flash_gated_delta_rule(
     head_first: bool = False,
     skip_recompute: bool = False,
     use_composite_core: bool = True,
+    using_l2norm_in_gdn: bool = False,
 ):
     r"""
     Flash-linear-attention NPU port of xtuner's GDN entry.
 
     This port keeps the xtuner NPU layout:
-        q, k: [B, H, T, K]
-        v:    [B, H, T, V]
-        g:    [B, T, H]
-        beta: [B, T, H]
+        q, k: [B, Hk, T, K]
+        v:    [B, Hv, T, V]
+        g:    [B, T, Hv]
+        beta: [B, T, Hv]
+
+    using_l2norm_in_gdn opts into composite GDN forward/backward L2Norm fusion.
+    With fusion disabled, use_qk_l2norm_in_kernel still normalizes Q/K externally.
 
     It returns:
-        o: [B, T, H, V]
-        final_state: [N, H, K, V] when output_final_state=True, else None
+        o: [B, T, Hv, V]
+        final_state: [N, Hv, K, V] when output_final_state=True, else None
     """
     if q.dtype != k.dtype or k.dtype != v.dtype:
         raise ValueError(
@@ -640,13 +672,17 @@ def flash_gated_delta_rule(
         raise ValueError("g and beta must be rank-3 tensors with shape [B, T, H].")
     if q.ndim != 4 or k.ndim != 4 or v.ndim != 4:
         raise ValueError("q, k and v must be rank-4 tensors with shape [B, H, T, D].")
-    if q.shape[:3] != k.shape[:3] or q.shape[:3] != v.shape[:3]:
-        raise ValueError(f"q/k/v shape prefixes must match, got {q.shape}, {k.shape}, {v.shape}.")
+    if q.shape != k.shape or (q.shape[0], q.shape[2]) != (v.shape[0], v.shape[2]):
+        raise ValueError(f"q/k shapes and q/k/v batch/sequence sizes must match, got {q.shape}, {k.shape}, {v.shape}.")
+    if q.shape[1] == 0 or v.shape[1] % q.shape[1] != 0 or not 1 <= v.shape[1] // q.shape[1] <= 4:
+        raise ValueError("The fused GDN backward requires Hv/Hk to be an integer in [1, 4].")
+    if q.shape[1] != v.shape[1] and not use_composite_core:
+        raise ValueError("Grouped Q/K heads require use_composite_core=True.")
     if g.shape != beta.shape:
         raise ValueError(f"g and beta shapes must match, got {g.shape} and {beta.shape}.")
-    if g.shape[0] != q.shape[0] or g.shape[1] != q.shape[2] or g.shape[2] != q.shape[1]:
+    if g.shape[0] != q.shape[0] or g.shape[1] != q.shape[2] or g.shape[2] != v.shape[1]:
         raise ValueError(
-            "Expected q/k/v in [B, H, T, D] and g/beta in [B, T, H]; "
+            "Expected q/k in [B, Hk, T, K], v in [B, Hv, T, V] and g/beta in [B, T, Hv]; "
             f"got q={tuple(q.shape)}, g={tuple(g.shape)}."
         )
 
@@ -702,6 +738,7 @@ def flash_gated_delta_rule(
         chunk_size,
         skip_recompute,
         use_composite_core,
+        using_l2norm_in_gdn,
     )
     return o, final_state
 
