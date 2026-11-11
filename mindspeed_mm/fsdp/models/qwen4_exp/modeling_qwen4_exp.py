@@ -1868,63 +1868,6 @@ class Qwen4ExpTextNGramEmbedding(nn.Module):
         )
         return self.ngram_embedding(ngram_ids.to(execution_device)).to(ngram_ids.device).flatten(-2)
 
-    def vp_forward(
-        self,
-        input_ids: torch.Tensor,
-        past_key_values: Cache | None,
-        vocab_group=None,
-        vocab_plan=None,
-    ) -> torch.Tensor:
-        """Vocab-parallel lookup injected by `vocab_parallelize_modules` (see `vocab_plan`).
-
-        The model either leaves this as the module's ``forward``, or calls the same function ahead of
-        the consuming layer (see VocabPlanConfig.prefetch). Because only `input_ids` decides which
-        rows are needed, the earlier call lets recomputation reuse its result instead of looking the
-        rows up again.
-        """
-        return self.vp_resolve(self.vp_prepare(input_ids, past_key_values, vocab_group, vocab_plan))
-
-    def vp_prepare(self, input_ids: torch.Tensor, past_key_values: Cache | None, vocab_group=None,
-                   vocab_plan=None):
-        """Ids plus the first half of the lookup: route them, fetch the rows, start the copy.
-
-        Called ahead of the decoder layers, so the host-to-device copy can run under the layers in
-        between; the layer finishes it through :meth:`vp_finish` (see VocabPlanConfig.prefetch_split).
-        """
-        from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_dispatcher import get_vocab_split_dispatcher
-
-        if vocab_plan is None:
-            raise RuntimeError("vp_prepare requires vocab_plan; it is injected by vocab_parallelize_modules.")
-        ngram_ids = self._compute_ngram_ids(input_ids, past_key_values)
-        prepare, _ = get_vocab_split_dispatcher(vocab_plan.dispatcher)
-        return prepare(self.ngram_embedding, ngram_ids, vocab_group, vocab_plan)
-
-    def vp_finish(self, pending) -> torch.Tensor:
-        """Second half of a split lookup: cast, embedding all-to-all, unpermute, flatten."""
-        from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_dispatcher import get_vocab_split_dispatcher
-
-        _, finish = get_vocab_split_dispatcher(pending.dispatcher)
-        return finish(self.ngram_embedding, pending).flatten(-2)
-
-    def vp_resolve(self, prefetched):
-        """Complete a prefetched lookup: a ready tensor when it was not split, or the pending one."""
-        from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_dispatcher import PendingLookup
-
-        if isinstance(prefetched, PendingLookup):
-            # Hold the record (and the rows it carries) past the forward: the recomputation pass reads
-            # it again from inside the backward, while the model's own dictionary is gone by then.
-            self._vp_pending = prefetched
-            return self.vp_finish(prefetched)
-        return prefetched
-
-    @staticmethod
-    def vp_batch_size(prefetched) -> int:
-        """Batch size a prefetched lookup was computed for (both shapes carry it)."""
-        from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_dispatcher import PendingLookup
-
-        return prefetched.batch_size if isinstance(prefetched, PendingLookup) else prefetched.shape[0]
-
-
 class Qwen4ExpTextPLELayer(nn.Module):
     """Inject hashed n-gram features into every hyper-connection stream.
 
@@ -2005,29 +1948,10 @@ class Qwen4ExpTextPLELayer(nn.Module):
         input_ids: torch.Tensor,
         past_key_values: Cache | None,
         conv_mask: torch.Tensor | None = None,
-        prefetched: object | None = None,
+        prefetched: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        # A prefetched tensor holds the whole batch; a chunked micro-batch (chunk_mbs) would need its
-        # own slice, so look this chunk's rows up instead of using the wrong ones. Such a mismatch means
-        # the whole-batch prefetch can never be consumed, so drop the prefetch of this table: the model
-        # only calls it while `_vp_prefetch` is set, and one lookup of the whole batch per step would
-        # otherwise be computed and thrown away for every chunk above.
-        # `prefetched` is either a ready tensor (unsplit prefetch) or a pending lookup whose copy is
-        # still in flight; `vp_batch_size` and `vp_resolve` handle both, and the first thing resolve
-        # does for the pending case is wait for that copy.
-        if prefetched is not None and self.ple_embedding.vp_batch_size(prefetched) == input_ids.shape[0]:
-            embeddings = self.ple_embedding.vp_resolve(prefetched)
-        else:
-            if prefetched is not None:
-                self.ple_embedding._vp_prefetch = None
-                print_rank(
-                    logger.info,
-                    f"[Vocabulary Parallel] prefetch off for layers.{self.layer_idx}.ple.ple_embedding: "
-                    f"the layer receives a batch of {input_ids.shape[0]} while the prefetch computed "
-                    f"{self.ple_embedding.vp_batch_size(prefetched)} rows (chunk_mbs slices the batch in "
-                    f"between), so the lookup stays inside the layer from now on",
-                )
-            embeddings = self.ple_embedding(input_ids, past_key_values)
+        # The lookup (or the prefetched rows this layer already has) is bound as the embedding's forward.
+        embeddings = self.ple_embedding(input_ids, past_key_values, prefetched=prefetched)
         key_normed = self.norm_key(self.key_proj(embeddings)).unflatten(-1, (self.hc_count, self.hidden_size))
         value = self.value_proj(embeddings)
         query_normed = self.norm_query(hidden_states).unflatten(-1, (self.hc_count, self.hidden_size))
@@ -2071,7 +1995,8 @@ class Qwen4ExpTextDecoderLayer(GradientCheckpointingLayer):
     ) -> torch.FloatTensor:
         if self.ple is not None:
             hidden_states = hidden_states + self.ple(
-                hidden_states, ple_input_ids, past_key_values, conv_mask=conv_mask, prefetched=ple_prefetched
+                hidden_states, ple_input_ids, past_key_values, conv_mask=conv_mask,
+                prefetched=ple_prefetched,
             )
 
         hidden_states, hyper_input, injection_weights = self.attn_hyper_connection(hidden_states)
@@ -2307,15 +2232,17 @@ class Qwen4ExpTextModel(Qwen4ExpPreTrainedModel):
         hidden_states = hidden_states.repeat(1, 1, self.config.hc_count)
 
         # The n-gram ids depend only on `ple_input_ids`, so each PLE layer's rows are looked up here,
-        # once and ahead of the layer that consumes them: recomputation reuses the result instead of
-        # looking the rows up a second time. Empty when the prefetch is off, in which case each layer
-        # does its own lookup (see VocabPlanConfig.prefetch).
+        # once and ahead of the layer that consumes them, and handed down as an input: recomputation
+        # reuses that tensor instead of looking the rows up a second time. Without vocabulary
+        # parallelism neither hook exists; with prefetch disabled both do nothing.
         ple_prefetched = {}
         if ple_input_ids is not None:
             for layer_idx, decoder_layer in enumerate(self.layers[: self.config.num_hidden_layers]):
                 ple = getattr(decoder_layer, "ple", None)
-                if ple is not None and getattr(ple.ple_embedding, "_vp_prefetch", None) is not None:
-                    ple_prefetched[layer_idx] = ple.ple_embedding._vp_prefetch(ple_input_ids, past_key_values)
+                embedding = getattr(ple, "ple_embedding", None) if ple is not None else None
+                prefetch = getattr(embedding, "vp_prefetch", None) if embedding is not None else None
+                if prefetch is not None:
+                    ple_prefetched[layer_idx] = prefetch(ple_input_ids, past_key_values)
 
         for layer_idx, decoder_layer in enumerate(self.layers[: self.config.num_hidden_layers]):
             hidden_states = decoder_layer(

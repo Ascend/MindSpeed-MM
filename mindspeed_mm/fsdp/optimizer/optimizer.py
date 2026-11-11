@@ -35,6 +35,8 @@ from torch.optim.optimizer import Optimizer
 from ..distributed.parallel_state import get_parallel_state
 from ...optimizer.muon import Muon
 from mindspeed_mm.fsdp.optimizer.swap_optimizer import AdamWSwap
+from mindspeed_mm.fsdp.optimizer.cpu_sparse_optimizer import CPU_SPARSE_KEY, build_cpu_sparse_member
+from mindspeed_mm.fsdp.utils.utils import get_host_resident_params
 
 
 logger = logging.getLogger(__name__)
@@ -86,6 +88,7 @@ class MultiOptimizer(Optimizer, Stateful):
         return all_groups
 
     def step(self) -> None:
+        # A member that needs a pre-step action owns it (see CpuSparseAdam); the container only steps.
         for opt in self.optimizers_dict.values():
             opt.step()
 
@@ -100,7 +103,11 @@ class MultiOptimizer(Optimizer, Stateful):
         merged: Dict[str, Any] = {}
         for name in self.key_names:
             opt = self.optimizers_dict.get(name)
-            sd = get_optimizer_state_dict(self.model, opt, options=StateDictOptions(flatten_optimizer_state_dict=True))
+            # A member may adapt its own checkpoint entries (see CpuSparseAdam.state_dict_for).
+            if hasattr(opt, "state_dict_for"):
+                sd = opt.state_dict_for(self.model)
+            else:
+                sd = get_optimizer_state_dict(self.model, opt, options=StateDictOptions(flatten_optimizer_state_dict=True))
             # check for key clashes before merging
             overlap = set(merged.keys()) & set(sd.keys())
             if overlap:
@@ -114,10 +121,13 @@ class MultiOptimizer(Optimizer, Stateful):
         return merged
 
     def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
-        # Feed the same merged flattened dict to each sub-optimizer; PyTorch will
-        # pick out only the entries for parameters that belong to that optimizer.
+        # Every member gets the whole merged dict and keeps the entries of its own parameters; a member
+        # that adapts its entries (see CpuSparseAdam.load_state_dict_for) takes them back on its own.
         for name in self.key_names:
             opt = self.optimizers_dict.get(name)
+            if hasattr(opt, "load_state_dict_for"):
+                opt.load_state_dict_for(self.model, state_dict)
+                continue
             set_optimizer_state_dict(
                 self.model,
                 opt,
@@ -267,28 +277,46 @@ def build_optimizer(
             muon_fallback_param_keywords=muon_fallback_param_keywords,
             mem_fraction_static=mem_fraction_static,
         )
+    # The cpu-resident embeddings get their own sparse optimizer, so the dense groups must not see them.
+    # They are separated as a whole: taking them out of the decay list alone would only move them into
+    # the no-decay group below.
+    host_params = get_host_resident_params(model)
+    host_names = {name for name, _ in host_params}
+
     # Other cases remain the same
     if lr_scaling_plan:
         decay_param_names = get_parameter_names(model, no_decay_modules, no_decay_params)
-        param_groups = get_param_groups(model, weight_decay, lr, lr_scaling_plan, decay_param_names)
+        param_groups = get_param_groups(model, weight_decay, lr, lr_scaling_plan, decay_param_names,
+                                        skip_names=host_names)
 
     elif param_groups is None:
-        decay_param_names = get_parameter_names(model, no_decay_modules, no_decay_params)
+        # A set, because the two loops below only ask whether a name belongs to the decay group.
+        decay_param_names = set(get_parameter_names(model, no_decay_modules, no_decay_params)) - host_names
         param_groups = [
             {
-                "params": [p for n, p in model.named_parameters() if n in decay_param_names and p.requires_grad],
+                "params": [param for name, param in model.named_parameters()
+                           if name in decay_param_names and param.requires_grad],
                 "weight_decay": weight_decay,
             },
         ]
         no_decay_parameters, no_decay_parameter_names = [], []
-        for n, p in model.named_parameters():
-            if n not in decay_param_names and p.requires_grad:
-                no_decay_parameter_names.append(n)
-                no_decay_parameters.append(p)
+        for name, param in model.named_parameters():
+            if name in host_names or name in decay_param_names or not param.requires_grad:
+                continue
+            no_decay_parameter_names.append(name)
+            no_decay_parameters.append(param)
 
         if len(no_decay_parameters) > 0:
             logger.info(f"Parameters without weight decay: {no_decay_parameter_names}")
             param_groups.append({"params": no_decay_parameters, "weight_decay": 0.0})
+
+    cpu_sparse = None
+    hooks = getattr(model, "_cpu_sparse_hooks", None)
+    if host_params and hooks is not None:
+        # Only a model that keeps an n-gram table in host memory needs the extra member.
+        cpu_sparse = build_cpu_sparse_member(
+            [param for _, param in host_params], lr=lr, betas=betas, eps=eps, hooks=hooks
+        )
 
     if optimizer_type == "muon":
         param_groups = _mark_muon_param_groups(model, param_groups, muon_fallback_param_keywords)
@@ -319,7 +347,11 @@ def build_optimizer(
     else:
         raise ValueError("Only adamw, adamw_swap and muon are supported as optimizers.")
 
-    return optim
+    if cpu_sparse is None:
+        return optim
+    # Same container as the EP path: one object steps every member, one scheduler covers them.
+    return MultiOptimizer(model, {"dense": optim, CPU_SPARSE_KEY: cpu_sparse},
+                          key_names=["dense", CPU_SPARSE_KEY])
 
 
 def group_params_by_lr_ratio(param_names: List[str], params: List[torch.Tensor],
@@ -352,6 +384,7 @@ def get_param_groups(
         base_lr: float,
         lr_scaling_plan: List[Dict] = None,
         decay_param_names: List[str] = None,
+        skip_names: Iterable[str] = (),
 ) -> List[Dict]:
     """按正则表达式分组参数，先按weight_decay，再按lr_ratio分组"""
 
@@ -359,7 +392,7 @@ def get_param_groups(
     decay_parameters, decay_parameter_names = [], []
 
     for n, p in model.named_parameters():
-        if not p.requires_grad:
+        if not p.requires_grad or n in skip_names:
             continue
 
         if n in decay_param_names:
@@ -413,6 +446,10 @@ def build_ep_fsdp2_optimizer(
     - Each group's params are automatically split into EP and non-EP based on DTensor mesh
     - Custom learning rates and other optimizer settings are preserved per group
     """
+    # The cpu-resident embeddings get their own sparse optimizer, so they must never enter these groups.
+    host_params = get_host_resident_params(model)
+    host_ids = {id(param) for _, param in host_params}
+
     # Collect all EP and non-EP parameters across all groups
     ep_groups: List[Dict[str, Any]] = []
     non_ep_groups: List[Dict[str, Any]] = []
@@ -430,7 +467,7 @@ def build_ep_fsdp2_optimizer(
             group_non_ep_params: List[torch.nn.Parameter] = []
 
             for p in group_params:
-                if not p.requires_grad:
+                if not p.requires_grad or id(p) in host_ids:
                     continue
                 if DTensor is not None and isinstance(p, DTensor):
                     mesh = getattr(p, "device_mesh", None)
@@ -471,7 +508,7 @@ def build_ep_fsdp2_optimizer(
         non_ep_params: List[torch.nn.Parameter] = []
 
         for _, p in model.named_parameters():
-            if not p.requires_grad:
+            if not p.requires_grad or id(p) in host_ids:
                 continue
             if DTensor is not None and isinstance(p, DTensor):
                 mesh = getattr(p, "device_mesh", None)
@@ -521,6 +558,14 @@ def build_ep_fsdp2_optimizer(
         optimizer_dict["ep"] = _build(ep_groups)
     if non_ep_groups:
         optimizer_dict["non_ep"] = _build(non_ep_groups)
+    # The cpu embeddings are in none of the groups above: their rows live in cpu memory and the sparse
+    # optimizer consumes the row ledger directly.
+    hooks = getattr(model, "_cpu_sparse_hooks", None)
+    if host_params and hooks is not None:
+        # Only a model that keeps an n-gram table in host memory needs the extra member.
+        optimizer_dict[CPU_SPARSE_KEY] = build_cpu_sparse_member(
+            [param for _, param in host_params], lr=lr, betas=betas, eps=eps, hooks=hooks
+        )
 
     # cache for EP-aware grad clipping helpers
     model._ep_param_groups = {

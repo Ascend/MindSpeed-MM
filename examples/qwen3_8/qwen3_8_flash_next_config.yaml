@@ -7,6 +7,7 @@ parallel:
       - model.language_model.embed_tokens
       - model.language_model
       - model.language_model.layers.{*}
+      - model.language_model.layers.{*}.ple.ple_embedding.ngram_embedding
       - model.language_model.layers.{*}.linear_attn
       - model.language_model.layers.{*}.mlp.experts
       - lm_head
@@ -24,6 +25,15 @@ parallel:
     dispatcher: chunkmoe
     moe_num_chunks: 2
     use_npu_fused_ops: true
+  vocab_parallel_size: 8
+  vocab_plan:
+    apply_modules:
+      - model.language_model.layers.{*}.ple.ple_embedding
+    host_by_cpu: true
+    dedup: true
+    prefetch: true
+    prefetch_split: false
+    async_offload: true
 
 ### 数据相关配置
 data:

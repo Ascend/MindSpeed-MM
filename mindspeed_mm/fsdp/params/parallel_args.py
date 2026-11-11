@@ -115,15 +115,23 @@ class VocabPlanConfig(BaseArguments):
                           "they overlap the compute stream. Covers the backward row-gradient copy and, "
                           "with prefetch_split, the forward copy. Off makes every transfer block."}
     )
+    device_merge: bool = field(
+        default=True,
+        metadata={"help": "Merge the step's row gradients on the device instead of gathering them to the "
+                          "cpu first. A debugging switch: it changes where the merge runs, not the result."}
+    )
+    device_sort: bool = field(
+        default=False,
+        metadata={"help": "Sort the row ids on the device while accumulating; only matters when "
+                          "device_merge is off."}
+    )
 
     def model_post_init(self, __context):
-        # Three renames landed together, and the base class accepts unknown keys, so a stale plan would
+        # Two renames landed together, and the base class accepts unknown keys, so a stale plan would
         # otherwise be ignored and silently take the cpu path.
         legacy = {
             "device": "host_by_cpu (true: table on cpu, false: table on the accelerator)",
             "async_transfer": "async_offload",
-            "device_sort": "environment variable MM_VP_DEVICE_SORT",
-            "device_merge": "environment variable MM_VP_DEVICE_MERGE",
         }
         stale = [f"{key} -> {hint}" for key, hint in legacy.items() if key in (self.model_extra or {})]
         if stale:
@@ -174,6 +182,16 @@ class ParallelArguments(BaseArguments):
         metadata={"help": "Expert Data Parallel size for MoE models."}
     )
     ep_plan: EPPlanConfig = field(default_factory=EPPlanConfig)
+
+    vocab_parallel_size: int = field(
+        default=1,
+        metadata={"help": "Vocabulary Parallel size. The rows of a large embedding table (e.g. the qwen4_exp PLE ngram_embedding) are split across this many ranks, like EP splits experts."}
+    )
+    vocab_data_parallel_size: int = field(
+        default=1,
+        metadata={"help": "Replication size for Vocabulary Parallel shards. Derived as world_size // vocab_parallel_size; it only exists to finish the world."}
+    )
+    vocab_plan: VocabPlanConfig = field(default_factory=VocabPlanConfig)
 
     recompute: bool = field(
         default=False,
@@ -266,3 +284,29 @@ class ParallelArguments(BaseArguments):
                     f"HSDP mode requires expert_parallel_size > 1, "
                     f"got {self.expert_parallel_size}"
                 )
+
+        # vp and vdp must cover the world: vdp is derived, it only exists to finish the world
+        if self.vocab_parallel_size > 1:
+            if self.world_size % self.vocab_parallel_size != 0:
+                raise ValueError(
+                    f"world_size({self.world_size}) must be divisible by "
+                    f"vocab_parallel_size({self.vocab_parallel_size})."
+                )
+            ##self.vocab_data_parallel_size = self.world_size // self.vocab_parallel_size
+            if self.vocab_data_parallel_size != self.world_size // self.vocab_parallel_size:
+                logger.warning(
+                    f"vocab_data_parallel_size({self.vocab_data_parallel_size}) does not match,switch to auto calculated value"
+                )
+                self.vocab_data_parallel_size = self.world_size // self.vocab_parallel_size
+            if not self.vocab_plan.apply_modules:
+                # EP behaves the same way: a size above one with an empty plan simply does nothing, so a
+                # debugging configuration stays valid instead of failing at parse time.
+                logger.warning(
+                    "[Vocabulary Parallel] vocab_parallel_size=%d but vocab_plan.apply_modules is "
+                    "empty: vocabulary parallelism will not be applied.", self.vocab_parallel_size,
+                )
+        elif self.vocab_plan.apply_modules:
+            logger.warning(
+                "[Vocabulary Parallel] vocab_plan.apply_modules is configured but vocab_parallel_size "
+                "== 1: the plan is ignored and the n-gram table stays an ordinary parameter."
+            )

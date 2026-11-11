@@ -13,6 +13,11 @@ from torch.utils._foreach_utils import (
 )
 
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.distributed.vocab_parallel.vocab_sparse_grad import (
+    finalize_vocab_gradients,
+    get_device_vocab_embeddings,
+    get_vocab_embeddings,
+)
 from mindspeed_mm.fsdp.optimizer.grad_norm_overlap import manager as _grad_norm_overlap_mgr
 from mindspeed_mm.fsdp.utils.device import get_device_type
 
@@ -59,19 +64,31 @@ def clip_grad_norm(
     ps = get_parallel_state()
     fsdp_group = ps.get_fsdp_group()
     params: List[torch.nn.Parameter] = [p for p in model.parameters() if p.grad is not None]
+    # A replicated device embedding would be counted once per replica by the FSDP-group sum, so it enters
+    # through _vocab_stat (the vocab group, where the windows are disjoint); clipping still sees it.
+    vocab_has_replicas = has_vocab_replicas(ps)
+    dense_embedding_ids = _get_dense_embedding_param_ids(model)
+    if vocab_has_replicas:
+        params_for_norm = [p for p in params if id(p) not in dense_embedding_ids]
+    else:
+        params_for_norm = params
     # Compute and reduce non-EP
     total_norm = _fsdp2_reduce_group(
-        params=params,
+        params=params_for_norm,
         norm_type=norm_type,
         reduce_groups=[("fsdp", fsdp_group)],
     )
+    total_norm = _add_vocab_stat(total_norm, model, norm_type, vocab_has_replicas)
     if math.isinf(norm_type):
         total_norm = total_norm
     else:
         total_norm = total_norm ** (1.0 / float(norm_type))
     # Special case: max_norm = 0 means only compute gradient norm without clipping
     if max_norm > 0.:
-        torch.nn.utils.clip_grads_with_norm_(params, max_norm, total_norm, foreach=foreach)
+        clip_params = [p for p in params if id(p) not in dense_embedding_ids]
+        torch.nn.utils.clip_grads_with_norm_(clip_params, max_norm, total_norm, foreach=foreach)
+        _clip_device_vocab_grads(model, max_norm, total_norm)
+        _clip_vocab_row_grads(model, max_norm, total_norm)
     return total_norm
 
 
@@ -100,9 +117,15 @@ def ep_fsdp2_clip_grad_norm(
     ep_params: List[torch.nn.Parameter] = [p for p in model._ep_param_groups.get("ep", []) if p.grad is not None]
     non_ep_params: List[torch.nn.Parameter] = [p for p in model._ep_param_groups.get("non_ep", []) if p.grad is not None]
     non_ep_groups, ep_groups = _norm_reduce_groups(fsdp_group, ep_fsdp_group, ep_group)
+    vocab_has_replicas = has_vocab_replicas(ps)
+    dense_embedding_ids = _get_dense_embedding_param_ids(model)
+    if vocab_has_replicas:
+        non_ep_for_norm = [p for p in non_ep_params if id(p) not in dense_embedding_ids]
+    else:
+        non_ep_for_norm = non_ep_params
     # Compute and reduce non-EP
     non_ep_total = _fsdp2_reduce_group(
-        params=non_ep_params,
+        params=non_ep_for_norm,
         norm_type=norm_type,
         reduce_groups=non_ep_groups,
     )
@@ -114,15 +137,21 @@ def ep_fsdp2_clip_grad_norm(
     )
 
     if math.isinf(norm_type):
-        total_norm = torch.maximum(non_ep_total, ep_total)
+        combined = torch.maximum(non_ep_total, ep_total)
     else:
-        total_norm = (non_ep_total + ep_total) ** (1.0 / float(norm_type))
+        combined = non_ep_total + ep_total
+    total_norm = _add_vocab_stat(combined, model, norm_type, vocab_has_replicas)
+    if not math.isinf(norm_type):
+        total_norm = total_norm ** (1.0 / float(norm_type))
 
     if max_norm == 0.:
         return total_norm
     # Apply the same clip coefficient to both groups
     torch.nn.utils.clip_grads_with_norm_(ep_params, max_norm, total_norm, foreach=foreach)
-    torch.nn.utils.clip_grads_with_norm_(non_ep_params, max_norm, total_norm, foreach=foreach)
+    non_ep_clip = [p for p in non_ep_params if id(p) not in dense_embedding_ids]
+    torch.nn.utils.clip_grads_with_norm_(non_ep_clip, max_norm, total_norm, foreach=foreach)
+    _clip_device_vocab_grads(model, max_norm, total_norm)
+    _clip_vocab_row_grads(model, max_norm, total_norm)
 
     return total_norm
 
@@ -179,6 +208,110 @@ def _local_max(params: List[torch.nn.Parameter]) -> torch.Tensor:
         dev = torch.device(get_device_type())
         mx = torch.tensor(0.0, device=dev, dtype=torch.float32)
     return mx
+
+
+def _get_vocab_row_grads(model) -> list:
+    """``(module name, accumulator)`` of every host-resident vocab embedding in ``model``."""
+    return [(name, module._vp_row_grad) for name, module in get_vocab_embeddings(model)]
+
+
+def _get_dense_embedding_param_ids(model) -> set:
+    """``id`` of the parameters of device-resident vocab embeddings (``vocab_plan.host_by_cpu: false``)."""
+    return {id(module.weight) for _, module in get_device_vocab_embeddings(model)}
+
+
+def has_vocab_replicas(parallel_state) -> bool:
+    """Whether a device embedding's row window is replicated over the data-parallel ranks."""
+    get_vdp_group = getattr(parallel_state, "get_vdp_group", None)
+    if not callable(get_vdp_group) or not dist.is_initialized():
+        return False
+    group = get_vdp_group()
+    return group is not None and dist.get_world_size(group) > 1
+
+
+@torch.no_grad()
+def _vocab_stat(model, norm_type: float, device, vocab_has_replicas: bool) -> torch.Tensor:
+    """p-th power sum (or the max) of the vocab embeddings the parameter-wise paths cannot count.
+
+    Materializes the embeddings' gradient first: this function is its first reader, and every rank has
+    to enter the collectives whether or not its own tokens touched a row (see finalize_vocab_gradients).
+    A model without vocabulary parallelism has no cache on it and returns before any of that happens.
+
+    Two cases meet here. A host-resident embedding keeps its gradient in a COO ledger until the optimizer
+    step, so the parameter loop never sees it. A device-resident embedding whose row window is replicated
+    over the data-parallel ranks has to stay out of the FSDP-group sum, which would count every replica.
+    Both are reduced over the vocabulary group only: the row windows are disjoint there, so one
+    reduction covers the whole embedding exactly once. ``device`` is where the statistic is accumulated --
+    the caller passes the device its own total lives on, so a CPU-only model keeps a CPU result.
+    """
+    if not getattr(model, "_vocab_embeddings", None):
+        # No vocabulary parallelism: nothing to add, and the module tree is not walked either.
+        return torch.zeros((), device=device, dtype=torch.float32)
+
+    finalize_vocab_gradients(model)
+    statistics = []
+    for _, accumulator in _get_vocab_row_grads(model):
+        grad = accumulator.pending_sparse_grad()
+        if grad is not None:
+            statistics.append(grad.values().detach().float())
+    if vocab_has_replicas:
+        for _, module in get_device_vocab_embeddings(model):
+            grad = module.weight.grad
+            if grad is not None:
+                statistics.append((grad.to_local() if isinstance(grad, DTensor) else grad).detach().float())
+
+    # No early return when this rank's rows were not hit: every rank has to enter the vp-group
+    # reduction below, and an empty window contributes 0 to both the sum and the max.
+    is_max = math.isinf(norm_type)
+    local = torch.zeros((), dtype=torch.float32)
+    for values in statistics:
+        value = values.abs().max() if is_max else (values.abs() ** norm_type).sum()
+        local = torch.maximum(local, value) if is_max else local + value
+
+    value = local.to(device) if device is not None else local
+    if dist.is_initialized():
+        group = get_parallel_state().get_vp_group()
+        if group is not None:
+            op = dist.ReduceOp.MAX if is_max else dist.ReduceOp.SUM
+            dist.all_reduce(value, op=op, group=group)
+    return value
+
+
+@torch.no_grad()
+def _add_vocab_stat(total_norm: torch.Tensor, model, norm_type: float,
+                    vocab_has_replicas: bool) -> torch.Tensor:
+    """Fold the vocab embeddings' statistic into the total the parameter-wise paths produced."""
+    stat = _vocab_stat(model, norm_type, total_norm.device, vocab_has_replicas)
+    if math.isinf(norm_type):
+        return torch.maximum(total_norm, stat)
+    return total_norm + stat
+
+
+@torch.no_grad()
+def _clip_device_vocab_grads(model, max_norm: float, total_norm: torch.Tensor) -> None:
+    """Apply the clip coefficient to the device embeddings, whose grad lives on the vocab mesh.
+
+    A DTensor op is bound to one mesh, so they cannot join the FSDP-mesh foreach above; the factor is
+    applied to their local shard instead.
+    """
+    factor = float(max_norm / (total_norm + 1e-6))
+    if factor >= 1.0:
+        return
+    for _, embedding in get_device_vocab_embeddings(model):
+        grad = embedding.weight.grad
+        if grad is None:
+            continue
+        local = grad.to_local() if isinstance(grad, DTensor) else grad
+        local.mul_(factor)
+
+
+def _clip_vocab_row_grads(model, max_norm: float, total_norm: torch.Tensor) -> None:
+    """Apply the same clip coefficient the ``.grad`` parameters get to the host-resident embeddings."""
+    factor = float(max_norm / (total_norm + 1e-6))
+    if factor >= 1.0:
+        return
+    for _, accumulator in _get_vocab_row_grads(model):
+        accumulator.scale(factor)
 
 
 def _norm_reduce_groups(fsdp_group, ep_fsdp_group, ep_group):

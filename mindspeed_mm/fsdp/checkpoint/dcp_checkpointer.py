@@ -58,6 +58,9 @@ class ModelState(Stateful):
         # which is aumatically triggered by get_model_state_dict
         self.parallel_state = get_parallel_state()
         self.save_ckpt_dtype = save_ckpt_dtype
+        # Optional object that adapts entries whose keys depend on how a parameter is sharded (see
+        # HostVocabCheckpointAdapter); the checkpointer itself stays feature-agnostic.
+        self.checkpoint_adapter = getattr(model, "_checkpoint_adapter", None)
 
     @torch.no_grad()
     def state_dict(self):
@@ -66,6 +69,8 @@ class ModelState(Stateful):
             for k, v in model_state_dict.items():
                 if isinstance(v, torch.Tensor) and torch.is_floating_point(v):
                     model_state_dict[k] = v.to(self.save_ckpt_dtype)
+        if self.checkpoint_adapter is not None:
+            self.checkpoint_adapter.adapt_saved(self.model, model_state_dict)
         return model_state_dict
 
     @torch.no_grad()
@@ -75,6 +80,10 @@ class ModelState(Stateful):
         need to drop EP-dim when loading from DCP checkpoints
         so that EP-FSDP would not be confused
         """
+        # Undo what state_dict() appended: DCP hands the template keys back here and the model's
+        # parameters carry their plain names.
+        if self.checkpoint_adapter is not None:
+            self.checkpoint_adapter.adapt_loaded(self.model, state_dict)
         set_model_state_dict(model=self.model, model_state_dict=state_dict)
 
 
@@ -104,6 +113,8 @@ class LoraModelState(ModelState):
             _model_state_dict = super().state_dict()
             self.key_mapping = remove_base_layer_keys(_model_state_dict)
         restore_base_layer_keys(state_dict, self.key_mapping)
+        if self.checkpoint_adapter is not None:
+            self.checkpoint_adapter.adapt_loaded(self.model, state_dict)
         set_model_state_dict(model=self.model, model_state_dict=state_dict)
 
 
@@ -295,6 +306,10 @@ class DistributedCheckpointer(CheckpointerBase):
         load_state = {"model": model_state_cls(state["model"])}
         if not release and "optimizer" in state:
             load_state["optimizer"] = OptimizerState(model=state["model"], optimizer=state["optimizer"])  # type: ignore[index]
+            adapter = getattr(state["model"], "_checkpoint_adapter", None)
+            warning = adapter.legacy_warning(checkpoint_dir) if adapter is not None else None
+            if warning is not None:
+                logger.warning("[Checkpoint] %s", warning)
 
         if storage_reader is None:
             storage_reader = cls._create_storage_reader(checkpoint_dir)

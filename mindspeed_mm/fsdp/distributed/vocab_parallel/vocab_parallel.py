@@ -6,19 +6,21 @@ import torch
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor, Replicate, Shard
 
-from mindspeed_mm.fsdp import envs
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.log import print_rank
+from mindspeed_mm.fsdp.optimizer.cpu_sparse_optimizer import CpuSparseHooks
 from mindspeed_mm.fsdp.params.parallel_args import VocabPlanConfig
 from mindspeed_mm.fsdp.utils.device import get_device_type
 from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.utils.utils import is_host_resident_param
+from mindspeed_mm.fsdp.utils.dtype import get_dtype
 
 from . import vocab_stream
 from .constants import HOST_RESIDENT_HINT
 from .vocab_dispatcher import get_vocab_split_dispatcher, vp_lookup
 from .vocab_row_fetch import DeviceRowFetcher, HostRowFetcher
-from .vocab_sparse_grad import VocabRowGrad
+from .vocab_sparse_grad import VocabRowGrad, clear_sparse_gradient, prepare_sparse_optimizer_step
+from .vocab_checkpoint import HostVocabCheckpointAdapter
 
 
 logger = logging.getLogger(__name__)
@@ -245,9 +247,12 @@ def vocab_parallelize_modules(
     model: torch.nn.Module,
     vp_mesh: DeviceMesh,
     plan: VocabPlanConfig,
-    output_dtype: torch.dtype | None = None,
     fsdp_plan=None,
 ) -> torch.nn.Module:
+    # The table stays fp32 in CPU memory; the lookup has to hand rows back in the dtype the FSDP
+    # mixed-precision policy would have produced, so the caller does not pass it separately.
+    param_dtype = getattr(fsdp_plan, "param_dtype", None) if fsdp_plan is not None else None
+    output_dtype = get_dtype(param_dtype) if param_dtype else None
     vp_modules = get_vp_modules(model, plan)
     if not vp_modules:
         raise ValueError(
@@ -319,8 +324,8 @@ def vocab_parallelize_modules(
             shape=embedding.weight.shape,
             group=parallel_state.get_vdp_group(),
             device=torch.device(get_device_type()),
-            device_sort=envs.MM_VP_DEVICE_SORT,
-            device_merge=envs.MM_VP_DEVICE_MERGE,
+            device_sort=plan.device_sort,
+            device_merge=plan.device_merge,
         )
         embedding._vp_fetcher = HostRowFetcher()
         # The lookup reads fp32 rows out of host memory; the layer around it runs in the mixed
@@ -353,4 +358,14 @@ def vocab_parallelize_modules(
 
     # The per-step paths (optimizer member, clipping) read this instead of walking the module tree.
     model._vocab_embeddings = {"host": host_embeddings, "device": device_embeddings}
+    if host_embeddings:
+        # One adapter serves both consumers (the checkpoint's model state and the table's own optimizer
+        # state); the hooks are the ledger boundaries the optimizer member has to call.
+        adapter = HostVocabCheckpointAdapter(model)
+        model._checkpoint_adapter = adapter
+        model._cpu_sparse_hooks = CpuSparseHooks(
+            before_step=lambda: prepare_sparse_optimizer_step(model),
+            after_zero_grad=lambda: clear_sparse_gradient(model),
+            checkpoint_adapter=adapter,
+        )
     return model

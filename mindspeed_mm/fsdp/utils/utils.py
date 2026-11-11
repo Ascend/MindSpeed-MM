@@ -40,12 +40,35 @@ def get_host_resident_params(model, recurse: bool = True) -> list:
     ]
 
 
+def _allocate_host_tensor(shape, dtype, pin_memory: bool) -> torch.Tensor:
+    """Allocate a CPU tensor, optionally pinned (page-locked) for faster host-to-device transfer."""
+    if pin_memory:
+        try:
+            return torch.empty(shape, dtype=dtype, device="cpu", pin_memory=True)
+        except Exception as exc:
+            logger.warning(
+                "[VP] pinned host allocation failed (%s); falling back to pageable host memory", exc
+            )
+    return torch.empty(shape, dtype=dtype, device="cpu")
+
+
+def _host_tensor(param, pin_memory: bool) -> torch.Tensor:
+    """The host storage a host-resident parameter should carry (pinned when requested)."""
+    if param.is_meta:
+        return _allocate_host_tensor(param.shape, param.dtype, pin_memory)
+    host = param.data.to("cpu")  # a no-op when the parameter already lives on cpu
+    if pin_memory and not host.is_pinned():
+        host = host.pin_memory()
+    return host
+
+
 def to_empty_if_needed(
     model,
     device: torch.device | str | int | None,
     recurse: bool = True,
     only_meta: bool = False,
     buffer_device: torch.device | str | int | None = None,
+    pin_host_memory: bool = True,
 ):
     """Move parameters/buffers toward ``device`` without copying storage when already there.
 
@@ -60,6 +83,8 @@ def to_empty_if_needed(
             of ``device`` (FSDP2 CPU-offload keeps buffers such as RoPE
             ``inv_freq`` on the compute device); other buffers stay. A concrete
             device materializes/moves meta or wrong-device buffers to it.
+        pin_host_memory: Whether ``model._no_placement_params`` are materialized in
+            pinned (page-locked) host memory.
 
     Behavior Scenarios (ACC = accelerator returned by ``get_device_type()``):
         Scenario 1: Meta initialization + CPU offload (e.g., FSDP2 with offload_to_cpu=True)
@@ -82,12 +107,24 @@ def to_empty_if_needed(
           - Meta Parameters:          Meta => device (default CPU)
           - Meta Buffers:             Meta => device
           - Non-meta tensors:         untouched (same object, no copy)
+
+        Scenario 4: Parameters declared host-resident (``model._no_placement_params``, e.g. the
+        huge engram vocab embedding) are NEVER sent to ``device`` in any scenario: they are
+        materialized in pinned host memory (allocated once, address-stable) by
+        this function and read row-by-row from there.
     """
     device = torch.empty((), device=device).device
+
+    host_resident_ids = {id(param) for _, param in get_host_resident_params(model, recurse=recurse)}
 
     def _replace_tensor(t):
         # Case 1: This is a trainable parameter (subclass of torch.Tensor with requires_grad)
         if isinstance(t, torch.nn.Parameter):
+            if id(t) in host_resident_ids:
+                # Host-resident by design: never sent to ``device``. Materialize it here instead: a meta
+                # parameter gets a fresh pinned host tensor (``_apply`` replaces the parameter object), a
+                # concrete one keeps its object and only swaps storage.
+                return _host_tensor(t, pin_host_memory)
             if only_meta and not t.is_meta:
                 return t
             return torch.empty_like(t, device=device) if t.device != device else t

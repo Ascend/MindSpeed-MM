@@ -58,3 +58,32 @@ def _map_keys(checkpoint_state: dict, keys: dict, add: bool) -> None:
         state[convert(name)] = state.pop(name)
     for group in checkpoint_state.get("param_groups") or ():
         group["params"] = [p if not isinstance(p, str) else convert(p) for p in group["params"]]
+
+
+class HostVocabCheckpointAdapter:
+    """Adapt the cpu embeddings' optimizer entries to the row-window checkpoint keys.
+
+    A member of ``MultiOptimizer`` may carry its own checkpoint adaptation; this is the vocab one. The
+    window is per rank, so the entries cannot share the plain parameter names.
+    """
+
+    def __init__(self, model):
+        self.keys = get_host_vocab_shard_keys(model)
+
+    def adapt_saved(self, model, state: dict) -> None:
+        add_shard_suffixes(state, self.keys)
+
+    def adapt_loaded(self, model, state: dict) -> None:
+        remove_shard_suffixes(state, self.keys)
+
+    def legacy_warning(self, checkpoint_dir) -> str | None:
+        """Text for a checkpoint that still keeps the embedding optimizer in its own entry."""
+        import os
+
+        if not os.path.isdir(os.path.join(checkpoint_dir, "vocab_optimizer")):
+            return None
+        return (
+            "this checkpoint keeps the embedding optimizer in a separate 'vocab_optimizer' entry, from "
+            "before it joined the composite optimizer; the embedding moments are not loaded and the "
+            "embeddings start from zero moments. Re-save to migrate."
+        )

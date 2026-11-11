@@ -14,6 +14,7 @@ from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig, EPPlanConfig
 from mindspeed_mm.fsdp.utils.device import get_torch_device, get_device_type
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
+from mindspeed_mm.fsdp.utils.utils import get_host_resident_params
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
 from mindspeed_mm.fsdp.log import print_rank
 
@@ -99,6 +100,8 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
 
     # Get modules and parameters that should be ignored for FSDP
     ignored_modules, ignored_params = get_ignored_modules(model, fsdp_plan)
+    # Host-resident params (the huge engram vocab embedding) stay out of FSDP
+    ignored_params = ignored_params | {param for _, param in get_host_resident_params(model)}
     # Get modules that should have FSDP applied
     fsdp_modules = get_fsdp_modules(model, fsdp_plan, ignored_modules)
     # Get modules that FSDP hook add (only needed for 2.7.1/2.9.0 patched fully_shard)

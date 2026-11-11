@@ -25,7 +25,7 @@ def fetch_rows_from_host(
     if weight.device.type != "cpu":
         raise RuntimeError(
             f"[VP] fetch_rows_from_host expects the vocab embedding in host memory, got {weight.device}. "
-            f"The embedding must stay host-resident (see _no_placement_params / to_host_if_needed): a "
+            f"The embedding must stay host-resident (see model._no_placement_params): a "
             f"device-resident embedding puts the engram layer back into accelerator memory."
         )
 

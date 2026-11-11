@@ -1,12 +1,18 @@
+import logging
+
 import torch
 
 from .expert_parallel.expert_parallel import expert_parallelize_modules
 from .expert_parallel.expert_fully_shard_parallel import expert_fully_shard_modules
+from .vocab_parallel.vocab_parallel import get_vp_modules, set_host_resident, vocab_parallelize_modules
 from .fully_shard_parallel import fully_shard_parallel_modules, set_modules_to_prefetch
 from .parallel_state import get_parallel_state
+from ..log import print_rank
 from ..params.parallel_args import ParallelArguments
 from ..params.training_args import TrainingArguments
 from ..params.feature_args import FeatureArguments
+
+logger = logging.getLogger(__name__)
 
 
 class ParallelApplier:
@@ -47,6 +53,30 @@ class ParallelApplier:
             self.config.fsdp_plan.apply_modules = [x for x in self.config.fsdp_plan.apply_modules if x not in self.config.ep_plan.apply_efsdp_modules]
         return model
 
+    def apply_vocab_modules(self, model):
+        if not (self.config.vocab_parallel_size > 1 and self.config.vocab_plan.apply_modules):
+            # Vocabulary parallelism offloads the n-gram table to CPU memory. Drop that declaration when
+            # it is disabled, so the table is an ordinary accelerator parameter again.
+            set_host_resident(model, host_resident=False)
+            return model
+        if self.config.fully_shard_parallel_size == 1 and not self.training_config.init_model_with_meta_device:
+            # DDP replicates the module and all-reduces every parameter on one device, which cannot
+            # coexist with a table deliberately kept in host memory: reject it where the table is created
+            # instead of after the model has been moved to the accelerator.
+            raise NotImplementedError(
+                "a host-resident n-gram table (vocab_plan.host_by_cpu=true) needs FSDP2: DDP "
+                "(fully_shard_parallel_size=1 without init_model_with_meta_device) has no way to keep one "
+                "parameter off the accelerator and out of the gradient all-reduce. Set "
+                "fully_shard_parallel_size > 1, enable init_model_with_meta_device, or set "
+                "vocab_plan.host_by_cpu=false."
+            )
+        return vocab_parallelize_modules(
+            model,
+            self.parallel_state.get_vp_device_mesh(),
+            self.config.vocab_plan,
+            fsdp_plan=self.config.fsdp_plan,
+        )
+
     def set_modules_to_prefetch(self, model):
         if self.config.fsdp_plan.num_to_forward_prefetch > 0 or self.config.fsdp_plan.num_to_backward_prefetch > 0:
             ep_plan = self.config.ep_plan if self.config.expert_parallel_size > 1 and self.config.ep_plan.apply_modules else None
@@ -76,13 +106,14 @@ class ParallelApplier:
 
     def __call__(self, model):
         # Apply configuration-based parallel strategies
-        # Order matters: TP -> EP -> Recompute -> FSDP
+        # Order matters: TP -> EP -> VP -> Recompute -> FSDP
 
         # must set before fully_shard, inplace operation
         self.apply_quantization_modules(model=model)
 
         model = self.apply_tp_modules(model=model)
         model = self.apply_ep_modules(model=model)
+        model = self.apply_vocab_modules(model=model)
         model = self.apply_fsdp_modules(model=model, training_config=self.training_config)
         model = self.set_modules_to_prefetch(model=model)
         return model

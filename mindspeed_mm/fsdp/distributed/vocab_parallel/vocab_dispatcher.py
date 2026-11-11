@@ -10,6 +10,8 @@ from .comm import all_to_all_single, differentiable_all_to_all
 
 def get_num_tokens_per_owner(owners: torch.Tensor, vp_size: int) -> torch.Tensor:
     """Count how many ids this rank sends to each vocab owner."""
+    if owners.device.type == "cpu":
+        owners = owners.float()  # cpu histc only dispatches on floating dtypes
     return torch.histc(owners, bins=vp_size, min=0, max=vp_size).to(dtype=torch.int64)
 
 

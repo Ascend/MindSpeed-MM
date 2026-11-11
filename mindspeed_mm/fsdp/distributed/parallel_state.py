@@ -40,6 +40,9 @@ class ParallelState(metaclass=Singleton):
     expert_fully_shard_parallel_size: int = 1
     expert_data_parallel_size: int = 1
 
+    vocab_parallel_size: int = 1
+    vocab_data_parallel_size: int = 1
+
     device_mesh_map: dict[str, DeviceMesh] = None
 
     def __post_init__(self):
@@ -96,6 +99,16 @@ class ParallelState(metaclass=Singleton):
         self.ep_fsdp_device_mesh = init_device_mesh(device_type=get_device_type(), mesh_shape=mesh_shape, mesh_dim_names=mesh_dim_names)
         self.ep_fsdp_device_mesh[("edp", "efsdp")]._flatten(mesh_dim_name="ehsdp")
         self.register_funcs(self.ep_fsdp_device_mesh, mesh_dim_names)
+
+
+        # create VP/VDP groups
+        mesh_dim_names = ('vdp', 'vp')
+        mesh_shape = (self.vocab_parallel_size,)
+        self.vocab_data_parallel_size = get_last_mesh_dim(mesh_shape)
+        mesh_shape = (self.vocab_data_parallel_size,) + mesh_shape
+
+        self.vocab_device_mesh = init_device_mesh(device_type=get_device_type(), mesh_shape=mesh_shape, mesh_dim_names=mesh_dim_names)
+        self.register_funcs(self.vocab_device_mesh, mesh_dim_names)
 
         if torch.distributed.get_rank() == 0:
             logger.info(f'Parallel state initialized:\n {self.__str__()}')
@@ -218,6 +231,8 @@ def init_parallel_state(
     expert_parallel_size: int = 1,
     expert_fully_shard_parallel_size: int = 1,
     expert_data_parallel_size: int = 1,
+    vocab_parallel_size: int = 1,
+    vocab_data_parallel_size: int = 1,
     **kwargs
 ):
     global _PARALLEL_STATE
@@ -230,7 +245,9 @@ def init_parallel_state(
         kvallgather_parallel_size=kvallgather_parallel_size,
         expert_parallel_size=expert_parallel_size,
         expert_fully_shard_parallel_size=expert_fully_shard_parallel_size,
-        expert_data_parallel_size=expert_data_parallel_size
+        expert_data_parallel_size=expert_data_parallel_size,
+        vocab_parallel_size=vocab_parallel_size,
+        vocab_data_parallel_size=vocab_data_parallel_size
     )
 
     return _PARALLEL_STATE
