@@ -1,0 +1,46 @@
+{
+  "timestamp_utc": "2026-09-15T10:55:04.141485+00:00",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "service_health",
+      "status": "passed"
+    },
+    {
+      "name": "environment_fingerprint",
+      "status": "passed"
+    },
+    {
+      "name": "dual_npu_training_100_steps",
+      "status": "passed"
+    },
+    {
+      "name": "grounding_12_case_ab",
+      "status": "passed"
+    }
+  ],
+  "grounding_metrics": {
+    "baseline": {
+      "responses": 12,
+      "unsupported_gene_response_rate": 0.0,
+      "unsupported_citation_response_rate": 0.0,
+      "transparent_rule_violation_rate": 0.0,
+      "evidence_absence_acknowledgement_rate": 0.5,
+      "mean_generation_seconds": 6.860413485517104,
+      "mean_tokens_per_second": 17.67095590889925
+    },
+    "evidence_guarded": {
+      "responses": 12,
+      "unsupported_gene_response_rate": 0.0,
+      "unsupported_citation_response_rate": 0.0,
+      "transparent_rule_violation_rate": 0.0,
+      "evidence_absence_acknowledgement_rate": 0.8333333333333334,
+      "mean_generation_seconds": 6.345019585142533,
+      "mean_tokens_per_second": 18.961932149708755
+    }
+  },
+  "notes": [
+    "Training comparison and grounding A/B are separate experiments.",
+    "Grounding audit is rule-based and not a complete biological quality judge."
+  ]
+}
