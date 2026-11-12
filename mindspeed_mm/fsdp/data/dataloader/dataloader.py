@@ -279,6 +279,19 @@ class PrefetchGradAccDataLoader:
             self.base_dataloader.load_state_dict(state_dict)
 
 
+def _record_batch_stream(batch, stream):
+    """Keep device storage alive until the consuming stream has finished using it."""
+    if isinstance(batch, torch.Tensor):
+        if batch.device.type != "cpu":
+            batch.record_stream(stream)
+    elif isinstance(batch, dict):
+        for value in batch.values():
+            _record_batch_stream(value, stream)
+    elif isinstance(batch, (list, tuple)):
+        for value in batch:
+            _record_batch_stream(value, stream)
+
+
 class Preloader:
     """
     Async data preloader with decoupled CPU prefetch and H2D transfer.
@@ -386,18 +399,6 @@ class Preloader:
             self._h2d_error = sys.exc_info()
             self.next_batch = None
 
-    def _record_batch_stream(self, batch, stream):
-        """Keep prefetched device storage alive while the consumer stream uses it."""
-        if isinstance(batch, torch.Tensor):
-            if batch.device.type != "cpu":
-                batch.record_stream(stream)
-        elif isinstance(batch, dict):
-            for value in batch.values():
-                self._record_batch_stream(value, stream)
-        elif isinstance(batch, (list, tuple)):
-            for value in batch:
-                self._record_batch_stream(value, stream)
-
     def trigger_h2d(self):
         """Launch H2D for the prefetched batch in a background thread.
         Call this after backward completes (per micro-batch) so that the next
@@ -427,12 +428,11 @@ class Preloader:
 
         if self.next_batch is None:
             raise StopIteration("Dataloader has been exhausted, no more data available.")
-        current_stream = get_current_stream()
-        current_stream.wait_stream(self.h2dstream)
+        consumer_stream = get_current_stream()
+        consumer_stream.wait_stream(self.h2dstream)
         batch = self.next_batch
-        # H2D owns these allocations; the training stream may still be reading
-        # them after Python drops the batch during asynchronous backward.
-        self._record_batch_stream(batch, current_stream)
+        # Prevent storage reuse until the consumer stream finishes using the batch.
+        _record_batch_stream(batch, consumer_stream)
         self.next_batch = None
 
         # Capture dataloader state BEFORE kicking off background prefetch for next batch.
