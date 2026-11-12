@@ -80,15 +80,26 @@ pip install triton-ascend==3.2.1 --extra-index-url=https://triton-ascend.osinfra
 
 ### 4. 安装fla-npu以适配AscendC
 
-拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切到对应commitID
+拉取flash-linear-attention-npu代码仓，并进入代码仓根目录，切换指定分支
 
 ```bash
 git clone https://github.com/flashserve/flash-linear-attention-npu
 cd flash-linear-attention-npu
-git checkout c2e3d83f
+git checkout v26.10.0
 ```
 
-安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/release/v26.1.0/README.md)
+安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/main/README.md)
+
+> **说明：** 请确保操作系统已安装 `gawk`和`cmake`，否则后续安装会失败。可参考以下命令安装：
+
+```shell
+# Ubuntu / Debian
+apt-get update
+apt-get install gawk cmake
+# openEuler / CentOS / RHEL
+yum update
+yum install gawk cmake
+```
 
 推荐使用以下安装命令
 
@@ -96,11 +107,12 @@ git checkout c2e3d83f
 # source 实际的cann路径
 source /usr/local/Ascend/cann/set_env.sh
 
-# 编译算子 run 包，--soc 需指定为当前机器芯片类型 {ascend910b/ascend910_93/ascend950}
-bash build.sh --soc=ascend910b --pkg --vendor_name=fla_npu
-bash build_out/*.run
-cd torch_custom/fla_npu/
-bash build.sh
+python -m pip install -r requirements.txt
+python scripts/check_npu_env.py # 无 NPU 的纯构建环境可加 --build-only
+
+# --soc 需指定为当前机器芯片类型 {Atlas A2训练系列产品: ascend910b, Atlas A3训练系列产品: ascend910_93, Ascend 950PR&950DT系列产品:ascend950}
+FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
+python -m pip install --force-reinstall --no-cache-dir --no-deps dist/flash_linear_attention_npu*.whl
 ```
 
 检验fla_npu是否安装成功
@@ -314,3 +326,6 @@ bash examples/mcore/qwen3_5/finetune_qwen3_5_xxB.sh
 1. 在加载 processor 过程中，会因 `mistral_common` 三方库版本的兼容性问题导致无法找到 processor，进而训练报错退出，可通过以下方式解决：
    - 卸载`mistral_common` 三方库：pip uninstall -y mistral_common
    - 升级`mistral_common` 三方库至最新版本：pip install --upgrade mistral_common
+2. libcudart.so.13:cannot open shared object file:No Such file or directory
+   - 处理方式： 卸载torchaudio。命令参考：pip uninstall torchaudio
+3. 启动训练时，如遇到transformers 在检查 flash-linear-attention（fla）是否可用时，拿到的版本号是字符串 'N/A'问题，更新transformers版本到最新即可。参考命令：pip install --upgrade transformers
