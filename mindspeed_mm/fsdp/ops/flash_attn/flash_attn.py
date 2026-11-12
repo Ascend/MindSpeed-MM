@@ -424,6 +424,8 @@ def flash_attention_forward(
         "flash_attention_2",
         "flash_attention_3",
     ]
+    chunk_layer_args = kwargs.pop("_chunk_layer_args", None)
+    chunk_cache_pair = None
 
     # Input Preprocessing (NPU Specific)
     if use_npu_fusion_fa:
@@ -485,6 +487,15 @@ def flash_attention_forward(
     ps = get_parallel_state()
     is_ulysses_enabled = ps.is_ulysses_enable() if dist.is_initialized() else False
     is_ring_enabled = ps.is_ring_enable() if dist.is_initialized() else False
+    if chunk_layer_args is not None:
+        if ps.is_kvallgather_enable():
+            raise ValueError("FA chunk_layer with KV AllGather context parallelism is not implemented")
+        if is_ring_enabled:
+            raise ValueError("FA chunk_layer with context parallelism supports Ulysses only")
+        if is_ulysses_enabled and skip_ulysses:
+            raise ValueError(
+                "FA chunk_layer cannot skip the required Ulysses exchange"
+            )
 
     if use_npu_fusion_fa:
         if input_layout in ["BSND", "1TND"]:
@@ -500,7 +511,7 @@ def flash_attention_forward(
     kv_head_num = key.shape[head_dim_index]
 
     # ulysses validation
-    if is_ulysses_enabled:
+    if is_ulysses_enabled and not skip_ulysses:
         ulysses_size = ps.get_ulysses_group_size()
         if q_head_num % ulysses_size != 0:
             raise ValueError(f"num_query_heads ({q_head_num}) must be divisible by ulysses_size ({ulysses_size})")
@@ -718,6 +729,28 @@ def flash_attention_forward(
             seq_len = query.shape[seq_dim_index]
             q_head_num = query.shape[head_dim_index]
 
+        if chunk_layer_args is not None:
+            # Layer caches use [B, N, T, D]. Convert only at the FA boundary,
+            # after Ulysses has gathered the current chunk's complete sequence.
+            cache_is_bnsd = head_dim_index == 1 and seq_dim_index == 2
+            cache_key = key if cache_is_bnsd else key.transpose(1, 2)
+            cache_value = value if cache_is_bnsd else value.transpose(1, 2)
+            (cache_key, cache_value), cache_kwargs = chunk_layer_args[
+                "layer_cache"
+            ].prepare_cache(
+                (cache_key, cache_value),
+                chunk_layer_args["history_cache"],
+                chunk_layer_args["chunk_idx"],
+            )
+            key = cache_key if cache_is_bnsd else cache_key.transpose(1, 2)
+            value = cache_value if cache_is_bnsd else cache_value.transpose(1, 2)
+            if "cu_seq_lens_k" in cache_kwargs:
+                cu_seq_lens_k = cache_kwargs.pop("cu_seq_lens_k")
+                if use_npu_fusion_fa and isinstance(cu_seq_lens_k, torch.Tensor):
+                    cu_seq_lens_k = cu_seq_lens_k.tolist()
+            kwargs.update(cache_kwargs)
+            chunk_cache_pair = (cache_key, cache_value)
+
         if use_npu_fusion_fa:
             if input_layout in ["BNSD", "BSND"]:
                 layout = input_layout
@@ -871,6 +904,15 @@ def flash_attention_forward(
                 cu_seq_lens_q=cu_seq_lens_q,
                 cu_seq_lens_k=cu_seq_lens_k,
                 **kwargs,
+            )
+
+        if chunk_layer_args is not None:
+            chunk_layer_args["output_cache"] = chunk_layer_args[
+                "layer_cache"
+            ].append(
+                chunk_cache_pair,
+                chunk_layer_args["history_cache"],
+                chunk_layer_args["chunk_idx"],
             )
 
         # Ulysses: attention a2a (inverse) -- restore full heads on the local sequence shard.

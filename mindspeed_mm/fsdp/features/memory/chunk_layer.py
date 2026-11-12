@@ -1,10 +1,11 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import wraps
 
 import torch
 
 from mindspeed_mm.fsdp.features.memory.swap_core import SwapCache
+from mindspeed_mm.fsdp.distributed.context_parallel.communication import SequencePartition
 from mindspeed_mm.fsdp.log import print_rank
 
 
@@ -42,6 +43,7 @@ class ChunkLayerPlan:
     cache_key: str
     forward_id: int
     chunk_infos: tuple[dict, ...]
+    sequence_partition: SequencePartition = field(default_factory=SequencePartition)
 
 
 def _build_chunk_bounds(
@@ -221,8 +223,8 @@ def _make_chunk_scheduler(module, chunk_decoder_forward, swap_cache: SwapCache):
         from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 
         parallel_state = get_parallel_state()
-        if parallel_state.ulysses_parallel_size > 1 or parallel_state.ring_attention_size > 1:
-            raise ValueError("chunk_layer currently requires context/sequence parallel size 1")
+        if parallel_state.ring_attention_size > 1:
+            raise ValueError("chunk_layer with context parallelism currently supports Ulysses only")
 
         batch_size, seq_len, _ = hidden_states.shape
         num_chunks = int(module.chunk_layer_chunks)
@@ -231,6 +233,15 @@ def _make_chunk_scheduler(module, chunk_decoder_forward, swap_cache: SwapCache):
         if original_cu is None:
             original_cu = kwargs.get("cu_seqlens")
         layout = "tnd" if original_cu is not None else "bsnd"
+        sp_size = int(parallel_state.ulysses_parallel_size)
+        # The scheduler receives S / SP tokens after chunk-major sharding,
+        # while chunk metadata and post-Ulysses caches describe the global S.
+        plan_sequence_length = seq_len * sp_size
+        if sp_size > 1 and seq_len % num_chunks != 0:
+            raise ValueError(
+                f"sequence length {seq_len} must be divisible by chunk_layer_chunks={num_chunks} "
+                f"when sequence parallel is enabled"
+            )
         if layout == "tnd":
             if batch_size != 1:
                 raise ValueError("packed TND chunk_layer requires micro_batch_size=1")
@@ -240,9 +251,10 @@ def _make_chunk_scheduler(module, chunk_decoder_forward, swap_cache: SwapCache):
                 )
             else:
                 original_cu = original_cu.to(device=hidden_states.device, dtype=torch.int64)
-            if int(original_cu[-1]) != seq_len:
+            if int(original_cu[-1]) != plan_sequence_length:
                 raise ValueError(
-                    f"last cu_seqlens value {int(original_cu[-1])} must equal sequence length {seq_len}"
+                    f"last cu_seqlens value {int(original_cu[-1])} must equal global "
+                    f"sequence length {plan_sequence_length}"
                 )
 
         forward_id = int(getattr(module, "_chunk_layer_forward_id", 0))
@@ -252,7 +264,7 @@ def _make_chunk_scheduler(module, chunk_decoder_forward, swap_cache: SwapCache):
             original_cu_seqlens=original_cu,
             layout=layout,
             batch_size=batch_size,
-            sequence_length=seq_len,
+            sequence_length=plan_sequence_length,
             num_chunks=num_chunks,
             cache_key=cache_key,
             forward_id=forward_id,
@@ -260,8 +272,13 @@ def _make_chunk_scheduler(module, chunk_decoder_forward, swap_cache: SwapCache):
                 original_cu,
                 layout,
                 batch_size,
-                seq_len,
+                plan_sequence_length,
                 num_chunks,
+            ),
+            sequence_partition=(
+                SequencePartition.chunk_major(num_chunks)
+                if sp_size > 1
+                else SequencePartition()
             ),
         )
         from mindspeed_mm.fsdp.features.memory.chunk_layer_cache import (
@@ -283,10 +300,15 @@ def _make_chunk_scheduler(module, chunk_decoder_forward, swap_cache: SwapCache):
         output_buffer = torch.empty_like(hidden_states)
         history_cache_1 = history_cache_2 = None
         chunk_base_kwargs = kwargs.copy()
+        chunk_size = seq_len // num_chunks
 
         for chunk_idx, chunk_info in enumerate(plan.chunk_infos):
-            start = chunk_info["start"]
-            end = chunk_info["end"]
+            if sp_size > 1:
+                start = chunk_idx * chunk_size
+                end = start + chunk_size
+            else:
+                start = chunk_info["start"]
+                end = chunk_info["end"]
             hidden_chunk_view = hidden_states[:, start:end, :]
             chunk_position_embeddings = tuple(
                 tensor[:, start:end, ...] for tensor in position_embeddings

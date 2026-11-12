@@ -60,6 +60,8 @@ from mindspeed_mm.fsdp.utils.constants import AVG_PER_STEP_TOKEN_NUM, GLOBAL_STE
 
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
+    compute_sequence_partition,
+    set_sequence_partition,
     split_forward_gather_backward,
     gather_forward_split_backward,
     split_forward_gather_backward_with_cp,
@@ -724,8 +726,6 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
         if chunk_layer_args is not None:
             if use_precomputed_states or cache_params is not None:
                 raise ValueError("chunk_layer state chaining cannot be combined with inference cache")
-            if ps.is_ulysses_enable():
-                raise ValueError("GDN chunk_layer currently requires Ulysses/sequence parallel size 1")
             if ps.is_kvallgather_enable():
                 raise ValueError(
                     "GDN chunk_layer state chaining is not implemented under kvallgather "
@@ -789,15 +789,22 @@ class Qwen3_5MoeGatedDeltaNet(nn.Module):
             # Reshape mixed_qkv to head layout for all-to-all: [B, S_local, D] -> split+reshape to heads
             q_proj, k_proj, v_proj = torch.split(mixed_qkv, [self.key_dim, self.key_dim, self.value_dim], dim=-1)
 
-            # All-to-all: gather ulysses-subgroup sequence, scatter heads -> [B, S/kv, local_dim]
-            q_proj = all_to_all(q_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
-            k_proj = all_to_all(k_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
-            v_proj = all_to_all(v_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
+            # Chunk Layer gathers one global chunk at a time; ordinary SP still
+            # gathers its subgroup sequence (total / kv_size).
+            ulysses_gather_size = ulysses_gather
+            if chunk_layer_args is not None:
+                plan = chunk_layer_args["plan"]
+                ulysses_gather_size = plan.sequence_length // plan.num_chunks
+
+            # All-to-all: gather sequence, scatter heads -> [B, S_gathered, local_dim]
+            q_proj = all_to_all(q_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather_size)
+            k_proj = all_to_all(k_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather_size)
+            v_proj = all_to_all(v_proj, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather_size)
 
             b = b.reshape(batch_size, seq_len, self.num_v_heads)
             a = a.reshape(batch_size, seq_len, self.num_v_heads)
-            b = all_to_all(b, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
-            a = all_to_all(a, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather)
+            b = all_to_all(b, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather_size)
+            a = all_to_all(a, process_group=ulysses_group, scatter_dim=2, gather_dim=1, gather_size=ulysses_gather_size)
 
             # Concat for conv1d: [B, S/kv, local_dim]
             mixed_qkv = torch.cat((q_proj, k_proj, v_proj), dim=-1)
@@ -1216,15 +1223,8 @@ class Qwen3_5MoeAttention(nn.Module):
         if chunk_layer_args is not None:
             if past_key_values is not None:
                 raise ValueError("chunk_layer cannot be combined with generation KV cache")
-            # Extend this chunk with its differentiable K/V history.
-            (key_states, value_states), cache_kwargs = chunk_layer_args[
-                "layer_cache"
-            ].prepare_cache(
-                (key_states, value_states),
-                chunk_layer_args["history_cache"],
-                chunk_layer_args["chunk_idx"],
-            )
-            kwargs.update(cache_kwargs)
+            # FA owns the complete K/V cache lifecycle for both SP1 and Ulysses.
+            kwargs["_chunk_layer_args"] = chunk_layer_args
 
         if past_key_values is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
@@ -1235,7 +1235,12 @@ class Qwen3_5MoeAttention(nn.Module):
             self.config._attn_implementation, eager_attention_forward
         )
         # CP Modification: add total_seq_len for Attention
-        total_seq_len = query_states.shape[2] if chunk_layer_args is not None else get_seq_len("total")
+        total_seq_len = (
+            chunk_layer_args["plan"].sequence_length
+            // chunk_layer_args["plan"].num_chunks
+            if chunk_layer_args is not None
+            else get_seq_len("total")
+        )
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -1256,15 +1261,6 @@ class Qwen3_5MoeAttention(nn.Module):
         attn_output = attn_output * torch.sigmoid(gate)
 
         attn_output = self.o_proj(attn_output)
-        if chunk_layer_args is not None:
-            # Preserve only the K/V tail required by the next chunk.
-            chunk_layer_args["output_cache"] = chunk_layer_args[
-                "layer_cache"
-            ].append(
-                (key_states, value_states),
-                chunk_layer_args["history_cache"],
-                chunk_layer_args["chunk_idx"],
-            )
         return attn_output, attn_weights
 
 
@@ -1562,6 +1558,7 @@ class Qwen3_5MoeDecoderLayer(GradientCheckpointingLayer):
         chunk_info = plan.chunk_infos[chunk_idx]
         chunk_args = {
             "layer_cache": layer_cache,
+            "plan": plan,
             "chunk_idx": chunk_idx,
             "history_cache": history_cache,
             "output_cache": None,
@@ -2322,10 +2319,54 @@ class Qwen3_5MoeTextModel(Qwen3_5MoePreTrainedModel):
                 position_ids, text_position_ids, inputs_embeds,
                 total_seq_len, use_packing, self.config, kwargs)
         elif ps.is_ulysses_enable():
-            position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
-            text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
-            inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
-            kwargs["seq_mask"] = split_forward_gather_backward_with_cp(kwargs["seq_mask"], dim=1)
+            sequence_partition = compute_sequence_partition(self.config)
+            if sequence_partition.mode == "chunk_major":
+                if ps.is_ring_enable():
+                    raise ValueError(
+                        "chunk-major SP layout currently supports Ulysses only"
+                    )
+                chunk_layer_types = set(
+                    getattr(self.config, "chunk_layer_types", ())
+                )
+                model_layer_types = {
+                    layer.layer_type
+                    for layer in self.layers[: self.config.num_hidden_layers]
+                }
+                if not model_layer_types.issubset(chunk_layer_types):
+                    raise ValueError(
+                        "chunk-major Ulysses requires every decoder attention type "
+                        "to be enabled in chunk_layer_types"
+                    )
+
+            position_ids = split_forward_gather_backward_with_cp(
+                position_ids,
+                dim=2,
+                partition=sequence_partition,
+            )
+            text_position_ids = split_forward_gather_backward_with_cp(
+                text_position_ids,
+                dim=1,
+                partition=sequence_partition,
+            )
+            inputs_embeds = split_forward_gather_backward_with_cp(
+                inputs_embeds,
+                dim=1,
+                partition=sequence_partition,
+            )
+            kwargs["seq_mask"] = split_forward_gather_backward_with_cp(
+                kwargs["seq_mask"],
+                dim=1,
+                partition=sequence_partition,
+            )
+            if (
+                cache_position is not None
+                and sequence_partition.mode == "chunk_major"
+            ):
+                cache_position = split_forward_gather_backward_with_cp(
+                    cache_position,
+                    dim=0,
+                    partition=sequence_partition,
+                )
 
         hidden_states = inputs_embeds
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
@@ -3303,6 +3344,9 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
         )
 
         hidden_states = outputs[0]
+        ps = get_parallel_state()
+        sequence_partition = compute_sequence_partition(self.config.text_config)
+        set_sequence_partition(sequence_partition)
 
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
@@ -3317,7 +3361,6 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
                 loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.text_config.vocab_size)
 
         # Modification: all gather loss in all cp ranks for scaling up the grad.
-        ps = get_parallel_state()
         if loss is not None and ps.is_cp_enable():
             loss = gather_forward_split_backward(loss.unsqueeze(0), ps.get_cp_group(), dim=0)
             loss = loss.sum()
@@ -3329,7 +3372,11 @@ class Qwen3_5MoeForConditionalGeneration(Qwen3_5MoePreTrainedModel, GenerationMi
             if router_aux_loss_type == "global" and not router_aux_loss_use_attention_mask:
                 aux_attention_mask = None
             elif attention_mask is not None and ps.is_cp_enable():
-                aux_attention_mask = split_forward_gather_backward_with_cp(attention_mask, dim=1)
+                aux_attention_mask = split_forward_gather_backward_with_cp(
+                    attention_mask,
+                    dim=1,
+                    partition=sequence_partition,
+                )
 
             gate_logits = outputs.router_logits
 

@@ -82,7 +82,6 @@ class LayerCache(ABC):
         self.handles: list[CacheHandle] = []
         self.handles_by_chunk: dict[int, list[CacheHandle]] = defaultdict(list)
         self.copy_events: dict[tuple[str, str, int], object] = {}
-        self.released_storage_ids = set()
         self.device_tensors: dict[str, torch.Tensor] = {}
         self.swap_handles: dict[str, TensorSwapHandle] = {}
 
@@ -173,7 +172,6 @@ class LayerCache(ABC):
         self.handles.clear()
         self.handles_by_chunk.clear()
         self.copy_events.clear()
-        self.released_storage_ids.clear()
         self.state = "released"
 
     def _validate_before_swap_out(self) -> None:
@@ -195,18 +193,22 @@ class LayerCache(ABC):
         self.handles_by_chunk[handle.spec.chunk_idx].append(handle)
 
     def complete_chunk(self, consumer_chunk_idx: int) -> None:
-        """Release the preceding carry once this chunk has consumed it."""
+        """Mark the preceding carry as consumed once this chunk has read it.
+
+        The carry's storage is deliberately not released here. The same tensor
+        is handed to the shared SwapCache (ActStash packs the tensor that the
+        consuming chunk's concat saved), and the cache D2Hs it asynchronously;
+        shrinking that storage makes the copy read invalid memory (silent NaN,
+        or a setStorage error when the copy has not been issued yet). The cache
+        owns the HBM lifetime of everything it was given and releases it
+        through its own eviction.
+        """
         if self.state != "staging":
             return None
         current_stream = get_current_stream()
         for handle in self.handles_by_chunk.pop(consumer_chunk_idx - 1, ()):
             if handle.copy_event is not None:
                 current_stream.wait_event(handle.copy_event)
-            storage = handle.tensor.untyped_storage()
-            storage_id = storage._cdata
-            if storage_id not in self.released_storage_ids:
-                storage.resize_(0)
-                self.released_storage_ids.add(storage_id)
             handle.source_released = True
 
     def _carry_tensor(

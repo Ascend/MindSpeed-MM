@@ -1,5 +1,6 @@
 # Copyright (c) 2024, Huawei Technologies Co., Ltd.  All rights reserved.
-from typing import Optional, List, Tuple
+from dataclasses import dataclass
+from typing import Literal, Optional, List, Tuple
 
 import torch
 import torch.distributed as dist
@@ -18,6 +19,52 @@ PERMUTE_DIMS2 = {
     4: (1, 2, 0, 3),
     5: (1, 2, 0, 3, 4),
 }
+
+
+@dataclass(frozen=True)
+class SequencePartition:
+    """Describe how a sequence is partitioned across context-parallel ranks."""
+
+    mode: Literal["contiguous", "chunk_major"] = "contiguous"
+    num_chunks: int = 1
+
+    def __post_init__(self):
+        if self.mode not in ("contiguous", "chunk_major"):
+            raise ValueError(f"unsupported sequence partition mode: {self.mode}")
+        if self.num_chunks < 1:
+            raise ValueError(
+                f"num_chunks must be positive, but got {self.num_chunks}"
+            )
+
+    @classmethod
+    def chunk_major(cls, num_chunks: int) -> "SequencePartition":
+        return cls(mode="chunk_major", num_chunks=num_chunks)
+
+
+_SEQUENCE_PARTITION: Optional[SequencePartition] = None
+
+
+def compute_sequence_partition(config) -> Optional[SequencePartition]:
+    """Resolve the configured sequence layout once for all CP consumers."""
+    ps = get_parallel_state()
+    if not ps.is_cp_enable():
+        return None
+    chunk_count = int(getattr(config, "chunk_layer_chunks", 1))
+    chunk_types = tuple(getattr(config, "chunk_layer_types", ()))
+    if ps.is_ulysses_enable() and chunk_count > 1 and chunk_types:
+        return SequencePartition.chunk_major(chunk_count)
+    return SequencePartition()
+
+
+def set_sequence_partition(partition: Optional[SequencePartition]) -> None:
+    """Store the sequence partition used by the current forward pass."""
+    global _SEQUENCE_PARTITION
+    _SEQUENCE_PARTITION = partition
+
+
+def get_sequence_partition() -> Optional[SequencePartition]:
+    """Return the sequence partition set for the current forward pass."""
+    return _SEQUENCE_PARTITION
 
 
 def adjust_tensor_dimensions(tensor, scatter_idx, gather_idx):
@@ -758,6 +805,108 @@ def gather_forward_split_backward(
     return _GatherForwardSplitBackward.apply(input_, process_group, dim, gather_sizes, grad_scale)
 
 
+def _chunk_major_local_shard(
+    input_: torch.Tensor,
+    rank: int,
+    world_size: int,
+    dim: int,
+    num_chunks: int,
+) -> torch.Tensor:
+    """Select one SP shard from every global chunk."""
+    sequence_length = input_.shape[dim]
+    divisor = world_size * num_chunks
+    if sequence_length % divisor != 0:
+        raise ValueError(
+            f"sequence length ({sequence_length}) must be divisible by "
+            f"SP size * chunk count ({world_size} * {num_chunks})"
+        )
+    shard_length = sequence_length // divisor
+    view_shape = (
+        *input_.shape[:dim],
+        num_chunks,
+        world_size,
+        shard_length,
+        *input_.shape[dim + 1 :],
+    )
+    local = input_.reshape(view_shape).select(dim + 1, rank)
+    output_shape = (
+        *input_.shape[:dim],
+        sequence_length // world_size,
+        *input_.shape[dim + 1 :],
+    )
+    return local.contiguous().reshape(output_shape)
+
+
+def _restore_chunk_major_order(
+    input_: torch.Tensor,
+    world_size: int,
+    dim: int,
+    num_chunks: int,
+) -> torch.Tensor:
+    """Convert gathered rank-major data back to global chunk-major order."""
+    sequence_length = input_.shape[dim]
+    divisor = world_size * num_chunks
+    if sequence_length % divisor != 0:
+        raise ValueError(
+            f"gathered sequence length ({sequence_length}) must be divisible by "
+            f"SP size * chunk count ({world_size} * {num_chunks})"
+        )
+    shard_length = sequence_length // divisor
+    view_shape = (
+        *input_.shape[:dim],
+        world_size,
+        num_chunks,
+        shard_length,
+        *input_.shape[dim + 1 :],
+    )
+    restored = input_.reshape(view_shape).transpose(dim, dim + 1)
+    return restored.contiguous().reshape(input_.shape)
+
+
+class _ChunkMajorSplitForwardGatherBackward(torch.autograd.Function):
+    """Split each global chunk in forward and restore token order in backward."""
+
+    @staticmethod
+    def forward(ctx, input_, process_group, dim, num_chunks):
+        ctx.process_group = process_group
+        ctx.dim = dim
+        ctx.num_chunks = int(num_chunks)
+        ctx.world_size = dist.get_world_size(process_group)
+        rank = dist.get_rank(process_group)
+        return _chunk_major_local_shard(
+            input_, rank, ctx.world_size, dim, ctx.num_chunks
+        )
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad_output = grad_output / ctx.world_size
+        gather_sizes = [grad_output.shape[ctx.dim]] * ctx.world_size
+        grad_input = _gather(
+            grad_output,
+            ctx.process_group,
+            ctx.dim,
+            gather_sizes,
+        )
+        grad_input = _restore_chunk_major_order(
+            grad_input,
+            ctx.world_size,
+            ctx.dim,
+            ctx.num_chunks,
+        )
+        return grad_input, None, None, None
+
+
+def _chunk_major_split_forward_gather_backward(
+    input_: torch.Tensor,
+    process_group: dist.ProcessGroup,
+    dim: int,
+    num_chunks: int,
+) -> torch.Tensor:
+    return _ChunkMajorSplitForwardGatherBackward.apply(
+        input_, process_group, dim, num_chunks
+    )
+
+
 class _SplitForwardGatherBackWardWithMegatronCP(torch.autograd.Function):
     '''
     Split the input tensor in the forward pass and gather the gradients in the backward pass.
@@ -859,16 +1008,32 @@ def load_balanced_gather_forward_split_backward(
 def split_forward_gather_backward_with_cp(
     input_: torch.Tensor,
     dim: int,
+    partition: Optional[SequencePartition] = None,
 ) -> torch.Tensor:
     """
     Perform a context-parallel-aware tensor split during forward pass and gather during backward pass.
 
-    This function supports multiple context parallel (CP) algorithms:
+    This function supports multiple context parallel (CP) algorithms and an
+    optional sequence partition layout:
       - Ulysses-style CP: uniform or non-uniform split across CP ranks.
       - Ring Attention: typically used with sequence parallelism and ring-based communication.
       - Hybrid CP: combines ring and Ulysses-style splitting in nested groups.
+      - Chunk-major Ulysses: splits every Chunk Layer chunk across Ulysses ranks.
     """
     ps = get_parallel_state()
+    partition = partition or get_sequence_partition() or SequencePartition()
+    if partition.mode == "chunk_major":
+        if ps.is_ring_enable():
+            raise ValueError("chunk-major SP layout currently supports Ulysses only")
+        if ps.is_ulysses_enable():
+            return _chunk_major_split_forward_gather_backward(
+                input_,
+                ps.get_ulysses_group(),
+                dim=dim,
+                num_chunks=partition.num_chunks,
+            )
+        return input_
+
     seq_len = input_.shape[dim]
     if ps.is_ring_enable():
         if seq_len % (2 * ps.get_ring_group_size()) != 0:
