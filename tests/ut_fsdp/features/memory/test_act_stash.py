@@ -518,8 +518,7 @@ class TestFlattenInputs:
 
     def test_op_replay_patcher_exposes_wrapped_signature(self):
         # OpReplayPatcher.__call__ 是通用签名；透出被包 forward 的签名，
-        # 供下游 inspect.signature 消费者（recompute 包装层的 past_key_values
-        # 注入判断）看到真实签名
+        # 让下游 inspect.signature 消费者看到真实签名
         from mindspeed_mm.fsdp.features.memory.op_replay import OpReplayPatcher
         patcher = OpReplayPatcher(self.AttnLike(), controller=None, scope=None)
         assert list(inspect.signature(patcher).parameters) == ['hidden_states', 'aux']

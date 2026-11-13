@@ -1,6 +1,5 @@
 # Copyright (c) 2025, Huawei Technologies Co., Ltd. All rights reserved.
 import logging
-import inspect
 import functools
 from contextlib import nullcontext, ExitStack
 
@@ -213,16 +212,7 @@ def _flatten_call(function, args, kwargs):
 
 
 def recompute_wrapper(function, use_reentrant, context_fn=None, flatten_inputs=False, module=None):
-    # Only inject the transformers-style cache kwarg when the wrapped forward
-    # actually accepts it. Native Wan blocks do not take this argument.
-    sig = inspect.signature(function)
-    has_past_key_values = 'past_key_values' in sig.parameters
-
     def wrapper(*args, **kwargs):
-        if has_past_key_values:
-            bound = sig.bind(*args, **kwargs)
-            bound.arguments['past_key_values'] = None
-            args, kwargs = bound.args, bound.kwargs
         ckpt_kwargs = {}
         if not use_reentrant:
             _, mxfp8_ctx_fn = _load_mxfp8_recompute_phase()

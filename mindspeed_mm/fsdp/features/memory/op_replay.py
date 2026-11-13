@@ -419,8 +419,8 @@ class OpReplayPatcher:
         self.scope = scope
         self._orig_forward = module.forward
         # Expose the wrapped forward's signature (PEP 362): __call__'s generic
-        # (*args, **kwargs) would otherwise make signature consumers (e.g. the
-        # recompute wrapper's past_key_values check) see VAR_POSITIONAL.
+        # (*args, **kwargs) would otherwise expose only variadic parameters to
+        # inspect.signature consumers.
         self.__signature__ = inspect.signature(self._orig_forward)
 
     def __call__(self, *args, **kwargs):

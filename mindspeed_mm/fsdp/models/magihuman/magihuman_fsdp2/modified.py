@@ -304,7 +304,7 @@ def block_forward(
     local_attn_handler: Any,
     modality_dispatcher: Any,
     cp_split_sizes: Any,
-    **_kwargs: Any,  # tolerate framework recompute kwargs (past_key_values / use_cache)
+    **_kwargs: Any,  # tolerate framework kwargs (for example use_cache)
 ) -> torch.Tensor:
     """Drop-in for ``TransFormerLayer.forward`` (dit_module.py:782-811).
 

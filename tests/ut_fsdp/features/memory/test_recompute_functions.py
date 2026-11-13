@@ -90,11 +90,10 @@ class TestRecomputeModulesWiring:
         with pytest.raises(ValueError):
             recompute_modules(torch.nn.Linear(4, 4), RecomputePlanConfig(apply_modules=['no_dot']))
 
-    def test_past_key_values_positional_not_duplicated(self):
-        # Regression: forcing the kv cache to None must overwrite the bound slot,
-        # not inject a kwarg that collides with a positional past_key_values
-        # ("got multiple values for argument 'past_key_values'").
+    def test_positional_and_keyword_arguments_preserved(self):
         seen = []
+        past = object()
+        mask = torch.ones(1)
 
         class Attn(torch.nn.Module):
             def __init__(self):
@@ -102,9 +101,8 @@ class TestRecomputeModulesWiring:
                 self.linear = torch.nn.Linear(4, 4)
 
             def _attention_forward(self, hidden_states, position_embeddings,
-                                   attention_mask=None, position_ids=None,
-                                   past_key_values=None, cache_position=None):
-                seen.append(past_key_values)
+                                   past_key_values=None, **kwargs):
+                seen.append((past_key_values, kwargs))
                 return self.linear(hidden_states)
 
         class M(torch.nn.Module):
@@ -112,12 +110,18 @@ class TestRecomputeModulesWiring:
                 super().__init__()
                 self.attn = Attn()
 
-            def forward(self, x):
-                # past_key_values passed positionally, as the model does.
-                return self.attn._attention_forward(x, None, None, None, 'cache', None)
+            def forward(self, x, past_key_values, attention_mask):
+                return self.attn._attention_forward(
+                    x, None, past_key_values,
+                    attention_mask=attention_mask, position_ids=None, cache_position=None,
+                )
 
         model = M()
         recompute_modules(model, RecomputePlanConfig(apply_modules=['attn._attention_forward']))
-        model(_input()).sum().backward()
-        assert len(seen) == 2                      # initial forward + backward replay
-        assert all(pkv is None for pkv in seen)    # slot forced to None, no duplicate-arg error
+        model(_input(), past, mask).sum().backward()
+        assert len(seen) == 2
+        for seen_past, kwargs in seen:
+            assert seen_past is past
+            assert kwargs['attention_mask'] is mask
+            assert kwargs['position_ids'] is None
+            assert kwargs['cache_position'] is None
