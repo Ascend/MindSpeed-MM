@@ -10,7 +10,7 @@ PyTorch的完全分片数据并行（FSDP）旨在提供一个高性能的即时
 
 基于上述局限性，FSDP2移除了FlatParameter，采用沿0维分片的DTensor表示分片参数，支持对单个参数的便捷操作、无需通信的分片状态字典，以及更简化的初始化流程；同时FSDP2实现了一种改进的内存管理系统，通过避免使用recordStream来降低并确定Device内存使用，且无需任何Host同步。
 
-<div align="center"><img src="../../../../sources/images/features/fsdp2/compare_fsdp1_fsdp2.png" width="70%"></div>
+![compare_fsdp1_fsdp2](../../../../sources/images/features/fsdp2/compare_fsdp1_fsdp2.png)
 
 ## 核心工作机制
 
@@ -23,7 +23,7 @@ PyTorch的完全分片数据并行（FSDP）旨在提供一个高性能的即时
 
 3. **自底向上的分组策略** ：在复杂模型中 `fully_shard` 应遵循自底向上的应用顺序，例如：应先对每个TransformerLayer层应用 `fully_shard` ，再应用于root模型
 
-<div align="center"><img src="../../../../sources/images/features/fsdp2/fsdp_workflow.png" width="70%"></div>
+![fsdp_workflow](../../../../sources/images/features/fsdp2/fsdp_workflow.png)
 
 ## 使用方式
 

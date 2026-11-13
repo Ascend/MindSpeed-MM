@@ -21,9 +21,7 @@
   </thead>
   <tbody>
     <tr>
-      <td rowspan="23"> 多模态生成 </td>
-      </tr>
-      <tr>
+      <td rowspan="22"> 多模态生成 </td>
       <td rowspan="2"><a href="../../../examples/wan2.2">Wan2.2-T2V</a></td>
       <td><a href="https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B-Diffusers">5B</a></td>
       <td> 预训练 </td>
@@ -171,9 +169,7 @@
       <td> BF16 </td>
     </tr>
     <tr>
-      <td rowspan="19"> 多模态理解 </td>
-    </tr>
-    <tr>
+      <td rowspan="18"> 多模态理解 </td>
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/2.2.0/examples/llava1.5">LLaVA 1.5</a></td>
       <td><a href="https://github.com/haotian-liu/LLaVA">7B</a></td>
       <td> 全参微调 </td>

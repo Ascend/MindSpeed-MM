@@ -272,7 +272,8 @@
 export ASCEND_LAUNCH_BLOCKING=1
 ```
 
-> **警告**：同步模式会严重影响性能，仅在 debug 时使用，生产环境必须关闭。
+> [!WARNING]
+> 同步模式会严重影响性能，仅在 debug 时使用，生产环境必须关闭。
 
 ### 开启自动求导异常检测
 
@@ -287,7 +288,8 @@ export MM_DETECT_ANOMALY=true
 `torch.autograd.set_detect_anomaly(True)`。反向传播发生异常时，日志会包含对应
 前向计算的调用栈。未设置时默认为 `false`。
 
-> **警告**：自动求导异常检测会显著降低训练性能，仅用于问题定位，正式训练时必须关闭。
+> [!WARNING]
+> 自动求导异常检测会显著降低训练性能，仅用于问题定位，正式训练时必须关闭。
 
 ### 开启 NPU 特征值检测
 
@@ -309,7 +311,8 @@ export ASCEND_GLOBAL_LOG_LEVEL=0  # DEBUG，输出最详细日志
 export ASCEND_SLOG_PRINT_TO_STDOUT=1  # 日志直接打印到终端
 ```
 
-> **注意**：DEBUG 级别日志流量大，会影响训练性能，仅在排查问题时短暂开启。
+> [!NOTE]
+> DEBUG 级别日志流量大，会影响训练性能，仅在排查问题时短暂开启。
 
 ### 使用 Profiling 工具
 

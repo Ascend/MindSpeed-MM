@@ -4,7 +4,7 @@ TP-SP是Megatron-LM框架最早提出的一种序列并行技术，是基于Mega
 
 **论文链接**: <https://arxiv.org/pdf/2205.05198>
 
-<div align="center"><img src="../../../../sources/images/features/cp/tp-sp.png" width="600px"></div>
+![tp-sp](../../../../sources/images/features/cp/tp-sp.png)
 
 使用
 
@@ -57,6 +57,6 @@ TP-SP是Megatron-LM框架最早提出的一种序列并行技术，是基于Mega
 </body>
 </html>
 
-> **注意**
+> [!NOTE]
 >
 > MoE类模型暂不支持开启--use-ascend-mc2

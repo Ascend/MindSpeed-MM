@@ -132,7 +132,8 @@
         </table>
     </div>
 
-> **备注：** 更多昇腾相关环境变量请参考 [环境变量列表](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0001.html)
+> [!NOTE]
+> 更多昇腾相关环境变量请参考 [环境变量列表](https://www.hiascend.com/document/detail/zh/canncommercial/83RC1/maintenref/envvar/envref_07_0001.html)
 
 <div style="height: 40px;"></div>
 

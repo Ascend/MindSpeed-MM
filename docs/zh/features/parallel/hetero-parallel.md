@@ -22,11 +22,11 @@ Hetero Parallel（异构并行）是 MindSpeed-MM 中用于多模态模型的一
 
 当前部署方案为全共卡异构并行：
 
-<img src="../../../../sources/images/features/hetero-parallel/共卡部署.png" alt="共卡部署" width="50%">
+![共卡部署](../../../../sources/images/features/hetero-parallel/shared_deployment.png)
 
 未来计划支持局部共卡异构并行。
 
-<img src="../../../../sources/images/features/hetero-parallel/局部共卡部署.png" alt="局部共卡部署" width="50%">
+![局部共卡部署](../../../../sources/images/features/hetero-parallel/partial_shared_deployment.png)
 
 ## 3. 核心设计
 
@@ -72,7 +72,7 @@ Hetero Parallel（异构并行）是 MindSpeed-MM 中用于多模态模型的一
 
 特性工作原理如下图：
 
-<img src="../../../../sources/images/features/hetero-parallel/全流程.png" alt="全流程" width="50%">
+![全流程](../../../../sources/images/features/hetero-parallel/workflow.png)
 
 1. **并行初始化**：解析模型配置，为每个模块创建独立的并行状态快照
 2. **模型初始化**：创建多模态模型，注册模块前向钩子

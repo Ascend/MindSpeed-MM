@@ -25,7 +25,7 @@ FSDP2
 
 该方案具体的示意图如下
 
-<img src="../../../../sources/images/chunkmbs.png" alt="chunkmbs" style="zoom:30%;" />
+![chunkmbs](../../../../sources/images/chunkmbs.png)
 
 在GBS相同的情况下，设置`micro_batch_size`为MBS，设置梯度累积步数（`gradient_accumulation_steps`）为`GBS/(DP*MBS)`，在每个梯度累积步都要进行每个block参数的unshard；但是开启该特性后，一种典型用法是设置`micro_batch_size`为`GBS/DP`（DP=1时即GBS），设置梯度累积为1，设置`chunkmbs_plan.chunk_mbs`为原来的MBS（即合并前每个micro_batch的大小），这样每次更新模型参数都只要对每个block进行一次参数unshard，大大节省了通信时间。在Qwen3.5 35B模型上实测整网收益5%左右。
 

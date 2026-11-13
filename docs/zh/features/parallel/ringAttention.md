@@ -14,7 +14,7 @@
 - 单步计算修正：计算完attention后，需要对输出中间值L进行修正，保证输出正确；
 - 计算最终输出：算完所有的分块attention后，对最终结果O进行修正、合并。
 
-<div align="center"><img src="../../../../sources/images/features/cp/ring.png" width="400px"></div>
+![ring](../../../../sources/images/features/cp/ring.png)
 
 ## 使用方式
 

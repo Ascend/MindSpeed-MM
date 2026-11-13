@@ -19,3 +19,51 @@
 }
 
 #training_flow > svg { width: 1000px }
+
+/* 正文图片：限制最大宽度，独立成段的图片居中。
+   整改前各图在 rst 中通过 :width: / :align: 单独设定，转为 markdown 后无对应写法，
+   改由样式统一约束，避免大尺寸图片铺满整个正文区域。 */
+.rst-content p img {
+    max-width: 1200px;
+}
+
+.rst-content p > img:only-child {
+    display: block;
+    margin: 1.5em auto;
+}
+
+/* 表格：表头统一为深色底，与正文内容区分。
+   文档中除 markdown 表格（docutils）外还有若干直接以 HTML 书写的表格，
+   这些表格不带 docutils 类，主题默认不为其设置边框与内边距，此处一并补齐。
+   feature_list 等文档自带 <style> 配色（tg 类），不在此处覆盖。 */
+.rst-content table.docutils thead th,
+.rst-content table:not(.docutils):not(.tg) thead th {
+    background-color: #2c3e50;
+    border-bottom: none;
+    color: #fff;
+    vertical-align: middle;
+    white-space: normal;
+}
+
+.rst-content table:not(.docutils):not(.tg) {
+    border-collapse: collapse;
+    margin-bottom: 24px;
+    width: 100%;
+}
+
+.rst-content table:not(.docutils):not(.tg) td,
+.rst-content table:not(.docutils):not(.tg) th {
+    border: 1px solid #e1e4e5;
+    font-size: 90%;
+    padding: 8px 16px;
+    vertical-align: top;
+}
+
+.rst-content table:not(.docutils):not(.tg) tbody tr:nth-child(2n-1) td {
+    background-color: #f3f6f6;
+}
+
+/* 跨行的分类单元格垂直居中，便于与所辖行对应 */
+.rst-content table:not(.docutils):not(.tg) td[rowspan] {
+    vertical-align: middle;
+}

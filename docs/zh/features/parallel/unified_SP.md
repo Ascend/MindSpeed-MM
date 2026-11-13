@@ -9,7 +9,7 @@
 - Ulysses: 当序列长度和计算设备成比例增加时，通信量保持不变。在All2All操作后，这四个张量的分割从序列维度L转移到注意力头数维度hc。这样，每个注意力头的softmax(QK^T)V计算可以完整地进行，而不会因为张量的分割而中断。
 - RingAttention: 可以看作是FlashAttention的分布式版本。在计算输出张量O的各个块时，如果所需的K和V块不在本地可用，则使用点对点（P2P）通信从其他设备获取。这种方法的通信可以以环形方式组织，每个设备同时发送和接收K、V块，允许通信与计算重叠。
 
-<div align="center"><img src="../../../../sources/images/features/cp/usp.png" width="400px"></div>
+![usp](../../../../sources/images/features/cp/usp.png)
 
 Ulysses在增加计算设备和序列长度时能保持恒定的通信量，而Ring-Attention通过计算和通信的重叠隐藏了由SP引入的点对点（P2P）通信成本。然而，DeepSpeed-Ulysses的并行度受到注意力头数的限制，而Ring-Attention在分块矩阵乘法中的计算效率较低。
 
@@ -17,7 +17,7 @@ Ulysses在增加计算设备和序列长度时能保持恒定的通信量，而R
 
 具体来说，统一的SP方法在一个2D网格的进程组中运行，其中DeepSpeed-Ulysses沿着网格的行进行操作，而Ring-Attention沿着列进行。这种设置不仅提高了模型架构和网络硬件的适应性，还通过更有效的负载平衡和通信模式，提高了整体的计算性能。
 
-<div align="center"><img src="../../../../sources/images/features/cp/usp2.png" width="600px"></div>
+![usp2](../../../../sources/images/features/cp/usp2.png)
 
 ## 使用方式
 
@@ -126,7 +126,7 @@ Ulysses在增加计算设备和序列长度时能保持恒定的通信量，而R
 </body>
 </html>
 
-> **注意**
+> [!NOTE]
 >
 > - 需要确保 `--context-parallel-size` 参数的数值可以被 `--ulysses-degree-in-cp` 整除，例如当设置 `--context-parallel-size 8` `--ulysses-degree-in-cp 2` 时，此时ring cp并行度为4。
 > - 需要确保 `--ulysses-degree-in-cp * --tensor-model-parallel-size` 可以被num-attention-heads数整除

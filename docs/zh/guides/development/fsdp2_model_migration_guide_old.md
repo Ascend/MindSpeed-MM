@@ -39,15 +39,56 @@ MindSpeed-MM 训练逻辑整体沿用 Megatron 风格，各类模型统一使用
 
 ### 📁 结构概览
 
-| 模块类型 | 子模块/文件 | 路径 | 功能描述 |
-| --- | --- | --- | --- |
-| **训练入口文件** | 主训练脚本 | `pretrain_xxx.py`（根目录） | 如 pretrain_sora.py、pretrain_vlm.py 等 |
-| **示例配置目录（总览）** | 模型配置目录 | `examples/`（根目录） | 特定模型的训练配置目录，如 examples/qwen3vl/ |
-| **示例配置目录（数据）** | 数据配置文件 | `examples/model_name/data.json` | 定义数据集路径、预处理方式、数据增强策略等 |
-| **示例配置目录（模型）** | 模型配置文件 | `examples/model_name/model.json` | 定义模型架构、参数等 |
-| **示例配置目录（启动）** | 启动脚本 | `examples/model_name/pretrain.sh` | 训练启动脚本，包含执行命令和参数设置 |
-| **核心源码目录** | 数据处理模块 | `mindspeed_mm/data/` | 数据加载、预处理、增强、采样等功能实现 |
-| **核心源码目录** | 模型结构模块 | `mindspeed_mm/model/` | 各种模型组件的实现，包括编码器、解码器、视觉模块等 |
+<table class="struct-overview">
+  <thead>
+    <tr>
+      <th>模块类型</th>
+      <th>子模块/文件</th>
+      <th>路径</th>
+      <th>功能描述</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>训练入口文件</b></td>
+      <td>主训练脚本</td>
+      <td><code>pretrain_xxx.py</code>（根目录）</td>
+      <td>如 pretrain_sora.py、pretrain_vlm.py 等</td>
+    </tr>
+    <tr>
+      <td rowspan="4"><b>示例配置目录</b></td>
+      <td>模型配置目录</td>
+      <td><code>examples/</code>（根目录）</td>
+      <td>特定模型的训练配置目录，如 examples/qwen3vl/</td>
+    </tr>
+    <tr>
+      <td>数据配置文件</td>
+      <td><code>examples/model_name/data.json</code></td>
+      <td>定义数据集路径、预处理方式、数据增强策略等</td>
+    </tr>
+    <tr>
+      <td>模型配置文件</td>
+      <td><code>examples/model_name/model.json</code></td>
+      <td>定义模型架构、参数等</td>
+    </tr>
+    <tr>
+      <td>启动脚本</td>
+      <td><code>examples/model_name/pretrain.sh</code></td>
+      <td>训练启动脚本，包含执行命令和参数设置</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><b>核心源码目录</b></td>
+      <td>数据处理模块</td>
+      <td><code>mindspeed_mm/data/</code></td>
+      <td>数据加载、预处理、增强、采样等功能实现</td>
+    </tr>
+    <tr>
+      <td>模型结构模块</td>
+      <td><code>mindspeed_mm/model/</code></td>
+      <td>各种模型组件的实现，包括编码器、解码器、视觉模块等</td>
+    </tr>
+  </tbody>
+</table>
 
 ### 🚀 核心接口适配
 

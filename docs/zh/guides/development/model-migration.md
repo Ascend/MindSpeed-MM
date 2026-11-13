@@ -38,6 +38,7 @@ NVIDIA GPU采用CUDA（Compute Unified Device Architecture）的并行计算架�
 ## 模型迁移总体流程
 
 通用模型迁移适配方法，可以分为四个阶段：迁移分析、模型迁移、精度调试与性能调优，总体流程如下图所示。
+
 ![alt text](../../../../sources/images/migration_guide/migration_process1.png)
 
 ## 迁移分析

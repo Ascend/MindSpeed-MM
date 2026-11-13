@@ -8,7 +8,7 @@ Ulysses是DeepSpeed提出的针对长序列模型训练的解决方案。官方�
 - 计算Attention之前，使用 All-To-All 通信把 Query、Key 和 Value 进行聚合，以便每张卡上都具有完整序列长度，同时使得各张卡上只处理部分注意力头，以便并行计算Attention；
 - 最后，再使用 All-To-All 来沿着注意力头收集结果，同时沿着序列维度重新分区
 
-<div align="center"><img src="../../../../sources/images/features/cp/ulysses.png" width="800px"></div>
+![ulysses](../../../../sources/images/features/cp/ulysses.png)
 
 ## 使用方式
 
@@ -113,7 +113,7 @@ Ulysses是DeepSpeed提出的针对长序列模型训练的解决方案。官方�
 
 <div style="height: 40px;"></div>
 
-> **注意**
+> [!NOTE]
 >
 > num-attention-heads需要够被tensor-model-parallel-size * context-parallel-size整除
 >

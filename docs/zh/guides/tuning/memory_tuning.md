@@ -171,7 +171,7 @@ dump执行完成后，会在输出目录生成 `snapshot_` 开头的 `pickle` �
 offload_to_cpu: True
 ```
 
-> **注意**
+> [!NOTE]
 >
 > 当设置 `offload_to_cpu=True` 时，需在入口脚本中设置通信组为双后端，即： `--distributed-backend npu:hccl,cpu:gloo`
 
@@ -310,7 +310,7 @@ GBS=$(($MBS*$GRAD_ACC_STEP*$DP))
 解决VAE激活值瓶颈的另一个方法是开启分块处理。业界当前已经有比较成熟的分块处理算法。
 VAE 分块处理通过将图像分割成多个较小的重叠图块，一次处理一块，而不是一次性处理整张图像，从而节省内存。
 
-> **注意**
+> [!NOTE]
 >
 > 分块处理(tiling)不会显著降低生成质量，但是和原始计算并不等价
 
@@ -345,7 +345,7 @@ for i in range(len(caches)):
 
 我们对一些场景的offload做了异步优化，可以参考async offload特性文档。
 
-> **注意**
+> [!NOTE]
 >
 > 需要注意的是，torch的tensor生命周期管理复用了python的引用管理，因此在offload时需要确认卸载tensor的引用已清空，否则空间将不会被回收。
 

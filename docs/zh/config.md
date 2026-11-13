@@ -80,7 +80,7 @@ MyArguments.register_field(
 
 MindSpeed MM中提供了Arguments类作为配置基类，强烈建议用户在自定义扩展配置时继承此类，以保证框架中所需的配置可以被正确初始化。Arguments类构成如下：
 
-<img src="../../sources/images/config/arguments.png" width="30%" style="display:block; margin:auto;">
+![arguments](../../sources/images/config/arguments.png)
 
 ### ConfigManager
 
@@ -136,7 +136,7 @@ def print_summary(self)
 
 基本使用方法如下图所示：
 
-<img src="../../sources/images/config/user_guide.png" width="30%" style="display:block; margin:auto;">
+![user_guide](../../sources/images/config/user_guide.png)
 
 **基础使用：**
 

@@ -257,7 +257,7 @@ class CustomModel(nn.Module, FSDP2Mixin, WeightInitMixin):
         self.predictor.set_input_tensor(input_tensor)
 ```
 
-> **说明**
+> [!NOTE]
 >
 > CustomModel 需要继承 `FSDP2Mixin`、`WeightInitMixin` 以提供 FSDP2 和权重初始化能力。
 >
@@ -448,7 +448,7 @@ class CustomDiTBlock(nn.Module):
         return hidden_states
 ```
 
-> **说明**
+> [!NOTE]
 >
 > 构建好 CustomDiT 后，需要将模型注册到 PredictModel 的 `PREDICTOR_MODEL_MAPPINGS` 中。
 

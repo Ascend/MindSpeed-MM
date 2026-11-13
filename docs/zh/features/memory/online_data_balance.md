@@ -43,7 +43,7 @@ flowchart TD
 
 紫色为初始状态，蓝色为目标状态。通过数据映射路径与All2All通信，实现数据的重排布。
 
-<img src="../../../../sources/images/features/online-data-balance/all2all.png" alt="all2all">
+![all2all](../../../../sources/images/features/online-data-balance/all2all.png)
 
 ## 3. 使用指南
 

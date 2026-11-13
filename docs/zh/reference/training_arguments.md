@@ -387,4 +387,5 @@
 
 对于以`pretrain_transformers.py`为训练入口的模型，模型参数除了以命令行参数形式传入外，也可以通过相关yaml配置文件传入，详情见[配置概览](configuration_overview.md)。yaml配置文件中各参数含义同表格所述一致。
 
-> **备注：** 更多Megatron和MindSpeed args可以参考 `megatron/training/arguments.py` 和 `mindspeed/arguments.py`
+> [!NOTE]
+> 更多Megatron和MindSpeed args可以参考 `megatron/training/arguments.py` 和 `mindspeed/arguments.py`
