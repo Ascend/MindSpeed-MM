@@ -76,6 +76,7 @@ data:
       model_name: qwen3vl
       ignore_pad_token_for_loss: true
     enable_preload: false
+    infinite_sampler: true
 
 # 模型配置
 model:
