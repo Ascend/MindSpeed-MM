@@ -28,7 +28,7 @@ def get_args():
     return parser.parse_args()
 
 
-def merge_lora_to_base(base_state_dict, lora_state_dict, target_layers, scaling, device="npu"):
+def merge_lora_to_base(base_state_dict, lora_state_dict, target_layers, scaling, merged_layers, device="npu"):
     """Merge LoRA weights into base model weights."""
     for target_layer in target_layers:
         base_key = f"{target_layer}.weight"
@@ -45,6 +45,7 @@ def merge_lora_to_base(base_state_dict, lora_state_dict, target_layers, scaling,
                 lora_b = lora_b.to(device=device, dtype=torch.float32)
                 merged_weight = base_weight + scaling * (lora_b @ lora_a)
                 base_state_dict[base_key] = merged_weight.to(device="cpu", dtype=torch.bfloat16)
+                merged_layers.add(target_layer)
     return base_state_dict
 
 
@@ -94,7 +95,9 @@ def main():
 
     print(f"\nCopying config and tokenizer...")
     for item in base_hf_dir.iterdir():
-        if item.name.startswith("model.safetensors"):
+        if item.name.startswith("model.safetensors") or (
+            item.name.startswith("model-") and item.name.endswith(".safetensors")
+        ):
             continue
         if item.is_file():
             shutil.copy2(item, save_merged_hf_dir / item.name)
@@ -104,6 +107,7 @@ def main():
     shutil.copy2(index_file, save_merged_hf_dir / "model.safetensors.index.json")
 
     print(f"\nMerging and saving shards...")
+    merged_layers = set()
     for shard_file, keys in shard_keys.items():
         print(f"  Processing {shard_file}...")
 
@@ -113,9 +117,10 @@ def main():
             for key in f.keys():
                 shard_state_dict[key] = f.get_tensor(key)
 
-        shard_state_dict = merge_lora_to_base(shard_state_dict, lora_state_dict, target_layers, scaling, device)
+        shard_state_dict = merge_lora_to_base(
+            shard_state_dict, lora_state_dict, target_layers, scaling, merged_layers, device
+        )
         merged_count = sum(1 for tl in target_layers if f"{tl}.weight" in shard_state_dict)
-
         if merged_count > 0:
             print(f"    Merged {merged_count} layers")
 
@@ -124,6 +129,9 @@ def main():
         if device == "npu":
             torch.npu.empty_cache()
 
+    merged_total = len(merged_layers)
+    total_targets = len(target_layers)
+    print(f"Successfully merged {merged_total}/{total_targets} LoRA modules")
     print(f"\nMerge complete! Saved to {save_merged_hf_dir}")
 
 
