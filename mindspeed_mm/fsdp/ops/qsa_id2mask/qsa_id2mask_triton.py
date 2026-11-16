@@ -10,6 +10,8 @@ import torch
 import triton
 import triton.language as tl
 
+from mindspeed_mm.fsdp.utils.device import get_vector_num, is_arch35
+
 
 @triton.jit
 def _qsa_id2mask_sanitize_block_ids_kernel(IDs, Safe, S: tl.constexpr, K: tl.constexpr, N: tl.constexpr,
@@ -89,6 +91,42 @@ def _qsa_id2mask_block_table_to_mask_packed16_kernel(Table, Out, Q: tl.constexpr
             tl.store(Out + row.to(tl.int64) * (KV // 2) + pair, word, pair < KV // 2)
 
 
+@triton.jit
+def _qsa_id2mask_ratio4_packed16_kernel(
+    Table, Out, Q: tl.constexpr, KV: tl.constexpr, PREFIX: tl.constexpr,
+    S: tl.constexpr, N: tl.constexpr, STRIDE: tl.constexpr, ROWS: tl.constexpr,
+    BLOCKS_PER_TILE: tl.constexpr, MASK16: tl.constexpr,
+):
+    # Every 4-token block expands into two packed 16-bit output pairs.
+    # Tile blocks so arbitrary sequence lengths do not exceed on-chip memory.
+    blocks = tl.arange(0, BLOCKS_PER_TILE)
+    pairs = tl.arange(0, 2 * BLOCKS_PER_TILE)
+    masked_word = MASK16 | (MASK16 << 16)
+    for row in range(tl.program_id(0), ROWS, tl.num_programs(0)):
+        q = row % Q
+        pos = q + KV - Q
+        for tile in range(tl.cdiv(KV // 2, 2 * BLOCKS_PER_TILE)):
+            pair = tile * 2 * BLOCKS_PER_TILE + pairs
+            keys = pair * 2
+            if q < PREFIX:
+                word = tl.where(keys <= pos, tl.full((2 * BLOCKS_PER_TILE,), 0, tl.uint32),
+                                tl.full((2 * BLOCKS_PER_TILE,), masked_word, tl.uint32))
+            else:
+                table_row = (row.to(tl.int64) // Q) * S + q - PREFIX
+                block = tile * BLOCKS_PER_TILE + blocks
+                flags = tl.load(Table + table_row * STRIDE + block,
+                                block < N, other=0).to(tl.float32)
+                selected = tl.interleave(flags, flags) != 0
+                tail = ((pos + 1) % 4 != 0) & (keys // 4 == (pos + 1) // 4)
+                allow = (selected | tail) & (keys <= pos)
+                word = tl.where(allow, tl.full((2 * BLOCKS_PER_TILE,), 0, tl.uint32),
+                                tl.full((2 * BLOCKS_PER_TILE,), masked_word, tl.uint32))
+            if pos % 2 == 0:
+                word |= tl.where(keys == pos, tl.full((2 * BLOCKS_PER_TILE,), MASK16 << 16, tl.uint32),
+                                 tl.full((2 * BLOCKS_PER_TILE,), 0, tl.uint32))
+            tl.store(Out + row.to(tl.int64) * (KV // 2) + pair, word, pair < KV // 2)
+
+
 def _qsa_id2mask_forward(selected_blocks, *, query_length, kv_length,
                 token_budget, compress_ratio, dtype):
     """Return [B,1,Q,KV], bool True=allowed or additive 0/finfo.min.
@@ -112,6 +150,7 @@ def _qsa_id2mask_forward(selected_blocks, *, query_length, kv_length,
         raise ValueError("selected_blocks shape does not match the LightningIndexer complete-block output")
     if batch * query_length * kv_length == 0:
         return torch.empty((batch, 1, query_length, kv_length), device=selected_blocks.device, dtype=dtype)
+    vector_num = get_vector_num(selected_blocks.device)
     blocks = triton.cdiv(kv_length, compress_ratio)
     # One sink column for invalid IDs; pad rows so native scatter and Triton
     # loads use aligned addresses. Only 0/1 membership is needed, even for
@@ -120,7 +159,7 @@ def _qsa_id2mask_forward(selected_blocks, *, query_length, kv_length,
     table = torch.zeros((batch, max(1, sparse_rows), table_stride), dtype=torch.int8, device=selected_blocks.device)
     if sparse_rows:
         safe_ids = torch.empty(selected_blocks.shape, dtype=torch.int32, device=selected_blocks.device)
-        _qsa_id2mask_sanitize_block_ids_kernel[(48,)](
+        _qsa_id2mask_sanitize_block_ids_kernel[(vector_num,)](
             selected_blocks, safe_ids, sparse_rows, topk, blocks,
             *selected_blocks.stride(), selected_blocks.numel(), 2048, multibuffer=False,
         )
@@ -138,14 +177,25 @@ def _qsa_id2mask_forward(selected_blocks, *, query_length, kv_length,
     }[dtype]
     storage = output if dtype == torch.bool else output.view(integer_dtype)
     if dtype in (torch.bfloat16, torch.float16) and kv_length % 2 == 0 and compress_ratio % 2 == 0:
-        _qsa_id2mask_block_table_to_mask_packed16_kernel[(48,)](
-            table, output.view(torch.int32), query_length, kv_length, prefix, sparse_rows,
-            compress_ratio, blocks, table_stride, batch * query_length,
-            triton.next_power_of_2(blocks), 4096,
-            masked_bits & 65535, multibuffer=False,
-        )
+        # The ratio-4 path expands each block flag into two output pairs;
+        # the tile count follows the actual KV length rather than a fixed cutoff.
+        tuned = compress_ratio == 4 and is_arch35()
+        if tuned:
+            blocks_per_tile = min(1024, triton.next_power_of_2(blocks))
+            _qsa_id2mask_ratio4_packed16_kernel[(min(vector_num, batch * query_length),)](
+                table, output.view(torch.int32), query_length, kv_length, prefix,
+                sparse_rows, blocks, table_stride, batch * query_length,
+                blocks_per_tile, masked_bits & 65535, multibuffer=False,
+            )
+        else:
+            _qsa_id2mask_block_table_to_mask_packed16_kernel[(vector_num,)](
+                table, output.view(torch.int32), query_length, kv_length, prefix, sparse_rows,
+                compress_ratio, blocks, table_stride, batch * query_length,
+                triton.next_power_of_2(blocks), 4096,
+                masked_bits & 65535, multibuffer=False,
+            )
     else:
-        _qsa_id2mask_block_table_to_mask_kernel[(48,)](
+        _qsa_id2mask_block_table_to_mask_kernel[(vector_num,)](
             table, storage, query_length, kv_length, prefix, sparse_rows, compress_ratio,
             blocks, table_stride, batch * query_length, triton.next_power_of_2(blocks),
             4096, masked_bits, dtype == torch.bool, multibuffer=False,

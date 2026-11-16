@@ -25,13 +25,14 @@ import torch.nn as nn
 import triton
 import triton.language as tl
 
+from mindspeed_mm.fsdp.utils.device import get_vector_num, is_arch35
+
 
 _MAX_NUMEL_I32 = 2**31 - 1
 _MAX_BLOCK_N = 4096
 _MAX_FORWARD_TILE_ELEMENTS = 8192
 _MAX_BACKWARD_TILE_ELEMENTS = 4096
 _PREFETCH_ROW_THRESHOLD = 131072
-
 
 
 @triton.jit(do_not_specialize=["num_rows"])
@@ -140,6 +141,7 @@ def _rmsnorm_gated_backward_kernel(
     COMPUTE_DWEIGHT: tl.constexpr,
     CONTIGUOUS_PARTITION: tl.constexpr,
     PREFETCH_LOADS: tl.constexpr,
+    SCHEDULE_EARLY: tl.constexpr,
 ):
     pid = tl.program_id(0)
     num_programs = tl.num_programs(0)
@@ -218,7 +220,15 @@ def _rmsnorm_gated_backward_kernel(
         d_transformed = dy * activated_gate
         if CAST_WEIGHTED_NORM:
             d_transformed = d_transformed.to(x_raw.dtype).to(tl.float32)
-        d_activated_gate = dy * transformed
+        if SCHEDULE_EARLY:
+            # Finish these consumers before the RMS reduction so fewer large
+            # intermediates stay live across it on Ascend 950DT.
+            if COMPUTE_DWEIGHT:
+                dweight += tl.sum(d_transformed * normalized, axis=0)
+            dgate = (dy * transformed) * grad_activation
+            tl.store(dgate_ptr + offsets, dgate, mask=mask)
+        else:
+            d_activated_gate = dy * transformed
 
         # The eager multiplication returns a grad with the dtype of
         # `normalized.to(input_dtype)`, before that cast back-propagates.
@@ -230,12 +240,12 @@ def _rmsnorm_gated_backward_kernel(
         dx = rstd[:, None] * d_normalized - (
             x * dot[:, None] * rstd3_over_n[:, None]
         )
-        dgate = d_activated_gate * grad_activation
-
         tl.store(dx_ptr + offsets, dx, mask=mask)
-        tl.store(dgate_ptr + offsets, dgate, mask=mask)
-        if COMPUTE_DWEIGHT:
-            dweight += tl.sum(d_transformed * normalized, axis=0)
+        if not SCHEDULE_EARLY:
+            dgate = d_activated_gate * grad_activation
+            tl.store(dgate_ptr + offsets, dgate, mask=mask)
+            if COMPUTE_DWEIGHT:
+                dweight += tl.sum(d_transformed * normalized, axis=0)
 
     if COMPUTE_DWEIGHT:
         tl.store(
@@ -495,6 +505,7 @@ class RMSNormGatedFunction(torch.autograd.Function):
             COMPUTE_DWEIGHT=compute_dweight,
             CONTIGUOUS_PARTITION=ctx.contiguous_partition,
             PREFETCH_LOADS=prefetch_loads,
+            SCHEDULE_EARLY=is_arch35(),
         )
         if compute_dweight:
             _rmsnorm_gated_reduce_dweight_kernel[(1,)](
@@ -527,15 +538,16 @@ class RMSNormGated(nn.Module):
         eps: float = 1e-6,
         activation: str = "silu",
         *,
-        block_rows: int = 32,
-        backward_block_rows: int = 32,
-        program_limit: int = 40,
+        block_rows: Optional[int] = None,
+        backward_block_rows: Optional[int] = None,
+        program_limit: Optional[int] = None,
         contiguous_partition: bool = True,
     ) -> None:
         super().__init__()
         if hidden_size <= 0:
             raise ValueError("hidden_size must be positive")
-        if min(block_rows, backward_block_rows, program_limit) <= 0:
+        if any(value is not None and value <= 0
+               for value in (block_rows, backward_block_rows, program_limit)):
             raise ValueError("block sizes and program_limit must be positive")
         self.weight = nn.Parameter(torch.ones(hidden_size))
         self.variance_epsilon = eps
@@ -566,15 +578,29 @@ class RMSNormGated(nn.Module):
 
 
 def rmsnorm_gated(hidden_states, gate, weight, eps=1e-6, activation="silu", *,
-                  block_rows=32, backward_block_rows=32, program_limit=40,
+                  block_rows=None, backward_block_rows=None, program_limit=None,
                   contiguous_partition=True):
     """Run Triton gated RMSNorm without falling back to another backend."""
     if not _supported_inputs(hidden_states, gate, weight):
         raise ValueError("Triton gated RMSNorm does not support these inputs")
     if activation not in {"silu", "sigmoid"}:
         raise ValueError("activation must be 'silu' or 'sigmoid'")
-    if min(block_rows, backward_block_rows, program_limit) <= 0:
+    if any(value is not None and value <= 0
+           for value in (block_rows, backward_block_rows, program_limit)):
         raise ValueError("block sizes and program_limit must be positive")
+    # Device detection is needed only to select a default launch parameter.
+    tuned = is_arch35() if (
+        block_rows is None or program_limit is None
+    ) else False
+    if program_limit is None:
+        program_limit = get_vector_num(hidden_states.device) if tuned else 40
+    # Balance the available programs against the number of input rows.
+    # The kernel applies its element-capacity limit based on the hidden width.
+    if block_rows is None:
+        num_rows = hidden_states.numel() // hidden_states.shape[-1]
+        rows_per_program = max(1, triton.cdiv(num_rows, program_limit))
+        block_rows = min(64, triton.next_power_of_2(rows_per_program)) if tuned else 32
+    backward_block_rows = 32 if backward_block_rows is None else backward_block_rows
     needs_grad = torch.is_grad_enabled() and (
         hidden_states.requires_grad or gate.requires_grad or weight.requires_grad
     )

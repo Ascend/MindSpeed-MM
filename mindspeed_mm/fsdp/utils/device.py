@@ -105,6 +105,33 @@ def is_arch35() -> bool:
     return "Ascend910_95" in device_name or "Ascend950" in device_name
 
 
+@lru_cache(maxsize=None)
+def _get_vector_num_for_device(index: int) -> int:
+    # Keep Triton optional for consumers that only use the PyTorch utilities.
+    from triton.runtime import driver
+
+    count = int(driver.active.utils.get_device_properties(index)["num_vectorcore"])
+    if count <= 0:
+        raise ValueError("num_vectorcore must be positive")
+    return count
+
+
+def get_vector_num(device: Optional[torch.device] = None) -> int:
+    """Return the NPU vector-core count, caching successful queries per device.
+
+    A single program remains a correct fallback if device properties cannot
+    be queried. Failed queries are not cached, so a later call can retry.
+    """
+    try:
+        index = device.index if device is not None else None
+        if index is None:
+            index = torch.npu.current_device()
+        return _get_vector_num_for_device(index)
+    except Exception as exc:
+        logger.warning("Unable to query NPU vector-core count (%s); using one program.", exc)
+        return 1
+
+
 def synchronize() -> None:
     """Execute torch synchronize operation."""
     get_torch_device().synchronize()
