@@ -47,13 +47,13 @@ from torch.optim.optimizer import Optimizer
 
 from ..distributed.parallel_state import get_parallel_state
 from ...optimizer.muon import Muon
+from .muon_routing import _configure_muon_qk_clip, _log_muon_group_routing, _mark_muon_param_groups
 from mindspeed_mm.fsdp.optimizer.swap_optimizer import AdamWSwap
 from mindspeed_mm.fsdp.optimizer.cpu_sparse_optimizer import CPU_SPARSE_KEY, build_cpu_sparse_member
 from mindspeed_mm.fsdp.utils.utils import get_host_resident_params
 
 
 logger = logging.getLogger(__name__)
-DEFAULT_MUON_FALLBACK_PARAM_KEYWORDS = ["embedding", "embed_tokens", "output_layer", "lm_head"]
 
 
 class MultiOptimizer(Optimizer, Stateful):
@@ -101,7 +101,11 @@ class MultiOptimizer(Optimizer, Stateful):
         return all_groups
 
     def step(self) -> None:
-        # A member that needs a pre-step action owns it (see CpuSparseAdam); the container only steps.
+        # Validate QK-Clip in every child before any child updates. Preflight
+        # caches the reduced metrics, so each child's step reuses them.
+        for opt in self.optimizers_dict.values():
+            if isinstance(opt, Muon):
+                opt._preflight_qk_clip()
         for opt in self.optimizers_dict.values():
             opt.step()
 
@@ -178,59 +182,6 @@ def _make_param_groups_for_subset(
     return groups
 
 
-def _is_muon_eligible(
-    name: str,
-    param: torch.nn.Parameter,
-    fallback_param_keywords: Optional[Iterable[str]] = None,
-) -> bool:
-    if len(param.shape) != 2:
-        return False
-
-    lower_name = (name or "").lower()
-    if lower_name.endswith(".bias"):
-        return False
-
-    keywords = list(DEFAULT_MUON_FALLBACK_PARAM_KEYWORDS)
-    if fallback_param_keywords:
-        if isinstance(fallback_param_keywords, str):
-            keywords.append(fallback_param_keywords)
-        else:
-            keywords.extend(fallback_param_keywords)
-
-    return not any(keyword and keyword.lower() in lower_name for keyword in keywords)
-
-
-def _mark_muon_param_groups(
-    model: "nn.Module",
-    param_groups: Sequence[Dict[str, Any]],
-    muon_fallback_param_keywords: Optional[Iterable[str]] = None,
-) -> List[Dict[str, Any]]:
-    name_by_param = {p: n for n, p in model.named_parameters()}
-    marked_groups: List[Dict[str, Any]] = []
-
-    for group in param_groups:
-        params = group.get("params", [])
-        muon_params = []
-        fallback_params = []
-
-        for p in params:
-            if not p.requires_grad:
-                continue
-            param_name = name_by_param.get(p, "")
-            if _is_muon_eligible(param_name, p, muon_fallback_param_keywords):
-                muon_params.append(p)
-            else:
-                fallback_params.append(p)
-
-        group_base = {k: v for k, v in group.items() if k != "params"}
-        if muon_params:
-            marked_groups.append({**group_base, "params": muon_params, "use_muon": True})
-        if fallback_params:
-            marked_groups.append({**group_base, "params": fallback_params, "use_muon": False})
-
-    return marked_groups
-
-
 # adapted from https://github.com/huggingface/transformers/blob/v4.49.0/src/transformers/trainer_pt_utils.py#L1123
 def get_parameter_names(model, forbidden_layer_types, forbidden_param_names):
     forbidden_layer_types = [] if forbidden_layer_types is None else forbidden_layer_types
@@ -266,11 +217,33 @@ def build_optimizer(
     muon_momentum: float = 0.95,
     ns_steps: int = 5,
     muon_fallback_param_keywords: Optional[List[str]] = None,
+    ns_coefficients: Any = "polar_express",
+    muon_per_head: bool = False,
+    muon_per_expert: bool = False,
+    qk_clip_threshold: Optional[float] = None,
+    qk_clip_alpha: float = 0.5,
     lr_scaling_plan: Optional[List] = None,
     mem_fraction_static: float = 0.8,
 ) -> "torch.optim.Optimizer":
+    if qk_clip_threshold is not None and optimizer_type != "muon":
+        raise ValueError("QK-Clip requires optimizer_type='muon'")
+    if optimizer_type != "muon":
+        _configure_muon_qk_clip(model, enabled=False)
     # EP-aware routing: for FSDP2+EP, split params into EP and non-EP groups and build two optimizers.
     ps = get_parallel_state()
+    # Host-resident embeddings are updated by the CPU sparse optimizer.
+    host_params = get_host_resident_params(model)
+    host_names = {name for name, _ in host_params}
+    # With expert parallelism, only Muon applies lr_scaling_plan: its groups are
+    # built here and then split into EP and non-EP parameters. For other
+    # optimizers the EP path still builds its own groups and ignores the plan
+    # (unchanged behaviour).
+    if lr_scaling_plan and (optimizer_type == "muon" or ps.get_ep_group_size() <= 1):
+        decay_param_names = get_parameter_names(model, no_decay_modules, no_decay_params)
+        param_groups = get_param_groups(
+            model, weight_decay, lr, lr_scaling_plan, decay_param_names, skip_names=host_names
+        )
+
     if ps.get_ep_group_size() > 1:
         logger.info("Building EP+FSDP2 optimizer")
         return build_ep_fsdp2_optimizer(
@@ -288,21 +261,14 @@ def build_optimizer(
             muon_momentum=muon_momentum,
             ns_steps=ns_steps,
             muon_fallback_param_keywords=muon_fallback_param_keywords,
+            ns_coefficients=ns_coefficients,
+            muon_per_head=muon_per_head,
+            muon_per_expert=muon_per_expert,
+            qk_clip_threshold=qk_clip_threshold,
+            qk_clip_alpha=qk_clip_alpha,
             mem_fraction_static=mem_fraction_static,
         )
-    # The cpu-resident embeddings get their own sparse optimizer, so the dense groups must not see them.
-    # They are separated as a whole: taking them out of the decay list alone would only move them into
-    # the no-decay group below.
-    host_params = get_host_resident_params(model)
-    host_names = {name for name, _ in host_params}
-
-    # Other cases remain the same
-    if lr_scaling_plan:
-        decay_param_names = get_parameter_names(model, no_decay_modules, no_decay_params)
-        param_groups = get_param_groups(model, weight_decay, lr, lr_scaling_plan, decay_param_names,
-                                        skip_names=host_names)
-
-    elif param_groups is None:
+    if param_groups is None:
         # A set, because the two loops below only ask whether a name belongs to the decay group.
         decay_param_names = set(get_parameter_names(model, no_decay_modules, no_decay_params)) - host_names
         param_groups = [
@@ -332,8 +298,16 @@ def build_optimizer(
         )
 
     if optimizer_type == "muon":
-        param_groups = _mark_muon_param_groups(model, param_groups, muon_fallback_param_keywords)
-        logger.info(f"Muon parameter groups: {param_groups}")
+        param_groups = _mark_muon_param_groups(
+            model,
+            param_groups,
+            muon_fallback_param_keywords=muon_fallback_param_keywords,
+            muon_per_head=muon_per_head,
+            muon_per_expert=muon_per_expert,
+            qk_clip_threshold=qk_clip_threshold,
+            qk_clip_alpha=qk_clip_alpha,
+        )
+        _log_muon_group_routing(model, param_groups, "default", lr, muon_fallback_param_keywords)
         optim = Muon(
             param_groups,
             lr=lr,
@@ -341,8 +315,11 @@ def build_optimizer(
             matched_adamw_rms=matched_adamw_rms,
             momentum=muon_momentum,
             ns_steps=ns_steps,
+            ns_coefficients=ns_coefficients,
             adamw_betas=betas,
             adamw_eps=eps,
+            qk_clip_threshold=qk_clip_threshold,
+            qk_clip_alpha=qk_clip_alpha,
         )
     elif optimizer_type == "adamw":
         foreach = not fused
@@ -447,6 +424,11 @@ def build_ep_fsdp2_optimizer(
     muon_momentum: float = 0.95,
     ns_steps: int = 5,
     muon_fallback_param_keywords: Optional[List[str]] = None,
+    ns_coefficients: Any = "polar_express",
+    muon_per_head: bool = False,
+    muon_per_expert: bool = False,
+    qk_clip_threshold: Optional[float] = None,
+    qk_clip_alpha: float = 0.5,
     mem_fraction_static: float = 0.8,
 ):
     """
@@ -459,6 +441,8 @@ def build_ep_fsdp2_optimizer(
     - Each group's params are automatically split into EP and non-EP based on DTensor mesh
     - Custom learning rates and other optimizer settings are preserved per group
     """
+    if optimizer_type != "muon":
+        _configure_muon_qk_clip(model, enabled=False)
     # The cpu-resident embeddings get their own sparse optimizer, so they must never enter these groups.
     host_params = get_host_resident_params(model)
     host_ids = {id(param) for _, param in host_params}
@@ -473,6 +457,13 @@ def build_ep_fsdp2_optimizer(
         for group_config in param_groups:
             # Extract group-specific settings
             group_lr = group_config.get("lr", lr)
+            group_weight_decay = weight_decay
+            group_no_decay_modules = no_decay_modules
+            group_no_decay_params = no_decay_params
+            if optimizer_type == "muon" and "weight_decay" in group_config:
+                group_weight_decay = group_config["weight_decay"]
+                group_no_decay_modules = []
+                group_no_decay_params = []
             group_params = group_config["params"]
 
             # Split this group's params into EP and non-EP
@@ -494,7 +485,7 @@ def build_ep_fsdp2_optimizer(
             # Create subgroups with weight decay handling
             if group_ep_params:
                 group_ep_subgroups = _make_param_groups_for_subset(
-                    model, group_ep_params, weight_decay, no_decay_modules, no_decay_params
+                    model, group_ep_params, group_weight_decay, group_no_decay_modules, group_no_decay_params
                 )
                 for subgroup in group_ep_subgroups:
                     subgroup["lr"] = group_lr
@@ -506,7 +497,7 @@ def build_ep_fsdp2_optimizer(
 
             if group_non_ep_params:
                 group_non_ep_subgroups = _make_param_groups_for_subset(
-                    model, group_non_ep_params, weight_decay, no_decay_modules, no_decay_params
+                    model, group_non_ep_params, group_weight_decay, group_no_decay_modules, group_no_decay_params
                 )
                 for subgroup in group_non_ep_subgroups:
                     subgroup["lr"] = group_lr
@@ -537,11 +528,20 @@ def build_ep_fsdp2_optimizer(
             model, non_ep_params, weight_decay, no_decay_modules, no_decay_params
         )
 
-    def _build(groups: Sequence[Dict[str, Any]]) -> Optimizer:
+    def _build(groups: Sequence[Dict[str, Any]], label: str) -> Optimizer:
         foreach = not fused
         fused_ = fused
         if optimizer_type == "muon":
-            groups = _mark_muon_param_groups(model, groups, muon_fallback_param_keywords)
+            groups = _mark_muon_param_groups(
+                model,
+                groups,
+                muon_fallback_param_keywords=muon_fallback_param_keywords,
+                muon_per_head=muon_per_head,
+                muon_per_expert=muon_per_expert,
+                qk_clip_threshold=qk_clip_threshold,
+                qk_clip_alpha=qk_clip_alpha,
+            )
+            _log_muon_group_routing(model, groups, label, lr, muon_fallback_param_keywords)
             return Muon(
                 groups,
                 lr=lr,
@@ -549,8 +549,11 @@ def build_ep_fsdp2_optimizer(
                 matched_adamw_rms=matched_adamw_rms,
                 momentum=muon_momentum,
                 ns_steps=ns_steps,
+                ns_coefficients=ns_coefficients,
                 adamw_betas=betas,
                 adamw_eps=eps,
+                qk_clip_threshold=qk_clip_threshold,
+                qk_clip_alpha=qk_clip_alpha,
             )
         elif optimizer_type == "adamw":
             return AdamW(groups, lr, betas, eps, weight_decay, fused=fused_, foreach=foreach)
@@ -568,9 +571,9 @@ def build_ep_fsdp2_optimizer(
 
     optimizer_dict: Dict[str, Optimizer] = {}
     if ep_groups:
-        optimizer_dict["ep"] = _build(ep_groups)
+        optimizer_dict["ep"] = _build(ep_groups, "ep")
     if non_ep_groups:
-        optimizer_dict["non_ep"] = _build(non_ep_groups)
+        optimizer_dict["non_ep"] = _build(non_ep_groups, "non_ep")
     # The cpu embeddings are in none of the groups above: their rows live in cpu memory and the sparse
     # optimizer consumes the row ledger directly.
     hooks = getattr(model, "_cpu_sparse_hooks", None)

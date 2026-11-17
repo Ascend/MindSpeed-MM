@@ -170,6 +170,58 @@ class TrainingArguments(BaseArguments):
             )
         },
     )
+    ns_coefficients: str = field(
+        default="polar_express",
+        metadata={
+            "help": (
+                "Newton-Schulz coefficient schedule for Muon: 'polar_express' "
+                "(default, five steps, from the Polar Express paper), 'keller' "
+                "(Keller Jordan's single triple) or 'you' (Jiacheng You's "
+                "five-step schedule). A schedule shorter than ns_steps repeats "
+                "its final triple."
+            )
+        },
+    )
+    muon_per_head: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Orthogonalize each attention head's slice of the Q/K/V "
+                "projection weights separately instead of the whole matrix. "
+                "Requires model-provided head layout annotations, currently implemented for Kimi K3."
+            )
+        },
+    )
+    muon_per_expert: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Orthogonalize each routed expert's weight matrix separately. "
+                "Requires model-provided expert layout annotations, currently implemented for Kimi K3."
+            )
+        },
+    )
+    qk_clip_threshold: Optional[float] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Enable QK-Clip on Kimi MLA attention: after each optimizer step, "
+                "rescale the query and key weights of every head whose maximum "
+                "attention logit exceeded this value. Requires optimizer: muon "
+                "and muon_per_head."
+            )
+        },
+    )
+    qk_clip_alpha: float = field(
+        default=0.5,
+        metadata={
+            "help": (
+                "For heads over the threshold, gamma = qk_clip_threshold / max_logit. "
+                "Queries are scaled by gamma**qk_clip_alpha and keys by "
+                "gamma**(1 - qk_clip_alpha)."
+            )
+        },
+    )
     adam_fused: bool = field(
         default=True,
         metadata={"help": "Whether to use fused AdamW optimizer for better performance."},

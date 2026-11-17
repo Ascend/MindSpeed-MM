@@ -75,6 +75,8 @@ else:
     from fla.utils import tensor_cache
 
 from .configuration_kimi_k3 import KimiLinearConfig
+from .muon_metadata import build_mla_qk_clip_metadata
+from mindspeed_mm.fsdp.optimizer.muon_metadata import register_muon_layout
 
 if version.parse(transformers.__version__) < version.parse("4.56.0"):
     raise RuntimeError("Please upgrade transformers to >= 4.56.0")
@@ -503,6 +505,9 @@ class KimiMLAAttention(nn.Module):
             self.hidden_size,
             bias=False,
         )
+        query = self.q_b_proj if self.q_lora_rank is not None else self.q_proj
+        for projection in (query, self.kv_b_proj):
+            register_muon_layout(projection, mode="per_head", num_heads=self.num_heads)
         self.is_causal = True
         assert self.use_nope
 
@@ -514,6 +519,14 @@ class KimiMLAAttention(nn.Module):
         self.rotary_emb = None
         self._qk_clip_enabled = False
         self._qk_clip_max_logits = None
+
+    def configure_muon_qk_clip(self, *, enabled):
+        self._qk_clip_enabled = enabled
+        if not enabled:
+            self._qk_clip_max_logits = None
+            return {}
+        query = "q_b_proj" if self.q_lora_rank is not None else "q_proj"
+        return {f"{query}.weight": build_mla_qk_clip_metadata(self)}
 
     def _publish_qk_clip_max_logits(self, per_head_max: torch.Tensor) -> None:
         """Accumulate detached maximum logits for each attention head."""
@@ -647,6 +660,8 @@ class KimiDeltaAttention(nn.Module):
         self.k_proj = nn.Linear(
             self.hidden_size, projection_k_size, bias=False)
         self.v_proj = nn.Linear(self.hidden_size, projection_size, bias=False)
+        for projection in (self.q_proj, self.k_proj, self.v_proj):
+            register_muon_layout(projection, mode="per_head", num_heads=self.num_heads)
 
         self.causal_conv1d_implementation = getattr(config, "causal_conv1d_implementation", "triton")
         self.kda_implementation = getattr(config, "kda_implementation", "triton")

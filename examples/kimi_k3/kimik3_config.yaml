@@ -155,6 +155,12 @@ training:
   clip_grad: 0.0
   init_model_with_meta_device: true
   optimizer: adamw
+  # The Muon options below take effect only with optimizer: muon.
+  muon_per_head: false
+  muon_per_expert: false
+  # QK-Clip requires muon_per_head and a numeric threshold.
+  qk_clip_threshold: null
+  qk_clip_alpha: 0.5
   adam_fused: true
   save_interval: 10000
   use_deter_comp: false

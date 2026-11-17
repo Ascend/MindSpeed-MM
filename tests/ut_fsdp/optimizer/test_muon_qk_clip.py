@@ -1,6 +1,7 @@
 """QK-Clip scales only out-of-bound heads and agrees across CPU/Gloo ranks."""
 import copy
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -9,6 +10,7 @@ import torch.multiprocessing as mp
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.tensor import DTensor, Replicate, Shard, distribute_tensor
 
+from mindspeed_mm.fsdp.optimizer.optimizer import MultiOptimizer
 from mindspeed_mm.optimizer.muon import Muon, qk_clip_, qk_clip_mla_
 from mindspeed_mm.optimizer.muon.qk_clip import _apply_qk_clip_groups, _QK_CLIP_RUNTIME_KEYS
 
@@ -91,13 +93,25 @@ def _distributed_checks(rank, rendezvous):
                 metrics[0] = torch.nan
             group = _group(query, key, metrics, 4, process_groups)
             group["qk_clip_metric_provider"] = lambda: metrics
+            earlier = torch.nn.Parameter(torch.ones(3))
+            earlier.grad = torch.ones_like(earlier)
+            first = Muon([dict(params=[earlier], use_muon=False)], lr=.01)
+            second = Muon([group], lr=.01)
+            container = MultiOptimizer(torch.nn.Module(), {"first": first, "second": second}, ["first", "second"])
             error = RuntimeError if "missing" in failure else ValueError
-            with pytest.raises(error):
-                _apply_qk_clip_groups([group])
+            with patch.object(dist, "all_reduce", wraps=dist.all_reduce) as reduce:
+                with pytest.raises(error):
+                    container.step()
+                assert reduce.call_count == len(process_groups)
+            torch.testing.assert_close(earlier, torch.ones_like(earlier))
+            assert not first.state and not second.state
             torch.testing.assert_close(query, torch.ones_like(query))
             torch.testing.assert_close(key, torch.ones_like(key))
             metrics = torch.full((4,), 20.)
-            _apply_qk_clip_groups([group])
+            with patch.object(dist, "all_reduce", wraps=dist.all_reduce) as reduce:
+                container.step()
+                # Container preflight, then the child step re-reduces its cached metrics.
+                assert reduce.call_count == 2 * len(process_groups)
             torch.testing.assert_close(query, torch.full_like(query, .5))
             torch.testing.assert_close(key, torch.full_like(key, .5))
             dist.barrier()
@@ -221,3 +235,42 @@ def test_invalid_controls_fail_before_any_optimizer_update(name, value):
     optimizer.step()
     assert len(calls) == 1
     assert optimizer.state
+
+
+def test_multi_optimizer_preflight_preserves_providers_and_hooks():
+    model = torch.nn.ModuleList([_TinyAttention(), _TinyAttention()])
+    metrics = [[torch.tensor([10., 12.])] for _ in model]
+    calls = [0, 0]
+
+    def provider(index):
+        calls[index] += 1
+        return metrics[index].pop() if metrics[index] else None
+
+    children = [_qk_clip_muon(module, lambda i=i: provider(i)) for i, module in enumerate(model)]
+    optimizer = MultiOptimizer(model, dict(enumerate(children)), [0, 1])
+    events = []
+    for index, child in enumerate(children):
+        child.register_step_pre_hook(lambda opt, args, kwargs, i=index: events.append((i, "pre")))
+        child.register_step_post_hook(lambda opt, args, kwargs, i=index: events.append((i, "post")))
+    for parameter in model.parameters():
+        parameter.grad = torch.ones_like(parameter)
+    before = copy.deepcopy(model.state_dict())
+    children[1].param_groups[0]["qk_clip_alpha"] = 2.
+    with pytest.raises(ValueError):
+        optimizer.step()
+    torch.testing.assert_close(model.state_dict(), before, rtol=0, atol=0)
+    assert all(not child.state for child in children)
+    assert not events
+
+    children[1].param_groups[0]["qk_clip_alpha"] = .5
+    optimizer.step()
+    assert calls == [1, 1]
+    assert events == [(0, "pre"), (0, "post"), (1, "pre"), (1, "post")]
+
+    # Zero-lr initialization must not consume metrics or clip either child.
+    for group in optimizer.param_groups:
+        group["lr"] = 0.
+    before = copy.deepcopy(model.state_dict())
+    optimizer.step()
+    torch.testing.assert_close(model.state_dict(), before, rtol=0, atol=0)
+    assert calls == [1, 1]

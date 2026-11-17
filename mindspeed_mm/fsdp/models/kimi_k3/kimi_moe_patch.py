@@ -42,6 +42,7 @@ from mindspeed_mm.fsdp.ops.moe_ops.gemm import grouped_matmul
 from mindspeed_mm.fsdp.ops.moe_ops.permute import permute
 from mindspeed_mm.fsdp.ops.moe_ops.unpermute import unpermute
 from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+from mindspeed_mm.fsdp.optimizer.muon_metadata import register_muon_layout
 
 from .configuration_kimi_k3 import KimiLinearConfig
 from .modeling_kimi_linear import (
@@ -92,6 +93,8 @@ class PatchKimiMoeExperts(nn.Module):
         self.down_proj = nn.Parameter(
             torch.empty(self.num_experts, self.intermediate_size, self.hidden_size)
         )
+        for name in ("gate_up_proj", "down_proj"):
+            register_muon_layout(self, name, mode="per_expert", num_experts=self.num_experts)
 
         if _is_situ(config):
             beta, linear_beta = _get_situ_activation_params(config)
