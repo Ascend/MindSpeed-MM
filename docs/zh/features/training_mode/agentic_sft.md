@@ -9,7 +9,7 @@ Agentic SFT是一种针对具备工具调用能力的多模态模型的训练方
 - 支持包含工具调用（tool_call）和工具响应（tool_response）的多轮对话数据训练
 - 支持将工具定义（tools schema）注入到系统提示中，使模型能够理解可用的工具能力
 - 支持多模态数据（图像、视频、音频）与工具调用的联合训练
-- 兼容现有FSDP2训练流程，无需额外配置即可启用
+- 通过 `formatting: multimodal_tool` 启用，兼容现有FSDP2训练流程
 
 ## 数据格式说明
 
@@ -47,12 +47,23 @@ Agentic SFT数据采用JSON格式，每条数据包含以下关键字段：
 | `tool_call` | 工具调用 | 模型发起的工具调用请求，使用特殊格式 |
 | `tool_response` | 工具响应 | 外部工具返回的结果 |
 
-### tool_call 和 tool_response 的顺序约束
+### 数据组织与 loss 计算规则
 
-**重要规则：**
+框架按 0/1 下标对 `messages` 做奇偶配对。去掉首条 `system` 后，剩余消息依次编号为 `messages[0]`、`messages[1]`、……，
+并按 `(messages[0], messages[1])`、`(messages[2], messages[3])`、…… 两两分组。默认配置
+（`train_on_prompt: false`、`mask_history: false`）下：
 
-1. **交替出现原则**：`工具调用(tool_call)` 和 `工具响应(tool_response)` 必须成对出现，且 `工具调用(tool_call)` 必须在 `工具响应(tool_response)` 之前
-2. **位置约束**：工具调用流程通常出现在用户输入之后，形成"用户输入(user) → 工具调用(tool_call) → 工具响应(tool_response) → 助手回复(assistant)"的交互链
+| 下标 | 允许的角色 | 标签处理 |
+| --- | --- | --- |
+| 偶数下标（0、2、4、…） | `user`、`tool_response` | 作为上下文，label 全部置为 `-100`，不参与 loss |
+| 奇数下标（1、3、5、…） | `assistant`、`tool_call` | 作为训练目标，参与 loss 计算 |
+
+因此构造数据时必须满足：
+
+1. 去掉首条 `system` 后，`messages` 数量为偶数，最后一条为 `assistant`；
+2. 偶数下标为 `user` 或 `tool_response`，奇数下标为 `assistant` 或 `tool_call`；
+3. 每条 `tool_call` 后紧跟一条 `tool_response`，形成
+   `user → tool_call → tool_response → tool_call → tool_response → … → assistant` 的交替链。
 
 ## 完整数据示例
 
@@ -136,6 +147,15 @@ Agentic SFT数据采用JSON格式，每条数据包含以下关键字段：
 }
 ```
 
+### tool_call 前带模型输出的变体
+
+原始示例中，`tool_call` 的 content 直接以工具调用块开头。如果希望模型在调用工具前先输出一段自然语言分析，
+把这段分析写在**同一个 `tool_call` 消息**的 content 开头即可，不要新增一条 `assistant` 消息：
+
+```json
+{"role": "tool_call", "content": "我先为您查询可预约的时间。\n\n<tool_call>\n{\"name\": \"register_vaccine_appointment\", \"arguments\": {\"appointment_time\": \"周三下午三点\"}}\n</tool_call>"}
+```
+
 ## 配置说明
 
 ### 数据配置
@@ -149,20 +169,25 @@ data:
       formatting: multimodal_tool  # 使用 multimodal_tool 格式转换器
 
     basic_parameters:
-      template: qwen3_vl_nothink  # 推荐使用 qwen3_vl_nothink 或 qwen3_omni_nothink 模板
-      # 如需使用其他模板，可参照 qwen3_vl_nothink 的模板注册代码进行传参 tool_prompt = StringFormatter(slots=[tools_slot])
+      template: qwen3_vl_nothink  # nothink 模板
+      enable_thinking: false
 ```
 
 ### 支持的模型
 
-当前支持 Agentic SFT 的模型：
+当前支持 Agentic SFT 的模型与模板：
 
-- Qwen3.5（推荐使用 `qwen3_vl_nothink` 模板）
-- Qwen3Omni（推荐使用 `qwen3_omni_nothink` 模板）
+| 模型 | nothink 模板 | think 模板 |
+| --- | --- | --- |
+| Qwen3.5 | `qwen3_vl_nothink` | `qwen3_vl` |
+| Qwen3Omni | `qwen3_omni_nothink` | `qwen3_omni` |
+
+think 与 nothink 的消息角色序列、0/1 loss 规则完全相同，差异仅由模型模板和 `enable_thinking` 控制。
+如需使用其他模板，可参照 qwen3_vl_nothink 的模板注册代码进行传参 tool_prompt = StringFormatter(slots=[tools_slot])
 
 ## 注意事项
 
 1. **数据校验**：训练前请确保 `tool_call` 和 `tool_response` 正确配对，未配对的工具调用会导致数据被跳过
-2. **模板兼容**：确保选择的模板支持工具调用格式，目前 `qwen3_vl_nothink` 模板已完整支持
+2. **模板兼容**：Qwen3.5 支持 `qwen3_vl_nothink`（nothink）/`qwen3_vl`（think）；Qwen3Omni 支持 `qwen3_omni_nothink`（nothink）/`qwen3_omni`（think）
 3. **多模态支持**：Agentic SFT 支持与图像、视频、音频数据联合训练，但需确保文件路径正确
 4. **工具定义**：`tools` 字段可选，如需注入工具定义到系统提示，请按规范格式填写

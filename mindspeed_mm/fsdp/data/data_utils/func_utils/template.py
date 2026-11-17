@@ -504,7 +504,8 @@ _register_template(
                 "<|im_start|>user\n<tool_response>\n{{content}}\n</tool_response><|im_end|>\n<|im_start|>assistant\n"]
         ),
         stop_words=["<|im_end|>"],
-        replace_eos=True),
+        replace_eos=True,
+        tool_prompt=StringFormatter(slots=[tools_slot])),
     mm_plugin=get_mm_plugin(
         name="qwen3_omni", audio_token="<|audio_pad|>", image_token="<|image_pad|>", video_token="<|video_pad|>"),
     template_class=ReasoningTemplate

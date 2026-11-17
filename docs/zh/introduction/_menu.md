@@ -21,6 +21,7 @@
   - [训练模式]()
     - [LoRA微调（基于Megatron训练后端）](../features/training_mode/lora_finetune.md)
     - [LoRA微调（基于FSDP2训练后端）](../features/training_mode/lora_finetune_fsdp2.md)     
+    - [Agentic SFT](../features/training_mode/agentic_sft.md)
   - [数据处理](../features/data/seqpack.md)
   - [确定性计算](../features/other/deterministic_computing.md)
 - [模型迁移]()

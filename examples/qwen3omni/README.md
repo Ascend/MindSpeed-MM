@@ -558,6 +558,14 @@ bash examples/qwen3omni/finetune_qwen3omni.sh
 }
 ```
 
+**Thinking 模式**
+
+将 `basic_parameters.template` 改为 `qwen3_omni` 并设置 `enable_thinking: true` 即可使用 thinking 模板。
+消息角色序列与 0/1 loss 规则和上面的 nothink 示例相同，差异只在模型模板对推理内容的处理。
+think 模板下，`tool_call`/`assistant` 的 content 会包含 `<think>...</think>` 推理段。
+
+详细规则见 [Agentic SFT](../../docs/zh/features/training_mode/agentic_sft.md)。
+
 ---
 
 <a id="jump10"></a>

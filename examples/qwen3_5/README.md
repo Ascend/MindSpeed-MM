@@ -368,6 +368,13 @@ features:
 - 已在 CANN 9.1.0、PyTorch 2.7.1 环境下完成 Qwen3.5-9B、Qwen3.6-27B 和 Qwen3-VL-30B-A3B-Instruct 的 FSDP2 纯文本单轮训练验证；
 - Qwen3.5-9B 另已在 CANN 9.1.0、PyTorch 2.10.0 环境下完成纯文本单轮训练验证。
 
+【Agentic SFT】
+
+使用 `formatting: multimodal_tool` 进行 Agentic SFT 时，数据组织与 loss 掩码规则见
+[Agentic SFT](../../docs/zh/features/training_mode/agentic_sft.md)。Qwen3.5 支持 `qwen3_vl_nothink`（nothink）
+与 `qwen3_vl`（think）模板，两者的消息角色序列和 0/1 loss 规则相同，差异由模型模板与 `enable_thinking` 控制。
+think 模板下，`tool_call`/`assistant` 的 content 会包含 `<think>...</think>` 推理段。
+
 【单机运行配置】
 以qwen3_5模型为例：
 配置`examples/qwen3_5/finetune_qwen3_5.sh`参数如下
