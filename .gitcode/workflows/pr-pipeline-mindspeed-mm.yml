@@ -109,7 +109,7 @@ stages:
       CodeCheck_pre_commit:
         name: CodeCheck_pre_commit
         if : ${{ jobs.Detect_file_changes.outputs.need_build_ut == 'yes' }}
-        runs-on: [ self-hosted, default, x86, cpu=2 ]
+        runs-on: [ self-hosted, default, x86, cpu=8 ]
         container:
           image: swr.cn-north-4.myhuaweicloud.com/atlas-ci/common:latest
         steps:
