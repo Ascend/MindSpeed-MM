@@ -1,5 +1,5 @@
+# Copyright 2024 Huawei Technologies Co., Ltd.
 # coding=utf-8
-# Copyright (c) 2024, HUAWEI CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -368,7 +368,7 @@ def apply_patches():
 
     # apply dcp_patch before lora patch to megatron.training.checkpointing._load_base_checkpoint if use torch_dcp
     from mindspeed.megatron_adaptor import get_mindspeed_args
-    from mindspeed_mm.patchs.torch_dcp_patch import _load_base_checkpoint as _load_base_checkpoint_dcp
+    from mindspeed_mm.patches.torch_dcp_patch import _load_base_checkpoint as _load_base_checkpoint_dcp
     mindspeed_args = get_mindspeed_args()
     has_lora_target_modules = hasattr(mindspeed_args, 'lora_target_modules') and mindspeed_args.lora_target_modules
     is_torch_dcp = hasattr(mindspeed_args, 'ckpt_format') and mindspeed_args.ckpt_format == 'torch_dcp'

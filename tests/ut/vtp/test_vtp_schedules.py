@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 import mindspeed.megatron_adaptor
 import torch
 
-from mindspeed_mm.patchs.layerwise_disaggregated_training import parallel_state_patch as mod
+from mindspeed_mm.patches.layerwise_disaggregated_training import parallel_state_patch as mod
 from tests.ut.utils import judge_expression
 
 mpu = mod.mpu

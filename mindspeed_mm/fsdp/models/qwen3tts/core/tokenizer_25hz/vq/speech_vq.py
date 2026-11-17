@@ -1,3 +1,4 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # coding=utf-8
 # Copyright 2026 The Alibaba Qwen team.
 # SPDX-License-Identifier: Apache-2.0

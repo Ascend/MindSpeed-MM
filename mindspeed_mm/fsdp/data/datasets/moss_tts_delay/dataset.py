@@ -1,3 +1,4 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # Copyright 2026 OpenMOSS team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

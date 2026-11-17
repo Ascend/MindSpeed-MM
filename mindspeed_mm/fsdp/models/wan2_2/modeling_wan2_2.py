@@ -1,3 +1,4 @@
+# Copyright 2025 Huawei Technologies Co., Ltd.
 # Copyright 2025 The Wan-Video Team and The HuggingFace Inc. team. All rights reserved.
 #
 #

@@ -20,29 +20,29 @@ def _load_patch_manager():
     """Load patch_manager.py in an isolated sys.modules context."""
     extra = {}
 
-    if "mindspeed_mm.patchs" not in sys.modules:
-        pkg = types.ModuleType("mindspeed_mm.patchs")
-        pkg.__path__ = [str(_root / "mindspeed_mm" / "patchs")]
-        extra["mindspeed_mm.patchs"] = pkg
+    if "mindspeed_mm.patches" not in sys.modules:
+        pkg = types.ModuleType("mindspeed_mm.patches")
+        pkg.__path__ = [str(_root / "mindspeed_mm" / "patches")]
+        extra["mindspeed_mm.patches"] = pkg
 
     for name in [
-        "mindspeed_mm.patchs.adaptive_clip_grad_patch",
-        "mindspeed_mm.patchs.infer_fa_patch",
-        "mindspeed_mm.patchs.models_patches",
-        "mindspeed_mm.patchs.fsdp1_patches",
-        "mindspeed_mm.patchs.training_patches",
-        "mindspeed_mm.patchs.fsdp2_patches",
-        "mindspeed_mm.patchs.optimizer_patch",
-        "mindspeed_mm.patchs.bridge_patch",
-        "mindspeed_mm.patchs.validate_args_patch",
+        "mindspeed_mm.patches.adaptive_clip_grad_patch",
+        "mindspeed_mm.patches.infer_fa_patch",
+        "mindspeed_mm.patches.models_patches",
+        "mindspeed_mm.patches.fsdp1_patches",
+        "mindspeed_mm.patches.training_patches",
+        "mindspeed_mm.patches.fsdp2_patches",
+        "mindspeed_mm.patches.optimizer_patch",
+        "mindspeed_mm.patches.bridge_patch",
+        "mindspeed_mm.patches.validate_args_patch",
     ]:
         if name not in sys.modules:
             extra[name] = MagicMock()
 
-    ldt_pkg_name = "mindspeed_mm.patchs.layerwise_disaggregated_training"
+    ldt_pkg_name = "mindspeed_mm.patches.layerwise_disaggregated_training"
     if ldt_pkg_name not in sys.modules:
         ldt_pkg = types.ModuleType(ldt_pkg_name)
-        ldt_pkg.__path__ = [str(_root / "mindspeed_mm" / "patchs" / "layerwise_disaggregated_training")]
+        ldt_pkg.__path__ = [str(_root / "mindspeed_mm" / "patches" / "layerwise_disaggregated_training")]
         extra[ldt_pkg_name] = ldt_pkg
 
     for name in [
@@ -57,8 +57,8 @@ def _load_patch_manager():
 
     with patch.dict(sys.modules, extra):
         spec = importlib.util.spec_from_file_location(
-            "mindspeed_mm.patchs.patch_manager",
-            str(_root / "mindspeed_mm" / "patchs" / "patch_manager.py"),
+            "mindspeed_mm.patches.patch_manager",
+            str(_root / "mindspeed_mm" / "patches" / "patch_manager.py"),
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

@@ -1,3 +1,4 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # coding=utf-8
 # Copyright 2026 OpenMOSS Team, Fudan University, SII and MOSI
 # SPDX-License-Identifier: Apache-2.0

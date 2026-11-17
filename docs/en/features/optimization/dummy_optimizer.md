@@ -20,7 +20,7 @@ Prerequisites: the typical scenario is that all parameters of a pipeline stage a
 1. Import the patch module in the model entry script:
 
    ```python
-   from mindspeed_mm.patchs import dummy_optimizer_patch
+   from mindspeed_mm.patches import dummy_optimizer_patch
    ```
 
 2. Add the parameter in the model startup shell:

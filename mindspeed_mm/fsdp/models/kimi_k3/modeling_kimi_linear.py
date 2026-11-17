@@ -1,6 +1,6 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # coding=utf-8
 # Copyright 2025-2026 The Moonshot AI Team, DeepSeek-AI, and HuggingFace Inc. team. All rights reserved.
-#
 # The multi-head latent attention, MoE gating and sparse MoE block in this file are
 # adapted from DeepSeek-V3 (DeepSeek-V3/modeling_deepseek.py). They have been
 # extensively modified and extended for the Kimi-Linear architecture.
@@ -10,6 +10,7 @@
 # - Other parts of the code are licensed under the MIT License.
 #
 # Apache License, Version 2.0:
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at

@@ -20,7 +20,7 @@ MCORE
 1. 在模型入口脚本中导入patch模块：
 
    ```python
-   from mindspeed_mm.patchs import dummy_optimizer_patch
+   from mindspeed_mm.patches import dummy_optimizer_patch
    ```
 
 2. 在模型启动shell中添加参数：

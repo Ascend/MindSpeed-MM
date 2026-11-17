@@ -9,7 +9,7 @@ import mindspeed.megatron_adaptor
 import pytest
 import torch
 
-from mindspeed_mm.patchs.layerwise_disaggregated_training import utils_patch as mod
+from mindspeed_mm.patches.layerwise_disaggregated_training import utils_patch as mod
 from tests.ut.utils import judge_expression
 
 _PATCH_CUDA = patch("torch.cuda.current_device", return_value="cpu")

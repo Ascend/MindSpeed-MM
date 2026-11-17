@@ -6,7 +6,7 @@ from megatron.training import get_args
 from megatron.training.checkpointing import load_checkpoint
 from megatron.training.initialize import initialize_megatron
 
-from mindspeed_mm.patchs.patch_manager import PatchesManager
+from mindspeed_mm.patches.patch_manager import PatchesManager
 from mindspeed_mm.models.text_encoder import Tokenizer
 from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.configs.config import merge_mm_args

@@ -1,3 +1,4 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # coding=utf-8
 # Copyright 2025-2026 The Moonshot AI Team, DeepSeek-AI, and HuggingFace Inc. team. All rights reserved.
 #

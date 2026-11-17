@@ -1,5 +1,17 @@
+# Copyright 2024 Huawei Technologies Co., Ltd.
 # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
-# Copyright (c) 2024, HUAWEI CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import os
 import time
 from abc import ABC, abstractmethod
@@ -30,7 +42,7 @@ from megatron.training.utils import average_losses_across_data_parallel_group, u
 from megatron.training.utils import print_rank_0
 from mindspeed_mm.arguments import extra_args_provider_decorator
 from mindspeed_mm.configs.config import merge_mm_args
-from mindspeed_mm.patchs.patch_manager import PatchesManager
+from mindspeed_mm.patches.patch_manager import PatchesManager
 from mindspeed_mm.tasks.rl.utils import compute_log_probs
 from mindspeed_mm.training import train
 from mindspeed_mm.utils.random import seed_all

@@ -50,7 +50,7 @@ Hetero Parallel（异构并行）是 MindSpeed-MM 中用于多模态模型的一
 
 ### 4.2 流水线并行补丁： `hetero_pipeline_patches.py`
 
-路径： `MindSpeed-MM/mindspeed_mm/patchs/hetero_pipeline_patches.py`
+路径： `MindSpeed-MM/mindspeed_mm/patches/hetero_pipeline_patches.py`
 
 主要功能：
 

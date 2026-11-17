@@ -1,3 +1,4 @@
+# Copyright 2024 Huawei Technologies Co., Ltd.
 # Copyright 2024 OpenAccess AI Collective and the LlamaFactory team.
 #
 # This code is inspired by the OpenAccess AI Collective's axolotl library.

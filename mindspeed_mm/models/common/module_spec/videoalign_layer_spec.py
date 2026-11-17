@@ -1,5 +1,18 @@
+# Copyright 2025 Huawei Technologies Co., Ltd.
 # Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
 # Copyright (c) 2025 Alibaba PAI and Nvidia Megatron-LM Team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
@@ -20,7 +33,7 @@ from megatron.core.models.gpt.gpt_layer_specs import _get_mlp_module_spec
 from mindspeed_mm.models.common.module_spec.llava_layer_spec import get_mlp_module_spec
 from mindspeed_mm.models.vision.vision_encoders.qwen2vl_vit_model import Qwen2vlVitSelfAttention, Qwen2vlSelfAttention
 
-from mindspeed_mm.patchs.canonical_layer_patch import (
+from mindspeed_mm.patches.canonical_layer_patch import (
     PatchSplitQKVSelfAttention,
     _patch_get_mlp_module_spec,
     PatchViTSelfAttention,

@@ -1,3 +1,4 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # coding=utf-8
 # Copyright 2023-present the HuggingFace Inc. team.
 #

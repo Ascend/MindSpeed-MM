@@ -1,4 +1,17 @@
+# Copyright 2025 Huawei Technologies Co., Ltd.
 # Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import os
 import warnings
 import torch
@@ -14,7 +27,7 @@ from megatron.training.utils import get_device_arch_version, update_use_dist_ckp
 
 from mindspeed_mm.configs.config import merge_mm_args
 from mindspeed_mm.utils.utils import ensure_valid
-from mindspeed_mm.patchs.layerwise_disaggregated_training.parallel_state_patch import (
+from mindspeed_mm.patches.layerwise_disaggregated_training.parallel_state_patch import (
     pre_validate_args_for_vtp,
     post_validate_args_for_vtp,
     install_ldt_init_model_parallel_patch,
@@ -831,5 +844,5 @@ def validate_args(args, defaults=None):
     return args
 
 pm.register_patch("megatron.training.arguments.validate_args", validate_args, force_patch=True)
-pm.register_patch("mindspeed_mm.patchs.validate_args_patch.validate_args", validate_args_wrapper)
+pm.register_patch("mindspeed_mm.patches.validate_args_patch.validate_args", validate_args_wrapper)
 pm.apply_patches()

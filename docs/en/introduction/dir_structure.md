@@ -31,7 +31,7 @@ The complete directory hierarchy of the project is introduced as follows:
 │  ├─data                                          # Data Processing Code
 │  ├─models                                        # Model Structure Code
 │  ├─optimizer                                     # Optimizer Code
-│  ├─patchs                                        # Patch Directory
+│  ├─patches                                        # Patch Directory
 │  ├─tasks                                         # Pipeline Code for Different Tasks Such as SFT/Infer/RL
 │  ├─tools                                         # Performance/Memory Profiling Tool Code
 │  ├─utils                                         # Utility Functions/Helper Code Directory

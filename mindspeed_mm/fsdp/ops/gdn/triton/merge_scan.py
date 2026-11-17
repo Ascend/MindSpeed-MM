@@ -1,17 +1,14 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # -*- coding: utf-8 -*-
-# Copyright (c) 2026, Huawei Technologies Co., Ltd. All rights reserved.
-#
 # Triton merge kernel for GDN scan context-parallel cross-rank prefix compose.
 # Replaces the pure-Python for-loop in parallel_scan.py:prefix_scan_compose /
 # prefix_scan_compose_bwd. Implements the cross-rank merge on MindSpeed-MM's Ascend
 # triton dialect and [M|S_ext] packed layout.
-#
 # Math (forward, for cp_rank r >= 1):
 #   S = 0; for j in 1..r: S = M_{j-1} @ S + S_ext_{j-1}
 #   (M = A_p [B,H,K,K], S_ext = B_p [B,H,K,V], both fp32)
 # Math (backward, for cp_rank r <= kv-2):
 #   dht = 0; for j in kv-1 down to r+1: dht = dM_j @ dht + dS_ext_j
-#
 # NO gate/exp involvement (M, S_ext pre-computed) -> exp2-vs-tl.exp landmine does NOT apply.
 # M@S_ext chain stays fp32 (b_h fp32, inputs cast fp32). Uses BK=next_pow2(K) single block,
 # NOT the 64-unroll of fwd_h -- simpler and avoids the "compute all new_h from old
@@ -19,6 +16,18 @@
 #
 # A `use_triton` flag in prefix_scan_compose[_bwd] selects triton vs the original Python path
 # (Python retained for gradcheck diffing, fallback, non-NPU environments).
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import torch
 import triton

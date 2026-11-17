@@ -1,3 +1,4 @@
+# Copyright 2023 Huawei Technologies Co., Ltd.
 # pylint: disable=too-many-lines,relative-beyond-top-level,duplicate-code
 # coding=utf-8
 # Copyright 2023 DeepSeek-AI and The HuggingFace Inc. team. All rights reserved.

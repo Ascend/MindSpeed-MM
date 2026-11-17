@@ -50,7 +50,7 @@ Main functions:
 
 ### 4.2 Pipeline Parallel Patch: `hetero_pipeline_patches.py`
 
-Path: `MindSpeed-MM/mindspeed_mm/patchs/hetero_pipeline_patches.py`
+Path: `MindSpeed-MM/mindspeed_mm/patches/hetero_pipeline_patches.py`
 
 Main functions:
 

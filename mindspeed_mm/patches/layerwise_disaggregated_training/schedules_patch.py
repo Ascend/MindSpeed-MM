@@ -1,4 +1,17 @@
+# Copyright 2022 Huawei Technologies Co., Ltd.
 # Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import contextlib
 from typing import List, Iterator, Union, Dict, Any
@@ -35,8 +48,8 @@ from megatron.core.utils import (
 from megatron.training import get_args
 from megatron.training.utils import average_losses_across_data_parallel_group
 
-from mindspeed_mm.patchs.layerwise_disaggregated_training import p2p_communication_patch
-from mindspeed_mm.patchs.layerwise_disaggregated_training.parallel_state_patch import (
+from mindspeed_mm.patches.layerwise_disaggregated_training import p2p_communication_patch
+from mindspeed_mm.patches.layerwise_disaggregated_training.parallel_state_patch import (
     get_pipeline_model_parallel_group_alternate,
     get_pipeline_model_parallel_group_last_to_first,
     get_pipeline_model_parallel_group_first_to_last,

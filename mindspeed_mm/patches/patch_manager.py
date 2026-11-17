@@ -15,7 +15,7 @@ from megatron.training import get_args
 from megatron.training.utils import print_rank_0
 from mindspeed.patch_utils import MindSpeedPatchesManager as pm
 
-from mindspeed_mm.patchs import (
+from mindspeed_mm.patches import (
     adaptive_clip_grad_patch,
     infer_fa_patch,
     models_patches,
@@ -25,7 +25,7 @@ from mindspeed_mm.patchs import (
     optimizer_patch,
     bridge_patch
 )
-from mindspeed_mm.patchs.layerwise_disaggregated_training import (
+from mindspeed_mm.patches.layerwise_disaggregated_training import (
     distributed_data_parallel_patch,
     parallel_state_patch,
     schedules_patch,

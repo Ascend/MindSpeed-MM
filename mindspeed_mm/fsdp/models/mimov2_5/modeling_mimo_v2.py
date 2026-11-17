@@ -1,3 +1,4 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # pylint: skip-file
 # coding=utf-8
 #

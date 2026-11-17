@@ -19,7 +19,7 @@ from mindspeed_mm.configs.config import mm_extra_args_provider
 from mindspeed_mm.data import build_mm_dataloader, build_mm_dataset
 from mindspeed_mm.data.data_utils.utils import build_iterations
 from mindspeed_mm.models.vlm_model import VLMModel
-from mindspeed_mm.patchs import dummy_optimizer_patch
+from mindspeed_mm.patches import dummy_optimizer_patch
 from mindspeed_mm.training import pretrain
 from mindspeed_mm.utils.transformer_model_config import get_model_config
 from mindspeed_mm.utils.hetero_parallel import change_parallel_state, apply_hetero_parallel_hooks
@@ -250,7 +250,7 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
 
 
 if __name__ == "__main__":
-    from mindspeed_mm.patchs import ring_attn_patch, ulysses_patches, torch_dcp_patch
+    from mindspeed_mm.patches import ring_attn_patch, ulysses_patches, torch_dcp_patch
     import gc
     # set gc threshold to mitigate performance fluctuation
     gc.set_threshold(700, 10, 1000)

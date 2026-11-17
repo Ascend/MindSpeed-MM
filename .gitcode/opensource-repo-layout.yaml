@@ -1,0 +1,457 @@
+project: Ascend/MindSpeed-MM
+directories:
+  - path: "./mindspeed_mm/"
+    type: source
+  - path: "./mindspeed_mm/data/data_utils/func_utils"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/data/data_utils/func_utils"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/data/datasets/cosyvoice3"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/data/datasets/moss_tts_delay"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/data/datasets/qwen3tts"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/gemma4"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/internvlu"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/mimov2_5"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/moss_tts_delay"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3_5_moe"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3omni"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/core/models"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/core/tokenizer_12hz"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/inference"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen4_exp"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/attn_res"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton_core"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/hc"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/kda/ascendc"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/kda/triton_ascend"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/npu_patch"
+    type: upstream
+  - path: "./mindspeed_mm/models/ae/training"
+    type: upstream
+  - path: "./mindspeed_mm/models/audio"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/transformer"
+    type: upstream
+  - path: "./mindspeed_mm/models/text_decoder"
+    type: upstream
+  - path: "./mindspeed_mm/models/text_encoder/hunyuan15_byt5"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen2vl"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/evaluation/reward_impl/utils"
+    type: upstream
+files:
+  - path: "./mindspeed_mm/data/data_utils/data_transform.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/data_utils/processing_deepseek_vl_v2.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/data_utils/reward_preprocess.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/data_utils/utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/dataloader/batching_strategy.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/dataloader/dataloader.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/dataloader/dynamic_batching_dataloader.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/datasets/audio_dataset.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/datasets/bagel_dataset.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/datasets/bagel_iterable_dataset.py"
+    type: upstream
+  - path: "./mindspeed_mm/data/datasets/multimodal_dataset.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/checkpoint/dcp_checkpointer.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/checkpoint/utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/data/data_utils/generative_data_utils/data_transform.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/data/data_utils/generative_data_utils/utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/data/dataloader/dataloader.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/distributed/context_parallel/ring_context_parallel/ring_context_parallel.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/distributed/context_parallel/ring_context_parallel/utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/cosyvoice3/common.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/cosyvoice3/llm.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/glm4_5v/modeling_glm4_5v.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/glm5_next/configuration_glm5_next.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/glm5_next/modeling_glm5_next.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/glm5_next/video_processing_glm5_next.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/kimi_k3/modeling_kimi_k3.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/kimi_k3/modeling_kimi_linear.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/kimi_k3/tokenization_kimi.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/kimik2_5/modeling_deepseek.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/kimik2_5/modeling_kimi_k25.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/kimik2_5/tokenization_kimi.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/longcat_next/modeling_longcat_next.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/longcat_next/refiner_modules.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/magihuman/magihuman_fsdp2/modified.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/minimax_h3/vendor/diffsynth/core/attention/attention.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/minimax_h3/vendor/diffsynth/diffusion/flow_match.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/minimax_h3/vendor/diffsynth/models/minimax_constant.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/minimax_h3/vendor/diffsynth/models/minimax_h3_dit.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/minimax_m3_vl/image_processor.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/minimax_m3_vl/modeling_minimax_m3_vl.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/mtp.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3_5/causal_conv1d.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3_5/modeling_qwen3_5.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3_asr/configuration_qwen3_asr.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3_asr/modeling_qwen3_asr.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3_asr/processing_qwen3_asr.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/core/__init__.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/core/tokenizer_25hz/configuration_qwen3_tts_tokenizer_v1.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/core/tokenizer_25hz/modeling_qwen3_tts_tokenizer_v1.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/core/tokenizer_25hz/vq/core_vq.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/core/tokenizer_25hz/vq/speech_vq.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3tts/core/tokenizer_25hz/vq/whisper_encoder.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3vl/modeling_qwen3_vl.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/qwen3vl_moe/modeling_qwen3_vl_moe.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/models/wan2_2/modeling_wan2_2.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/chunk_gated_delta_rule.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/flash_chunk_gated_delta_rule.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/chunk_delta_h.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/chunk_o.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/chunk_scaled_dot_kkt.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/convolution.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/cumsum.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/solve_tril.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/stateful_convolution.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/gdn/triton/wy_fast.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/kda/short_conv.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/ops/qsa/ascendc/qsa_indexer.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/optimizer/lr_scheduler.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/optimizer/optimizer.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/params/tools_args.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/params/training_args.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/tools/flops_tool/flops_qwen3_5.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/tools/flops_tool/flops_qwen3_vl.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/utils/device.py"
+    type: upstream
+  - path: "./mindspeed_mm/fsdp/utils/lora_utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/mcore/models/qwen3_5/gated_delta_net.py"
+    type: upstream
+  - path: "./mindspeed_mm/mcore/models/qwen3_5/modeling_qwen3_5.py"
+    type: upstream
+  - path: "./mindspeed_mm/mcore/models/qwen3_5/pretrain_qwen3_5.py"
+    type: upstream
+  - path: "./mindspeed_mm/mcore/models/qwen3_5/spec.py"
+    type: upstream
+  - path: "./mindspeed_mm/mcore/models/qwen3_5/utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/mcore/process_group_configs.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/ae/autoencoder_kl_hunyuanvideo.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/ae/flux_vae.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/ae/hunyuanvideo_15_vae.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/ae/losses/lpips.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/ae/stepvideo_vae.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/blocks.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/embeddings/__init__.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/embeddings/common_embeddings.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/embeddings/patch_embeddings.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/embeddings/pos_patch_encoding.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/ffn.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/fpdt_layer.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/fused_moe.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/mm_gpt_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/module.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/module_spec/glm4v_layer_spec.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/module_spec/llava_layer_spec.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/module_spec/qwen2_5omni_layer_spec.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/module_spec/qwen2vl_layer_spec.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/module_spec/qwen3vl_layer_spec.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/common/module_spec/videoalign_layer_spec.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/deepseekvl_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/diffusion/ddpm.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/diffusion/diffusion_utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/diffusion/flow_match_discrete_scheduler.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/diffusion/hunyuan_video_15_scheduler.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/diffusion/iddpm.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/diffusion/opensoraplanv1_5_scheduler.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/omni/mllms/bagel_qwen2_mot.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/hunyuan_video_15_dit.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/hunyuanvideo15/attention.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/hunyuanvideo15/communications.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/hunyuanvideo15/embed_layers.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/hunyuanvideo15/ssta_attention.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/hunyuanvideo15/token_refiner.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/lumina_mgpt2.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/mmdit.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/pt_dit_diffusers.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/predictor/dits/step_video_dit.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/qwen2vl_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/reward_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/text_encoder/hunyuan15_mllm_text_encoder.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/text_encoder/stepllm_text_encoder.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/text_encoder/stepllm_tokenizer.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/configuration_hunyuan.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/glm4v_moe/glm4_5v.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/glm4v_moe/modeling_glm4v_moe.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/hunyuan_image_3_pipeline.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/internvl3_5.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/mistral3/mistral3.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/mistral3/modules.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/moe_utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen3omni/modeling_outputs.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen3omni/modeling_qwen3_omni_moe.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen3omni/modules.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen3vl/modeling_qwen3_vl.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen3vl/modeling_qwen3_vl_moe.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen3vl/modules.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen3vl/output.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/transformers/qwen3vl/qwen3vl.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vision/projectors/deepseekvl_mlp.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vision/projectors/multimodal_projector.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vision/vision_encoders/clip_vit_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vision/vision_encoders/glm4v_vl_vit_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vision/vision_encoders/qwen2vl_vit_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vision/vision_encoders/qwen3vl_vit_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vision/vision_encoders/vision_transformer_block.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vision/vlm_attentionmask_for_llm.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/vlm_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/models/whisper/whisper_model.py"
+    type: upstream
+  - path: "./mindspeed_mm/optimizer/muon/__init__.py"
+    type: upstream
+  - path: "./mindspeed_mm/optimizer/muon/newton_schulz.py"
+    type: upstream
+  - path: "./mindspeed_mm/optimizer/muon/optimizer.py"
+    type: upstream
+  - path: "./mindspeed_mm/optimizer/muon/qk_clip.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/adaptive_clip_grad_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/bridge_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/canonical_layer_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/fsdp1_patches.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/hetero_pipeline_patches.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/layerwise_disaggregated_training/distributed_data_parallel_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/layerwise_disaggregated_training/p2p_communication_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/layerwise_disaggregated_training/parallel_state_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/layerwise_disaggregated_training/schedules_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/layerwise_disaggregated_training/utils_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/layerwise_disaggregated_training/vlm_model_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/models_patches.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/optimizer_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/torch_dcp_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/training_patches.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/ulysses_patches.py"
+    type: upstream
+  - path: "./mindspeed_mm/patches/validate_args_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/evaluation/gen_impl/vbench_utils/vbench_i2v_patch.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/evaluation/utils/string_utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/cogvideox_pipeline.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/hunyuanvideo_15_pipeline.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/internvl_pipeline.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/parallel_wrapper.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/pipeline_mixin/encode_mixin.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/pipeline_mixin/generation_mixin.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/pipeline_mixin/inputs_checks_mixin.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/qwen2vl_pipeline.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/utils/llava_utils.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/videoalign_pipeline.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/inference/pipeline/wan_pipeline.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/dpo/dpo_trainer.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/dpo/reward_trainer.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/soragrpo/dataset/latent_flux_rl_datasets.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/soragrpo/flux_grpo_trainer.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/soragrpo/preprocess/data_preprocess.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/soragrpo/preprocess/flux_data_preprocess.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/soragrpo/sora_grpo_trainer.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/soragrpo/utils/communications_flux.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/soragrpo/utils/fsdp_util.py"
+    type: upstream
+  - path: "./mindspeed_mm/tasks/rl/soragrpo/utils/parallel_states.py"
+    type: upstream
+  - path: "./mindspeed_mm/training.py"
+    type: upstream
+  - path: "./mindspeed_mm/utils/extra_processor/hunyuanvideo_15_i2v_processor.py"
+    type: upstream
+  - path: "./mindspeed_mm/utils/utils.py"
+    type: upstream

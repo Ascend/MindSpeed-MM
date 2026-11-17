@@ -1,3 +1,4 @@
+# Copyright 2024 Huawei Technologies Co., Ltd.
 # Copyright 2024 The CogVideoX team, Tsinghua University & ZhipuAI and The HuggingFace Team.
 # All rights reserved.
 #

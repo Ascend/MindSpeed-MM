@@ -1,6 +1,17 @@
-# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
-# Copyright 2024 Huawei Technologies Co., Ltd
+# Copyright 2026 Huawei Technologies Co., Ltd.
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import os
 import dataclasses
@@ -13,23 +24,36 @@ from megatron.training.global_vars import get_args
 from megatron.core import mpu, tensor_parallel
 from megatron.core.transformer.module import Float16Module
 from megatron.core.distributed import DistributedDataParallelConfig
-from megatron.training.checkpointing import load_checkpoint, get_checkpoint_tracker_filename, read_metadata, get_checkpoint_name
+from megatron.training.checkpointing import load_checkpoint, get_checkpoint_tracker_filename, read_metadata, \
+    get_checkpoint_name
 from megatron.core.distributed import DistributedDataParallel as DDP
 from megatron.core.utils import get_model_config
 from megatron.core.fp8_utils import correct_amax_history_if_needed
 from megatron.core.distributed.custom_fsdp import FullyShardedDataParallel as custom_FSDP
+
 try:
     from megatron.core.distributed import TorchFullyShardedDataParallel as torch_FSDP
+
     HAVE_FSDP2 = True
 except ImportError:
     HAVE_FSDP2 = False
 
 from mindspeed_mm.utils.utils import ensure_valid
-from mindspeed_mm.tasks.finetune.lora.utils import is_enable_lora
-from mindspeed_mm.tasks.finetune.lora.lora_patch import model_provider_func_wrapper
 
 
-def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encoder_or_decoder, wrap_with_ddp=True):
+def contains_huggingface_weight(file_path):
+    if os.path.isdir(file_path):
+        for _, _, files in os.walk(file_path):
+            for file in files:
+                if file.lower().endswith(".safetensors"):
+                    return True
+    elif os.path.isfile(file_path) and file_path.lower().endswith(".safetensors"):
+        return True
+
+    return False
+
+
+def get_model(model_provider_func, model_type=ModelType.encoder_or_decoder, wrap_with_ddp=True):
     """
     This function is copied from Megatron's get_model function with one key modification:
     Added functionality to load model weights from .pt checkpoint files at the end of build_model().
@@ -38,13 +62,10 @@ def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encode
     args = get_args()
     args.model_type = model_type
 
-    if is_enable_lora():
-        model_provider_func = model_provider_func_wrapper(model_provider_func)
-
     # Build model.
     def build_model():
         if mpu.get_pipeline_model_parallel_world_size() > 1 and \
-        args.virtual_pipeline_model_parallel_size is not None:
+                args.virtual_pipeline_model_parallel_size is not None:
             if model_type == ModelType.encoder_and_decoder:
                 ensure_valid(
                     args.encoder_pipeline_model_parallel_size == 0,
@@ -122,6 +143,7 @@ def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encode
         # ==========================================================
 
         return model
+
     if args.init_model_with_meta_device:
         with init_empty_weights():
             model = build_model()
@@ -226,16 +248,23 @@ def get_dist_model_load_from_pt(model_provider_func, model_type=ModelType.encode
                 ddp_config.bucket_size = None
 
         model = [DP(config=config,
-                     ddp_config=ddp_config,
-                     module=model_chunk,
-                     # Turn off bucketing for model_chunk 2 onwards, since communication for these
-                     # model chunks is overlapped with compute anyway.
-                     disable_bucketing=(model_chunk_idx > 0) or args.overlap_param_gather_with_optimizer_step)
+                    ddp_config=ddp_config,
+                    module=model_chunk,
+                    # Turn off bucketing for model_chunk 2 onwards, since communication for these
+                    # model chunks is overlapped with compute anyway.
+                    disable_bucketing=(model_chunk_idx > 0) or args.overlap_param_gather_with_optimizer_step)
                  for (model_chunk_idx, model_chunk) in enumerate(model)]
 
         # Broadcast params from data parallel src rank to other data parallel ranks.
         if args.data_parallel_random_init:
             for model_module in model:
                 model_module.broadcast_params()
+
+
+        load_dir = args.load
+        if load_dir and contains_huggingface_weight(load_dir):
+            from bridge.models.conversion.auto_bridge import AutoBridge
+            bridge = AutoBridge.from_hf_pretrained(load_dir)
+            bridge.load_hf_weights(model)
 
     return model

@@ -1,3 +1,4 @@
+# Copyright 2025 Huawei Technologies Co., Ltd.
 # Copyright 2025 HuggingFace Inc. and the LlamaFactory team.
 #
 # This code is inspired by the HuggingFace's transformers library.

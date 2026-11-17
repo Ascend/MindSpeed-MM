@@ -1,3 +1,4 @@
+# Copyright 2026 Huawei Technologies Co., Ltd.
 # --------------------------------------------------------
 # InternVL-U
 # Modifications Copyright (c) 2026 OpenGVLab
