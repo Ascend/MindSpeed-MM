@@ -14,7 +14,6 @@
 
 import logging
 import random
-from dataclasses import asdict
 
 import torch
 
@@ -427,15 +426,13 @@ class DataloaderMapStyle:
 
 def build_funasr_dataloader_factory(data_args, frontend, tokenizer):
     """Build FunASR dataloader factory with proper distributed config."""
-    dataset_conf = data_args.dataset_param.dataset_conf
-    dataloader_conf = data_args.dataset_param.dataset_conf
-    combined_conf = {**dataloader_conf, **dataset_conf}
+    dataset_conf = data_args.dataset_param.dataset_conf.to_dict()
 
     dataloader_kwargs = {
         'dataset': "FunASR",
         'train_data_set_list': data_args.train_data_set_list,
         'valid_data_set_list': data_args.valid_data_set_list,
-        'dataset_conf': combined_conf,
+        'dataset_conf': dataset_conf,
         'frontend': frontend,
         'tokenizer': tokenizer,
     }

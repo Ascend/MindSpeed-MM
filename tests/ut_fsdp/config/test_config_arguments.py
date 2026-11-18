@@ -435,3 +435,41 @@ def test_yaml_accepts_extra_root_and_nested_sections(tmp_path):
     ).load_and_parse()
     assert config.custom.encoder.hidden_size == 128
     assert config.features.model_specific_option.value == 1
+
+
+def test_cosyvoice3_sampling_supports_attribute_access():
+    path = Path(__file__).resolve().parents[3] / "examples/cosyvoice3/cosyvoice3_config.yaml"
+    config = ConfigManager(
+        config_class=Arguments,
+        config_file_path=str(path),
+        allow_cli_override=False,
+    ).load_and_parse()
+
+    assert config.model.sampling.top_p == 0.8
+    assert config.model.sampling.top_k == 25
+    assert config.model.sampling.win_size == 10
+    assert config.model.sampling.tau_r == 0.1
+
+
+def test_funasr_config_attributes_and_dict_boundaries(tmp_path):
+    example = Path(__file__).resolve().parents[3] / "examples/funasr/funasr_config.yaml"
+    payload = yaml.safe_load(example.read_text())
+    # The example uses null for string fields; that separate issue is not under test.
+    payload["training"]["load"] = ""
+    payload["training"]["save"] = ""
+    path = tmp_path / "funasr_config.yaml"
+    path.write_text(yaml.safe_dump(payload))
+    config = ConfigManager(
+        config_class=Arguments,
+        config_file_path=str(path),
+        allow_cli_override=False,
+    ).load_and_parse()
+
+    assert config.model.audio_encoder_conf.freeze is True
+    assert config.model.llm_conf.freeze is False
+    assert config.model.audio_adaptor_conf.freeze is True
+    assert config.model.ctc_decoder_conf.freeze is False
+    assert config.training.scheduler_conf.to_dict() == {"warmup_steps": 10}
+    dataset_conf = config.data.dataset_param.dataset_conf.to_dict()
+    assert isinstance(dataset_conf, dict)
+    assert isinstance(dataset_conf["prompt_conf"], dict)

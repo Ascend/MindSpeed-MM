@@ -91,12 +91,14 @@ class CosyVoice3LM(torch.nn.Module, BaseModel):
         self.speech_embedding = torch.nn.Embedding(config.speech_token_size + 200, config.llm_input_size)
 
         # 4. sampling method
+        if config.sampling is None:
+            raise ValueError("sampling config must not be None")
         self.sampling = partial(
             ras_sampling,
-            top_p=config.sampling.get("top_p", 0.8),
-            top_k=config.sampling.get("top_k", 25),
-            win_size=config.sampling.get("win_size", 10),
-            tau_r=config.sampling.get("tau_r", 0.1),
+            top_p=getattr(config.sampling, "top_p", 0.8),
+            top_k=getattr(config.sampling, "top_k", 25),
+            win_size=getattr(config.sampling, "win_size", 10),
+            tau_r=getattr(config.sampling, "tau_r", 0.1),
         )
         self.mix_ratio = config.mix_ratio
 
