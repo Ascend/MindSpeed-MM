@@ -20,11 +20,41 @@ existing eager path remains in the LightningIndexer adapter. The caller
 still combines this selected mask with its causal/padding mask.
 """
 
+import logging
+from functools import lru_cache
+
 import torch
 import triton
 import triton.language as tl
 
-from mindspeed_mm.fsdp.utils.device import get_vector_num, is_arch35
+from mindspeed_mm.fsdp.utils.device import get_device_name, get_vector_num, is_arch35
+
+logger = logging.getLogger(__name__)
+
+# TILE 4096 is the configuration validated on Ascend 910C/950, but its live
+# 4096-wide uint32 vectors overflow the smaller unified buffer on Atlas A2
+# training products and fail
+# HIVM PlanMemory during triton compilation. The width is picked from the SoC
+# version instead and halved again if even that fails to compile.
+_PACKED16_TILE = None       # resolved lazily on the first launch
+_PACKED16_DISABLED = False  # flipped off permanently once every tile failed
+
+
+@lru_cache(maxsize=None)
+def _is_ascend_a2() -> bool:
+    """True on Atlas A2 training products, whose AIV unified buffer is the smallest."""
+    try:
+        return "910B" in get_device_name()
+    except Exception:
+        # Undetectable SoC: keep the validated wide tile and let the launch
+        # ladder shrink it if the compiler rejects it.
+        return False
+
+
+def _device_tile() -> int:
+    """4096 on validated SoCs, 2048 on Atlas A2 training products (half the
+    unified-buffer footprint)."""
+    return 2048 if _is_ascend_a2() else 4096
 
 
 @triton.jit
@@ -141,6 +171,45 @@ def _qsa_id2mask_ratio4_packed16_kernel(
             tl.store(Out + row.to(tl.int64) * (KV // 2) + pair, word, pair < KV // 2)
 
 
+def _launch_packed16(table, output, *, programs, batch, query_length, kv_length, prefix,
+                     sparse_rows, compress_ratio, blocks, table_stride, masked_bits):
+    """Launch the generic packed16 kernel, shrinking the tile if compilation fails.
+
+    Returns false once every tile width has been rejected so the caller can
+    fall back to the unpacked kernel instead of crashing mid-training.
+    """
+    global _PACKED16_TILE, _PACKED16_DISABLED
+    # A failed compile is not cached by triton, so without this guard every
+    # forward would retry the doomed launch and re-log the fallback warning.
+    if _PACKED16_DISABLED:
+        return False
+    if _PACKED16_TILE is None:
+        _PACKED16_TILE = _device_tile()
+    while True:
+        try:
+            _qsa_id2mask_block_table_to_mask_packed16_kernel[(programs,)](
+                table, output.view(torch.int32), query_length, kv_length, prefix, sparse_rows,
+                compress_ratio, blocks, table_stride, batch * query_length,
+                triton.next_power_of_2(blocks), _PACKED16_TILE,
+                masked_bits & 65535, multibuffer=False,
+            )
+            return True
+        except Exception as e:
+            failed = _PACKED16_TILE
+            if failed > 1024:
+                _PACKED16_TILE = failed // 2
+                logger.warning(
+                    "qsa_id2mask packed16 kernel failed at TILE=%d (%s: %s); "
+                    "retrying with TILE=%d", failed, type(e).__name__, e, _PACKED16_TILE)
+                continue
+            _PACKED16_DISABLED = True
+            logger.warning(
+                "qsa_id2mask packed16 kernel failed (%s: %s); falling back to "
+                "the unpacked kernel for the rest of this run",
+                type(e).__name__, e)
+            return False
+
+
 def _qsa_id2mask_forward(selected_blocks, *, query_length, kv_length,
                 token_budget, compress_ratio, dtype):
     """Return [B,1,Q,KV], bool True=allowed or additive 0/finfo.min.
@@ -194,6 +263,7 @@ def _qsa_id2mask_forward(selected_blocks, *, query_length, kv_length,
         # The ratio-4 path expands each block flag into two output pairs;
         # the tile count follows the actual KV length rather than a fixed cutoff.
         tuned = compress_ratio == 4 and is_arch35()
+        packed = True
         if tuned:
             blocks_per_tile = min(1024, triton.next_power_of_2(blocks))
             _qsa_id2mask_ratio4_packed16_kernel[(min(vector_num, batch * query_length),)](
@@ -202,18 +272,18 @@ def _qsa_id2mask_forward(selected_blocks, *, query_length, kv_length,
                 blocks_per_tile, masked_bits & 65535, multibuffer=False,
             )
         else:
-            _qsa_id2mask_block_table_to_mask_packed16_kernel[(vector_num,)](
-                table, output.view(torch.int32), query_length, kv_length, prefix, sparse_rows,
-                compress_ratio, blocks, table_stride, batch * query_length,
-                triton.next_power_of_2(blocks), 4096,
-                masked_bits & 65535, multibuffer=False,
-            )
-    else:
-        _qsa_id2mask_block_table_to_mask_kernel[(vector_num,)](
-            table, storage, query_length, kv_length, prefix, sparse_rows, compress_ratio,
-            blocks, table_stride, batch * query_length, triton.next_power_of_2(blocks),
-            4096, masked_bits, dtype == torch.bool, multibuffer=False,
-        )
+            packed = _launch_packed16(
+                table, output, programs=vector_num, batch=batch, query_length=query_length,
+                kv_length=kv_length, prefix=prefix, sparse_rows=sparse_rows,
+                compress_ratio=compress_ratio, blocks=blocks,
+                table_stride=table_stride, masked_bits=masked_bits)
+        if packed:
+            return output
+    _qsa_id2mask_block_table_to_mask_kernel[(vector_num,)](
+        table, storage, query_length, kv_length, prefix, sparse_rows, compress_ratio,
+        blocks, table_stride, batch * query_length, triton.next_power_of_2(blocks),
+        _device_tile(), masked_bits, dtype == torch.bool, multibuffer=False,
+    )
     return output
 
 
