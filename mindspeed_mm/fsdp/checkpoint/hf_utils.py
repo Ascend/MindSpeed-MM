@@ -37,6 +37,14 @@ from mindspeed_mm.fsdp.log import print_rank
 logger = logging.getLogger(__name__)
 
 
+DTYPES = {
+    'BOOL': torch.bool, 'U8': torch.uint8, 'I8': torch.int8, 'I16': torch.int16,
+    'I32': torch.int32, 'I64': torch.int64, 'F16': torch.float16,
+    'BF16': torch.bfloat16, 'F32': torch.float32, 'F64': torch.float64,
+    'C64': torch.complex64, 'C128': torch.complex128,
+}
+
+
 @dataclass
 class HFWeightFileStream:
     """Yields ``(key, full_tensor)`` one tensor at a time from a safetensors file.
