@@ -32,7 +32,7 @@ def _load_mxfp8_recompute_phase():
     if _MXFP8_RECOMPUTE_CACHE is not None:
         return _MXFP8_RECOMPUTE_CACHE
     try:
-        from fsdp_turbo.quantization.core.recompute_phase import (
+        from fsdp_turbo.quantization import (
             mark_module_for_recompute,
             mxfp8_recompute_context,
         )

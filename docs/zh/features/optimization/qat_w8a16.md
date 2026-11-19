@@ -8,7 +8,7 @@ W8A16 将权重量化为 FP8 e4m3（per-32-block MX 共享指数格式），激�
 
 ### 工作原理
 
-W8A16 的 converter 由 FSDPTurbo 自动注册。当 MindSpeed-MM 的 `ParallelApplier.apply_quantization_modules` 导入 `fsdp_turbo.quantization.converter.model_converter.build_model_converter` 时，FSDPTurbo 的 `quantization` 包初始化会自动执行 `w8a16_converter.py`，将以下 converter 注册到全局 registry：
+W8A16 的 converter 由 FSDPTurbo 自动注册。当 MindSpeed-MM 的 `ParallelApplier.apply_quantization_modules` 导入 `fsdp_turbo.quantization.build_model_converter` 时，FSDPTurbo 的 `quantization` 包初始化会自动执行 `w8a16_converter.py`，将以下 converter 注册到全局 registry：
 
 - `quantize.linear.w8a16`：将模型中的 `nn.Linear` 替换为 `W8A16Linear`，权重经 `w8a16_fake_quant` 做 FP8 e4m3 per-32-block 量化，激活值保持高精度，反向使用 STE
 
@@ -16,14 +16,25 @@ W8A16 的 converter 由 FSDPTurbo 自动注册。当 MindSpeed-MM 的 `ParallelA
 
 ## 前置依赖
 
-W8A16 量化依赖 FSDPTurbo 包，使用前需安装：
+W8A16 量化依赖 FSDPTurbo 与 torchao/torchao-ascend，使用前需安装：
 
 ```bash
+# 1. 安装 FSDPTurbo（MindSpeed-MM 的量化 converter 由其注册）
 git clone https://gitcode.com/Ascend/FSDPTurbo.git
 cd FSDPTurbo
 pip install -e .
+cd ..
+
+# 2. 安装 torchao 与 torchao-ascend（低精度量化 kernel 实现）
+pip install torchao==0.18.0
+git clone --depth 1 -b TorchAO-Ascend-CI-1114 https://gitcode.com/Ascend/torchao-ascend.git
+cd torchao-ascend
+pip install -e . --no-build-isolation --no-deps
+cd ..
 ```
 
+> 说明：FSDPTurbo 负责 converter 注册与量化接口，`torchao-ascend` 提供 `torchao_npu` 量化 kernel，两者均需安装。`torchao-ascend` 的 pyproject 声明 `torch>=2.11.0`，若当前环境为 torch 2.10，请保留 `--no-deps` 以避免升级 torch，全新环境建议使用与 torch/torch-npu 2.11 配套的版本。
+>
 > ⚠️ 仅当配置中实际选择了 W8A16 converter 时才会触发量化转换。
 
 ## 使用方法
@@ -115,7 +126,7 @@ training:
 
 ## 注意事项
 
-- ⚠️ 使用前请确保已安装 FSDPTurbo（`pip install -e FSDPTurbo`），否则在 converter 实例化时会报 `ModuleNotFoundError`。
+- ⚠️ 使用前请确保已安装 FSDPTurbo 与 torchao/torchao-ascend（见"前置依赖"），否则在 converter 实例化时会报 `ModuleNotFoundError`。
 - ⚠️ `quant_recipe` 设为 `w8a16`，`converters` 中必须配置 `quantize.linear.w8a16`，两者缺一不可。
 - ⚠️ W8A16 为 fake-quant 训练路径，不修改 FSDP 低精度 all-gather 通信路径，因此 `enable_fsdp_low_precision_all_gather` / `fsdp_low_precision_all_gather_mode` 对其无效，无需配置。
 - ⚠️ 低精度训练相关功能仅支持在 Ascend 950PR&950DT系列产品上运行，Atlas A2训练系列产品和Atlas A3训练系列产品等不支持。

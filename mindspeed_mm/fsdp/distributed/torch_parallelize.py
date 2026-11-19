@@ -111,7 +111,7 @@ class ParallelApplier:
                 and quantization_plan.fsdp_low_precision_all_gather_mode == "on-demand"
             )
 
-            from fsdp_turbo.quantization.converter.model_converter import build_model_converter
+            from fsdp_turbo.quantization import build_model_converter
 
             model_converters = build_model_converter(self.training_config.quantization_plan)
             model_converters.convert(model)

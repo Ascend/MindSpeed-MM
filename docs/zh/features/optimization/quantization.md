@@ -10,14 +10,25 @@ FSDP2
 提升训练效率与显存利用率。通过配置量化配置（QuantizeConfig）与低精度all-gather模式，可在保持模型精度的前提下，显著降低通信开销与内存占用，适用于大模型训练场景。
 
 ## 前置依赖
- 
-使用前需安装FSDPTurbo：
- 
+
+低精度量化依赖 FSDPTurbo 与 torchao/torchao-ascend，使用前需安装：
+
 ```bash
+# 1. 安装 FSDPTurbo（MindSpeed-MM 的量化 converter 由其注册）
 git clone https://gitcode.com/Ascend/FSDPTurbo.git
 cd FSDPTurbo
 pip install -e .
+cd ..
+
+# 2. 安装 torchao 与 torchao-ascend（低精度量化 kernel 实现）
+pip install torchao==0.18.0
+git clone --depth 1 -b TorchAO-Ascend-CI-1114 https://gitcode.com/Ascend/torchao-ascend.git
+cd torchao-ascend
+pip install -e . --no-build-isolation --no-deps
+cd ..
 ```
+
+> 说明：FSDPTurbo 负责 converter 注册与量化接口，`torchao-ascend` 提供 `torchao_npu` 量化 kernel，两者均需安装。`torchao-ascend` 的 pyproject 声明 `torch>=2.11.0`，若当前环境为 torch 2.10，请保留 `--no-deps` 以避免升级 torch，全新环境建议使用与 torch/torch-npu 2.11 配套的版本。
 
 ## 使用方法
 
