@@ -74,16 +74,16 @@ def l2norm_bwd_kernel1(
     tl.store(dx + cols, b_dx, mask=mask)
 
 
-@triton.jit
+@triton.jit(do_not_specialize=["T", "NB"])
 def l2norm_fwd_kernel(
     x,
     y,
     rstd,
     eps,
-    T: tl.constexpr,
+    T,
     D: tl.constexpr,
     BD: tl.constexpr,
-    NB: tl.constexpr,
+    NB,
     BT: tl.constexpr,
     bt_size,
 ):
@@ -103,17 +103,17 @@ def l2norm_fwd_kernel(
             tl.store(p_rstd, b_rstd.to(p_rstd.dtype.element_ty), boundary_check=(0,))
 
 
-@triton.jit
+@triton.jit(do_not_specialize=["T", "NB"])
 def l2norm_bwd_kernel(
     y,
     rstd,
     dy,
     dx,
     eps,
-    T: tl.constexpr,
+    T,
     D: tl.constexpr,
     BD: tl.constexpr,
-    NB: tl.constexpr,
+    NB,
     BT: tl.constexpr,
     bt_size,
 ):
