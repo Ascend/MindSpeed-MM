@@ -39,6 +39,7 @@ from mindspeed_mm.fsdp.checkpoint.hf_utils import (
     find_safetensors_index,
     merge_lora_weights,
     save_state_dict,
+    supports_hf_group_loading,
 )
 from mindspeed_mm.fsdp.utils.constants import FILE_MODE
 from mindspeed_mm.fsdp.utils.device import empty_cache, get_device_type, synchronize
@@ -263,7 +264,16 @@ class HuggingFaceCheckpointer(CheckpointerBase):
             with open(cfg_path, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
         tcfg = cfg.get("text_config", cfg)
-        method = "rank0-broadcast" if load_rank0_and_broadcast else "every-rank-read"
+        transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id, None)
+        weight_transform = transform_cls(hf_dir=path, mtp_num_layers=mtp_num_layers) if transform_cls else None
+        group_loading = supports_hf_group_loading(weight_transform)
+        if group_loading and load_rank0_and_broadcast:
+            raise ValueError(
+                'Local expert-group HF loading requires load_rank0_and_broadcast: false; '
+                'FSDP group readers distribute local slices without full expert projections.'
+            )
+        method = ('expert-group-reader' if group_loading else
+                  'rank0-broadcast' if load_rank0_and_broadcast else 'every-rank-read')
         print_rank(
             logger.info,
             f"Loading HF safetensors -> FSDP DTensors via {method} (online): "
@@ -272,9 +282,6 @@ class HuggingFaceCheckpointer(CheckpointerBase):
             f"layers={tcfg.get('num_hidden_layers', '?')} "
             f"tie_emb={cfg.get('tie_word_embeddings', tcfg.get('tie_word_embeddings', '?'))}",
         )
-
-        transform_cls = WEIGHT_TRANSFORM_PIPELINES.get(model_id, None)
-        weight_transform = transform_cls(hf_dir=path, mtp_num_layers=mtp_num_layers) if transform_cls else None
 
         original_num_threads = torch.get_num_threads()
         local_world_size = max(1, envs.LOCAL_WORLD_SIZE)

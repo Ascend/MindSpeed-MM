@@ -20,7 +20,9 @@
   - [权重下载及转换](#权重下载及转换)
     - [1. 权重下载](#1-权重下载)
     - [2. 反量化为 BF16 格式](#2-反量化为-bf16-格式)
-    - [3. 转换为 DCP 格式](#3-转换为-dcp-格式)
+    - [3. 权重加载](#3-权重加载)
+      - [3.1 权重在线加载](#31-权重在线加载)
+      - [3.2 hf权重转dcp后加载](#32-hf权重转dcp后加载)
   - [数据集准备及处理](#数据集准备及处理)
   - [训练](#训练)
     - [1. 准备工作](#1-准备工作)
@@ -232,21 +234,34 @@ python examples/kimi_k31_pro/convert_kimi_k31_mxfp4_to_bf16_mp.py \
 
 <a id="jump25.3"></a>
 
-### 3. 转换为 DCP 格式
+### 3. 权重加载
 
-完成 BF16 权重转换后，进一步将反量化后的 Safetensors 权重转换为适配 FSDP2 分布式训练的 DCP（Distributed Checkpoint）格式，完成模型权重加载格式适配，为多机多卡训练提供支持：
+3.1和3.2选择一种方式即可，当权重位于共享存储且FSDP和EP切分策略已确定时推荐使用hf转dcp后加载，长期变换并行策略则在线加载更便捷
+
+#### 3.1 权重在线加载
+
+在训练配置中将`training.load`配置为反量化转换后的 huggingface格式 权重目录，`training.load_format`配置为`hf`，`training.load_rank0_and_broadcast`设置为`false`
+
+#### 3.2 hf权重转dcp后加载
+
+使用如下脚本离线将反量化后的 Safetensors 权重转换为适配 FSDP2 分布式训练的 DCP（Distributed Checkpoint）格式：
 
 ```shell
-python checkpoint/vlm_model/converters/kimi_k31.py \
-    --src-dir /mnt/weight/moonshotai/Kimi-K3.1-Pro-bf16 \
-    --dst-dir /mnt/weight/moonshotai/Kimi-K3.1-Pro-bf16-fsdp128-ep64 \
-    --fsdp-shards 128 \
-    --ep-size 64 \
-    --workers 8 \
-    --read-threads 4
+export NON_MEGATRON=true
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+python -u -m mindspeed_mm.fsdp.checkpoint.hf_to_dcp \
+  --model-id kimi_k31_pro \
+  --src-dir /path/to/Kimi-K3.1-Pro-bf16 \
+  --dst-dir /path/to/new-Kimi-K3.1-Pro-fsdp128-ep64 \
+  --fsdp-shards 128 \
+  --ep-size 64 \
+  --workers 8 \
+  --read-threads 4
+
 ```
 
-转换完成后，在训练配置中将`training.load`配置为转换后的 DCP 权重目录，`training.load_format`配置为`dcp`。
+其中fsdp-shards和ep-size需要配置为实际的并行数，首次转换使用空目录或新目录。恢复时在原命令末尾增加 --resume。输出根目录包含配置、tokenizer、release/ 和 tracker，可用于基座权重初始化
+转换完成后，在训练配置中将`training.load`配置为转换后的 DCP 权重目录，`training.load_format`配置为`dcp`，`training.load_rank0_and_broadcast`设置为`false`。
 
 ---
 

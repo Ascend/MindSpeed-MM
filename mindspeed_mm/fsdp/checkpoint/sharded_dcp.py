@@ -112,8 +112,8 @@ def publish(release, metadata, report):
     """Publish validated metadata first and the release tracker last."""
     data = pickle.dumps(metadata, protocol=pickle.HIGHEST_PROTOCOL)
     report = dict(report, completed=True, output_metadata_sha256=hashlib.sha256(data).hexdigest())
-    write_json(release / 'reshard_manifest.json', report)
     atomic(release / '.metadata', data)
+    write_json(release / 'reshard_manifest.json', report)
     (release / '.incomplete').unlink(missing_ok=True)
     syncdir(release)
     atomic(release.parent / 'latest_checkpointed_iteration.txt', b'release\n')

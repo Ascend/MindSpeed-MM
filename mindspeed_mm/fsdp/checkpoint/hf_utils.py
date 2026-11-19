@@ -12,20 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import defaultdict
+from collections.abc import MutableMapping
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import re
+import struct
 from typing import Dict, Generator, List, Optional, Set, Tuple
 
 from pydantic import FilePath
 from safetensors import safe_open
 from safetensors.torch import save_file
 import torch
-from torch.distributed.tensor import DTensor, Replicate
+import torch.distributed as dist
+from torch.distributed.tensor import DTensor, Replicate, Shard
 from tqdm import tqdm
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME
 
@@ -43,6 +49,144 @@ DTYPES = {
     'BF16': torch.bfloat16, 'F32': torch.float32, 'F64': torch.float64,
     'C64': torch.complex64, 'C128': torch.complex128,
 }
+
+
+def identity(path):
+    st = path.stat()
+    return [st.st_size, st.st_mtime_ns]
+
+
+def read_tensor(src, entry, pool=None):
+    """Read one CPU tensor, optionally using a caller-owned IO thread pool."""
+    path = src / entry['file']
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        buf = bytearray(entry['length'])
+
+        def read_range(start):
+            view = memoryview(buf)[start:min(start + (4 << 20), len(buf))]
+            pos = entry['offset'] + start
+            while view:
+                n = os.preadv(fd, [view], pos)
+                if n == 0:
+                    raise EOFError(f'Short read: {path}')
+                pos += n
+                view = view[n:]
+
+        read_map = map if pool is None else pool.map
+        list(read_map(read_range, range(0, len(buf), 4 << 20)))
+        return torch.frombuffer(buf, dtype=DTYPES[entry['dtype']]).reshape(entry['shape'])
+    finally:
+        os.close(fd)
+
+
+class LazyExpertWeights(MutableMapping):
+    """Resolve expert keys on demand without caching source tensor payloads."""
+
+    def __init__(self, entries, src, pool):
+        self.entries, self.src, self.pool = dict(entries), src, pool
+
+    def __contains__(self, key):
+        # Mapping's default membership would call __getitem__ and read all keys.
+        return key in self.entries
+
+    def __getitem__(self, key):
+        return read_tensor(self.src, self.entries[key], self.pool)
+
+    def __delitem__(self, key):
+        del self.entries[key]
+
+    def __setitem__(self, key, value):
+        raise TypeError('Expert sources are read-only')
+
+    def __iter__(self):
+        return iter(self.entries)
+
+    def __len__(self):
+        return len(self.entries)
+
+
+def _read_json(path):
+    return json.loads(Path(path).read_text(encoding='utf-8'))
+
+
+def read_safetensors_header(path):
+    """Return the tensor entries and payload start offset without reading weights."""
+    with path.open('rb') as stream:
+        raw = stream.read(8)
+        if len(raw) != 8:
+            raise ValueError(f'Truncated safetensors header: {path}')
+        size = struct.unpack('<Q', raw)[0]
+        if size > 100_000_000 or size + 8 > path.stat().st_size:
+            raise ValueError(f'Invalid safetensors header: {path}')
+        header = json.loads(stream.read(size))
+    return {k: v for k, v in header.items() if k != '__metadata__'}, size + 8
+
+
+def _read_hf_index(src):
+    if (src / SAFE_WEIGHTS_INDEX_NAME).is_file():
+        return _read_json(src / SAFE_WEIGHTS_INDEX_NAME)
+    if (src / SAFE_WEIGHTS_NAME).is_file():
+        header, _ = read_safetensors_header(src / SAFE_WEIGHTS_NAME)
+        return {'weight_map': {key: SAFE_WEIGHTS_NAME for key in header}}
+    raise FileNotFoundError(f'No HF safetensors index or model.safetensors in {src}')
+
+
+def read_hf_tensor_shape(src, key, cache):
+    """Resolve original shapes lazily; cache only the index and per-file shapes."""
+    if 'weight_map' not in cache:
+        cache['weight_map'] = _read_hf_index(src)['weight_map']
+    filename = cache['weight_map'].get(key)
+    if not filename or not filename.endswith('.safetensors'):
+        raise ValueError(f'Cannot find original HF tensor shape: {key}')
+    if filename not in cache:
+        path = (src / filename).resolve()
+        if not path.is_relative_to(src) or not path.is_file():
+            raise ValueError(f'Cannot restore HF shape without source shard: {path}')
+        header, _ = read_safetensors_header(path)
+        cache[filename] = {name: entry['shape'] for name, entry in header.items()}
+    if key not in cache[filename]:
+        raise ValueError(f'Cannot find original HF tensor shape: {key}')
+    return list(cache[filename][key])
+
+
+def inspect_source(src):
+    """Inspect all source metadata without materializing model tensors."""
+    index = _read_hf_index(src)
+    groups = defaultdict(set)
+    for key, filename in index['weight_map'].items():
+        path = (src / filename).resolve()
+        if not path.is_relative_to(src) or path == src:
+            raise ValueError(f'Source file outside HF directory: {filename}')
+        groups[filename].add(key)
+    if not groups:
+        raise ValueError('Empty HF checkpoint')
+    entries, files, total = {}, {}, 0
+    for filename, expected in sorted(groups.items()):
+        path = src / filename
+        before = identity(path)
+        header, base = read_safetensors_header(path)
+        if set(header) != expected:
+            raise ValueError(f'{filename}: header/index key mismatch')
+        cursor = 0
+        for key, info in sorted(header.items(), key=lambda item: item[1]['data_offsets'][0]):
+            dtype, shape = info['dtype'], info['shape']
+            if dtype not in DTYPES or any(type(n) is not int or n < 0 for n in shape):
+                raise ValueError(f'{key}: unsupported dtype or shape')
+            start, end = info['data_offsets']
+            length = math.prod(shape) * DTYPES[dtype].itemsize
+            if type(start) is not int or type(end) is not int or start != cursor or end - start != length:
+                raise ValueError(f'{key}: invalid safetensors offsets/shape')
+            entries[key] = dict(file=filename, offset=base + start, length=length, shape=shape, dtype=dtype)
+            cursor = end
+            total += length
+        if base + cursor != before[0] or identity(path) != before:
+            raise ValueError(f'{filename}: source changed or payload size mismatch')
+        files[filename] = before
+    declared = index.get('metadata', {}).get('total_size')
+    if declared is not None and declared != total:
+        raise ValueError('HF index total_size mismatch')
+    return entries, files
 
 
 @dataclass
@@ -139,20 +283,18 @@ def _resolve_leaf(model: torch.nn.Module, name: str) -> Tuple[torch.nn.Module, s
     return module, pieces[-1]
 
 
-def write_full_tensor(model: torch.nn.Module, name: str, full_tensor: torch.Tensor) -> None:
-    """Write *full_tensor* into the model at *name* (parameter or buffer).
-
-    For a sharded parameter, slice the CPU tensor to this rank's shard before
-    moving it to the device. Plain tensors are moved and copied directly.
-    """
+def _target_tensor(model: torch.nn.Module, name: str) -> torch.Tensor:
     leaf_module, local_name = _resolve_leaf(model, name)
-
     if local_name in leaf_module._parameters:
-        target = leaf_module._parameters[local_name].data
+        return leaf_module._parameters[local_name].data
     elif local_name in leaf_module._buffers:
-        target = leaf_module._buffers[local_name]
-    else:
-        raise ValueError(f"'{name}' is neither a parameter nor a buffer of the model.")
+        return leaf_module._buffers[local_name]
+    raise ValueError(f"'{name}' is neither a parameter nor a buffer of the model.")
+
+
+def write_full_tensor(model: torch.nn.Module, name: str, full_tensor: torch.Tensor) -> None:
+    """Write a full parameter/buffer, slicing on CPU before copying to its device."""
+    target = _target_tensor(model, name)
 
     if hasattr(target, "device_mesh"):  # sharded -> a DTensor
         # Slice on CPU first, then move only this rank's shard to the NPU.
@@ -161,6 +303,234 @@ def write_full_tensor(model: torch.nn.Module, name: str, full_tensor: torch.Tens
         target.to_local().copy_(full_tensor.to(device=target.device, dtype=target.dtype))
     else:  # plain tensor (replicated on every rank)
         target.copy_(full_tensor.to(device=target.device, dtype=target.dtype))
+
+
+def supports_hf_group_loading(weight_transform) -> bool:
+    """Opt in only transforms implementing the offline expert-group protocol."""
+    return all(callable(getattr(weight_transform, name, None))
+               for name in ('describe_hf_tensors', 'convert_expert_group'))
+
+
+def _local_tensor_region(target: torch.Tensor) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
+    """Return this rank's rectangular region using the actual DTensor mesh.
+
+    Partial and strided/interleaved shards cannot be represented by one region
+    and must fail rather than silently load the wrong experts.
+    """
+    if isinstance(target, DTensor):
+        mesh = target.device_mesh
+        coordinate = mesh.get_coordinate()
+        if coordinate is None:
+            raise ValueError('Current rank is outside the target parameter mesh')
+        offsets, sizes = _tensor_region(target.shape, mesh, target.placements, coordinate)
+        if tuple(sizes) != tuple(target.to_local().shape):
+            raise ValueError('DTensor local shape disagrees with its mesh/placements')
+        return offsets, sizes
+    return (0,) * target.ndim, tuple(target.shape)
+
+
+def _tensor_region(shape, mesh, placements, coordinate):
+    """Compute a contiguous region for an arbitrary coordinate in a real mesh."""
+    offsets, sizes = [0] * len(shape), list(shape)
+    for axis, placement in enumerate(placements):
+        if type(placement) is Replicate:
+            continue
+        if type(placement) is not Shard:
+            raise ValueError(f'Local HF loading requires contiguous Shard/Replicate: {placement}')
+        dim = placement.dim % len(shape)
+        # Match torch.chunk without depending on version-specific private APIs.
+        width = (sizes[dim] + mesh.size(axis) - 1) // mesh.size(axis)
+        offset = min(coordinate[axis] * width, sizes[dim])
+        offsets[dim] += offset
+        sizes[dim] = min(width, sizes[dim] - offset)
+    return tuple(offsets), tuple(sizes)
+
+
+def _expert_read_group(target):
+    """Use an existing FSDP/replication axis whose members own the same experts.
+
+    Multiple non-expert axes need a multidimensional distribution protocol;
+    those layouts retain independent, bounded local reads for compatibility.
+    """
+    if not isinstance(target, DTensor):
+        return None
+    axes = [axis for axis, placement in enumerate(target.placements)
+            if target.device_mesh.size(axis) > 1 and
+            (type(placement) is Replicate or
+             (type(placement) is Shard and placement.dim % target.ndim != 0))]
+    return target.device_mesh.get_group(axes[0]) if len(axes) == 1 else None
+
+
+def _check_hf_group_error(error, group, status):
+    """Make local IO/allocation/copy failures fail every member before more P2P."""
+    status.fill_(int(error is not None))
+    dist.all_reduce(status, op=dist.ReduceOp.MAX, group=group)
+    if status.item():
+        errors = [None] * dist.get_world_size(group)
+        dist.all_gather_object(errors, error, group=group)
+        raise RuntimeError('HF expert group loading failed: ' + next(e for e in errors if e is not None))
+
+
+def _load_expert_projection(target, item, entries, source, pool, weight_transform, region):
+    """Read/convert once per EP group's FSDP axis, sending one local slice at a time."""
+    offsets, sizes = region
+    local_target = target.to_local() if isinstance(target, DTensor) else target
+    group = _expert_read_group(target)
+    rank = dist.get_rank() if group is not None else 0
+    peers = [(rank, offsets, sizes)]
+    if group is not None:
+        mesh = target.device_mesh
+        peers = []
+        for peer in dist.get_process_group_ranks(group):
+            coordinate = (mesh.mesh == peer).nonzero().flatten().tolist()
+            peer_offsets, peer_sizes = _tensor_region(target.shape, mesh, target.placements, coordinate)
+            if (peer_offsets[0], peer_sizes[0]) != (offsets[0], sizes[0]):
+                raise ValueError('HF reader group members must own the same expert range')
+            peers.append((peer, peer_offsets, peer_sizes))
+    leader = peers[0][0]
+    max_numel = max(math.prod(peer_sizes[1:]) for _, _, peer_sizes in peers)
+    if not sizes[0] or not max_numel:
+        return
+
+    status = torch.zeros(1, dtype=torch.int32, device=local_target.device) if group is not None else None
+    staging, error = None, None
+    if group is not None:
+        try:
+            count = max_numel if rank == leader else math.prod(sizes[1:])
+            staging = torch.empty(count, dtype=local_target.dtype, device=local_target.device)
+        except Exception as exc:
+            error = f'{item["target"]}: staging allocation: {type(exc).__name__}: {exc}'
+        _check_hf_group_error(error, group, status)
+
+    for local_index in range(sizes[0]):
+        value, error = None, None
+        if rank == leader:
+            try:
+                keys = item['keys'][offsets[0] + local_index]
+                weights = LazyExpertWeights({key: entries[key] for key in keys}, source, pool)
+                value = torch.empty((1, *item['shape'][1:]), dtype=DTYPES[item['dtype']], device='cpu')
+                weight_transform.convert_expert_group(item['target'], tuple(keys), weights, value)
+                if weights:
+                    raise ValueError(f'Unconsumed expert sources: {item["target"]}')
+                del weights
+            except Exception as exc:
+                if group is None:
+                    raise
+                error = f'{item["target"]}: expert {offsets[0] + local_index}: {type(exc).__name__}: {exc}'
+        if group is not None:
+            _check_hf_group_error(error, group, status)
+
+        copy_error = None
+        for peer, peer_offsets, peer_sizes in peers:
+            count = math.prod(peer_sizes[1:])
+            if not count:
+                continue  # All members compute the same empty destination list.
+            error, local = None, None
+            if rank == leader:
+                try:
+                    local = value
+                    for dim in range(1, len(peer_sizes)):
+                        local = local.narrow(dim, peer_offsets[dim], peer_sizes[dim])
+                    if group is not None:
+                        # copy_ performs dtype conversion and a blocking CPU->device copy;
+                        # no list of all device shards or full device projection is built.
+                        staging[:count].view(1, *peer_sizes[1:]).copy_(local)
+                except Exception as exc:
+                    if group is None:
+                        raise
+                    error = f'{item["target"]}: preparing rank {peer}: {type(exc).__name__}: {exc}'
+            if group is not None:
+                _check_hf_group_error(error, group, status)
+                if peer != leader:
+                    if rank == leader:
+                        dist.send(staging[:count], dst=peer, group=group)
+                    elif rank == peer:
+                        dist.recv(staging, src=leader, group=group)
+            if rank == peer:
+                try:
+                    received = staging[:count].view(1, *peer_sizes[1:]) if group is not None else local
+                    local_target[local_index:local_index + 1].copy_(received)
+                    del received
+                except Exception as exc:
+                    if group is None:
+                        raise
+                    copy_error = f'{item["target"]}: writing rank {rank}: {type(exc).__name__}: {exc}'
+            del local
+        if group is not None:
+            _check_hf_group_error(copy_error, group, status)
+        del value
+
+
+def _load_hf_weights_local(model, hf_dir, enable_lora, load_strict, weight_transform):
+    """Reuse offline descriptors and fusion, reading only local expert sources.
+
+    Within the local EP range, a FSDP group leader fuses one expert projection
+    at a time and sends local slices to its peers. This bounds the fusion buffer
+    even for EP=1 or replicated tensors. Ordinary parameters retain the existing
+    full-tensor conversion and CPU slicing behavior.
+    """
+    source = Path(hf_dir).resolve()
+    entries, source_ids = inspect_source(source)
+    description = weight_transform.describe_hf_tensors(entries)
+    param_names = {name for name, _ in model.named_parameters()}
+    buffer_names = {name for name, _ in model.named_buffers()}
+    lora_base_map = _lora_base_key_map(param_names) if enable_lora else {}
+    unexpected_keys, assigned, targets = set(), set(), set()
+    prepared = []
+    # Validate the full descriptor and target layout before reading payloads.
+    descriptors = [(item, False) for item in description['ordinary']]
+    descriptors.extend((item, True) for group in description['expert_groups']
+                       for item in group['tensors'])
+    for item, expert in descriptors:
+        keys = [key for row in item['keys'] for key in row] if expert else [item['key']]
+        if expert and (len(item['keys']) != item['shape'][0] or any(not row for row in item['keys'])):
+            raise ValueError(f'Expert descriptor shape/key mismatch: {item["target"]}')
+        for key in keys:
+            if key not in entries or key in assigned or entries[key]['dtype'] != item['dtype']:
+                raise ValueError(f'Missing, duplicate or inconsistent HF source: {key}')
+            assigned.add(key)
+        name = lora_base_map.get(item['target'], item['target'])
+        if name in targets:
+            raise ValueError(f'Duplicate HF target: {name}')
+        targets.add(name)
+        if name not in param_names and name not in buffer_names:
+            unexpected_keys.add(name)
+            continue
+        target = _target_tensor(model, name)
+        if tuple(target.shape) != tuple(item['shape']):
+            raise ValueError(f'HF/model shape mismatch: {name}: {item["shape"]} != {list(target.shape)}')
+        region = _local_tensor_region(target) if expert else None
+        prepared.append((item, expert, name, target, region))
+    if assigned != set(entries):
+        raise ValueError(f'Unconverted HF sources: {sorted(set(entries) - assigned)[:6]}')
+
+    shared = sum(expert and _expert_read_group(target) is not None
+                 for _, expert, _, target, _ in prepared)
+    total_experts = sum(expert for _, expert, _, _, _ in prepared)
+    print_rank(logger.info, f'HF expert projections: {shared} using group readers, '
+               f'{total_experts - shared} using independent bounded reads')
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        for item, expert, name, target, region in tqdm(
+            prepared, desc='Loading local HF parameters', disable=envs.get('LOCAL_RANK', -1) > 0,
+        ):
+            if not expert:
+                converted = weight_transform.hf_to_dcp(item['key'], read_tensor(source, entries[item['key']], pool))
+                if (converted is None or converted[0] != item['target']
+                        or tuple(converted[1].shape) != tuple(item['shape'])
+                        or converted[1].dtype != DTYPES[item['dtype']]):
+                    raise ValueError(f'Unexpected ordinary HF conversion: {name}')
+                write_full_tensor(model, name, converted[1])
+                del converted
+            else:
+                _load_expert_projection(target, item, entries, source, pool, weight_transform, region)
+            param_names.discard(name)
+    for filename, expected in source_ids.items():
+        if identity(source / filename) != expected:
+            raise ValueError(f'HF source changed during loading: {filename}')
+    # describe_hf_tensors validates the complete expert set. The streaming
+    # finalize hook tracks full projections and does not apply to group loads.
+    _log_unexpected_keys(unexpected_keys)
+    post_process_after_load(missing_param_keys=param_names, load_strict=load_strict)
 
 
 def _log_unexpected_keys(unexpected_keys: Set[str]) -> None:
@@ -221,15 +591,17 @@ def load_hf_weights(
 ) -> None:
     """Load HF safetensors weights into *model* directly, no offline conversion.
 
-    Every rank opens the same files and slices each full tensor into its own
-    DTensor shard locally -- no cross-rank communication. Suitable for small/
-    medium models or shared filesystems; for very large models use the
-    rank0-read-and-broadcast variant (added in a follow-up).
+    Transforms implementing the expert-group protocol use a reader per FSDP
+    group and distribute local expert slices. Other models retain the existing
+    full-tensor streaming path without new communication.
 
     Assumes ``model`` has already been laid out by ``fully_shard`` and brought
     out of meta via ``to_empty_if_needed`` -- i.e. parameter slots are empty
     DTensors on the real device and buffer values have been preserved.
     """
+    if supports_hf_group_loading(weight_transform):
+        return _load_hf_weights_local(model, hf_dir, enable_lora, load_strict, weight_transform)
+
     param_names = {name for name, _ in model.named_parameters()}
     buffer_names = {name for name, _ in model.named_buffers()}
     lora_base_map = _lora_base_key_map(param_names) if enable_lora else {}
@@ -259,6 +631,9 @@ def load_hf_weights(
             else:
                 unexpected_keys.add(key)
 
+    finalize = getattr(weight_transform, 'finalize_hf_to_dcp', None)
+    if finalize is not None:
+        finalize()
     _log_unexpected_keys(unexpected_keys)
     post_process_after_load(missing_param_keys=param_names, load_strict=load_strict)
 
@@ -292,6 +667,7 @@ def get_model_save_state(
 ) -> Dict[str, torch.Tensor]:
     """Build a state dict suitable for HuggingFace safetensors saving.
     """
+    # dcp_checkpointer imports hf_utils through broadcast_utils; defer this dependency.
     from mindspeed_mm.fsdp.checkpoint.dcp_checkpointer import LoraModelState, ModelState
 
     model_state_cls = LoraModelState if enable_lora else ModelState

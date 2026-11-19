@@ -13,12 +13,15 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
+import json
+from pathlib import Path
 import re
 from typing import Dict, List, Optional, Tuple
 
 import torch
 from transformers import AutoConfig
 
+from mindspeed_mm.fsdp.checkpoint.hf_utils import read_hf_tensor_shape, read_tensor
 from mindspeed_mm.fsdp.utils.constants import (
     DCP_DOWN_PROJ_SUFFIX,
     DCP_GATE_UP_PROJ_SUFFIX,
@@ -107,32 +110,65 @@ def merge_moe_expert_weights(
     hf_gate_proj_suffix: str = HF_GATE_PROJ_SUFFIX,
     hf_up_proj_suffix: str = HF_UP_PROJ_SUFFIX,
     transpose: bool = True,
+    *,
+    out: Optional[torch.Tensor] = None,
 ) -> Optional[Tuple[str, torch.Tensor]]:
-    """Merge a complete projection group from buffered MTP experts.
+    """Merge experts with the original concat/stack behavior or stream into ``out``.
+
+    Missing keys return None without consuming inputs. The out path requires
+    exact shape/dtype/device and releases each source before reading the next.
+    A failed copy may leave out partially written; callers must not publish it.
     """
     if not all(key in state_dict for key in hf_keys):
         return None
     if dcp_key.endswith(dcp_down_proj_suffix):
-        down_proj_weights = [state_dict.pop(key) for key in hf_keys]
-        if transpose:
-            down_proj_weights = [weight.T for weight in down_proj_weights]
-        return dcp_key, torch.stack(down_proj_weights)
+        gate_up = False
+        groups = [(key,) for key in hf_keys]
+    elif dcp_key.endswith(dcp_gate_up_proj_suffix):
+        gate_up = True
+        groups = list(zip(hf_keys[::2], hf_keys[1::2]))
+    else:
+        raise ValueError(f'Unsupported DCP expert weight key: {dcp_key}')
 
-    if dcp_key.endswith(dcp_gate_up_proj_suffix):
-        gate_up_proj_weights = []
-        # hf_keys is built as (gate, up) pairs for each expert, so even/odd slices align.
-        for gate_proj, up_proj in zip(hf_keys[::2], hf_keys[1::2]):
-            gate_prefix = gate_proj.removesuffix(hf_gate_proj_suffix)
-            up_prefix = up_proj.removesuffix(hf_up_proj_suffix)
-            if gate_prefix != up_prefix:
-                raise ValueError(f"Mismatched gate/up expert keys: {gate_proj}, {up_proj}")
-            weight = torch.concat(
-                [state_dict.pop(gate_proj), state_dict.pop(up_proj)]
-            )
-            gate_up_proj_weights.append(weight.T if transpose else weight)
-        return dcp_key, torch.stack(gate_up_proj_weights)
+    if out is not None:
+        if not isinstance(out, torch.Tensor) or out.ndim != 3 or out.layout != torch.strided:
+            raise ValueError('out must be a dense 3D expert tensor')
+        if not hf_keys or len(set(hf_keys)) != len(hf_keys):
+            raise ValueError('Expert keys must be nonempty and unique')
+        if out.shape[0] != len(groups) or (gate_up and len(hf_keys) % 2):
+            raise ValueError('Expert keys must form complete groups matching out expert count')
+        axis = 1 if transpose else 0
+        if gate_up and out.shape[axis + 1] % 2:
+            raise ValueError('out fused gate/up dimension must be even')
+        width = out.shape[axis + 1] // 2
 
-    raise ValueError(f"Unsupported DCP expert weight key: {dcp_key}")
+    if gate_up:
+        for gate_key, up_key in groups:
+            if (gate_key.removesuffix(hf_gate_proj_suffix) != up_key.removesuffix(hf_up_proj_suffix)
+                    or (out is not None and (not gate_key.endswith(hf_gate_proj_suffix)
+                                             or not up_key.endswith(hf_up_proj_suffix)))):
+                raise ValueError(f'Mismatched gate/up expert keys: {gate_key}, {up_key}')
+
+    merged = []
+    for expert, keys in enumerate(groups):
+        if out is None:
+            # Preserve dtype promotion, autograd and unequal gate/up row counts.
+            weight = (torch.concat([state_dict.pop(key) for key in keys]) if gate_up
+                      else state_dict.pop(keys[0]))
+            merged.append(weight.T if transpose else weight)
+        else:
+            for projection, key in enumerate(keys):
+                target = out[expert].narrow(axis, projection * width, width) if gate_up else out[expert]
+                value = state_dict.pop(key)
+                if not isinstance(value, torch.Tensor) or value.ndim != 2 or value.layout != torch.strided:
+                    raise ValueError(f'Expected a dense 2D expert matrix: {key}')
+                value = value.T if transpose else value
+                if value.shape != target.shape or value.dtype != target.dtype or value.device != target.device:
+                    raise ValueError(f'Expert out shape/dtype/device mismatch: {key}')
+                with torch.no_grad():
+                    target.copy_(value)
+                del value  # Release the source (including a transpose view) before the next pop.
+    return dcp_key, torch.stack(merged) if out is None else out
 
 
 def split_moe_expert_weights(
@@ -185,6 +221,11 @@ class WeightTransformPipeline(ABC):
         self.hf_to_dcp_mapping: Dict[Tuple[str, ...], str] = {}
         self.dcp_to_hf_mapping: Dict[str, Tuple[str, ...]] = {}
 
+    @staticmethod
+    def _to_full(tensor: torch.Tensor) -> torch.Tensor:
+        from torch.distributed.tensor import DTensor
+        return tensor.full_tensor().cpu() if isinstance(tensor, DTensor) else tensor
+
     @abstractmethod
     def hf_to_dcp(
         self,
@@ -214,6 +255,207 @@ class WeightTransformPipeline(ABC):
         ``up_proj`` and/or ``down_proj`` HF expert weights.
         """
         pass
+
+
+class KimiK31WeightTransformPipeline(WeightTransformPipeline):
+    """Kimi-K3.1 weight mappings and padding rules.
+
+    Group descriptors and preallocated expert merging support low-memory loads.
+    """
+
+    _DTYPES = {'BF16': torch.bfloat16, 'F32': torch.float32, 'F16': torch.float16}
+    _EXPERT_KWARGS = dict(hf_gate_proj_suffix='.w1.weight', hf_up_proj_suffix='.w3.weight', transpose=True)
+    _EXPERT_RE = re.compile(
+        r'^language_model\.model\.layers\.(\d+)\.block_sparse_moe\.experts\.(\d+)\.(w[123])\.weight$')
+
+    def __init__(self, hf_dir: str, mtp_num_layers: Optional[int] = None) -> None:
+        super().__init__()
+        self.hf_dir = Path(hf_dir).resolve()
+        with (self.hf_dir / 'config.json').open(encoding='utf-8') as stream:
+            self.config = json.load(stream)
+        text = self.config['text_config']
+        self.num_layers = text['num_hidden_layers']
+        self.num_experts = text['num_experts']
+        self.hidden_size = text['hidden_size']
+        expert_hidden_size = text.get('routed_expert_hidden_size')
+        self.expert_hidden_size = self.hidden_size if expert_hidden_size is None else expert_hidden_size
+        self.intermediate_size = text['moe_intermediate_size']
+        dense = text['first_k_dense_replace']
+        frequency = text.get('moe_layer_freq', 1)
+        self.moe_layers = tuple(i for i in range(dense, self.num_layers) if i % frequency == 0)
+        self.linear_heads = (text.get('linear_attn_config') or {}).get('num_heads')
+        # mtp_num_layers is accepted for the common pipeline interface; K3.1 has no MTP conversion.
+        for layer in self.moe_layers:
+            prefix = f'language_model.model.layers.{layer}.block_sparse_moe.experts'
+            gate = tuple(f'{prefix}.{e}.{part}.weight' for e in range(self.num_experts) for part in ('w1', 'w3'))
+            down = tuple(f'{prefix}.{e}.w2.weight' for e in range(self.num_experts))
+            self.hf_to_dcp_mapping[gate] = prefix + '.gate_up_proj'
+            self.hf_to_dcp_mapping[down] = prefix + '.down_proj'
+        self.dcp_to_hf_mapping = {v: k for k, v in self.hf_to_dcp_mapping.items()}
+        self._buffered_weights = {}
+        self._finished_targets = set()
+        self._expert_dtypes = {}
+        self._source_shapes = {}
+        self._source_metadata = {}
+
+    def hf_to_dcp(self, key: str, tensor: torch.Tensor) -> Optional[Tuple[str, torch.Tensor]]:
+        """Merge experts; pass ordinary tensors through with Kimi padding fixes."""
+        if tensor.dtype not in self._DTYPES.values():
+            raise ValueError(f'{key}: unsupported training dtype {tensor.dtype}')
+        info = self._expert_info(key)
+        if info is not None:
+            self._check_expert_shape_dtype(key, info, tensor.shape, tensor.dtype, self._expert_dtypes)
+            target = info[3]
+            if key in self._buffered_weights or target in self._finished_targets:
+                raise ValueError(f'Duplicate HF expert key: {key}')
+            self._buffered_weights[key] = tensor
+            result = merge_moe_expert_weights(
+                self._buffered_weights, self.dcp_to_hf_mapping[target], target,
+                **self._EXPERT_KWARGS)
+            if result is not None:
+                self._finished_targets.add(target)
+            return result
+        target_shape = self._ordinary_shape(key, tensor.shape)
+        self._source_shapes[key] = list(tensor.shape)
+        if list(tensor.shape) != target_shape:
+            if key.endswith('.self_attn.A_log') and tensor[target_shape[0]:].count_nonzero().item():
+                raise ValueError(f'{key}: A_log padding contains nonzero data; refusing to truncate')
+            tensor = tensor[:target_shape[0]].clone()
+        return key, tensor
+
+    def dcp_to_hf(self, key: str, tensor: torch.Tensor) -> Dict[str, torch.Tensor]:
+        if key in self.dcp_to_hf_mapping:
+            tensor = self._to_full(tensor)
+            if list(tensor.shape) != self._fused_expert_shape(key, self.num_experts):
+                raise ValueError(f'Unexpected fused Kimi expert shape: {key}')
+            return split_moe_expert_weights(
+                tensor, self.dcp_to_hf_mapping[key], key,
+                **self._EXPERT_KWARGS)
+        self._ordinary_shape(key, tensor.shape)
+        if key.endswith('.self_attn.A_log') and self.linear_heads is not None:
+            tensor = self._to_full(tensor)
+            source_shape = self._source_shape(key)
+            target_shape = self._ordinary_shape(key, source_shape)
+            if list(tensor.shape) != target_shape:
+                raise ValueError(f'Unexpected trained A_log shape: {key}')
+            if source_shape != target_shape:
+                restored = tensor.new_zeros(source_shape)
+                restored[:self.linear_heads].copy_(tensor)
+                tensor = restored
+        elif key.endswith(('.block_sparse_moe.gate.weight', '.block_sparse_moe.gate.e_score_correction_bias')):
+            source_shape = self._source_shape(key)
+            if list(tensor.shape) != source_shape:
+                raise ValueError(f'Cannot reconstruct truncated HF router rows for {key}; original shape={source_shape}')
+            tensor = self._to_full(tensor)
+        return {key: tensor}
+
+    def describe_hf_tensors(self, entries):
+        """Validate model metadata and describe ordinary tensors and full expert groups."""
+        ordinary, found, dtypes = [], set(), {}
+        for key, entry in entries.items():
+            if entry['dtype'] not in self._DTYPES:
+                raise ValueError(f'{key}: unsupported training dtype {entry["dtype"]}')
+            info = self._expert_info(key)
+            if info is not None:
+                self._check_expert_shape_dtype(key, info, entry['shape'], entry['dtype'], dtypes)
+                found.add(key)
+            else:
+                self._source_shapes[key] = list(entry['shape'])
+                shape = self._ordinary_shape(key, entry['shape'])
+                if key.endswith('.self_attn.A_log') and list(entry['shape']) != shape:
+                    if not (self.hf_dir / entry['file']).resolve().is_relative_to(self.hf_dir):
+                        raise ValueError(f'Source tensor path is outside HF directory: {entry["file"]}')
+                    # A_log is a small vector; reuse the streaming padding check.
+                    self.hf_to_dcp(key, read_tensor(self.hf_dir, entry))
+                ordinary.append(dict(key=key, target=key, shape=shape, dtype=entry['dtype']))
+        expected = {key for keys in self.hf_to_dcp_mapping for key in keys}
+        if found != expected:
+            raise ValueError(f'Missing/unexpected Kimi experts: missing={sorted(expected-found)[:6]}, '
+                             f'unexpected={sorted(found-expected)[:6]}')
+        groups = {}
+        for hf_keys, target in self.hf_to_dcp_mapping.items():
+            layer = self._expert_info(hf_keys[0])[0]
+            stride = len(hf_keys) // self.num_experts
+            groups.setdefault(layer, []).append(dict(
+                target=target, shape=self._fused_expert_shape(target, self.num_experts),
+                dtype=dtypes[layer], keys=[list(hf_keys[i:i+stride]) for i in range(0, len(hf_keys), stride)]))
+        return dict(ordinary=sorted(ordinary, key=lambda t: t['key']),
+                    expert_groups=[dict(tensors=tensors) for tensors in groups.values()])
+
+    def convert_expert_group(self, target_key, hf_keys, weights, out):
+        """Merge one complete EP subgroup using the shared preallocated-output path."""
+        if target_key not in self.dcp_to_hf_mapping:
+            raise ValueError(f'Unknown Kimi expert target: {target_key}')
+        if not isinstance(out, torch.Tensor) or out.dtype not in self._DTYPES.values():
+            raise ValueError('Kimi expert output requires a supported floating-point tensor')
+        keys = tuple(hf_keys)
+        infos = [self._expert_info(key) for key in keys]
+        if not keys or any(info is None or info[3] != target_key for info in infos):
+            raise ValueError(f'Expert group keys do not match target: {target_key}')
+        stride = 1 if target_key.endswith('.down_proj') else 2
+        ids = [info[1] for info in infos[::stride]]
+        if ids != sorted(set(ids)):
+            raise ValueError('Expert group keys must follow ascending expert order')
+        if list(out.shape) != self._fused_expert_shape(target_key, len(ids)):
+            raise ValueError(f'Expert group output shape mismatch: {target_key}')
+        result = merge_moe_expert_weights(
+            weights, keys, target_key, out=out, **self._EXPERT_KWARGS)
+        if result is None:
+            raise ValueError(f'Missing expert group source: {target_key}')
+        return result
+
+    def finalize_hf_to_dcp(self):
+        """Reject truncated expert streams even when a caller allows partial loading."""
+        missing = set(self.dcp_to_hf_mapping) - self._finished_targets
+        if self._buffered_weights or missing:
+            raise ValueError(f'Incomplete Kimi expert stream: {len(missing)} unfinished projections; '
+                             f'buffered keys={list(self._buffered_weights)[:6]}')
+
+    def _expert_info(self, key):
+        match = self._EXPERT_RE.fullmatch(key)
+        if match is None:
+            if '.block_sparse_moe.experts.' in key:
+                raise ValueError(f'Unsupported Kimi-K3.1 expert key: {key}')
+            return None
+        layer, expert = int(match[1]), int(match[2])
+        if layer not in self.moe_layers or not 0 <= expert < self.num_experts:
+            raise ValueError(f'Unexpected Kimi-K3.1 expert key: {key}')
+        part = match[3]
+        projection = 'down_proj' if part == 'w2' else 'gate_up_proj'
+        return layer, expert, part, f'language_model.model.layers.{layer}.block_sparse_moe.experts.{projection}'
+
+    def _ordinary_shape(self, key, shape):
+        shape = list(shape)
+        if key.endswith(('.block_sparse_moe.gate.weight', '.block_sparse_moe.gate.e_score_correction_bias')):
+            expected = [self.num_experts, self.hidden_size] if key.endswith('.gate.weight') else [self.num_experts]
+            if shape != expected:
+                raise ValueError(f'{key}: incompatible router shape {shape}; expected {expected}')
+            return shape
+        if key.endswith('.self_attn.A_log') and self.linear_heads is not None:
+            padded = 1 << (self.linear_heads - 1).bit_length()
+            if shape not in ([self.linear_heads], [padded]):
+                raise ValueError(f'{key}: incompatible A_log shape {shape}')
+            return [self.linear_heads]
+        return shape
+
+    def _fused_expert_shape(self, target_key, expert_count):
+        tail = ([self.intermediate_size, self.expert_hidden_size] if target_key.endswith('.down_proj')
+                else [self.expert_hidden_size, 2 * self.intermediate_size])
+        return [expert_count] + tail
+
+    def _check_expert_shape_dtype(self, key, info, shape, dtype, dtypes):
+        layer, _, part, _ = info
+        expected = ([self.expert_hidden_size, self.intermediate_size] if part == 'w2'
+                    else [self.intermediate_size, self.expert_hidden_size])
+        if list(shape) != expected:
+            raise ValueError(f'{key}: expected expert shape {expected}, got {list(shape)}')
+        if dtypes.setdefault(layer, dtype) != dtype:
+            raise ValueError(f'Layer {layer}: mixed expert dtypes cannot be fused losslessly')
+
+    def _source_shape(self, key):
+        if key not in self._source_shapes:
+            self._source_shapes[key] = read_hf_tensor_shape(self.hf_dir, key, self._source_metadata)
+        return self._source_shapes[key]
 
 
 class Qwen35WeightTransformPipeline(WeightTransformPipeline):
@@ -287,11 +529,6 @@ class Qwen35WeightTransformPipeline(WeightTransformPipeline):
         # experts.down_proj [E, H, I] -> [E, I, H]
         tensor = permute_moe_expert(key, tensor, self.expert_weight_patterns)
         return key, tensor
-
-    @staticmethod
-    def _to_full(tensor: torch.Tensor) -> torch.Tensor:
-        from torch.distributed.tensor import DTensor
-        return tensor.full_tensor().cpu() if isinstance(tensor, DTensor) else tensor
 
     def dcp_to_hf(
         self, key: str, tensor: torch.Tensor
@@ -451,11 +688,6 @@ class Glm53FlashWeightTransformPipeline(WeightTransformPipeline):
 
         # 5. rename only
         return self._rename(key, self.RENAME_RULES), tensor
-    @staticmethod
-    def _to_full(tensor: torch.Tensor) -> torch.Tensor:
-        from torch.distributed.tensor import DTensor
-        return tensor.full_tensor().cpu() if isinstance(tensor, DTensor) else tensor
-
     def dcp_to_hf(self, key: str, tensor: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Convert a DCP weight to Huggingface format. 是 hf_to_dcp 的逆。"""
         hf_keys = self.dcp_to_hf_mapping.get(key)
@@ -608,6 +840,7 @@ class MagiHumanWeightTransformPipeline(WeightTransformPipeline):
 
 
 WEIGHT_TRANSFORM_PIPELINES = {
+    "kimi_k31_pro": KimiK31WeightTransformPipeline,
     "qwen3_5_moe": Qwen35WeightTransformPipeline,
     "wan2_2": Wan22DiffusersTransformPipeline,
     "glm5_next": Glm53FlashWeightTransformPipeline,
