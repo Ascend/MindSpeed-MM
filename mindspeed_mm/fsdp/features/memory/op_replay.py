@@ -57,7 +57,6 @@ from torch.utils._pytree import tree_flatten, tree_unflatten
 
 from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from ...utils.device import IS_NPU_AVAILABLE
-from .quantizer import QUANTIZERS, Fp8BlockwiseQuantizer
 from .swap_core import SwapCache, SwapHandle
 
 
@@ -186,25 +185,17 @@ class OpReplayScope:
                "cache everything" mode (it would swap out cheap-to-recompute
                and view/metadata ops whose payloads are pure waste).
     save_rng:  record/replay post-op RNG snapshots for this scope's cached ops
-    quantizer: payload quantizer for this scope's cached outputs, handed to
-               the swap cache on every put (None = store raw bytes). A
-               registered name (QUANTIZERS) resolves to its instance once,
-               here; an instance is used as-is. Static per scope: no data- or
-               size-dependent selection, every cached leaf of the scope goes
-               in with the same quantizer.
+    quantizer: payload quantizer instance for this scope's cached outputs,
+               handed to the swap cache on every put (None = store raw
+               bytes). Static per scope: no data- or size-dependent
+               selection, every cached leaf of the scope goes in with the
+               same quantizer. Config-based scopes resolve it via
+               QuantizerPlan.resolve() (see params/quantizer_args.py).
     """
 
     def __init__(self, cache_ops=None, save_rng=True, name=None, quantizer=None):
         if cache_ops is None:
             cache_ops = _default_cache_ops()
-        if isinstance(quantizer, str):
-            # A registered name resolves here, once; an unknown name is a
-            # config error, raised at scope construction — not at first put.
-            if quantizer not in QUANTIZERS:
-                raise ValueError(
-                    f"unknown payload quantizer {quantizer!r} "
-                    f"(registered: {sorted(QUANTIZERS)})")
-            quantizer = QUANTIZERS[quantizer]
         self.cache_ops = cache_ops
         self.save_rng = save_rng
         self.name = name
@@ -216,18 +207,15 @@ class OpReplayScope:
 
         Whitelist fallback chain: scope.cache_ops -> built-in default whitelist
         (the fallback lives in the constructor, so both entry paths agree).
+        Quantizer resolution (name+params -> instance) lives in the config
+        layer; this just asks the nested plan for its instance.
         """
-        quantizer = getattr(cfg, "quantizer", None)
-        if quantizer == Fp8BlockwiseQuantizer.name:
-            block_size = getattr(
-                cfg, "fp8_block_size", Fp8BlockwiseQuantizer.DEFAULT_BLOCK_SIZE)
-            if block_size != Fp8BlockwiseQuantizer.DEFAULT_BLOCK_SIZE:
-                quantizer = Fp8BlockwiseQuantizer(block_size=block_size)
+        quantizer_plan = getattr(cfg, "quantizer", None)
         return cls(
             cache_ops=_parse_op_list(getattr(cfg, "cache_ops", None)),
             save_rng=getattr(cfg, "save_rng", True),
             name=getattr(cfg, "name", None),
-            quantizer=quantizer,
+            quantizer=quantizer_plan.resolve() if quantizer_plan is not None else None,
         )
 
     def __repr__(self):

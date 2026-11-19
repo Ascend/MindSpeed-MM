@@ -49,6 +49,9 @@ features:
 | `enable_activation_offload` | bool | false | 是否开启激活offload。 |
 | `activation_offload_plan.apply_modules` | List[str] / null | None | 应用激活offload的模块（pattern匹配，如 `model.language_model.layers.{*}`）。默认 `None`，需显式配置。 |
 | `activation_offload_plan.impl` | str | "legacy" | 实现方式，二选一：`"legacy"` = 逐层hidden_states换出（自管理流与预取启发式，即 [Async Activation Offload](./async_activation_offload.md) 的路径）；`"stash"` = Act Stash（`saved_tensors_hooks` 租户，物理行为全部由 `swap_plan` 决定）。非法值启动校验报错。 |
+| `activation_offload_plan.quantizer` | dict / str / null | None | 仅 `impl: "stash"` 生效。Act Stash载荷量化器：pack（put）前对落盘张量做有损量化、unpack（pop）后反量化；`None` = 不量化（默认，逐位保留原张量）。两种写法等价：裸字符串注册名（如 `quantizer: int8_pertoken`），或嵌套字典（字段见下两行）。量化器不支持的张量（dtype/连续性/末维不满足）原样透传、不报错。未注册名在配置解析期报错。**精度边界**：开量化后反向取回的是有损近似张量（pop返回反量化后的新张量），验收只能用容差口径（loss/grad norm在约定容差内一致），逐位比对仅对不配置 `quantizer` 成立。 |
+| `activation_offload_plan.quantizer.name` | str | 必填 | 量化器注册名（分发标签）：`int8_pertoken` = INT8 per-token量化；`fp8_blockwise` = FP8 E4M3分块量化（仅支持Ascend 950PR&950DT系列产品；要求最后一维是block size的倍数）。 |
+| `activation_offload_plan.quantizer.block_size` | int | 128 | 仅 `name: fp8_blockwise` 时有效：`fp8_blockwise` 的列分块大小，行分块固定为1。支持 `64`、`128`、`192`、`256`；对 `int8_pertoken` 配置该项在配置解析期报错。 |
 | `recompute_plan.flatten_inputs` | bool | false | 把checkpoint边界完整 `(args, kwargs)` 输入树摊平为去重的位置参数叶子，使kwargs与容器内张量纳入Act Stash覆盖；仅non-reentrant生效。语义见[覆盖范围与资格过滤](#覆盖范围与资格过滤)。 |
 
 ### `capacity_mb` 怎么定

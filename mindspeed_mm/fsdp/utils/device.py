@@ -224,12 +224,12 @@ def prime_cpu_affinity_binding():
 
     torch_npu applies the configured CPU affinity (card-local socket) only at
     the FIRST BACKWARD. Pinned host buffers allocated before that — e.g. swap
-    arena slabs, lazily created and first-touched during the first forward —
-    then keep their unbound NUMA footprint for their whole lifetime (pinned
-    pages cannot migrate), and several ranks' footprints tend to pile onto
-    one node, collapsing concurrent D2H bandwidth (the effect size and even
-    the binding map's correctness are platform-dependent — validate with a
-    concurrent-bandwidth A/B on the target machine). One tiny RNG-free
+    arena slabs, whether preallocated at startup or first-touched during the
+    first forward — then keep their unbound NUMA footprint for their whole
+    lifetime (pinned pages cannot migrate), and several ranks' footprints tend
+    to pile onto one node, collapsing concurrent D2H bandwidth (the effect size
+    and even the binding map's correctness are platform-dependent — validate
+    with a concurrent-bandwidth A/B on the target machine). One tiny RNG-free
     backward at startup moves the binding ahead of any pinned allocation.
     No model parameters, no optimizer state and no RNG are touched.
 

@@ -85,6 +85,16 @@ class SwapManager:
             logger.info(f"Swap cache shared with tenant: {tenant}")
         return self._cache
 
+    def preallocate(self):
+        count = self._plan.cpu_arena_preallocate_slabs
+        if not count or self._cache is None:
+            return
+        stats = self._cache.preallocate(cpu_slabs=count)
+        logger.info(
+            f"Preallocated CPU swap arena: requested_slabs={count} "
+            f"slab_size_mb={self._plan.cpu_arena_slab_size_mb} "
+            f"total_capacity_gib={stats['total_capacity'] / 1024 ** 3:.2f} stats={stats}")
+
     def step_end(self):
         """Drive the per-step iteration boundary of the shared cache."""
         if self._cache is not None:

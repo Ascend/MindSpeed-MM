@@ -129,6 +129,7 @@ class Trainer:
             save_checkpointer=self.save_checkpointer,
             val_dataloader=self.val_dataloader,
             lora_weight_manager=self.lora_weight_manager,
+            on_train_start=self.model_features_applier.on_train_start,
             on_step_end=self.model_features_applier.on_step_end,
         )
 

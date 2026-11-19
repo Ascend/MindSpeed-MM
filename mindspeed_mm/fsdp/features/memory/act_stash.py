@@ -91,14 +91,15 @@ class ActStashHooks(saved_tensors_hooks):
     (retain_graph replays unpack), so a pop miss is always a bug, not a race.
     """
 
-    def __init__(self, cache: SwapCache):
+    def __init__(self, cache: SwapCache, quantizer=None):
         self._cache = cache
+        self._quantizer = quantizer
         super().__init__(self._pack, self._unpack)
 
     def _pack(self, tensor: torch.Tensor):
         if not _stashable(tensor):
             return tensor
-        return self._cache.put(tensor)
+        return self._cache.put(tensor, quantizer=self._quantizer)
 
     def _unpack(self, token):
         if isinstance(token, torch.Tensor):
@@ -125,15 +126,15 @@ def get_act_stash_modules(model, apply_modules):
     return matched_modules
 
 
-def _act_stash_wrapper(forward_func, cache):
+def _act_stash_wrapper(forward_func, cache, quantizer=None):
     @functools.wraps(forward_func)
     def wrapper(*args, **kwargs):
-        with ActStashHooks(cache):
+        with ActStashHooks(cache, quantizer=quantizer):
             return forward_func(*args, **kwargs)
     return wrapper
 
 
-def apply_act_stash_modules(model, apply_modules, cache: SwapCache):
+def apply_act_stash_modules(model, apply_modules, cache: SwapCache, quantizer=None):
     """Wrap each matched module's forward with ActStashHooks (in place).
 
     Wired after recompute in FeaturesApplier.pre_fully_shard_apply, so the
@@ -141,5 +142,5 @@ def apply_act_stash_modules(model, apply_modules, cache: SwapCache):
     checkpoint boundary inputs (see module docstring)."""
     for name, module in get_act_stash_modules(model, apply_modules):
         print_rank(logger.info, f'Applying act stash to module: {name}')
-        module.forward = _act_stash_wrapper(module.forward, cache)
+        module.forward = _act_stash_wrapper(module.forward, cache, quantizer=quantizer)
     return model

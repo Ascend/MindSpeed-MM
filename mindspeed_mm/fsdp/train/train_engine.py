@@ -62,6 +62,7 @@ class TrainEngine:
         lora_weight_manager=None,
         val_dataloader=None,
         on_step_end=None,
+        on_train_start=None,
         **kwargs,
     ):
         self.args = args
@@ -77,6 +78,7 @@ class TrainEngine:
         if self.load_checkpointer is None or self.save_checkpointer is None:
             raise ValueError("Both load_checkpointer and save_checkpointer must be provided.")
         self.lora_weight_manager = lora_weight_manager
+        self.on_train_start = on_train_start
         # Optional per-step boundary hook registered by the feature layer
         # (e.g. the swap cache iteration boundary); None when nothing registers.
         self.on_step_end = on_step_end
@@ -352,9 +354,9 @@ class TrainEngine:
             )
 
         self.model.train()
-        # Prime torch_npu's CPU affinity binding before any pinned allocation
-        # (swap arena slabs are first-touched in the first forward).
         prime_cpu_affinity_binding()
+        if self.on_train_start is not None:
+            self.on_train_start()
         if args.training.manual_gc_interval > 0:
             gc.disable()
             gc.collect()

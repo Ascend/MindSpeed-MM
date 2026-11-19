@@ -45,10 +45,12 @@ Quantizer contract:
   returns unchanged with meta=None, and dequantize() with meta=None returns
   the payload untouched.
 
-Registering a new quantizer: add one instance to QUANTIZERS under its name;
-tenants then hand the instance to SwapCache.put(..., quantizer=...) (config
-files reference it by name, resolved at scope construction). Nothing else in
-the swap path needs to change.
+Registering a new quantizer: implement the class with an instance()
+classmethod (one shared instance per parameter set), add a plan class in
+params/quantizer_args.py as a member of the QuantizerPlan union, and resolve
+config to an instance via plan.resolve(); tenants then hand the instance to
+SwapCache.put(..., quantizer=...). Nothing else in the swap path needs to
+change.
 
 Two modes are registered: int8 per-token and fp8-e4m3 block-wise (1xN per
 token, DeepSeek-style dynamic scaling with N=64/128/192/256). Both use AscendC fused ops:
@@ -56,8 +58,10 @@ npu_dynamic_quant / npu_dynamic_block_quant at put, npu_anti_quant at pop
 (the int8 mode additionally has Triton/torch dequant fallbacks — see
 ops/int8_dequant.py; the fp8 block-wise mode is AscendC-only).
 
-This module is the tenant-facing layer: the contract, the meta record, the
-registry. The hardware-facing dequant implementation (native op probe, Triton
+This module is the tenant-facing layer: the contract, the meta record, and
+the class-managed instances. Config-layer plans live in
+mindspeed_mm/fsdp/params/quantizer_args.py. The hardware-facing dequant
+implementation (native op probe, Triton
 kernels, per-arch geometry) lives in mindspeed_mm/fsdp/ops/int8_dequant.py.
 """
 import logging
@@ -128,6 +132,14 @@ class Int8PerTokenQuantizer:
     """
 
     name = "int8_pertoken"
+
+    _INSTANCE = None  # class-managed singleton (see instance())
+
+    @classmethod
+    def instance(cls) -> "Int8PerTokenQuantizer":
+        if cls._INSTANCE is None:
+            cls._INSTANCE = cls()
+        return cls._INSTANCE
 
     def __init__(self):
         # reject reasons already warned about: one warning per reason instead
@@ -214,7 +226,7 @@ class Fp8BlockwiseQuantizer:
     quantize: torch.ops.npu.npu_dynamic_block_quant(x2d,
     dst_type=torch.float8_e4m3fn, row_block_size=1,
     col_block_size=block_size) -> (e4m3 payload, fp32 scale), with a dynamic
-    scale of amax / 448 for each block. Ascend 950PR and 950DT series products support block sizes 64, 128,
+    scale of amax / 448 for each block. Ascend 950PR&950DT products support block sizes 64, 128,
     192 and 256; the default is 128.
     dequantize: torch.ops.npu.npu_anti_quant over the [rows*groups, block_size]
     view with scales reshaped to [rows*groups, 1], explicitly selecting per-row
@@ -230,6 +242,14 @@ class Fp8BlockwiseQuantizer:
     name = "fp8_blockwise"
     DEFAULT_BLOCK_SIZE = 128
     SUPPORTED_BLOCK_SIZES = (64, 128, 192, 256)
+
+    _INSTANCES: dict = {}  # block_size -> instance; class-managed (see instance())
+
+    @classmethod
+    def instance(cls, block_size=DEFAULT_BLOCK_SIZE) -> "Fp8BlockwiseQuantizer":
+        if block_size not in cls._INSTANCES:
+            cls._INSTANCES[block_size] = cls(block_size=block_size)
+        return cls._INSTANCES[block_size]
 
     def __init__(self, block_size=DEFAULT_BLOCK_SIZE):
         if block_size not in self.SUPPORTED_BLOCK_SIZES:
@@ -292,12 +312,3 @@ class Fp8BlockwiseQuantizer:
         out = torch.ops.npu.npu_anti_quant(
             q2d, scale, dst_dtype=meta.orig_dtype)
         return out.reshape(meta.orig_shape)
-
-
-# Name -> quantizer instance. Config layers reference a quantizer by name and
-# resolve it here (OpReplayScope construction); the swap core itself never
-# imports this module.
-QUANTIZERS = {
-    Int8PerTokenQuantizer.name: Int8PerTokenQuantizer(),
-    Fp8BlockwiseQuantizer.name: Fp8BlockwiseQuantizer(),
-}

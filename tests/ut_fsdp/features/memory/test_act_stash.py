@@ -156,6 +156,37 @@ class TestForwardBackward:
         for g, g_ref in zip(_grads_of(model, x), _grads_of(reference, x)):
             assert torch.equal(g, g_ref)
 
+    def test_grads_finite_with_int8_pertoken(self):
+        _skip_if_cpu()
+        from mindspeed_mm.fsdp.features.memory.quantizer import Int8PerTokenQuantizer
+
+        model, _ = self._make_pair()
+        model = model.bfloat16()
+        cache = _make_evicting_cache()
+        apply_act_stash_modules(
+            model, ["layers.{*}"], cache, quantizer=Int8PerTokenQuantizer.instance())
+
+        x = torch.randn(8, 64, dtype=torch.bfloat16, device=_get_device(), requires_grad=True)
+        _run_fwd_bwd(model, x)
+        for grad in _grads_of(model, x):
+            assert torch.isfinite(grad).all()
+
+    def test_quantizer_is_forwarded_to_cache(self):
+        _skip_if_cpu()
+
+        class RecordingCache:
+            def __init__(self):
+                self.quantizer = None
+
+            def put(self, tensor, quantizer=None):
+                self.quantizer = quantizer
+                return object()
+
+        cache = RecordingCache()
+        hooks = ActStashHooks(cache, quantizer='int8_pertoken')
+        hooks._pack(torch.randn(4, 4, dtype=torch.bfloat16, device=_get_device()))
+        assert cache.quantizer == 'int8_pertoken'
+
     def test_put_on_forward_pop_on_backward(self):
         _skip_if_cpu()
         model, _ = self._make_pair()
@@ -557,6 +588,18 @@ class TestWiring:
         assert cache._iter_stats['put_cnt'] == 2
         assert cache._iter_stats['pop_cnt'] == 2
 
+    def test_stash_int8_uses_registered_quantizer(self):
+        _skip_if_cpu()
+        from mindspeed_mm.fsdp.features.apply_features import FeaturesApplier
+
+        applier = FeaturesApplier(self._make_config(impl="stash", quantizer="int8_pertoken"))
+        model = TinyModel(depth=2).to(_get_device()).bfloat16()
+        applier.apply_activation_offload_modules(model)
+        x = torch.randn(8, 64, dtype=torch.bfloat16, device=_get_device(), requires_grad=True)
+        model(x).sum().backward()
+        for grad in _grads_of(model, x):
+            assert torch.isfinite(grad).all()
+
     def test_legacy_impl_untouched(self):
         _skip_if_cpu()
         from mindspeed_mm.fsdp.features.apply_features import FeaturesApplier
@@ -573,3 +616,29 @@ class TestWiring:
         from mindspeed_mm.fsdp.params.feature_args import ActivationOffloadPlanConfig
         with pytest.raises(ValidationError):
             ActivationOffloadPlanConfig(impl="bogus")
+
+    def test_quantizer_config_validation(self):
+        from pydantic import ValidationError
+        from mindspeed_mm.fsdp.params.feature_args import ActivationOffloadPlanConfig
+        from mindspeed_mm.fsdp.params.quantizer_args import Int8PerTokenQuantizerPlan
+
+        config = ActivationOffloadPlanConfig(quantizer='int8_pertoken')
+        assert isinstance(config.quantizer, Int8PerTokenQuantizerPlan)
+        with pytest.raises(ValidationError):
+            ActivationOffloadPlanConfig(quantizer='unknown')
+        with pytest.raises(ValidationError, match='fp8_block_size'):
+            ActivationOffloadPlanConfig(quantizer='int8_pertoken', fp8_block_size=64)
+
+    def test_quantizer_config_accepts_nested_fp8(self):
+        from mindspeed_mm.fsdp.params.feature_args import ActivationOffloadPlanConfig
+        from mindspeed_mm.fsdp.params.quantizer_args import Fp8BlockwiseQuantizerPlan
+        from mindspeed_mm.fsdp.utils.device import is_arch35
+        if not is_arch35():
+            pytest.skip("fp8_blockwise requires Ascend 950PR&950DT products")
+
+        config = ActivationOffloadPlanConfig(
+            quantizer={'name': 'fp8_blockwise', 'block_size': 192})
+
+        assert isinstance(config.quantizer, Fp8BlockwiseQuantizerPlan)
+        assert config.quantizer.block_size == 192
+        assert config.quantizer.resolve().block_size == 192

@@ -20,7 +20,6 @@ from pydantic import ValidationError
 from mindspeed_mm.fsdp.features.memory import op_replay as opr
 from mindspeed_mm.fsdp.features.memory import swap_core as swap_core_mod
 from mindspeed_mm.fsdp.features.memory.quantizer import (
-    QUANTIZERS,
     Fp8BlockwiseQuantizer,
     Int8PerTokenQuantizer,
 )
@@ -35,7 +34,7 @@ pytestmark = pytest.mark.skipif(
     reason="swap requires a usable device (fast fail on CPU-only hosts)")
 
 MODE = Int8PerTokenQuantizer.name
-INT8 = QUANTIZERS[MODE]
+INT8 = Int8PerTokenQuantizer.instance()
 
 
 def _get_device():
@@ -253,11 +252,6 @@ class TestQuantizerFallbackAndErrors:
         assert cache.pop(h0) is fp32
         assert cache.pop(h2) is view
 
-    def test_unknown_quantizer_name_raises_at_scope_construction(self):
-        with pytest.raises(ValueError, match="unknown payload quantizer"):
-            opr.OpReplayScope(quantizer="int4_imaginary")
-
-
 class TestQuantizerContracts:
     """Contracts the swap path relies on: no RNG use, no autograd state"""
 
@@ -379,12 +373,17 @@ class TestOpReplayWiring:
     def test_config_rejects_invalid_fp8_block_size(self):
         with pytest.raises(ValidationError):
             OpReplayScopeConfig(name='q8', apply_modules=['0'],
-                                quantizer=FP8_MODE, fp8_block_size=96)
+                                quantizer={'name': FP8_MODE, 'block_size': 96})
 
     def test_config_rejects_fp8_block_size_for_int8(self):
-        with pytest.raises(ValidationError, match='fp8_block_size'):
+        with pytest.raises(ValidationError, match='block_size'):
             OpReplayScopeConfig(name='q', apply_modules=['0'],
-                                quantizer=MODE, fp8_block_size=64)
+                                quantizer={'name': MODE, 'block_size': 64})
+
+    def test_config_rejects_legacy_flat_fp8_block_size(self):
+        with pytest.raises(ValidationError, match='fp8_block_size'):
+            OpReplayScopeConfig(name='q8', apply_modules=['0'],
+                                quantizer=MODE, fp8_block_size=128)
 
     def _run_mm_through_caching_mode(self, scope, op_cache):
         session = opr.OpReplaySession(_FakeController(scope, op_cache))
@@ -397,7 +396,7 @@ class TestOpReplayWiring:
     def test_caching_mode_puts_with_the_scope_quantizer(self):
         op_cache = _PutSpyCache()
         scope = opr.OpReplayScope(cache_ops=opr._parse_op_list(['aten.mm.default']),
-                                  name='q', quantizer=MODE)
+                                  name='q', quantizer=INT8)
         assert self._run_mm_through_caching_mode(scope, op_cache) == [INT8]
 
         # a scope without a quantizer puts unquantized
@@ -407,7 +406,7 @@ class TestOpReplayWiring:
 
 
 FP8_MODE = Fp8BlockwiseQuantizer.name
-FP8 = QUANTIZERS[FP8_MODE]
+FP8 = Fp8BlockwiseQuantizer.instance()
 
 
 def _fp8_dequant_reference(payload, meta):
@@ -416,7 +415,7 @@ def _fp8_dequant_reference(payload, meta):
     return (q * meta.scale.unsqueeze(-1)).to(meta.orig_dtype).reshape(meta.orig_shape)
 
 
-@pytest.mark.skipif(not is_arch35(), reason="fp8 block-wise quantization is only tested on Ascend 950PR and 950DT series products")
+@pytest.mark.skipif(not is_arch35(), reason="fp8 block-wise quantization is only tested on Ascend 950PR&950DT products")
 class TestFp8BlockwiseRoundtrip:
     """fp8-e4m3 1x128 block-wise payload: quantize at put, dequantize at pop"""
 
@@ -537,10 +536,22 @@ class TestFp8BlockwiseRoundtrip:
 
     def test_scope_uses_configured_fp8_block_size(self):
         cfg = OpReplayScopeConfig(name='q8', apply_modules=['0'],
-                                  quantizer=FP8_MODE, fp8_block_size=192)
+                                  quantizer={'name': FP8_MODE, 'block_size': 192})
 
         scope = opr.OpReplayScope.from_config(cfg)
 
         assert scope.quantizer is not FP8
         assert isinstance(scope.quantizer, Fp8BlockwiseQuantizer)
         assert scope.quantizer.block_size == 192
+
+
+def test_quantizer_instances_are_class_managed_singletons():
+    """The quantizer classes own their instances: one per (class, params)
+    process-wide."""
+
+    assert Int8PerTokenQuantizer.instance() is Int8PerTokenQuantizer.instance()
+    assert Fp8BlockwiseQuantizer.instance() is Fp8BlockwiseQuantizer.instance()
+    custom = Fp8BlockwiseQuantizer.instance(block_size=192)
+    assert custom is Fp8BlockwiseQuantizer.instance(block_size=192)
+    assert custom is not Fp8BlockwiseQuantizer.instance()
+    assert custom.block_size == 192

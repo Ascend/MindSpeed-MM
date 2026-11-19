@@ -56,6 +56,10 @@ class FeaturesApplier:
             self.swap_manager = SwapManager(getattr(self.config, "swap_plan", None))
         return self.swap_manager
 
+    def on_train_start(self):
+        if self.swap_manager is not None:
+            self.swap_manager.preallocate()
+
     def on_step_end(self):
         # Per-step boundary hook passed to the TrainEngine as a plain callable
         # (fired exactly once per training step, after optimizer.zero_grad()).
@@ -96,7 +100,9 @@ class FeaturesApplier:
         if getattr(plan, "impl", "legacy") == "stash":
             # ActStash: saved_tensors_hooks pure tenant of the shared swap cache
             cache = self._ensure_swap_manager().get_cache("actstash")
-            apply_act_stash_modules(model, plan.apply_modules, cache)
+            quantizer_plan = getattr(plan, "quantizer", None)
+            quantizer = quantizer_plan.resolve() if quantizer_plan is not None else None
+            apply_act_stash_modules(model, plan.apply_modules, cache, quantizer=quantizer)
             return
 
         activation_offload_modules = get_offload_modules(model, plan.apply_modules)

@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import torch
 from dataclasses import dataclass
 from typing import Optional, List
+
+
+logger = logging.getLogger(__name__)
 
 
 # torch_npu DMA copies require the start addresses of both ends to be aligned
@@ -182,6 +187,27 @@ class SlabArena:
         self._free: List[SlabBuffer] = []       # completely idle slabs (reusable)
         self._oversized_total = 0               # cumulative count of oversized slabs created
 
+    def preallocate(self, count: int):
+        """Ensure at least count standard slabs are allocated and first-touched."""
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise TypeError(f"SlabArena.preallocate: count must be an integer, got {count!r}")
+        if count < 0:
+            raise ValueError(f"SlabArena.preallocate: count must be non-negative, got {count}")
+        if count and self.pool_policy == "none":
+            raise ValueError("SlabArena.preallocate requires a retained pool policy ('all' or 'standard')")
+        standard_count = sum(not slab.oversized for slab in self._active + self._free)
+        for _ in range(max(0, count - standard_count)):
+            try:
+                slab = SlabBuffer(self.slab_size, self.device, self.pin_memory)
+                slab.buf.zero_()
+            except RuntimeError:
+                logger.error(
+                    f"SlabArena preallocation failed: target_slabs={count} "
+                    f"pin_memory={self.pin_memory} stats={self.stats()}")
+                raise
+            self._free.append(slab)
+        return self.stats()
+
     @classmethod
     def on_demand(cls, pin_memory: bool = True) -> "SlabArena":
         """On-demand arena: minimal slab size -> exact per-tensor slab,
@@ -287,8 +313,14 @@ class SlabArena:
             # tensors (a squatter would keep ref_count from reaching zero,
             # breaking pool_policy="standard"'s release-on-empty)
             self._oversized_total += 1
-        slab = SlabBuffer(num_bytes if oversized else self.slab_size,
-                          self.device, self.pin_memory, oversized=oversized)
+        try:
+            slab = SlabBuffer(num_bytes if oversized else self.slab_size,
+                              self.device, self.pin_memory, oversized=oversized)
+        except RuntimeError:
+            logger.error(
+                f"SlabArena allocation failed: requested_bytes={num_bytes} "
+                f"pin_memory={self.pin_memory} stats={self.stats()}")
+            raise
         return self._activate_and_alloc(slab, num_bytes, alignment)
 
     def register(self, tensor: torch.Tensor) -> TensorBuffer:

@@ -731,6 +731,14 @@ class SwapCache:
         """Pass through CPU arena statistics (total_capacity/active_used/slabs/oversized, etc.)"""
         return self._cpu_arena.stats()
 
+    def preallocate(self, cpu_slabs: int = 0) -> dict:
+        """Warm up backend resources before the first training step.
+
+        Keyword args are the extension points: a future disk backend adds its
+        own knob here; each backend preallocates only when its knob is set.
+        """
+        return self._cpu_arena.preallocate(cpu_slabs)
+
     def release_empty_slabs(self) -> None:
         """Physically release the pinned memory of all empty slabs back to the
         torch host cache (measured: not directly to the OS).

@@ -19,8 +19,7 @@ from typing import List, Literal, Optional
 from pydantic import model_validator
 
 from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
-from mindspeed_mm.fsdp.features.memory.quantizer import QUANTIZERS
-from mindspeed_mm.fsdp.utils.device import is_arch35
+from .quantizer_args import QuantizerPlan, _coerce_quantizer_field
 
 
 class SwapPlanConfig(BaseArguments):
@@ -53,6 +52,10 @@ class SwapPlanConfig(BaseArguments):
         default="standard",
         metadata={"help": "CPU arena pool policy: 'all' (retain all empty slabs), 'standard' (retain standard slabs, release oversized on empty), 'none' (release immediately). Only effective with cpu_arena_slab_size_mb."},
     )
+    cpu_arena_preallocate_slabs: int = field(
+        default=0,
+        metadata={"help": "Number of standard CPU arena slabs to allocate and first-touch before the first training step. 0 disables preallocation. Requires a pooled arena and pool policy 'all' or 'standard'."},
+    )
     pin_memory: bool = field(
         default=True,
         metadata={"help": "Whether arena slabs use pinned (page-locked) memory. False is the escape hatch when host pinned memory is exhausted; non-pinned copies then execute synchronously (torch behavior)."},
@@ -67,6 +70,22 @@ class SwapPlanConfig(BaseArguments):
         if not (0.0 <= self.keep_rate <= 1.0):
             raise ValueError(
                 f"swap_plan.keep_rate must be in [0, 1], got {self.keep_rate}")
+        return self
+
+    @model_validator(mode='after')
+    def _check_preallocate(self):
+        if self.cpu_arena_preallocate_slabs < 0:
+            raise ValueError(
+                "swap_plan.cpu_arena_preallocate_slabs must be non-negative, "
+                f"got {self.cpu_arena_preallocate_slabs}")
+        if self.cpu_arena_preallocate_slabs:
+            if self.cpu_arena_slab_size_mb is None:
+                raise ValueError(
+                    "swap_plan.cpu_arena_preallocate_slabs requires a pooled arena; "
+                    "cpu_arena_slab_size_mb must not be null")
+            if self.cpu_arena_pool_policy == "none":
+                raise ValueError(
+                    "swap_plan.cpu_arena_preallocate_slabs requires pool policy 'all' or 'standard'")
         return self
 
 
@@ -97,38 +116,20 @@ class OpReplayScopeConfig(BaseArguments):
                           "['aten.mm.default', 'aten.linear.default']). None falls back to the "
                           "built-in default whitelist."},
     )
-    quantizer: Optional[str] = field(
+    quantizer: Optional[QuantizerPlan] = field(
         default=None,
-        metadata={"help": "Payload quantizer applied statically per scope when handing "
-                          "cached op outputs to the swap cache; None = no quantization (default, "
-                          "bit-exact today's behavior). Registered names live in "
-                          "mindspeed_mm/fsdp/features/memory/quantizer.py (e.g. 'int8_pertoken', "
-                          "'fp8_blockwise' for fp8-e4m3 block-wise quantization); "
-                          "an unregistered name is a config error, rejected at config parse. "
+        metadata={"help": "Payload quantizer applied to this scope's cached op outputs; "
+                          "None = no quantization (default, bit-exact). Registered names live "
+                          "in mindspeed_mm/fsdp/features/memory/quantizer.py (e.g. 'int8_pertoken', "
+                          "'fp8_blockwise' for fp8-e4m3 block-wise quantization). "
                           "Only the precision of the cached payload changes — which ops are "
                           "cached is decided by cache_ops alone."},
     )
-    fp8_block_size: Literal[64, 128, 192, 256] = field(
-        default=128,
-        metadata={"help": "Column block size for 'fp8_blockwise' on Ascend 950PR and 950DT "
-                          "series products; row block size remains 1. Supported values: 64, 128 (default), 192, 256."},
-    )
 
-    @model_validator(mode='after')
-    def _check_quantizer(self):
-        if self.quantizer is not None and self.quantizer not in QUANTIZERS:
-            raise ValueError(
-                f"op_replay scope {self.name!r}: unknown payload quantizer "
-                f"{self.quantizer!r} (registered: {sorted(QUANTIZERS)})")
-        if self.quantizer == 'fp8_blockwise' and not is_arch35():
-            raise ValueError(
-                f"op_replay scope {self.name!r}: 'fp8_blockwise' is only supported on "
-                "Ascend 950PR and 950DT series products")
-        if self.quantizer != 'fp8_blockwise' and self.fp8_block_size != 128:
-            raise ValueError(
-                f"op_replay scope {self.name!r}: 'fp8_block_size' requires "
-                "quantizer='fp8_blockwise'")
-        return self
+    @model_validator(mode='before')
+    @classmethod
+    def _coerce_quantizer(cls, data):
+        return _coerce_quantizer_field(data)
 
 
 class RecomputePlanConfig(BaseArguments):
@@ -248,6 +249,18 @@ class ActivationOffloadPlanConfig(BaseArguments):
                           "cache; all physical behavior (capacity, async, prefetch, eviction) is "
                           "governed by swap_plan."}
     )
+    quantizer: Optional[QuantizerPlan] = field(
+        default=None,
+        metadata={"help": "Quantizer applied to ActStash payloads before offload. None preserves "
+                          "the original tensor bit-exactly. Registered names: 'int8_pertoken' and "
+                          "'fp8_blockwise' (Ascend 950PR&950DT products only, param 'block_size' "
+                          "64/128/192/256); unsupported tensors pass through unchanged."},
+    )
+
+    @model_validator(mode='before')
+    @classmethod
+    def _coerce_quantizer(cls, data):
+        return _coerce_quantizer_field(data)
 
 
 class ChunkMbsPlanConfig(BaseArguments):

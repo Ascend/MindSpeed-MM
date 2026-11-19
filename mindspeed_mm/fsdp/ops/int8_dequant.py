@@ -22,7 +22,7 @@ says nothing about per-row scale support), then a fused Triton kernel, then
 the equivalent torch composition. Triton is imported lazily and must not
 become a module-level dependency.
 
-The tenant-facing contract (PayloadQuantizer, the meta record, QUANTIZERS)
+The tenant-facing contract (PayloadQuantizer, the meta record)
 lives in mindspeed_mm/fsdp/features/memory/quantizer.py.
 """
 from dataclasses import dataclass
