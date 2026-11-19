@@ -18,6 +18,8 @@ import os
 from typing import Tuple
 
 import torch
+from torch.distributed.checkpoint._nested_dict import flatten_state_dict, unflatten_state_dict
+from torch.distributed.checkpoint.state_dict import StateDictOptions, set_optimizer_state_dict
 from torch.distributed.tensor import DTensor
 
 from .coefficients import resolve_ns_coefficients
@@ -321,6 +323,68 @@ class Muon(torch.optim.Optimizer):
             for key in _QK_CLIP_RUNTIME_KEYS:
                 group.pop(key, None)
         return state_dict
+
+    def _checkpoint_group_defaults(self, model, flattened):
+        names = {parameter: name for name, parameter in model.named_parameters()}
+        for index, group in enumerate(self.param_groups):
+            prefixes = (
+                [(f"param_groups.{names[p]}",) for p in group["params"]]
+                if flattened else [("param_groups", index)]
+            )
+            # Only fields added after the legacy format can use current defaults.
+            for key in ("ns_coefficients", "qk_clip_threshold", "qk_clip_alpha", "param_names"):
+                if key not in group:
+                    continue
+                for prefix in prefixes:
+                    path = (f"{prefix[0]}.{key}",) if flattened else (*prefix, key)
+                    yield ".".join(map(str, path)), path, group[key]
+
+    def prepare_checkpoint_load(self, model, state_dict, checkpoint_keys):
+        """Match the load template to an older Muon checkpoint."""
+        flattened = "state" not in state_dict
+        values, mapping = flatten_state_dict(state_dict)
+        names = {parameter: name for name, parameter in model.named_parameters()}
+        for group in self.param_groups:
+            for parameter in group["params"]:
+                name = names[parameter]
+                current = f"state.{name}.momentum_buffer"
+                legacy = f"state.{name}.muon_buffer"
+                if (current in values and f"optimizer.{legacy}" in checkpoint_keys
+                        and f"optimizer.{current}" not in checkpoint_keys):
+                    values[legacy] = values.pop(current)
+                    path = mapping.pop(current)
+                    mapping[legacy] = (legacy,) if flattened else (*path[:-1], "muon_buffer")
+        for key, _, _ in self._checkpoint_group_defaults(model, flattened):
+            if key in values and f"optimizer.{key}" not in checkpoint_keys:
+                values.pop(key)
+                mapping.pop(key)
+        return unflatten_state_dict(values, mapping)
+
+    def load_state_dict_for(self, model, state_dict):
+        """Load named checkpoint state, including legacy Muon buffers."""
+        flattened = "state" not in state_dict
+        values, mapping = flatten_state_dict(state_dict)
+        for key, path, value in self._checkpoint_group_defaults(model, flattened):
+            values.setdefault(key, value)
+            mapping.setdefault(key, path)
+        if flattened:
+            names = {parameter: name for name, parameter in model.named_parameters()}
+            for group in self.param_groups:
+                for parameter in group["params"]:
+                    name = names[parameter]
+                    legacy = f"state.{name}.muon_buffer"
+                    current = f"state.{name}.momentum_buffer"
+                    if legacy in values:
+                        buffer = values.pop(legacy)
+                        mapping.pop(legacy)
+                        if current not in values:
+                            momentum = values[f"param_groups.{name}.momentum"]
+                            values[current] = buffer * (1 - momentum)
+                            mapping[current] = (current,)
+        set_optimizer_state_dict(
+            model, self, unflatten_state_dict(values, mapping),
+            options=StateDictOptions(flatten_optimizer_state_dict=flattened),
+        )
 
     def load_state_dict(self, state_dict):
         """Restore optimizer state and reattach the current QK-Clip runtime bindings."""

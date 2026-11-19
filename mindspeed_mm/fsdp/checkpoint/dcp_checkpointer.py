@@ -45,7 +45,7 @@ from mindspeed_mm.fsdp.checkpoint.utils import (
     restore_base_layer_keys,
 )
 from mindspeed_mm.fsdp.checkpoint.broadcast_utils import rank0_load_and_broadcast_dcp_weights
-from mindspeed_mm.fsdp.checkpoint.dcp_utils import ProgressLoadPlanner
+from mindspeed_mm.fsdp.checkpoint.dcp_utils import ProgressLoadPlanner, load_metadata
 from mindspeed_mm.fsdp.log import print_rank
 
 
@@ -145,8 +145,25 @@ class OptimizerState(Stateful):
         # Similar to ModelState, OptimizerState also need to be EP+FSDP2 aware
         self.parallel_state = get_parallel_state()
         self.should_ep_aware = getattr(self.optimizer, "_is_multi_optimizer", False)
+        self._load_template = None
+
+    def _prepare_optimizer_load(self, storage_reader):
+        """Prepare optimizer state before DCP plans the load."""
+        self._load_template = None
+        members = self.optimizer.optimizers_dict.values() if self.should_ep_aware else (self.optimizer,)
+        hooks = [getattr(member, "prepare_checkpoint_load", None) for member in members]
+        hooks = [hook for hook in hooks if hook is not None]
+        if not hooks:
+            return
+        checkpoint_keys = load_metadata(storage_reader).state_dict_metadata
+        template = self.state_dict()
+        for hook in hooks:
+            template = hook(self.model, template, checkpoint_keys)
+        self._load_template = template
 
     def state_dict(self):
+        if self._load_template is not None:
+            return self._load_template
         if self.should_ep_aware:
             # MultiOptimizer is only used for EP+FSDP2 case for now,
             # and it knows how to produce a merged, flattened dict already
@@ -163,14 +180,16 @@ class OptimizerState(Stateful):
         if self.should_ep_aware:
             # Delegate to MultiOptimizer (it will split/filter correctly)
             self.optimizer.load_state_dict(optim_state_from_dcp_load)
-            return
-
-        # Single torch optimizer
-        set_optimizer_state_dict(
-            model=self.model,
-            optimizers=self.optimizer,
-            optim_state_dict=optim_state_from_dcp_load,
-        )
+        elif self._load_template is not None and hasattr(self.optimizer, "load_state_dict_for"):
+            self.optimizer.load_state_dict_for(self.model, optim_state_from_dcp_load)
+        else:
+            # Single torch optimizer
+            set_optimizer_state_dict(
+                model=self.model,
+                optimizers=self.optimizer,
+                optim_state_dict=optim_state_from_dcp_load,
+            )
+        self._load_template = None
 
 
 class DistributedCheckpointer(CheckpointerBase):
@@ -317,15 +336,20 @@ class DistributedCheckpointer(CheckpointerBase):
 
         model_state_cls = LoraModelState if enable_lora else ModelState
         load_state = {"model": model_state_cls(state["model"])}
+
+        if storage_reader is None:
+            storage_reader = cls._create_storage_reader(checkpoint_dir)
+
         if not release and "optimizer" in state:
-            load_state["optimizer"] = OptimizerState(model=state["model"], optimizer=state["optimizer"])  # type: ignore[index]
             adapter = getattr(state["model"], "_checkpoint_adapter", None)
             warning = adapter.legacy_warning(checkpoint_dir) if adapter is not None else None
             if warning is not None:
                 logger.warning("[Checkpoint] %s", warning)
-
-        if storage_reader is None:
-            storage_reader = cls._create_storage_reader(checkpoint_dir)
+            load_state["optimizer"] = OptimizerState(  # type: ignore[index]
+                model=state["model"],
+                optimizer=state["optimizer"],
+            )
+            load_state["optimizer"]._prepare_optimizer_load(storage_reader)
 
         if load_rank0_and_broadcast:
             rank0_load_and_broadcast_dcp_weights(
