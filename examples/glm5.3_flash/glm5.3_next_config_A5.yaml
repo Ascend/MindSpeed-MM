@@ -108,6 +108,16 @@ features:
           - model.visual.blocks.{*}
         cache_ops:
           - npu.npu_fusion_attention.default
+      # Cache attention output projections instead of recomputing matmul.
+      - name: save_attention_o_proj
+        apply_modules:
+          - model.language_model.layers.{*}.self_attn.o_proj
+        save_rng: false
+        cache_ops:
+          - aten.matmul.default
+          - aten.mm.default
+          - aten.addmm.default
+          - aten.linear.default
   enable_chunk_loss: true
   chunkloss_plan:
     apply_module: lm_head
@@ -117,7 +127,7 @@ features:
   enable_activation_offload: true
   activation_offload_plan:
     apply_modules:
-      - model.visual.blocks.{*}
+      # Keep ViT checkpoint inputs on NPU to avoid per-block D2H/H2D waits.
       - model.language_model.layers.{*}
   enable_chunk_mbs: false
   chunkmbs_plan:

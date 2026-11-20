@@ -20,15 +20,20 @@ if IS_NPU_AVAILABLE:
 
 class AllToAllGroupedMatmul(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, inputs, weights, group, send_counts, recv_counts, shared_inputs, shared_weight):
+    def forward(ctx, inputs, weights, group, send_counts, recv_counts, shared_inputs, shared_weight, host_counts=None):
         rank = torch.distributed.get_rank(group)
         global_rank = torch.distributed.get_global_rank(group, rank)
         hcomm = group._get_backend(torch.device("npu")).get_hccl_comm_name(global_rank)
         ep_world_size = torch.distributed.get_world_size(group)
         group_list_tensor = recv_counts.reshape(ep_world_size, -1).sum(dim=0)
 
-        send_counts = send_counts.tolist()
-        recv_counts = recv_counts.tolist()
+        # CPU counts belong to this routing invocation only. Reuse them for
+        # both FCs so FC2 does not drain the compute stream with another D2H.
+        if host_counts is None:
+            send_counts = send_counts.tolist()
+            recv_counts = recv_counts.tolist()
+        else:
+            send_counts, recv_counts = host_counts
 
         output, shared_output, permute_output = torch_npu.npu_alltoallv_gmm(inputs, weights, hcomm, ep_world_size,
                                                                            send_counts, recv_counts, mm_x=shared_inputs,
@@ -60,20 +65,26 @@ class AllToAllGroupedMatmul(torch.autograd.Function):
                                                     split_item=3, group_type=2, group_list_type=1)[0]
 
         shared_weight_grad = None if shared_inputs is None else torch.matmul(shared_inputs.T, shared_output_grad)
-        return inputs_grad, weights_grad, None, None, None, shared_inputs_grad, shared_weight_grad
+        grads = (inputs_grad, weights_grad, None, None, None, shared_inputs_grad, shared_weight_grad)
+        return grads + (None,) if len(ctx.needs_input_grad) == 8 else grads
 
 
 class GroupedMatmulAllToAll(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, inputs, weights, group, send_counts, recv_counts, shared_inputs, shared_weight):
+    def forward(ctx, inputs, weights, group, send_counts, recv_counts, shared_inputs, shared_weight, host_counts=None):
         rank = torch.distributed.get_rank(group)
         global_rank = torch.distributed.get_global_rank(group, rank)
         hcomm = group._get_backend(torch.device("npu")).get_hccl_comm_name(global_rank)
         ep_world_size = torch.distributed.get_world_size(group)
         group_list_tensor = send_counts.reshape(ep_world_size, -1).sum(dim=0)
 
-        send_counts = send_counts.tolist()
-        recv_counts = recv_counts.tolist()
+        # CPU counts belong to this routing invocation only. Reuse them for
+        # both FCs so FC2 does not drain the compute stream with another D2H.
+        if host_counts is None:
+            send_counts = send_counts.tolist()
+            recv_counts = recv_counts.tolist()
+        else:
+            send_counts, recv_counts = host_counts
 
         output, shared_output = torch_npu.npu_gmm_alltoallv(inputs, weights, hcomm, ep_world_size, send_counts,
                                                         recv_counts, mm_x=shared_inputs, mm_weight=shared_weight)
@@ -107,19 +118,20 @@ class GroupedMatmulAllToAll(torch.autograd.Function):
 
 
         shared_weight_grad = None if shared_inputs is None else torch.matmul(shared_inputs.T, shared_output_grad)
-        return inputs_grad, weights_grad, None, None, None, shared_inputs_grad, shared_weight_grad
+        grads = (inputs_grad, weights_grad, None, None, None, shared_inputs_grad, shared_weight_grad)
+        return grads + (None,) if len(ctx.needs_input_grad) == 8 else grads
 
 
 # send_counts: [num_global_experts], recv_counts: [num_global_experts]
-def all2all_grouped_matmul(inputs, weights, group, send_counts, recv_counts, shared_inputs=None, shared_weight=None):
-    output = AllToAllGroupedMatmul.apply(inputs, weights, group, send_counts, recv_counts, shared_inputs, shared_weight)
+def all2all_grouped_matmul(inputs, weights, group, send_counts, recv_counts, shared_inputs=None, shared_weight=None, host_counts=None):
+    output = AllToAllGroupedMatmul.apply(inputs, weights, group, send_counts, recv_counts, shared_inputs, shared_weight, host_counts)
     if shared_inputs is not None:
         return output[0], output[1]  # experts output and shared experts outputs
     return output[0]
 
 
-def grouped_matmul_all2all(inputs, weights, group, send_counts, recv_counts, shared_inputs=None, shared_weight=None):
-    output = GroupedMatmulAllToAll.apply(inputs, weights, group, send_counts, recv_counts, shared_inputs, shared_weight)
+def grouped_matmul_all2all(inputs, weights, group, send_counts, recv_counts, shared_inputs=None, shared_weight=None, host_counts=None):
+    output = GroupedMatmulAllToAll.apply(inputs, weights, group, send_counts, recv_counts, shared_inputs, shared_weight, host_counts)
     if shared_inputs is not None:
         return output[0], output[1]  # experts output and shared experts outputs
     return output[0]

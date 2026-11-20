@@ -72,6 +72,7 @@ from torch.distributed.tensor import DTensor
 from torch.distributed.distributed_c10d import ProcessGroup
 
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
+from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
 if IS_NPU_AVAILABLE:
     import torch_npu
 
@@ -234,6 +235,7 @@ class Glm5NextTextExperts(nn.Module):
         from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import (
             ep_forward, ep_mc2_forward, ep_allgather_forward,
         )
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_chunkmoe import ep_chunkmoe_forward
 
         gate_up_proj = self.gate_up_proj.to_local() if isinstance(self.gate_up_proj, DTensor) else self.gate_up_proj
         down_proj = self.down_proj.to_local() if isinstance(self.down_proj, DTensor) else self.down_proj
@@ -242,8 +244,9 @@ class Glm5NextTextExperts(nn.Module):
             "alltoall": ep_forward,
             "mc2": ep_mc2_forward,
             "allgather": ep_allgather_forward,
+            "chunkmoe": ep_chunkmoe_forward,
         }
-        if ep_plan.dispatcher not in ["alltoall"]:
+        if ep_plan.dispatcher not in ("alltoall", "chunkmoe"):
             raise NotImplementedError(
                 f"EP dispatcher {ep_plan.dispatcher} is not implemented for Glm5Next MoE."
             )
@@ -252,6 +255,9 @@ class Glm5NextTextExperts(nn.Module):
         hidden_states = hidden_states.reshape(-1, self.hidden_dim)
 
         dispatcher_func = ep_dispatcher_dict[ep_plan.dispatcher]
+        dispatcher_kwargs = {}
+        if ep_plan.dispatcher == "chunkmoe":
+            dispatcher_kwargs["ep_plan"] = ep_plan
         hidden_states = dispatcher_func(
             self.num_experts,
             top_k_weights,
@@ -262,6 +268,7 @@ class Glm5NextTextExperts(nn.Module):
             ep_group=ep_group,
             fused=ep_plan.use_npu_fused_ops,
             swiglu_limit=self.swiglu_limit or 0.0,
+            **dispatcher_kwargs,
         )
         return hidden_states.view(orig_shape)
 
@@ -2098,6 +2105,10 @@ class Glm5NextVisionAttention(nn.Module):
 
         if is_flash_attention_requested(self.config):
             # Flash Attention: Use cu_seqlens for variable length attention
+            # CPU sequence lengths no longer synchronize the NPU stream; retain
+            # the ordering needed by flash attention during checkpoint replay.
+            if IS_NPU_AVAILABLE and TrainingContext().get_training_stage() == TrainingStage.BACKWARD:
+                torch.npu.current_stream(query_states.device).synchronize()
             max_seqlen = get_max_seqlen(cu_seqlens, self.config, kwargs={"max_seqlen": max_seqlen})
             attn_output, _ = attention_interface(
                 self,
@@ -2270,6 +2281,10 @@ class Glm5NextVisionModel(Glm5NextPreTrainedModel):
         """
         position_ids = get_vision_position_ids(grid_thw, self.spatial_merge_size, kwargs=kwargs)
         cu_seqlens, max_seqlen = get_vision_attention_seqlens(grid_thw, self.config, kwargs=kwargs)
+        # NPU attention consumes host sequence lengths; copy once before the blocks
+        # so per-layer list conversion does not synchronize the compute stream.
+        if cu_seqlens.device.type == "npu":
+            cu_seqlens = cu_seqlens.cpu()
 
         hidden_states = self.patch_embed(hidden_states)
         rotary_emb = self.rotary_pos_emb(position_ids)

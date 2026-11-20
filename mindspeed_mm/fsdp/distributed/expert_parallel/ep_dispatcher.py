@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 from typing import Callable, List, Optional
 
 import torch
@@ -432,10 +434,18 @@ def ep_mc2_forward(
     send_counts = num_local_tokens_per_expert
     recv_counts = num_global_tokens_per_expert[:, start_idx:end_idx].reshape(-1)
 
+    # Materialize real routing counts once, before enqueueing token permutation.
+    # Keep this snapshot local: checkpoint replay and later microbatches may
+    # produce different routes and must obtain their own metadata.
+    host_counts = None
+    if os.environ.get("MM_MC2_REUSE_HOST_COUNTS", "1") == "1":
+        host_counts = (send_counts.tolist(), recv_counts.tolist())
+
     hidden_states, unpermute_indices = permute(hidden_states, selected_experts.to(torch.int32), fused=fused)
 
     intermediate_hidden_states = all2all_grouped_matmul(
-        inputs=hidden_states, weights=fc1_weight, group=ep_group, send_counts=send_counts, recv_counts=recv_counts
+        inputs=hidden_states, weights=fc1_weight, group=ep_group, send_counts=send_counts, recv_counts=recv_counts,
+        host_counts=host_counts
     )
     intermediate_activations = apply_activation(
         intermediate_hidden_states,
@@ -447,7 +457,8 @@ def ep_mc2_forward(
     )
 
     hidden_states = grouped_matmul_all2all(
-        inputs=intermediate_activations, weights=fc2_weight, group=ep_group, send_counts=recv_counts, recv_counts=send_counts
+        inputs=intermediate_activations, weights=fc2_weight, group=ep_group, send_counts=recv_counts, recv_counts=send_counts,
+        host_counts=None if host_counts is None else (host_counts[1], host_counts[0])
     )
     hidden_states = unpermute(
         hidden_states, unpermute_indices, probs=routing_weights, fused=True
