@@ -233,15 +233,15 @@ main() {
     case "$npu_device_id_lower" in
         d802)
             NPU_TYPE="a2"
-            echo "NPU Type: Atlas A2训练系列产品 (d802)"
+            echo "NPU Type: Atlas A2 training products (d802)"
             ;;
         d803)
             NPU_TYPE="a3"
-            echo "NPU Type: Atlas A3训练系列产品 (d803)"
+            echo "NPU Type: Atlas A3 training products (d803)"
             ;;
         *)
             echo "Error: Unsupported NPU device ID: $npu_device_id"
-            echo "Supported device IDs: d802 (Atlas A2训练系列产品), d803 (Atlas A3训练系列产品)"
+            echo "Supported device IDs: d802 (Atlas A2 training products), d803 (Atlas A3 training products)"
             echo "Your device ID: $npu_device_id"
             return 1
             ;;

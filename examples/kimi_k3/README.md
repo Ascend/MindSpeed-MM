@@ -173,8 +173,8 @@ export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_nn/op_api/lib/:${LD_LIB
 
 产品名对应的`${soc_series}`取值如下，请按实际场景传参：
 
-- Atlas A2训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
-- Atlas A3训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
+- Atlas A2训练系列产品：取值为ascend910b
+- Atlas A3训练系列产品：取值为ascend910_93
 - Ascend 950PR&950DT系列产品：取值为Ascend950
 
 ### 6. 安装ops-transformer以适配AscendC版本attn_res
@@ -204,8 +204,8 @@ export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_transformer/op_api/lib/
 
 产品名对应的`${soc_series}`取值如下，请按实际场景传参：
 
-- Atlas A2训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
-- Atlas A3训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
+- Atlas A2训练系列产品：取值为ascend910b
+- Atlas A3训练系列产品：取值为ascend910_93
 - Ascend 950PR&950DT系列产品：取值为Ascend950
 
 ### 7. 安装MindSpeed-Ops以支持Triton版本causal conv1d

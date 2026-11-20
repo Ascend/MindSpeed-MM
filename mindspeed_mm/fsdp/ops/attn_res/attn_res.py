@@ -60,7 +60,7 @@ def apply_attn_res(
         device_name = torch_npu.npu.get_device_name()
         if "Ascend950" not in device_name:
             raise RuntimeError(
-                f"attn_res_implementation 'triton' is only supported on Ascend 950PR and 950DT series products, "
+                f"attn_res_implementation 'triton' is only supported on Ascend 950PR&950DT products, "
                 f"got device: {device_name}. Use 'ascendc' or 'eager' instead."
             )
         from mindspeed_mm.fsdp.ops.attn_res.attn_res_triton import attn_res_triton

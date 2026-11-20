@@ -183,8 +183,8 @@ export LD_LIBRARY_PATH=${ASCEND_OPP_PATH}/vendors/custom_transformer/op_api/lib:
 
 产品名对应的`${soc_series}`取值如下，请按实际场景传参：
 
-- Atlas A2训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
-- Atlas A3训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
+- Atlas A2训练系列产品：取值为ascend910b
+- Atlas A3训练系列产品：取值为ascend910_93
 - Ascend 950PR&950DT系列产品：取值为Ascend950
 
 实际安装包名称和动态库路径以构建输出为准。
@@ -410,7 +410,7 @@ WORLD_SIZE=$(($NPROC_PER_NODE*$NNODES))
 - **减层减专家训练**：当前版本仅进行了至多8机验证，验证规格减少模型尺寸为28专家，尚未进行全层训练验证。
 - **DSA长序列路径**：测试序列长度需大于`index_topk`，才能覆盖实际的稀疏Top-K路径。K3.1默认`index_topk=2048`。
 - Top-K选择是离散操作，当前Indexer参数不从语言模型损失接收梯度，将会尽快支持。
-- **完整参数LoRA微调**：当前版本进行了128卡Atlas 950 SuperPoD验证.
+- **完整参数LoRA微调**：当前版本进行了128卡Ascend 950PR&950DT系列产品验证.
 
 <a id="jump3.4"></a>
 
@@ -428,7 +428,7 @@ bash examples/kimi_k31_pro/finetune_kimik31_pro.sh
 
 ### 5. 分布式 LoRA 微调
 
-基于128卡Atlas 950 SuperPoD开展Kimi-K3.1-Pro LoRA微调，采用FSDP2+EP混合并行策略，实现超大规模模型的分布式部署与高效训练。
+基于128卡Ascend 950PR&950DT系列产品开展Kimi-K3.1-Pro LoRA微调，采用FSDP2+EP混合并行策略，实现超大规模模型的分布式部署与高效训练。
 
 (1) 在`kimik31_pro_lora_128p.yaml`配置文件中完成模型权重、训练数据集、LoRA参数及分布式并行策略等配置（LoRA参数见`training.lora`字段，分布式并行策略见`parallel`字段）；
 
