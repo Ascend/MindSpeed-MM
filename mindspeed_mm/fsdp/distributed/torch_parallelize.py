@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import logging
+from copy import copy
 
 import torch
 
 from .expert_parallel.expert_parallel import expert_parallelize_modules
 from .expert_parallel.expert_fully_shard_parallel import expert_fully_shard_modules
+from .data_parallel import distributed_data_parallel_modules
 from .vocab_parallel.vocab_parallel import get_vp_modules, set_host_resident, vocab_parallelize_modules
 from .fully_shard_parallel import fully_shard_parallel_modules, set_modules_to_prefetch
 from .parallel_state import get_parallel_state
@@ -37,6 +39,14 @@ class ParallelApplier:
         self.parallel_state = get_parallel_state()
 
     def apply_fsdp_modules(self, model, training_config):
+        if self.parallel_state.fully_shard_parallel_size == 1:
+            if self.config.fsdp_plan.cpu_offload:
+                raise ValueError("DDP (fully_shard_parallel_size=1) does not support fsdp_plan.cpu_offload.")
+            return distributed_data_parallel_modules(
+                model,
+                self.parallel_state.get_dp_group(),
+                training_config,
+            )
         model = fully_shard_parallel_modules(model, self.parallel_state.get_hsdp_device_mesh(), self.config.fsdp_plan,
                                              training_config)
         return model
@@ -73,16 +83,10 @@ class ParallelApplier:
             # it is disabled, so the table is an ordinary accelerator parameter again.
             set_host_resident(model, host_resident=False)
             return model
-        if self.config.fully_shard_parallel_size == 1 and not self.training_config.init_model_with_meta_device:
-            # DDP replicates the module and all-reduces every parameter on one device, which cannot
-            # coexist with a table deliberately kept in host memory: reject it where the table is created
-            # instead of after the model has been moved to the accelerator.
+        if self.parallel_state.fully_shard_parallel_size == 1:
             raise NotImplementedError(
-                "a host-resident n-gram table (vocab_plan.host_by_cpu=true) needs FSDP2: DDP "
-                "(fully_shard_parallel_size=1 without init_model_with_meta_device) has no way to keep one "
-                "parameter off the accelerator and out of the gradient all-reduce. Set "
-                "fully_shard_parallel_size > 1, enable init_model_with_meta_device, or set "
-                "vocab_plan.host_by_cpu=false."
+                "Vocabulary parallelism is not supported with DDP "
+                "(fully_shard_parallel_size=1); use fully_shard_parallel_size > 1."
             )
         return vocab_parallelize_modules(
             model,
@@ -92,9 +96,18 @@ class ParallelApplier:
         )
 
     def set_modules_to_prefetch(self, model):
-        if self.config.fsdp_plan.num_to_forward_prefetch > 0 or self.config.fsdp_plan.num_to_backward_prefetch > 0:
+        fsdp_plan = self.config.fsdp_plan
+        if fsdp_plan.num_to_forward_prefetch > 0 or fsdp_plan.num_to_backward_prefetch > 0:
             ep_plan = self.config.ep_plan if self.config.expert_parallel_size > 1 and self.config.ep_plan.apply_modules else None
-            set_modules_to_prefetch(model, fsdp_plan=self.config.fsdp_plan, ep_plan=ep_plan)
+            if self.parallel_state.fully_shard_parallel_size == 1:
+                if ep_plan is None:
+                    return model
+                # Only expert FSDP units exist under the replicated root.
+                fsdp_plan = copy(fsdp_plan)
+                fsdp_plan.apply_modules = ep_plan.apply_efsdp_modules
+                fsdp_plan.hook_modules = None
+                ep_plan = None
+            set_modules_to_prefetch(model, fsdp_plan=fsdp_plan, ep_plan=ep_plan)
         return model
 
     def apply_quantization_modules(self, model):

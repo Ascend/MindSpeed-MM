@@ -19,12 +19,11 @@ import torch
 from torch.distributed._tensor import DTensor
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard, CPUOffloadPolicy
-from torch.nn.parallel import DistributedDataParallel as DDP
 
 from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.params.parallel_args import FSDPPlanConfig, EPPlanConfig
-from mindspeed_mm.fsdp.utils.device import get_torch_device, get_device_type
+from mindspeed_mm.fsdp.utils.device import get_torch_device
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.utils.utils import get_host_resident_params
 from mindspeed_mm.fsdp.params.training_args import TrainingArguments
@@ -65,31 +64,6 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
     Returns:
         The model with FSDP applied to specified modules.
     """
-
-    ps = get_parallel_state()
-
-    if ps.fully_shard_parallel_size == 1 and not training_config.init_model_with_meta_device:
-        # Background: In DDP mode, model is loaded in float32 by default.
-        # Qwen3.5's ChunkGatedDeltaRuleFunction requires bfloat16, so we need to
-        # convert the model to the target dtype specified in fsdp_plan.
-        target_dtype = get_dtype(fsdp_plan.param_dtype) if fsdp_plan.param_dtype else None
-        if target_dtype is not None:
-            for name, param in model.named_parameters():
-                if "lora" not in name:
-                    param.data = param.data.to(dtype=target_dtype)
-
-        # wrap model in DDP
-        dp_group = ps.get_dp_group()
-        model = DDP(
-            model.to(get_device_type()),
-            process_group=dp_group,
-            find_unused_parameters=True,
-            device_ids=[get_torch_device()],
-        )
-
-        print_rank(logger.info,
-                   "DDP mode is enabled (fully_shard_parallel_size=1) instead of FSDP wrapping")
-        return model
 
     is_container = hasattr(model, 'get_sub_models') and callable(getattr(model, 'get_sub_models'))
 

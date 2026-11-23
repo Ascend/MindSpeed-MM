@@ -3,6 +3,7 @@
 - [特性列表](../features/supported_features.md)
 - [并行特性]()
   - [FSDP2](../features/parallel/fsdp2.md)
+  - [DDP](../features/parallel/ddp.md)
   - [序列并行]()
     - [Unaligned Ulysses CP](../features/parallel/unaligned_ulysses_cp.md)
     - [DiT Ring Attention](../features/parallel/dit_ring_attention.md)

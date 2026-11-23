@@ -21,6 +21,7 @@ import torch
 
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.distributed.fully_shard_parallel import pregather_fsdp_params
+from mindspeed_mm.fsdp.distributed.data_parallel import configure_ddp_gradient_sync
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.utils.utils import move_to_device, get_time, configure_hsdp_gradient_sync, tensor_to_dtensor, \
     report_memory
@@ -230,9 +231,11 @@ class TrainEngine:
             self.set_loss_func(batch_data)
 
             # Determine if this is the last step of gradient accumulation
-            if ps.fully_shard_parallel_size > 1 or args.training.init_model_with_meta_device:
-                is_last_step = step == args.training.gradient_accumulation_steps - 1
+            is_last_step = step == args.training.gradient_accumulation_steps - 1
+            if ps.fully_shard_parallel_size > 1:
                 configure_hsdp_gradient_sync(self.model, is_last_step)
+            else:
+                configure_ddp_gradient_sync(self.model, is_last_step)
 
             # forward step
             TrainingContext().set_training_stage(TrainingStage.FORWARD)

@@ -40,9 +40,15 @@
   </tr></thead>
 <tbody>
   <tr>
-    <td class="tg-t1fb" rowspan="6">并行特性</td>
+    <td class="tg-t1fb" rowspan="7">并行特性</td>
     <td class="tg-citn">FSDP2</td>
     <td class="tg-i1fi"><a href="parallel/fsdp2.md">FSDP2</a></td>
+    <td class="tg-fr9f">✓</td>
+    <td class="tg-fr9f">×</td>
+  </tr>
+  <tr>
+    <td class="tg-citn">DDP</td>
+    <td class="tg-i1fi"><a href="parallel/ddp.md">DDP</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">×</td>
   </tr>

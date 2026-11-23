@@ -38,9 +38,14 @@
   </tr></thead>
 <tbody>
   <tr>
-    <td class="tg-t1fb" rowspan="9">并行特性</td>
+    <td class="tg-t1fb" rowspan="10">并行特性</td>
     <td class="tg-citn">FSDP2</td>
     <td class="tg-i1fi"><a href="parallel/fsdp2.md">FSDP2</a></td>
+
+  </tr>
+  <tr>
+    <td class="tg-citn">DDP</td>
+    <td class="tg-i1fi"><a href="parallel/ddp.md">DDP</a></td>
 
   </tr>
   <tr>
