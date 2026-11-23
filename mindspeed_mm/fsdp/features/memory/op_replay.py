@@ -191,15 +191,29 @@ class OpReplayScope:
                selection, every cached leaf of the scope goes in with the
                same quantizer. Config-based scopes resolve it via
                QuantizerPlan.resolve() (see params/quantizer_args.py).
+    pinned_ops: ops whose outputs are retained by op replay itself instead of
+               being handed to the swap cache ("self-selected recompute").
+               Union with cache_ops: listing an op only here still replays it;
+               overlap resolves to pinned (no put/pop at all). Pinned payloads
+               never enter the swap cache, so they are outside its capacity
+               budget and are not quantized; the tenant owns their footprint.
     """
 
-    def __init__(self, cache_ops=None, save_rng=True, name=None, quantizer=None):
+    def __init__(self, cache_ops=None, pinned_ops=None, save_rng=True, name=None, quantizer=None):
         if cache_ops is None:
             cache_ops = _default_cache_ops()
-        self.cache_ops = cache_ops
+        pinned_ops = set(pinned_ops or ())
+        # Union, not subset: listing an op only here still replays it. The
+        # overlap resolves to pinned, so a user never has to edit both.
+        self.cache_ops = cache_ops | pinned_ops
+        self.pinned_ops = pinned_ops
         self.save_rng = save_rng
         self.name = name
         self.quantizer = quantizer
+
+    def is_pinned(self, func) -> bool:
+        """True when this op's outputs are owned by the tenant (no swap cache)."""
+        return func in self.pinned_ops
 
     @classmethod
     def from_config(cls, cfg) -> "OpReplayScope":
@@ -213,6 +227,7 @@ class OpReplayScope:
         quantizer_plan = getattr(cfg, "quantizer", None)
         return cls(
             cache_ops=_parse_op_list(getattr(cfg, "cache_ops", None)),
+            pinned_ops=_parse_op_list(getattr(cfg, "pinned_ops", None)),
             save_rng=getattr(cfg, "save_rng", True),
             name=getattr(cfg, "name", None),
             quantizer=quantizer_plan.resolve() if quantizer_plan is not None else None,
@@ -233,11 +248,31 @@ class OpReplaySession:
     def __init__(self, controller: "OpReplayController"):
         self._scope_stack = controller._scope_stack       # shared by reference
         self.op_cache = controller.op_cache               # shared
+        # PINNED payloads are owned by this tenant (no swap-cache handle);
+        # the controller keeps the process-wide footprint so the cost of the
+        # bypass stays observable.
+        self.pinned_stats = controller.pinned_stats
         # token_routes: func -> [(info_leaves, spec, post_rng_snap), ...], FIFO.
         # post_rng_snap is the RNG snapshot right after the op ran in forward;
         # replaying (skipping) the op restores it to keep the recompute RNG
         # stream aligned with forward op by op.
         self.token_routes: defaultdict = defaultdict(list)
+
+    def pin(self, tensor: torch.Tensor) -> None:
+        """Account for a payload the caller now keeps in its route.
+
+        Ownership lives in ``token_routes`` (the route holds the tensor); this
+        only maintains the footprint counters, unlike ``pop()``, which has to
+        produce the payload.
+        """
+        self.pinned_stats['puts'] += 1
+        self.pinned_stats['bytes'] += tensor.nbytes
+        self.pinned_stats['peak_bytes'] = max(self.pinned_stats['peak_bytes'], self.pinned_stats['bytes'])
+
+    def unpin(self, tensor: torch.Tensor) -> None:
+        """Drop the footprint of a pinned payload the route no longer holds."""
+        self.pinned_stats['pops'] += 1
+        self.pinned_stats['bytes'] -= tensor.nbytes
 
     @property
     def zone_scope(self) -> Optional[OpReplayScope]:
@@ -277,6 +312,11 @@ class OpReplayCachingMode(_OpReplayMode):
     quantized scope replays a dequantized (lossy) tensor instead of the exact
     forward output. Every cached leaf of the scope gets the same quantizer —
     never a per-tensor choice by size or data.
+
+    Outputs of scope.pinned_ops take the other path: op replay keeps the tensor
+    itself (no swap-cache put), so those payloads never enter the cache's
+    capacity budget and are not quantized. The replay mode hands them straight
+    back; see OpReplaySession.pin/unpin for the footprint accounting.
     """
 
     def __torch_dispatch__(self, func, types, args=(), kwargs=None):
@@ -289,14 +329,22 @@ class OpReplayCachingMode(_OpReplayMode):
         any_ret_has_alias_info = any(
             ret.alias_info is not None for ret in func._schema.returns)
         leaves, spec = tree_flatten(out)
+        pinned = scope.is_pinned(func)
         info_leaves = []
         has_tensor = False
         for leaf in leaves:
             if isinstance(leaf, torch.Tensor):
-                handle = self.session.op_cache.put(
-                    _maybe_detach(leaf, any_ret_has_alias_info),
-                    quantizer=scope.quantizer)
-                info_leaves.append(_HandleInfo(handle))
+                leaf = _maybe_detach(leaf, any_ret_has_alias_info)
+                if pinned:
+                    # PINNED: op replay keeps the output itself. It never
+                    # reaches the swap cache, so it is outside that cache's
+                    # capacity budget and is not quantized.
+                    self.session.pin(leaf)
+                    info_leaves.append(leaf)
+                else:
+                    handle = self.session.op_cache.put(
+                        leaf, quantizer=scope.quantizer)
+                    info_leaves.append(_HandleInfo(handle))
                 has_tensor = True
             else:
                 info_leaves.append(leaf)
@@ -326,6 +374,12 @@ class OpReplayReplayingMode(_OpReplayMode):
         if not routes:
             return func(*args, **kwargs)
         info_leaves, spec, post_rng_snap = routes.pop(0)
+
+        # PINNED leaves are the payloads themselves: hand them back and drop
+        # the tenant's ownership (they never round-trip through the cache).
+        for info in info_leaves:
+            if isinstance(info, torch.Tensor):
+                self.session.unpin(info)
 
         # Any miss -> the whole op falls back to recompute. No RNG restore
         # is needed then: the stream is already at forward's pre-op position.
@@ -371,14 +425,33 @@ class OpReplayReplayingMode(_OpReplayMode):
         # Release routes this checkpoint did not consume (e.g. early stop).
         # A quantized payload is dequantized here even though nobody reads it:
         # the cleanup path only reclaims the handle (small known waste, see
-        # SwapCache.pop).
+        # SwapCache.pop). Pinned payloads are simply handed back to the GC.
         for func, routes in self.session.token_routes.items():
             for info_leaves, spec, post_rng_snap in routes:
                 for info in info_leaves:
                     if isinstance(info, _HandleInfo):
                         self.session.op_cache.pop(info.handle)
+                    elif isinstance(info, torch.Tensor):
+                        self.session.unpin(info)
         self.session.token_routes.clear()
+        self._log_pinned_peak()
         return ret
+
+    def _log_pinned_peak(self) -> None:
+        """Report the PINNED footprint once.
+
+        These payloads bypass the swap cache by design, so this line is where
+        the user sees what that costs (the counter stays queryable on the
+        controller for metrics).
+        """
+        stats = self.session.pinned_stats
+        if not stats['peak_bytes'] or stats['logged']:
+            return
+        stats['logged'] = True
+        logger.info(
+            "op replay PINNED peak: %.1f MiB across %d puts (held by the "
+            "tenant, outside the swap cache)",
+            stats['peak_bytes'] / (1024 * 1024), stats['puts'])
 
 
 class OpReplayController:
@@ -389,6 +462,11 @@ class OpReplayController:
         self.scopes = list(scopes)
         self.op_cache = op_cache
         self._scope_stack: List[OpReplayScope] = []
+        # Process-wide footprint of PINNED payloads (tenant-owned, never in
+        # the swap cache): put/pop counters plus the concurrent/peak bytes.
+        self.pinned_stats = {
+            'puts': 0, 'pops': 0, 'bytes': 0, 'peak_bytes': 0, 'logged': False,
+        }
 
     @contextlib.contextmanager
     def replay_zone(self, scope: OpReplayScope):

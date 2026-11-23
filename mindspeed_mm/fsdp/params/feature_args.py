@@ -60,9 +60,9 @@ class SwapPlanConfig(BaseArguments):
         default=True,
         metadata={"help": "Whether arena slabs use pinned (page-locked) memory. False is the escape hatch when host pinned memory is exhausted; non-pinned copies then execute synchronously (torch behavior)."},
     )
-    eviction_policy: Literal["fifo", "belady"] = field(
+    eviction_policy: Literal["fifo", "belady", "size_order"] = field(
         default="fifo",
-        metadata={"help": "Swap cache eviction policy: 'fifo' or 'belady'. With keep_rate=0 (default) every put evicts everything and the two policies are equivalent; belady matters when keep_rate > 0 (evict the farthest-future use)."},
+        metadata={"help": "Swap cache eviction policy: 'fifo' or 'belady'. With keep_rate=0 (default) every put evicts everything and the two policies are equivalent; belady matters when keep_rate > 0 (evict the farthest-future use). 'size_order' evicts the largest payload first, so a byte budget is freed with the fewest copies (host issue economy); it matters under bursts (keep_rate > 0, prefetch backlog, hard-limit reclaim)."},
     )
 
     @model_validator(mode='after')
@@ -115,6 +115,14 @@ class OpReplayScopeConfig(BaseArguments):
         metadata={"help": "Whitelist of aten op names to cache in this scope (e.g. "
                           "['aten.mm.default', 'aten.linear.default']). None falls back to the "
                           "built-in default whitelist."},
+    )
+    pinned_ops: Optional[List[str]] = field(
+        default=None,
+        metadata={"help": "Ops whose outputs op replay keeps in HBM itself, bypassing the swap "
+                          "cache entirely (no put/pop, so no capacity accounting and no "
+                          "quantization). Union with cache_ops: an op listed only here is still "
+                          "replayed; overlap resolves to pinned. The tenant owns the footprint — "
+                          "a one-time PINNED peak is logged."},
     )
     quantizer: Optional[QuantizerPlan] = field(
         default=None,

@@ -46,23 +46,42 @@ flowchart LR
 
 同时满足才生效：`features.recompute: true`；`use_reentrant: false`（reentrant下checkpoint不使用 `context_fn`，Op Replay永不激活，启动时warning并跳过）；`op_replay_scopes` 非空（非空即启用）。
 
-最小配置示例：
+### 配置示例
 
 ```yaml
 features:
   recompute: true
   recompute_plan:
+    # true 时 Op Replay 不生效（reentrant checkpoint 不使用 context_fn）
+    use_reentrant: false
+    # 重计算覆盖的模块 pattern
     apply_modules:
       - model.language_model.layers.{*}
-    use_reentrant: false
     op_replay_scopes:
       - name: layer_attn
+        # scope 区域，必须落在 recompute_plan.apply_modules 覆盖范围内
         apply_modules:
           - model.language_model.layers.{*}.self_attn
-        # cache_ops 缺省回落内置白名单（matmul 族 + SDPA flash attention）
+        # scope 内含 dropout 等随机算子时保持 true
+        save_rng: true
+        # 输出换出到 SwapCache；缺省用内置白名单，[] 表示不缓存
+        cache_ops:
+          - aten.matmul.default
+          - aten.mm.default
+          - aten.addmm.default
+          - aten.linear.default
+          - npu.npu_fusion_attention.default
+        # 输出留在 HBM，不经过 SwapCore；与 cache_ops 并集，重叠时 pinned 优先
+        pinned_ops:
+          - aten.matmul.default
+        # null | {name: int8_pertoken} | {name: fp8_blockwise, block_size: 128}
+        quantizer: null
   swap_plan:
-    capacity_mb: 1024   # 多租户共享预算，与 Act Stash 同开时按总量规划
+    # 与 Act Stash 同开时按总换出量规划
+    capacity_mb: 1024
 ```
+
+`apply_modules` 是模块 pattern，`cache_ops` / `pinned_ops` 是 `torch.ops` 全限定名，两者不要混写。`cache_ops` 缺省时使用内置白名单；显式 `[]` 表示不缓存任何算子。`pinned_ops` 里的算子仍会回放，只是输出不 put；同一算子同时出现在两个列表时按 pinned 处理。
 
 ### 参数说明
 
@@ -83,9 +102,42 @@ features:
 | `op_replay_scopes[i].apply_modules` | List[str] | [] | 标定scope区域的模块。**必须落在 `recompute_plan.apply_modules` 覆盖范围内**——dispatch模式只在checkpoint内部激活，scope落在覆盖外时永不回放（不报错，只是不生效）。 |
 | `op_replay_scopes[i].save_rng` | bool | true | 是否记录/回放该scope内缓存算子执行后的RNG快照。作用域内含随机算子（如dropout、randn_like等）时保持重计算RNG流与forward逐算子对齐，保证梯度一致；scope内无随机算子时可关闭。 |
 | `op_replay_scopes[i].cache_ops` | List[str] / null | None | 缓存算子白名单，元素为 `torch.ops` 全限定名（如 `aten.mm.default`、`npu.npu_fusion_attention.default`）。`None` 回落到内置默认白名单：matmul族（`aten.mm.default` / `aten.addmm.default` / `aten.bmm.default` / `aten.linear.default`）与 `aten._scaled_dot_product_flash_attention.default`；**显式空列表 = 不缓存任何算子**。缓存始终白名单门控，不存在"全缓存"模式。 |
+| `op_replay_scopes[i].pinned_ops` | List[str] / null | None | 输出由 Op Replay **自己保管在 HBM**的算子（"自选重算"）：**完全不经过 SwapCore**（不 put/pop），因此不受 `swap_plan.capacity_mb` 约束、也不量化。与 `cache_ops` 取**并集**：只写在这里的算子仍会被回放；两边都列时以 `pinned` 为准（不报错，不需要改两遍）。占用由租户自担，首次非零时打印一次 PINNED 峰值日志。 |
 | `op_replay_scopes[i].quantizer` | dict / str / null | None | 该scope缓存输出交给Swap Cache时使用的载荷量化器（**静态**按scope配置，不按尺寸/数据逐张量选择）：`None` = 不量化（默认，与不加该字段的行为逐位相同）。两种写法等价：裸字符串注册名（如 `quantizer: int8_pertoken`），或嵌套字典（字段见下两行）。未注册名在**配置解析期即报错**（fail-fast，不等接线或首次put）。只影响缓存载荷的精度，不影响收哪些算子（那由 `cache_ops` 决定）。**精度边界：forward与loss逐位不变**——被替换的只是backward期重算本该产出的那个张量（`pop`返回反量化后的新张量，是该张量的有损近似，不再是put进去的对象）；因此开量化的scope只能用容差口径验收，逐位口径仅对不配置 `quantizer` 成立。 |
 | `op_replay_scopes[i].quantizer.name` | str | 必填 | 量化器注册名（分发标签）：`int8_pertoken` = INT8 per-token量化；`fp8_blockwise` = FP8 E4M3分块量化（仅支持Ascend 950PR&950DT系列产品；要求最后一维是block size的倍数）。 |
 | `op_replay_scopes[i].quantizer.block_size` | int | 128 | 仅 `name: fp8_blockwise` 时有效：`fp8_blockwise` 的列分块大小，行分块固定为1。支持 `64`、`128`、`192`、`256`；对 `int8_pertoken` 配置该项在配置解析期报错。 |
+
+### 自选驻留（PINNED）
+
+默认所有缓存输出都交给 SwapCore：put 后异步换出，重放时可能需要 H2D 回读。若某些算子的输出"回读代价高、体积可控"，把它们列进 `pinned_ops`——Op Replay 直接把张量留在自己的路由里，**不经过 SwapCore**，强制驻留在HBM侧。
+
+### 只跳过最后一层重计算
+
+最后一层的激活很快会被消费，不需要 checkpoint 重算，也不希望进入 SwapCore 换出。做法是把最后一层从重计算和 Op Replay 的覆盖范围里一起排除：
+
+```yaml
+features:
+  recompute: true
+  recompute_plan:
+    use_reentrant: false
+    # 93 层模型：索引 0-92，最后一层 92 被排除
+    apply_modules:
+      - model.language_model.layers.{0-91}
+    op_replay_scopes:
+      - name: layer_attn
+        apply_modules:
+          - model.language_model.layers.{0-91}.self_attn
+  enable_activation_offload: true
+  activation_offload_plan:
+    apply_modules:
+      - model.language_model.layers.{0-91}
+```
+
+N 层模型写成 `layers.{0-(N-2)}`。最后一层不在 checkpoint 和 scope 覆盖内，因此不重算，也不会被 Op Replay put；它的激活保留在 HBM。
+
+若仍要保留最后一层的 checkpoint、只避免换出，则 `recompute_plan.apply_modules` 保持 `{*}`，只把 `op_replay_scopes.apply_modules` 收窄到 `{0-(N-2)}`；代价是最后一层仍会在 backward 重算。若启用了 `chunkmbs_plan`，其 `apply_modules` 也要同步收窄。
+
+`pinned_ops` 按算子类型生效，不能只作用于某一层；需要按层控制时，用上面的范围排除，而不是逐个枚举最后一层的算子。
 
 ### 自定义算子纳管
 

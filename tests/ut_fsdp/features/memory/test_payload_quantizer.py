@@ -109,11 +109,15 @@ class _PutSpyCache:
 
 
 class _FakeController:
-    """OpReplaySession only shares _scope_stack / op_cache by reference."""
+    """OpReplaySession only shares _scope_stack / op_cache / pinned_stats."""
 
     def __init__(self, scope, op_cache):
         self._scope_stack = [scope]
         self.op_cache = op_cache
+        # PINNED payload footprint is owned process-wide by the controller.
+        self.pinned_stats = {
+            'puts': 0, 'pops': 0, 'bytes': 0, 'peak_bytes': 0, 'logged': False,
+        }
 
 
 class TestInt8PerTokenRoundtrip:

@@ -77,6 +77,29 @@ flowchart TB
 
 `swap_plan` 描述全部租户共享的换入换出物理资源（HBM容量预算、CPU锁页arena、驱逐与预取策略），在训练YAML的 `features` 段配置（FSDP2后端）。
 
+### 配置示例
+
+```yaml
+features:
+  swap_plan:
+    # 全部租户共享的 HBM 预算；<0 不管理，0 每次 put 即驱逐，>0 异步管理
+    capacity_mb: 1024.0
+    # 软上限 = capacity_mb * keep_rate；0 立即换出，1 尽量驻留到硬上限
+    keep_rate: 0.0
+    # 第二个 iteration 起按 pop 顺序链式预取
+    enable_prefetch: true
+    # CPU 锁页 slab 大小；null 表示 on-demand（逐张量精确分配）
+    cpu_arena_slab_size_mb: 2048.0
+    # all | standard | none
+    cpu_arena_pool_policy: standard
+    # false 时退化为同步拷贝，仅作锁页内存耗尽时的逃生口
+    pin_memory: true
+    # fifo | belady | size_order
+    eviction_policy: fifo
+```
+
+`swap_plan` 只配置物理资源，本身不产生换出；需要同时启用租户（Op Replay 或 Act Stash），租户的 `cache_ops` / `pinned_ops` 等配置见 [Op Replay](../optimization/op_replay.md) 和 [Act Stash](act_stash.md)。
+
 ### 参数说明
 
 | 配置项 | 类型 | 默认值 | 含义与取值约束 |
@@ -88,7 +111,7 @@ flowchart TB
 | `swap_plan.cpu_arena_pool_policy` | str | "standard" | CPU arena池策略：`"all"` 保留所有空slab的物理内存；`"standard"` 保留标准slab、超大slab空后立即释放；`"none"` 任何slab空后立即释放。仅在配置了 `cpu_arena_slab_size_mb` 时生效。 |
 | `swap_plan.cpu_arena_preallocate_slabs` | int | 0 | 首个训练step前预分配并清零触页的标准slab数量，`0` 表示不预分配。仅在已有swap租户时执行，无租户不会创建cache或分配slab。要求使用pooled arena且池策略为 `"all"` 或 `"standard"`。 |
 | `swap_plan.pin_memory` | bool | true | arena slab是否使用锁页（page-locked）内存。`false` 是宿主机锁页内存耗尽时的逃生口：非锁页拷贝将退化为同步执行（torch行为）。 |
-| `swap_plan.eviction_policy` | str | "fifo" | 驱逐策略：`"fifo"`（最早放入者先驱逐）或 `"belady"`（驱逐最远未来才使用的张量）。`keep_rate=0`（默认）的管理模式下每次put即驱逐，"驱逐谁"无选择、两策略等价；`keep_rate>0` 时belady生效。 |
+| `swap_plan.eviction_policy` | str | "fifo" | 驱逐策略：`"fifo"`（最早放入者先驱逐）或 `"belady"`（驱逐最远未来才使用的张量）。`keep_rate=0`（默认）的管理模式下每次put即驱逐，"驱逐谁"无选择、两策略等价；`keep_rate>0` 时belady生效。另支持 `"size_order"`：优先驱逐载荷最大的张量，用最少的拷贝腾出字节预算（host 下发经济性），在批量驱逐场景（`keep_rate>0`、预取积压、硬上限回收）减少 D2H 下发次数。 |
 
 ### 配置机制图解
 
@@ -104,7 +127,7 @@ flowchart LR
         FLIGHT["在途驱逐子集<br/>D2H 未完成，仍占 HBM"]
     end
 
-    SOFT -->|"超过软上限 → 选中驱逐<br/>（eviction_policy：fifo / belady）"| FLIGHT
+    SOFT -->|"超过软上限 → 选中驱逐<br/>（eviction_policy：fifo / belady / size_order）"| FLIGHT
 
     DDR[("DDR 集合（锁页 arena）<br/>pin_memory · cpu_arena_slab_size_mb<br/>· cpu_arena_pool_policy")]
 
@@ -121,11 +144,12 @@ flowchart LR
 - **释放时机**：D2H拷贝完成本身不释放HBM——释放是独立的宿主侧动作，只在三类时机发生（容量管理等待在途D2H完成、pop、迭代边界），之后张量才落入DDR集合、HBM占用才真正下降。
 - **容量定标规则**：异步重叠要成立，容量必须容得下"在飞"的拷贝——稳态下在飞D2H的份数 ≈ 单份传输耗时 ÷ 换出间隔（Little's law）。经验规则：`capacity_mb ≥ (⌈单份传输耗时/换出间隔⌉ + 1) × 单份换出大小`；低于此下界，硬上限反压停顿开始暴露到前向关键路径（表现为step time变长而HBM占用看似更低）。
 
-要点（fifo与belady）：
+要点（fifo，belady和size_order）：
 
 - **判据方向相反**：fifo用put插入序取队头；belady用转移图记录的「下次使用步」，驱逐最晚才用的张量——这是缓存理论的最优策略（OPT），前提是未来访问顺序已知且稳定。
 - **belady的两个生效前提**：转移图已学习（第二个iteration起）且 `keep_rate > 0`（默认 `keep_rate = 0` 时每次put即驱逐，两策略等价）。
 - **belady与可变负载**：查不到未来pop位置的张量按「永不使用」优先驱逐；pop顺序每步可变的负载转移图学到的「未来」不可靠，建议 `enable_prefetch: false` + `eviction_policy: fifo`。
+- **size_order**：按载荷字节数取最大者先驱逐，一次拷贝腾出尽量多的字节，减少批量驱逐时的 D2H 下发次数；代价是不看未来使用，可能踢掉马上要回读的大张量，适合 host 提交成为瓶颈的负载。
 
 ## 租户清单与选型指引
 

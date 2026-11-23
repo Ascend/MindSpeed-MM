@@ -387,8 +387,8 @@ class SwapHandle:
 
 
 class SwapCache:
-    """SwapHandle collection management: FIFO/Belady eviction + capacity
-    limits (hard capacity + soft limit) + hit/prefetch statistics
+    """SwapHandle collection management: FIFO/Belady/size-order eviction +
+    capacity limits (hard capacity + soft limit) + hit/prefetch statistics
 
     Token model: the SwapHandle returned by put is the sole token for pop
     (and the cache key, so tenants need no numbering space).
@@ -504,13 +504,29 @@ class SwapCache:
         self._apply(handle.wait())
         self._d2h_in_flight.pop(handle, None)
 
-    def _evict_oldest(self) -> bool:
+    def _evict_one(self) -> bool:
+        """Evict one policy-selected victim; False if none is evictable."""
         # belady (graph learned): evict the tensor used farthest in the future;
         # unknown future pop position counts as "never used again" (infinitely
         # far, evicted first). Prefetched tensors are not protected: with
         # zero-cost REPLICATED eviction there is nothing to protect against,
         # and protecting never-popped tensors would pin their HBM forever.
         # Otherwise FIFO (earliest stored).
+        # size_order: largest payload first, minimizing the number of copies
+        # needed to free a byte budget (host issue economy); strict '>' keeps
+        # the earliest put on a size tie.
+        if self._eviction_policy == "size_order":
+            candidate = None
+            for handle in self.handles:
+                if not handle.can_offload():
+                    continue
+                if candidate is None or handle.bytes() > candidate.bytes():
+                    candidate = handle
+            if candidate is not None:
+                self._evict(candidate)
+                return True
+            return False
+
         if self._eviction_policy == "belady" and not self._is_first_iter and self._pop_step_for_put_idx:
             candidate = None
             farthest = -1.0
@@ -561,7 +577,7 @@ class SwapCache:
         limit. With soft_limit_bytes=0 this evicts right after put,
         maximizing async D2H overlap."""
         while self._projected_hbm_bytes() > self.soft_limit_bytes:
-            if self._evict_oldest():
+            if self._evict_one():
                 continue
             # Nothing evictable; wait for in-flight copies to lower the projection.
             if self._d2h_in_flight:
@@ -578,7 +594,7 @@ class SwapCache:
                 self._wait_oldest_d2h()
                 continue
             # Nothing in flight; only option is evict, then wait the copy.
-            if not self._evict_oldest():
+            if not self._evict_one():
                 break
             if self._d2h_in_flight:
                 self._wait_oldest_d2h()
