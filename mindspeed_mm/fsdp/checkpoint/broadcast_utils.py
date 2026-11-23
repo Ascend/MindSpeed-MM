@@ -334,4 +334,8 @@ def rank0_load_and_broadcast_hf_weights(
         empty_cache()
 
     _log_unexpected_keys(unexpected_keys)
-    post_process_after_load(missing_param_keys=param_names, load_strict=load_strict)
+    post_process_after_load(
+        missing_param_keys=param_names,
+        load_strict=load_strict,
+        initialized_param_prefixes=("mtp.",) if getattr(model, "_ms_mm_mtp_preinitialized", False) else (),
+    )

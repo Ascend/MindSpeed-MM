@@ -156,20 +156,33 @@ class TrainEngine:
 
     def set_loss_func(self, batch_data):
         args = self.args
-        if args.features.loss_cfg.loss_type == "raw":
+        model = getattr(self.model, "module", self.model)
+        is_raw = args.features.loss_cfg.loss_type == "raw"
+        if is_raw and not (
+            args.model.mtp_num_layers > 0
+            and getattr(getattr(model, "mtp", None), "_ms_mm_mtp_adapter_created", False)
+        ):
+            # Native models retain their existing raw loss function and inputs.
             return
         plan = args.features.chunkloss_plan
         chunk_size = plan.chunk_size
         vocab_tile_size = plan.vocab_tile_size
-
         if args.features.enable_dynamic_chunk_loss:
             batch_data['total_chunk_size'] = plan.total_chunk_size
+        if is_raw:
+            # Only adapter-created MTP needs this auxiliary CE in raw mode.
+            mtp_chunk = args.features.enable_chunk_loss or args.features.enable_dynamic_chunk_loss
+            model.mtp_loss_function = build_loss_func(
+                "default",
+                chunk_size=chunk_size if mtp_chunk else None,
+                vocab_tile_size=vocab_tile_size if mtp_chunk else None,
+                is_mtp=True,
+                **batch_data,
+            )
+            return
         loss_func = build_loss_func(args.features.loss_cfg.loss_type, chunk_size=chunk_size, vocab_tile_size=vocab_tile_size, **batch_data)
 
-        if hasattr(self.model, "loss_function"):
-            self.model.loss_function = loss_func
-        else:
-            setattr(self.model, "loss_function", loss_func)
+        model.loss_function = loss_func
 
         if getattr(args.model, "mtp_num_layers", 0) > 0:
             mtp_loss_func = build_loss_func(
@@ -179,7 +192,7 @@ class TrainEngine:
                 is_mtp=True,
                 **batch_data,
             )
-            setattr(self.model, "mtp_loss_function", mtp_loss_func)
+            model.mtp_loss_function = mtp_loss_func
 
         output_router_logits = args.features.loss_cfg.router_aux_loss_coef > 0.0
         if output_router_logits:
@@ -189,6 +202,7 @@ class TrainEngine:
         """Perform a single training step with gradient accumulation."""
         args = self.args
         global_aux_loss_enabled = self.is_global_router_aux_loss_enabled()
+        total_base_loss = 0
         total_loss = 0
         total_lm_loss = 0 if global_aux_loss_enabled else None
         total_aux_loss = None
@@ -232,7 +246,8 @@ class TrainEngine:
             batch_data.pop("pixel_values", None)
             batch_data.pop("pixel_values_videos", None)
             loss = output.loss / args.training.gradient_accumulation_steps
-            total_loss += loss
+            # Preserve the native metric: model loss before framework MTP weighting.
+            total_base_loss += loss.detach()
 
             if global_aux_loss_enabled:
                 output_aux_loss = getattr(output, 'aux_loss', None)
@@ -247,11 +262,13 @@ class TrainEngine:
             mtp_loss = getattr(output, 'mtp_loss', None)
             if mtp_loss is not None:
                 final_mtp_loss = torch.mean(torch.stack(mtp_loss)) / args.training.gradient_accumulation_steps
-                loss += final_mtp_loss * getattr(args.model, 'mtp_loss_scaling_factor', 0.1)
+                loss = loss + final_mtp_loss * args.model.mtp_loss_scaling_factor
                 if all_mtp_loss is None:
                     all_mtp_loss = [torch.zeros_like(loss) for loss in mtp_loss]
                 for i in range(len(mtp_loss)):
                     all_mtp_loss[i] += mtp_loss[i] / args.training.gradient_accumulation_steps
+
+            total_loss += loss.detach()
 
             # Backward
             TrainingContext().set_training_stage(TrainingStage.BACKWARD)
@@ -269,8 +286,10 @@ class TrainEngine:
         loss_dict = {}
 
         # Average loss across data parallel group
+        total_base_loss = self.average_losses_across_data_parallel_group([total_base_loss])
         total_loss = self.average_losses_across_data_parallel_group([total_loss])
-        loss_dict["loss"] = total_loss.item()
+        loss_dict["loss"] = total_base_loss.item()
+        loss_dict["total loss"] = total_loss.item()
 
         if global_aux_loss_enabled:
             total_lm_loss = self.average_losses_across_data_parallel_group([total_lm_loss])

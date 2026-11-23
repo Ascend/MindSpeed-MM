@@ -60,11 +60,21 @@ class ModelArguments(BaseArguments):
     )
     mtp_num_layers: int = field(
         default=0,
-        metadata={"help": "Number of mtp layers."},
+        metadata={
+            "help": "Number of auxiliary MTP prediction depths; 0 disables MTP. "
+                    "With the generic adapter, share_decoder controls whether depths share one decoder."
+        },
     )
     mtp_loss_scaling_factor: float = field(
         default=0.1,
-        metadata={"help": "Mtp loss scaling factor."},
+        metadata={"help": "Weight applied to the mean loss across MTP prediction depths; defaults to 0.1."},
+    )
+    mtp_adapter: Optional[Dict[str, Any]] = field(
+        default=None,
+        metadata={
+            "help": "Optional overrides for generic FSDP2 MTP module paths and decoder construction. "
+                    "Omit to use default resolution; must be unset when the model provides its own MTP."
+        },
     )
     chunk_layer_chunks: int = field(
         default=1,

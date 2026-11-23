@@ -547,9 +547,15 @@ def _log_unexpected_keys(unexpected_keys: Set[str]) -> None:
 def post_process_after_load(
     missing_param_keys: set,
     load_strict: bool = False,
+    initialized_param_prefixes: tuple[str, ...] = (),
 ) -> None:
     # filter LoRA: lora_A/lora_B are intentionally absent from a base checkpoint
     missing = {k for k in missing_param_keys if "lora_" not in k}
+    if not load_strict and initialized_param_prefixes:
+        preinitialized = {k for k in missing if k.startswith(initialized_param_prefixes)}
+        missing -= preinitialized
+        if preinitialized:
+            logger.info("%d checkpoint parameter(s) kept their initialized values", len(preinitialized))
     if missing:
         # load_strict : true -> error on any model key the tensor did not provide with raise.
         if load_strict:
@@ -635,7 +641,11 @@ def load_hf_weights(
     if finalize is not None:
         finalize()
     _log_unexpected_keys(unexpected_keys)
-    post_process_after_load(missing_param_keys=param_names, load_strict=load_strict)
+    post_process_after_load(
+        missing_param_keys=param_names,
+        load_strict=load_strict,
+        initialized_param_prefixes=("mtp.",) if getattr(model, "_ms_mm_mtp_preinitialized", False) else (),
+    )
 
 
 def find_safetensors_index(directory: Path) -> Optional[FilePath]:

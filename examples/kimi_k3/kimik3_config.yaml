@@ -12,6 +12,8 @@ parallel:
       # Patched sparse MoE stores all routed experts in one 3-D tensor module.
       - language_model.model.layers.{*}.block_sparse_moe.experts
       - language_model.lm_head
+      # Explicit MTP shard; Trainer does not append or reorder this plan.
+      - mtp
     hook_modules:
       - language_model.model.layers.{*}
     num_to_forward_prefetch: 1
@@ -84,6 +86,23 @@ data:
 # 模型配置
 model:
   model_id: kimi_k3
+  # MTP 辅助预测深度 N：0 关闭；N > 0 时额外预测 t+2 至 t+N+1 共 N 个 token，不是新增的 decoder 层数。
+  mtp_num_layers: 0
+  # MTP 辅助损失权重，默认 0.1，可调整：total loss = loss + 权重 × mean(各深度 MTP loss)。
+  mtp_loss_scaling_factor: 0.1
+  mtp_adapter:
+    hidden_state_module: language_model.model
+    # 位置 ID 采用三轴格式；MTP attention 为 NoPE，不配置 rotary_emb。
+    position_ids_mode: mrope
+    # 在公共 MTP 层组合现有 MLA/MLP/norm，绕过主干 KDA/AttnRes 层结构。
+    decoder_class: mindspeed_mm.fsdp.models.mtp_decoders.PlainResidualDecoder
+    layer_kwargs:
+      attention_class: mindspeed_mm.fsdp.models.kimi_k3.modeling_kimi_linear.KimiMLAAttention
+      mlp_class: mindspeed_mm.fsdp.models.kimi_k3.modeling_kimi_linear.KimiMLP
+      norm_class: mindspeed_mm.fsdp.models.kimi_k3.modeling_kimi_linear.KimiRMSNorm
+      config_overrides:
+        # MTP 不在主干的选择性重计算/激活卸载链上。
+        skip_flash_attn_recompute: false
   model_name_or_path: *HF_MODEL_LOAD_PATH
   trust_remote_code: true
   use_grouped_expert_matmul: true

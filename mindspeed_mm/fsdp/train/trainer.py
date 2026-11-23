@@ -33,6 +33,7 @@ from mindspeed_mm.fsdp.utils.device import (
 )
 from mindspeed_mm.fsdp.distributed.parallel_state import init_parallel_state, get_parallel_state
 from mindspeed_mm.fsdp.models.modelhub import ModelHub
+from mindspeed_mm.fsdp.models.mtp_adapter import attach_mtp_adapter, initialize_mtp_parameters
 from mindspeed_mm.fsdp.models.model_container import ModelContainer
 from mindspeed_mm.fsdp.distributed.torch_parallelize import ParallelApplier
 from mindspeed_mm.fsdp.features.apply_features import FeaturesApplier
@@ -62,6 +63,7 @@ from mindspeed_mm.fsdp.utils.lora_weight_manager import LoraWeightManager
 from mindspeed_mm.fsdp.config.config_manager import ConfigManager
 from mindspeed_mm.fsdp.checkpoint.hf_utils import looks_like_hf_weight_dir
 from mindspeed_mm.fsdp.checkpoint.utils import retie_embeddings
+from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.utils.dtype import get_dtype
 from mindspeed_mm.fsdp.log import print_rank, init_logger
 
@@ -239,6 +241,42 @@ class Trainer:
         model = self.get_foundation_model() if model_provider is None else model_provider()
         is_container = isinstance(model, ModelContainer)
 
+        if args.model.mtp_num_layers:
+            if is_container:
+                raise ValueError("Configure MTP separately for each ModelContainer sub-model")
+            if getattr(model, "mtp", None) is not None:
+                if args.model.mtp_adapter is not None:
+                    raise ValueError("Model already provides MTP; remove model.mtp_adapter")
+            elif args.training.init_model_with_meta_device:
+                from accelerate import init_empty_weights
+                with init_empty_weights():
+                    model = attach_mtp_adapter(model, args.model, args.features)
+            else:
+                model = attach_mtp_adapter(model, args.model, args.features)
+                initialize_mtp_parameters(model, seed=args.training.seed)
+            if getattr(model, "mtp", None) is not None:
+                print_rank(logger.info, f"MTP module: {type(model.mtp).__name__}; adapter: {args.model.mtp_adapter}")
+                # An empty plan shards the root only, so MTP needs no entry there.
+                # A pattern matching a submodule is not enough: the block's own
+                # fc and norms stay in the root group unless 'mtp' itself matches.
+                fsdp_patterns = args.parallel.fsdp_plan.apply_modules
+                if fsdp_patterns and not any(module_name_match(p, "mtp") for p in fsdp_patterns):
+                    print_rank(
+                        logger.warning,
+                        "parallel.fsdp_plan.apply_modules lists modules but none of them covers "
+                        "'mtp', so the MTP parameters fall back to the root FSDP group and are "
+                        "gathered together with the embedding and the output head, raising peak "
+                        "memory. Append 'mtp' to the list.",
+                    )
+                if getattr(model.mtp, "_ms_mm_mtp_adapter_created", False):
+                    # ModelHub freezes native modules before this new block exists.
+                    # Apply only the user's configured patterns to adapter-owned MTP.
+                    for name, module in model.mtp.named_modules():
+                        full_name = f"mtp.{name}" if name else "mtp"
+                        if any(module_name_match(pattern, full_name) for pattern in args.model.freeze):
+                            for parameter in module.parameters():
+                                parameter.requires_grad_(False)
+
         # Apply LoRA adapters before FSDP2 sharding (if enabled)
         if args.training.lora.enable:
             if is_container:
@@ -276,9 +314,18 @@ class Trainer:
                             init_model_weights(sub_model, seed=args.training.seed)
             else:
                 to_empty_if_needed(model, device=device)
-                if args.training.load is None and not args.training.load_rank0_and_broadcast:
-                    if not getattr(model, "_weights_loaded", False):
-                        init_model_weights(model, seed=args.training.seed)
+                if (
+                    args.training.load is None
+                    and not args.training.load_rank0_and_broadcast
+                    and not getattr(model, "_weights_loaded", False)
+                ):
+                    # Full initialization includes MTP. Initializing it first
+                    # consumes RNG and changes the subsequent backbone weights.
+                    init_model_weights(model, seed=args.training.seed)
+                elif getattr(getattr(model, "mtp", None), "_ms_mm_mtp_adapter_created", False):
+                    # Pre-load initialization is only for framework-created MTP.
+                    # Native models keep their original checkpoint/RNG behavior.
+                    initialize_mtp_parameters(model, seed=args.training.seed)
 
             if args.training.lora.enable:
                 if is_container:

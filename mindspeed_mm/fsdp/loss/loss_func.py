@@ -103,6 +103,8 @@ def get_loss_func_params(
         else:
             # Compute per-sample loss: alpha scales each sample by total valid tokens in the batch.
             alpha = loss_mask.sum(1) * loss_mask.shape[0]  # shape: [batch_size]
+        if is_mtp:
+            alpha = torch.where(alpha == 0, torch.ones_like(alpha), alpha)
         reduction = "none"  # Keep per-token losses for sample-wise aggregation.
     elif loss_type == "per_token_loss":
         # Use raw sum loss without normalization here;
@@ -120,6 +122,10 @@ def get_loss_func_params(
     elif loss_type == "default":
         # Default: normalize loss by total number of valid tokens in the batch.
         alpha = loss_mask.sum()  # scalar
+        if is_mtp:
+            # A distant prediction step may have no valid labels (short or
+            # packed sequences). Its summed CE is zero, so use 1 instead of 0.
+            alpha = alpha.clamp(min=1)
         reduction = "sum"
     else:
         raise NotImplementedError(f"{loss_type} is not implemented!")

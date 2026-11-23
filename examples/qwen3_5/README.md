@@ -307,6 +307,10 @@ mm-convert Qwen35Converter dcp_to_hf \
 当前模型支持配置mtp模块，在`xxx_config.yaml`中model下的`mtp_num_layers`字段配置为1，默认为0；`mtp_loss_scaling_factor`字段也支持配置，默认为0.1
 注意：qwen3.5的mtp layer目前只支持配置1层。
 
+- `mtp_num_layers: 1`：主模型在位置 `t` 预测 `t+1`，MTP 额外预测 `t+2`。
+- `mtp_loss_scaling_factor`：MTP 辅助损失的权重，默认 0.1，可调整，总损失为 `loss + mtp_loss_scaling_factor × mtp loss`。
+- Qwen3.5 的 MTP 由模型实现自带，不需要配置 `model.mtp_adapter`，配置后启动会报错。
+
 【性能优化配置】
 
 - 重计算

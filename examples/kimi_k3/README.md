@@ -24,6 +24,7 @@
     - [2. 配置参数](#2-配置参数)
     - [3. 受限场景支持](#3-受限场景支持)
     - [4. 启动训练](#4-启动训练)
+    - [5. 通用 MTP 配置](#5-通用-mtp-配置)
   - [环境变量声明](#环境变量声明)
   - [注意事项](#注意事项)
 
@@ -301,6 +302,13 @@ NODE_RANK: 当前节点序号
 | `enable_activation_offload` | `features` | 激活值异步卸载到Host侧内存开关 | 开启后降低Device显存占用，`apply_modules`指定需要开启该特性的module |
 | `enable_chunk_loss` | `features` | chunkloss特性开关 | 需与`chunkloss_plan`关联使用，开启后大幅降低loss计算时的显存尖刺，详细说明请参考[chunkloss文档](../../docs/zh/features/optimization/chunkloss.md) |
 | `enable_chunk_mbs` | `features` | 是否开启chunkmbs特性 | 需与`chunkmbs_plan`关联使用，开启后将MicroBatch维度切分为多个微块依次计算，可压缩激活显存峰值并提升训练吞吐，详细说明请参考[chunkmbs文档](../../docs/zh/features/optimization/chunkmbs.md) |
+| `mtp_num_layers` | `model` | 通用 MTP 辅助预测深度数量 | 默认 `0` 关闭；正整数 `N` 增加 `N` 个辅助预测目标，默认共享一个 MTP decoder；建议从 `1` 开始 |
+| `mtp_loss_scaling_factor` | `model` | MTP 辅助损失权重 | 默认 `0.1`；训练目标为主 loss 加上该系数乘各深度 MTP loss 的平均值 |
+| `mtp_adapter` | `model` | 通用 MTP 的模块路径、位置接口及 decoder 构造配置 | 示例显式指定主干、位置模式和组件类，其余字段使用默认值；NoPE 不填写 `rotary_emb`；详见[通用 MTP](#5-通用-mtp-配置) |
+| `decoder_class` | `model->mtp_adapter` | MTP decoder 构造类 | Kimi 使用 `mindspeed_mm.fsdp.models.mtp_decoders.PlainResidualDecoder`，组合现有组件，避免依赖主干 KDA/Attention Residual 状态 |
+| `layer_kwargs` | `model->mtp_adapter` | 公共 decoder 的组件类及独立配置 | 示例已填写 KimiMLAAttention、KimiMLP、KimiRMSNorm；`config_overrides.skip_flash_attn_recompute: false` 只作用于 MTP，不修改主干同名开关 |
+| `apply_modules` | `parallel->fsdp_plan` | 手动指定 FSDP 分片模块 | 两份示例均已在列表末尾配置 `mtp`；自定义配置请保留原列表并手动追加，Trainer 不自动补充或重排 |
+| `freeze` | `model` | 手动冻结匹配模块的参数 | 可选；`mtp` 冻结 MTP 自身参数，`mtp.layers.{*}` 只冻结 MTP decoder；不配置匹配项时不冻结，共享 embedding/head 按自身路径单独配置 |
 
 【数据目录配置】
 
@@ -398,6 +406,38 @@ NNODES: 一共几个节点
 ```shell
 bash examples/kimi_k3/finetune_kimik3.sh
 ```
+
+### 5. 通用 MTP 配置
+
+Kimi-K3 通过框架的通用 MTP 接入。两份示例配置（[kimik3_config.yaml](kimik3_config.yaml)、[kimik3_config_A5.yaml](kimik3_config_A5.yaml)）已包含以下字段，默认 `mtp_num_layers: 0`，改为 `1` 即可开启：
+
+```yaml
+model:
+  mtp_num_layers: 1             # 辅助预测深度：0 关闭，1 额外预测 t+2
+  mtp_loss_scaling_factor: 0.1  # 辅助损失权重，默认 0.1，可调整
+  mtp_adapter:
+    hidden_state_module: language_model.model
+    position_ids_mode: mrope
+    decoder_class: mindspeed_mm.fsdp.models.mtp_decoders.PlainResidualDecoder
+    layer_kwargs:
+      attention_class: mindspeed_mm.fsdp.models.kimi_k3.modeling_kimi_linear.KimiMLAAttention
+      mlp_class: mindspeed_mm.fsdp.models.kimi_k3.modeling_kimi_linear.KimiMLP
+      norm_class: mindspeed_mm.fsdp.models.kimi_k3.modeling_kimi_linear.KimiRMSNorm
+      config_overrides:
+        skip_flash_attn_recompute: false
+```
+
+各字段的取值原因：
+
+| 字段 | 说明 |
+|---|---|
+| `position_ids_mode: mrope` | Kimi-K3 使用三轴位置 ID；MTP attention 为 NoPE，因此不配置 `rotary_emb` |
+| `decoder_class` / `layer_kwargs` | Kimi 主干层包含 KDA/MLA 混合注意力和跨层 Attention Residual 状态，不能直接用于 MTP，因此用 `PlainResidualDecoder` 组合 MLA、MLP 和 RMSNorm |
+| `config_overrides.skip_flash_attn_recompute: false` | MTP 层不在主干的选择性重计算流程中，只修改 MTP 的配置副本，主干配置不变 |
+
+其余字段使用默认值：`decoder_layers`、`embed_tokens`、`final_norm` 分别为 `language_model.model` 下的 `layers`、`embed_tokens`、`norm`，`lm_head` 为 `language_model.lm_head`，`share_decoder` 为 `true`。
+
+两份示例的 `parallel.fsdp_plan.apply_modules` 末尾已包含 `mtp`。开启 ChunkLoss 时，`features.chunkloss_plan.apply_module` 应为 `language_model.lm_head`。字段完整说明见 [FSDP2 通用 MTP 接入指南](../../docs/fsdp2_mtp_adapter.md)。
 
 <a id="jump4"></a>
 

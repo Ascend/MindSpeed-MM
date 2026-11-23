@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 from typing import Optional, Tuple, Callable
 
 import torch
@@ -30,6 +31,18 @@ from transformers.masking_utils import create_causal_mask
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
 from mindspeed_mm.fsdp.distributed.context_parallel.communication import split_forward_gather_backward_with_cp, gather_forward_split_backward
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes, generate_ulysses_cu_seqlen_params
+
+
+_DEFAULT_MASK_BUILDER = object()
+
+
+def _mask_embedding_keyword(mask_builder):
+    """Select the embedding keyword used by this mask builder's API."""
+    if mask_builder is not None:
+        parameters = inspect.signature(mask_builder).parameters
+        if "input_embeds" in parameters and "inputs_embeds" not in parameters:
+            return "input_embeds"
+    return "inputs_embeds"
 
 
 def shift_tensor(tensor, shifts=-1, dims=-1, fill_value=0, cu_seqlens=None):
@@ -64,23 +77,57 @@ class _MTPPerTokenLoss(torch.autograd.Function):
 
 
 class MultiTokenPredictionBlock(nn.Module):
+    """Compute auxiliary losses for ``config.mtp_num_layers`` prediction depths.
+
+    Depth 1 predicts token t+2 from the backbone state at t and the token t+1
+    embedding; each later depth advances the target by one more token.
+    ``share_decoder=True`` reuses one MTP decoder across all depths; otherwise
+    each depth owns a decoder. Backbone decoder parameters are not shared.
+
+    ``position_ids_mode`` describes the position-ID layout, not a RoPE algorithm:
+    ``text`` uses [batch, sequence] positions (the first axis of 3-D input),
+    while ``mrope`` uses [3, batch, sequence] positions for rotary embeddings.
+    In mrope mode, 2-D input is expanded to three axes; 4-axis input separates
+    the leading text positions from the remaining three rotary-position axes.
+    The decoder and causal mask receive the text positions in both modes.
+    A rotary module is optional, including for NoPE attention.
+    """
+
     def __init__(
         self,
         config,
         layer_cls,
         norm_cls,
+        position_ids_mode: str = "mrope",
+        causal_mask_builder: Optional[Callable] = _DEFAULT_MASK_BUILDER,
+        share_decoder: bool = True,
     ):
         super().__init__()
+        if position_ids_mode not in ("mrope", "text"):
+            raise ValueError(f"Unsupported MTP position_ids_mode: {position_ids_mode}")
         self.config = config
-        num_physical_layers = int(config.mtp_num_layers > 0)
+        self.position_ids_mode = position_ids_mode
+        self.share_decoder = share_decoder
+        self.causal_mask_builder = (
+            create_causal_mask if causal_mask_builder is _DEFAULT_MASK_BUILDER else causal_mask_builder
+        )
+        self._mask_embedding_name = _mask_embedding_keyword(self.causal_mask_builder)
+        num_physical_layers = int(config.mtp_num_layers > 0) if share_decoder else config.mtp_num_layers
         self.layers = nn.ModuleList([
             layer_cls(config, i, is_mtp=True)
             for i in range(num_physical_layers)
         ])
-        self.pre_fc_norm_embedding = norm_cls(config.hidden_size, eps=config.rms_norm_eps)
-        self.pre_fc_norm_hidden = norm_cls(config.hidden_size, eps=config.rms_norm_eps)
+        if self.layers:
+            layer_signature = inspect.signature(self.layers[0].forward)
+            self._layer_forward_names = set(layer_signature.parameters)
+            self._layer_accepts_kwargs = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in layer_signature.parameters.values()
+            )
+        norm_eps = getattr(config, "rms_norm_eps", getattr(config, "layer_norm_epsilon", 1e-5))
+        self.pre_fc_norm_embedding = norm_cls(config.hidden_size, eps=norm_eps)
+        self.pre_fc_norm_hidden = norm_cls(config.hidden_size, eps=norm_eps)
         self.fc = nn.Linear(config.hidden_size * 2, config.hidden_size, bias=False)
-        self.norm = norm_cls(config.hidden_size, eps=config.rms_norm_eps)
+        self.norm = norm_cls(config.hidden_size, eps=norm_eps)
 
     def _prepare_position_ids(
         self,
@@ -96,11 +143,17 @@ class MultiTokenPredictionBlock(nn.Module):
             )
 
         if position_ids is None:
-            position_ids = cache_position.view(1, 1, -1).expand(3, inputs_embeds.shape[0], -1)
-        elif position_ids.ndim == 2:
+            if self.position_ids_mode == "text":
+                position_ids = cache_position.view(1, -1).expand(inputs_embeds.shape[0], -1)
+            else:
+                position_ids = cache_position.view(1, 1, -1).expand(3, inputs_embeds.shape[0], -1)
+        elif position_ids.ndim == 2 and self.position_ids_mode == "mrope":
             position_ids = position_ids[None, ...].expand(3, position_ids.shape[0], -1)
 
-        if position_ids.ndim == 3 and position_ids.shape[0] == 4:
+        if self.position_ids_mode == "text":
+            text_position_ids = position_ids[0] if position_ids.ndim == 3 else position_ids
+            position_ids = text_position_ids
+        elif position_ids.ndim == 3 and position_ids.shape[0] == 4:
             text_position_ids = position_ids[0]
             position_ids = position_ids[1:]
         else:
@@ -150,8 +203,8 @@ class MultiTokenPredictionBlock(nn.Module):
             ))
             cu_seqlens = kwargs["cu_seqlens"].squeeze(0).to(device=input_ids.device, dtype=torch.long)
 
-        for _ in range(self.config.mtp_num_layers):
-            decoder_layer = self.layers[0]
+        for step in range(self.config.mtp_num_layers):
+            decoder_layer = self.layers[0 if self.share_decoder else step]
             input_ids = shift_tensor(input_ids, cu_seqlens=cu_seqlens)
             labels = shift_tensor(labels, fill_value=-100, cu_seqlens=cu_seqlens)
             if cu_seqlens is not None:
@@ -163,12 +216,12 @@ class MultiTokenPredictionBlock(nn.Module):
                 position_ids, inputs_embeds, past_key_values, cache_position
             )
 
-            if use_packing:
+            if use_packing or self.causal_mask_builder is None:
                 causal_mask = None
             else:
-                causal_mask = create_causal_mask(
+                causal_mask = self.causal_mask_builder(
                     config=self.config,
-                    inputs_embeds=inputs_embeds,
+                    **{self._mask_embedding_name: inputs_embeds},
                     attention_mask=attention_mask,
                     cache_position=cache_position,
                     past_key_values=past_key_values,
@@ -178,18 +231,20 @@ class MultiTokenPredictionBlock(nn.Module):
             if ps.is_ulysses_enable():
                 if not use_packing:
                     kwargs.update(generate_ulysses_cu_seqlen_params(text_position_ids))
-                position_ids = split_forward_gather_backward_with_cp(position_ids, dim=2)
+                position_ids = split_forward_gather_backward_with_cp(position_ids, dim=position_ids.ndim - 1)
                 text_position_ids = split_forward_gather_backward_with_cp(text_position_ids, dim=1)
                 inputs_embeds = split_forward_gather_backward_with_cp(inputs_embeds, dim=1)
 
-            position_embeddings = rotary_emb(hidden_states, position_ids)
+            # NoPE attention has no rotary embedding module.
+            position_embeddings = (
+                rotary_emb(hidden_states, position_ids) if rotary_emb is not None else None
+            )
 
             inputs_embeds = self.pre_fc_norm_embedding(inputs_embeds)
             hidden_states = self.pre_fc_norm_hidden(hidden_states)
             hidden_states = self.fc(torch.cat([inputs_embeds, hidden_states], dim=-1))
 
-            hidden_states = decoder_layer(
-                hidden_states,
+            layer_kwargs = dict(
                 position_embeddings=position_embeddings,
                 attention_mask=causal_mask,
                 position_ids=text_position_ids,
@@ -198,6 +253,13 @@ class MultiTokenPredictionBlock(nn.Module):
                 cache_position=cache_position,
                 **kwargs,
             )
+            if not self._layer_accepts_kwargs:
+                layer_kwargs = {k: v for k, v in layer_kwargs.items() if k in self._layer_forward_names}
+            hidden_states = decoder_layer(hidden_states, **layer_kwargs)
+            if isinstance(hidden_states, (tuple, list)):
+                hidden_states = hidden_states[0]
+            if not isinstance(hidden_states, torch.Tensor):
+                raise ValueError("MTP decoder must return a tensor or a tuple starting with a tensor")
 
             hidden_states = self.norm(hidden_states)
 
@@ -225,7 +287,7 @@ class MultiTokenPredictionBlock(nn.Module):
 
             if ps.is_ulysses_enable():
                 gather_sizes = cal_split_sizes(seq_len, ps.get_ulysses_group_size())
-                position_ids = gather_forward_split_backward(position_ids, ps.get_ulysses_group(), dim=2, grad_scale="up", gather_sizes=gather_sizes)
+                position_ids = gather_forward_split_backward(position_ids, ps.get_ulysses_group(), dim=position_ids.ndim - 1, grad_scale="up", gather_sizes=gather_sizes)
                 text_position_ids = gather_forward_split_backward(text_position_ids, ps.get_ulysses_group(), dim=1, grad_scale="up", gather_sizes=gather_sizes)
 
         if all_mtp_loss is not None and ps.is_cp_enable():
