@@ -67,7 +67,7 @@ bash scripts/install.sh --msbranch master
 避免覆盖后与 CANN 不匹配；也可以在命令中追加 `-n` 参数自动跳过所有重装询问。
 
 生成 MiniMax-H3 预计算缓存时还需要 DiffSynth-Studio，请根据DiffSynth-Studio 安装指南
-安装依赖。(具体可以参考"DiffSynth-Studio/examples/minimax_h3/model_training"下的脚本)
+安装依赖。
 
 ## 权重下载
 

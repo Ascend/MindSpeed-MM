@@ -223,7 +223,7 @@ MindSpeed MM保存权重类型支持huggingface格式和dcp格式，在`xxx_conf
 
 **注意：hf保存格式仅支持保存权重，不支持保存优化器状态和随机数状态，若需要进行断点续训，请保存为dcp格式**
 
-（3）`save_format`配置为`dcp`时,可使用如下命令将dcp权重转换回hf权重：
+（3）当 `save_format` 设置为 `dcp` 时，Qwen3.8 复用 Qwen3.5 的权重转换器 `Qwen35Converter`，将 DCP 权重转换为 Hugging Face 格式。请将 `--origin_hf_dir` 指向对应 Qwen3.8 模型的原始 Hugging Face 权重目录。
 
 ```bash
 # 待转换的dcp权重目录结构样例为：
@@ -371,7 +371,7 @@ features:
 ```shell
 # 根据实际情况修改 ascend-toolkit 路径
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-NPUS_PER_NODE=8
+NPUS_PER_NODE=8 # Atlas A3训练系列产品值为16
 MASTER_ADDR=localhost
 MASTER_PORT=6000
 NNODES=1
