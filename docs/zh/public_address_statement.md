@@ -79,3 +79,11 @@
 |  开发引入  |                                                             /                                                             |                  docker/scripts/ci/build_ci_envs.py                   |                                                            <https://repo.anaconda.com/pkgs/main>                                                             |   开源软件安装地址   |
 |  开发引入  |                                                             /                                                             |                  docker/scripts/ci/build_ci_envs.py                   |                                                             <https://repo.anaconda.com/pkgs/r>                                                              |   开源软件安装地址   |
 |  开发引入  |                                                             /                                                             |                       scripts/install.sh                             |                                                        <https://download.pytorch.org/whl/cu121>                                                         |   开源软件安装地址   |
+| 开发引入 | / | mindspeed_mm/optimizer/muon/coefficients.py<br>docs/zh/features/optimization/fsdp2_muon_optimizer.md | <https://x.com/YouJiacheng/status/1905861218138804534> | 开源代码参考链接 |
+| 开发引入 | / | docs/zh/features/optimization/fsdp2_muon_optimizer.md | <https://github.com/MoonshotAI/Kimi-K2> | 开源代码参考链接 |
+| 开发引入 | / | docs/zh/features/optimization/fsdp2_muon_optimizer.md | <https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf> | 参考论文地址 |
+| 开发引入 | / | docs/zh/features/optimization/fsdp2_muon_optimizer.md | <https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5/blob/main/README_CN.md> | 开源代码参考链接 |
+| 开发引入 | / | docs/zh/features/optimization/fsdp2_muon_optimizer.md | <https://docs.nvidia.com/nemo/rl/latest/guides/muon-optimizer.html> | Muon 文档参考链接 |
+| 开发引入 | / | docs/zh/features/optimization/fsdp2_muon_optimizer.md | <https://github.com/MoonshotAI/Moonlight/blob/master/examples/toy_train.py> | 开源代码参考链接 |
+| 开发引入 | / | docs/zh/features/optimization/fsdp2_muon_optimizer.md | <https://github.com/KellerJordan/Muon/blob/master/muon.py> | 开源代码参考链接 |
+| 开发引入 | / | docs/zh/features/optimization/fsdp2_muon_optimizer.md | <https://arxiv.org/abs/2505.16932> | 参考论文地址 |
