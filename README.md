@@ -80,6 +80,7 @@ MindSpeed MM：面向大规模分布式训练的昇腾多模态大模型套件�
 
 ---
 
+- [Nov. 18, 2026]: 🚀 MindSpeed MM基于FSDP2支持[MiniMax-H3 DMD2 LoRA蒸馏后训练](./docs/zh/features/training_mode/minimax_h3_dmd2.md)【beta】
 - [Nov. 05, 2026]: 🚀 MindSpeed MM基于FSDP2支持[Kimi-K3.1-Pro](./examples/kimi_k31_pro)模型【beta】
 - [Sep. 01, 2026]: 🚀 MindSpeed MM基于FSDP2支持[GLM-5.3-Flash](./examples/glm5.3_flash)模型【beta】
 - [Aug. 14, 2026]: 🚀 MindSpeed MM基于FSDP2支持[MiniMax-M3](./examples/minimax_m3_vl)模型【beta】

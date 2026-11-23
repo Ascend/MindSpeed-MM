@@ -121,7 +121,12 @@ class Trainer:
             self.model_features_applier.apply_optimizer_hook(self.model, self.optimizer)
 
         # Create the training engine
-        self.trainer = TrainEngine(
+        self.trainer = self.get_train_engine()
+
+    def get_train_engine(self):
+        """Build the default engine; task trainers can override this factory."""
+        args = self.args
+        return TrainEngine(
             args,
             self.train_dataloader,
             self.model,

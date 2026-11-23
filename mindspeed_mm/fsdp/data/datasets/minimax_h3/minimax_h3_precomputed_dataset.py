@@ -21,7 +21,6 @@ from torch.utils.data import Dataset
 
 from mindspeed_mm.fsdp.utils.register import data_register
 
-
 _PACKED_TENSOR_KEYS = (
     "img_pos",
     "audio_pos",
@@ -44,6 +43,70 @@ def _param(config, name, default=None):
     if isinstance(config, dict):
         return config.get(name, default)
     return getattr(config, name, default)
+
+
+def _complete_training_layout(packed, video, audio, prompt):
+    """Enrich DiffSynth inference packing with MindSpeed training metadata."""
+    packed = dict(packed)
+    latent_t, latent_h, latent_w = video.shape[2:]
+    target_rows = latent_t * (latent_h // 2) * (latent_w // 2)
+    cond_rows = packed["img_pos"].numel() - target_rows
+    ref_audio_rows = packed["audio_pos"].numel() - audio.shape[0] * audio.shape[2]
+    if cond_rows < 0 or ref_audio_rows < 0:
+        raise ValueError("Packed positions are shorter than target latent rows")
+    expected = dict(
+        text_len=prompt.shape[0],
+        audio_channel=audio.shape[0],
+        audio_t=audio.shape[2],
+        latent_t=latent_t,
+        latent_h_patched=latent_h // 2,
+        latent_w_patched=latent_w // 2,
+        cond_rows=cond_rows,
+        ref_audio_rows=ref_audio_rows,
+    )
+    for key, value in expected.items():
+        packed.setdefault(key, value)
+    if "update_mask" not in packed:
+        # These are output-row multipliers, NOT an attention padding mask.
+        # Reference rows stay fixed; all generated video rows are retained.
+        mask = torch.ones(packed["img_pos"].numel(), dtype=torch.bool)
+        mask[:cond_rows] = False
+        packed["update_mask"] = mask
+    return packed
+
+
+def flatten_h3_cache(shared, positive, *, complete_layout=False):
+    packed = positive["packed"]
+    if complete_layout:
+        packed = _complete_training_layout(
+            packed, shared["input_latents"], shared["audio_input_latents"], positive["prompt_embeds"]
+        )
+    output = {
+        "input_latents": shared["input_latents"],
+        "audio_input_latents": shared["audio_input_latents"],
+        "prompt_embeds": positive["prompt_embeds"],
+        # The common device mover casts floating tensors to BF16. Keep the
+        # original FP64 position IDs as bits and restore them in the model.
+        "packed_img_position_ids_bits": packed["img_position_ids"].contiguous().view(torch.int64),
+        "packed_update_mask": packed["update_mask"],
+        "packed_cond_rows": int(packed.get("cond_rows", 0)),
+    }
+    if "keyframe_cond_anchor" in shared:
+        output["keyframe_cond_anchor"] = shared["keyframe_cond_anchor"]
+    if "ref_blocks" in shared:
+        visual_parts = [block["visual_rows"] for block in shared["ref_blocks"] if "visual_rows" in block]
+        audio_parts = [block["audio_rows"] for block in shared["ref_blocks"] if "audio_rows" in block]
+        if visual_parts:
+            output["ref_visual_anchor"] = torch.cat(visual_parts, dim=0)
+        if audio_parts:
+            output["ref_audio_anchor"] = torch.cat(audio_parts, dim=0)
+    for key in _PACKED_TENSOR_KEYS:
+        output[f"packed_{key}"] = packed[key]
+    for key in _PACKED_INT_KEYS:
+        output[f"packed_{key}"] = int(packed[key])
+    if "ref_audio_rows" in packed:
+        output["packed_ref_audio_rows"] = int(packed["ref_audio_rows"])
+    return output
 
 
 @data_register.register("minimax_h3_precomputed")

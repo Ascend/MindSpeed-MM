@@ -381,3 +381,24 @@ def _modulate_gate(x, gate, other, indices):
 
 这里的 `.float()` 须位于 `index_select` 前面，才能使反向的重复索引归约使用 FP32
 累加；不要求将整个 DiT block、Attention 或推理流程改为 FP32。
+
+## LoRA 后训练【实验室特性】
+
+MiniMax-H3 后训练接入 FSDP2，支持新建 LoRA、导入已有 LightX2V/DiffSynth/PEFT
+LoRA 继续训练，以及 DCP 完整状态保存恢复。Student、Teacher、Critic 复用当前模型
+接口，按角色配置更新频率、优化器与重计算。
+
+| 训练方式 | 配置 | 指南 |
+| --- | --- | --- |
+| DMD2 新建 LoRA | `posttrain_dmd2.yaml` | [DMD2 训练与续训](../../docs/zh/features/training_mode/minimax_h3_dmd2.md) |
+| DMD2 已有 LoRA 续训 | `posttrain_dmd2_continue.yaml` | [DMD2 训练与续训](../../docs/zh/features/training_mode/minimax_h3_dmd2.md) |
+
+在 YAML 中填写模型、缓存和输出目录后，从仓库根目录启动：
+
+```bash
+CONFIG_PATH=examples/minimax_h3/posttrain_dmd2.yaml \
+bash examples/minimax_h3/posttrain_minimax_h3_dmd2.sh
+```
+
+默认使用 8 个 NPU 进程，可用 `NPUS_PER_NODE` 覆盖。多机在各节点设置 `NNODES`、
+`NODE_RANK`、`MASTER_ADDR` 和 `MASTER_PORT` 后执行同一入口。

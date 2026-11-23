@@ -1,0 +1,119 @@
+# Same recipe, initialized from an existing Student LoRA.
+parallel:
+  tensor_parallel_size: 1
+  fully_shard_parallel_size: auto
+  ulysses_parallel_size: 1
+  ring_attention_size: 1
+  expert_parallel_size: 1
+  expert_fully_shard_parallel_size: 1
+  fsdp_plan:
+    apply_modules:
+    - student.blocks.{*}
+    - teacher.blocks.{*}
+    - critic.blocks.{*}
+    param_dtype: bf16
+    reduce_dtype: fp32
+    output_dtype: bf16
+    cast_forward_inputs: false
+    cpu_offload: false
+model:
+  model_id: minimax_h3_distillation
+  model_name_or_path: ./checkpoints/MiniMax-H3/FL2VA/transformer
+  attn_implementation: flash_attention_2
+data:
+  dataset_param:
+    dataset_type: minimax_h3_distillation_precomputed
+    preprocess_parameters: {}
+    basic_parameters:
+      dataset_dir: ./data/minimax_h3/t2va_cache
+      dataset_repeat: 1
+      load_negative: false
+      check_finite: true
+  dataloader_param:
+    pin_memory: true
+    shuffle: false
+    dataloader_mode: sampler
+    drop_last: true
+    sampler_type: SeedRandomBatchSampler
+    num_workers: 0
+    enable_preload: false
+    infinite_sampler: true
+features:
+  recompute: true
+  recompute_plan:
+    apply_modules:
+    - student.blocks.{*}
+    - critic.blocks.{*}
+    use_reentrant: false
+  loss_cfg:
+    loss_type: raw
+distillation:
+  student:
+    lr: 0.0001
+    clip_grad: 10.0
+    import_lora:
+      path: ./checkpoints/student_lora.safetensors
+      source_format: auto
+    rank: 64
+    alpha: 64
+  critic:
+    lr: 0.0002
+    clip_grad: 10.0
+    rank: 128
+    alpha: 128
+  student_updates: 1
+  critic_updates: 4
+  student_steps: 8
+  video_shift: 6.0
+  audio_shift: 3.0
+  rollout_mode: sde
+  matching_min: 0.02
+  matching_max: 0.98
+  teacher_video_cfg: 1.0
+  teacher_audio_cfg: 1.0
+  critic_loss_space: velocity
+  audio_loss_weight: 1.0
+  resume_from: null
+  student_schedule:
+  - 1.0
+  - 0.875
+  - 0.75
+  - 0.625
+  - 0.5
+  - 0.375
+  - 0.25
+  - 0.125
+training:
+  micro_batch_size: 1
+  gradient_accumulation_steps: 1
+  train_iters: 6
+  lr_decay_style: constant
+  lr_warmup_ratio: 0.0
+  lr_min: 0.0
+  weight_decay: 0.01
+  optimizer: adamw
+  adam_fused: true
+  adam_beta1: 0.0
+  adam_beta2: 0.999
+  adam_eps: 1.0e-08
+  init_model_with_meta_device: true
+  load: ""
+  save: ./outputs/minimax_h3/dmd2_continue_smoke
+  save_format: dcp
+  save_interval: 3
+  save_async: false
+  no_save_optim: false
+  no_save_rng: false
+  log_interval: 1
+  val_interval: 0
+  use_deter_comp: false
+  allow_hf32: false
+  plugin:
+  - mindspeed_mm/fsdp/models/minimax_h3/distillation_adapter
+  - mindspeed_mm/fsdp/data/datasets/minimax_h3/minimax_h3_distillation_dataset
+  seed: 42
+tools:
+  profile:
+    enable: false
+  memory_profile:
+    enable: false
