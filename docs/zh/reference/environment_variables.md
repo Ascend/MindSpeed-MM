@@ -104,10 +104,12 @@
                 </tr>
                 <tr>
                     <td><code class="env-var">MULTI_STREAM_MEMORY_REUSE</code></td>
-                    <td>控制多流内存复用</td>
+                    <td>配置多流内存复用策略</td>
                     <td>
-                        <code class="value-desc">0</code>: 关闭<br>
-                        <code class="value-desc">1</code>: 开启
+                        <code class="value-desc">0</code>：关闭多流内存复用。<br>
+                        <code class="value-desc">1</code>：开启多流内存复用。通过 <code>eraseStream</code> 擦除已有的 <code>recordStream</code> 标记。该模式持有张量的弱引用，不会延长张量的生命周期。<br>
+                        <code class="value-desc">2</code>：开启多流内存复用。跳过 <code>recordStream</code> 标记。该模式持有张量的强引用，可能延长张量的生命周期。<br>
+                        <code class="value-desc">3</code>：在模式 <code>1</code> 的基础上进一步优化内存复用，即使张量提前释放，也能擦除 <code>recordStream</code> 标记。
                     </td>
                 </tr>
                 <tr>

@@ -450,7 +450,7 @@ bash examples/kimi_k31_pro/kimik31_pro_lora_128p.sh
 | `CPU_AFFINITY_CONF` | 控制CPU端算子任务的处理器亲和性，即设定任务绑核 | 设置`0`或未设置：不启用绑核<br>`1`：开启粗粒度绑核<br>`2`：开启细粒度绑核 |
 | `HCCL_CONNECT_TIMEOUT` | 用于限制不同设备之间socket建链过程的超时等待时间 | 需要配置为整数，取值范围`[120,7200]`，默认值为`120`，单位`s` |
 | `PYTORCH_NPU_ALLOC_CONF` | 控制缓存分配器行为 | `expandable_segments:<value>`：使能内存池扩展段功能 |
-| `MULTI_STREAM_MEMORY_REUSE` | 配置多流内存复用是否开启 | `0`：关闭多流内存复用<br>`1`：开启多流内存复用 |
+| `MULTI_STREAM_MEMORY_REUSE` | 配置多流内存复用策略 | `0`：关闭多流内存复用。<br>`1`：开启多流内存复用。通过 `eraseStream` 擦除已有的 `recordStream` 标记。该模式持有张量的弱引用，不会延长张量的生命周期。<br>`2`：开启多流内存复用。跳过 `recordStream` 标记。该模式持有张量的强引用，可能延长张量的生命周期。<br>`3`：在模式 `1` 的基础上进一步优化内存复用，即使张量提前释放，也能擦除 `recordStream` 标记。 |
 | `TRITON_ALWAYS_COMPILE` | 控制Triton算子是否总是重新编译 | `0`：命中编译缓存时不重复编译<br>`1`：每次运行强制重新编译 |
 | `NUM_HIDDEN_LAYERS` | 功能验证时覆盖语言模型层数 | 不设置时使用模型配置；仅在减层调试时设置 |
 | `NUM_EXPERTS` | 功能验证时覆盖专家个数 | 不设置时使用模型配置；需与EP并行度配套 |

@@ -159,7 +159,7 @@ Step3-VL 示例脚本中使用了以下环境变量：
 | `NON_MEGATRON` | 选择 MindSpeed-MM FSDP2 插件式训练入口 | `true`：启用非 Megatron 训练路径 |
 | `HCCL_CONNECT_TIMEOUT` | 分布式场景下设备间 socket 建链超时时间 | 整数，取值范围 `[120,7200]`，单位 `s` |
 | `PYTORCH_NPU_ALLOC_CONF` | 控制 NPU 缓存分配器行为 | `expandable_segments:True`：启用虚拟内存扩展段 |
-| `MULTI_STREAM_MEMORY_REUSE` | 控制多流内存复用 | `0`：关闭；`1` 或 `2`：启用对应等级的复用策略 |
+| `MULTI_STREAM_MEMORY_REUSE` | 配置多流内存复用策略 | `0`：关闭多流内存复用。<br>`1`：开启多流内存复用。通过 `eraseStream` 擦除已有的 `recordStream` 标记。该模式持有张量的弱引用，不会延长张量的生命周期。<br>`2`：开启多流内存复用。跳过 `recordStream` 标记。该模式持有张量的强引用，可能延长张量的生命周期。<br>`3`：在模式 `1` 的基础上进一步优化内存复用，即使张量提前释放，也能擦除 `recordStream` 标记。 |
 | `TASK_QUEUE_ENABLE` | 控制 task_queue 算子下发队列优化等级 | `0`：关闭；`1`：开启 Level 1；`2`：开启 Level 2 |
 | `CPU_AFFINITY_CONF` | 控制 CPU 端算子任务处理器亲和性 | `0` 或未设置：关闭；`1`：粗粒度绑核；`2`：细粒度绑核 |
 

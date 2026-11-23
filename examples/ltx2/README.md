@@ -258,4 +258,4 @@ bash examples/ltx2/finetune_ltx2_t2av.sh
 | `CPU_AFFINITY_CONF`         | 控制 CPU 端算子任务绑核                       | `0` 关闭；`1` 粗粒度；`2` 细粒度 |
 | `HCCL_CONNECT_TIMEOUT`      | 分布式 socket 建链超时等待时间（单位 s）      | `[120, 7200]`，默认 `120` |
 | `PYTORCH_NPU_ALLOC_CONF`    | NPU 缓存分配器行为                            | 例如 `expandable_segments:True` |
-| `MULTI_STREAM_MEMORY_REUSE` | 多流内存复用开关                              | `0` 关闭；`1` 开启 |
+| `MULTI_STREAM_MEMORY_REUSE` | 配置多流内存复用策略 | `0`：关闭多流内存复用。<br>`1`：开启多流内存复用。通过 `eraseStream` 擦除已有的 `recordStream` 标记。该模式持有张量的弱引用，不会延长张量的生命周期。<br>`2`：开启多流内存复用。跳过 `recordStream` 标记。该模式持有张量的强引用，可能延长张量的生命周期。<br>`3`：在模式 `1` 的基础上进一步优化内存复用，即使张量提前释放，也能擦除 `recordStream` 标记。 |

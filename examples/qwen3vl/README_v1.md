@@ -213,7 +213,7 @@ bash examples/qwen3vl/finetune_qwen3vl_30B_v1.sh
 | `CPU_AFFINITY_CONF`           | 控制CPU端算子任务的处理器亲和性，即设定任务绑核                                    | 设置`0`或未设置: 表示不启用绑核功能<br>`1`: 表示开启粗粒度绑核<br>`2`: 表示开启细粒度绑核                                     |
 | `HCCL_CONNECT_TIMEOUT`        | 用于限制不同设备之间socket建链过程的超时等待时间                                  | 需要配置为整数，取值范围`[120,7200]`，默认值为`120`，单位`s`                                                     |
 | `PYTORCH_NPU_ALLOC_CONF`      | 控制缓存分配器行为                                                          | `expandable_segments:<value>`: 使能内存池扩展段功能，即虚拟内存特征                                            |
-| `MULTI_STREAM_MEMORY_REUSE`   | 配置多流内存复用是否开启 | `0`: 关闭多流内存复用<br>`1`: 开启多流内存复用                                                               |
+| `MULTI_STREAM_MEMORY_REUSE` | 配置多流内存复用策略 | `0`：关闭多流内存复用。<br>`1`：开启多流内存复用。通过 `eraseStream` 擦除已有的 `recordStream` 标记。该模式持有张量的弱引用，不会延长张量的生命周期。<br>`2`：开启多流内存复用。跳过 `recordStream` 标记。该模式持有张量的强引用，可能延长张量的生命周期。<br>`3`：在模式 `1` 的基础上进一步优化内存复用，即使张量提前释放，也能擦除 `recordStream` 标记。 |
 | `NPUS_PER_NODE`               | 配置一个计算节点上使用的NPU数量                                                  | 整数值（如 `1`, `8` 等）                                                                            |
 
 ---
