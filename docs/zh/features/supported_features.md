@@ -113,7 +113,7 @@
     <td class="tg-fr9f">✓</td>
   </tr>
   <tr>
-    <td class="tg-jajh"><a href="training_mode/lora_finetune_fsdp2.md">LoRA微调（基于FSDP后端）</a></td>
+    <td class="tg-jajh"><a href="training_mode/lora_finetune_fsdp2.md">LoRA微调（基于FSDP2后端）</a></td>
     <td class="tg-fr9f">✓</td>
     <td class="tg-fr9f">×</td>
   </tr>

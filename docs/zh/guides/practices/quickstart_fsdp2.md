@@ -2,7 +2,7 @@
 
 MindSpeed MM支持多模态理解模型，下面以Qwen3-VL模型为例，介绍MindSpeed MM的使用方法，引导开发者快速上手预置模型在昇腾NPU上的高效运行。
 
-Qwen3-VL模型采用Pytorch原生FSDP2（Fully Sharded Data Parallel 2）框架, FSDP2沿数据并行维对参数、梯度、优化器状态做全分片，显著降低单卡显存占用，且与模型结构解耦、适配新模型成本低。在 MindSpeed-MM中，FSDP2训练具有以下特点：
+Qwen3-VL模型采用PyTorch原生FSDP2（Fully Sharded Data Parallel 2）框架，FSDP2沿数据并行维对参数、梯度、优化器状态做全分片，显著降低单卡显存占用，且与模型结构解耦、适配新模型成本低。在 MindSpeed-MM中，FSDP2训练具有以下特点：
 
 - **训练器**：`mindspeed_mm/fsdp/train/trainer.py`，启动脚本一行`torchrun`即可启动；
 - **配置集中**：一份 YAML 即可，分`parallel`/`data`/`model`/`features`/`training`/`tools`六段；
@@ -39,7 +39,7 @@ Qwen3-VL模型采用Pytorch原生FSDP2（Fully Sharded Data Parallel 2）框架,
 1. 权重下载
 
    从Hugging Face下载对应的模型权重[Qwen3-VL-30B-A3B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-30B-A3B-Instruct)。
-    >[!NOTE]
+    > [!NOTE]
     >
     >如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
 
@@ -63,11 +63,11 @@ Qwen3-VL模型采用Pytorch原生FSDP2（Fully Sharded Data Parallel 2）框架,
     |参数|说明|是否必选|默认值|
     |-|-|-|-|
     |GenericDCPConverter|Qwen3-VL模型转换工具|是|/|
-    |hf_to_dcp|Hugging Face模型转换MindSpeed MM模型权重|是|/|
+    |hf_to_dcp|Hugging Face模型转换为MindSpeed MM模型权重|是|/|
     |dcp_dir|转换后保存目录|是|/|
     |hf_dir|Hugging Face权重目录|是|/|
 
-    使用 meta init 初始化时需要 DCP 权重（**Qwen3-VL-30B / 235B 必须使用 meta init，仓库默认开启**）
+    使用 meta init 初始化时需要 DCP 权重（**Qwen3-VL-30B / 235B 必须使用 meta init，仓库默认开启**）。
    转换后 `--dcp_dir` 下会生成 `release/` 文件夹和 `latest_checkpointed_iteration.txt`。随后在配置文件中开启 `init_model_with_meta_device` 并把 **`load` 指向该 dcp 目录**（写到 `release` 的上一级，即 `ckpt/Qwen3-VL-30B-A3B-Instruct-dcp`）。
 
 ## 数据集准备及处理
@@ -87,7 +87,7 @@ Qwen3-VL模型采用Pytorch原生FSDP2（Fully Sharded Data Parallel 2）框架,
 
     执行如下数据转换脚本：
 
-    ```python
+    ```bash
     # 该脚本对 Qwen2-VL / Qwen3-VL 通用，可直接运行
     python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py
     ```

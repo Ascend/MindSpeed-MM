@@ -19,7 +19,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别�
 
 > [!NOTE]
 >
-> MindSpeed MM支持<term>Ascend 950PR&950DT系列产品</term>、<term>Atlas A3训练系列产品</term>和<term>Atlas A2训练系列产品</term>，且要求单NPU的片上内存为64GB及以上
+> MindSpeed MM支持<term>Ascend 950PR&950DT系列产品</term>、<term>Atlas A3训练系列产品</term>和<term>Atlas A2训练系列产品</term>，且要求单NPU的片上内存为64GB及以上。
 >
 > 当前示例脚本中`NPUS_PER_NODE=8`表示需要8个NPU，如果实际情况低于此配置，可能遇到OOM问题。
 
@@ -37,7 +37,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别�
 
    > [!NOTE]
    >
-   > 如无法顺利访问HuggingFace社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
+   > 如无法顺利访问Hugging Face社区下载资源，推荐前往ModelScope下载，需关注待下载文件的正确性与安全性。
 
 2. 权重文件保存
 
@@ -65,8 +65,8 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别�
     |hf_to_mm|Hugging Face模型转换MindSpeed MM模型权重|是|/|
     |mm_dir|转换后保存目录|是|/|
     |hf_dir|Hugging Face权重目录|是|/|
-    |llm_pp_layers|llm在每个卡上切分的层数，注意要和examples/qwen2.5vl/model_3b.json中配置的pipeline_num_layers一致|否|36|
-    |vit_pp_layers|vit在每个卡上切分的层数，注意要和examples/qwen2.5vl/model_3b.json中配置的pipeline_num_layers一致|否|32|
+    |llm_pp_layers|LLM在每个卡上切分的层数，注意要和examples/qwen2.5vl/model_3b.json中配置的pipeline_num_layers一致|否|36|
+    |vit_pp_layers|ViT在每个卡上切分的层数，注意要和examples/qwen2.5vl/model_3b.json中配置的pipeline_num_layers一致|否|32|
     |tp_size|TP并行数量，注意要和微调启动脚本中的配置一致|否|1|
 
     > [!NOTE]
@@ -86,7 +86,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别�
 
     执行如下数据转换脚本：
 
-    ```python
+    ```bash
     python mindspeed_mm/fsdp/tools/data_tool/llava_instruct_2_mllm_demo_format.py
     ```
 
@@ -176,7 +176,7 @@ MindSpeed MM同时支持多模态生成和多模态理解模型，下面分别�
         --log-interval 1 \  # 日志间隔
         --save-interval 5000 \  # 保存间隔
         ...
-        --log-tps \  # 增加此参数可使能在训练中打印每步语言模块的平均序列长度，并在训练结束后计算每秒吞吐tokens量。
+        --log-tps \  # 增加此参数可使能在训练中打印每步语言模块的平均序列长度，并在训练结束后计算每秒tokens吞吐量。
     "
     ```
 
@@ -288,7 +288,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 
 1. 权重下载
 
-    从Huggingface库下载模型权重: [Wan2.2-T2V-A14B-Diffusers](https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers)
+    从Hugging Face库下载模型权重: [Wan2.2-T2V-A14B-Diffusers](https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers)
     在MindSpeed-MM下创建`weights/Wan2.2-T2V-A14B-Diffusers/`，并将下载的模型权重保存到该目录下。
     > [!NOTE]
     >
@@ -306,7 +306,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 
     > [!NOTE]
     >
-    > huggingface Diffusers权重中包含两个transformer权重， 其中transformer文件夹对应高噪声（high）模型权重，transformer_2文件夹对应低噪声（low）模型权重
+    > Hugging Face Diffusers权重中包含两个transformer权重， 其中transformer文件夹对应高噪声（high）模型权重，transformer_2文件夹对应低噪声（low）模型权重
 
     若需要转化为DCP格式权重，可参考以下方式：
 
@@ -328,7 +328,7 @@ LOAD_PATH="ckpt/mm_path/Qwen2.5-VL-3B-Instruct"
 
 ### 数据预处理
 
-在`MindSpeed-MM`下创建`dataset`目录，随后在`dataset`下创建目录`videos`和文件`data.json`，并将需要处理的视频保存在`videos`中。数据集中所有的视频-文本对信息保存在`data.json`中。（数据集可以使用[Open-Sora-Dataset pixabay_v2 数据集](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/tree/main/pixabay_v2_tar),对应的数据标注文件为[video_pixabay_65f_601513.json](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/blob/main/anno_jsons/video_pixabay_65f_601513.json)，格式需要处理成下文示例形式）
+在`MindSpeed-MM`下创建`dataset`目录，随后在`dataset`下创建目录`videos`和文件`data.json`，并将需要处理的视频保存在`videos`中。数据集中所有的视频-文本对信息保存在`data.json`中。（数据集可以使用[Open-Sora-Dataset pixabay_v2 数据集](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/tree/main/pixabay_v2_tar)，对应的数据标注文件为[video_pixabay_65f_601513.json](https://huggingface.co/datasets/LanguageBind/Open-Sora-Plan-v1.1.0/blob/main/anno_jsons/video_pixabay_65f_601513.json)，格式需要处理成下文示例形式）
 
 > [!NOTE]
 >
@@ -416,7 +416,7 @@ dataset
 
 3. 配置model_t2v.json
 
-    修改`examples/wan2.2/A14B/t2v/pretrain_model_high.json、*examples/wan2.2/A14B/t2v/pretrain_model_low.json*`文件，其中`from_pretrained`为下载的权重所对应路径，包括vae和text_encoder。根据实际情况修改参数：
+    修改`examples/wan2.2/A14B/t2v/pretrain_model_high.json、*examples/wan2.2/A14B/t2v/pretrain_model_low.json*`文件，其中`from_pretrained`为下载的权重所对应路径，包括VAE和text_encoder。根据实际情况修改参数：
 
     ```json
     {
@@ -434,7 +434,7 @@ dataset
 
 4. 配置pretrain_high.sh、*pretrain_low.sh*
 
-    一个单机8卡的高噪模型微调脚本示例如下(examples/wan2.2/A14B/t2v/pretrain_high.sh)，注意需要修改 LOAD_PATH 为MM格式权重实际存放路径， SAVE_PATH 修改为微调后权重保存路径。
+    一个单机8卡的高噪模型微调脚本示例如下（examples/wan2.2/A14B/t2v/pretrain_high.sh），注意需要修改 LOAD_PATH 为MM格式权重实际存放路径，SAVE_PATH 修改为微调后权重保存路径。
 
     ```sh
     #!/bin/bash

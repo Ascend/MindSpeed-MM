@@ -59,20 +59,20 @@ MindSpeed MM 新模型基于**插件式 FSDP2 后端**接入：训练入口为 `
 | `models/modelhub.py` | 模型构建中枢（`ModelHub.build`） | 先尝试 `AutoConfig.from_pretrained` 走 Transformers 风格构建，失败则走自定义模型构建 |
 | `params/*_args.py`（如 `model_args.py`、`training_args.py`） | YAML 各段对应的参数定义（pydantic dataclass） | 写 YAML 字段前，以这里的定义为准（字段名、默认值、校验） |
 | `distributed/torch_parallelize.py` | 并行/分片策略（`ParallelApplier`） | 按 `parallel.fsdp_plan`/`ep_plan` 对模型施加 `fully_shard` 分片，以及 TP、EP、prefetch 等 |
-| `features/apply_features.py` | 训练特性应用（`FeaturesApplier`） | 按 `features` 段施加重计算、ChunkLoss、激活值卸载等 |
+| `features/apply_features.py` | 训练特性应用（`FeaturesApplier`） | 按 `features` 段应用重计算、ChunkLoss、激活值卸载等 |
 | `train/train_engine.py` | 单步训练逻辑（`TrainEngine`） | 以 `model(**batch, use_cache=False)` 调用模型并读取 `output.loss`，模型 forward 需匹配此调用方式 |
 | `checkpoint/dcp_checkpointer.py` | 检查点读写（`DistributedCheckpointer`） | 训练检查点的保存与加载走 DCP 格式（meta init 加载 DCP 权重亦经此） |
 
 ### 接入方式的选择
 
-模型接入有三种方式：自定义模型接入、Transformers 模型接入、第三方模型适配封装。**Qwen3VL 属于第二种"Transformers 模型接入"**：模型类保持继承 HF `PreTrainedModel`，沿用 HF 体系的构建与权重加载方式。
+模型接入有三种方式：自定义模型接入、Transformers 模型接入、第三方模型适配封装。**Qwen3VL 属于第二种“Transformers 模型接入”**：模型类保持继承 HF `PreTrainedModel`，沿用 HF 体系的构建与权重加载方式。
 
 需要说明的是，同为 Transformers 模型接入，工程上有两种形态：上游模型无需修改内部逻辑时，直接 import 上游类、按需注册即可；而 Qwen3VL 需要在模型 **forward 内部**做改造，import 方式无法满足，因此将 `modeling_qwen3_vl_moe.py` 整体拷贝进仓再改造。需要改造的内容例如：
 
 - 序列并行（Ulysses/Ring CP）：在视觉/文本前向中插入序列的切分与聚合通信；
 - MoE 负载均衡辅助损失（aux loss）：在前向中计算辅助损失并累加进总 loss。
 
-第三种"第三方模型适配封装"（外层 wrapper 负责权重加载与输入输出字段适配）适用于源模型结构不便修改的场景，同样覆盖不了上述 forward 内部改造，因此 Qwen3VL 未采用。
+第三种“第三方模型适配封装”（外层 wrapper 负责权重加载与输入输出字段适配）适用于源模型结构不便修改的场景，同样覆盖不了上述 forward 内部改造，因此 Qwen3VL 未采用。
 
 为新模型选择接入方式时，可按下表判断：
 
@@ -118,7 +118,7 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
 
 ### 数据处理的复用与适配
 
-原始数据（对话 json、图像/视频）按实际任务准备；迁移时需要判断**数据处理链路能否复用、还是要适配**。该链路由三部分组成，是否复用各看条件：
+原始数据（对话 json、图像/视频）按实际任务准备；迁移时需要判断**数据处理链路能否复用、还是要适配**。该链路由三部分组成，是否复用视条件而定：
 
 - **数据集构建**（`dataset_type`，负责加载原始数据并做字段映射、对话模板、tokenize 等预处理）：数据为标准对话格式时，复用注册名为 `huggingface` 的通用多模态数据集（`mindspeed_mm/fsdp/data/datasets/huggingface/`）；格式非标准（语音特征、视频 latent、自定义打包）时，用 `@data_register.register` 注册新的数据集构建逻辑；
 - **多模态打包 Plugin**（`mindspeed_mm/fsdp/data/data_utils/func_utils/mm_plugin.py` 的 `PLUGINS` 表，处理特殊 token、视觉/视频 token 占位符展开，按模型不同）：模型已在 `PLUGINS` 中时直接复用，否则需新增或覆写对应 Plugin；

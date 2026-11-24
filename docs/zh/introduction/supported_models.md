@@ -1,6 +1,6 @@
-# MindSpeed MM 支持模型列表
+# MindSpeed MM支持模型列表
 
-本表展示了MindSpeed MM支持的模型。
+本文档列出MindSpeed MM支持的多模态生成、多模态理解、语音识别与语音生成模型，逐行给出各模型的参数量、支持任务、集群规格与精度格式。
 >[!NOTE]
 >
 >下述列表中支持的模型，我们在各模型的**README**文件中提供了相应的使用说明，里面有详细的模型训练、推理、微调等流程。
@@ -180,7 +180,7 @@
       <td><a href="https://gitcode.com/Ascend/MindSpeed-MM/tree/26.1.0/examples/internvl3.5">InternVL 3.5</a></td>
       <td><a href="https://huggingface.co/OpenGVLab/InternVL3_5-30B-A3B-Instruct">30B</a></td>
       <td> 微调 </td>
-      <td> 1x8 (Atlas A3训练系列产品)  </td>
+      <td> 1x8 (Atlas A3训练系列产品) </td>
       <td> BF16 </td>
     </tr>
     <tr>

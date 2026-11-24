@@ -4,9 +4,9 @@
 |:------:|:------:|:------:|:------:|:------:|:------:|
 | 1 | CANN 版本不匹配导致训练报错 | 训练无法启动或出现算子报错 | 确保驱动固件、CANN Toolkit/Kernels/NNAL、PyTorch、TorchNPU 版本严格配套，参考 [版本配套说明](../../release_notes_mm.md#相关产品版本配套说明) | 持续更新版本配套表 | [安装说明](../installation/install_guide.md) |
 | 2 | `ModuleNotFoundError: No module named 'acl'` | 无法导入昇腾相关模块 | 检查是否已执行 `source /usr/local/Ascend/ascend-toolkit/set_env.sh`，建议写入 `~/.bashrc` | - | [安装说明](../installation/install_guide.md) |
-| 3 | CANN nnal 包安装顺序错误导致 `libatb.so` 找不到 | 推理或训练时报动态库缺失错误 | nnal 包必须在 `source /usr/local/Ascend/ascend-toolkit/set_env.sh` 之后安装，否则找不到依赖路径 | - | [安装说明](../installation/install_guide.md) |
-| 4 | 多机多卡启动时脚本卡死无报错 | 无法启动分布式训练 | 确保已安装 `pdsh`，否则多机多卡启动脚本会卡死。可通过 `apt install pdsh` 或 `yum install pdsh` 安装 | - | - |
-| 5 | HuggingFace 权重无法直接用于训练 | 训练启动失败 | HuggingFace 权重格式（safetensors/bin）不能直接用于 Megatron 架构训练，需使用 `mm-convert` 工具转换为 MindSpeed-MM 格式 | - | [权重转换](../../tools/mm_convert.md) |
+| 3 | CANN NNAL 包安装顺序错误导致 `libatb.so` 找不到 | 推理或训练时报动态库缺失错误 | nnal 包必须在 `source /usr/local/Ascend/ascend-toolkit/set_env.sh` 之后安装，否则找不到依赖路径 | - | [安装说明](../installation/install_guide.md) |
+| 4 | 多机多卡启动时脚本卡死无报错 | 无法启动分布式训练 | 确保已安装 `pdsh`，否则多机多卡启动脚本会卡死，可通过 `apt install pdsh` 或 `yum install pdsh` 安装 | - | - |
+| 5 | HuggingFace 权重无法直接用于训练 | 训练启动失败 | HuggingFace 权重格式（safetensors/bin）不能直接用于 Megatron 架构训练，需使用 `mm-convert` 工具转换为 MindSpeed MM 格式 | - | [权重转换](../../tools/mm_convert.md) |
 | 6 | 权重转换时 TP/PP 参数与训练不一致 | 训练加载权重失败 | 权重转换时的 `tp_size`、`pp_size` 及 `llm_pp_layers`/`vit_pp_layers` 必须与训练脚本中的并行配置保持一致 | - | [权重转换](../../tools/mm_convert.md) |
 | 7 | `tp_size` 超过 `num_key_value_heads` 导致报错 | 张量并行切分失败 | TP 并行度（`tp_size`）不能超过模型配置中的 `num_key_value_heads`，否则 KV 头无法均分到各卡 | - | - |
 | 8 | 训练完成后权重文件数量与原始 HF 模型不一致 | 用户疑惑权重是否完整 | 训练生成的是 Megatron-Core (mcore) 格式权重，经 mg2hf 转换后得到标准 HF 格式。文件数量因切分策略不同而变化，但参数完整，需重新生成 `model.safetensors.index.json` | - | [权重转换](../../tools/mm_convert.md) |

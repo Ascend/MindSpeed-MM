@@ -30,7 +30,7 @@ flowchart LR
 两个后端的采集入口不同：
 
 - **FSDP2**：在训练YAML的`tools.profile`中配置静态采集。可参考`examples/qwen3vl/qwen3vl_30B_config_v1.yaml`。
-- **MCORE（Megatron）**：在`mindspeed_mm/tools/tools.json`中配置静态或动态采集，详见[Profiling采集工具](../../tools/tools.md#profiling采集工具)。
+- **MCORE（Megatron）**：在`mindspeed_mm/tools/tools.json`中配置静态或动态采集,详见[Profiling采集工具](../../tools/tools.md#profiling采集工具)。
 
 FSDP2静态采集示例，合并到YAML中已有的`tools`段：
 
@@ -52,7 +52,7 @@ tools:
       analyse_flag: true
 ```
 
-示例采集预热后的一个step：活动步数为`end_step - start_step`，训练需运行足够长。选择稳定区间，避开初始化、checkpoint等操作。排查跨卡等待时选择相关rank；`ranks: [-1]`表示全部rank，但采集开销和数据量也会增加。需要调用栈或形状信息时再开启相应选项。
+示例采集预热后的一个step：活动步数为`end_step - start_step`，训练需运行足够长的时间。选择稳定区间，避开初始化、checkpoint等操作。排查跨卡等待时选择相关rank；`ranks: [-1]`表示全部rank，但采集开销和数据量也会增加。需要调用栈或形状信息时再开启相应选项。
 
 `with_memory`采集算子内存信息；`tools.memory_profile`则生成分配历史快照，使用方法见[显存调优](memory_tuning.md)。FSDP2若关闭在线解析，可运行`python mindspeed_mm/fsdp/tools/profiler.py --profiler-path ./profiling`；多机分析前应汇总各机器的采集结果。
 
@@ -83,7 +83,7 @@ tools:
 
 从通信timeline定位时，应先区分耗时是**真正的通信传输**还是**同步等待**：若AllGather / ReduceScatter等通信算子内存在较长的`notify_wait`，说明本卡已就绪、正在等待较慢的rank，根因多在慢卡（下发或显存重整产生异常Free）而非本卡，调整本卡的通信预取难以见效，应优先排查并消除慢卡上的下发或显存重整问题。
 
-此外，**显存重整**也是导致长时间Free的常见原因。当显存占用过高时，分配器需要先把已有显存碎片整理、整合出一块连续空间才能完成分配，这一过程开销较大，会在timeline上表现为明显且较长时间的Free，显著拖慢训练。排查时建议在采集profile时一并开启memory采集（FSDP2下将YAML的`tools.memory_profile`段设`enable: true`），若观察到整体显存占用出现明显的上升下降（骤升骤降），通常即为触发了显存重整。由于重整对性能影响较大，应设法降低显存占用，例如降低序列长度或扩大卡数。
+此外，**显存重整**也是导致长时间Free的常见原因。当显存占用过高时，分配器需要先把已有显存碎片整理、整合出一块连续空间才能完成分配，这一过程开销较大，会在timeline上表现为明显且较长时间的Free，显著拖慢训练。排查时建议在采集profile时一并开启memory采集（FSDP2下将YAML的`tools.memory_profile`段设`enable: true`），若观察到整体显存占用出现明显的上升下降（骤升骤降），通常即为触发了显存重整。由于重整对性能影响较大，应设法降低显存占用，例如降低序列长度或增加卡数。
 
 #### MFU分解分析
 
@@ -108,11 +108,11 @@ MindSpeed-MM提供了多种性能调优特性，可根据实际场景选择合�
 
 #### 显存优化
 
-重计算以额外计算换显存；[异步激活值卸载](../../features/memory/async_activation_offload.md)将激活值卸载至Host；[ChunkLoss](../../features/optimization/chunkloss.md)分块计算loss。适用模型、配置和代价见各特性文档。
+重计算以额外计算换显存;[异步激活值卸载](../../features/memory/async_activation_offload.md)将激活值卸载至Host；[ChunkLoss](../../features/optimization/chunkloss.md)分块计算loss。适用模型、配置和代价见各特性文档。
 
 #### 融合算子
 
-将多个连续小算子融合为单个大算子（如RotaryMul、RmsNorm、SwiGlu等），减少kernel launch开销和显存带宽消耗。融合算子的使用由框架自动应用，无需用户手动配置。
+将多个连续小算子融合为单个大算子（如RotaryMul、RmsNorm、SwiGLU等），减少kernel launch开销和显存带宽消耗。融合算子的使用由框架自动应用，无需用户手动配置。
 
 #### CPU绑核
 

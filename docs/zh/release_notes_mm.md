@@ -2,6 +2,8 @@
 
 ## 关键特性
 
+MindSpeed MM新增支持Kimi-K3、GLM5.3 NEXT、MiniMax M3等模型。
+
 ## 版本配套说明
 
 ### 产品版本信息
@@ -23,7 +25,7 @@
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%" id="mcps1.1.3.4.1"><p>发布时间</p>
 </th>
-<td class="cellrowborder" valign="top" width="73.75%" headers="mcps1.1.3.4.1 "><p>2026年9月</p>
+<td class="cellrowborder" valign="top" width="73.75%" headers="mcps1.1.3.4.1 "><p>2026年10月</p>
 </td>
 </tr>
 <tr><th class="firstcol" valign="top" width="26.25%"><p>维护周期</p>
@@ -49,7 +51,7 @@
 | 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.2           | Python3.10      |
 | 26.0.0           | 26.0.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.0.0        | 9.0.0  | 3.2.1           | Python3.10      |
 
->[!NOTE]
+> [!NOTE]
 >
 >- 用户可根据需要选择MindSpeed MM代码分支下载源码并进行安装。
 >- Triton-Ascend版本与CANN版本强绑定，Triton-Ascend的使用应该与CANN版本一一对应，详见[Triton-Ascend兼容性](https://triton-ascend.readthedocs.io/zh-cn/latest/release_note.html#id13)。
@@ -169,7 +171,7 @@
 
 |组件|描述|目的|
 |--|--|--|
-|MindSpeed MM|新模型|支持Kimi-K3，GLM5.3 NEXT，MiniMax M3|
+|MindSpeed MM|新模型|支持Kimi-K3、GLM5.3 NEXT、MiniMax M3|
 
 ### 删除特性
 
@@ -208,8 +210,8 @@
 |文档名称|内容简介|更新说明|
 |--|--|--|
 |《[MindSpeed MM安装指导](guides/installation/install_guide.md)》|指导用户如何在NPU上基于PyTorch完成MindSpeed MM的安装，内容涵盖硬件与操作系统兼容性说明、驱动固件及CANN基础软件安装，以及基于PyTorch框架下的完整安装流程，帮助用户快速搭建多模态模型训练环境。|-|
-|《[MindSpeed MM快速入门（基于Megatron训练后端）](guides/practices/quickstart.md)》|以Wan2.1和Qwen2.5-VL为例，指导开发者基于Megatron训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
-|《[MindSpeed MM快速入门（基于FSDP2训练后端）](guides/practices/quickstart_fsdp2.md)》|以Qwen3-VL-30B，指导开发者基于FSDP2训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
+|《[MindSpeed MM快速入门（基于Megatron训练后端）](guides/practices/quickstart.md)》|以Wan2.2和Qwen2.5-VL为例，指导开发者基于Megatron训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
+|《[MindSpeed MM快速入门（基于FSDP2训练后端）](guides/practices/quickstart_fsdp2.md)》|以Qwen3-VL-30B为例，指导开发者基于FSDP2训练后端完成微调任务，帮助用户快速上手多模态模型训练。|-|
 
 ## 病毒扫描及漏洞修补列表
 
