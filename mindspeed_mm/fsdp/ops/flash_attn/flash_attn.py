@@ -189,17 +189,21 @@ def get_attn_mask(device, seq_len=2048):
 def _convert_cu_seq_lens(
     cu_seq_lens_q: Optional[Union[torch.Tensor, List[int]]],
     cu_seq_lens_k: Optional[Union[torch.Tensor, List[int]]],
-    input_layout: Optional[str] = None
-) -> Tuple[Optional[List[int]], Optional[str]]:
+    input_layout: Optional[str] = None,
+    batch_size: Optional[int] = None,
+) -> Tuple[Optional[List[int]], Optional[List[int]], Optional[str]]:
     """
     Converts cu_seq_lens to a list and validates input_layout constraints.
 
     Args:
-        cu_seq_lens: Cumulative sequence lengths, can be a Tensor or List.
+        cu_seq_lens_q: Cumulative query sequence lengths, can be a Tensor or List.
+        cu_seq_lens_k: Cumulative key/value sequence lengths, can be a Tensor or List.
         input_layout: The layout of the input tensor (e.g., 'BNSD', 'BSND').
+        batch_size: Batch dimension of the input tensor. Equal-length segments in '1NTD'
+            can fall back to 'BNSD' only when each segment corresponds to one batch row.
 
     Returns:
-        A tuple containing the processed cu_seq_lens (as list) and the validated layout.
+        A tuple containing the processed (cu_seq_lens_q, cu_seq_lens_k, input_layout).
     """
 
     # 1. Convert Tensor to List if necessary
@@ -233,9 +237,18 @@ def _convert_cu_seq_lens(
                 input_layout = "BNSD"
                 cu_seq_lens_q = None
                 cu_seq_lens_k = None
-            elif len(cu_seq_lens_q) > 2 and len(cu_seq_lens_k) > 2:
-                # Judge whether cu_seq_lens is an arithmetic sequence (i.e., all sequences have equal length).
-                # If true, switch to BNSD computation
+            elif (
+                cu_seq_lens_q is not None
+                and cu_seq_lens_k is not None
+                and len(cu_seq_lens_q) > 2
+                and len(cu_seq_lens_k) > 2
+                and batch_size is not None
+                and len(cu_seq_lens_q) - 1 == batch_size
+                and len(cu_seq_lens_k) - 1 == batch_size
+            ):
+                # Judge whether cu_seq_lens is an arithmetic sequence (i.e., all sequences have equal length)
+                # and each segment corresponds to a separate batch row (e.g., mbs > 1 with CP).
+                # Keep 1NTD varlen layout for packed rows (batch_size == 1) to avoid dropping document boundaries.
                 cu_seq_q = torch.tensor(cu_seq_lens_q)
                 diffs_q = torch.diff(cu_seq_q)
                 cu_seq_k = torch.tensor(cu_seq_lens_k)
@@ -453,7 +466,12 @@ def flash_attention_forward(
         # Convert cumulative sequence lengths to list format for NPU API.
         # (For ring cp, cu_seqlens info in seq_split_lens)
         if not dist.is_initialized() or not (get_parallel_state().is_ring_enable() and seq_split_lens is not None):
-            cu_seq_lens_q, cu_seq_lens_k, input_layout = _convert_cu_seq_lens(cu_seq_lens_q, cu_seq_lens_k, input_layout=input_layout)
+            cu_seq_lens_q, cu_seq_lens_k, input_layout = _convert_cu_seq_lens(
+                cu_seq_lens_q,
+                cu_seq_lens_k,
+                input_layout=input_layout,
+                batch_size=query.shape[0],
+            )
 
         # Determine sequence length based on layout.
         if input_layout in ["BSND", "1TND"]:

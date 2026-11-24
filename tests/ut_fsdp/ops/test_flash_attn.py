@@ -50,8 +50,10 @@ class TestFlashAttention:
             (32, 32, 8, 128, None, False),  # Explicit uncompressed [S, S] attention mask.
             (1, 4096, 32, 128, None, True),
             (1, 4096, 32, 128, [0, 1024, 2048, 4096], True),
+            (1, 984, 8, 128, [0, 164, 328, 492, 656, 820, 984], True),  # Equal-length packed docs (issue #786).
             (1, 4096, 32, 128, None, False),
             (1, 4096, 32, 128, [0, 1024, 2048, 4096], False),
+            (1, 984, 8, 128, [0, 164, 328, 492, 656, 820, 984], False),  # Equal-length packed docs non-causal (issue #786).
         ]
 
         for batch_size, seq_len, num_heads, head_dim, cu_seq_lens, is_causal in TEST_CASES:
@@ -134,6 +136,85 @@ class TestFlashAttention:
 
             judge_expression(torch.allclose(target_output, output, rtol=1e-4, atol=1e-5))
 
+        # Equal-length packed 1NTD must match independent-document BSND without cross-doc leakage (issue #786).
+        num_docs, doc_len, num_heads, head_dim = 6, 164, 8, 128
+        total_len = num_docs * doc_len
+        cu_equal = [i * doc_len for i in range(num_docs + 1)]
+        scale = 1.0 / (head_dim**0.5)
+        q_packed = torch.randn((1, total_len, num_heads, head_dim), device=device, dtype=dtype)
+        k_packed = torch.randn((1, total_len, num_heads, head_dim), device=device, dtype=dtype)
+        v_packed = torch.randn((1, total_len, num_heads, head_dim), device=device, dtype=dtype)
+        causal_mask = torch.triu(torch.ones([2048, 2048], device=device), diagonal=1).bool()
+
+        for is_causal in (True, False):
+            ref_bsnd = torch_npu.npu_fusion_attention(
+                q_packed.view(num_docs, doc_len, num_heads, head_dim),
+                k_packed.view(num_docs, doc_len, num_heads, head_dim),
+                v_packed.view(num_docs, doc_len, num_heads, head_dim),
+                num_heads,
+                "BSND",
+                padding_mask=None,
+                atten_mask=causal_mask if is_causal else None,
+                scale=scale,
+                keep_prob=1,
+                inner_precise=0,
+                sparse_mode=3 if is_causal else 0,
+            )[0].reshape(1, total_len, num_heads, head_dim)
+
+            out_1ntd = self._test_flash_attention_forward(
+                module=DummyModule(is_causal=is_causal),
+                q=q_packed.transpose(1, 2).contiguous(),
+                k=k_packed.transpose(1, 2).contiguous(),
+                v=v_packed.transpose(1, 2).contiguous(),
+                attn_mask=None,
+                common_kwargs={
+                    "dropout": 0.0,
+                    "scaling": scale,
+                    "cu_seq_lens_q": cu_equal,
+                    "cu_seq_lens_k": cu_equal,
+                    "input_layout": "1NTD",
+                    "total_seq_len": total_len,
+                },
+            )
+            judge_expression(torch.allclose(ref_bsnd, out_1ntd, rtol=1e-4, atol=1e-5))
+
+        # Non-packed mbs > 1 with one equal-length sequence per batch row keeps the BNSD optimization (PR !2750).
+        mbs, mbs_seq, mbs_heads = 2, 256, 8
+        q_mbs = torch.randn((mbs, mbs_heads, mbs_seq, head_dim), device=device, dtype=dtype)
+        k_mbs = torch.randn((mbs, mbs_heads, mbs_seq, head_dim), device=device, dtype=dtype)
+        v_mbs = torch.randn((mbs, mbs_heads, mbs_seq, head_dim), device=device, dtype=dtype)
+        ref_mbs = torch_npu.npu_fusion_attention(
+            q_mbs,
+            k_mbs,
+            v_mbs,
+            mbs_heads,
+            "BNSD",
+            padding_mask=None,
+            atten_mask=causal_mask,
+            actual_seq_qlen=None,
+            actual_seq_kvlen=None,
+            scale=scale,
+            keep_prob=1,
+            inner_precise=0,
+            sparse_mode=3,
+        )[0].transpose(1, 2)
+        out_mbs = self._test_flash_attention_forward(
+            module=DummyModule(is_causal=True),
+            q=q_mbs,
+            k=k_mbs,
+            v=v_mbs,
+            attn_mask=None,
+            common_kwargs={
+                "dropout": 0.0,
+                "scaling": scale,
+                "cu_seq_lens_q": [0, mbs_seq, 2 * mbs_seq],
+                "cu_seq_lens_k": [0, mbs_seq, 2 * mbs_seq],
+                "input_layout": "1NTD",
+                "total_seq_len": mbs_seq,
+            },
+        )
+        judge_expression(torch.allclose(ref_mbs, out_mbs, rtol=1e-4, atol=1e-5))
+
     def _test_cp(self, ulysses_parallel_size=1, ring_parallel_size=1):
         from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
             split_forward_gather_backward_with_cp,
@@ -163,6 +244,7 @@ class TestFlashAttention:
             TEST_CASES = [
                 (1, 4096, 32, 128, None, True),
                 (1, 4096, 32, 128, [0, 1024, 2048, 4096], True),
+                (1, 4096, 32, 128, [0, 1024, 2048, 3072, 4096], True),
                 (1, 4096, 32, 128, None, False),
                 (1, 4096, 32, 128, [0, 1024, 2048, 4096], False),
             ]
@@ -359,3 +441,42 @@ class TestFlashAttention:
         finally:
             if os.path.exists(init_file):
                 os.remove(init_file)
+
+    def test_convert_cu_seq_lens_equal_length_packing(self):
+        from mindspeed_mm.fsdp.ops.flash_attn.flash_attn import _convert_cu_seq_lens
+
+        cu = [0, 164, 328, 492, 656, 820, 984]
+        assert _convert_cu_seq_lens(cu, cu, input_layout="1NTD", batch_size=1) == (cu, cu, "1NTD")
+        assert _convert_cu_seq_lens(cu, cu, input_layout="1NTD") == (cu, cu, "1NTD")
+        assert _convert_cu_seq_lens(
+            torch.tensor(cu, dtype=torch.int32),
+            torch.tensor(cu, dtype=torch.int32),
+            input_layout="1NTD",
+            batch_size=1,
+        ) == (cu, cu, "1NTD")
+        assert _convert_cu_seq_lens([0, 40, 80], [0, 40, 80], input_layout="1NTD", batch_size=2) == (
+            None,
+            None,
+            "BNSD",
+        )
+        cu_multi = [0, 40, 80, 120, 160]
+        assert _convert_cu_seq_lens(cu_multi, cu_multi, input_layout="1NTD", batch_size=2) == (
+            cu_multi,
+            cu_multi,
+            "1NTD",
+        )
+        assert _convert_cu_seq_lens([0, 40, 80], [0, 40, 80, 120], input_layout="1NTD", batch_size=2) == (
+            [0, 40, 80],
+            [0, 40, 80, 120],
+            "1NTD",
+        )
+        assert _convert_cu_seq_lens([0, 48, 88], [0, 48, 88], input_layout="1NTD", batch_size=2) == (
+            [0, 48, 88],
+            [0, 48, 88],
+            "1NTD",
+        )
+        assert _convert_cu_seq_lens([0, 80], [0, 80], input_layout="1NTD", batch_size=1) == (
+            None,
+            None,
+            "BNSD",
+        )
