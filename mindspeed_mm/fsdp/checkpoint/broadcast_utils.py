@@ -136,6 +136,8 @@ def rank0_load_and_broadcast_dcp_weights(load_state, storage_reader):
                 for fqn2file_elem in chunk_list(fqn2file_list, shard_count):
                     selected_keys = [fqn[0] for fqn in fqn2file_elem if fqn[0] in dcp_keys]
                     shard_info_list.append(selected_keys)
+            # Replicated parameters and buffers must also be restored alongside sharded weights.
+            register_shard_info(unshard_dict)
     else:
         shard_info_list = []
 
