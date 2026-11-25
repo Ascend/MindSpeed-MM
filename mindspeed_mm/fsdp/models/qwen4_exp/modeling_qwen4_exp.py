@@ -116,6 +116,7 @@ IMPL_FOR_QSA_INDEXER = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC)
 
 _TOTAL_SEQ_LEN = None
 _VISUAL_SEQ_LEN = None
+
 _VISUAL_PER_SEQ_LEN = None
 
 def get_seq_len(seq_type: str = None) -> int:
@@ -235,9 +236,10 @@ class Qwen4ExpTextRotaryEmbedding(nn.Module):
 
 
 class Qwen4ExpTextRMSNorm(nn.Module):
-    def __init__(self, dim: int, group_size: int | None = None, eps: float = 1e-6):
+    def __init__(self, dim: int, group_size: int | None = None, eps: float = 1e-6, *, low_precision: bool = False):
         super().__init__()
         self.eps = eps
+        self.low_precision = low_precision
         self.weight = nn.Parameter(torch.zeros(dim))
         self.group_size = group_size
         self._norm_ones = None
@@ -255,7 +257,10 @@ class Qwen4ExpTextRMSNorm(nn.Module):
             output = self._norm(x.float())
             output = output * (1.0 + self.weight.float())
             return output.type_as(x)
-        z = x.float()
+        low_precision = (self.low_precision and self.group_size is None
+                         and x.dtype == torch.bfloat16)
+        z = x if low_precision else x.float()
+        norm_dtype = z.dtype
         if self.group_size is not None:
             z = z.reshape(*z.shape[:-1], -1, self.group_size)
             if self._norm_ones is None or self._norm_ones.device != z.device:
@@ -264,8 +269,8 @@ class Qwen4ExpTextRMSNorm(nn.Module):
             output = torch_npu.npu_rms_norm(z, self._norm_ones, self.eps)[0]
             output = output.flatten(-2) * (1.0 + self.weight.float())
         else:
-            output = torch_npu.npu_rms_norm(z, 1.0 + self.weight.float(), self.eps)[0]
-        return output.type_as(x)
+            output = torch_npu.npu_rms_norm(z, 1.0 + self.weight.to(norm_dtype), self.eps)[0]
+        return output if low_precision else output.type_as(x)
 
     def extra_repr(self):
         return f"{tuple(self.weight.shape)}, eps={self.eps}"
@@ -997,8 +1002,10 @@ class Qwen4ExpTextQSAIndexer(nn.Module):
             (self.index_n_heads + self.index_kv_heads) * self.index_head_dim,
             bias=False,
         )
-        self.q_layernorm = Qwen4ExpTextRMSNorm(self.index_head_dim, eps=config.rms_norm_eps)
-        self.k_layernorm = Qwen4ExpTextRMSNorm(self.index_head_dim, eps=config.rms_norm_eps)
+        self.q_layernorm = Qwen4ExpTextRMSNorm(self.index_head_dim, eps=config.rms_norm_eps,
+                                                low_precision=getattr(config, "rms_norm_low_precision", False))
+        self.k_layernorm = Qwen4ExpTextRMSNorm(self.index_head_dim, eps=config.rms_norm_eps,
+                                                low_precision=getattr(config, "rms_norm_low_precision", False))
         self.qsa_indexer_implementation = config.qsa_indexer_implementation
         self.qsa_id2mask_implementation = config.qsa_id2mask_implementation
 
@@ -1225,8 +1232,10 @@ class Qwen4ExpTextAttention(nn.Module):
         self.o_proj = nn.Linear(
             config.num_attention_heads * self.head_dim, config.hidden_size, bias=config.attention_bias
         )
-        self.q_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
-        self.k_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
+        self.q_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps,
+                                                low_precision=getattr(config, "rms_norm_low_precision", False))
+        self.k_norm = Qwen4ExpTextRMSNorm(self.head_dim, eps=config.rms_norm_eps,
+                                                low_precision=getattr(config, "rms_norm_low_precision", False))
         self.indexer = Qwen4ExpTextQSAIndexer(config, layer_idx)
         self.qsa_implementation = config.qsa_implementation
 
@@ -3414,6 +3423,11 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
         transformer_config.text_config.use_grouped_expert_matmul = getattr(
             model_args, "use_grouped_expert_matmul", False
         )
+
+        rms_norm_low_precision = getattr(model_args, "rms_norm_low_precision", False)
+        if not isinstance(rms_norm_low_precision, bool):
+            raise ValueError("rms_norm_low_precision must be a boolean")
+        transformer_config.text_config.rms_norm_low_precision = rms_norm_low_precision
 
         # aux loss
         transformer_config.text_config.router_aux_loss_coef = feature_args.loss_cfg.router_aux_loss_coef
