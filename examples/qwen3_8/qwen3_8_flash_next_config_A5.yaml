@@ -100,6 +100,7 @@ model:
   # 融合算子配置
   rmsnormgated_implementation: triton  # eager | triton
   qhc_implementation: ascendc  # eager | ascendc | triton
+  use_triton_addcmul: true
   gdn_implementation: ascendc
   causal_conv1d_implementation: ascendc
   qsa_indexer_implementation: ascendc # eager | ascendc
@@ -124,6 +125,14 @@ features:
     use_reentrant: false
     mod_replay_scopes: []
     op_replay_scopes:
+      # GDN core：只重放 GDN fused kernel
+      - name: gdn_core_raw
+        apply_modules:
+          - model.language_model.layers.{*}.linear_attn
+        cache_ops:
+          - mindspeed_mm.chunk_gdn_fwd.default
+        quantizer: int8_pertoken
+        save_rng: false
       # GDN：仅重放 out_proj，勿扩大为全部 matmul
       - name: gdn_out_proj_probe
         apply_modules:

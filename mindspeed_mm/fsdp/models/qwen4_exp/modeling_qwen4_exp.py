@@ -96,6 +96,7 @@ from mindspeed_mm.fsdp.distributed.context_parallel.communication import (
 )
 from mindspeed_mm.fsdp.distributed.context_parallel.utils import cal_split_sizes
 from mindspeed_mm.fsdp.distributed.parallel_state import get_parallel_state
+from mindspeed_mm.fsdp.ops.addcmul.gated_residual import gated_residual_injection
 
 if IS_NPU_AVAILABLE:
     import torch_npu
@@ -1984,6 +1985,7 @@ class Qwen4ExpTextDecoderLayer(GradientCheckpointingLayer):
         self.ple = Qwen4ExpTextPLELayer(config, layer_idx, ple_layer_index) if ple_layer_index is not None else None
         self.attn_hyper_connection = Qwen4ExpTextGatedResidual(config)
         self.mlp_hyper_connection = Qwen4ExpTextGatedResidual(config)
+        self.use_triton_addcmul = getattr(config, "use_triton_addcmul", False)
 
     def forward(
         self,
@@ -2016,15 +2018,16 @@ class Qwen4ExpTextDecoderLayer(GradientCheckpointingLayer):
                 **kwargs,
             )
 
-        injection = hidden_states.unsqueeze(-2) * injection_weights.unsqueeze(-1)
-        hidden_states = hyper_input + injection.flatten(-2)
+        hidden_states = gated_residual_injection(
+            hidden_states, injection_weights, hyper_input, fused=self.use_triton_addcmul
+        )
 
         hidden_states, hyper_input, injection_weights = self.mlp_hyper_connection(hidden_states)
         hidden_states = self.mlp(hidden_states)
 
-        injection = hidden_states.unsqueeze(-2) * injection_weights.unsqueeze(-1)
-        hidden_states = hyper_input + injection.flatten(-2)
-        return hidden_states
+        return gated_residual_injection(
+            hidden_states, injection_weights, hyper_input, fused=self.use_triton_addcmul
+        )
 
 
 @auto_docstring
@@ -3325,6 +3328,11 @@ class Qwen4ExpForConditionalGeneration(Qwen4ExpPreTrainedModel, GenerationMixin)
         if qhc_implementation not in (IMPL_EAGER, IMPL_ASCENDC, IMPL_TRITON):
             raise ValueError("qhc_implementation must be eager, ascendc, or triton.")
         transformer_config.text_config.qhc_implementation = qhc_implementation
+
+        use_triton_addcmul = getattr(model_args, "use_triton_addcmul", False)
+        if not isinstance(use_triton_addcmul, bool):
+            raise ValueError("use_triton_addcmul must be a boolean")
+        transformer_config.text_config.use_triton_addcmul = use_triton_addcmul
 
         # Gated RMSNorm implementation
         rmsnormgated_implementation = getattr(model_args, "rmsnormgated_implementation", IMPL_EAGER).lower().strip()

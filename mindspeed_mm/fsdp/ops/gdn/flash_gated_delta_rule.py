@@ -21,6 +21,7 @@ from typing import Dict, Optional
 import torch
 import torch_npu
 import fla_npu
+from torch.library import custom_op
 from fla_npu.ops.ascendc import (
     chunk_bwd_dqkwg as ascendc_chunk_bwd_dqkwg,
     chunk_bwd_dv_local as ascendc_chunk_bwd_dv_local,
@@ -49,6 +50,41 @@ else:
 
 _disable_compile = getattr(getattr(torch, "compiler", None), "disable", lambda fn: fn)
 _DEFAULT_VARLEN_CHUNK_SIZES = (16, 32, 64, 128, 608 * 2)
+
+
+@custom_op("mindspeed_mm::chunk_gdn_fwd", mutates_args=())
+def _chunk_gdn_fwd_op(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    g: torch.Tensor,
+    beta: torch.Tensor,
+    scale: float,
+    initial_state: Optional[torch.Tensor],
+    output_final_state: bool,
+    chunk_size: int,
+    cu_seqlens: Optional[list[int]],
+    chunk_indices: Optional[list[int]],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    o, final_state, g_cumsum, A, _, _, _, _, _, _ = ascendc_chunk_gated_delta_rule_fwd(
+        q,
+        k,
+        v,
+        g,
+        beta,
+        initial_state=initial_state,
+        output_final_state=output_final_state,
+        chunk_size=chunk_size,
+        cu_seqlens=cu_seqlens,
+        chunk_indices=chunk_indices,
+        scale=scale,
+        disable_recompute=True,
+        return_intermediate_states=False,
+        use_qk_l2norm_in_kernel=False,
+    )
+    if final_state is None:
+        final_state = o.new_empty((0,))
+    return o, final_state, g_cumsum, A
 
 
 def cdiv_torch(a, b):
@@ -204,27 +240,41 @@ def flash_chunk_gated_delta_rule_fwd(
     cu_list = cu_seqlens_list
     chunk_list = _chunk_list(chunk_indices_list, chunk_size)
     if use_composite_core:
-        o, final_state, g, A, _, _, q_hat, k_hat, fused_q_rstd, fused_k_rstd = ascendc_chunk_gated_delta_rule_fwd(
-            q,
-            k,
-            v,
-            g,
-            beta,
-            initial_state=initial_state,
-            output_final_state=output_final_state,
-            chunk_size=chunk_size,
-            cu_seqlens=cu_list,
-            chunk_indices=chunk_list,
-            scale=scale,
-            disable_recompute=True,
-            return_intermediate_states=False,
-            use_qk_l2norm_in_kernel=fused_qk_l2norm,
-        )
         if fused_qk_l2norm:
+            o, final_state, g, A, _, _, q_hat, k_hat, fused_q_rstd, fused_k_rstd = ascendc_chunk_gated_delta_rule_fwd(
+                q,
+                k,
+                v,
+                g,
+                beta,
+                initial_state=initial_state,
+                output_final_state=output_final_state,
+                chunk_size=chunk_size,
+                cu_seqlens=cu_list,
+                chunk_indices=chunk_list,
+                scale=scale,
+                disable_recompute=True,
+                return_intermediate_states=False,
+                use_qk_l2norm_in_kernel=fused_qk_l2norm,
+            )
             if any(x is None for x in (q_hat, k_hat, fused_q_rstd, fused_k_rstd)):
                 raise RuntimeError("Fused GDN forward must return normalized Q/K and rstd.")
             q, k = q_hat, k_hat
             q_rstd, k_rstd = fused_q_rstd, fused_k_rstd
+        else:
+            o, final_state, g, A = _chunk_gdn_fwd_op(
+                q,
+                k,
+                v,
+                g,
+                beta,
+                scale,
+                initial_state,
+                output_final_state,
+                chunk_size,
+                cu_list,
+                chunk_list,
+            )
         if not output_final_state:
             final_state = None
         return g, o, A, final_state, q, k, q_rstd, k_rstd
