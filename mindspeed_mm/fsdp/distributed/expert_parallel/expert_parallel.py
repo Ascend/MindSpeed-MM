@@ -23,10 +23,10 @@ from torch.distributed.tensor import Shard, DTensor, Replicate, distribute_tenso
 from mindspeed_mm.fsdp.utils.str_match import module_name_match
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 from mindspeed_mm.fsdp.log import print_rank
+from mindspeed_mm.fsdp.ops.moe_ops.gemm_mc2_udma import initialize_udma_group
 
 
 logger = logging.getLogger(__name__)
-
 
 def expert_parallelize_modules(modules: torch.nn.Module, ep_mesh: DeviceMesh, plan: EPPlanConfig):
     ep_modules = get_ep_modules(modules, plan)
@@ -34,6 +34,8 @@ def expert_parallelize_modules(modules: torch.nn.Module, ep_mesh: DeviceMesh, pl
     ep_group = ep_mesh.get_group()
     ep_rank = torch.distributed.get_rank(ep_group)
     ep_size = torch.distributed.get_world_size(ep_group)
+    if plan.dispatcher == "mc2_udma":
+        initialize_udma_group(ep_group)
 
     for module in ep_modules:
         distribute_experts_module(module, ep_mesh)
@@ -103,7 +105,7 @@ def apply_grad_division_hook(module, ep_size):
 
 
 def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher="alltoall", plan=None):
-    from .ep_dispatcher import ep_forward, ep_mc2_forward, ep_allgather_forward
+    from .ep_dispatcher import ep_forward, ep_mc2_forward, ep_allgather_forward, ep_mc2_udma_forward
     from .ep_chunkmoe import ep_chunkmoe_forward
 
     def experts_forward(self, hidden_states: torch.Tensor, routing_weights: torch.Tensor, router_indices: torch.Tensor):
@@ -117,6 +119,7 @@ def get_experts_forward_fn_for_qwen(ep_group, use_npu_fused_ops=True, dispatcher
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
             "mc2": ep_mc2_forward,
+            "mc2_udma": ep_mc2_udma_forward,
             "allgather": ep_allgather_forward,
             "chunkmoe": ep_chunkmoe_forward,
         }

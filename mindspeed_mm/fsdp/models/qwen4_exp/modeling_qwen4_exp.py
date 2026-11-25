@@ -1544,12 +1544,14 @@ class Qwen4ExpTextExperts(nn.Module):
             ep_allgather_forward,
             ep_forward,
             ep_mc2_forward,
+            ep_mc2_udma_forward,
         )
         from mindspeed_mm.fsdp.distributed.expert_parallel.ep_chunkmoe import ep_chunkmoe_forward
 
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
             "mc2": ep_mc2_forward,
+            "mc2_udma": ep_mc2_udma_forward,
             "allgather": ep_allgather_forward,
             "chunkmoe": ep_chunkmoe_forward,
         }

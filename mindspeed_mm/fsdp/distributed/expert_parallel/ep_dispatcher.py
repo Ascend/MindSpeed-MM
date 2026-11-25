@@ -473,6 +473,109 @@ def ep_mc2_forward(
     return hidden_states
 
 
+def ep_mc2_udma_forward(
+    num_experts: int,
+    routing_weights: torch.Tensor,
+    selected_experts: torch.Tensor,
+    hidden_states: torch.Tensor,
+    fc1_weight: torch.Tensor,
+    fc2_weight: torch.Tensor,
+    ep_group: Optional[dist.ProcessGroup] = None,
+    fused: bool = True,
+    swiglu_limit: float = 0.0,
+    swiglu_alpha: Optional[float] = None,
+    ep_balance_strategy = None,
+    skip_moe_pad_tokens: bool = False,
+    seq_mask: Optional[torch.Tensor] = None,
+    activation: Optional[Callable] = None,
+) -> torch.Tensor:
+    from mindspeed_mm.fsdp.ops.moe_ops.gemm_mc2_udma import (
+        initialize_udma_group,
+        grouped_matmul_all2all as grouped_matmul_all2all_udma,
+        all2all_grouped_matmul as all2all_grouped_matmul_udma,
+    )
+
+    if not fused:
+        raise ValueError("ep mc2_udma only supports fused=True.")
+    if ep_balance_strategy is not None:
+        raise NotImplementedError("mc2_udma does not support EP load balancing.")
+    ep_size = dist.get_world_size(ep_group)
+    if num_experts % ep_size != 0:
+        raise ValueError("Number of experts must be divisible by expert parallel size.")
+    initialize_udma_group(ep_group)
+    if skip_moe_pad_tokens:
+        if seq_mask is None:
+            raise ValueError("seq_mask must be provided when SKIP_MOE_PAD_TOKENS is enabled.")
+        seq_mask = seq_mask.view(-1)
+        pad_indices = seq_mask == 0
+        nonpad_indices = ~pad_indices
+        original_hidden_states = hidden_states
+        hidden_states = original_hidden_states[nonpad_indices, :]
+        pad_hidden_states = original_hidden_states[pad_indices, :]
+        routing_weights = routing_weights[nonpad_indices, :]
+        selected_experts = selected_experts[nonpad_indices, :]
+
+    if FORCE_EP_BALANCE:
+        selected_experts = force_ep_balance(num_experts, selected_experts)
+
+    hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
+    ep_size = dist.get_world_size(ep_group)
+    ep_rank = dist.get_rank(ep_group)
+    num_local_experts = num_experts // ep_size
+
+    num_local_tokens_per_expert = get_num_global_tokens_per_local_expert(selected_experts, num_experts).to(torch.int64)
+
+    num_global_tokens_per_expert = torch.zeros(
+        ep_size,
+        num_experts,
+        dtype=num_local_tokens_per_expert.dtype,
+        device=num_local_tokens_per_expert.device
+    ) # [ep_size, num_experts]
+    dist.all_gather_into_tensor(num_global_tokens_per_expert, num_local_tokens_per_expert, group=ep_group)
+
+    start_idx, end_idx = ep_rank * num_local_experts, (ep_rank + 1) * num_local_experts
+
+    send_counts = num_local_tokens_per_expert
+    recv_counts = num_global_tokens_per_expert[:, start_idx:end_idx].reshape(-1)
+
+    # UDMA consumes device counts, but needs a host scalar to size its output.
+    # Read it before enqueueing permute and FC1, and keep it local to this
+    # invocation so checkpoint replay and later microbatches use fresh routes.
+    reuse_host_counts = os.environ.get("MM_MC2_REUSE_HOST_COUNTS", "1") == "1"
+    received_rows = int(recv_counts.sum().item()) if reuse_host_counts else None
+
+    hidden_states, unpermute_indices = permute(hidden_states, selected_experts.to(torch.int32), fused=fused)
+
+    intermediate_hidden_states = all2all_grouped_matmul_udma(
+        inputs=hidden_states, weights=fc1_weight, group=ep_group, send_counts=send_counts, recv_counts=recv_counts,
+        received_rows=received_rows,
+    )
+    intermediate_activations = apply_activation(
+        intermediate_hidden_states,
+        dim=-1,
+        fused=fused,
+        swiglu_limit=swiglu_limit,
+        swiglu_alpha=swiglu_alpha,
+        activation=activation,
+    )
+
+    hidden_states = grouped_matmul_all2all_udma(
+        inputs=intermediate_activations, weights=fc2_weight, group=ep_group, send_counts=recv_counts, recv_counts=send_counts,
+        output_rows=hidden_states.shape[0] if reuse_host_counts else None,
+    )
+    hidden_states = unpermute(
+        hidden_states, unpermute_indices, probs=routing_weights, fused=True
+    )
+
+    if skip_moe_pad_tokens:
+        result = torch.zeros_like(original_hidden_states)
+        result[nonpad_indices, :] = hidden_states
+        result[pad_indices, :] = pad_hidden_states
+        hidden_states = result
+
+    return hidden_states
+
+
 def ep_allgather_forward(
     num_experts: int,
     routing_weights: torch.Tensor,
