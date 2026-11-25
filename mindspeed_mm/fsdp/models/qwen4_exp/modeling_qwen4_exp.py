@@ -1176,7 +1176,7 @@ def qsa_flash_attention_forward(
     if attention_mask is None or attention_mask.ndim != 4:
         raise ValueError("QSA flash_attention_2 requires the full [B,1,Sq,Skv] attention mask")
     b, h, sq, _ = query.shape
-    if key.shape[1] != h:
+    if ps.is_ulysses_enable() and key.shape[1] != h:
         if h % key.shape[1] != 0:
             raise ValueError(
                 f"QSA key/value heads ({key.shape[1]}) must divide query heads ({h})"
