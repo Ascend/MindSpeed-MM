@@ -18,7 +18,7 @@ import logging
 import torch
 
 from mindspeed_mm.fsdp import envs
-from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE
+from mindspeed_mm.fsdp.utils.device import IS_NPU_AVAILABLE, is_arch35
 from mindspeed_mm.fsdp.config.arguments.base_args import BaseArguments
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ class EPPlanConfig(BaseArguments):
     """Configuration for Expert Parallelism (EP) plan for MoE models."""
     apply_modules: List[str] = field(default_factory=list)
     use_npu_fused_ops: bool = True
-    dispatcher: Literal["alltoall", "allgather", "mc2", "chunkmoe", "mc2_udma"] = "alltoall"
+    dispatcher: Literal["alltoall", "allgather", "mc2", "chunkmoe", "mc2_udma", "megamoe"] = "alltoall"
     apply_efsdp_modules: List[str] = field(default_factory=list)
     _gradient_divide_factor: float = None
 
@@ -78,6 +78,11 @@ class EPPlanConfig(BaseArguments):
     )
 
     def model_post_init(self, __context):
+        if self.dispatcher == "megamoe":
+            if is_arch35():
+                raise ValueError("megamoe dispatcher does not support Ascend 950PR&950DT products")
+            if not self.use_npu_fused_ops:
+                raise ValueError("megamoe dispatcher requires use_npu_fused_ops=True")
         if self.moe_chunk_size > 0 and self.moe_num_chunks > 0:
             logger.warning(
                 "moe_chunk_size (%s) and moe_num_chunks (%s) are both set; "

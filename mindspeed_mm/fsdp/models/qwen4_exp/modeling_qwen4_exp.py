@@ -1557,6 +1557,7 @@ class Qwen4ExpTextExperts(nn.Module):
             ep_mc2_udma_forward,
         )
         from mindspeed_mm.fsdp.distributed.expert_parallel.ep_chunkmoe import ep_chunkmoe_forward
+        from mindspeed_mm.fsdp.distributed.expert_parallel.ep_megamoe import ep_megamoe_forward
 
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
@@ -1564,6 +1565,7 @@ class Qwen4ExpTextExperts(nn.Module):
             "mc2_udma": ep_mc2_udma_forward,
             "allgather": ep_allgather_forward,
             "chunkmoe": ep_chunkmoe_forward,
+            "megamoe": partial(ep_megamoe_forward, owner=self),
         }
         if ep_plan.dispatcher not in ep_dispatcher_dict:
             raise NotImplementedError(
