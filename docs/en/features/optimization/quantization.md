@@ -139,5 +139,5 @@ To enable low-precision training and communication, simply add the quantization-
 
 ## Notes
 
-- ⚠️ Currently, low-precision training is supported only on 950-based machines. Machines such as 910B&C are not supported.
+- ⚠️ Currently, features related to low-precision training run only on Ascend 950PR&950DT products. Atlas A2 training products, Atlas A3 training products, and similar products are not supported.
 - ⚠️ Low-precision training may cause precision loss and degrade model performance. This is not a framework issue; use with caution.

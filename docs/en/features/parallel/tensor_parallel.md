@@ -6,7 +6,7 @@ Last updated: 12/13/2025. Author: yaoyaoxu
 
 To address the memory bottleneck in multimodal large model training, tensor parallelism (TP) shards the weight matrices within a layer across multiple computing devices to scale memory, making it a key model parallelism technique. It can be flexibly combined with strategies such as data parallelism and pipeline parallelism to form hybrid parallelism schemes that support training extremely large models.
 
-<!-- <img src="../../../../sources/images/features/tp/tp.png"> -->
+<img src="../../../../sources/images/features/tp/tp.png">
 
 Note, however, that the essence of TP is trading communication for memory. As shown in the figure above, it introduces significant inter-device communication overhead. In scenarios where the model size or network bandwidth is insufficient to hide this overhead, enabling TP needs to be evaluated carefully.
 

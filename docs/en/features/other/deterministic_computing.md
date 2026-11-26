@@ -28,11 +28,11 @@ In MindSpeed MM, deterministic computation is enabled based on the training back
    --npu-deterministic
    ```
 
-   For detailed instructions, refer to: [Deterministic Computing](https://gitcode.com/Ascend/MindSpeed/blob/26.1.0_core_r0.12.1/docs/en/features/npu_deterministic.md).
+   For detailed instructions, refer to [Deterministic Computing](https://gitcode.com/Ascend/MindSpeed/blob/master/docs/en/features/npu_deterministic.md).
 
 2. **Using the msProbe Tool**
    Deterministic computation is enabled through the msprobe package in the MindStudio Training Tools toolchain.  
-   Deterministic computation can be enabled using the msProbe package from the MindStudio Training Tools. For usage instructions<!--, refer to [msProbe documentation](https://gitcode.com/Ascend/msprobe/blob/master/docs/en/user_guide/dump/pytorch_data_dump_instruct.md)-->.
+   Deterministic computation can be enabled using the msProbe package from the MindStudio Training Tools. For usage instructions, refer to [msProbe documentation](https://gitcode.com/Ascend/msprobe/blob/master/docs/en/user_guide/dump/pytorch_data_dump_instruct.md).
 
 ## Required Environment Variables
 

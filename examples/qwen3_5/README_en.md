@@ -102,14 +102,28 @@ pip install triton-ascend==3.2.2 --extra-index-url=https://triton-ascend.osinfra
 
 ### 4. Install fla-npu for AscendC Adaptation
 
-Clone the flash-linear-attention-npu repository and go to the repository root directory:
+Method 1: Download the prebuilt whl package from the official website
 
-```bash
-git clone https://github.com/flashserve/flash-linear-attention-npu -b v26.6.0
-cd flash-linear-attention-npu
+Open [flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/releases), select the whl package that suits your current environment, and install it. The following commands are recommended:
+
+```shell
+# source the actual CANN path
+source /usr/local/Ascend/cann/set_env.sh
+# cd to the directory where the whl package is stored and run the installation
+python -m pip install --force-reinstall --no-deps ./flash_linear_attention_npu*.whl
 ```
 
-Installation steps: see the README of the fla-npu repository [flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/v26.6.0/README.md).
+Method 2: Build the package manually and install it
+
+Clone the `flash-linear-attention-npu` repository and go to the repository root directory:
+
+```bash
+git clone https://github.com/flashserve/flash-linear-attention-npu
+cd flash-linear-attention-npu
+git checkout v26.9.1
+```
+
+Installation steps: see the README of the [flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/v26.6.0/README.md) repository.
 
 > **Note:** Make sure `gawk` and `cmake` are installed on the operating system; otherwise, the subsequent installation will fail. You can install them with the following commands:
 
@@ -129,24 +143,20 @@ The following installation commands are recommended:
 source /usr/local/Ascend/cann/set_env.sh
 
 python -m pip install -r requirements.txt
-python scripts/check_npu_env.py --build-only
+python scripts/check_npu_env.py  # Add --build-only for a pure build environment without NPU
 
-# --soc must be set to the chip type of the current machine {ascend910b/ascend910_93/ascend950}
-FLA_NPU_SOC=ascend910_93 python -m pip wheel --no-build-isolation --no-deps . -w dist
-python -m pip install --force-reinstall --no-deps dist/flash_linear_attention_npu-*.whl
+# --soc must be set to the chip type of the current machine {Atlas A2 training products: ascend910b, Atlas A3 training products: ascend910_93, Ascend 950PR&950DT products: ascend950}
+FLA_NPU_SOC=ascend910_93 python scripts/build_wheel.py
+python -m pip install --force-reinstall --no-cache-dir --no-deps dist/flash_linear_attention_npu*.whl
 ```
 
 Check whether fla_npu is installed successfully:
 
 ```bash
-# Displays True
-python -c "import fla_npu; import torch; print(hasattr(torch.ops.npu, 'npu_chunk_fwd_o'))"
-
-# Displays Packaged wheel API check passed.
-python scripts/check_packaged_wheel_api.py
-
-# Displays flash-linear-attention-npu 26.6.0
 pip list | grep fla
+python -c "import fla_npu; print('ok')"
+python -c "from fla_npu.ops import ascendc; print(hasattr(ascendc, 'chunk_fwd_o'))"
+python scripts/check_packaged_wheel_api.py
 ```
 
 ---
@@ -178,6 +188,8 @@ Loading Hugging Face weights or DCP weights is supported. Configure the weight t
 If you need to load DCP weights, first convert the HF weights to DCP weights based on the model configuration as follows:
 
 ```bash
+# Set this environment variable before conversion
+export NON_MEGATRON=true
 mm-convert Qwen35Converter hf_to_dcp \
 --hf_dir ckpt/hf_path/xxxxxxx \
 --dcp_dir ckpt/dcp_path/xxxxxxx \
@@ -217,6 +229,8 @@ MindSpeed MM supports saving weights in Hugging Face format and DCP format. Conf
 #   |—— release
 #   |—— latest_checkpointed_iteration.txt
 
+# Set this environment variable before conversion
+export NON_MEGATRON=true
 mm-convert Qwen35Converter dcp_to_hf \
 --save_hf_dir ckpt/save_hf_path/Qwen3.5-xxB-hf-save \
 --dcp_dir ./save_path/iter_000xx \

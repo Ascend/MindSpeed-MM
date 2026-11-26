@@ -46,9 +46,10 @@ MindSpeed MM adds support for the Kimi-K3, GLM5.3 NEXT, and MiniMax M3 models.
 
 | MindSpeed MM Version | MindSpeed Core Code Branch | Megatron Version | PyTorch Version | TorchNPU Version | CANN Version | Triton-Ascend Version | Python Version |
 | ---------------- | ------------------ | ------------ | -----------  | ------------- |--------------------- |-----------------| ------------------- |
-| 26.2.0 | 26.2.0_core_r0.12.1  | core_v0.12.1  | 2.10.0       | 26.2.0       | 9.2.0  | 3.2.2            | Python3.12      |
-| 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.2           | Python3.10      |
-| 26.0.0           | 26.0.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.0.0        | 9.0.0  | 3.2.1           | Python3.10      |
+| master (under development) | master (under development) | core_v0.12.1 | 2.10.0 | Under development | Under development | In Development | Python 3.12 |
+| 26.2.0 | 26.2.0_core_r0.12.1  | core_v0.12.1  | 2.10.0       | 26.2.0       | 9.2.0  | 3.2.2            | Python 3.12      |
+| 26.1.0           | 26.1.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.1.0        | 9.1.0  | 3.2.2           | Python 3.10      |
+| 26.0.0           | 26.0.0_core_r0.12.1 | core_v0.12.1  | 2.7.1       | 26.0.0        | 9.0.0  | 3.2.1           | Python 3.10      |
 
 >[!NOTE]
 >

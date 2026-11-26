@@ -14,7 +14,7 @@ Based on the native Ulysses sequence partitioning logic, FPDT further splits the
 
 ## How to Use
 
-Use Case: when the video resolution/frame count is set very high and a single device runs out of memory (OOM) under CP partitioning during training, FPDT needs to be enabled. Currently only the wan2.1 1.3B T2V example (`WanDiT`) provides this configuration.
+Use Case: when the video resolution/frame count is set very high and a single device runs out of memory (OOM) under CP partitioning during training, FPDT needs to be enabled.
 
 Enabling method: enable CP > 1 and modify the following JSON configuration keys in the `predictor` section of the startup script `pretrain_model.json` (prerequisites: `context_parallel_algo` must be set to `ulysses_cp_algo` or `hybrid_cp_algo`, and the attention type must be self-attention):
 

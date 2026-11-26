@@ -8,7 +8,7 @@ Migration work is typically divided into the following parts: model integration,
 
 ## 1. Identify the FSDP2 Route
 
-Two easily confused FSDP2 usage methods coexist in the MindSpeed MM repository. They differ in training entry points, configuration files, and model/data integration methods. Before migration, you must first determine the target route. This document focuses on the new plugin-style FSDP2; new models and datasets are recommended to be integrated via this route first. The Megatron-bridged FSDP2 is a transitional form, mainly maintained for legacy entry point compatibility, and will no longer be the direction for new feature iteration. For the legacy route, refer to `docs/en/features/parallel/fsdp2.md` and the corresponding `examples/*/fsdp2_config.yaml`.
+Two easily confused FSDP2 usage methods coexist in the MindSpeed MM repository. They differ in training entry points, configuration files, and model/data integration methods. Before migration, you must first determine the target route. This document focuses on the new plugin-style FSDP2; new models and datasets are recommended to be integrated via this route first. The Megatron-bridged FSDP2 is a transitional form, mainly maintained for legacy entry point compatibility, and will no longer be the direction for new feature iteration. For the legacy route, refer to `docs/zh/features/parallel/fsdp2.md` and the corresponding `examples/*/fsdp2_config.yaml`.
 
 | Item | New plugin-Style FSDP2 (Main Focus) | Megatron-Bridged FSDP2 (Legacy Route) |
 |---|---|---|

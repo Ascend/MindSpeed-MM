@@ -16,7 +16,7 @@ Migrating a model from other hardware devices and software frameworks to MindSpe
 
 The following figure shows the overall model migration flowchart:
 
-![migration](../../../../sources/images/dev_guide/migration/migration.png)
+![migration](../../../../sources/images/dev_guide/migration/migration_en.png)
 
 To complete the above adaptation work systematically, we break the model migration process into four key stages:
 

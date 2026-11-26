@@ -73,11 +73,11 @@ Asymmetric TP implementation logic: Under symmetric TP, P2P communication occurs
 
 Example: `PP=2`, `TP=8`, symmetric TP
 
-![image](../../../../sources/images/layerwise_disaggregated_training/ldt_tp.png 'ldt_tp.png')
+![image](../../../../sources/images/layerwise_disaggregated_training/ldt_tp_en.png 'ldt_tp.png')
 
 Example: `PP=2`, `TP=4`/`TP=8`, asymmetric TP
 
-![image](../../../../sources/images/layerwise_disaggregated_training/ldt_vtp.png 'ldt_vtp.png')
+![image](../../../../sources/images/layerwise_disaggregated_training/ldt_vtp_en.png 'ldt_vtp_en.png')
 
 Effect: Since Megatron's existing logic performs AllReduce communication within the TP group before P2P communication, only a single rank needs to communicate to pass the complete data to the next PP stage. This P2P approach guarantees correctness for cross-pipeline communication under asymmetric TP.
 

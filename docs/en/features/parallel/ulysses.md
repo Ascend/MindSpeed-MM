@@ -108,12 +108,13 @@ Its core approach is as follows:
     </div>
 </body>
 </html>
+
 <div style="height: 40px;"></div>
 
 > **Note**
 >
 > `num-attention-heads` must be divisible by `tensor-model-parallel-size` * `context-parallel-size`.
 >
-> - `um-attention-heads` indicates the number of attention heads.
+> - `num-attention-heads` indicates the number of attention heads.
 > - `tensor-model-parallel-size` indicates the tensor parallelism scale.
 > - `context-parallel-size` indicates the long sequence parallelism size.

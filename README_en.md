@@ -2,6 +2,10 @@
 # <p align="center"> <img src="sources/images/mm_logo.png" height="103px" width="700px"> </p>
 
 <p align="center">
+  <a href="./README.md">简体中文</a> | English
+</p>
+
+<p align="center">
     <a href="./LICENSE">
         <img alt="Badge" src="https://img.shields.io/badge/License-MIT-blue.svg">
     </a>
@@ -81,6 +85,7 @@ The key directories are as follows. For a detailed directory introduction, see [
 
 ---
 
+- [Nov. 05, 2026]: 🚀 MindSpeed MM supports [Kimi-K3.1-Pro](./examples/kimi_k31_pro) based on FSDP2 [beta]
 - [Sep. 01, 2026]: 🚀 MindSpeed MM supports the [GLM-5.3-Flash](./examples/glm5.3_flash) model based on FSDP2 [beta]
 - [Aug. 14, 2026]: 🚀 MindSpeed MM supports the [MiniMax-M3](./examples/minimax_m3_vl) model based on FSDP2 [beta]
 - [Jul. 27, 2026]: 🚀 MindSpeed MM supports the [Kimi-K3](./examples/kimi_k3) model based on FSDP2 [beta]

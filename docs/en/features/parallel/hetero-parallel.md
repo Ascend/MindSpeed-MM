@@ -50,7 +50,7 @@ Main functions:
 
 ### 4.2 Pipeline Parallel Patch: `hetero_pipeline_patches.py`
 
-Path: `MindSpeed-MM/mindspeed_mm/patches/hetero_pipeline_patches.py`
+Path: `MindSpeed-MM/mindspeed_mm/patchs/hetero_pipeline_patches.py`
 
 Main functions:
 
@@ -231,8 +231,8 @@ CP=1
     "pp": 1, # Currently only pp=1 is supported
     "cp": 1
   },
-  "audio_decoder": {
-    "audio_decoder":{
+  "audio_encoder": {
+    "audio_encoder":{
       ...,
       "pipeline_num_layers": [32],
       ...

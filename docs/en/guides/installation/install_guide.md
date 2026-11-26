@@ -52,7 +52,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 > - Before using an image, confirm the machine model. The latest images support only the AArch64 architecture. Run the uname -a command to check whether the current environment meets the requirements.
 > - The matching images have CANN 9.2.0 and the TorchNPU 26.2.0 plug-in preinstalled. Select one as required.
 > - If the current environment is incompatible with the provided images, use [Method 2: Installation from Source](#method-2-installation-from-source).
-> - New images will be released for the 26.2.0 branch later. If you need to build a custom image, see [Image Overview](../../../../docker/OVERVIEW.md).
+> - New images will be released for the master branch later. If you need to build a custom image, see [Image Overview](../../../../docker/OVERVIEW.md).
 
 1. Pull an image.
 

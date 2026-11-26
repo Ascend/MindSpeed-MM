@@ -15,16 +15,15 @@ The configuration parameters of MindSpeed MM mainly include `model configuration
 
 ## Configuration Entry Points
 
-All configuration entry points are in the bash files of the training/inference scripts or in the related parameter configuration yaml files. 
-<!-- Take `examples/qwen3vl/finetune_qwen3vl_30B.sh` as an example: -->
+All configuration entry points are in the bash files of the training/inference scripts or in the related parameter configuration yaml files. Take `examples/qwen3vl/finetune_qwen3vl_30B.sh` as an example:
 
-<!-- The configuration entry point in the bash script is as follows:
+The configuration entry point in the bash script is as follows:
 
-![image](../../../sources/images/config/config_in.png)
+![image](../../../sources/images/config/config_in_en.png)
 
 The configuration yaml file is as follows:
 
-![image](../../../sources/images/config/config_in2.png) -->
+![image](../../../sources/images/config/config_in2_en.png)
 
 ## Configuration Parsing
 
