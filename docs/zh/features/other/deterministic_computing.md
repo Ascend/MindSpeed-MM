@@ -2,7 +2,7 @@
 
 ## 概述
 
-在模型训练过程中，由于各种随机因素（如随机初始化、数据打乱、dropout等）的影响，即使使用相同的超参数，每次训练的结果也可能存在差异，导致LOSS曲线无法完全重合。
+在模型训练过程中，由于各种随机因素（如随机初始化、数据打乱、dropout等）的影响，即使使用相同的超参数，每次训练的结果也可能存在差异，导致Loss曲线无法完全重合。
 
 然而，在以下场景中需要确保计算结果的一致性和可复现性：
 
@@ -16,8 +16,8 @@
 
 在MindSpeed MM中，根据训练后端启用确定性计算：
 
-- **原生 FSDP2（native FSDP2）**：在模型 YAML 配置文件的 `training` 段设置 `use_deter_comp: true`。
-- **Mcore / 基于 Megatron 的 FSDP2（Mcore-FSDP2）**：在训练脚本中添加 `--use-deter-comp` 参数。
+- **原生FSDP2（native FSDP2）**：在模型YAML配置文件的 `training` 段设置 `use_deter_comp: true`。
+- **Mcore / 基于Megatron的FSDP2（Mcore-FSDP2）**：在训练脚本中添加 `--use-deter-comp` 参数。
 
 ### 替代方案
 

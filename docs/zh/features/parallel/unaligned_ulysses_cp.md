@@ -33,15 +33,15 @@ model:
 
 ### MCORE（Megatron）
 
-以 qwen2.5vl72b 为例：
+以Qwen2.5-VL-72B为例：
 
-1. examples/qwen2.5vl/finetune_qwen2_5_vl_72b.sh中设置CP大小，默认脚本中为1
+1. examples/qwen2.5vl/finetune_qwen2_5_vl_72b.sh中设置CP大小，默认脚本中为1：
 
     ```shell
     CP=1
     ```
 
-2. examples/qwen2.5vl/finetune_qwen2_5_vl_72b.sh中的GPT_ARGS添加
+2. examples/qwen2.5vl/finetune_qwen2_5_vl_72b.sh中的GPT_ARGS添加：
 
     ```shell
         --context-parallel-algo ulysses_cp_algo

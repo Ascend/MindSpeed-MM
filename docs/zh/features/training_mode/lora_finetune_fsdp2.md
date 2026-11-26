@@ -151,7 +151,7 @@ bash examples/qwen3_5/finetune_qwen3_5_xxB.sh
 
 训练启动后，会自动打印 LoRA 配置摘要，包括匹配的模块数量、可训练参数量等信息。
 
-## 合并lora权重到HuggingFace权重
+## 合并LoRA权重到HuggingFace权重
 
 开启 `lora_save_only=true` 参数后仅保存 LoRA 权重，可通过以下脚本将其与原始 HF 权重离线合并：
 
@@ -163,13 +163,13 @@ python merge_lora_safetensors_to_base.py \
     --save_merged_hf_dir ./merged_qwen3_5_27B_lora
 ```
 
-## lora断点续训
+## LoRA断点续训
 
 完整断点续训需在上次保存时设置 `save_format=dcp`、`lora.lora_save_only=false`，并将 `no_save_optim`、`no_save_rng` 设为 `false`。恢复时，`load` 指向包含 `latest_checkpointed_iteration.txt` 的 checkpoint 根目录，`no_load_optim`、`no_load_rng` 设为 `false`。DCP 权重包含完整基础权重和 LoRA 权重，无需再设置 `pretrained_lora_path`。
 
-## lora微调支持模型
+## LoRA微调支持模型
 
-qwen3vl，qwen3.5，qwen3.6，qwen3.8，qwen3omni
+qwen3vl、qwen3.5、qwen3.6、qwen3.8、qwen3omni
 
 ## 注意事项
 
@@ -179,7 +179,7 @@ qwen3vl，qwen3.5，qwen3.6，qwen3.8，qwen3omni
 - **权重验证**：训练启动时会自动验证 LoRA 权重是否包含 NaN 或 Inf 值
 - **分布式训练**：在 FSDP2 分布式训练环境下，LoRA 权重保存会自动处理 DTensor 分片，无需额外配置
 - **与 Megatron 后端的区别**：FSDP2 后端使用 YAML 配置方式，而非命令行参数（如 `--lora-r`、`--lora-alpha` 等）
-- **MoE路由专家参数微调**：MoE 模型的路由专家参数使用`nn.Parameter`类型，目前暂不支持LoRA微调，该功能正在开发中。
+- **MoE路由专家参数微调**：MoE 模型的路由专家参数使用`nn.Parameter`类型，目前暂不支持LoRA微调，该功能正在开发中
 
 ## 参考文献
 

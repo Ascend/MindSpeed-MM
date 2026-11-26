@@ -41,7 +41,7 @@ Agentic SFT数据采用JSON格式，每条数据包含以下关键字段：
 
 | role 值 | 含义 | 说明 |
 |---------|------|------|
-| `system` | 系统提示 | 定义助手的角色和行为规范，通常位于messages首位 |
+| `system` | 系统提示 | 定义助手的角色和行为规范，通常位于`messages`首位 |
 | `user` | 用户输入 | 用户的提问或请求 |
 | `assistant` | 助手回复 | 模型的回复内容 |
 | `tool_call` | 工具调用 | 模型发起的工具调用请求，使用特殊格式 |
@@ -61,7 +61,7 @@ Agentic SFT数据采用JSON格式，每条数据包含以下关键字段：
 因此构造数据时必须满足：
 
 1. 去掉首条 `system` 后，`messages` 数量为偶数，最后一条为 `assistant`；
-2. 偶数下标为 `user` 或 `tool_response`，奇数下标为 `assistant` 或 `tool_call`；
+2. 偶数下标为 `user` 或 `tool_response`，奇数下标为 `assistant` 或 `tool_call`。
 3. 每条 `tool_call` 后紧跟一条 `tool_response`，形成
    `user → tool_call → tool_response → tool_call → tool_response → … → assistant` 的交替链。
 
@@ -183,7 +183,7 @@ data:
 | Qwen3Omni | `qwen3_omni_nothink` | `qwen3_omni` |
 
 think 与 nothink 的消息角色序列、0/1 loss 规则完全相同，差异仅由模型模板和 `enable_thinking` 控制。
-如需使用其他模板，可参照 qwen3_vl_nothink 的模板注册代码进行传参 tool_prompt = StringFormatter(slots=[tools_slot])
+如需使用其他模板，可参照 `qwen3_vl_nothink` 的模板注册代码进行传参 `tool_prompt = StringFormatter(slots=[tools_slot])`。
 
 ## 注意事项
 

@@ -10,7 +10,7 @@ FSDP2 + MCORE
 
 ### 现有方案局限（legacy）
 
-`impl_type=legacy`（默认）通过"序列维分块 + 在forward内手动计算梯度"来降低显存：每个chunk仍会物化一份形状为`[chunk, vocab_size]`的logits，且其计算与梯度反传依赖`ChunkLoss`、`calculate_lm_loss`、`fixed_cross_entropy`三层调用栈，反向需要回放chunk内的计算图。当词表极大（如Qwen3.5的248320）或序列很长时，单块logits仍占不小显存，多层调用也带来额外开销。
+`impl_type=legacy`（默认）通过“序列维分块 + 在forward内手动计算梯度”来降低显存：每个chunk仍会物化一份形状为`[chunk, vocab_size]`的logits，且其计算与梯度反传依赖`ChunkLoss`、`calculate_lm_loss`、`fixed_cross_entropy`三层调用栈，反向需要回放chunk内的计算图。当词表极大（如Qwen3.5的248320）或序列很长时，单块logits仍占不小显存，多层调用也带来额外开销。
 
 ## 解决方案
 
@@ -23,7 +23,7 @@ FSDP2 + MCORE
 `impl_type=cce`采用Cut Cross-Entropy思路，在**词表维度**进行tile流式分块并配合在线softmax，前向过程从不物化完整的`[N, V]` logits（仅保留用于反向重算所需的激活值），从而在降低显存峰值的同时减少多层调用开销。
 
 - **两层分块**：外层按序列长度切成`seq_chunk_size`段（可选，由`chunk_size`复用，`None`表示单段不切分）；内层将词表切成大小为`vocab_tile_size`的tile逐一处理。
-- **双stream流水**：Cube流执行`hidden @ head`的矩阵乘，Vector流执行tile级在线softmax与累加，配合滑动窗口（NSLOT轮转）重叠计算，提升硬件利用率。
+- **双流（dual-stream）流水**：Cube流执行`hidden @ head`的矩阵乘，Vector流执行tile级在线softmax与累加，配合滑动窗口（NSLOT轮转）重叠计算，提升硬件利用率。
 - **反向重算**：基于前向缓存激活值重算所需梯度，无需额外保存完整logits。
 - **更轻的实现**：直接替换`ChunkLoss` + `calculate_lm_loss` + `fixed_cross_entropy`三层调用栈为融合算子`chunk_loss_cce_fused`，并可在无Triton环境下正常运行。
 
@@ -92,12 +92,12 @@ CCE不额外引入独立启动脚本，直接在标准启动脚本所加载的co
 ```
 
 - `compute_mode`：
-  - 设为 `"default"` 表示使用原始的loss计算方式；
-  - 设为 `"chunk"` 则启用ChunkLoss静态分块功能，按固定长度对序列分块后计算loss；
+  - 设为 `"default"` 表示使用原始的loss计算方式。
+  - 设为 `"chunk"` 则启用ChunkLoss静态分块功能，按固定长度对序列分块后计算loss。
   - 设为 `"dynamic_chunk"` 则启用ChunkLoss动态分块功能，自适应调整分块大小。
 - `chunk_size`：
-  - 当`compute_mode`设为`"chunk"`时：表示指定序列分块后，每个子序列的最大长度（即每个chunk所包含的token数量）；
-  - 当`compute_mode`设为`"dynamic_chunk"`时：表示"每个子序列长度 × 批次大小（batch_size）"的最大长度（用于约束动态分块的总计算量，避免显存溢出）。
+  - 当`compute_mode`设为`"chunk"`时：表示指定序列分块后，每个子序列的最大长度（即每个chunk所包含的token数量）。
+  - 当`compute_mode`设为`"dynamic_chunk"`时：表示“每个子序列长度 × 批次大小（batch_size）”的最大长度（用于约束动态分块的总计算量，避免显存溢出）。
 
 通过合理配置 `chunk_size`，可在保证训练正确性的同时有效控制显存占用。
 
@@ -105,20 +105,20 @@ CCE不额外引入独立启动脚本，直接在标准启动脚本所加载的co
 
 在 SFT 等场景下，`shift_labels` 中常有大量 token 被置为 `ignore_index`（prompt 段、padding 等），它们对 loss 与梯度的贡献**恒为 0**，但默认仍会随其余 token 一起被投影到 `lm_head`、白白消耗算力与激活显存。ChunkLoss 会在**进入 `lm_head` 投影之前**把这些 token 丢弃，从而按被 mask 比例节省投影计算与激活显存（mask 越多、收益越大）。两条计算路径均支持：
 
-- ChunkLoss（`chunk_loss`）：拼回完整 `shift_labels`、过滤有效 token 后重新分块再计算；
-- CCE（`chunk_loss_cce_fused`）：在进入 vocab-tile 流式 kernel 前过滤掉 `ignore_index` 行。
+- ChunkLoss（`chunk_loss`）：拼回完整 `shift_labels`、过滤有效 token 后重新分块再计算。
+- CCE（`chunk_loss_cce_fused`）：在进入 vocab-tile 流式算子前过滤掉 `ignore_index` 行。
 
 **该优化对训练无任何数值影响、无需额外开关**：满足条件时自动生效，其 loss 与梯度和不跳过的稠密路径逐元素等价（仅存在 fp32/bf16 求和顺序级别的浮点噪声）。
 
 **生效条件**（同时满足）：
 
-- 计算方式为 `default` 或 `per_token_loss`——这两种都是「所有有效 token 的 CE 求和 ÷ 一个标量 alpha（全量有效 token 数）」，总 loss 与是否丢弃被 mask 的 token 无关，故可安全丢弃；
-- 序列中**部分**（而非全部、也非零个）token 被 mask；
+- 计算方式为 `default` 或 `per_token_loss`——这两种都是「所有有效 token 的 CE 求和 ÷ 一个标量 alpha（全量有效 token 数）」，总 loss 与是否丢弃被 mask 的 token 无关，故可安全丢弃。
+- 序列中**部分**（而非全部、也非零个）token 被 mask。
 - **任意 batch size 均可**——标量-sum 归约与 batch 结构无关，多样本 batch 的有效 token 会被展平成单条稠密序列后重新分块，结果仍与稠密路径逐元素一致。
 
 **回退到稠密路径的情形**（此时行为与未开启该优化完全一致，仅无额外收益）：
 
-- 计算方式为 `per_sample_loss`——它对**每个样本各除以自己的 alpha**（该样本有效 token 数 × batch）后再相加，一个 token 的贡献取决于它属于哪个样本；而丢弃 mask token 需要把整个 batch 展平成一条序列，会丢掉样本边界，无法再对回各自的 alpha，因此不做此优化（对应 `reduction != "sum"` 或 `alpha` 非标量）；
+- 计算方式为 `per_sample_loss`——它对**每个样本各除以自己的 alpha**（该样本有效 token 数 × batch）后再相加，一个 token 的贡献取决于它属于哪个样本；而丢弃 mask token 需要把整个 batch 展平成一条序列，会丢掉样本边界，无法再对回各自的 alpha，因此不做此优化（对应 `reduction != "sum"` 或 `alpha` 非标量）。
 - 序列中没有任何 token 被 mask，或全部被 mask。
 
 ## 注意事项

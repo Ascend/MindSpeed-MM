@@ -32,9 +32,9 @@ subcommands:
 
 ```
 
-可用到其中支持的子命令包括`Qwen2VLConverter`、`InternVLConverter`。
+可用的子命令包括`Qwen2VLConverter`、`InternVLConverter`。
 
-继续对`Qwen2VLConverter`命令进行help可以看到 
+继续对`Qwen2VLConverter`命令进行help可以看到：
 
 ```bash
 [root@node-xx-xx MindSpeed-MM]# mm-convert  Qwen2VLConverter -h
@@ -56,11 +56,11 @@ subcommands:
 mm-convert  Qwen2VLConverter hf_to_mm -h
 ```
 
-# 传参方式
+## 传参方式
 
 支持三种传参方式：
 
-## 命令行参数
+### 命令行参数
 
 ```bash
 mm-convert  Qwen2VLConverter hf_to_mm \
@@ -74,7 +74,7 @@ mm-convert  Qwen2VLConverter hf_to_mm \
 > 转换的并行配置（`tp_size`、`llm_pp_layers`/`vit_pp_layers`）必须与训练脚本保持一致，否则生成的权重目录命名与切分对不上会导致加载失败。
 > 例如：只有 PP>1 时权重目录才带 stage 后缀（如 `mp_rank_00_000`）；PP=1 时为 `mp_rank_00`，此时 `llm_pp_layers` 应配成单段（如 `[[28]]`）。
 
-## yaml文件
+### yaml文件
 
 1. yaml配置文件可自动生成基础版本，然后手动修改必要的配置
 
@@ -82,7 +82,7 @@ mm-convert  Qwen2VLConverter hf_to_mm \
       mm-convert  Qwen2VLConverter hf_to_mm --print_config=comments > hf_to_mm.yaml
      ```
 
-     会生成如下配置文件
+     会生成如下配置文件：
 
      ```yaml
      # huggingface模型转换mindspeed-mm模型权重
@@ -148,9 +148,9 @@ mm-convert  Qwen2VLConverter hf_to_mm \
      mm-convert  Qwen2VLConverter hf_to_mm --config hf_to_mm.yaml
      ```
 
-## 环境变量
+### 环境变量
 
-1. 环境变量模式当前默认未开启，如需开启可以使用配置环境变量
+1. 环境变量模式当前默认未开启，如需开启可以配置环境变量
 
      ```bash
       export JSONARGPARSE_DEFAULT_ENV=true
@@ -178,7 +178,7 @@ mm-convert  Qwen2VLConverter hf_to_mm \
      mm-convert  Qwen2VLConverter hf_to_mm
      ```
 
-# 权重转换注意事项
+## 权重转换注意事项
 
 如果在权重转换过程中发生错误，请从Hugging Face等网站下载最新权重并重新转换。如问题仍然存在，请提交issue，我们会第一时间为您解答。
 

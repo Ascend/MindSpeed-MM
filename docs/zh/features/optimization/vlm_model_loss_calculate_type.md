@@ -2,7 +2,7 @@
 
 ## 适用后端
 
-FSDP2 + MCORE
+FSDP2 + Mcore
 
 ## 问题分析
 
@@ -22,7 +22,7 @@ FSDP2 + MCORE
 - **步骤2**：在梯度累积维度上求均值  
 - **步骤3**：在数据并行（DP）域上求均值  
 
-![默认方式](../../../../sources/images/vlm_model_loss_calculate_type/default.png)
+![Loss计算流程示意图](../../../../sources/images/vlm_model_loss_calculate_type/default.png)
 
 ### 按样本粒度计算Loss（Calculate Per Sample Loss）
 
@@ -33,20 +33,20 @@ FSDP2 + MCORE
 - **步骤3**：在梯度累积维度上求均值  
 - **步骤4**：在数据并行（DP）域上求均值  
 
-![按样本计算](../../../../sources/images/vlm_model_loss_calculate_type/sample_level.png)
+![按样本粒度Loss计算流程示意图](../../../../sources/images/vlm_model_loss_calculate_type/sample_level.png)
 
 ### 按Token粒度计算Loss（Calculate Per Token Loss）
 
 计算流程如下：  
 
-- 直接累加全局批次中所有有效token的交叉熵损失  
-- 最终结果除以全局批次中的有效token总数  
+1. 直接累加全局批次中所有有效token的交叉熵损失  
+2. 最终结果除以全局批次中的有效token总数  
 
 ![按Token计算](../../../../sources/images/vlm_model_loss_calculate_type/token_level.png)
 
 ## 使用方法
 
-### megatron后端
+### Megatron后端
 
 针对入口为`pretrain_vlm.py`的模型，使能方式如下：
 
@@ -90,7 +90,7 @@ FSDP2后端通过 `loss_cfg` 的 `loss_type` 字段设置，两种配置方式�
 ```yaml
 features:
   loss_cfg:
-    loss_type: default   # 可选 raw（默认）/ default / per_sample_loss / per_token_loss
+    loss_type: default
 ```
 
 | 取值 | 说明 |
@@ -128,6 +128,6 @@ features:
 
 ### 已知约束
 
-1. 如果使用megatron后端，`--calculate-per-sample-loss` 与 `--calculate-per-token-loss` 参数不可同时使用（框架有冲突校验，同时开启会报错）。
-2. 如果loss计算方式选择不当，会对下游任务评测产生较大影响。用户需要根据实际数据集样本分布情况选择合适的计算方式。如果训练数据集样本分布不均，有的样本response很长，有的样本response很短，甚至是一个token。按token粒度计算loss，则会使target token数量多的样本更受重视，从而引入不同样本间的不平衡，使得长输出会被训练的更充分。
+1. 如果使用Megatron后端，`--calculate-per-sample-loss` 与 `--calculate-per-token-loss` 参数不可同时使用（框架有冲突校验，同时开启会报错）。
+2. 如果loss计算方式选择不当，会对下游任务评测产生较大影响。用户需要根据实际数据集样本分布情况选择合适的计算方式。如果训练数据集样本分布不均，有的样本response很长，有的样本response很短，甚至是一个token。按token粒度计算loss，则会使target token数量多的样本更受重视，从而引入不同样本间的不平衡，使得长输出会被训练得更充分。
 3. FSDP2两条路径（原生 / megatron-FSDP2）的 `per_token_loss` 均要求使用 `PrefetchGradAccDataLoader`，否则运行期抛 `KeyError`（已核实 `mindspeed_mm/fsdp/loss/loss_func.py` 与 `mindspeed_mm/models/transformers_model.py` 中的显式raise）。

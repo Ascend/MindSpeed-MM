@@ -1,6 +1,8 @@
-# MindSpeed MM 工具库使用指南
+# MindSpeed MM工具库使用指南
 
-## MCORE-FSDP2 后端工具
+本文档介绍MindSpeed MM工具库的profiling采集、内存快照提取、Sora类模型特征提取和Tensorboard使用功能。
+
+## Mcore-FSDP2 后端工具
 
 ### Profiling采集工具
 
@@ -29,9 +31,9 @@ prof.stop()
 
 #### 静态采集
 
-`Static Profile`静态采集功能为执行模型训练过程中，针对指定的steps区间进行采集，操作步骤如下：
+Static Profile静态采集功能为执行模型训练过程中，针对指定的steps区间进行采集，操作步骤如下：
 
-1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 static, 设置 `ranks`。
+1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 static，设置 `ranks`。
 
 2. 配置静态采集的相关参数。
 
@@ -65,9 +67,9 @@ prof.stop()
 
 #### 动态采集
 
-`Dynamic Profile`动态采集功能可在执行模型训练过程中随时开启采集进程，操作步骤如下：
+Dynamic Profile动态采集功能可在执行模型训练过程中随时开启采集进程，操作步骤如下：
 
-1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 dynamic, 设置 `ranks`。
+1. 在模型config设置里开启`enable`采集开关，设置`profile_type` 为 dynamic，设置 `ranks`。
 
 2. 配置动态采集的相关参数。
 
@@ -86,15 +88,15 @@ prof.stop()
     - 动态采集通过识别`profiler_config.json`文件的状态判断文件是否被修改，若感知到`profiler_config.json`文件被修改，`dynamic_profile`会在下一个step时开启Profiling任务
     - `config_path`目录下会自动记录`dynamic_profile`的维测日志
 
-动态采集的具体参数、入参表、及具体操作步骤等请参考《CANN性能调优工具用户指南》的“[Ascend PyTorch Profiler接口采集](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)”章节。
+动态采集的具体参数、入参表及具体操作步骤等请参考《CANN性能调优工具用户指南》的“[Ascend PyTorch Profiler接口采集](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/800alpha001/devaids/devtools/profiling/atlasprofiling_16_0033.html#ZH-CN_TOPIC_0000002046667974__section17272160135118)”章节。
 
 #### 离线解析命令参数说明
 
 ```shell
---mm-tool <path>               # MM工具配置文件路径，默认为./mindspeed_mm/tools/tools.json
---profiler-path <path>         # Profiler数据目录路径（可选，若不指定则从配置文件中读取）
---max-process-number <number>  # 分析的最大进程数（可选，默认：CPU核心数/2）
---export-type <type>           # 分析结果的导出类型，支持：text、db，可多次指定，默认：text
+--mm-tool <path>
+--profiler-path <path>
+--max-process-number <number>
+--export-type <type>
 ```
 
 |参数类型|参数名|参数说明|默认值|
@@ -142,7 +144,7 @@ python mindspeed_mm/tools/profiler.py --mm-tool mindspeed_mm/tools/tools.json --
 
 3. 配置完成后，调用[feature_extraction.sh](../../../examples/wan2.2/feature_extract/feature_extraction.sh)即可提取数据特征。
 
-### 内存快照提取
+### 内存快照采集
 
 套件集成了昇腾[内存快照采集工具](../../../mindspeed_mm/tools/mem_profiler.py)，以提供对模型运行情况的分析。内置模型均已适配，只需修改[tools.json](../../../mindspeed_mm/tools/tools.json)文件即可生效。
 
@@ -200,15 +202,15 @@ _stop()
 
 dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件，可以在[交互式查看器](https://pytorch.org/memory_viz)可视化查看内存快照。
 
-### Tensorboard使用
+### TensorBoard使用
 
-1. 若使用Tensorboard，需进行安装：
+1. 若使用TensorBoard，需进行安装：
 
     ```bash
     pip install tensorboard
     ```
 
-2. 设置Tensorboard的保存路径`TENSORBOARD_LOGS_PATH`，然后在运行脚本中的`OUTPUT_ARGS`中添加`--tensorboard-dir`从而进行使能：
+2. 设置TensorBoard的保存路径`TENSORBOARD_LOGS_PATH`，然后在运行脚本中的`OUTPUT_ARGS`中添加`--tensorboard-dir`从而进行使能：
 
     ```shell
     TENSORBOARD_LOGS_PATH="./tensorboard_dir/" # tensorboard保存路径
@@ -226,7 +228,7 @@ dump执行完成后，会在输出目录生成`snapshot_`开头的`pickle`文件
     "
     ```
 
-3. 打开Tensorboard进行查看，`./tensorboard_dir/`为step2中的保存路径，按需修改：
+3. 打开TensorBoard进行查看，`./tensorboard_dir/`为step2中的保存路径，按需修改：
 
     ```shell
     tensorboard --logdir ./tensorboard_dir/
@@ -287,12 +289,12 @@ FSDP2 后端通过配置模型训练 YAML 文件中的 tools 相关参数实现p
 
 ### Profiling离线解析
 
-FSDP2 后端使用 mindspeed_mm/fsdp/tools/profiler.py 进行离线解析，通过 --profiler-path 指定待解析的 Profiling 数据目录。
+FSDP2 后端使用 `mindspeed_mm/fsdp/tools/profiler.py` 进行离线解析，通过 `--profiler-path` 指定待解析的 Profiling 数据目录。
 
 ```shell
---profiler-path <path>         # Profiler数据目录路径（必选）
---max-process-number <number>  # 分析的最大进程数（可选，默认：CPU核心数/2）
---export-type <type>           # 导出类型，支持text、db，可多次指定，默认：text
+--profiler-path <path>
+--max-process-number <number>
+--export-type <type>
 ```
 
 |参数类型|参数名|参数说明|默认值|

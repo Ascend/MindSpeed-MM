@@ -11,7 +11,7 @@ $
 W' = W + A \cdot B
 $
 
-![alt text](../../../../sources/images/lora_finetune/lora_model.png)
+![LoRA权重更新原理示意图](../../../../sources/images/lora_finetune/lora_model.png)
 
    其中，$W'$ 是更新后的权重，$W$ 是原始权重，$A$ 和 $B$ 是需要学习的低秩矩阵。
 
@@ -31,7 +31,7 @@ MindSpeed MM LoRA微调使能方法：
 ### LoRA 权重合并
 
 LoRA权重和原始权重合并方法：
-例如，可在`Qwen2-VL`的合并脚本`merge_lora`中设置参数执行合并，其中`base_save_dir`,`lora_save_dir`,`merge_save_dir`分别设置为原始权重目录，LoRA权重目录，合并权重保存目录，`use_npu`设置是否启用npu加速。
+例如，可在`Qwen2-VL`的合并脚本`merge_lora`中设置参数执行合并，其中`base_save_dir`,`lora_save_dir`,`merge_save_dir`分别设置为原始权重目录、LoRA权重目录、合并权重保存目录，`use_npu`设置是否启用NPU加速。
 
 #### 参数说明
 
@@ -45,14 +45,14 @@ LoRA权重和原始权重合并方法：
   LoRA rank，表示低秩矩阵的维度。较低的 rank 值模型在训练时会使用更少的参数更新，从而减少计算量和内存消耗。然而，过低的 rank 可能限制模型的表达能力。
 
 - **`--lora-alpha`**
-  控制 LoRA 权重对原始权重的影响比例, 数值越高则影响越大。一般保持 `α/r` 为 2。
+  控制 LoRA 权重对原始权重的影响比例，数值越高则影响越大。一般保持 `α/r` 为 2。
 
 - **`--lora-dropout`**
   在 LoRA 模块中`dropout`的比例，默认为`0`。
 
 - **`--lora-target-modules`**
   选择需要添加 LoRA 的模块。
-  *mcore 模型可选模块：* `linear_qkv`, `linear_proj`, `linear_fc1`, `linear_fc2`；
+  *mcore 模型可选模块：* `linear_qkv`, `linear_proj`, `linear_fc1`, `linear_fc2`。
   *legacy 模型可选模块：* `query_key_value`, `dense`, `dense_h_to_4h`, `dense_4h_to_h`。
   多模态场景下需根据模型结构选择合适的微调模块。
 
