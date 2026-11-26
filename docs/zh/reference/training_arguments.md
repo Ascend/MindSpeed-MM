@@ -69,21 +69,21 @@
             <td>数据集相关配置</td>
             <td>json配置文件路径</td>
             <td>-</td>
-            <td><code><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/数据配置.html">配置可以参考数据配置</a></code></td>
+            <td><code><a href="./data_configuration.md">配置可以参考数据配置</a></code></td>
         </tr>
         <tr>
             <td><code>--mm-model</code></td>
             <td>模型相关配置</td>
             <td>json配置文件路径</td>
             <td>-</td>
-            <td><code><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/模型配置.html">配置可以参考模型配置</a></code></td>
+            <td><code><a href="./model_configuration.md">配置可以参考模型配置</a></code></td>
         </tr>
         <tr>
             <td><code>--mm-tool</code></td>
             <td>工具相关配置</td>
             <td>json配置文件路径</td>
             <td><code>./mindspeed_mm/tools/tools.json</code></td>
-            <td><code><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/工具配置.html">配置可以参考工具配置</a></code></td>
+            <td><code><a href="./tools_configuration.md">配置可以参考工具配置</a></code></td>
         </tr>
         <tr>
             <td rowspan="42" style="vertical-align: middle; font-weight: bold;">GPT_ARGS</td>

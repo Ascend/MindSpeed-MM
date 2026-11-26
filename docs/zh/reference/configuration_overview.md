@@ -6,12 +6,12 @@
 
 MindSpeed-MM的配置参数主要有`模型配置`、`数据配置`、 `fsdp2配置`、 `训练参数` 、`工具配置` 、 `环境变量`。
 
-- [模型配置](https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/模型配置.html)
-- [数据配置](https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/数据配置.html)
-- [训练参数](https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/训练参数.html)
-- [fsdp2配置](https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/fsdp2配置.html)
-- [工具配置](https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/工具配置.html)
-- [环境变量](https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/环境变量.html)
+- [模型配置](./model_configuration.md)
+- [数据配置](./data_configuration.md)
+- [训练参数](./training_arguments.md)
+- [fsdp2配置](./mcore-fsdp2_configuration.md)
+- [工具配置](./tools_configuration.md)
+- [环境变量](./environment_variables.md)
 
 ## 配置入口
 

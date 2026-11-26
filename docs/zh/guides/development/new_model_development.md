@@ -16,7 +16,7 @@ Last updated: 12/08/2025. Author: cxiaolong
 
    昇腾Atlas A2、Atlas A3、Ascend 950 训练系列产品，建议8卡或以上
 
-2. 参考 [环境搭建](https://mindspeed-mm.readthedocs.io/zh-cn/latest/quick_start/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA.html) 章节，完成 HDK、CANN、PyTorch 和 TorchNPU 基础环境搭建；
+2. 参考 [环境搭建](../../guides/installation/install_guide.md) 章节，完成 HDK、CANN、PyTorch 和 TorchNPU 基础环境搭建；
 
 3. 创建并激活 Python 虚拟环境；
 
@@ -454,7 +454,7 @@ class CustomDiTBlock(nn.Module):
 
 ## Step4: 配置文件
 
-配置文件主要包括模型配置 (model.json)、数据配置 (data.json)、FSDP2 配置 (fsdp2_config.yaml)，配置文件内容可以参考 [配置说明](https://mindspeed-mm.readthedocs.io/zh-cn/latest/config/%E9%85%8D%E7%BD%AE%E6%A6%82%E8%A7%88.html)，这里 Diffusion、AE 和 text_encoder 使用 Wan2.2 的模型。
+配置文件主要包括模型配置 (model.json)、数据配置 (data.json)、FSDP2 配置 (fsdp2_config.yaml)，配置文件内容可以参考 [配置说明](../../reference/configuration_overview.md)，这里 Diffusion、AE 和 text_encoder 使用 Wan2.2 的模型。
 
 新建 `examples/custom_model/model.json`、`examples/custom_model/data.json`、`examples/custom_model/fsdp2_config.yaml`
 

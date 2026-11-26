@@ -304,13 +304,13 @@
                     <tr>
                         <td rowspan="10" class="category-cell">并行特性</td>
                         <td rowspan="1" class="subcategory-cell">FSDP2</td>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/fsdp2.html">FSDP2</a></td>
+                        <td class="feature-name"><a href="../features/parallel/fsdp2.md">FSDP2</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                     <!-- 并行特性 - TP并行 -->
                     <tr>
                         <td rowspan="1" class="subcategory-cell">TP并行</td>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/tensor-parallel.html">tensor-parallel</a></td>
+                        <td class="feature-name"><a href="../features/parallel/tensor_parallel.md">tensor-parallel</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                     <!-- 并行特性 - PP并行 -->
@@ -330,25 +330,25 @@
                     <!-- 并行特性 - 序列并行 -->
                     <tr>
                         <td rowspan="4" class="subcategory-cell">序列并行</td>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/ulysses.html">Ulysses</a></td>
+                        <td class="feature-name"><a href="../features/parallel/ulysses.md">Ulysses</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                     <tr>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/RingAttention.html">RingAttention</a></td>
+                        <td class="feature-name"><a href="../features/parallel/ringAttention.md">RingAttention</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                     <tr>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/USP%28混合并行%2C%20Unified%20SP%29.html">USP</a></td>
+                        <td class="feature-name"><a href="../features/parallel/unified_SP.md">USP</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                     <tr>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/tp-sp.html">TP-SP</a></td>
+                        <td class="feature-name"><a href="../features/parallel/tp_sp.md">TP-SP</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                     <!-- 并行特性 - 异构并行 -->
                     <tr>
                         <td rowspan="1" class="subcategory-cell">异构并行</td>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/hetero-parallel.html">hetero-parallel</a></td>
+                        <td class="feature-name"><a href="../features/parallel/hetero_parallel.md">hetero-parallel</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                     <!-- 显存优化 - 重计算 -->
@@ -361,14 +361,14 @@
                     <!-- 显存优化 - Offload -->
                     <tr>
                         <td class="subcategory-cell">Offload</td>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/async-offload.html">async offload</a></td>
+                        <td class="feature-name"><a href="../features/memory/async_activation_offload.md">async offload</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                     <!-- 数据优化 - 负载均衡 -->
                     <tr>
                         <td rowspan="1" class="category-cell">显存优化</td>
                         <td class="subcategory-cell">负载均衡</td>
-                        <td class="feature-name"><a href="https://mindspeed-mm.readthedocs.io/zh-cn/latest/features/online-data-balance.html">在线数据重排</a></td>
+                        <td class="feature-name"><a href="../features/memory/online_data_balance.md">在线数据重排</a></td>
                         <td class="status-cell"><span class="status-released">已发布</span></td>
                     </tr>
                 </tbody>

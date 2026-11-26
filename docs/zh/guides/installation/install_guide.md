@@ -50,30 +50,30 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 > [!NOTE]
 >
 > - 使用镜像前，请先确认机器型号。可通过uname -a命令确认当前环境是否符合要求。
-> - 配套镜像已预装配套的CANN 9.2.0软件及TorchNPU 26.2.0插件，您可根据需要选用。
-> - 若您当前环境与提供的镜像不兼容，请选择[方式二：源码安装](#方式二源码安装)。
-> - 26.2.0分支后续会更新新的镜像，如果需要自定义构建镜像，请参见[镜像概述](../../../../docker/OVERVIEW.zh.md)。
+> - 配套镜像已预装配套的CANN 9.2.1软件及TorchNPU 26.2.0插件，您可根据需要选用。
+> - 若当前环境与提供的镜像不兼容，请选择[方式二：源码安装](#方式二源码安装)。
+> - 如果需要自定义构建镜像，请参见[镜像概述](../../../../docker/OVERVIEW.zh.md)。
 
 1. 拉取镜像
 
-   最新镜像均配套[MindSpeed MM的26.2.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.2.0)，该镜像即将上线，当前可使用MindSpeed MM 26.1.0分支对应镜像，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
+   最新镜像均配套[MindSpeed MM的26.2.0分支](https://gitcode.com/Ascend/MindSpeed-MM/tree/26.2.0)，请按需[拉取镜像](https://www.hiascend.com/developer/ascendhub/detail/6857f6fc2cfa4a678710a7075426ee5e)。
 
    <!-- npu="950" id1 -->
-   - <term>Ascend 950PR&950DT系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-openeuler24.03-py3.11
+   - <term>Ascend 950PR&950DT系列产品</term>：v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-openeuler24.03-py3.12
 
-   - <term>Ascend 950PR&950DT系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-950-ubuntu22.04-py3.11
+   - <term>Ascend 950PR&950DT系列产品</term>：v26.2.0-cann9.2.1-torch_npu2.10.0.post7-950-ubuntu22.04-py3.12
    <!-- end id1 -->
 
    <!-- npu="A3" id2 -->
-   - <term>Atlas A3训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11
+   - <term>Atlas A3训练系列产品</term>：v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12
 
-   - <term>Atlas A3训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-ubuntu22.04-py3.11
+   - <term>Atlas A3训练系列产品</term>：v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-ubuntu22.04-py3.12
    <!-- end id2 -->
    
    <!-- npu="910b" id3 -->
-   - <term>Atlas A2训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-openeuler24.03-py3.11
+   - <term>Atlas A2训练系列产品</term>：v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-openeuler24.03-py3.12
 
-   - <term>Atlas A2训练系列产品</term>：v26.1.0-cann9.1.0-torch_npu2.7.1.post8-910b-ubuntu22.04-py3.11
+   - <term>Atlas A2训练系列产品</term>：v26.2.0-cann9.2.1-torch_npu2.10.0.post7-910b-ubuntu22.04-py3.12
    <!-- end id3 -->
 
    ```bash
@@ -96,7 +96,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
 
       ```bash
       docker run -it --rm \
-          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+          mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12 bash
       ```
 
     - 示例二：使用 NPU 设备运行（示例：设备 /dev/davinci1）
@@ -114,7 +114,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
           -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ \
           -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info \
           -v /etc/ascend_install.info:/etc/ascend_install.info \
-          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+          mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12 bash
       ```
 
     - 示例三：挂载数据目录运行（示例：设备 /dev/davinci1）
@@ -133,7 +133,7 @@ chmod +x Ascend-hdk-<chip_type>-npu-firmware_<version>.run
           -v /etc/ascend_install.info:/etc/ascend_install.info \
           -v /path/to/data:/data \
           -v /path/to/weights:/weights \
-          mindspeed-mm:v26.1.0-cann9.1.0-torch_npu2.7.1.post8-a3-openeuler24.03-py3.11 bash
+          mindspeed-mm:v26.2.0-cann9.2.1-torch_npu2.10.0.post7-a3-openeuler24.03-py3.12 bash
       ```
 
     具体参数配置说明可查看MindSpeed MM Docker镜像概述的[构建脚本参数说明](../../../../docker/OVERVIEW.zh.md#构建脚本参数说明)
