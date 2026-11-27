@@ -155,6 +155,8 @@ class Glm5NextTextConfig(PreTrainedConfig):
     index_kpool_always_select_tail: bool = True
 
     def __post_init__(self, **kwargs):
+        kwargs.pop("mhc_pre_op_replay", None)
+        kwargs.pop("_mhc_pre_op_replay", None)
         if self.num_key_value_heads is None:
             self.num_key_value_heads = self.num_attention_heads
 
@@ -205,6 +207,13 @@ class Glm5NextTextConfig(PreTrainedConfig):
         self.qk_head_dim = self.qk_rope_head_dim + self.qk_nope_head_dim
 
         super().__post_init__(**kwargs)
+
+    def to_dict(self):
+        """Keep runtime replay routing out of saved model configurations."""
+        output = super().to_dict()
+        output.pop("mhc_pre_op_replay", None)
+        output.pop("_mhc_pre_op_replay", None)
+        return output
 
     def validate_architecture(self):
         """Part of `@strict`-powered validation. Validates the architecture of the config."""

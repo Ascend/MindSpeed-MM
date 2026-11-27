@@ -267,3 +267,22 @@ def causal_conv1d_ascendc(
         cu_seqlens,
         output_final_state,
     )
+
+
+def causal_conv1d_qkv_ascendc(
+    x: torch.Tensor,
+    weight: torch.Tensor,
+    H: int,
+    bias: Optional[torch.Tensor] = None,
+    activation: Optional[str] = None,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Convolve equal-sized, stateless Q/K/V together and return BNSD tensors."""
+    if x.ndim != 3 or H <= 0 or x.shape[-1] % (3 * H):
+        raise ValueError("Fused QKV convolution expects [B, S, 3*H*D] with H > 0.")
+    if weight.ndim != 2 or weight.shape[0] != x.shape[-1]:
+        raise ValueError("Fused QKV convolution weight must have shape [3*H*D, W].")
+    output, _ = causal_conv1d_ascendc(x, weight, 3 * H, bias=bias, activation=activation)
+    expected = (x.shape[0], 3 * H, x.shape[1], x.shape[-1] // (3 * H))
+    if tuple(output.shape) != expected:
+        raise RuntimeError(f"Expected fused QKV convolution output {expected}, got {tuple(output.shape)}.")
+    return tuple(part.contiguous() for part in output.split(H, dim=1))

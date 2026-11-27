@@ -4,6 +4,7 @@ parallel:
   fsdp_plan:
     apply_modules:
       - model.visual
+      - model.visual.blocks.{*}
       - model.language_model.embed_tokens
       - model.language_model
       - model.language_model.layers.{*}
@@ -76,9 +77,9 @@ model:
   trust_remote_code: true
   attn_implementation: sdpa
   kda_implementation: ascendc
-  causal_conv1d_implementation: triton
-  dsa_implementation: sfa
-  indexer_implementation: triton
+  causal_conv1d_implementation: ascendc
+  dsa_implementation: masked_fa
+  indexer_implementation: lightning_indexer_v2
 
 features:
   swap_plan:
@@ -95,11 +96,25 @@ features:
       - model.visual.blocks.{*}
       - model.language_model.layers.{*}
     op_replay_scopes:
-      - name: sfa
+      - name: glm_mhc_pre
+        apply_modules:
+          - model.language_model.layers.{*}.attn_hc
+          - model.language_model.layers.{*}.ffn_hc
+        save_rng: false
+        cache_ops:
+          - cann_ops_transformer.mhc_pre_sinkhorn.default
+      - name: skip_mm
+        apply_modules:
+          - model.language_model.layers.{*}
+        save_rng: false
+        cache_ops:
+          - aten.matmul.default
+      - name: self_attn
         apply_modules:
           - model.language_model.layers.{*}.self_attn
         save_rng: true
         cache_ops:
+          - npu.npu_fusion_attention.default
           - npu.npu_sparse_flash_attention.default
           - mindspeed_mm.chunk_kda_fwd.default
       - name: vit

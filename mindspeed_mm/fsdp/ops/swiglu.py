@@ -37,6 +37,32 @@ def swiglu(inputs, dim=-1, fused=True):
         return eager_swiglu(inputs, dim=dim)
 
 
+def clamp_with_fused_backward(inputs, lower, upper):
+    """Use the fused first-order gradient for supported GLM activations."""
+    if (IS_NPU_AVAILABLE and inputs.device.type == "npu" and torch.is_grad_enabled()
+            and not torch.compiler.is_compiling() and type(inputs) is torch.Tensor
+            and inputs.requires_grad and inputs.dtype == torch.bfloat16
+            and inputs.ndim >= 2 and 0 < inputs.numel() < 2**31
+            and inputs.shape[-1] <= 8192 and inputs.shape[-1] % 2 == 0
+            and all(type(t) is torch.Tensor and t.layout == torch.strided
+                    and t.is_contiguous() and t.device == inputs.device and t.dtype == inputs.dtype
+                    for t in (inputs, lower, upper))
+            and lower.shape == upper.shape == inputs.shape[-1:]
+            and not lower.requires_grad and not upper.requires_grad
+            and all(torch_npu.get_npu_format(t) == 2 for t in (inputs, lower, upper))):
+        try:
+            from mindspeed_mm.fsdp.ops.glu.clamp_triton import ClampWithFusedBackward
+        except ImportError:
+            pass
+        else:
+            if inputs.ndim == 2:
+                return ClampWithFusedBackward.apply(inputs, lower, upper)
+            return ClampWithFusedBackward.apply(
+                inputs.reshape(-1, inputs.shape[-1]), lower, upper
+            ).reshape(inputs.shape)
+    return torch.clamp(inputs, min=lower, max=upper)
+
+
 def clamp_swiglu(inputs, dim=-1, fused=True, limit=0.0):
     y1, y2 = torch.chunk(inputs, 2, dim=-1)
     if limit > 0:

@@ -119,7 +119,7 @@ GLM-5.3-Flash适配包含 AscendC KDA wrapper，需安装 fla-npu 以保证相�
 ```bash
 git clone https://github.com/flashserve/flash-linear-attention-npu
 cd flash-linear-attention-npu
-git checkout 2062460754c8
+git checkout dc1113e2e9f2
 ```
 
 安装步骤可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/main/README.md), 参考"源码一键编译并生成 wheel"完整fla编译。
@@ -199,8 +199,9 @@ training:
 | `expert_parallel_size` | `parallel` | EP专家并行度 | 值为1时不开启，仅对MoE模型生效 |
 | `kda_implementation` | `model` | KDA实现选择 | `ascendc` / `triton` / `eager` |
 | `causal_conv1d_implementation` | `model` | KDA短卷积实现选择 | `ascendc` / `triton` / `eager` |
-| `dsa_implementation` | `model` | DSA实现选择 | `dense` / `sfa` |
-| `indexer_implementation` | `model` | DSAindexer实现选择 | `eager` / `triton` |
+| `dsa_implementation` | `model` | DSA 实现 | `dense` / `sfa` / `masked_fa` |
+| `indexer_implementation` | `model` | DSA Indexer 实现 | `eager` / `triton` / `lightning_indexer_v2` / `key_pool_v2` |
+| `use_ascend_mhc` | `model` | 融合 mHC Pre/Post | 可显式开启，或由 mHC Pre replay 配置自动启用 |
 | `recompute` | `features` | 重计算开关 | 开启后节省显存占用 |
 | `enable_activation_offload` | `features` | 激活值异步卸载到Host侧内存开关 | 开启后降低Device显存占用，`apply_modules`指定需要开启该特性的module |
 | `enable_chunk_loss` | `features` | chunk loss 开关 | 默认开启，需与 `chunkloss_plan` 配套 |
@@ -309,4 +310,4 @@ bash examples/glm5.3_flash/finetune_glm53_flash.sh
 
 1. 启动脚本中的CANN路径为示例环境路径，使用前需改为当前机器实际路径。
 2. 默认配置使用16卡单机训练，运行前请检查`npu-smi info`，避免占用他人任务。
-3. 默认`dsa_implementation: sfa`依赖`torch_npu.npu_sparse_flash_attention`；如果当前 TorchNPU 不支持该接口，可先切换为 `dense` 做功能验证。
+3. `sfa` 使用 `torch_npu.npu_sparse_flash_attention`，`masked_fa` 使用支持 uint8 mask 的 `torch_npu.npu_fusion_attention`。也可配置 `dense` 做功能验证。

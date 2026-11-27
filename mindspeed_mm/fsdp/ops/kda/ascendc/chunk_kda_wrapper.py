@@ -18,8 +18,8 @@
 # limitations under the License.
 """AscendC KDA: AscendC forward plus the fused AscendC backward.
 
-Supported: chunk_size=64, K=128, V in {128, 256}, H == HV, dense inputs,
-post-sigmoid beta, no initial/final state.
+Supported: chunk_size=64, BF16 Q/K/V, K=V=128, H == HV, dense inputs,
+kernel-side gate, post-sigmoid beta, no initial/final state.
 """
 
 import torch
@@ -83,38 +83,6 @@ def _chunk_kda_fwd_op(
         state_v_first=False,
     )
     return o, g_cumsum, Aqk, Akk, w, qg, kg, v_new, h
-
-def _bsnd_to_bnsd(tensor):
-    if tensor is None:
-        return None
-    if tensor.dim() != 4:
-        raise RuntimeError(f"Expected a rank-4 BSND tensor, got shape {tuple(tensor.shape)}.")
-    return tensor.permute(0, 2, 1, 3).contiguous()
-
-
-def _bnsd_to_bsnd(tensor):
-    if tensor is None:
-        return None
-    if tensor.dim() != 4:
-        raise RuntimeError(f"Expected a rank-4 BNSD tensor, got shape {tuple(tensor.shape)}.")
-    return tensor.permute(0, 2, 1, 3).contiguous()
-
-
-def _bsh_to_bhs(tensor):
-    if tensor is None:
-        return None
-    if tensor.dim() != 3:
-        raise RuntimeError(f"Expected a rank-3 BSH tensor, got shape {tuple(tensor.shape)}.")
-    return tensor.permute(0, 2, 1).contiguous()
-
-
-def _bhs_to_bsh(tensor):
-    if tensor is None:
-        return None
-    if tensor.dim() != 3:
-        raise RuntimeError(f"Expected a rank-3 BHS tensor, got shape {tuple(tensor.shape)}.")
-    return tensor.permute(0, 2, 1).contiguous()
-
 
 def _check_intermediates(q, v, gk, Aqk, Akk, w, qg, kg, v_new, h):
     batch, tokens, heads, key_dim = q.shape
@@ -202,7 +170,6 @@ class ChunkKDAAscendCFunction(torch.autograd.Function):
         ctx.safe_gate = safe_gate
         ctx.lower_bound = lower_bound
         ctx.use_qk_l2norm_in_kernel = use_qk_l2norm_in_kernel
-        ctx.use_gate_in_kernel = use_gate_in_kernel
         return o.type_as(q), final_state
 
     @staticmethod
@@ -215,21 +182,14 @@ class ChunkKDAAscendCFunction(torch.autograd.Function):
         if dht is not None:
             raise RuntimeError("The fused AscendC KDA backward has no final-state gradient.")
 
-        gate_dt_bias = None
-        if ctx.use_gate_in_kernel and dt_bias is not None:
-            gate_dt_bias = dt_bias.reshape(q.shape[2], q.shape[3]).contiguous()
-
-        dq_h, dk_h, dv_h, db_h, dg_h, dh0, dA, dbias = ascendc_chunk_kda_bwd(
-            _bsnd_to_bnsd(q),
-            _bsnd_to_bnsd(k),
-            _bsnd_to_bnsd(v),
-            _bsh_to_bhs(beta),
+        dq, dk, dv, db, dg, dh0, dA, dbias = ascendc_chunk_kda_bwd(
+            q.contiguous(), k.contiguous(), v.contiguous(), beta.contiguous(),
             g_cumsum, Aqk, Akk, w, qg, kg, v_new, h,
-            _bsnd_to_bnsd(do),
+            do.contiguous(),
             float(ctx.scale),
-            raw_g=_bsnd_to_bnsd(g_input) if ctx.use_gate_in_kernel else None,
-            A_log=A_log if ctx.use_gate_in_kernel else None,
-            dt_bias=gate_dt_bias,
+            raw_g=g_input.contiguous(),
+            A_log=A_log,
+            dt_bias=dt_bias,
             initial_state=None,
             dht=None,
             cu_seqlens=None,
@@ -237,14 +197,13 @@ class ChunkKDAAscendCFunction(torch.autograd.Function):
             chunk_size=CHUNK_SIZE,
             safe_gate=ctx.safe_gate,
             lower_bound=ctx.lower_bound,
-            use_gate_in_kernel=ctx.use_gate_in_kernel,
+            use_gate_in_kernel=True,
             disable_recompute=True,
             use_exp2=True,
             state_v_first=False,
+            layout="BSND",
         )
 
-        dq, dk, dv = map(_bnsd_to_bsnd, (dq_h, dk_h, dv_h))
-        db, dg = _bhs_to_bsh(db_h), _bnsd_to_bsnd(dg_h)
         if dbias is not None:
             dbias = dbias.reshape(dt_bias.shape)
 
@@ -282,22 +241,22 @@ def chunk_kda_ascendc(
         raise NotImplementedError("chunk_kda_ascendc does not support output_final_state.")
     if kwargs.get("use_beta_sigmoid_in_kernel"):
         raise NotImplementedError("chunk_kda_ascendc expects post-sigmoid beta.")
+    if not use_gate_in_kernel:
+        raise NotImplementedError("chunk_kda_ascendc requires use_gate_in_kernel=True.")
     chunk_size = kwargs.pop("chunk_size", CHUNK_SIZE)
     if chunk_size != CHUNK_SIZE:
         raise ValueError(f"chunk_size must be {CHUNK_SIZE}, got {chunk_size}.")
 
-    A_log = dt_bias = None
-    if use_gate_in_kernel:
-        A_log, dt_bias = kwargs["A_log"], kwargs.get("dt_bias")
-        if A_log.dtype != torch.float32:
-            raise TypeError(f"A_log must be float32, got {A_log.dtype}.")
-        if dt_bias is not None and dt_bias.dtype != torch.float32:
-            raise TypeError(f"dt_bias must be float32, got {dt_bias.dtype}.")
-        if safe_gate:
-            if lower_bound is None:
-                raise ValueError("lower_bound is required when safe_gate=True.")
-            if not -5 <= lower_bound < 0:
-                raise ValueError(f"lower_bound must be in [-5, 0), got {lower_bound}.")
+    A_log, dt_bias = kwargs["A_log"], kwargs.get("dt_bias")
+    if A_log.dtype != torch.float32:
+        raise TypeError(f"A_log must be float32, got {A_log.dtype}.")
+    if dt_bias is not None and dt_bias.dtype != torch.float32:
+        raise TypeError(f"dt_bias must be float32, got {dt_bias.dtype}.")
+    if safe_gate:
+        if lower_bound is None:
+            raise ValueError("lower_bound is required when safe_gate=True.")
+        if not -5 <= lower_bound < 0:
+            raise ValueError(f"lower_bound must be in [-5, 0), got {lower_bound}.")
 
     B, T, H, K = q.shape
     HV, V = v.shape[2], v.shape[3]
@@ -305,10 +264,10 @@ def chunk_kda_ascendc(
         raise ValueError(f"q and k must match, got {tuple(q.shape)} vs {tuple(k.shape)}.")
     if H != HV:
         raise NotImplementedError(f"GVA is unsupported: H={H}, HV={HV}.")
-    if K != 128 or V not in (128, 256):
-        raise NotImplementedError(f"Requires K=128 and V in (128, 256), got K={K}, V={V}.")
-    if q.dtype not in (torch.float16, torch.bfloat16):
-        raise TypeError(f"q must be float16 or bfloat16, got {q.dtype}.")
+    if K != 128 or V != 128:
+        raise NotImplementedError(f"Requires K=V=128, got K={K}, V={V}.")
+    if q.dtype != torch.bfloat16 or k.dtype != q.dtype or v.dtype != q.dtype:
+        raise TypeError("Q, K and V must be bfloat16.")
     if g.shape != (B, T, HV, K):
         raise ValueError(f"g must be {(B, T, HV, K)}, got {tuple(g.shape)}.")
     if beta.shape != (B, T, HV):

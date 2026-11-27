@@ -22,6 +22,7 @@
 import math
 import warnings
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 import torch
@@ -73,6 +74,7 @@ from torch.distributed.distributed_c10d import ProcessGroup
 
 from mindspeed_mm.fsdp.params.parallel_args import EPPlanConfig
 from mindspeed_mm.fsdp.train.training_context import TrainingContext, TrainingStage
+from mindspeed_mm.fsdp.ops.dsa.masked_flash_attention import PoolSelection
 if IS_NPU_AVAILABLE:
     import torch_npu
 
@@ -91,15 +93,26 @@ except ImportError as err:
     _KERNEL_IMPORT_ERROR["kda_ascendc"] = err
 
 try:
+    from mindspeed_mm.fsdp.ops.kda.ascendc.chunk_kda_ascendc_glm import (
+        chunk_kda_ascendc as chunk_kda_bnsd,
+    )
+except ImportError as err:
+    chunk_kda_bnsd = None
+    _KERNEL_IMPORT_ERROR["kda_bnsd"] = err
+
+try:
     from mindspeed_mm.fsdp.models.qwen3_5.causal_conv1d import causal_conv1d
 except ImportError as err:
     causal_conv1d = None
     _KERNEL_IMPORT_ERROR["causal_conv1d_triton"] = err
 
 try:
-    from mindspeed_mm.fsdp.ops.gdn.causal_conv1d_ascendc import causal_conv1d_ascendc
+    from mindspeed_mm.fsdp.ops.gdn.causal_conv1d_ascendc import (
+        causal_conv1d_ascendc, causal_conv1d_qkv_ascendc,
+    )
 except ImportError as err:
     causal_conv1d_ascendc = None
+    causal_conv1d_qkv_ascendc = None
     _KERNEL_IMPORT_ERROR["causal_conv1d_ascendc"] = err
 
 try:
@@ -108,7 +121,8 @@ except ImportError as err:
     hc_split_sinkhorn = None
     _KERNEL_IMPORT_ERROR["hc_sinkhorn"] = err
 
-from mindspeed_mm.fsdp.ops.swiglu import swiglu
+from mindspeed_mm.fsdp.ops.hc.npu_mhc import load_mhc_replay_op, npu_mhc_post, npu_mhc_pre_sinkhorn
+from mindspeed_mm.fsdp.ops.swiglu import clamp_with_fused_backward, swiglu
 
 
 def _require_kernel(kernel, key: str, option: str) -> None:
@@ -124,6 +138,7 @@ def _require_kernel(kernel, key: str, option: str) -> None:
             f"stay on the eager path, or fix the install."
         ) from _KERNEL_IMPORT_ERROR.get(key)
 
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -132,10 +147,13 @@ IMPL_TRITON = "triton"
 IMPL_ASCENDC = "ascendc"
 IMPL_DENSE = "dense"
 IMPL_SFA = "sfa"
+IMPL_MASKED_FA = "masked_fa"
+IMPL_LIGHTNING_INDEXER_V2 = "lightning_indexer_v2"
+IMPL_KEY_POOL_V2 = "key_pool_v2"
 IMPL_FOR_KDA = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC)
 IMPL_FOR_CAUSAL_CONV = (IMPL_EAGER, IMPL_TRITON, IMPL_ASCENDC)
-IMPL_FOR_DSA = (IMPL_DENSE, IMPL_SFA)
-IMPL_FOR_INDEXER = (IMPL_EAGER, IMPL_TRITON)
+IMPL_FOR_DSA = (IMPL_DENSE, IMPL_SFA, IMPL_MASKED_FA)
+IMPL_FOR_INDEXER = (IMPL_EAGER, IMPL_TRITON, IMPL_LIGHTNING_INDEXER_V2, IMPL_KEY_POOL_V2)
 
 
 # @use_kernel_forward_from_hub("RMSNorm")
@@ -189,8 +207,8 @@ class Glm5NextTextMLP(nn.Module):
 
     def forward(self, x):
         gate_up = self.gate_up_proj(x)
-        gate_up = torch.clamp(gate_up, min=self._min_bound.to(gate_up.dtype),
-                              max=self._max_bound.to(gate_up.dtype))
+        gate_up = clamp_with_fused_backward(gate_up, self._min_bound.to(gate_up.dtype),
+                                            self._max_bound.to(gate_up.dtype))
         return self.down_proj(swiglu(gate_up, dim=-1))
 
 
@@ -206,6 +224,8 @@ class Glm5NextTextExperts(nn.Module):
         self.gate_up_proj = nn.Parameter(torch.empty(self.num_experts, 2 * self.intermediate_dim, self.hidden_dim))
         self.down_proj = nn.Parameter(torch.empty(self.num_experts, self.hidden_dim, self.intermediate_dim))
         self.swiglu_limit = config.swiglu_limit
+        self.register_buffer("_min_bound", None, persistent=False)
+        self.register_buffer("_max_bound", None, persistent=False)
 
     def forward(
         self, hidden_states: torch.Tensor, top_k_index: torch.Tensor, top_k_weights: torch.Tensor
@@ -233,7 +253,7 @@ class Glm5NextTextExperts(nn.Module):
         ep_plan: EPPlanConfig,
     ) -> torch.Tensor:
         from mindspeed_mm.fsdp.distributed.expert_parallel.ep_dispatcher import (
-            ep_forward, ep_mc2_forward, ep_allgather_forward,
+            ep_forward, ep_mc2_forward, ep_allgather_forward, ep_mc2_udma_forward,
         )
         from mindspeed_mm.fsdp.distributed.expert_parallel.ep_chunkmoe import ep_chunkmoe_forward
 
@@ -243,10 +263,11 @@ class Glm5NextTextExperts(nn.Module):
         ep_dispatcher_dict = {
             "alltoall": ep_forward,
             "mc2": ep_mc2_forward,
+            "mc2_udma": ep_mc2_udma_forward,
             "allgather": ep_allgather_forward,
             "chunkmoe": ep_chunkmoe_forward,
         }
-        if ep_plan.dispatcher not in ("alltoall", "chunkmoe"):
+        if ep_plan.dispatcher not in ep_dispatcher_dict:
             raise NotImplementedError(
                 f"EP dispatcher {ep_plan.dispatcher} is not implemented for Glm5Next MoE."
             )
@@ -258,19 +279,43 @@ class Glm5NextTextExperts(nn.Module):
         dispatcher_kwargs = {}
         if ep_plan.dispatcher == "chunkmoe":
             dispatcher_kwargs["ep_plan"] = ep_plan
+        routing_weights = (
+            top_k_weights.to(hidden_states.dtype)
+            if (
+                IS_NPU_AVAILABLE
+                and ep_plan.use_npu_fused_ops
+                and hidden_states.dtype == torch.bfloat16
+                and ep_plan.dispatcher in ("chunkmoe", "alltoall", "mc2", "mc2_udma")
+            )
+            else top_k_weights
+        )
         hidden_states = dispatcher_func(
             self.num_experts,
-            top_k_weights,
+            routing_weights,
             top_k_index,
             hidden_states,
             fc1_weight=gate_up_proj.transpose(1, 2),   # (E, 2I, H) -> (E, H, 2I)
             fc2_weight=down_proj.transpose(1, 2),      # (E, H,  I) -> (E, I, H)
             ep_group=ep_group,
             fused=ep_plan.use_npu_fused_ops,
+            activation=partial(self._ep_activation, fused=ep_plan.use_npu_fused_ops),
             swiglu_limit=self.swiglu_limit or 0.0,
             **dispatcher_kwargs,
         )
         return hidden_states.view(orig_shape)
+
+    def _ep_activation(self, gate_up: torch.Tensor, fused: bool) -> torch.Tensor:
+        if self.swiglu_limit is not None and self.swiglu_limit > 0:
+            # Build after materialization so meta initialization and checkpoint loading
+            # cannot leave uninitialized bounds. Reuse them for subsequent chunks.
+            if (self._min_bound is None or self._min_bound.device != gate_up.device
+                    or self._min_bound.dtype != gate_up.dtype):
+                self._min_bound = gate_up.new_full((2 * self.intermediate_dim,), -self.swiglu_limit)
+                self._min_bound[:self.intermediate_dim].fill_(float("-inf"))
+                self._max_bound = gate_up.new_full((2 * self.intermediate_dim,), self.swiglu_limit)
+            clamp = clamp_with_fused_backward if fused else torch.clamp
+            gate_up = clamp(gate_up, self._min_bound, self._max_bound)
+        return swiglu(gate_up, dim=-1, fused=fused)
 
     def _apply_gate(self, gate_up: torch.Tensor) -> torch.Tensor:
         gate, up = gate_up.chunk(2, dim=-1)
@@ -402,13 +447,16 @@ class Glm5NextTextHyperConnection(nn.Module):
         self.hc_eps = config.hc_eps
         self.input_norm = Glm5NextTextUnweightedRMSNorm(eps=config.rms_norm_eps, hidden_size=self.hc_mult * config.hidden_size)
         mix = (2 + self.hc_mult) * self.hc_mult
-        self.fn = nn.Parameter(torch.empty(mix, self.hc_mult * config.hidden_size))
-        self.base = nn.Parameter(torch.empty(mix))
+        self.fn = nn.Parameter(torch.empty(mix, self.hc_mult * config.hidden_size, dtype=torch.float32))
+        self.base = nn.Parameter(torch.empty(mix, dtype=torch.float32))
         # 3 = number of outputs from the mHC mapping: `pre` (input projection
         # weights), `post` (sublayer output projection weights), `comb` (the
         # H×H residual combine matrix that gets Sinkhorn-projected onto the
         # doubly-stochastic manifold). Each output gets its own learned scale.
-        self.scale = nn.Parameter(torch.empty(3))
+        self.scale = nn.Parameter(torch.empty(3, dtype=torch.float32))
+
+        self.mhc_pre_op_replay = getattr(config, "_mhc_pre_op_replay", False)
+        self.use_ascend_mhc = self.mhc_pre_op_replay or getattr(config, "use_ascend_mhc", False)
 
     def forward(self, hidden_streams: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         r"""
@@ -420,6 +468,22 @@ class Glm5NextTextHyperConnection(nn.Module):
         into the sublayer); `post` and `comb` are returned for the caller to
         apply on the sublayer output.
         """
+
+        if self.use_ascend_mhc:
+            if hidden_streams.device.type != "npu":
+                raise RuntimeError("Ascend fused MHC requires hidden_streams on an NPU device.")
+            return npu_mhc_pre_sinkhorn(
+                hidden_streams,
+                self.fn.float(),
+                self.scale.float(),
+                self.base.float(),
+                self.hc_mult,
+                self.hc_sinkhorn_iters,
+                self.hc_eps,
+                self.input_norm.eps,
+                replay=self.mhc_pre_op_replay,
+            )
+
         hc = self.hc_mult
         flat = self.input_norm(hidden_streams.flatten(start_dim=2).float())
         mixes = F.linear(flat, self.fn.float())
@@ -464,8 +528,8 @@ class Glm5NextTextForgetGate(nn.Module):
 
         self.f_a_proj = nn.Linear(config.hidden_size, self.head_dim, bias=False)
         self.f_b_proj = nn.Linear(self.head_dim, self.qkv_dim, bias=False)
-        self.dt_bias = nn.Parameter(torch.empty(self.qkv_dim))
-        self.A_log = nn.Parameter(torch.empty(self.num_heads))
+        self.dt_bias = nn.Parameter(torch.empty(self.qkv_dim, dtype=torch.float32))
+        self.A_log = nn.Parameter(torch.empty(self.num_heads, dtype=torch.float32))
 
         self.safe_gate_lower_bound = config.linear_lower_bound
 
@@ -485,6 +549,16 @@ class Glm5NextTextForgetGate(nn.Module):
         hidden_shape = (*hidden_states.shape[:2], -1, self.head_dim)
 
         forget_gate = self.f_b_proj(self.f_a_proj(hidden_states))
+
+        # The Triton kernel provides only a forward implementation.
+        if (self.safe_gate_lower_bound is not None and forget_gate.device.type == "npu"
+                and forget_gate.numel() and not torch.is_grad_enabled()):
+            from mindspeed_mm.fsdp.ops.forget_gate.forget_gate_triton import fused_safe_gate
+            return fused_safe_gate(
+                forget_gate, self.dt_bias.float(), self.A_log.float(),
+                self.safe_gate_lower_bound, head_dim=self.head_dim,
+            )
+
         g = (forget_gate.float() + self.dt_bias.float().view(1, 1, -1)).view(hidden_shape)
         A_log = self.A_log.float().view(1, 1, self.num_heads, 1)
         decay_rate = torch.exp(A_log)
@@ -510,6 +584,23 @@ class Glm5NextTextRMSNormGated(nn.Module):
 
     def forward(self, hidden_states, gate=None):
         input_dtype = hidden_states.dtype
+        if (
+            IS_NPU_AVAILABLE
+            and gate is not None
+            and input_dtype == torch.bfloat16
+            and self.activation in ("sigmoid", "silu")
+            and not torch.compiler.is_compiling()
+            and type(hidden_states) is torch.Tensor
+            and type(gate) is torch.Tensor
+            and not isinstance(self.weight, DTensor)
+        ):
+            try:
+                from mindspeed_mm.fsdp.ops.rmsnorm_gated.rmsnorm_gated_triton import _supported_inputs, rmsnorm_gated
+            except ImportError:
+                pass
+            else:
+                if _supported_inputs(hidden_states, gate, self.weight):
+                    return rmsnorm_gated(hidden_states, gate, self.weight, self.variance_epsilon, self.activation)
 
         hidden_states = hidden_states.to(torch.float32)
         if IS_NPU_AVAILABLE:
@@ -521,7 +612,8 @@ class Glm5NextTextRMSNormGated(nn.Module):
             hidden_states = self.weight.to(torch.float32) * hidden_states
 
         # Apply gating
-        hidden_states = hidden_states * ACT2FN[self.activation](gate.to(torch.float32))
+        if gate is not None:
+            hidden_states = hidden_states * ACT2FN[self.activation](gate.to(torch.float32))
 
         return hidden_states.to(input_dtype)
 
@@ -816,6 +908,14 @@ class Glm5NextTextLinearAttention(nn.Module):
         hidden_shape = (batch_size, seq_len, -1, self.head_dim)
 
         mixed_qkv = self.qkv_proj(hidden_states)
+        cu_seqlens = kwargs.get("cu_seqlens")
+        # Keep Q/K/V head-major between short convolution and KDA.
+        head_major_qkv = (
+            self.causal_conv1d_implementation == IMPL_ASCENDC
+            and self.kda_implementation == IMPL_ASCENDC
+            and cache_params is None and cu_seqlens is None
+            and self.head_dim == 128 and mixed_qkv.dtype == torch.bfloat16
+        )
 
         # Acts for normal prefill but also for multi-token prefill continue
         use_precomputed_states = cache_params is not None and cache_params.has_previous_state(self.layer_idx)
@@ -823,8 +923,12 @@ class Glm5NextTextLinearAttention(nn.Module):
             conv_state = cache_params.layers[self.layer_idx].conv_states[0]
             recurrent_state = cache_params.layers[self.layer_idx].recurrent_states[0]
 
-        # Single token decode path
-        if use_precomputed_states and seq_len == 1:
+        if head_major_qkv:
+            query, key, value = causal_conv1d_qkv_ascendc(
+                mixed_qkv, self.conv1d.weight.squeeze(1), self.num_heads,
+                bias=self.conv1d.bias, activation=self.activation,
+            )
+        elif use_precomputed_states and seq_len == 1:
             mixed_qkv = causal_conv1d_update(
                 mixed_qkv.transpose(1, 2),
                 conv_state,
@@ -840,7 +944,6 @@ class Glm5NextTextLinearAttention(nn.Module):
                     mixed_qkv.transpose(1, 2), self.layer_idx, conv_kernel_size=self.conv_kernel_size
                 ).transpose(1, 2)
 
-            cu_seqlens = kwargs.get("cu_seqlens")
             cu_seqlens = cu_seqlens.to(dtype=torch.int64) if cu_seqlens is not None else None
 
             if self.causal_conv1d_implementation == IMPL_TRITON:
@@ -879,18 +982,18 @@ class Glm5NextTextLinearAttention(nn.Module):
             # Cut out any tail
             mixed_qkv = mixed_qkv[:, -seq_len:, :]
 
-        query, key, value = torch.split(
-            mixed_qkv,
-            [self.qkv_dim] * 3,
-            dim=-1,
-        )
+        if not head_major_qkv:
+            query, key, value = torch.split(
+                mixed_qkv,
+                [self.qkv_dim] * 3,
+                dim=-1,
+            )
 
-        query = query.view(hidden_shape)
-        key = key.view(hidden_shape)
-        value = value.view(hidden_shape)
+            query = query.view(hidden_shape)
+            key = key.view(hidden_shape)
+            value = value.view(hidden_shape)
 
         # Forget gate and input gate
-        g = self.forget_gate(hidden_states)
         beta = torch.sigmoid(self.b_proj(hidden_states))
 
         # KDA
@@ -910,7 +1013,17 @@ class Glm5NextTextLinearAttention(nn.Module):
         else:
             if self.kda_implementation == IMPL_ASCENDC:
                 g = self.forget_gate.raw(hidden_states).view(hidden_shape)
-                core_attn_out, last_recurrent_state = chunk_kda_ascendc(
+                kda = chunk_kda_ascendc
+                kda_options = {}
+                if head_major_qkv:
+                    _require_kernel(chunk_kda_bnsd, "kda_bnsd", "AscendC BNSD KDA")
+                    kda = chunk_kda_bnsd
+                    kda_options = dict(
+                        qkv_layout="BNSD",
+                        disable_recompute=True,
+                        use_optimized_bwd="Ascend950" in torch_npu.npu.get_device_name(query.device),
+                    )
+                core_attn_out, last_recurrent_state = kda(
                     q=query, k=key, v=value, g=g, beta=beta,
                     initial_state=recurrent_state if use_precomputed_states else None,
                     output_final_state=cache_params is not None,
@@ -919,7 +1032,8 @@ class Glm5NextTextLinearAttention(nn.Module):
                     safe_gate=self.forget_gate.safe_gate_lower_bound is not None,
                     lower_bound=self.forget_gate.safe_gate_lower_bound,
                     A_log=self.forget_gate.A_log.float(),
-                    dt_bias=self.forget_gate.dt_bias.float()
+                    dt_bias=self.forget_gate.dt_bias.float(),
+                    **kda_options,
                 )
             elif self.kda_implementation == (IMPL_TRITON):
                 g = self.forget_gate.raw(hidden_states).view(hidden_shape)
@@ -1011,11 +1125,52 @@ class Glm5NextTextIndexer(nn.Module):
         self.pack_indices_for_sparse_kernel = getattr(config, "dsa_implementation", IMPL_DENSE) == IMPL_SFA
         self.indexer_implementation = getattr(config, "indexer_implementation", IMPL_EAGER)
         self._indexer_score = None
+        self._indexer_expand = None
+        self._key_pool = None
+        self._key_pool_cache_type = None
         if self.indexer_implementation == IMPL_TRITON:
             # Imported here so a build without triton only breaks the path asking for it.
             from mindspeed_mm.fsdp.ops.dsa.lightning_indexer_score import lightning_indexer_score
 
             self._indexer_score = lightning_indexer_score
+        elif self.indexer_implementation in (IMPL_LIGHTNING_INDEXER_V2, IMPL_KEY_POOL_V2):
+            if not IS_NPU_AVAILABLE:
+                raise RuntimeError(f"indexer_implementation='{self.indexer_implementation}' requires an NPU.")
+            try:
+                from cann_ops_transformer import lightning_indexer, lightning_indexer_metadata
+                if self.indexer_implementation == IMPL_KEY_POOL_V2:
+                    from cann_ops_transformer import key_pool
+            except (ImportError, AttributeError) as err:
+                raise RuntimeError(
+                    f"indexer_implementation='{self.indexer_implementation}' requires cann_ops_transformer "
+                    "with LightningIndexerV2, metadata and (for key_pool_v2) KeyPool support."
+                ) from err
+            self._indexer_v2 = lightning_indexer
+            self._indexer_v2_metadata = lightning_indexer_metadata
+            if self.indexer_implementation == IMPL_KEY_POOL_V2:
+                if (self.head_dim != 128 or self.qk_rope_head_dim != 0
+                        or not 1 <= self.n_heads <= 64
+                        or self.index_kpool not in (2, 4, 8, 16, 32, 64, 128)
+                        or not 1024 <= self.hidden_size <= 10240 or self.hidden_size % 512):
+                    raise ValueError("key_pool_v2 requires D=128, no indexer RoPE, 1..64 heads, "
+                                     "pool size 2/4/8/16/32/64/128 and 512-aligned hidden size 1024..10240")
+                self._key_pool = key_pool
+                from mindspeed_mm.fsdp.ops.key_pool_cache import KeyPoolCacheMixin
+                self._key_pool_cache_type = KeyPoolCacheMixin
+            # Keep one BSND plan per layer; lengths encoded in TND tensors can vary
+            # between calls and must not reuse a plan based only on tensor shapes.
+            self._indexer_v2_plan = None
+            self._indexer_v2_plan_key = None
+            self._warned_indexer_v2_mask = False
+            if (getattr(config, "indexer_fused_postprocess", True)
+                    and getattr(config, "dsa_implementation", IMPL_DENSE) == IMPL_SFA):
+                try:
+                    from mindspeed_mm.fsdp.ops.dsa.indexer_postpreprocess import expand_indexer_indices
+                except ImportError:
+                    # The CANN selector can also run in installations without Triton.
+                    pass
+                else:
+                    self._indexer_expand = expand_indexer_indices
 
     @torch.no_grad()
     def forward(
@@ -1024,7 +1179,9 @@ class Glm5NextTextIndexer(nn.Module):
         q_resid: torch.Tensor,
         attention_mask: torch.BoolTensor,
         past_key_values: Cache | None,
-    ) -> torch.LongTensor:
+        indexer_context: dict | None = None,
+        return_pools: bool = False,
+    ) -> torch.LongTensor | PoolSelection:
         """
         Selects the top-k tokens per query for DeepSeek Sparse Attention (DSA) based on grouping pools (and tails).
 
@@ -1033,34 +1190,81 @@ class Glm5NextTextIndexer(nn.Module):
             q_resid: Query residual from `q_a_layernorm(q_a_proj(x))`, shape `[B, S, q_lora_rank]`.
             attention_mask: Local boolean padding mask of shape `[B, S]`.
             past_key_values: Cache object containing the indexer state cache for this layer.
+            indexer_context: Optional precomputed mask metadata shared across layers.
+            return_pools: If True and eligible (`kpool == 4`, `S % 4 == 0`, unpadded or right-padded),
+                return `PoolSelection(pools, valid, num_pools, always_select_tail, valid_lengths)`.
 
         Returns:
-            `torch.Tensor`: the `int32` top-k token indices of shape `[B, S, topk]` (or `[B, S, 2*topk - 1]` with tail).
-            The eager / SDPA paths turn these into an additive sparse mask.
+            `torch.Tensor` or `PoolSelection`: int64 token indices (`[B, S, topk]` or
+            `[B, S, topk + pool_size - 1]`), or `PoolSelection` when `return_pools=True`.
         """
         batch_size, seq_len = hidden_states.shape[:2]
         hidden_shape = (batch_size, seq_len, -1, self.head_dim)
+        # Context belongs to one model invocation. Cached history has its own
+        # validity and must not reuse metadata derived from only the local mask.
+        if past_key_values is not None or (
+            indexer_context is not None and (
+                indexer_context.get("attention_mask") is not attention_mask
+                or (indexer_context.get("mask_version") is not None
+                    and indexer_context["mask_version"] != attention_mask._version)
+            )
+        ):
+            indexer_context = None
+        if (indexer_context is None and past_key_values is None
+                and (self.indexer_implementation in (IMPL_LIGHTNING_INDEXER_V2, IMPL_KEY_POOL_V2) or return_pools)):
+            indexer_context = self.prepare_indexer_context(attention_mask)
+        can_return_pools = (
+            return_pools and past_key_values is None and not self.pack_indices_for_sparse_kernel
+            and self.index_kpool == 4 and seq_len > 0 and seq_len % 4 == 0 and indexer_context is not None
+            and (indexer_context["is_unpadded"] or indexer_context.get("right_padded", False))
+        )
 
         q = self.wq_b(q_resid).view(hidden_shape)
-        k = self.k_norm(self.wk(hidden_states)).view(hidden_shape).squeeze(2)
-
-        gate_scores = F.linear(hidden_states, self.index_kpool_compress_gate)
-        valid_channel = attention_mask.to(k.dtype)[..., None]
-
-        packed_states = torch.cat([k, gate_scores, valid_channel], dim=-1)
-
-        kv_len = seq_len
-        current_length = seq_len
-        if past_key_values is not None:
-            cache_layer = past_key_values.layers[self.layer_idx]
-
-            packed_states = past_key_values.update_indexer(packed_states, self.layer_idx)
-            # Only different on static caches where key is a static full tensor to max len
-            kv_len = cache_layer.keys.shape[-2]
-            current_length = cache_layer.get_seq_length()
-
-        # Get pools based on the valid key entries (based on padding / causality)
-        valid_keys = packed_states[..., -1].bool()
+        # KeyPool fuses projection, LayerNorm, gate and compression. Without a
+        # cache it accepts a complete unpadded sequence; a KeyPool-owned cache
+        # additionally maintains partial pools across decode calls.
+        use_uncached_key_pool = (
+            self._key_pool is not None and past_key_values is None
+            and indexer_context is not None and indexer_context["is_unpadded"]
+            and seq_len >= self.index_kpool
+        )
+        use_cached_key_pool = (
+            self._key_pool_cache_type is not None
+            and isinstance(past_key_values, self._key_pool_cache_type)
+        )
+        if use_uncached_key_pool:
+            pool_keys = self._pool_with_key_pool(hidden_states)
+            num_pools = pool_keys.shape[1]
+            pool_indices = torch.arange(
+                num_pools * self.index_kpool, device=hidden_states.device
+            ).view(1, num_pools, self.index_kpool).expand(batch_size, -1, -1)
+            pool_valid = torch.ones((batch_size, num_pools), dtype=torch.bool, device=hidden_states.device)
+            valid_keys = attention_mask
+            kv_len = current_length = seq_len
+        elif use_cached_key_pool:
+            pool_keys, pool_indices, pool_valid, valid_keys, current_length = self._pool_with_cached_key_pool(
+                hidden_states, attention_mask, past_key_values
+            )
+            kv_len = current_length
+            if pool_keys.shape[1] == 0:
+                return self._key_pool_tail_only(attention_mask, valid_keys, past_key_values)
+        else:
+            k = self.k_norm(self.wk(hidden_states)).view(hidden_shape).squeeze(2)
+            gate_scores = F.linear(hidden_states, self.index_kpool_compress_gate)
+            valid_channel = attention_mask.to(k.dtype)[..., None]
+            packed_states = torch.cat([k, gate_scores, valid_channel], dim=-1)
+            kv_len = seq_len
+            current_length = seq_len
+            if past_key_values is not None:
+                cache_layer = past_key_values.layers[self.layer_idx]
+                packed_states = past_key_values.update_indexer(packed_states, self.layer_idx)
+                # Only different on static caches where key is a static full tensor to max len
+                kv_len = cache_layer.keys.shape[-2]
+                current_length = cache_layer.get_seq_length()
+            valid_keys = packed_states[..., -1].bool()
+            pool_keys, pool_indices, pool_valid = self.get_pooled_states(
+                packed_states=packed_states, indexer_context=indexer_context
+            )
         # Every consumer of `get_visible_tokens` below only ever reads a few columns
         # of it, so the query positions are carried instead of the [B, S, kv_len]
         # boolean tensor -- 67 MB at S=8192, and the index_select over it was the
@@ -1068,40 +1272,65 @@ class Glm5NextTextIndexer(nn.Module):
         query_positions = self.get_query_positions(seq_len, current_length, valid_keys.device)
 
         # Key difference: Score across pools, not on a per token basis
-        pool_keys, pool_indices, pool_valid = self.get_pooled_states(packed_states=packed_states)
-        # Clamp invalid / static pool ends
-        pool_end = pool_indices[..., -1].clamp(0, kv_len - 1)         # [B, P]
-        pool_visible = self.tokens_visible_to_query(pool_end, query_positions, valid_keys)
-        # A pool is selectable only if its final token is visible to the query
-        valid_candidates = pool_visible & pool_valid[:, None]
-
         # Weight per head, pre-scaled the way both scoring paths expect
         weights = self.weights_proj(hidden_states.to(self.weights_proj.weight.dtype)).float() * (self.n_heads**-0.5)
 
-        if self._indexer_score is not None:
-            # The kernel keeps the per-head scores on chip; the eager pair of
-            # matmuls below writes [B, S, NH, P] to memory first -- 2 GB in fp32
-            # at S=8192, and again for the relu and the scale.
-            index_scores = self._indexer_score(q, pool_keys, weights, valid_candidates, self.softmax_scale)
-        else:
-            scores = torch.matmul(q.float(), pool_keys.transpose(-1, -2).float().unsqueeze(1))
-            scores = F.relu(scores * self.softmax_scale)
-
-            # Sum across heads: [B, S, 1, H] @ [B, S, H, P] -> [B, S, P]
-            index_scores = torch.matmul(weights.unsqueeze(-2), scores).squeeze(-2)
-            index_scores = torch.where(
-                valid_candidates, index_scores, torch.finfo(index_scores.dtype).min
+        select_k = min(self.index_topk // self.index_kpool, pool_keys.shape[1])
+        selection = None
+        if self.indexer_implementation in (IMPL_LIGHTNING_INDEXER_V2, IMPL_KEY_POOL_V2):
+            selection = self._select_pools_v2(
+                q, pool_keys, weights, attention_mask, valid_keys, pool_valid, select_k,
+                indexer_context, sort_selected=not can_return_pools,
             )
 
-        # Similar budgeting as in original but compressed by its pool size
-        select_k = min(self.index_topk // self.index_kpool, index_scores.shape[-1])
+        if selection is None:
+            # A pool is selectable only after its final token is visible.
+            # The v2 path handles this internally without a [B, S, P] mask.
+            pool_end = pool_indices[..., -1].clamp(0, kv_len - 1)
+            pool_visible = self.tokens_visible_to_query(pool_end, query_positions, valid_keys)
+            valid_candidates = pool_visible & pool_valid[:, None]
+            if self._indexer_score is not None:
+                index_scores = self._indexer_score(q, pool_keys, weights, valid_candidates, self.softmax_scale)
+            else:
+                scores = torch.matmul(q.float(), pool_keys.transpose(-1, -2).float().unsqueeze(1))
+                scores = F.relu(scores * self.softmax_scale)
+                index_scores = torch.matmul(weights.unsqueeze(-2), scores).squeeze(-2)
+                index_scores = torch.where(
+                    valid_candidates, index_scores, torch.finfo(index_scores.dtype).min
+                )
+            selected = index_scores.topk(select_k, dim=-1).indices
+            selected_valid = valid_candidates.to(torch.int8).gather(-1, selected).bool()
+        else:
+            selected, selected_valid = selection
 
-        # Selection is based on 2 steps
-        #   1. The actual scores (selected indices)
-        #   2. And removing invalid rows based on padding (selected valid)
-        selected = index_scores.topk(select_k, dim=-1).indices
-        selected_valid = valid_candidates.to(torch.int8).gather(-1, selected).bool()
+        if can_return_pools:
+            valid_lengths = None if indexer_context["is_unpadded"] else indexer_context["lengths"]
+            return PoolSelection(
+                selected, selected_valid, pool_keys.shape[1], self.index_kpool_always_select_tail, valid_lengths
+            )
+
         num_pools = pool_indices.shape[1]
+        if self._indexer_expand is not None and indexer_context is not None:
+            metadata = {}
+            if not indexer_context["is_unpadded"]:
+                # This context belongs to the current uncached model invocation.
+                # Reuse the exact mask prefix and first position across indexers.
+                if "postprocess_visible_counts" not in indexer_context:
+                    indexer_context["postprocess_visible_counts"] = attention_mask.cumsum(-1, dtype=torch.int32)
+                    indexer_context["postprocess_first_key"] = attention_mask.to(torch.int32).argmax(-1)
+                metadata = {
+                    "pool_indices": pool_indices,
+                    "attention_mask": attention_mask,
+                    "visible_counts": indexer_context["postprocess_visible_counts"],
+                    "first_key": indexer_context["postprocess_first_key"],
+                }
+            expanded = self._indexer_expand(
+                selected, selected_valid, self.index_topk, self.index_kpool,
+                self.index_kpool_always_select_tail, self.pack_indices_for_sparse_kernel,
+                **metadata,
+            )
+            if expanded is not None:
+                return expanded
         flat_sel = (
             selected
             + torch.arange(batch_size, device=hidden_states.device)[:, None, None] * num_pools
@@ -1145,10 +1374,294 @@ class Glm5NextTextIndexer(nn.Module):
         else:
             topk_indices = torch.where(attention_mask[..., None], topk_indices, -1)
 
-        # if self.layer_idx == 0 and torch.distributed.get_rank() == 0:
-        #     print(f"[idx] select_k={select_k} n_pools={index_scores.shape[-1]} "
-        #           f"valid={(topk_indices >= 0).sum().item()}", flush=True)
         return topk_indices.long()
+
+    def _pool_with_key_pool(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """Compress one complete, unpadded sequence with the CANN KeyPool op."""
+        batch_size, seq_len = hidden_states.shape[:2]
+        block_size = 128
+        blocks_per_row = (seq_len + block_size - 1) // block_size
+        state_cache = torch.zeros(
+            (1 + batch_size * blocks_per_row, block_size, 2 * self.head_dim),
+            dtype=torch.float32, device=hidden_states.device,
+        )
+        block_table = torch.arange(
+            1, 1 + batch_size * blocks_per_row, dtype=torch.int32,
+            device=hidden_states.device,
+        ).view(batch_size, blocks_per_row)
+        start_pos = torch.zeros(batch_size, dtype=torch.int32, device=hidden_states.device)
+        result = self._key_pool(
+            hidden_states.contiguous(), self.wk.weight.contiguous(),
+            self.index_kpool_compress_gate.contiguous(),
+            self.index_kpool_compress_ape.float().contiguous(),
+            state_cache, block_table, start_pos,
+            norm_weight=self.k_norm.weight.float().contiguous(),
+            norm_bias=self.k_norm.bias.float().contiguous(),
+            norm_eps=self.k_norm.eps, cmp_ratio=self.index_kpool,
+        )
+        # KeyPool's BSH output has ceil(S/R) capacity; the incomplete last
+        # pool is uninitialized and must not become a candidate.
+        return result[:, :seq_len // self.index_kpool].contiguous()
+
+    def _pool_with_cached_key_pool(self, hidden_states, attention_mask, cache):
+        """Append valid tokens to each row's paged K/G state and completed pools."""
+        from mindspeed_mm.fsdp.ops.key_pool_cache import PoolLayer, PoolRow
+
+        batch_size, seq_len = hidden_states.shape[:2]
+        layer = cache.key_pool_states.get(self.layer_idx)
+        if layer is None:
+            layer = PoolLayer(rows=[PoolRow() for _ in range(batch_size)])
+            cache.key_pool_states[self.layer_idx] = layer
+        if layer.failed or len(layer.rows) != batch_size:
+            raise RuntimeError("KeyPool cache is invalid; reset it or use a new cache")
+        current_length = int(cache.layers[self.layer_idx].get_seq_length())
+        if current_length != layer.raw_length + seq_len:
+            raise ValueError("Main KV and KeyPool lengths differ")
+
+        runs = []
+        for b, bits in enumerate(attention_mask.detach().cpu().tolist()):
+            valid = [i for i, bit in enumerate(bits) if bit]
+            if not valid:
+                runs.append((0, 0))
+                continue
+            lo, hi = valid[0], valid[-1] + 1
+            if hi - lo != len(valid):
+                raise ValueError("KeyPool cache requires contiguous valid tokens")
+            row = layer.rows[b]
+            if row.first_slot is not None and layer.raw_length + lo != row.first_slot + row.length:
+                raise ValueError("KeyPool cache cannot resume after a padding gap")
+            runs.append((lo, hi))
+
+        layer.failed = True
+        block_size = 128
+        for b, (lo, hi) in enumerate(runs):
+            if lo == hi:
+                continue
+            row = layer.rows[b]
+            count = hi - lo
+            end = row.length + count
+            needed = (end + block_size - 1) // block_size
+            old_blocks = 0 if row.state_cache is None else row.state_cache.shape[0] - 1
+            if needed > old_blocks:
+                capacity = max(needed, max(1, 2 * old_blocks))
+                buffer = torch.zeros(
+                    (capacity + 1, block_size, 2 * self.head_dim),
+                    dtype=torch.float32, device=hidden_states.device,
+                )
+                if row.state_cache is not None:
+                    buffer[:old_blocks + 1].copy_(row.state_cache)
+                row.state_cache = buffer
+            table = torch.arange(1, needed + 1, dtype=torch.int32, device=hidden_states.device)[None]
+            start = torch.tensor([row.length], dtype=torch.int32, device=hidden_states.device)
+            result = self._key_pool(
+                hidden_states[b, lo:hi].unsqueeze(0).contiguous(),
+                self.wk.weight.contiguous(), self.index_kpool_compress_gate.contiguous(),
+                self.index_kpool_compress_ape.float().contiguous(),
+                row.state_cache, table, start,
+                norm_weight=self.k_norm.weight.float().contiguous(),
+                norm_bias=self.k_norm.bias.float().contiguous(),
+                norm_eps=self.k_norm.eps, cmp_ratio=self.index_kpool,
+            )
+            completed = end // self.index_kpool - row.length // self.index_kpool
+            new_pools = result[0, :completed].contiguous()
+            if row.pools is None:
+                row.pools = new_pools
+            elif completed:
+                row.pools = torch.cat((row.pools, new_pools), dim=0)
+            if row.first_slot is None:
+                row.first_slot = layer.raw_length + lo
+            row.length = end
+
+        pool_count = max(row.length // self.index_kpool for row in layer.rows)
+        pool_keys = hidden_states.new_zeros((batch_size, pool_count, self.head_dim))
+        pool_indices = torch.full(
+            (batch_size, pool_count, self.index_kpool), -1,
+            dtype=torch.long, device=hidden_states.device,
+        )
+        pool_valid = torch.zeros((batch_size, pool_count), dtype=torch.bool, device=hidden_states.device)
+        valid_keys = torch.zeros((batch_size, current_length), dtype=torch.bool, device=hidden_states.device)
+        offsets = torch.arange(self.index_kpool, device=hidden_states.device)
+        for b, row in enumerate(layer.rows):
+            if row.first_slot is None:
+                continue
+            valid_keys[b, row.first_slot:row.first_slot + row.length] = True
+            n = row.length // self.index_kpool
+            if n:
+                pool_keys[b, :n] = row.pools
+                pool_indices[b, :n] = row.first_slot + torch.arange(n, device=hidden_states.device)[:, None] * self.index_kpool + offsets
+                pool_valid[b, :n] = True
+        layer.raw_length = current_length
+        layer.failed = False
+        return pool_keys, pool_indices, pool_valid, valid_keys, current_length
+
+    def _key_pool_tail_only(self, attention_mask, valid_keys, cache):
+        """No completed pool exists yet; expose only the current partial tail."""
+        layer = cache.key_pool_states[self.layer_idx]
+        batch_size, seq_len = attention_mask.shape
+        width = self.index_topk + (self.index_kpool - 1 if self.index_kpool_always_select_tail
+                                   and not self.pack_indices_for_sparse_kernel else 0)
+        result = torch.full((batch_size, seq_len, width), -1,
+                            dtype=torch.long, device=attention_mask.device)
+        if self.index_kpool_always_select_tail:
+            query_positions = self.get_query_positions(seq_len, layer.raw_length, attention_mask.device)
+            visible_count = self.count_visible_tokens(query_positions, valid_keys)
+            first = torch.tensor(
+                [row.first_slot if row.first_slot is not None else layer.raw_length for row in layer.rows],
+                dtype=torch.long, device=attention_mask.device,
+            )
+            offsets = torch.arange(self.index_kpool - 1, device=attention_mask.device)
+            tail = first[:, None, None] + offsets[None, None, :]
+            valid = (offsets[None, None, :] < visible_count[..., None]) & attention_mask[..., None]
+            result[..., :self.index_kpool - 1] = torch.where(valid, tail, -1)
+        if self.pack_indices_for_sparse_kernel:
+            result = torch.where(attention_mask[..., None], result, torch.zeros_like(result))
+        return result
+
+    @staticmethod
+    def prepare_indexer_context(attention_mask: torch.BoolTensor) -> dict:
+        """Inspect a local mask once, then share the result across full indexers.
+
+        Never cache this dictionary across model invocations: a new batch may
+        update mask values in place without changing its shape or allocation.
+        """
+        context = {"attention_mask": attention_mask, "is_unpadded": bool(attention_mask.all())}
+        context["mask_version"] = None if torch.is_inference(attention_mask) else attention_mask._version
+        if not context["is_unpadded"]:
+            runs = attention_mask[:, :1].long().sum(-1) + (
+                attention_mask[:, 1:] & ~attention_mask[:, :-1]
+            ).long().sum(-1)
+            context["contiguous"] = bool((runs <= 1).all())
+            context["lengths"] = attention_mask.sum(-1, dtype=torch.int32)
+            context["right_padded"] = context["contiguous"] and bool(
+                (attention_mask[:, 0] | (context["lengths"] == 0)).all()
+            )
+        return context
+
+    def _select_pools_v2(
+        self,
+        q: torch.Tensor,
+        pool_keys: torch.Tensor,
+        weights: torch.Tensor,
+        attention_mask: torch.BoolTensor,
+        valid_keys: torch.BoolTensor,
+        pool_valid: torch.BoolTensor,
+        select_k: int,
+        indexer_context: dict | None = None,
+        sort_selected: bool = True,
+    ) -> tuple[torch.Tensor, torch.BoolTensor] | None:
+        """Select complete pools with the compressed right-down causal mask.
+
+        The operator reconstructs raw KV length as pool_count * ratio + residual.
+        TND packing removes padding so each query sequence is the suffix of its
+        valid KV sequence. Masks with interior holes need the eager candidate mask.
+        """
+        batch_size, seq_len = q.shape[:2]
+        output_shape = (batch_size, seq_len, select_k)
+        out_dtype = torch.long if sort_selected else torch.int32
+        if select_k == 0:
+            return (
+                torch.zeros(output_shape, dtype=out_dtype, device=q.device),
+                torch.zeros(output_shape, dtype=torch.bool, device=q.device),
+            )
+        if q.dtype not in (torch.bfloat16, torch.float16) or pool_keys.dtype != q.dtype:
+            raise TypeError("lightning_indexer_v2 requires matching BF16 or FP16 query and pool keys.")
+
+        packed_query_mask = None
+        is_unpadded = indexer_context["is_unpadded"] if indexer_context is not None else bool(
+            attention_mask.all() & valid_keys.all()
+        )
+        if is_unpadded:
+            # This includes unpadded prefill, chunked prefill and dynamic-cache
+            # decode. The plan also depends on the raw tail, not just pool count.
+            layout = "BSND"
+            key_length = valid_keys.shape[-1]
+            plan_key = (q.device, batch_size, seq_len, pool_keys.shape[1], key_length, select_k)
+            if self._indexer_v2_plan_key != plan_key:
+                residual = torch.full(
+                    (batch_size,), key_length % self.index_kpool, dtype=torch.int32, device=q.device
+                ) if self.index_kpool > 1 else None
+                metadata = self._indexer_v2_metadata(
+                    self.n_heads, 1, self.head_dim, select_k,
+                    cmp_residual_k=residual, batch_size=batch_size,
+                    max_seqlen_q=seq_len, max_seqlen_k=pool_keys.shape[1],
+                    layout_q=layout, layout_k=layout, mask_mode=3, cmp_ratio=self.index_kpool,
+                )
+                self._indexer_v2_plan = (metadata, residual)
+                self._indexer_v2_plan_key = plan_key
+            metadata, residual = self._indexer_v2_plan
+            op_kwargs = {"cmp_residual_k": residual}
+            op_q = q.contiguous()
+            op_k = pool_keys.unsqueeze(2).contiguous()
+            op_w = (weights * self.softmax_scale).contiguous()
+        else:
+            if indexer_context is None:
+                key_runs = valid_keys[:, :1].long().sum(-1) + (valid_keys[:, 1:] & ~valid_keys[:, :-1]).long().sum(-1)
+                query_runs = attention_mask[:, :1].long().sum(-1) + (
+                    attention_mask[:, 1:] & ~attention_mask[:, :-1]
+                ).long().sum(-1)
+                contiguous = bool((key_runs <= 1).all() & (query_runs <= 1).all())
+            else:
+                contiguous = indexer_context["contiguous"]
+            if not contiguous:
+                if not self._warned_indexer_v2_mask:
+                    logger.warning("lightning_indexer_v2 falls back to eager for masks with interior holes.")
+                    self._warned_indexer_v2_mask = True
+                return None
+
+            layout = "TND"
+            key_lengths = valid_keys.sum(-1, dtype=torch.int32) if indexer_context is None else indexer_context["lengths"]
+            query_lengths = attention_mask.sum(-1, dtype=torch.int32) if indexer_context is None else key_lengths
+            pool_counts = key_lengths // self.index_kpool
+            active = (query_lengths > 0) & (pool_counts > 0)
+            active_query_lengths = query_lengths[active]
+            active_pool_counts = pool_counts[active]
+            active_batch_size = active_query_lengths.numel()
+            if active_batch_size == 0:
+                return (
+                    torch.zeros(output_shape, dtype=out_dtype, device=q.device),
+                    torch.zeros(output_shape, dtype=torch.bool, device=q.device),
+                )
+
+            packed_query_mask = attention_mask & active[:, None]
+            packed_pool_mask = pool_valid & active[:, None]
+            op_q = q[packed_query_mask].contiguous()
+            op_k = pool_keys[packed_pool_mask].unsqueeze(1).contiguous()
+            op_w = (weights[packed_query_mask] * self.softmax_scale).contiguous()
+            zero = torch.zeros(1, dtype=torch.int32, device=q.device)
+            op_kwargs = {
+                "cu_seqlens_q": torch.cat((zero, active_query_lengths.cumsum(0, dtype=torch.int32))),
+                "cu_seqlens_k": torch.cat((zero, active_pool_counts.cumsum(0, dtype=torch.int32))),
+                "cmp_residual_k": key_lengths[active].remainder(self.index_kpool)
+                if self.index_kpool > 1 else None,
+            }
+            metadata = self._indexer_v2_metadata(
+                self.n_heads, 1, self.head_dim, select_k, **op_kwargs,
+                batch_size=active_batch_size, max_seqlen_q=seq_len,
+                max_seqlen_k=pool_keys.shape[1], layout_q=layout, layout_k=layout,
+                mask_mode=3, cmp_ratio=self.index_kpool,
+            )
+
+        indices, values = self._indexer_v2(
+            op_q, op_k, op_w, select_k, **op_kwargs, metadata=metadata,
+            layout_q=layout, layout_k=layout, mask_mode=3,
+            cmp_ratio=self.index_kpool, return_value=int(sort_selected),
+        )
+        if sort_selected:
+            # V2 does not guarantee descending score order. Tail budget truncation
+            # must still discard tokens from the lowest-scoring selected pool first.
+            order = values.argsort(dim=-1, descending=True, stable=True)
+            indices = indices.gather(-1, order).squeeze(-2).long()
+        else:
+            indices = indices.squeeze(-2)
+        valid = indices.ge(0) & indices.lt(pool_keys.shape[1])
+        safe_indices = indices.clamp(0, pool_keys.shape[1] - 1)
+        if packed_query_mask is not None:
+            selected = torch.zeros(output_shape, dtype=safe_indices.dtype, device=q.device)
+            selected_valid = torch.zeros(output_shape, dtype=torch.bool, device=q.device)
+            selected[packed_query_mask] = safe_indices
+            selected_valid[packed_query_mask] = valid
+            return selected, selected_valid
+        return safe_indices, valid
 
     def _gather_rows(self, source: torch.Tensor, flat_index: torch.Tensor) -> torch.Tensor:
         if IS_NPU_AVAILABLE:
@@ -1222,6 +1735,7 @@ class Glm5NextTextIndexer(nn.Module):
     def get_pooled_states(
         self,
         packed_states: torch.Tensor,
+        indexer_context: dict | None = None,
     ) -> tuple[torch.Tensor, torch.LongTensor, torch.BoolTensor]:
         """
         (Re-)Build compressed k-pool candidates from the packed state.
@@ -1246,6 +1760,26 @@ class Glm5NextTextIndexer(nn.Module):
             [self.head_dim, self.head_dim, 1],
             dim=-1,
         )
+        if indexer_context is not None and indexer_context["is_unpadded"]:
+            # Every complete group is valid and starts at raw token zero. Keep
+            # the same FP32 softmax -> input-dtype product -> reduction order as
+            # the general path; changing the intermediate rounding can reorder
+            # near-tied Top-K candidates.
+            batch_size, seq_len = keys.shape[:2]
+            num_pools = seq_len // self.index_kpool
+            pool_indices = torch.arange(
+                num_pools * self.index_kpool, device=keys.device
+            ).view(1, num_pools, self.index_kpool).expand(batch_size, -1, -1)
+            pool_valid = torch.ones((batch_size, num_pools), dtype=torch.bool, device=keys.device)
+            if num_pools == 0:
+                return keys[:, :0], pool_indices, pool_valid
+            grouped_keys = keys[:, :num_pools * self.index_kpool].reshape(
+                batch_size, num_pools, self.index_kpool, self.head_dim
+            )
+            grouped_gates = gate_scores[:, :num_pools * self.index_kpool].reshape_as(grouped_keys)
+            logits = grouped_gates.float() + self.index_kpool_compress_ape.float()[None, None]
+            probabilities = torch.nan_to_num(logits.softmax(dim=2)).to(grouped_keys.dtype)
+            return (probabilities * grouped_keys).sum(dim=2), pool_indices, pool_valid
         valid_keys = valid_keys.bool().squeeze(-1)
 
         # Metadata
@@ -1333,8 +1867,11 @@ class Glm5NextTextIndexer(nn.Module):
         tail_count = visible_count.remainder(self.index_kpool)
 
         positions = torch.arange(width, device=topk_indices.device).view(1, 1, -1)
-        history_indices = positions.clamp(max=history_width - 1).expand(*topk_indices.shape[:2], -1)
-        topk_indices = topk_indices.gather(-1, history_indices)
+        if history_width:
+            history_indices = positions.clamp(max=history_width - 1).expand(*topk_indices.shape[:2], -1)
+            topk_indices = topk_indices.gather(-1, history_indices)
+        else:
+            topk_indices = topk_indices.new_full((*topk_indices.shape[:2], width), -1)
 
         # Selected pools are already packed to the front: topk orders by score and
         # the invalid pools carry finfo.min, so they sort last.
@@ -1523,6 +2060,12 @@ class Glm5NextTextAttention(nn.Module):
             from mindspeed_mm.fsdp.ops.dsa.sfa_wrapper import sparse_flash_attention
 
             self._sparse_flash_attention = sparse_flash_attention
+        elif self.dsa_implementation == IMPL_MASKED_FA:
+            if (self.qk_head_dim, self.v_head_dim, self.qk_rope_head_dim, self.attention_dropout) != (256, 256, 0, 0):
+                raise ValueError("masked_fa requires 256-dimensional Q/K/V heads, NoPE and zero attention dropout.")
+            from mindspeed_mm.fsdp.ops.dsa.masked_flash_attention import masked_flash_attention
+
+            self._masked_flash_attention = masked_flash_attention
 
     def expand_kv(self, kv_nope: torch.Tensor, k_rot: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Expands the compressed latents into key and value states. Args:
@@ -1549,6 +2092,7 @@ class Glm5NextTextAttention(nn.Module):
         attention_mask: torch.Tensor | None,
         past_key_values: Cache | None = None,
         prev_topk_indices: torch.Tensor | None = None,
+        indexer_context: dict | None = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
         batch_size, seq_length = hidden_states.shape[:-1]
@@ -1563,13 +2107,12 @@ class Glm5NextTextAttention(nn.Module):
         k_pass = self.kv_a_layernorm(kv_pass).view(batch_size, 1, seq_length, self.kv_lora_rank)
         k_rot = k_rot.view(batch_size, 1, seq_length, self.qk_rope_head_dim)
 
-        use_sfa = self.dsa_implementation == IMPL_SFA
-        if use_sfa:
-            # The absorbed path never materialises per-head K/V, so there is
-            # nothing to hand to the MLA cache.
+        use_sparse_attention = self.dsa_implementation in (IMPL_SFA, IMPL_MASKED_FA)
+        if use_sparse_attention:
+            # These paths prepare their own K/V and do not populate an MLA cache.
             if past_key_values is not None and past_key_values.get_seq_length(self.layer_idx) > 0:
                 raise NotImplementedError(
-                    "dsa_implementation='sfa' does not support decoding from an MLA KV cache."
+                    f"dsa_implementation='{self.dsa_implementation}' does not support decoding from an MLA KV cache."
                 )
             key_states = value_states = None
         else:
@@ -1585,13 +2128,19 @@ class Glm5NextTextAttention(nn.Module):
                 q_resid=q_resid,
                 attention_mask=attention_mask,
                 past_key_values=past_key_values,
+                indexer_context=indexer_context,
+                return_pools=(
+                    self.dsa_implementation == IMPL_MASKED_FA
+                    and not self.next_skip_topk
+                    and past_key_values is None
+                ),
             )
         else:
             if prev_topk_indices is None:
                 raise ValueError("Shared DSA layers require top-k indices from a previous full indexer layer.")
             topk_indices = prev_topk_indices
 
-        if use_sfa:
+        if use_sparse_attention:
             attn_output = self.sparse_attention_from_topk(query_states, k_pass, topk_indices)
             attn_weights = None
         else:
@@ -1646,9 +2195,9 @@ class Glm5NextTextAttention(nn.Module):
         self,
         query_states: torch.Tensor,
         k_pass: torch.Tensor,
-        topk_indices: torch.Tensor,
+        topk_indices: torch.Tensor | PoolSelection,
     ) -> torch.Tensor:
-        """Attend over the indexer's selected keys without building a dense mask.
+        """Attend over the indexer's selected keys with the configured sparse backend.
 
         `npu_sparse_flash_attention` only accepts the absorbed MLA layout: one
         shared latent as both key and value, with `W_UK` folded into the query.
@@ -1660,6 +2209,15 @@ class Glm5NextTextAttention(nn.Module):
         the return is [B, Q_S, N, v_head_dim], the layout the dense path produces.
         """
         w_uk, w_uv = self.absorbed_kv_weights()
+        if self.dsa_implementation == IMPL_MASKED_FA:
+            return self._masked_flash_attention(
+                query_states.transpose(1, 2),
+                k_pass.transpose(1, 2),
+                w_uk.to(query_states.dtype),
+                w_uv.to(query_states.dtype),
+                topk_indices,
+                self.scaling,
+            )
 
         # [B, N, S, qk_nope] x [N, qk_nope, kv_lora] -> [B, S, N, kv_lora]
         query = torch.einsum("bnsd,ndc->bsnc", query_states, w_uk.to(query_states.dtype))
@@ -1748,6 +2306,7 @@ class Glm5NextTextDecoderLayer(GradientCheckpointingLayer):
         use_cache: bool | None = False,
         position_embeddings: tuple[torch.Tensor, torch.Tensor] | None = None,
         prev_topk_indices: torch.Tensor | None = None,
+        indexer_context: dict | None = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         dtype = hidden_states.dtype
@@ -1773,20 +2332,27 @@ class Glm5NextTextDecoderLayer(GradientCheckpointingLayer):
                 use_cache=use_cache,
                 position_embeddings=position_embeddings,
                 prev_topk_indices=prev_topk_indices,
+                indexer_context=indexer_context,
                 **kwargs,
             )
-        hidden_states = post.to(dtype).unsqueeze(-1) * hidden_states.unsqueeze(-2) + torch.matmul(
-            comb.to(dtype).transpose(-1, -2), residual
-        )
+        if self.attn_hc.use_ascend_mhc:
+            hidden_states = npu_mhc_post(hidden_states, residual, post, comb).to(dtype)
+        else:
+            hidden_states = post.to(dtype).unsqueeze(-1) * hidden_states.unsqueeze(-2) + torch.matmul(
+                comb.to(dtype).transpose(-1, -2), residual
+            )
 
         residual = hidden_states
         post, comb, hidden_states = self.ffn_hc(hidden_states)
         # Feed forward
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
-        hidden_states = post.to(dtype).unsqueeze(-1) * hidden_states.unsqueeze(-2) + torch.matmul(
-            comb.to(dtype).transpose(-1, -2), residual
-        )
+        if self.ffn_hc.use_ascend_mhc:
+            hidden_states = npu_mhc_post(hidden_states, residual, post, comb).to(dtype)
+        else:
+            hidden_states = post.to(dtype).unsqueeze(-1) * hidden_states.unsqueeze(-2) + torch.matmul(
+                comb.to(dtype).transpose(-1, -2), residual
+            )
 
         return hidden_states, topk_indices
 
@@ -1908,7 +2474,11 @@ class Glm5NextTextModel(Glm5NextPreTrainedModel):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
         if use_cache and past_key_values is None:
-            past_key_values = DynamicCache(config=self.config)
+            if getattr(self.config, "indexer_implementation", IMPL_EAGER) == IMPL_KEY_POOL_V2:
+                from mindspeed_mm.fsdp.ops.key_pool_cache import KeyPoolDynamicCache
+                past_key_values = KeyPoolDynamicCache(config=self.config)
+            else:
+                past_key_values = DynamicCache(config=self.config)
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -1943,6 +2513,16 @@ class Glm5NextTextModel(Glm5NextPreTrainedModel):
                 "linear_attention": attention_mask,
             }
 
+        # Inspect the common mask once rather than synchronizing the host in
+        # every full indexer. History-dependent cache validity stays per layer.
+        if (
+            getattr(self.config, "indexer_implementation", IMPL_EAGER) in (IMPL_LIGHTNING_INDEXER_V2, IMPL_KEY_POOL_V2)
+            or getattr(self.config, "dsa_implementation", IMPL_DENSE) == IMPL_MASKED_FA
+        ):
+            kwargs["indexer_context"] = (
+                Glm5NextTextIndexer.prepare_indexer_context(causal_mask_mapping["deepseek_sparse_attention"])
+                if past_key_values is None else None
+            )
         hidden_states = inputs_embeds.unsqueeze(2).expand(-1, -1, self.config.hc_mult, -1).contiguous()
 
         topk_indices = None
@@ -1986,7 +2566,7 @@ class Glm5NextVisionMLP(nn.Module):
         gate_up = torch.cat([self.gate_proj.weight, self.up_proj.weight], dim=0)
         bias = torch.cat([self.gate_proj.bias, self.up_proj.bias]) if self.gate_proj.bias is not None else None
         gate_up = torch.nn.functional.linear(hidden_state, gate_up, bias)
-        gate_up = torch.clamp(gate_up, min=self._min_bound.to(gate_up.dtype), max=self._max_bound.to(gate_up.dtype))
+        gate_up = clamp_with_fused_backward(gate_up, self._min_bound.to(gate_up.dtype), self._max_bound.to(gate_up.dtype))
         # swiglu() is npu_swiglu on NPU and eager silu(x1) * x2 off it -- same
         # dispatch Glm5NextTextMLP uses, so the two MLPs stay in step.
         return self.down_proj(swiglu(gate_up, dim=-1))
@@ -2215,6 +2795,26 @@ class Glm5NextVisionPatchEmbed(nn.Module):
         return hidden_states
 
 
+class _Glm5NextVisionDownsample(nn.Conv2d):
+    """Exact F.linear fast path for kernel-sized 2D patch-merge convolutions."""
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if (
+            type(self) is _Glm5NextVisionDownsample
+            and not isinstance(self.weight, DTensor)
+            and self.groups == 1
+            and self.padding == (0, 0)
+            and self.dilation == (1, 1)
+            and x.ndim == 4
+            and x.shape[1] == self.in_channels
+            and x.shape[2:] == self.kernel_size
+        ):
+            weight = self.weight.permute(0, 2, 3, 1).reshape(self.out_channels, -1)
+            out = F.linear(x.permute(0, 2, 3, 1).reshape(x.shape[0], -1), weight, self.bias)
+            return out.view(x.shape[0], self.out_channels, 1, 1)
+        return super().forward(x)
+
+
 @auto_docstring
 class Glm5NextVisionModel(Glm5NextPreTrainedModel):
     config: Glm5NextVisionConfig
@@ -2240,7 +2840,7 @@ class Glm5NextVisionModel(Glm5NextPreTrainedModel):
             hidden_act=config.hidden_act,
             swiglu_limit=config.swiglu_limit,
         )
-        self.downsample = nn.Conv2d(
+        self.downsample = _Glm5NextVisionDownsample(
             in_channels=config.hidden_size,
             out_channels=config.out_hidden_size,
             kernel_size=config.spatial_merge_size,
@@ -2637,6 +3237,25 @@ class Glm5NextForConditionalGeneration(Glm5NextPreTrainedModel, GenerationMixin)
             _require_kernel(causal_conv1d_ascendc, "causal_conv1d_ascendc",
                             "causal_conv1d_implementation='ascendc'")
         transformer_config.text_config.causal_conv1d_implementation = causal_conv1d_implementation
+        if hasattr(model_args, "mhc_pre_op_replay"):
+            logger.warning(
+                "model.mhc_pre_op_replay is deprecated and ignored. "
+                "Use op_replay_scopes to configure mHC replay."
+            )
+        recompute_plan = getattr(feature_args, "recompute_plan", None)
+        has_mhc_replay_scope = any(
+            "cann_ops_transformer.mhc_pre_sinkhorn.default" in (scope.cache_ops or [])
+            for scope in getattr(recompute_plan, "op_replay_scopes", [])
+        )
+        mhc_pre_op_replay = (
+            getattr(feature_args, "recompute", False)
+            and not getattr(recompute_plan, "use_reentrant", False)
+            and has_mhc_replay_scope
+        )
+        if mhc_pre_op_replay:
+            load_mhc_replay_op()
+        transformer_config.text_config.use_ascend_mhc = getattr(model_args, "use_ascend_mhc", False)
+        transformer_config.text_config._mhc_pre_op_replay = mhc_pre_op_replay
         # dsa impl
         dsa_implementation = getattr(model_args, "dsa_implementation", IMPL_DENSE).lower().strip()
         if dsa_implementation not in IMPL_FOR_DSA:
@@ -2651,6 +3270,7 @@ class Glm5NextForConditionalGeneration(Glm5NextPreTrainedModel, GenerationMixin)
                 f"Invalid indexer_implementation='{indexer_implementation}'. Must be one of: {IMPL_FOR_INDEXER}."
             )
         transformer_config.text_config.indexer_implementation = indexer_implementation
+        transformer_config.text_config.indexer_fused_postprocess = getattr(model_args, "indexer_fused_postprocess", True)
         # transformer_config.vision_config._attn_implementation = "flash_attention_2"
         # transformer_config.text_config._attn_implementation = getattr(model_args, "attn_implementation", "sdpa")
         return transformer_config
