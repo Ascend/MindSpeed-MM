@@ -120,7 +120,7 @@ class MultiOptimizer(Optimizer, Stateful):
         merged: Dict[str, Any] = {}
         for name in self.key_names:
             opt = self.optimizers_dict.get(name)
-            # A member may adapt its own checkpoint entries (see CpuSparseAdam.state_dict_for).
+            # A member may adapt its own checkpoint entries (see Muon.prepare_checkpoint_load).
             if hasattr(opt, "state_dict_for"):
                 sd = opt.state_dict_for(self.model)
             else:
@@ -131,15 +131,13 @@ class MultiOptimizer(Optimizer, Stateful):
                 raise KeyError(
                     f"Key clash detected while merging state dict for optimizer '{name}': {', '.join(sorted(overlap))}"
                 )
-            else:
-                logger.info("No clashes when merging MultiOptimizer state dicts")
             merged.update(sd)
 
         return merged
 
     def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
-        # Every member gets the whole merged dict and keeps the entries of its own parameters; a member
-        # that adapts its entries (see CpuSparseAdam.load_state_dict_for) takes them back on its own.
+        # Every member gets the whole merged dict and keeps the entries of its own parameters; a
+        # member that adapts its entries (see Muon.load_state_dict_for) takes them back on its own.
         for name in self.key_names:
             opt = self.optimizers_dict.get(name)
             if hasattr(opt, "load_state_dict_for"):
@@ -289,13 +287,9 @@ def build_optimizer(
             logger.info(f"Parameters without weight decay: {no_decay_parameter_names}")
             param_groups.append({"params": no_decay_parameters, "weight_decay": 0.0})
 
-    cpu_sparse = None
-    hooks = getattr(model, "_cpu_sparse_hooks", None)
-    if host_params and hooks is not None:
-        # Only a model that keeps an n-gram table in host memory needs the extra member.
-        cpu_sparse = build_cpu_sparse_member(
-            [param for _, param in host_params], lr=lr, betas=betas, eps=eps, hooks=hooks
-        )
+    # Only a model that keeps its embeddings in host memory needs the extra member.
+    cpu_sparse = build_cpu_sparse_member(getattr(model, "_cpu_sparse_params", None),
+                                         lr=lr, betas=betas, eps=eps)
 
     if optimizer_type == "muon":
         param_groups = _mark_muon_param_groups(
@@ -576,12 +570,10 @@ def build_ep_fsdp2_optimizer(
         optimizer_dict["non_ep"] = _build(non_ep_groups, "non_ep")
     # The cpu embeddings are in none of the groups above: their rows live in cpu memory and the sparse
     # optimizer consumes the row ledger directly.
-    hooks = getattr(model, "_cpu_sparse_hooks", None)
-    if host_params and hooks is not None:
-        # Only a model that keeps an n-gram table in host memory needs the extra member.
-        optimizer_dict[CPU_SPARSE_KEY] = build_cpu_sparse_member(
-            [param for _, param in host_params], lr=lr, betas=betas, eps=eps, hooks=hooks
-        )
+    sparse_member = build_cpu_sparse_member(getattr(model, "_cpu_sparse_params", None),
+                                            lr=lr, betas=betas, eps=eps)
+    if sparse_member is not None:
+        optimizer_dict[CPU_SPARSE_KEY] = sparse_member
 
     # cache for EP-aware grad clipping helpers
     model._ep_param_groups = {

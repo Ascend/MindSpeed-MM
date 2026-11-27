@@ -113,14 +113,20 @@ class ParallelState(metaclass=Singleton):
         self.register_funcs(self.ep_fsdp_device_mesh, mesh_dim_names)
 
 
-        # create VP/VDP groups
-        mesh_dim_names = ('vdp', 'vp')
+        # create VP/VDP groups. ``vfsdp`` is the size-one shard dim FSDP adopts for the host table.
+        mesh_dim_names = ("vp", "vfsdp", "vdp")
         mesh_shape = (self.vocab_parallel_size,)
         self.vocab_data_parallel_size = get_last_mesh_dim(mesh_shape)
-        mesh_shape = (self.vocab_data_parallel_size,) + mesh_shape
+        mesh_shape = (self.vocab_parallel_size, 1, self.vocab_data_parallel_size)
 
         self.vocab_device_mesh = init_device_mesh(device_type=get_device_type(), mesh_shape=mesh_shape, mesh_dim_names=mesh_dim_names)
         self.register_funcs(self.vocab_device_mesh, mesh_dim_names)
+
+        # The host table's metadata uses the same layout on a cpu mesh: FSDP adopts it through the
+        # size-one vfsdp shard without moving the table to the accelerator.
+        self.vocab_host_mesh = init_device_mesh(
+            device_type="cpu", mesh_shape=mesh_shape, mesh_dim_names=mesh_dim_names
+        )
 
         if torch.distributed.get_rank() == 0:
             logger.info(f'Parallel state initialized:\n {self.__str__()}')

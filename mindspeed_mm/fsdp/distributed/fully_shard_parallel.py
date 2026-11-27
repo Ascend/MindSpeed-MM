@@ -86,8 +86,6 @@ def fully_shard_parallel_modules(model: torch.nn.Module, fsdp_mesh: DeviceMesh, 
 
     # Get modules and parameters that should be ignored for FSDP
     ignored_modules, ignored_params = get_ignored_modules(model, fsdp_plan)
-    # Host-resident params (the huge engram vocab embedding) stay out of FSDP
-    ignored_params = ignored_params | {param for _, param in get_host_resident_params(model)}
     # Get modules that should have FSDP applied
     fsdp_modules = get_fsdp_modules(model, fsdp_plan, ignored_modules)
     # Get modules that FSDP hook add (only needed for 2.7.1/2.9.0 patched fully_shard)

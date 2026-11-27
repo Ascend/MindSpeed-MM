@@ -240,8 +240,8 @@ def get_vocab_embeddings(model) -> list:
     per-step callers do not walk the module tree. Without vocabulary parallelism the cache is absent and
     the list is empty, which is what the VP-off paths (optimizer, clipping, checkpoint keys) read.
     """
-    cache = getattr(model, "_vocab_embeddings", None)
-    return [] if cache is None else cache["host"]
+    cache = getattr(model, "_vocab_embeddings", None) or ()
+    return [(name, embedding) for name, embedding in cache if embedding._vp_host_resident]
 
 
 def get_device_vocab_embeddings(model) -> list:
@@ -249,8 +249,8 @@ def get_device_vocab_embeddings(model) -> list:
 
     Reads the cache ``vocab_parallelize_modules`` leaves behind, like ``get_vocab_embeddings``.
     """
-    cache = getattr(model, "_vocab_embeddings", None)
-    return [] if cache is None else cache["device"]
+    cache = getattr(model, "_vocab_embeddings", None) or ()
+    return [(name, embedding) for name, embedding in cache if not embedding._vp_host_resident]
 
 
 class _HostRowLookup(torch.autograd.Function):
@@ -262,7 +262,7 @@ class _HostRowLookup(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, weight, indices, accumulator, device, async_copy, ready):
+    def forward(ctx, weight, indices, accumulator, device, async_copy, ready, grad_sink):
         ctx.accumulator = accumulator
         ctx.save_for_backward(indices)
         rows, event = fetch_rows_from_host(weight, indices, device, async_copy=async_copy)
@@ -274,7 +274,7 @@ class _HostRowLookup(torch.autograd.Function):
     def backward(ctx, grad_output):
         (indices,) = ctx.saved_tensors
         ctx.accumulator.add(indices, grad_output)
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
 
 def host_row_lookup(
@@ -286,7 +286,11 @@ def host_row_lookup(
     ready: list | None = None,
 ):
     """Look up ``indices`` rows of the host-resident ``weight``; gradients go to ``accumulator``."""
-    return _HostRowLookup.apply(weight, indices, accumulator, device, async_copy, ready)
+    # The table is read from a detached local view (no DTensor autograd node, which would make the
+    # backward materialize a full-table gradient just to discard it), so the lookup needs one tiny
+    # grad-carrying input to keep its backward on the graph and fill the ledger.
+    grad_sink = torch.empty((), device=device, requires_grad=True)
+    return _HostRowLookup.apply(weight, indices, accumulator, device, async_copy, ready, grad_sink)
 
 
 def finalize_vocab_gradients(model) -> None:
@@ -330,16 +334,3 @@ def sum_replica_gradients(embedding) -> None:
         torch.distributed.all_reduce(local, group=group)
         return
     torch.distributed.all_reduce(local, group=group)
-
-
-def prepare_sparse_optimizer_step(model) -> None:
-    """Attach each embedding's pending sparse gradient to ``weight.grad``."""
-    for _, embedding in get_vocab_embeddings(model):
-        embedding.weight.grad = embedding._vp_row_grad.pending_sparse_grad()
-
-
-def clear_sparse_gradient(model) -> None:
-    """Drop the pending gradients once the optimizer has consumed them."""
-    for _, embedding in get_vocab_embeddings(model):
-        embedding.weight.grad = None
-        embedding._vp_row_grad.clear()

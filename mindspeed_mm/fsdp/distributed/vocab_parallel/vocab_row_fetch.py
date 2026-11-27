@@ -35,8 +35,14 @@ class HostRowFetcher:
     def fetch(self, module, received_ids, plan, async_copy: bool = True):
         """Return ``(rows, event)``; ``event`` is None when the copy is blocking."""
         ready = []
+        weight = module.weight
+        if isinstance(weight, DTensor):
+            # The lookup does not backpropagate into the table (the ledger collects the row gradients),
+            # so leave the DTensor out of the autograd graph: to_local() under grad mode would make the
+            # backward materialize a full-table gradient just to discard it.
+            weight = weight.to_local().detach()
         rows = host_row_lookup(
-            module.weight,
+            weight,
             received_ids,
             module._vp_row_grad,
             received_ids.device,
