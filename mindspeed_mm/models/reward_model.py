@@ -25,6 +25,7 @@ from megatron.core.tensor_parallel.mappings import scatter_to_sequence_parallel_
 
 from mindspeed_mm.models.vision.vlm_attentionmask_for_llm import prepare_positionsids_mask_for_llm
 from mindspeed_mm.models.vlm_model import VLMModel
+from mindspeed_mm.utils.reward_pooling import mean_pool_logits
 
 
 class Qwen2VLRewardModelBT(VLMModel):
@@ -135,9 +136,7 @@ class Qwen2VLRewardModelBT(VLMModel):
             if self.reward_token == "last":
                 pooled_logits = logits[torch.arange(batch_size, device=logits.device), sequence_lengths]
             elif self.reward_token == "mean":
-                # get the mean of all valid tokens' logits
-                valid_lengths = torch.clamp(sequence_lengths, min=0, max=logits.size(1) - 1)
-                pooled_logits = torch.stack([logits[i, :valid_lengths[i]].mean(dim=0) for i in range(batch_size)])
+                pooled_logits = mean_pool_logits(logits, sequence_lengths)
             elif self.reward_token == "special":
                 # create a mask for special tokens
                 special_token_mask = torch.zeros_like(input_ids, dtype=torch.bool)
