@@ -120,7 +120,7 @@ python -m pip install --force-reinstall --no-deps ./flash_linear_attention_npu*.
 ```bash
 git clone https://github.com/flashserve/flash-linear-attention-npu
 cd flash-linear-attention-npu
-git checkout v26.9.1
+git checkout v26.10.0-release
 ```
 
 安装步骤：可参考fla-npu仓README：[flash-linear-attention-npu](https://github.com/flashserve/flash-linear-attention-npu/blob/v26.6.0/README.md)
