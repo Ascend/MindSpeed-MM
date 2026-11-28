@@ -12,9 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+
 import torch
 
-from mindspeed_mm.utils.reward_pooling import mean_pool_logits
+_POOLING_MODULE_PATH = (
+    Path(__file__).parents[3] / "mindspeed_mm" / "utils" / "reward_pooling.py"
+)
+_POOLING_SPEC = spec_from_file_location("reward_pooling", _POOLING_MODULE_PATH)
+_POOLING_MODULE = module_from_spec(_POOLING_SPEC)
+_POOLING_SPEC.loader.exec_module(_POOLING_MODULE)
+mean_pool_logits = _POOLING_MODULE.mean_pool_logits
 
 
 def test_mean_pool_includes_last_valid_token_for_padded_batch():
